@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import styled from "styled-components";
+import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { Card } from "@andertal/ui";
 
 const Container = styled.div`
@@ -22,6 +24,8 @@ const Section = styled(Card)`
 `;
 
 export default function ReportsPage() {
+  const locale = useLocale();
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const [exporting, setExporting] = useState("");
 
   const runExport = async (format) => {
@@ -29,7 +33,7 @@ export default function ReportsPage() {
       setExporting(format);
       const token = typeof window !== "undefined" ? localStorage.getItem("sellerToken") : null;
       if (!token) {
-        alert("Please login again.");
+        alert(t("Please login again.", "Lutfen tekrar giris yapin.", "Veuillez vous reconnecter.", "Inicia sesion de nuevo.", "Accedi di nuovo.", "Bitte erneut einloggen."));
         return;
       }
       const response = await fetch("/api/import-export/export", {
@@ -41,7 +45,7 @@ export default function ReportsPage() {
           format,
         }),
       });
-      if (!response.ok) throw new Error(`Export failed (${response.status})`);
+      if (!response.ok) throw new Error(`${t("Export failed", "Disa aktarma basarisiz", "Export echoue", "Exportacion fallida", "Esportazione non riuscita", "Export fehlgeschlagen")} (${response.status})`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -52,7 +56,7 @@ export default function ReportsPage() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(e?.message || "Export failed");
+      alert(e?.message || t("Export failed", "Disa aktarma basarisiz", "Export echoue", "Exportacion fallida", "Esportazione non riuscita", "Export fehlgeschlagen"));
     } finally {
       setExporting("");
     }
@@ -60,10 +64,10 @@ export default function ReportsPage() {
 
   return (
     <Container>
-      <Title>Reports</Title>
+      <Title>{t("Reports", "Raporlar", "Rapports", "Informes", "Report", "Berichte")}</Title>
       <Section>
-        <h2>Generate and download reports</h2>
-        <p>Sales reports, tax reports, and more.</p>
+        <h2>{t("Generate and download reports", "Rapor olustur ve indir", "Generer et telecharger des rapports", "Generar y descargar informes", "Genera e scarica report", "Berichte erstellen und herunterladen")}</h2>
+        <p>{t("Sales reports, tax reports, and more.", "Satis raporlari, vergi raporlari ve daha fazlasi.", "Rapports de ventes, fiscaux et plus.", "Informes de ventas, impuestos y mas.", "Report vendite, fiscali e altro.", "Verkaufsberichte, Steuerberichte und mehr.")}</p>
         <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
           <button
             onClick={() => runExport("xlsx")}
@@ -78,7 +82,7 @@ export default function ReportsPage() {
               fontWeight: 600,
             }}
           >
-            {exporting === "xlsx" ? "Exporting..." : "Export XLSX"}
+            {exporting === "xlsx" ? t("Exporting...", "Aktariliyor...", "Export en cours...", "Exportando...", "Esportazione...", "Exportiere...") : "Export XLSX"}
           </button>
           <button
             onClick={() => runExport("csv")}
@@ -93,7 +97,7 @@ export default function ReportsPage() {
               fontWeight: 600,
             }}
           >
-            {exporting === "csv" ? "Exporting..." : "Export CSV"}
+            {exporting === "csv" ? t("Exporting...", "Aktariliyor...", "Export en cours...", "Exportando...", "Esportazione...", "Exportiere...") : "Export CSV"}
           </button>
         </div>
       </Section>

@@ -3,6 +3,8 @@
 import React from "react";
 import styled from "styled-components";
 import { Card, Button } from "@andertal/ui";
+import { useLocale } from "next-intl";
+import { getUploadTemplatesCopy } from "@/lib/products-pages-i18n";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -97,16 +99,19 @@ const downloadTemplate = (type) => {
 };
 
 export default function UploadTemplatesPage() {
+  const locale = useLocale();
+  const copy = getUploadTemplatesCopy(locale);
+
   return (
     <Container>
-      <Title>Upload Templates</Title>
+      <Title>{copy.title}</Title>
 
       <Section>
         <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-          Available Templates
+          {copy.available}
         </h2>
         <p style={{ color: "#6b7280", marginBottom: "24px" }}>
-          Download templates to ensure your data is formatted correctly for bulk uploads
+          {copy.subtitle}
         </p>
 
         <TemplateGrid>
@@ -114,13 +119,13 @@ export default function UploadTemplatesPage() {
             <TemplateIcon>
               <i className="fas fa-file-csv" />
             </TemplateIcon>
-            <TemplateTitle>Product Upload Template</TemplateTitle>
+            <TemplateTitle>{copy.productTemplateTitle}</TemplateTitle>
             <TemplateDescription>
-              Use this template for bulk product uploads. Includes all required fields and formatting guidelines.
+              {copy.productTemplateDesc}
             </TemplateDescription>
             <Button onClick={() => downloadTemplate("products")} fullWidth>
               <i className="fas fa-download" style={{ marginRight: "8px" }} />
-              Download Template
+              {copy.download}
             </Button>
           </TemplateCard>
 
@@ -128,13 +133,13 @@ export default function UploadTemplatesPage() {
             <TemplateIcon>
               <i className="fas fa-images" />
             </TemplateIcon>
-            <TemplateTitle>Bulk Images Template</TemplateTitle>
+            <TemplateTitle>{copy.imageTemplateTitle}</TemplateTitle>
             <TemplateDescription>
-              Template for uploading multiple product images at once. Link images to products by SKU.
+              {copy.imageTemplateDesc}
             </TemplateDescription>
             <Button onClick={() => downloadTemplate("images")} fullWidth>
               <i className="fas fa-download" style={{ marginRight: "8px" }} />
-              Download Template
+              {copy.download}
             </Button>
           </TemplateCard>
 
@@ -142,13 +147,13 @@ export default function UploadTemplatesPage() {
             <TemplateIcon>
               <i className="fas fa-video" />
             </TemplateIcon>
-            <TemplateTitle>Bulk Videos Template</TemplateTitle>
+            <TemplateTitle>{copy.videoTemplateTitle}</TemplateTitle>
             <TemplateDescription>
-              Template for uploading product videos. Include video URLs and thumbnail images.
+              {copy.videoTemplateDesc}
             </TemplateDescription>
             <Button onClick={() => downloadTemplate("videos")} fullWidth>
               <i className="fas fa-download" style={{ marginRight: "8px" }} />
-              Download Template
+              {copy.download}
             </Button>
           </TemplateCard>
         </TemplateGrid>

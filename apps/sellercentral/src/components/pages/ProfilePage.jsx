@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
+import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { Card, Button, Input } from "@andertal/ui";
 
 const Container = styled.div`
@@ -63,6 +65,8 @@ const FormRow = styled.div`
 `;
 
 export default function ProfilePage() {
+  const locale = useLocale();
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const [formData, setFormData] = useState({
     storeName: "",
     email: "",
@@ -86,7 +90,7 @@ export default function ProfilePage() {
     if (formData.storeName && typeof window !== "undefined") {
       localStorage.setItem("storeName", formData.storeName.trim());
     }
-    alert("Profile updated successfully!");
+    alert(t("Profile updated successfully!", "Profil başarıyla güncellendi!", "Profil mis a jour avec succes !", "Perfil actualizado correctamente!", "Profilo aggiornato con successo!", "Profil erfolgreich aktualisiert!"));
   };
 
   const getUserInitials = () => {
@@ -106,19 +110,19 @@ export default function ProfilePage() {
 
   return (
     <Container>
-      <Title>Profile</Title>
+      <Title>{t("Profile", "Profil", "Profil", "Perfil", "Profilo", "Profil")}</Title>
 
       <Section>
         <AvatarSection>
           <Avatar>{getUserInitials()}</Avatar>
           <AvatarInfo>
             <h2 style={{ fontSize: "24px", fontWeight: "600", color: "#1f2937", marginBottom: "8px" }}>
-              {formData.storeName || "Seller Account"}
+              {formData.storeName || t("Seller Account", "Satici Hesabi", "Compte vendeur", "Cuenta de vendedor", "Account venditore", "Verkauferkonto")}
             </h2>
             <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "16px" }}>{formData.email}</p>
             <Button variant="outline" style={{ padding: "8px 16px", fontSize: "14px" }}>
               <i className="fas fa-camera" style={{ marginRight: "8px" }} />
-              Change Avatar
+              {t("Change Avatar", "Avatari degistir", "Changer l'avatar", "Cambiar avatar", "Cambia avatar", "Avatar andern")}
             </Button>
           </AvatarInfo>
         </AvatarSection>
@@ -126,14 +130,14 @@ export default function ProfilePage() {
         <Form onSubmit={handleSubmit}>
           <FormRow>
             <Input
-              label="Store Name *"
+              label={t("Store Name *", "Magaza Adi *", "Nom de la boutique *", "Nombre de la tienda *", "Nome negozio *", "Shopname *")}
               type="text"
               value={formData.storeName}
               onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
               required
             />
             <Input
-              label="Email *"
+              label={t("Email *", "E-posta *", "E-mail *", "Correo electronico *", "Email *", "E-Mail *")}
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -143,13 +147,13 @@ export default function ProfilePage() {
 
           <FormRow>
             <Input
-              label="Phone"
+              label={t("Phone", "Telefon", "Telephone", "Telefono", "Telefono", "Telefon")}
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             />
             <Input
-              label="Website"
+              label={t("Website", "Web sitesi", "Site web", "Sitio web", "Sito web", "Webseite")}
               type="url"
               value={formData.website}
               onChange={(e) => setFormData({ ...formData, website: e.target.value })}
@@ -157,7 +161,7 @@ export default function ProfilePage() {
           </FormRow>
 
           <Input
-            label="Address"
+            label={t("Address", "Adres", "Adresse", "Direccion", "Indirizzo", "Adresse")}
             type="text"
             value={formData.address}
             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -165,13 +169,13 @@ export default function ProfilePage() {
 
           <FormRow>
             <Input
-              label="City"
+              label={t("City", "Sehir", "Ville", "Ciudad", "Citta", "Stadt")}
               type="text"
               value={formData.city}
               onChange={(e) => setFormData({ ...formData, city: e.target.value })}
             />
             <Input
-              label="Country"
+              label={t("Country", "Ulke", "Pays", "Pais", "Paese", "Land")}
               type="text"
               value={formData.country}
               onChange={(e) => setFormData({ ...formData, country: e.target.value })}
@@ -179,7 +183,7 @@ export default function ProfilePage() {
           </FormRow>
 
           <Input
-            label="Postal Code"
+            label={t("Postal Code", "Posta Kodu", "Code postal", "Codigo postal", "CAP", "Postleitzahl")}
             type="text"
             value={formData.postalCode}
             onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
@@ -187,7 +191,7 @@ export default function ProfilePage() {
 
           <div>
             <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
-              Description
+              {t("Description", "Aciklama", "Description", "Descripcion", "Descrizione", "Beschreibung")}
             </label>
             <textarea
               value={formData.description}
@@ -200,16 +204,16 @@ export default function ProfilePage() {
                 minHeight: "120px",
                 fontFamily: "inherit",
               }}
-              placeholder="Tell us about your store..."
+              placeholder={t("Tell us about your store...", "Magazanizdan kisaca bahsedin...", "Parlez-nous de votre boutique...", "Cuentanos sobre tu tienda...", "Parlaci del tuo negozio...", "Erzahlen Sie uns von Ihrem Shop...")}
             />
           </div>
 
           <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
             <Button type="button" variant="outline">
-              Cancel
+              {t("Cancel", "Iptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}
             </Button>
             <Button type="submit">
-              Save Changes
+              {t("Save Changes", "Degisiklikleri kaydet", "Enregistrer les modifications", "Guardar cambios", "Salva modifiche", "Anderungen speichern")}
             </Button>
           </div>
         </Form>

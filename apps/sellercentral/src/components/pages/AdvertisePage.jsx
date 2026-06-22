@@ -4,6 +4,8 @@ import React from "react";
 import styled from "styled-components";
 import { Card } from "@andertal/ui";
 import Link from "next/link";
+import { useLocale } from "next-intl";
+import { getAdvertisePageCopy } from "@/lib/advertise-pages-i18n";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -73,47 +75,49 @@ const ConnectButton = styled.div`
 `;
 
 export default function AdvertisePage() {
+  const locale = useLocale();
+  const copy = getAdvertisePageCopy(locale);
   const platforms = [
     {
       name: "Google Ads",
       href: "/advertise/google",
       icon: "fab fa-google",
       color: "#4285F4",
-      description: "Reach customers through Google Search and Display Network",
+      description: copy.googleDesc,
     },
     {
       name: "Meta (Facebook/Instagram)",
       href: "/advertise/meta",
       icon: "fab fa-facebook",
       color: "#1877F2",
-      description: "Advertise on Facebook and Instagram to reach your target audience",
+      description: copy.metaDesc,
     },
     {
       name: "TikTok Ads",
       href: "/advertise/tiktok",
       icon: "fab fa-tiktok",
       color: "#000000",
-      description: "Create engaging video ads on TikTok",
+      description: copy.tiktokDesc,
     },
     {
       name: "Pinterest Ads",
       href: "/advertise/pinterest",
       icon: "fab fa-pinterest",
       color: "#BD081C",
-      description: "Promote your products on Pinterest",
+      description: copy.pinterestDesc,
     },
   ];
 
   return (
     <Container>
-      <Title>Advertise</Title>
+      <Title>{copy.title}</Title>
 
       <Section>
         <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-          Connect Your Advertising Accounts
+          {copy.heading}
         </h2>
         <p style={{ color: "#6b7280", marginBottom: "24px" }}>
-          Link your advertising accounts to manage campaigns and track performance from one place
+          {copy.subtitle}
         </p>
 
         <PlatformGrid>
@@ -125,7 +129,7 @@ export default function AdvertisePage() {
                 </PlatformIcon>
                 <PlatformTitle>{platform.name}</PlatformTitle>
                 <PlatformDescription>{platform.description}</PlatformDescription>
-                <ConnectButton>Connect Account</ConnectButton>
+                <ConnectButton>{copy.connectAccount}</ConnectButton>
               </PlatformCard>
             </Link>
           ))}

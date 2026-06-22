@@ -15,13 +15,15 @@ import {
   Modal,
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { userError } from "@/lib/api-error-messages";
 
 const fmtDate = (v, locale) => {
   if (!v) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return new Date(v).toLocaleDateString(loc);
 };
 
@@ -47,17 +49,17 @@ function CouponRow({ c, onToggle, onRemove, onEdit, sellerLabel, ui, locale }) {
           </InlineStack>
           <Text tone="subdued" as="span">
             {c.discount_type === "fixed" ? `${(Number(c.discount_value || 0) / 100).toFixed(2)} €` : `${c.discount_value}%`} |
-            {locale === "en" ? "Min" : locale === "tr" ? "Min" : "Min"}: {(Number(c.min_subtotal_cents || 0) / 100).toFixed(2)} € |
-            {locale === "en" ? "Usage" : locale === "tr" ? "Kullanım" : "Nutzung"}: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""} |
-            {locale === "en" ? "Expires" : locale === "tr" ? "Bitiş" : "Ablauf"}: {fmtDate(c.expires_at, locale)}
+            {lt(locale, "Min", "Min", "Min", "Min", "Min", "Min")}: {(Number(c.min_subtotal_cents || 0) / 100).toFixed(2)} € |
+            {lt(locale, "Usage", "Kullanım", "Usage", "Usage", "Usage", "Nutzung")}: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""} |
+            {lt(locale, "Expires", "Bitiş", "Expires", "Expires", "Expires", "Ablauf")}: {fmtDate(c.expires_at, locale)}
           </Text>
           {sellerLabel ? (
-            <Text tone="subdued" as="span" variant="bodySm">{locale === "en" ? "Seller" : locale === "tr" ? "Satıcı" : "Verkäufer"}: {sellerLabel}</Text>
+            <Text tone="subdued" as="span" variant="bodySm">{lt(locale, "Seller", "Satıcı", "Seller", "Seller", "Seller", "Verkäufer")}: {sellerLabel}</Text>
           ) : null}
         </BlockStack>
         <InlineStack gap="200">
           <Button size="slim" onClick={() => onEdit(c)}>{ui.edit}</Button>
-          <Button size="slim" onClick={() => onToggle(c)}>{c.active ? (locale === "en" ? "Deactivate" : locale === "tr" ? "Devre dışı bırak" : "Deaktivieren") : (locale === "en" ? "Activate" : locale === "tr" ? "Etkinleştir" : "Aktivieren")}</Button>
+          <Button size="slim" onClick={() => onToggle(c)}>{c.active ? (lt(locale, "Deactivate", "Devre dışı bırak", "Deactivate", "Deactivate", "Deactivate", "Deaktivieren")) : (lt(locale, "Activate", "Etkinleştir", "Activate", "Activate", "Activate", "Aktivieren"))}</Button>
           <Button size="slim" tone="critical" variant="plain" onClick={() => onRemove(c.id)}>{ui.delete}</Button>
         </InlineStack>
       </InlineStack>
@@ -127,7 +129,7 @@ export default function CouponsPage() {
       const res = await getMedusaAdminClient().getCoupons();
       setCoupons(Array.isArray(res?.coupons) ? res.coupons : []);
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not load coupons." : locale === "tr" ? "Kuponlar yüklenemedi." : "Coupons konnten nicht geladen werden.") });
+      setMsg({ tone: "critical", text: userError(e, locale, "Could not load coupons.") });
     } finally {
       setLoading(false);
     }
@@ -151,7 +153,7 @@ export default function CouponsPage() {
   const submit = async () => {
     const dVal = discountValueForCreateApi();
     if (dVal == null || dVal <= 0) {
-      setMsg({ tone: "warning", text: locale === "en" ? "Please enter a valid discount value." : locale === "tr" ? "Lütfen geçerli bir indirim değeri girin." : "Bitte einen gültigen Rabattwert eingeben." });
+      setMsg({ tone: "warning", text: lt(locale, "Please enter a valid discount value.", "Lütfen geçerli bir indirim değeri girin.", "Please enter a valid discount value.", "Please enter a valid discount value.", "Please enter a valid discount value.", "Bitte einen gültigen Rabattwert eingeben.") });
       return;
     }
     setSaving(true);
@@ -166,10 +168,10 @@ export default function CouponsPage() {
         expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
       });
       setForm({ code: "", discount_type: "percent", discount_value: "", min_subtotal_cents: "", usage_limit: "", expires_at: "" });
-      setMsg({ tone: "success", text: locale === "en" ? "Coupon created." : locale === "tr" ? "Kupon oluşturuldu." : "Coupon erstellt." });
+      setMsg({ tone: "success", text: lt(locale, "Coupon created.", "Kupon oluşturuldu.", "Coupon created.", "Coupon created.", "Coupon created.", "Coupon erstellt.") });
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not create coupon." : locale === "tr" ? "Kupon oluşturulamadı." : "Coupon konnte nicht erstellt werden.") });
+      setMsg({ tone: "critical", text: userError(e, locale, "Could not create coupon.") });
     } finally {
       setSaving(false);
     }
@@ -208,12 +210,12 @@ export default function CouponsPage() {
     if (!editingId) return;
     const code = editForm.code.trim();
     if (!code) {
-      setMsg({ tone: "warning", text: locale === "en" ? "Please enter a code." : locale === "tr" ? "Lütfen bir kod girin." : "Bitte einen Code eingeben." });
+      setMsg({ tone: "warning", text: lt(locale, "Please enter a code.", "Lütfen bir kod girin.", "Please enter a code.", "Please enter a code.", "Please enter a code.", "Bitte einen Code eingeben.") });
       return;
     }
     const raw = Number(editForm.discount_value || 0);
     if (!Number.isFinite(raw) || raw <= 0) {
-      setMsg({ tone: "warning", text: locale === "en" ? "Please enter a valid discount value." : locale === "tr" ? "Lütfen geçerli bir indirim değeri girin." : "Bitte einen gültigen Rabattwert eingeben." });
+      setMsg({ tone: "warning", text: lt(locale, "Please enter a valid discount value.", "Lütfen geçerli bir indirim değeri girin.", "Please enter a valid discount value.", "Please enter a valid discount value.", "Please enter a valid discount value.", "Bitte einen gültigen Rabattwert eingeben.") });
       return;
     }
     const discountValue =
@@ -230,11 +232,11 @@ export default function CouponsPage() {
         usage_limit: editForm.usage_limit === "" ? null : Number(editForm.usage_limit),
         expires_at: editForm.expires_at ? new Date(editForm.expires_at).toISOString() : null,
       });
-      setMsg({ tone: "success", text: locale === "en" ? "Coupon updated." : locale === "tr" ? "Kupon güncellendi." : "Coupon aktualisiert." });
+      setMsg({ tone: "success", text: lt(locale, "Coupon updated.", "Kupon güncellendi.", "Coupon updated.", "Coupon updated.", "Coupon updated.", "Coupon aktualisiert.") });
       closeEdit();
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not update coupon." : locale === "tr" ? "Kupon güncellenemedi." : "Coupon konnte nicht aktualisiert werden.") });
+      setMsg({ tone: "critical", text: userError(e, locale, "Could not update coupon.") });
     } finally {
       setEditSaving(false);
     }
@@ -245,17 +247,17 @@ export default function CouponsPage() {
       await getMedusaAdminClient().updateCoupon(c.id, { active: !c.active });
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not change status." : locale === "tr" ? "Durum değiştirilemedi." : "Status konnte nicht geändert werden.") });
+      setMsg({ tone: "critical", text: userError(e, locale, "Could not change status.") });
     }
   };
 
   const remove = async (id) => {
-    if (!(await confirmDelete(locale === "en" ? "Delete coupon?" : locale === "tr" ? "Kuponu sil?" : "Coupon löschen?"))) return;
+    if (!(await confirmDelete(lt(locale, "Delete coupon?", "Kuponu sil?", "Delete coupon?", "Delete coupon?", "Delete coupon?", "Coupon löschen?")))) return;
     try {
       await getMedusaAdminClient().deleteCoupon(id);
       await load();
     } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Could not delete coupon." : locale === "tr" ? "Kupon silinemedi." : "Coupon konnte nicht gelöscht werden.") });
+      setMsg({ tone: "critical", text: userError(e, locale, "Could not delete coupon.") });
     }
   };
 
@@ -267,16 +269,16 @@ export default function CouponsPage() {
     return sellerNameById[c.seller_id] || null;
   };
 
-  const typeLabel = locale === "en" ? "Type" : locale === "tr" ? "Tür" : "Typ";
-  const percentLabel = locale === "en" ? "Percent" : locale === "tr" ? "Yüzde" : "Prozent";
-  const fixedLabel = locale === "en" ? "Fixed (€)" : locale === "tr" ? "Sabit (€)" : "Fix (€)";
-  const valuePercentLabel = locale === "en" ? "Value (%)" : locale === "tr" ? "Değer (%)" : "Wert (%)";
-  const valueEuroLabel = locale === "en" ? "Value (€)" : locale === "tr" ? "Değer (€)" : "Wert (€)";
-  const minOrderLabel = locale === "en" ? "Minimum order value (€)" : locale === "tr" ? "Minimum sipariş tutarı (€)" : "Mindestbestellwert (€)";
-  const usageLimitLabel = locale === "en" ? "Usage limit (optional)" : locale === "tr" ? "Kullanım limiti (isteğe bağlı)" : "Nutzungslimit (optional)";
-  const expiryLabel = locale === "en" ? "Expiry date (optional)" : locale === "tr" ? "Bitiş tarihi (isteğe bağlı)" : "Ablaufdatum (optional)";
-  const createTitle = locale === "en" ? "Create coupon" : locale === "tr" ? "Kupon oluştur" : "Coupon erstellen";
-  const editModalTitle = locale === "en" ? "Edit coupon" : locale === "tr" ? "Kuponu düzenle" : "Coupon bearbeiten";
+  const typeLabel = lt(locale, "Type", "Tür", "Type", "Type", "Type", "Typ");
+  const percentLabel = lt(locale, "Percent", "Yüzde", "Percent", "Percent", "Percent", "Prozent");
+  const fixedLabel = lt(locale, "Fixed (€)", "Sabit (€)", "Fixed (€)", "Fixed (€)", "Fixed (€)", "Fix (€)");
+  const valuePercentLabel = lt(locale, "Value (%)", "Değer (%)", "Value (%)", "Value (%)", "Value (%)", "Wert (%)");
+  const valueEuroLabel = lt(locale, "Value (€)", "Değer (€)", "Value (€)", "Value (€)", "Value (€)", "Wert (€)");
+  const minOrderLabel = lt(locale, "Minimum order value (€)", "Minimum sipariş tutarı (€)", "Minimum order value (€)", "Minimum order value (€)", "Minimum order value (€)", "Mindestbestellwert (€)");
+  const usageLimitLabel = lt(locale, "Usage limit (optional)", "Kullanım limiti (isteğe bağlı)", "Usage limit (optional)", "Usage limit (optional)", "Usage limit (optional)", "Nutzungslimit (optional)");
+  const expiryLabel = lt(locale, "Expiry date (optional)", "Bitiş tarihi (isteğe bağlı)", "Expiry date (optional)", "Expiry date (optional)", "Expiry date (optional)", "Ablaufdatum (optional)");
+  const createTitle = lt(locale, "Create coupon", "Kupon oluştur", "Create coupon", "Create coupon", "Create coupon", "Coupon erstellen");
+  const editModalTitle = lt(locale, "Edit coupon", "Kuponu düzenle", "Edit coupon", "Edit coupon", "Edit coupon", "Coupon bearbeiten");
 
   return (
     <Page title="Coupons">
@@ -396,7 +398,7 @@ export default function CouponsPage() {
             </InlineStack>
             <InlineStack>
               <Button variant="primary" onClick={submit} loading={saving} disabled={!form.code || !form.discount_value}>
-                {locale === "en" ? "Save coupon" : locale === "tr" ? "Kuponu kaydet" : "Coupon speichern"}
+                {lt(locale, "Save coupon", "Kuponu kaydet", "Save coupon", "Save coupon", "Save coupon", "Coupon speichern")}
               </Button>
             </InlineStack>
           </BlockStack>
@@ -407,13 +409,13 @@ export default function CouponsPage() {
             <InlineStack align="space-between" blockAlign="center">
               <Text as="h2" variant="headingMd">
                 {isSuperuser
-                  ? (locale === "en" ? `Own coupons (${ownCoupons.length})` : locale === "tr" ? `Kendi kuponlarım (${ownCoupons.length})` : `Eigene Coupons (${ownCoupons.length})`)
+                  ? lt(locale, `Own coupons (${ownCoupons.length})`, `Kendi kuponlarim (${ownCoupons.length})`, `Own coupons (${ownCoupons.length})`, `Own coupons (${ownCoupons.length})`, `Own coupons (${ownCoupons.length})`, `Eigene Coupons (${ownCoupons.length})`)
                   : `Coupons (${coupons.length})`}
               </Text>
               <Button onClick={load} loading={loading} size="slim">{ui.refresh}</Button>
             </InlineStack>
             {ownCoupons.length === 0 ? (
-              <Text tone="subdued">{locale === "en" ? "No coupons yet." : locale === "tr" ? "Henüz kupon yok." : "Noch keine Coupons vorhanden."}</Text>
+              <Text tone="subdued">{lt(locale, "No coupons yet.", "Henüz kupon yok.", "No coupons yet.", "No coupons yet.", "No coupons yet.", "Noch keine Coupons vorhanden.")}</Text>
             ) : (
               <div>
                 {ownCoupons.map((c) => (
@@ -436,9 +438,9 @@ export default function CouponsPage() {
         {isSuperuser && (
           <Card>
             <BlockStack gap="200">
-              <Text as="h2" variant="headingMd">{locale === "en" ? `Seller coupons (${sellerCoupons.length})` : locale === "tr" ? `Satıcı kuponları (${sellerCoupons.length})` : `Verkäufer-Coupons (${sellerCoupons.length})`}</Text>
+              <Text as="h2" variant="headingMd">{lt(locale, `Seller coupons (${sellerCoupons.length})`, `Satici kuponlari (${sellerCoupons.length})`, `Seller coupons (${sellerCoupons.length})`, `Seller coupons (${sellerCoupons.length})`, `Seller coupons (${sellerCoupons.length})`, `Verkaufer-Coupons (${sellerCoupons.length})`)}</Text>
               {sellerCoupons.length === 0 ? (
-                <Text tone="subdued">{locale === "en" ? "No seller coupons." : locale === "tr" ? "Satıcı kuponu yok." : "Keine Verkäufer-Coupons vorhanden."}</Text>
+                <Text tone="subdued">{lt(locale, "No seller coupons.", "Satıcı kuponu yok.", "No seller coupons.", "No seller coupons.", "No seller coupons.", "Keine Verkäufer-Coupons vorhanden.")}</Text>
               ) : (
                 <div>
                   {Object.entries(

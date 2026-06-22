@@ -19,6 +19,9 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { useLocale } from "next-intl";
+import { getBrandPageCopy } from "@/lib/brand-page-i18n";
+import { userError } from "@/lib/api-error-messages";
 
 const getDefaultBaseUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "") ||
@@ -27,7 +30,7 @@ const getDefaultBaseUrl = () =>
 const EMPTY_FORM = { name: "", handle: "", logo_image: "", banner_image: "", address: "" };
 
 // ── Brand card (display only) ──────────────────────────────────────────────
-function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser }) {
+function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, copy }) {
   const resolveUrl = (url) => {
     if (!url) return "";
     if (url.startsWith("http") || url.startsWith("data:")) return url;
@@ -59,7 +62,7 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser }) {
         {canEdit && (
           <div style={{ marginLeft: "auto", flexShrink: 0 }}>
             <Button size="slim" variant="secondary" onClick={() => onEdit(brand)}>
-              {isSuperuser ? "Edit" : "Logo / Banner"}
+              {isSuperuser ? copy.edit : copy.logoBanner}
             </Button>
           </div>
         )}
@@ -71,6 +74,7 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser }) {
 // ══════════════════════════════════════════════════════════════════════════
 export default function BrandPage() {
   const client = getMedusaAdminClient();
+  const locale = useLocale();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
 
   // Read caller identity from localStorage
@@ -94,6 +98,7 @@ export default function BrandPage() {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const copy = getBrandPageCopy(locale, isSuperuser);
 
   const loadBrands = () => {
     setLoading(true);
@@ -165,11 +170,11 @@ export default function BrandPage() {
           payload.handle = (formData.handle || "").trim() || editingBrand.handle;
         }
         await client.updateBrand(editingBrand.id, payload);
-        setMessage({ type: "success", text: "Brand updated." });
+        setMessage({ type: "success", text: copy.updated });
       } else {
         const name = (formData.name || "").trim();
         if (!name) {
-          setMessage({ type: "error", text: "Brand name is required." });
+          setMessage({ type: "error", text: copy.nameRequired });
           setSaving(false);
           return;
         }
@@ -181,12 +186,12 @@ export default function BrandPage() {
           banner_image: (formData.banner_image || "").trim() || null,
           address: (formData.address || "").trim() || null,
         });
-        setMessage({ type: "success", text: "Brand created." });
+        setMessage({ type: "success", text: copy.created });
       }
       closeModal();
       loadBrands();
     } catch (e) {
-      setMessage({ type: "error", text: e?.message || "Failed to save brand." });
+      setMessage({ type: "error", text: userError(e, locale, copy.saveError) });
     } finally {
       setSaving(false);
     }
@@ -194,12 +199,12 @@ export default function BrandPage() {
 
   const handleDelete = async (brand) => {
     if (!canEditBrand(brand)) return;
-    if (!(await confirmDelete(`Delete "${brand.name}"?`))) return;
+    if (!(await confirmDelete(copy.deleteConfirm(brand.name)))) return;
     try {
       await client.deleteBrand(brand.id);
       loadBrands();
     } catch (e) {
-      setMessage({ type: "error", text: e?.message || "Failed to delete." });
+      setMessage({ type: "error", text: userError(e, locale, copy.deleteError) });
     }
   };
 
@@ -208,8 +213,8 @@ export default function BrandPage() {
 
   return (
     <Page
-      title="Brands"
-      primaryAction={{ content: "Add Brand", onAction: openCreate }}
+      title={copy.title}
+      primaryAction={{ content: copy.addBrand, onAction: openCreate }}
     >
       <BlockStack gap="400">
         {message.text && (
@@ -224,7 +229,7 @@ export default function BrandPage() {
         {loading ? (
           <Card>
             <Box padding="800">
-              <Text as="p" tone="subdued">Loading…</Text>
+              <Text as="p" tone="subdued">{copy.loading}</Text>
             </Box>
           </Card>
         ) : (
@@ -233,15 +238,15 @@ export default function BrandPage() {
             <Card>
               <BlockStack gap="400">
                 <InlineStack gap="200" blockAlign="center">
-                  <Text as="h2" variant="headingMd">My Brands</Text>
+                  <Text as="h2" variant="headingMd">{copy.myBrands}</Text>
                   {myBrands.length > 0 && <Badge>{myBrands.length}</Badge>}
                 </InlineStack>
 
                 {myBrands.length === 0 ? (
                   <Box padding="600" background="bg-surface-secondary" borderRadius="200">
                     <BlockStack gap="100">
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">No brands yet</Text>
-                      <Text as="p" tone="subdued">Add a brand to appear in product form (Brand dropdown).</Text>
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">{copy.noBrandsYet}</Text>
+                      <Text as="p" tone="subdued">{copy.noBrandsHelp}</Text>
                     </BlockStack>
                   </Box>
                 ) : (
@@ -254,6 +259,7 @@ export default function BrandPage() {
                         onEdit={openEdit}
                         canEdit
                         isSuperuser={isSuperuser}
+                        copy={copy}
                       />
                     ))}
                   </BlockStack>
@@ -267,20 +273,20 @@ export default function BrandPage() {
                 <BlockStack gap="400">
                   <InlineStack gap="200" blockAlign="center">
                     <Text as="h2" variant="headingMd">
-                      {isSuperuser ? "All Brands" : "All Other Brands"}
+                      {copy.allBrands}
                     </Text>
                     {otherBrands.length > 0 && <Badge tone="info">{otherBrands.length}</Badge>}
                   </InlineStack>
 
                   {!isSuperuser && (
                     <Text as="p" variant="bodySm" tone="subdued">
-                      These brands belong to other sellers. You can view but not edit them.
+                      {copy.othersReadonly}
                     </Text>
                   )}
 
                   {otherBrands.length === 0 ? (
                     <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                      <Text as="p" tone="subdued">No other brands found.</Text>
+                      <Text as="p" tone="subdued">{copy.noOtherBrands}</Text>
                     </Box>
                   ) : (
                     <BlockStack gap="300">
@@ -292,6 +298,7 @@ export default function BrandPage() {
                           onEdit={openEdit}
                           canEdit={isSuperuser}
                           isSuperuser={isSuperuser}
+                          copy={copy}
                         />
                       ))}
                     </BlockStack>
@@ -307,11 +314,11 @@ export default function BrandPage() {
       <Modal
         open={modalOpen}
         onClose={closeModal}
-        title={editingBrand ? `Edit: ${editingBrand.name}` : "Add Brand"}
-        primaryAction={{ content: editingBrand ? "Save" : "Create", onAction: handleSubmit, loading: saving }}
+        title={editingBrand ? `${copy.editModal}: ${editingBrand.name}` : copy.addModal}
+        primaryAction={{ content: editingBrand ? copy.save : copy.create, onAction: handleSubmit, loading: saving }}
         secondaryActions={[
-          ...(editingBrand && canEditBrand(editingBrand) ? [{ content: "Delete", onAction: () => { closeModal(); handleDelete(editingBrand); }, destructive: true }] : []),
-          { content: "Cancel", onAction: closeModal },
+          ...(editingBrand && canEditBrand(editingBrand) ? [{ content: copy.delete, onAction: () => { closeModal(); handleDelete(editingBrand); }, destructive: true }] : []),
+          { content: copy.cancel, onAction: closeModal },
         ]}
       >
         <Modal.Section>
@@ -323,7 +330,7 @@ export default function BrandPage() {
             )}
 
             <TextField
-              label="Name"
+              label={copy.name}
               value={formData.name}
               onChange={(v) => {
                 if (!nameEditable) return;
@@ -333,32 +340,32 @@ export default function BrandPage() {
                   handle: slugManuallyEdited ? p.handle : titleToHandle(v),
                 }));
               }}
-              placeholder="e.g. My Brand"
+              placeholder={copy.namePlaceholder}
               autoComplete="off"
               disabled={!nameEditable}
-              helpText={!nameEditable ? "Brand name cannot be changed after creation." : undefined}
+              helpText={!nameEditable ? copy.nameLocked : undefined}
             />
 
             {nameEditable && (
               <TextField
-                label="Handle"
+                label={copy.handle}
                 value={formData.handle}
                 onChange={(v) => { setSlugManuallyEdited(true); setFormData((p) => ({ ...p, handle: v })); }}
-                placeholder="e.g. my-brand"
+                placeholder={copy.handlePlaceholder}
                 autoComplete="off"
-                helpText="URL-friendly key. Auto-filled from name unless edited."
+                helpText={copy.handleHelp}
               />
             )}
 
             <Divider />
 
             {/* Logo */}
-            <Text as="p" variant="bodyMd" fontWeight="medium">Logo</Text>
+            <Text as="p" variant="bodyMd" fontWeight="medium">{copy.logo}</Text>
             <InlineStack gap="300" blockAlign="center">
               {formData.logo_image ? (
                 <div>
                   <img src={resolveUrl(formData.logo_image)} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: "50%", border: "1px solid #e5e7eb", display: "block", marginBottom: 4 }} />
-                  <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, logo_image: "" }))}>Remove</Button>
+                  <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, logo_image: "" }))}>{copy.remove}</Button>
                 </div>
               ) : (
                 <div style={{ width: 64, height: 64, borderRadius: "50%", border: "2px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#9ca3af", fontSize: 20 }}>
@@ -366,17 +373,17 @@ export default function BrandPage() {
                 </div>
               )}
               <Button size="slim" variant="secondary" onClick={() => setLogoPickerOpen(true)}>
-                {formData.logo_image ? "Change logo" : "Select logo"}
+                {formData.logo_image ? copy.changeLogo : copy.selectLogo}
               </Button>
             </InlineStack>
 
             {/* Banner */}
-            <Text as="p" variant="bodyMd" fontWeight="medium">Banner</Text>
+            <Text as="p" variant="bodyMd" fontWeight="medium">{copy.banner}</Text>
             <InlineStack gap="300" blockAlign="center">
               {formData.banner_image ? (
                 <div>
                   <img src={resolveUrl(formData.banner_image)} alt="" style={{ width: 160, height: 50, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb", display: "block", marginBottom: 4 }} />
-                  <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, banner_image: "" }))}>Remove</Button>
+                  <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, banner_image: "" }))}>{copy.remove}</Button>
                 </div>
               ) : (
                 <div style={{ width: 160, height: 50, borderRadius: 6, border: "2px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#9ca3af", fontSize: 11 }}>
@@ -384,16 +391,16 @@ export default function BrandPage() {
                 </div>
               )}
               <Button size="slim" variant="secondary" onClick={() => setBannerPickerOpen(true)}>
-                {formData.banner_image ? "Change banner" : "Select banner"}
+                {formData.banner_image ? copy.changeBanner : copy.selectBanner}
               </Button>
             </InlineStack>
 
             {isSuperuser && (
               <TextField
-                label="Address"
+                label={copy.address}
                 value={formData.address}
                 onChange={(v) => setFormData((p) => ({ ...p, address: v }))}
-                placeholder="Optional"
+                placeholder={copy.optional}
                 multiline={2}
                 autoComplete="off"
               />
@@ -408,7 +415,7 @@ export default function BrandPage() {
         onClose={() => setLogoPickerOpen(false)}
         onSelect={(urls) => { if (urls?.[0]) setFormData((p) => ({ ...p, logo_image: urls[0] })); }}
         multiple={false}
-        title="Select logo"
+        title={copy.selectLogo}
       />
 
       {/* Banner picker */}
@@ -417,7 +424,7 @@ export default function BrandPage() {
         onClose={() => setBannerPickerOpen(false)}
         onSelect={(urls) => { if (urls?.[0]) setFormData((p) => ({ ...p, banner_image: urls[0] })); }}
         multiple={false}
-        title="Select banner"
+        title={copy.selectBanner}
       />
     </Page>
   );

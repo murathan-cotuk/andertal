@@ -5,30 +5,33 @@ import {
   Card, Text, BlockStack, InlineStack, Button, Box, TextField, Select, Spinner, Banner,
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getSellerErrorsCopy } from "@/lib/marketing-i18n";
+import { confirmDelete } from "@/lib/confirm-delete";
+import { userError } from "@/lib/api-error-messages";
 
 function getStatusOptions(locale) {
   return [
-    { label: locale === "en" ? "All" : locale === "tr" ? "Tümü" : "Alle", value: "all" },
-    { label: locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen", value: "open" },
-    { label: locale === "en" ? "Resolved" : locale === "tr" ? "Çözüldü" : "Gelöst", value: "resolved" },
-    { label: locale === "en" ? "In progress" : locale === "tr" ? "İşlemde" : "In Bearbeitung", value: "in_progress" },
+    { label: lt(locale, "All", "Tümü", "All", "All", "All", "Alle"), value: "all" },
+    { label: lt(locale, "Open", "Açık", "Open", "Open", "Open", "Offen"), value: "open" },
+    { label: lt(locale, "Resolved", "Çözüldü", "Resolved", "Resolved", "Resolved", "Gelöst"), value: "resolved" },
+    { label: lt(locale, "In progress", "İşlemde", "In progress", "In progress", "In progress", "In Bearbeitung"), value: "in_progress" },
   ];
 }
 
 function getStatusStyle(locale) {
   return {
-    open:        { bg: "#fef2f2", color: "#991b1b", label: locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen" },
-    in_progress: { bg: "#fffbeb", color: "#92400e", label: locale === "en" ? "In progress" : locale === "tr" ? "İşlemde" : "In Bearbeitung" },
-    resolved:    { bg: "#f0fdf4", color: "#166534", label: locale === "en" ? "Resolved" : locale === "tr" ? "Çözüldü" : "Gelöst" },
+    open:        { bg: "#fef2f2", color: "#991b1b", label: lt(locale, "Open", "Açık", "Open", "Open", "Open", "Offen") },
+    in_progress: { bg: "#fffbeb", color: "#92400e", label: lt(locale, "In progress", "İşlemde", "In progress", "In progress", "In progress", "In Bearbeitung") },
+    resolved:    { bg: "#f0fdf4", color: "#166534", label: lt(locale, "Resolved", "Çözüldü", "Resolved", "Resolved", "Resolved", "Gelöst") },
   };
 }
 
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return new Date(d).toLocaleString(loc, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -125,7 +128,7 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "en" }) {
 
             {/* Editable fields */}
             <Select
-              label={locale === "en" ? "Status" : locale === "tr" ? "Durum" : "Status"}
+              label={lt(locale, "Status", "Durum", "Status", "Status", "Status", "Status")}
               options={getStatusOptions(locale).filter(o => o.value !== "all")}
               value={status}
               onChange={setStatus}
@@ -178,7 +181,7 @@ export default function SellerErrorsPage() {
       setErrors(res?.errors || []);
       setUnreadCount(res?.unread_count || 0);
     } catch (e) {
-      setError(e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler"));
+      setError(userError(e, locale, "Error"));
     } finally {
       setLoading(false);
     }
@@ -194,11 +197,16 @@ export default function SellerErrorsPage() {
   };
 
   const handleDelete = async (err) => {
-    const confirmMsg = locale === "en"
-      ? `Delete this error: "${(err.error_message || "").slice(0, 60)}…"?`
-      : locale === "tr"
-      ? `Bu hatayı sil: "${(err.error_message || "").slice(0, 60)}…"?`
-      : `Diesen Fehler löschen: "${(err.error_message || "").slice(0, 60)}…"?`;
+    const preview = (err.error_message || "").slice(0, 60);
+    const confirmMsg = lt(
+      locale,
+      `Delete this error: "${preview}..."?`,
+      `Bu hatayi sil: "${preview}..."?`,
+      `Delete this error: "${preview}..."?`,
+      `Delete this error: "${preview}..."?`,
+      `Delete this error: "${preview}..."?`,
+      `Diesen Fehler loschen: "${preview}..."?`,
+    );
     if (!await confirmDelete(confirmMsg)) return;
     await client.request(`/admin-hub/v1/seller-errors/${err.id}`, { method: "DELETE" }).catch(() => {});
     load();
@@ -213,7 +221,7 @@ export default function SellerErrorsPage() {
       setNewError({ seller_id: "", error_code: "", error_message: "", terminal_output: "", context: "" });
       load();
     } catch (e) {
-      alert(e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler"));
+      alert(userError(e, locale, "Error"));
     } finally {
       setAdding(false);
     }
@@ -272,7 +280,7 @@ export default function SellerErrorsPage() {
         <Card padding="300">
           <InlineStack gap="200" blockAlign="end" wrap>
             <Box minWidth="160px">
-              <Select label={locale === "en" ? "Status" : locale === "tr" ? "Durum" : "Status"} options={getStatusOptions(locale)} value={statusFilter} onChange={setStatusFilter} />
+              <Select label={lt(locale, "Status", "Durum", "Status", "Status", "Status", "Status")} options={getStatusOptions(locale)} value={statusFilter} onChange={setStatusFilter} />
             </Box>
             <Box minWidth="200px">
               <TextField

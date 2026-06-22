@@ -80,7 +80,7 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
             <Text tone="subdued" as="span" variant="bodySm">{campaign.description}</Text>
           )}
           <Text tone="subdued" as="span" variant="bodySm">
-            Budget: {budget}
+            {mc.budgetDaily}: {budget}
             {campaign.created_at ? ` · ${createdLabel}: ${fmtDate(campaign.created_at, locale)}` : ""}
             {!isSuperuser ? ` · ${focusLabel}` : ""}
             {campaign.start_at || campaign.end_at ? ` · ${fmtDate(campaign.start_at, locale)} – ${fmtDate(campaign.end_at, locale)}` : ""}
@@ -108,7 +108,7 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
               url={buildGoogleAdsUrl(googleAdsCustomerId, externalIds)}
               external
             >
-              Google Ads
+              {mc.googleAds}
             </Button>
           )}
           <Button size="slim" onClick={() => onEdit(campaign)}>{ui.edit}</Button>
@@ -336,8 +336,8 @@ export default function MarketingCampaignsPage() {
   const sortOptions = [
     { value: "created_desc", label: locale === "de" ? "Neueste zuerst" : locale === "tr" ? "En yeniler önce" : locale === "fr" ? "Les plus récents d'abord" : locale === "es" ? "Más recientes primero" : locale === "it" ? "Più recenti prima" : "Newest first" },
     { value: "created_asc", label: locale === "de" ? "Älteste zuerst" : locale === "tr" ? "En eskiler önce" : locale === "fr" ? "Les plus anciens d'abord" : locale === "es" ? "Más antiguos primero" : locale === "it" ? "Più vecchi prima" : "Oldest first" },
-    { value: "name_asc", label: "Name A → Z" },
-    { value: "name_desc", label: "Name Z → A" },
+    { value: "name_asc", label: locale === "de" ? "Name A → Z" : locale === "tr" ? "Ad A → Z" : locale === "fr" ? "Nom A → Z" : locale === "es" ? "Nombre A → Z" : locale === "it" ? "Nome A → Z" : "Name A → Z" },
+    { value: "name_desc", label: locale === "de" ? "Name Z → A" : locale === "tr" ? "Ad Z → A" : locale === "fr" ? "Nom Z → A" : locale === "es" ? "Nombre Z → A" : locale === "it" ? "Nome Z → A" : "Name Z → A" },
     ...(isSuperuser ? [{ value: "seller_asc", label: locale === "de" ? "Verkäufer A → Z" : locale === "tr" ? "Satıcı A → Z" : locale === "fr" ? "Vendeur A → Z" : locale === "es" ? "Vendedor A → Z" : locale === "it" ? "Venditore A → Z" : "Seller A → Z" }] : []),
   ];
 

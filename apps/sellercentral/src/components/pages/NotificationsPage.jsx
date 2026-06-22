@@ -8,6 +8,7 @@ import { getUI } from "@/lib/ui-strings";
 import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { getNotificationsPageCopy } from "@/lib/notifications-page-i18n";
 
 function itemKey(it) {
   return `${it.source_type}:${it.source_id}`;
@@ -25,9 +26,9 @@ function formatDateDmy(value, locale) {
 }
 
 function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) {
+  const c = getNotificationsPageCopy(locale);
   const k = itemKey(it);
   const dt = formatDateDmy(it.created_at, locale);
-  const removeLabel = locale === "en" ? "Remove from list" : locale === "tr" ? "Listeden kaldır" : "Aus Liste entfernen";
   return (
     <div
       style={{
@@ -47,7 +48,7 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {!it.read && (
             <span
-              title={locale === "en" ? "Unread" : locale === "tr" ? "Okunmadı" : "Ungelesen"}
+              title={c.unread}
               style={{
                 width: 8,
                 height: 8,
@@ -68,7 +69,7 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) 
       <div style={{ fontSize: 12, color: "#9ca3af", whiteSpace: "nowrap" }}>{dt}</div>
       <div>
         <Button size="slim" variant="plain" tone="critical" disabled={busy} onClick={() => onDeleteOne(it)}>
-          {removeLabel}
+          {c.removeFromList}
         </Button>
       </div>
     </div>
@@ -79,6 +80,7 @@ export default function NotificationsPage() {
   const locale = useLocale();
   const lt = useLt();
   const ui = getUI(locale);
+  const c = getNotificationsPageCopy(locale);
 
   const [groups, setGroups] = useState([]);
   const [grandTotal, setGrandTotal] = useState(0);
@@ -108,7 +110,7 @@ export default function NotificationsPage() {
         setGrandTotal(typeof data.grand_total === "number" ? data.grand_total : (data.groups || []).reduce((s, g) => s + (g.items?.length || 0), 0));
       } else {
         const legacy = data.items || [];
-        const nextGroups = [{ key: "all", label_en: "All", label_tr: "Tümü", label_de: "Alle", description_de: "", items: legacy, total: legacy.length }];
+        const nextGroups = [{ key: "all", label_en: c.allFallback, label_tr: c.allFallback, label_de: c.allFallback, description_de: "", items: legacy, total: legacy.length }];
         setGroups(nextGroups);
         setActiveGroupKey("all");
         setGrandTotal(typeof data.total === "number" ? data.total : legacy.length);
@@ -195,12 +197,7 @@ export default function NotificationsPage() {
   };
 
   const deleteAll = async () => {
-    const confirmMsg = locale === "en"
-      ? "Remove all entries from this view? The underlying data (orders, sellers, etc.) will remain unchanged — only the display here will be hidden."
-      : locale === "tr"
-      ? "Tüm girişler bu görünümden kaldırılsın mı? Asıl veriler (siparişler, satıcılar vb.) değişmeyecek — yalnızca buradaki görüntü gizlenecek."
-      : "Alle Einträge aus dieser Übersicht entfernen? Die Daten selbst (Bestellungen, Verkäufer usw.) bleiben unverändert — nur die Anzeige hier wird ausgeblendet.";
-    if (!await confirmDelete(confirmMsg)) return;
+    if (!await confirmDelete(c.removeAllConfirm)) return;
     setBusy(true);
     try {
       await getMedusaAdminClient().deleteNotifications({ all: true });
@@ -236,25 +233,7 @@ export default function NotificationsPage() {
     setBusy(false);
   };
 
-  const pageTitle = locale === "en" ? "Notifications" : locale === "tr" ? "Bildirimler" : "Benachrichtigungen";
-  const pageSubtitle = locale === "en"
-    ? "Select a category above; only its notifications appear below."
-    : locale === "tr"
-    ? "Yukarıdan bir kategori seçin; yalnızca ilgili bildirimler aşağıda görünür."
-    : "Kategorien oben auswählen, darunter erscheinen nur die zugehörigen Benachrichtigungen.";
-  const infoText = locale === "en"
-    ? "Opening this page marks unread notifications as read (the red counter at the top disappears). Orders and other records are never deleted by this action."
-    : locale === "tr"
-    ? "Bu sayfayı açmak okunmamış bildirimleri okundu olarak işaretler (üstteki kırmızı sayaç kaybolur). Siparişler ve diğer kayıtlar bu işlemle hiçbir zaman silinmez."
-    : "Beim Öffnen dieser Seite werden ungelesene Hinweise als gelesen markiert (roter Zähler oben verschwindet). Bestellungen und andere Stammdaten werden nie durch diese Aktion gelöscht.";
-  const removeSelectedLabel = locale === "en"
-    ? `Remove selected from list (${selected.size})`
-    : locale === "tr"
-    ? `Seçilenleri listeden kaldır (${selected.size})`
-    : `Ausgewählte aus Liste entfernen (${selected.size})`;
-  const removeAllLabel = locale === "en" ? "Remove all from list" : locale === "tr" ? "Tümünü listeden kaldır" : "Alle aus Liste entfernen";
-  const categoryLabel = locale === "en" ? "Category" : locale === "tr" ? "Kategori" : "Kategorie";
-  const noNotifInCategory = locale === "en" ? "No notifications in this category." : locale === "tr" ? "Bu kategoride bildirim yok." : "Keine Benachrichtigungen in dieser Kategorie.";
+  const removeSelectedLabel = c.removeSelected(selected.size);
 
   const getGroupLabel = (g) => {
     if (locale === "en" && g.label_en) return g.label_en;
@@ -278,17 +257,17 @@ export default function NotificationsPage() {
   }, [groups, grandTotal, lt]);
 
   return (
-    <Page title={pageTitle} subtitle={pageSubtitle}>
+    <Page title={c.pageTitle} subtitle={c.pageSubtitle}>
       <BlockStack gap="400">
         <Card>
           <BlockStack gap="300">
-            <Text as="p" tone="subdued">{infoText}</Text>
+            <Text as="p" tone="subdued">{c.infoText}</Text>
             <InlineStack gap="200" wrap>
               <Button disabled={busy || selected.size === 0} onClick={deleteSelected}>
                 {removeSelectedLabel}
               </Button>
               <Button tone="critical" disabled={busy || flatItems.length === 0} onClick={deleteAll}>
-                {removeAllLabel}
+                {c.removeAll}
               </Button>
               <Button variant="plain" disabled={busy || loading} onClick={load}>
                 {ui.refresh}
@@ -381,7 +360,7 @@ export default function NotificationsPage() {
                 {activeGroupItems.length === 0 ? (
                   <Box padding="400">
                     <Text as="p" tone="subdued">
-                      {noNotifInCategory}
+                      {c.noInCategory}
                     </Text>
                   </Box>
                 ) : (

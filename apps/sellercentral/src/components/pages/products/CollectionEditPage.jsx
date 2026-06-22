@@ -23,6 +23,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import { useLocale } from "next-intl";
 import { userError } from "@/lib/api-error-messages";
+import { getCollectionEditCopy } from "@/lib/collection-edit-i18n";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -61,6 +62,7 @@ function isProductInCollection(product, collectionId) {
 export default function CollectionEditPage({ collection: initialCollection, isNew, onReload }) {
   const router = useRouter();
   const locale = useLocale();
+  const c = getCollectionEditCopy(locale);
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
   const [collection, setCollection] = useState(initialCollection ?? null);
@@ -230,7 +232,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     const title = (form.title || "").trim();
     const handle = (form.handle || "").trim() || slugFromTitle(title);
     if (!title) {
-      setError("Title is required.");
+      setError(c.titleRequired);
       return;
     }
     try {
@@ -324,10 +326,10 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
 
   return (
     <Page
-      title={isNew ? "New collection" : (collection?.title || "Edit collection")}
-      backAction={{ content: "Collections", onAction: () => router.push("/products/collections") }}
+      title={isNew ? c.newCollection : (collection?.title || c.editCollection)}
+      backAction={{ content: c.collections, onAction: () => router.push("/products/collections") }}
       primaryAction={{
-        content: saving ? "Saving…" : mediaUploading ? "Uploading…" : "Save",
+        content: saving ? c.saving : mediaUploading ? c.uploading : c.save,
         onAction: handleSave,
         loading: saving,
         disabled: mediaUploading,
@@ -361,33 +363,33 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingSm">
-                Basic
+                {c.basic}
               </Text>
               <TextField
-                label="Collection name"
+                label={c.collectionName}
                 value={form.title}
                 onChange={handleTitleChange}
-                placeholder="e.g. Summer Sale"
+                placeholder={c.namePlaceholder}
                 autoComplete="off"
-                helpText="Used in menus and admin."
+                helpText={c.nameHelp}
               />
               <TextField
-                label="Handle (URL slug)"
+                label={c.handleLabel}
                 value={form.handle}
                 onChange={(value) => {
                   setSlugManuallyEdited(true);
                   setForm((prev) => ({ ...prev, handle: value }));
                 }}
-                placeholder="e.g. summer-sale"
+                placeholder={c.handlePlaceholder}
                 autoComplete="off"
-                helpText="URL: /collections/[handle]"
+                helpText={c.handleHelp}
               />
               <CategoryDrilldownSelect
-                label="Link to category (optional)"
+                label={c.linkCategory}
                 categories={categories || []}
                 value={form.category_id}
                 onChange={(value) => setForm((prev) => ({ ...prev, category_id: value }))}
-                placeholder="Select category"
+                placeholder={c.selectCategory}
               />
             </BlockStack>
           </Card>
@@ -396,22 +398,22 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
           <Layout.Section>
             <Card>
               <BlockStack gap="400">
-                <Text as="h2" variant="headingSm">Products in this collection</Text>
+                <Text as="h2" variant="headingSm">{c.productsInCollection}</Text>
                 <p style={{ margin: 0, fontSize: 14, color: "var(--p-color-text-subdued)" }}>
-                  Products assigned to this collection (image, SKU, name, price, quantity).
+                  {c.productsHint}
                 </p>
                 {collectionProducts.length === 0 ? (
-                  <Text as="p" tone="subdued">No products in this collection. Add products below or assign from the product edit page.</Text>
+                  <Text as="p" tone="subdued">{c.noProducts}</Text>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--p-color-border)", textAlign: "left" }}>
-                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>Image</th>
-                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>SKU</th>
-                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>Name</th>
-                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>Price</th>
-                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>Qty</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>{c.colImage}</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>{c.colSku}</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>{c.colTitle}</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>{c.colPrice}</th>
+                          <th style={{ padding: "8px 12px", fontWeight: 600 }}>{c.colQty}</th>
                           <th style={{ padding: "8px 12px", fontWeight: 600, width: 100 }}></th>
                         </tr>
                       </thead>
@@ -439,7 +441,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                               <td style={{ padding: "8px 12px" }}>{typeof price === "number" ? (price % 1 === 0 ? price : price.toFixed(2)) : price} €</td>
                               <td style={{ padding: "8px 12px" }}>{qty}</td>
                               <td style={{ padding: "8px 12px" }}>
-                                <Button size="slim" tone="critical" variant="plain" onClick={() => removeProductFromCollection(p.id)} loading={removingProductId === p.id}>Remove</Button>
+                                <Button size="slim" tone="critical" variant="plain" onClick={() => removeProductFromCollection(p.id)} loading={removingProductId === p.id}>{c.remove}</Button>
                               </td>
                             </tr>
                           );
@@ -451,11 +453,11 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                 <div style={{ marginTop: 16 }}>
                   <div style={{ position: "relative" }}>
                     <TextField
-                      label="Add product"
+                      label={c.addProduct}
                       value={addProductSearch}
                       onChange={setAddProductSearch}
                       onFocus={() => setAddProductPopoverOpen(true)}
-                      placeholder="Search and add multiple products…"
+                      placeholder={c.searchProducts}
                       autoComplete="off"
                     />
                     {addProductPopoverOpen && (
@@ -495,7 +497,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                               onClick={() => addProductToCollection(p.id)}
                               disabled={!!addingProductId}
                             >
-                              {addingProductId === p.id ? "Adding… " : ""}{p.title || p.handle || p.sku || p.id}
+                              {addingProductId === p.id ? `${c.adding} ` : ""}{p.title || p.handle || p.sku || p.id}
                             </button>
                           ))}
                       </div>
@@ -516,20 +518,20 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <Text as="h2" variant="headingSm">Shop page</Text>
+              <Text as="h2" variant="headingSm">{c.shopPage}</Text>
               <TextField
-                label="Display title (h1 on collection page)"
+                label={c.displayTitle}
                 value={form.display_title}
                 onChange={(value) => setForm((prev) => ({ ...prev, display_title: value }))}
-                placeholder="Same as collection name if empty"
+                placeholder={c.displayTitlePlaceholder}
                 autoComplete="off"
               />
-              <Text as="p" variant="bodySm" fontWeight="medium">Main image (menus, dropdown)</Text>
+              <Text as="p" variant="bodySm" fontWeight="medium">{c.mainImage}</Text>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
                 {form.image_url ? (
                   <div style={{ width: 100, aspectRatio: 1, borderRadius: 8, overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", position: "relative" }}>
                     <img src={form.image_url.startsWith("http") || form.image_url.startsWith("data:") ? form.image_url : `${baseUrl}${form.image_url}`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    <button type="button" onClick={() => setForm((prev) => ({ ...prev, image_url: "" }))} style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, border: "none", borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", fontSize: 14 }} aria-label="Remove">×</button>
+                    <button type="button" onClick={() => setForm((prev) => ({ ...prev, image_url: "" }))} style={{ position: "absolute", top: 4, right: 4, width: 24, height: 24, border: "none", borderRadius: "50%", background: "rgba(0,0,0,0.5)", color: "#fff", cursor: "pointer", fontSize: 14 }} aria-label={c.remove}>×</button>
                   </div>
                 ) : null}
                 <div
@@ -539,7 +541,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                   <span style={{ fontSize: 24, color: "var(--p-color-icon)" }}>+</span>
                 </div>
               </div>
-              <Text as="p" variant="bodySm" fontWeight="medium">Banner image (1920×300 px, full-width)</Text>
+              <Text as="p" variant="bodySm" fontWeight="medium">{c.bannerImage}</Text>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
                 {form.banner_image_url ? (
                   <div style={{ maxWidth: 320, height: 50, borderRadius: 8, overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", position: "relative" }}>
@@ -611,22 +613,22 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <Text as="h2" variant="headingSm">SEO</Text>
+              <Text as="h2" variant="headingSm">{c.seo}</Text>
               <Box position="relative">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <Text as="span" variant="bodySm" tone="subdued">Meta title</Text>
+                  <Text as="span" variant="bodySm" tone="subdued">{c.metaTitle}</Text>
                   <Text as="span" variant="bodySm" tone="subdued">{(form.meta_title || "").length} / {META_TITLE_MAX}</Text>
                 </div>
-                <TextField label="" labelHidden value={form.meta_title} onChange={(v) => setForm((prev) => ({ ...prev, meta_title: v.slice(0, META_TITLE_MAX) }))} placeholder="Meta title" autoComplete="off" />
+                <TextField label="" labelHidden value={form.meta_title} onChange={(v) => setForm((prev) => ({ ...prev, meta_title: v.slice(0, META_TITLE_MAX) }))} placeholder={c.metaTitle} autoComplete="off" />
               </Box>
               <Box position="relative">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <Text as="span" variant="bodySm" tone="subdued">Meta description</Text>
+                  <Text as="span" variant="bodySm" tone="subdued">{c.metaDescription}</Text>
                   <Text as="span" variant="bodySm" tone="subdued">{(form.meta_description || "").length} / {META_DESC_MAX}</Text>
                 </div>
-                <TextField label="" labelHidden value={form.meta_description} onChange={(v) => setForm((prev) => ({ ...prev, meta_description: v.slice(0, META_DESC_MAX) }))} placeholder="Meta description" multiline={2} autoComplete="off" />
+                <TextField label="" labelHidden value={form.meta_description} onChange={(v) => setForm((prev) => ({ ...prev, meta_description: v.slice(0, META_DESC_MAX) }))} placeholder={c.metaDescription} multiline={2} autoComplete="off" />
               </Box>
-              <TextField label="Keywords" value={form.keywords} onChange={(value) => setForm((prev) => ({ ...prev, keywords: value }))} placeholder="comma-separated" autoComplete="off" />
+              <TextField label={c.keywords} value={form.keywords} onChange={(value) => setForm((prev) => ({ ...prev, keywords: value }))} placeholder={c.keywordsPlaceholder} autoComplete="off" />
             </BlockStack>
           </Card>
         </Layout.Section>

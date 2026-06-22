@@ -147,7 +147,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\" -Force)",
       "Bash(Select-Object Name, PSIsContainer)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\shop\" -Depth 0 | Where-Object { $_.PSIsContainer -eq $false } | Select-Object Name)",
-      "Bash(awk -F: '{print NR\": \"$0}')"
+      "Bash(awk -F: '{print NR\": \"$0}')",
+      "PowerShell(git *)"
     ]
   }
 }

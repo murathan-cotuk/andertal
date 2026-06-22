@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { useRouter } from "@/i18n/navigation";
 import { getUI } from "@/lib/ui-strings";
 import { Modal, BlockStack, TextField, Text, Button, InlineStack } from "@shopify/polaris";
@@ -12,23 +13,23 @@ import { statusLabel } from "@/lib/status-labels";
 import { CustomerFormModal } from "@/components/CustomerFormModal";
 
 function fmtCents(c, locale) {
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
 }
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   const dt = new Date(d);
   return dt.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" }) + " / " + dt.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
 }
 function fmtDateShort(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function fmtBirthDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "long", year: "numeric" });
 }
 
@@ -248,13 +249,13 @@ function BonusLedgerAddModal({ open, onClose, customerId, onAdded, locale }) {
     <Modal
       open={open}
       onClose={() => !saving && onClose()}
-      title={locale === "en" ? "Book bonus points" : locale === "tr" ? "Bonus puanı ekle" : "Bonuspunkte buchen"}
+      title={lt(locale, "Book bonus points", "Bonus puanı ekle", "Book bonus points", "Book bonus points", "Book bonus points", "Bonuspunkte buchen")}
       primaryAction={{
-        content: locale === "en" ? "Add" : locale === "tr" ? "Ekle" : "Hinzufügen",
+        content: lt(locale, "Add", "Ekle", "Add", "Add", "Add", "Hinzufügen"),
         onAction: handleAdd,
         loading: saving,
       }}
-      secondaryActions={[{ content: locale === "en" ? "Cancel" : locale === "tr" ? "İptal" : "Abbrechen", onAction: () => !saving && onClose() }]}
+      secondaryActions={[{ content: lt(locale, "Cancel", "İptal", "Cancel", "Cancel", "Cancel", "Abbrechen"), onAction: () => !saving && onClose() }]}
     >
       <Modal.Section>
         <BlockStack gap="400">
@@ -273,7 +274,7 @@ function BonusLedgerAddModal({ open, onClose, customerId, onAdded, locale }) {
             value={points}
             onChange={setPoints}
             autoComplete="off"
-            placeholder={locale === "en" ? "+50 or −20" : locale === "tr" ? "+50 veya −20" : "+50 oder −20"}
+            placeholder={lt(locale, "+50 or −20", "+50 veya −20", "+50 or −20", "+50 or −20", "+50 or −20", "+50 oder −20")}
             helpText={locale === "en" ? "Non-zero integer" : locale === "tr" ? "Sıfırdan farklı tam sayı" : locale === "fr" ? "Entier non nul" : locale === "es" ? "Entero distinto de cero" : locale === "it" ? "Intero diverso da zero" : "Ganze Zahl, nicht 0"}
             inputMode="numeric"
           />
@@ -479,7 +480,7 @@ export default function CustomerDetailPage() {
             {customer && isSuperuser && (
               <>
                 {customer.is_registered ? (
-                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>{locale === "en" ? "Registered" : locale === "tr" ? "Kayıtlı" : "Registriert"}</span>
+                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>{lt(locale, "Registered", "Kayıtlı", "Registered", "Registered", "Registered", "Registriert")}</span>
                 ) : (
                   <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>{ui.guestCustomer}</span>
                 )}
@@ -522,8 +523,8 @@ export default function CustomerDetailPage() {
               {[
                 { label: ui.totalSpent, value: fmtCents(totalSpent, locale), icon: "💰" },
                 { label: ui.orders, value: orders.length, icon: "📦" },
-                { label: locale === "en" ? "Avg. order" : locale === "tr" ? "Ort. sipariş" : "Ø Bestellwert", value: fmtCents(avgOrder, locale), icon: "📊" },
-                ...(isSuperuser ? [{ label: locale === "en" ? "Bonus points" : locale === "tr" ? "Bonus puanı" : "Bonuspunkte", value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => { setBonusVal(String(customer.bonus_points || 0)); setEditBonus(true); } }] : []),
+                { label: lt(locale, "Avg. order", "Ort. sipariş", "Avg. order", "Avg. order", "Avg. order", "Ø Bestellwert"), value: fmtCents(avgOrder, locale), icon: "📊" },
+                ...(isSuperuser ? [{ label: lt(locale, "Bonus points", "Bonus puanı", "Bonus points", "Bonus points", "Bonus points", "Bonuspunkte"), value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => { setBonusVal(String(customer.bonus_points || 0)); setEditBonus(true); } }] : []),
               ].map((s, i) => (
                 <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -559,7 +560,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Order history */}
-            <Card title={`${locale === "en" ? "Order history" : locale === "tr" ? "Sipariş geçmişi" : "Bestellhistorie"} (${orders.length})`}>
+            <Card title={`${lt(locale, "Order history", "Sipariş geçmişi", "Order history", "Order history", "Order history", "Bestellhistorie")} (${orders.length})`}>
               {orders.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>{ui.noOrders}</p>
               ) : (
@@ -612,7 +613,7 @@ export default function CustomerDetailPage() {
                     <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>SKU / {ui.colProduct}</th>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colRating}</th>
-                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{locale === "en" ? "Comment" : locale === "tr" ? "Yorum" : "Kommentar"}</th>
+                      <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{lt(locale, "Comment", "Yorum", "Comment", "Comment", "Comment", "Kommentar")}</th>
                       <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{ui.colDate}</th>
                     </tr>
                   </thead>
@@ -636,7 +637,7 @@ export default function CustomerDetailPage() {
               <>
                 {/* Discounts */}
                 <Card
-                  title={locale === "en" ? "Discounts & Coupons" : locale === "tr" ? "İndirimler & Kuponlar" : "Rabatte & Gutscheine"}
+                  title={lt(locale, "Discounts & Coupons", "İndirimler & Kuponlar", "Discounts & Coupons", "Discounts & Coupons", "Discounts & Coupons", "Rabatte & Gutscheine")}
                   action={
                     <Button size="slim" variant="primary" onClick={() => setShowDiscountModal(true)}>
                       {ui.add}
@@ -651,9 +652,9 @@ export default function CustomerDetailPage() {
                         <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
                           <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Code</th>
                           <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colType}</th>
-                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{locale === "en" ? "Value" : locale === "tr" ? "Değer" : "Wert"}</th>
-                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{locale === "en" ? "Uses" : locale === "tr" ? "Kullanım" : "Nutzungen"}</th>
-                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{locale === "en" ? "Valid until" : locale === "tr" ? "Geçerlilik" : "Gültig bis"}</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{lt(locale, "Value", "Değer", "Value", "Value", "Value", "Wert")}</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{lt(locale, "Uses", "Kullanım", "Uses", "Uses", "Uses", "Nutzungen")}</th>
+                          <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{lt(locale, "Valid until", "Geçerlilik", "Valid until", "Valid until", "Valid until", "Gültig bis")}</th>
                           <th></th>
                         </tr>
                       </thead>
@@ -664,7 +665,7 @@ export default function CustomerDetailPage() {
                           return (
                             <tr key={i} style={{ borderBottom: "1px solid #f3f4f6", opacity: (isExpired || isExhausted) ? 0.5 : 1 }}>
                               <td style={{ padding: "8px 0", fontWeight: 700, fontFamily: "monospace", fontSize: 12 }}>{d.code}</td>
-                              <td style={{ padding: "8px 0", color: "#6b7280" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? (locale === "en" ? "Fixed" : locale === "tr" ? "Sabit" : "Fest") : ui.shipping}</td>
+                              <td style={{ padding: "8px 0", color: "#6b7280" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? (lt(locale, "Fixed", "Sabit", "Fixed", "Fixed", "Fixed", "Fest")) : ui.shipping}</td>
                               <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600 }}>
                                 {d.type === "percentage" ? `${d.value}%` : d.type === "fixed" ? `${Number(d.value).toFixed(2)} €` : "—"}
                               </td>
@@ -698,7 +699,7 @@ export default function CustomerDetailPage() {
                         value={notesVal}
                         onChange={e => setNotesVal(e.target.value)}
                         style={{ width: "100%", height: 100, padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
-                        placeholder={locale === "en" ? "Internal notes about the customer…" : locale === "tr" ? "Müşteri hakkında dahili notlar…" : "Interne Notizen zum Kunden…"}
+                        placeholder={lt(locale, "Internal notes about the customer…", "Müşteri hakkında dahili notlar…", "Internal notes about the customer…", "Internal notes about the customer…", "Internal notes about the customer…", "Interne Notizen zum Kunden…")}
                         autoFocus
                       />
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -712,7 +713,7 @@ export default function CustomerDetailPage() {
                     </div>
                   ) : (
                     <p style={{ fontSize: 13, color: notesVal ? "#111827" : "#9ca3af", margin: "10px 0 4px", whiteSpace: "pre-wrap" }}>
-                      {notesVal || (locale === "en" ? "No notes" : locale === "tr" ? "Not yok" : "Keine Notizen")}
+                      {notesVal || (lt(locale, "No notes", "Not yok", "No notes", "No notes", "No notes", "Keine Notizen"))}
                     </p>
                   )}
                 </Card>
@@ -722,7 +723,7 @@ export default function CustomerDetailPage() {
             {/* Bonus ledger (superuser only) */}
             {isSuperuser && (
             <Card
-              title={locale === "en" ? "Bonus points — History" : locale === "tr" ? "Bonus puanları — Geçmiş" : "Bonuspunkte — Verlauf"}
+              title={lt(locale, "Bonus points — History", "Bonus puanları — Geçmiş", "Bonus points — History", "Bonus points — History", "Bonus points — History", "Bonuspunkte — Verlauf")}
               action={
                 <Button size="slim" variant="primary" onClick={() => setShowBonusLedgerModal(true)}>
                   {ui.add}
@@ -730,7 +731,7 @@ export default function CustomerDetailPage() {
               }
             >
               {bonusLedger.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>{locale === "en" ? "No ledger entries yet." : locale === "tr" ? "Henüz kayıt yok." : "Noch keine Einträge im Verlauf."}</p>
+                <p style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>{lt(locale, "No ledger entries yet.", "Henüz kayıt yok.", "No ledger entries yet.", "No ledger entries yet.", "No ledger entries yet.", "Noch keine Einträge im Verlauf.")}</p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -738,7 +739,7 @@ export default function CustomerDetailPage() {
                       <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
                         <th style={{ textAlign: "left", padding: "6px 8px 10px", width: 110 }}>{ui.colDate}</th>
                         <th style={{ textAlign: "left", padding: "6px 8px 10px" }}>{ui.colDescription}</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 100 }}>{locale === "en" ? "Bonus points" : locale === "tr" ? "Bonus puan" : "Bonuspunkte"}</th>
+                        <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 100 }}>{lt(locale, "Bonus points", "Bonus puan", "Bonus points", "Bonus points", "Bonus points", "Bonuspunkte")}</th>
                         <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 1 }} />
                       </tr>
                     </thead>
@@ -821,31 +822,31 @@ export default function CustomerDetailPage() {
           {/* RIGHT COLUMN */}
           <div>
             {/* Customer info */}
-            <Card title={locale === "en" ? "Customer Profile" : locale === "tr" ? "Müşteri Profili" : "Kundenprofil"}>
+            <Card title={lt(locale, "Customer Profile", "Müşteri Profili", "Customer Profile", "Customer Profile", "Customer Profile", "Kundenprofil")}>
               <InfoRow label={ui.firstName} value={customer.first_name} />
               <InfoRow label={ui.lastName} value={customer.last_name} />
               {isSuperuser && <InfoRow label={ui.colEmail} value={customer.email} />}
               {isSuperuser && <InfoRow label={ui.phone} value={customer.phone} />}
-              {customer.gender && <InfoRow label={locale === "en" ? "Gender" : locale === "tr" ? "Cinsiyet" : "Geschlecht"} value={customer.gender === "male" ? (locale === "en" ? "Male" : locale === "tr" ? "Erkek" : "Männlich") : customer.gender === "female" ? (locale === "en" ? "Female" : locale === "tr" ? "Kadın" : "Weiblich") : customer.gender} />}
-              {isSuperuser && customer.birth_date && <InfoRow label={locale === "en" ? "Date of birth" : locale === "tr" ? "Doğum tarihi" : "Geburtsdatum"} value={fmtBirthDate(customer.birth_date, locale)} />}
+              {customer.gender && <InfoRow label={lt(locale, "Gender", "Cinsiyet", "Gender", "Gender", "Gender", "Geschlecht")} value={customer.gender === "male" ? (lt(locale, "Male", "Erkek", "Male", "Male", "Male", "Männlich")) : customer.gender === "female" ? (lt(locale, "Female", "Kadın", "Female", "Female", "Female", "Weiblich")) : customer.gender} />}
+              {isSuperuser && customer.birth_date && <InfoRow label={lt(locale, "Date of birth", "Doğum tarihi", "Date of birth", "Date of birth", "Date of birth", "Geburtsdatum")} value={fmtBirthDate(customer.birth_date, locale)} />}
               {isSuperuser && <InfoRow label={ui.accountType} value={accountTypeLabel()} />}
-              {isSuperuser && <InfoRow label={locale === "en" ? "Account" : locale === "tr" ? "Hesap" : "Konto"} value={customer.is_registered ? (locale === "en" ? "Registered" : locale === "tr" ? "Kayıtlı" : "Registriert") : ui.guestCustomer} />}
-              {isSuperuser && <InfoRow label="Newsletter" value={customer.newsletter_opted_in ? (locale === "en" ? "✓ Subscribed" : locale === "tr" ? "✓ Abone" : "✓ Abonniert") : (locale === "en" ? "Not subscribed" : locale === "tr" ? "Abone değil" : "Nicht abonniert")} />}
-              {isSuperuser && customer.email_marketing_consent && <InfoRow label={locale === "en" ? "Marketing email" : locale === "tr" ? "Pazarlama e-postası" : "Marketing E-Mail"} value={locale === "en" ? "Consented" : locale === "tr" ? "Onaylandı" : "Zugestimmt"} />}
+              {isSuperuser && <InfoRow label={lt(locale, "Account", "Hesap", "Account", "Account", "Account", "Konto")} value={customer.is_registered ? (lt(locale, "Registered", "Kayıtlı", "Registered", "Registered", "Registered", "Registriert")) : ui.guestCustomer} />}
+              {isSuperuser && <InfoRow label="Newsletter" value={customer.newsletter_opted_in ? (lt(locale, "✓ Subscribed", "✓ Abone", "✓ Subscribed", "✓ Subscribed", "✓ Subscribed", "✓ Abonniert")) : (lt(locale, "Not subscribed", "Abone değil", "Not subscribed", "Not subscribed", "Not subscribed", "Nicht abonniert"))} />}
+              {isSuperuser && customer.email_marketing_consent && <InfoRow label={lt(locale, "Marketing email", "Pazarlama e-postası", "Marketing email", "Marketing email", "Marketing email", "Marketing E-Mail")} value={lt(locale, "Consented", "Onaylandı", "Consented", "Consented", "Consented", "Zugestimmt")} />}
               {customer.account_type === "gewerbe" && (
                 <>
                   <InfoRow label={ui.companyName} value={customer.company_name} />
                   <InfoRow label="USt-IdNr." value={customer.vat_number} mono />
                 </>
               )}
-              {isSuperuser && <InfoRow label={locale === "en" ? "Customer no." : locale === "tr" ? "Müşteri no." : "Kundennummer"} value={customer.customer_number ? `#${customer.customer_number}` : "—"} />}
-              {isSuperuser && <InfoRow label={locale === "en" ? "Created on" : locale === "tr" ? "Oluşturulma" : "Erstellt am"} value={fmtDateShort(customer.created_at, locale)} />}
-              {isSuperuser && <InfoRow label={locale === "en" ? "First order" : locale === "tr" ? "İlk sipariş" : "Erste Bestellung"} value={fmtDateShort(firstOrder, locale)} />}
+              {isSuperuser && <InfoRow label={lt(locale, "Customer no.", "Müşteri no.", "Customer no.", "Customer no.", "Customer no.", "Kundennummer")} value={customer.customer_number ? `#${customer.customer_number}` : "—"} />}
+              {isSuperuser && <InfoRow label={lt(locale, "Created on", "Oluşturulma", "Created on", "Created on", "Created on", "Erstellt am")} value={fmtDateShort(customer.created_at, locale)} />}
+              {isSuperuser && <InfoRow label={lt(locale, "First order", "İlk sipariş", "First order", "First order", "First order", "Erste Bestellung")} value={fmtDateShort(firstOrder, locale)} />}
               {isSuperuser && <InfoRow label={ui.lastOrder} value={fmtDateShort(lastOrder, locale)} />}
             </Card>
 
             {/* Delivery address */}
-            <Card title={locale === "en" ? "Delivery address" : locale === "tr" ? "Teslimat adresi" : "Lieferadresse"}>
+            <Card title={lt(locale, "Delivery address", "Teslimat adresi", "Delivery address", "Delivery address", "Delivery address", "Lieferadresse")}>
               <AddressBlock
                 label=""
                 line1={customer.address_line1}
@@ -855,12 +856,12 @@ export default function CustomerDetailPage() {
                 country={customer.country}
               />
               {!customer.address_line1 && !customer.city && (
-                <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>{locale === "en" ? "No delivery address" : locale === "tr" ? "Teslimat adresi yok" : "Keine Lieferadresse"}</p>
+                <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>{lt(locale, "No delivery address", "Teslimat adresi yok", "No delivery address", "No delivery address", "No delivery address", "Keine Lieferadresse")}</p>
               )}
             </Card>
 
             {/* Billing address */}
-            <Card title={locale === "en" ? "Billing address" : locale === "tr" ? "Fatura adresi" : "Rechnungsadresse"}>
+            <Card title={lt(locale, "Billing address", "Fatura adresi", "Billing address", "Billing address", "Billing address", "Rechnungsadresse")}>
               {hasStoredBilling ? (
                 <AddressBlock
                   label=""
@@ -884,23 +885,23 @@ export default function CustomerDetailPage() {
                 </>
               ) : (customer.address_line1 || customer.city) ? (
                 <p style={{ fontSize: 13, color: "#6b7280", margin: "10px 0 4px", lineHeight: 1.5 }}>
-                  {locale === "en" ? "Same as delivery address (no separate billing address)." : locale === "tr" ? "Teslimat adresiyle aynı (ayrı fatura adresi yok)." : "Entspricht der Lieferadresse (keine abweichende Rechnungsadresse)."}
+                  {lt(locale, "Same as delivery address (no separate billing address).", "Teslimat adresiyle aynı (ayrı fatura adresi yok).", "Same as delivery address (no separate billing address).", "Same as delivery address (no separate billing address).", "Same as delivery address (no separate billing address).", "Entspricht der Lieferadresse (keine abweichende Rechnungsadresse).")}
                 </p>
               ) : (
                 <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>
-                  {locale === "en" ? "No billing address on file." : locale === "tr" ? "Kayıtlı fatura adresi yok." : "Keine Rechnungsadresse hinterlegt."}
+                  {lt(locale, "No billing address on file.", "Kayıtlı fatura adresi yok.", "No billing address on file.", "No billing address on file.", "No billing address on file.", "Keine Rechnungsadresse hinterlegt.")}
                 </p>
               )}
             </Card>
 
             {/* Timeline */}
             {isSuperuser && (
-            <Card title={locale === "en" ? "Activity" : locale === "tr" ? "Aktivite" : "Aktivität"}>
+            <Card title={lt(locale, "Activity", "Aktivite", "Activity", "Activity", "Activity", "Aktivität")}>
               <div style={{ paddingTop: 8 }}>
                 {[
-                  customer.created_at && { date: customer.created_at, text: locale === "en" ? "Customer created" : locale === "tr" ? "Müşteri oluşturuldu" : "Kunde erstellt" },
-                  firstOrder && { date: firstOrder, text: locale === "en" ? "First order" : locale === "tr" ? "İlk sipariş" : "Erste Bestellung" },
-                  orders.length > 1 && lastOrder && { date: lastOrder, text: locale === "en" ? "Last order" : locale === "tr" ? "Son sipariş" : "Letzte Bestellung" },
+                  customer.created_at && { date: customer.created_at, text: lt(locale, "Customer created", "Müşteri oluşturuldu", "Customer created", "Customer created", "Customer created", "Kunde erstellt") },
+                  firstOrder && { date: firstOrder, text: lt(locale, "First order", "İlk sipariş", "First order", "First order", "First order", "Erste Bestellung") },
+                  orders.length > 1 && lastOrder && { date: lastOrder, text: lt(locale, "Last order", "Son sipariş", "Last order", "Last order", "Last order", "Letzte Bestellung") },
                 ].filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date)).map((ev, i) => (
                   <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
                     <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#008060", marginTop: 5, flexShrink: 0 }} />

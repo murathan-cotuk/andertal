@@ -7,25 +7,29 @@ import {
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { lt } from "@/lib/locale-text";
 import { defaultCountryName } from "@/lib/countries";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { userError } from "@/lib/api-error-messages";
 
 function getLocationTypes(locale) {
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   return [
-    { label: locale === "en" ? "Warehouse / Fulfillment" : locale === "tr" ? "Depo / Fulfillment" : "Lager / Fulfillment", value: "warehouse" },
-    { label: locale === "en" ? "Branch / Store" : locale === "tr" ? "Şube / Mağaza" : "Filiale / Store", value: "store" },
-    { label: locale === "en" ? "Office" : locale === "tr" ? "Ofis" : "Büro", value: "office" },
-    { label: locale === "en" ? "Other" : locale === "tr" ? "Diğer" : "Sonstige", value: "other" },
+    { label: t("Warehouse / Fulfillment", "Depo / Fulfillment", "Entrepôt / exécution", "Almacén / cumplimiento", "Magazzino / fulfillment", "Lager / Fulfillment"), value: "warehouse" },
+    { label: t("Branch / Store", "Şube / Mağaza", "Succursale / magasin", "Sucursal / tienda", "Filiale / negozio", "Filiale / Store"), value: "store" },
+    { label: t("Office", "Ofis", "Bureau", "Oficina", "Ufficio", "Büro"), value: "office" },
+    { label: t("Other", "Diğer", "Autre", "Otro", "Altro", "Sonstige"), value: "other" },
   ];
 }
 
 function getTypeLabel(type, locale) {
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const map = {
-    warehouse: locale === "en" ? "Warehouse" : locale === "tr" ? "Depo" : "Lager",
-    store: locale === "en" ? "Branch" : locale === "tr" ? "Şube" : "Filiale",
-    office: locale === "en" ? "Office" : locale === "tr" ? "Ofis" : "Büro",
-    other: locale === "en" ? "Other" : locale === "tr" ? "Diğer" : "Sonstige",
+    warehouse: t("Warehouse", "Depo", "Entrepôt", "Almacén", "Magazzino", "Lager"),
+    store: t("Branch", "Şube", "Succursale", "Sucursal", "Filiale", "Filiale"),
+    office: t("Office", "Ofis", "Bureau", "Oficina", "Ufficio", "Büro"),
+    other: t("Other", "Diğer", "Autre", "Otro", "Altro", "Sonstige"),
   };
   return map[type] || type;
 }
@@ -38,6 +42,7 @@ const getEmpty = (locale) => ({
 });
 
 function LocationModal({ location, onSave, onClose, locale, ui }) {
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const [form, setForm] = useState(location ? { ...getEmpty(locale), ...location } : { ...getEmpty(locale) });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -46,7 +51,7 @@ function LocationModal({ location, onSave, onClose, locale, ui }) {
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
-    if (!form.name.trim()) { setError(locale === "en" ? "Name required" : locale === "tr" ? "Ad gerekli" : "Name erforderlich"); return; }
+    if (!form.name.trim()) { setError(t("Name required", "Ad gerekli", "Nom requis", "Nombre requerido", "Nome obbligatorio", "Name erforderlich")); return; }
     setSaving(true); setError(null);
     try {
       if (location?.id) {
@@ -60,7 +65,7 @@ function LocationModal({ location, onSave, onClose, locale, ui }) {
       }
       onSave();
     } catch (e) {
-      setError(e?.message || (locale === "en" ? "Error saving" : locale === "tr" ? "Kaydetme hatası" : "Fehler beim Speichern"));
+      setError(userError(e, locale, t("Error saving", "Kaydetme hatası", "Erreur d'enregistrement", "Error al guardar", "Errore durante il salvataggio", "Fehler beim Speichern")));
     } finally {
       setSaving(false);
     }
@@ -86,8 +91,8 @@ function LocationModal({ location, onSave, onClose, locale, ui }) {
         }}>
           <Text variant="headingMd" as="h2" tone="text-inverse">
             {location?.id
-              ? (locale === "en" ? "Edit location" : locale === "tr" ? "Konumu düzenle" : "Standort bearbeiten")
-              : (locale === "en" ? "Add location" : locale === "tr" ? "Konum ekle" : "Standort hinzufügen")}
+              ? t("Edit location", "Konumu düzenle", "Modifier l'emplacement", "Editar ubicación", "Modifica posizione", "Standort bearbeiten")
+              : t("Add location", "Konum ekle", "Ajouter un emplacement", "Agregar ubicación", "Aggiungi posizione", "Standort hinzufügen")}
           </Text>
         </div>
         <div style={{ padding: "20px 22px" }}>
@@ -96,33 +101,33 @@ function LocationModal({ location, onSave, onClose, locale, ui }) {
             <InlineStack gap="300" wrap={false}>
               <div style={{ flex: 1 }}>
                 <TextField
-                  label={locale === "en" ? "Name *" : locale === "tr" ? "Ad *" : "Name *"}
+                  label={t("Name *", "Ad *", "Nom *", "Nombre *", "Nome *", "Name *")}
                   value={form.name}
                   onChange={set("name")}
-                  placeholder={locale === "en" ? "e.g. Main warehouse" : locale === "tr" ? "örn. Ana depo" : "z. B. Hauptlager"}
+                  placeholder={t("e.g. Main warehouse", "örn. Ana depo", "ex. Entrepôt principal", "p. ej. Almacén principal", "es. Magazzino principale", "z. B. Hauptlager")}
                   autoComplete="off"
                 />
               </div>
               <div style={{ minWidth: 160 }}>
                 <Select
-                  label={locale === "en" ? "Type" : locale === "tr" ? "Tür" : "Typ"}
+                  label={t("Type", "Tür", "Type", "Tipo", "Tipo", "Typ")}
                   options={getLocationTypes(locale)}
                   value={form.type}
                   onChange={set("type")}
                 />
               </div>
             </InlineStack>
-            <TextField label={locale === "en" ? "Street" : locale === "tr" ? "Sokak" : "Straße"} value={form.address_line1} onChange={set("address_line1")} autoComplete="off" />
-            <TextField label={locale === "en" ? "Address line 2" : locale === "tr" ? "Adres satırı 2" : "Adresszusatz"} value={form.address_line2} onChange={set("address_line2")} autoComplete="off" />
+            <TextField label={t("Street", "Sokak", "Rue", "Calle", "Via", "Straße")} value={form.address_line1} onChange={set("address_line1")} autoComplete="off" />
+            <TextField label={t("Address line 2", "Adres satırı 2", "Adresse ligne 2", "Dirección línea 2", "Indirizzo riga 2", "Adresszusatz")} value={form.address_line2} onChange={set("address_line2")} autoComplete="off" />
             <InlineStack gap="200" wrap={false}>
               <div style={{ minWidth: 100 }}>
-                <TextField label={locale === "en" ? "Postal code" : locale === "tr" ? "Posta kodu" : "PLZ"} value={form.postal_code} onChange={set("postal_code")} autoComplete="off" />
+                <TextField label={t("Postal code", "Posta kodu", "Code postal", "Código postal", "CAP", "PLZ")} value={form.postal_code} onChange={set("postal_code")} autoComplete="off" />
               </div>
               <div style={{ flex: 1 }}>
-                <TextField label={locale === "en" ? "City" : locale === "tr" ? "Şehir" : "Stadt"} value={form.city} onChange={set("city")} autoComplete="off" />
+                <TextField label={t("City", "Şehir", "Ville", "Ciudad", "Città", "Stadt")} value={form.city} onChange={set("city")} autoComplete="off" />
               </div>
             </InlineStack>
-            <TextField label={locale === "en" ? "Country" : locale === "tr" ? "Ülke" : "Land"} value={form.country} onChange={set("country")} autoComplete="off" />
+            <TextField label={t("Country", "Ülke", "Pays", "País", "Paese", "Land")} value={form.country} onChange={set("country")} autoComplete="off" />
             <InlineStack gap="200" wrap={false}>
               <div style={{ flex: 1 }}>
                 <TextField label={ui.phone} value={form.phone} onChange={set("phone")} autoComplete="off" type="tel" />
@@ -132,7 +137,7 @@ function LocationModal({ location, onSave, onClose, locale, ui }) {
               </div>
             </InlineStack>
             <Checkbox
-              label={locale === "en" ? "Set as primary location" : locale === "tr" ? "Birincil konum olarak ayarla" : "Als Primärstandort setzen"}
+              label={t("Set as primary location", "Birincil konum olarak ayarla", "Définir comme emplacement principal", "Establecer como ubicación principal", "Imposta come posizione principale", "Als Primärstandort setzen")}
               checked={!!form.is_primary}
               onChange={set("is_primary")}
             />
@@ -150,6 +155,7 @@ function LocationModal({ location, onSave, onClose, locale, ui }) {
 }
 
 function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const typeColor = TYPE_COLORS[loc.type] || "#6b7280";
   const typeLabel = getTypeLabel(loc.type, locale);
   const addressLines = [loc.address_line1, loc.address_line2, [loc.postal_code, loc.city].filter(Boolean).join(" "), loc.country].filter(Boolean);
@@ -174,7 +180,7 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
               <span style={{
                 display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600,
                 background: "#d1fae5", color: "#065f46",
-              }}>{locale === "en" ? "Primary" : locale === "tr" ? "Birincil" : "Primär"}</span>
+              }}>{t("Primary", "Birincil", "Principal", "Principal", "Principale", "Primär")}</span>
             )}
             {!loc.is_active && (
               <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#f3f4f6", color: "#9ca3af" }}>{ui.inactive}</span>
@@ -196,7 +202,7 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
         </BlockStack>
         <InlineStack gap="100" blockAlign="start">
           {!loc.is_primary && (
-            <Button size="slim" onClick={() => onSetPrimary(loc)}>{locale === "en" ? "Set primary" : locale === "tr" ? "Birincil yap" : "Primär setzen"}</Button>
+            <Button size="slim" onClick={() => onSetPrimary(loc)}>{t("Set primary", "Birincil yap", "Définir principal", "Establecer principal", "Imposta principale", "Primär setzen")}</Button>
           )}
           <Button size="slim" onClick={() => onEdit(loc)}>{ui.edit}</Button>
           <Button size="slim" tone="critical" onClick={() => onDelete(loc)}>{ui.delete}</Button>
@@ -208,6 +214,7 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
 
 export default function LocationsSettingsPage() {
   const locale = useLocale();
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const [locations, setLocations] = useState([]);
@@ -221,7 +228,7 @@ export default function LocationsSettingsPage() {
       const res = await client.request("/admin-hub/v1/seller/locations");
       setLocations(res?.locations || []);
     } catch (e) {
-      setError(e?.message || (locale === "en" ? "Error loading" : locale === "tr" ? "Yükleme hatası" : "Fehler beim Laden"));
+      setError(userError(e, locale, t("Error loading", "Yükleme hatası", "Erreur de chargement", "Error de carga", "Errore di caricamento", "Fehler beim Laden")));
     } finally {
       setLoading(false);
     }
@@ -230,17 +237,20 @@ export default function LocationsSettingsPage() {
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (loc) => {
-    const confirmMsg = locale === "en"
-      ? `Delete location "${loc.name}"?`
-      : locale === "tr"
-      ? `"${loc.name}" konumunu sil?`
-      : `Standort "${loc.name}" löschen?`;
+    const confirmMsg = t(
+      `Delete location "${loc.name}"?`,
+      `"${loc.name}" konumunu sil?`,
+      `Supprimer l'emplacement "${loc.name}" ?`,
+      `¿Eliminar ubicación "${loc.name}"?`,
+      `Eliminare posizione "${loc.name}"?`,
+      `Standort "${loc.name}" löschen?`,
+    );
     if (!await confirmDelete(confirmMsg)) return;
     try {
       await client.request(`/admin-hub/v1/seller/locations/${loc.id}`, { method: "DELETE" });
       load();
     } catch (e) {
-      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
+      alert(`${t("Error: ", "Hata: ", "Erreur : ", "Error: ", "Errore: ", "Fehler: ")}${userError(e, locale, t("Unknown", "Bilinmiyor", "Inconnu", "Desconocido", "Sconosciuto", "Unbekannt"))}`);
     }
   };
 
@@ -251,7 +261,7 @@ export default function LocationsSettingsPage() {
       });
       load();
     } catch (e) {
-      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
+      alert(`${t("Error: ", "Hata: ", "Erreur : ", "Error: ", "Errore: ", "Fehler: ")}${userError(e, locale, t("Unknown", "Bilinmiyor", "Inconnu", "Desconocido", "Sconosciuto", "Unbekannt"))}`);
     }
   };
 
@@ -261,13 +271,13 @@ export default function LocationsSettingsPage() {
         <BlockStack gap="200">
           <InlineStack align="space-between" blockAlign="center">
             <BlockStack gap="050">
-              <Text variant="headingMd" as="h2">{locale === "en" ? "Locations" : locale === "tr" ? "Konumlar" : "Standorte"}</Text>
+              <Text variant="headingMd" as="h2">{t("Locations", "Konumlar", "Emplacements", "Ubicaciones", "Posizioni", "Standorte")}</Text>
               <Text as="p" tone="subdued" variant="bodySm">
-                {locale === "en" ? "Manage your warehouse, branch and office locations." : locale === "tr" ? "Depo, şube ve ofis konumlarınızı yönetin." : "Verwalten Sie Ihre Lager-, Filial- und Bürostandorte."}
+                {t("Manage your warehouse, branch and office locations.", "Depo, şube ve ofis konumlarınızı yönetin.", "Gérez vos emplacements d'entrepôt, de succursale et de bureau.", "Gestione sus ubicaciones de almacén, sucursal y oficina.", "Gestisci le posizioni di magazzino, filiale e ufficio.", "Verwalten Sie Ihre Lager-, Filial- und Bürostandorte.")}
               </Text>
             </BlockStack>
             <Button variant="primary" onClick={() => setModal("add")}>
-              {locale === "en" ? "+ Add location" : locale === "tr" ? "+ Konum ekle" : "+ Standort hinzufügen"}
+              {t("+ Add location", "+ Konum ekle", "+ Ajouter un emplacement", "+ Agregar ubicación", "+ Aggiungi posizione", "+ Standort hinzufügen")}
             </Button>
           </InlineStack>
         </BlockStack>
@@ -289,10 +299,10 @@ export default function LocationsSettingsPage() {
           <BlockStack gap="200" inlineAlign="center">
             <div style={{ fontSize: 40, textAlign: "center" }}>📍</div>
             <Text as="p" tone="subdued" alignment="center">
-              {locale === "en" ? "No locations added yet." : locale === "tr" ? "Henüz konum eklenmedi." : "Noch keine Standorte hinterlegt."}
+              {t("No locations added yet.", "Henüz konum eklenmedi.", "Aucun emplacement ajouté pour l'instant.", "Aún no se han agregado ubicaciones.", "Nessuna posizione aggiunta finora.", "Noch keine Standorte hinterlegt.")}
             </Text>
             <Button variant="primary" onClick={() => setModal("add")}>
-              {locale === "en" ? "Add first location" : locale === "tr" ? "İlk konumu ekle" : "Ersten Standort hinzufügen"}
+              {t("Add first location", "İlk konumu ekle", "Ajouter le premier emplacement", "Agregar primera ubicación", "Aggiungi prima posizione", "Ersten Standort hinzufügen")}
             </Button>
           </BlockStack>
         </Card>

@@ -36,9 +36,9 @@ import {
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
 import { polarisI18nFor } from "@/lib/polaris-locale";
+import { getApprovalBannerCopy } from "@/lib/approval-banner-i18n";
 import "@shopify/polaris/build/esm/styles.css";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { LogoutButton } from "@andertal/ui";
 import { fieldNameDisplayLabel } from "@/lib/product-change-request-format";
 import { getNotificationsCopy } from "@/lib/notifications-i18n";
 import { statusLabel as localizeStatus } from "@/lib/status-labels";
@@ -712,6 +712,7 @@ export default function PolarisLayout({ children }) {
     {
       items: [
         { content: tCommon("settings"), onAction: () => router.push("/settings") },
+        { content: tCommon("logout"), onAction: () => handleLogout() },
       ],
     },
   ];
@@ -993,9 +994,6 @@ export default function PolarisLayout({ children }) {
             )}
           </div>
 
-          {/* Logout */}
-          <LogoutButton label={tCommon("logout")} onClick={handleLogout} />
-
           {/* Profile */}
           <TopBar.UserMenu
             name={storeName}
@@ -1138,35 +1136,7 @@ export default function PolarisLayout({ children }) {
   );
 
   const linkComponent = unsaved ? UnsavedAwareLink : NextLink;
-  const bannerI18n = locale === "tr"
-    ? {
-        completeVerification: "Satışa başlayabilmek için doğrulama adımlarına geçin",
-        goVerification: "Doğrulamaya git",
-        suspended: "hesabınız askıya alındı. lütfen destek ile iletişime geçin",
-        rejected: "hesabınız reddedildi. lütfen evrakları kontrol edip destek ile iletişime geçin.",
-        docsSubmitted: "evraklar gönderildi. hesabınız inceleme altında.",
-        pending: "hesabınız onay bekliyor. inceleme sonrası bilgilendirileceksiniz.",
-        accountStatus: (status) => `hesap durumu: ${status}`,
-      }
-    : locale === "de"
-      ? {
-          completeVerification: "Gehe zu den Verifizierungsschritten, um mit dem Verkauf zu starten",
-          goVerification: "Zur Verifizierung",
-          suspended: "Ihr Konto wurde gesperrt. Bitte kontaktieren Sie den Support.",
-          rejected: "Ihr Konto wurde abgelehnt. Bitte prüfen Sie Ihre Unterlagen und kontaktieren Sie den Support.",
-          docsSubmitted: "Unterlagen eingereicht. Ihr Konto wird geprüft.",
-          pending: "Ihr Konto wartet auf Freigabe. Sie werden nach der Prüfung benachrichtigt.",
-          accountStatus: (status) => `Kontostatus: ${status}`,
-        }
-      : {
-          completeVerification: "Go to verification steps to start selling",
-          goVerification: "Go to verification",
-          suspended: "Your account is suspended. Please contact support.",
-          rejected: "Your account was rejected. Please review your documents and contact support.",
-          docsSubmitted: "Documents submitted. Your account is under review.",
-          pending: "Your account is pending approval. You will be notified after review.",
-          accountStatus: (status) => `Account status: ${status}`,
-        };
+  const bannerI18n = getApprovalBannerCopy(locale);
   const approvalBanner = !isSuperuser ? (() => {
     const status = String(approvalStatus || "").toLowerCase();
     if (!status) return null;

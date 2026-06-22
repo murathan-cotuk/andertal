@@ -113,6 +113,8 @@ export function getMarketingPpcEditorCopy(locale) {
     resume: t("Resume", "Devam et", "Reprendre", "Reanudar", "Riprendi", "Fortsetzen"),
     activeOn: t("Active on", "Aktif:", "Actif sur", "Activo en", "Attivo su", "Aktiv auf"),
     created: t("Created", "Oluşturuldu", "Créé", "Creado", "Creato", "Erstellt"),
+    budgetDaily: t("Budget", "Butce", "Budget", "Presupuesto", "Budget", "Budget"),
+    googleAds: t("Google Ads", "Google Ads", "Google Ads", "Google Ads", "Google Ads", "Google Ads"),
     focusShop: t("Focus: Visibility & Sponsored in shop", "Odak: Mağazada görünürlük & sponsorlu", "Focus : Visibilité & sponsorisé dans la boutique", "Enfoque: Visibilidad & patrocinado en la tienda", "Focus: Visibilità & sponsorizzato nel negozio", "Fokus: Sichtbarkeit & Sponsored im Shop"),
     errors: t("Errors", "Hatalar", "Erreurs", "Errores", "Errori", "Fehler"),
     remove: t("Remove", "Kaldır", "Supprimer", "Eliminar", "Rimuovi", "Entfernen"),

@@ -10,15 +10,17 @@ import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
+import { dateLocaleFor, lt } from "@/lib/locale-text";
+import { userError } from "@/lib/api-error-messages";
 
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = dateLocaleFor(locale);
   return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function fmtCents(c, locale) {
   if (c == null || c === "") return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = dateLocaleFor(locale);
   return (Number(c) / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
 }
 function orderTotal(o) {
@@ -656,12 +658,29 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     setBackfilling(true);
     try {
       const res = await client.request("/admin-hub/v1/payouts/backfill", { method: "POST" });
-      alert(res?.message || (locale === "en" ? "Backfill completed" : locale === "tr" ? "Backfill tamamlandı" : "Backfill abgeschlossen"));
+      alert(
+        res?.message ||
+          lt(
+            locale,
+            "Backfill completed",
+            "Backfill tamamlandı",
+            "Remplissage rétroactif terminé",
+            "Backfill completado",
+            "Backfill completato",
+            "Backfill abgeschlossen",
+          ),
+      );
       // Reload
       const invRes = await client.request("/admin-hub/v1/commission-invoices").catch(() => ({ invoices: [] }));
       setInvoices(invRes?.invoices || []);
     } catch (e) {
-      alert((locale === "en" ? "Error: " : locale === "tr" ? "Hata: " : "Fehler: ") + (e?.message || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt")));
+      alert(
+        `${lt(locale, "Error: ", "Hata: ", "Erreur : ", "Error: ", "Errore: ", "Fehler: ")}${userError(
+          e,
+          locale,
+          lt(locale, "Unknown", "Bilinmiyor", "Inconnu", "Desconocido", "Sconosciuto", "Unbekannt"),
+        )}`,
+      );
     } finally {
       setBackfilling(false);
     }

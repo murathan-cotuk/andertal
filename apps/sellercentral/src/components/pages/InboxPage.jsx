@@ -607,7 +607,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                   onChange={setReply}
                   minHeight="140px"
                   placeholder={locale === "en" ? "Reply (Visual, HTML or Text)…" : locale === "tr" ? "Yanıt (Görsel, HTML veya Metin)…" : locale === "fr" ? "Réponse (Visuel, HTML ou Texte)…" : locale === "es" ? "Respuesta (Visual, HTML o Texto)…" : locale === "it" ? "Risposta (Visuale, HTML o Testo)…" : "Antwort (Visuell, HTML oder Text)…"}
-                  modes={{ visual: locale === "en" ? "Visual" : locale === "tr" ? "Görsel" : locale === "fr" ? "Visuel" : locale === "es" ? "Visual" : locale === "it" ? "Visuale" : "Visuell", html: "HTML", text: locale === "en" ? "Text" : locale === "tr" ? "Metin" : "Text" }}
+                  modes={{ visual: locale === "en" ? "Visual" : locale === "tr" ? "Görsel" : locale === "fr" ? "Visuel" : locale === "es" ? "Visual" : locale === "it" ? "Visuale" : "Visuell", html: "HTML", text: lt(locale, "Text", "Metin", "Text", "Text", "Text", "Text") }}
                 />
                 <InlineStack gap="200" blockAlign="center" wrap={false}>
                   <Box minWidth="100%">
@@ -1239,7 +1239,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                   onChange={setReply}
                   minHeight="140px"
                   placeholder={locale === "en" ? "Message (Visual, HTML or Text)…" : locale === "tr" ? "Mesaj (Görsel, HTML veya Metin)…" : locale === "fr" ? "Message (Visuel, HTML ou Texte)…" : locale === "es" ? "Mensaje (Visual, HTML o Texto)…" : locale === "it" ? "Messaggio (Visuale, HTML o Testo)…" : "Nachricht (Visuell, HTML oder Text)…"}
-                  modes={{ visual: locale === "en" ? "Visual" : locale === "tr" ? "Görsel" : locale === "fr" ? "Visuel" : locale === "es" ? "Visual" : locale === "it" ? "Visuale" : "Visuell", html: "HTML", text: locale === "en" ? "Text" : locale === "tr" ? "Metin" : "Text" }}
+                  modes={{ visual: locale === "en" ? "Visual" : locale === "tr" ? "Görsel" : locale === "fr" ? "Visuel" : locale === "es" ? "Visual" : locale === "it" ? "Visuale" : "Visuell", html: "HTML", text: lt(locale, "Text", "Metin", "Text", "Text", "Text", "Text") }}
                 />
                 <InlineStack gap="200" blockAlign="center">
                   <Button variant="primary" onClick={handleSend} disabled={sending || !canSend()} loading={sending}>

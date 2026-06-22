@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import { Card, Button } from "@andertal/ui";
+import { useLocale } from "next-intl";
+import { getNotificationSettingsCopy } from "@/lib/settings-pages-i18n";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -96,6 +98,8 @@ const Toggle = styled.label`
 `;
 
 export default function NotificationSettingsPage() {
+  const locale = useLocale();
+  const copy = getNotificationSettingsCopy(locale);
   const [notifications, setNotifications] = useState({
     orderUpdates: true,
     paymentNotifications: true,
@@ -112,52 +116,19 @@ export default function NotificationSettingsPage() {
     }));
   };
 
-  const notificationItems = [
-    {
-      key: "orderUpdates",
-      title: "Order Updates",
-      description: "Get notified about new orders and order status changes",
-    },
-    {
-      key: "paymentNotifications",
-      title: "Payment Notifications",
-      description: "Receive notifications about payments and payouts",
-    },
-    {
-      key: "productAlerts",
-      title: "Product Alerts",
-      description: "Get alerts when products are low in stock or need attention",
-    },
-    {
-      key: "marketingEmails",
-      title: "Marketing Emails",
-      description: "Receive tips, updates, and promotional emails",
-    },
-    {
-      key: "weeklyReports",
-      title: "Weekly Reports",
-      description: "Get weekly summary reports of your store performance",
-    },
-    {
-      key: "securityAlerts",
-      title: "Security Alerts",
-      description: "Important security notifications and account changes",
-    },
-  ];
-
   return (
     <Container>
-      <Title>Notification Settings</Title>
+      <Title>{copy.pageTitle}</Title>
 
       <Section>
         <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-          Email Notifications
+          {copy.emailTitle}
         </h2>
         <p style={{ color: "#6b7280", marginBottom: "24px" }}>
-          Choose which notifications you want to receive via email
+          {copy.emailSubtitle}
         </p>
 
-        {notificationItems.map((item) => (
+        {copy.items.map((item) => (
           <NotificationItem key={item.key}>
             <NotificationInfo>
               <NotificationTitle>{item.title}</NotificationTitle>
@@ -176,7 +147,7 @@ export default function NotificationSettingsPage() {
 
         <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end" }}>
           <Button>
-            Save Preferences
+            {copy.savePreferences}
           </Button>
         </div>
       </Section>

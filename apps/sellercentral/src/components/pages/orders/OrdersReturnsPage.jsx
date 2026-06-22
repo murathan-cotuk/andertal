@@ -6,18 +6,17 @@ import { getUI } from "@/lib/ui-strings";
 import { lt, dateLocaleFor } from "@/lib/locale-text";
 import { statusLabel as localizeStatus } from "@/lib/status-labels";
 import { returnSlipFilename } from "@/lib/download-names";
+import { getOrdersReturnsCopy } from "@/lib/orders-returns-i18n";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 /* ───────── helpers ───────── */
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
-  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(d).toLocaleDateString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function fmtMoney(cents, locale) {
   if (cents == null) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
-  return (cents / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
+  return (cents / 100).toLocaleString(dateLocaleFor(locale), { style: "currency", currency: "EUR" });
 }
 
 /* ───────── constants ───────── */
@@ -131,6 +130,7 @@ function downloadRetourenschein(ret, locale) {
 /* ───────── RefundModal ───────── */
 function RefundModal({ ret, onClose, onRefunded, locale }) {
   const ui = getUI(locale);
+  const c = getOrdersReturnsCopy(locale);
   const orderTotal = ret.total_cents || 0;
   const [mode, setMode] = useState("full"); // "full" | "partial"
   const [amount, setAmount] = useState((orderTotal / 100).toFixed(2));
@@ -142,11 +142,11 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
     e.preventDefault();
     const cents = Math.round(parseFloat(amount) * 100);
     if (!cents || isNaN(cents) || cents <= 0) {
-      setError(locale === "en" ? "Invalid amount" : locale === "tr" ? "Geçersiz tutar" : "Ungültiger Betrag");
+      setError(c.invalidAmount);
       return;
     }
     if (cents > orderTotal && orderTotal > 0) {
-      setError(locale === "en" ? `Amount cannot exceed order total (${fmtMoney(orderTotal, locale)})` : locale === "tr" ? `Tutar sipariş toplamını (${fmtMoney(orderTotal, locale)}) aşamaz` : `Betrag darf Bestellsumme (${fmtMoney(orderTotal, locale)}) nicht überschreiten`);
+      setError(c.amountExceeds(fmtMoney(orderTotal, locale)));
       return;
     }
     setSaving(true);
@@ -156,34 +156,17 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
       onRefunded(res?.return ?? { ...ret, refund_amount_cents: cents, refund_note: note, refund_status: "erstattet" });
       onClose();
     } catch (err) {
-      setError(err?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler"));
+      setError(err?.message || c.error);
     }
     setSaving(false);
   };
 
-  const fullRefundLabel = locale === "en" ? "Full refund" : locale === "tr" ? "Tam iade" : "Vollständige Erstattung";
-  const partialRefundLabel = locale === "en" ? "Partial refund" : locale === "tr" ? "Kısmi iade" : "Teilerstattung";
-  const amountLabel = locale === "en" ? "Amount (€)" : locale === "tr" ? "Tutar (€)" : "Betrag (€)";
-  const noteLabel = locale === "en" ? "Internal note (optional)" : locale === "tr" ? "Dahili not (isteğe bağlı)" : "Interne Notiz (optional)";
-  const notePlaceholder = locale === "en" ? "e.g. Item returned damaged…" : locale === "tr" ? "ör. Ürün hasarlı döndü…" : "z.B. Artikel beschädigt zurückgekommen…";
-  const paymentMethodLabel = locale === "en" ? "Payment method" : locale === "tr" ? "Ödeme yöntemi" : "Zahlungsmethode";
-  const unknownLabel = locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt";
-  const paymentNote = locale === "en"
-    ? "Refunds are processed via the Stripe dashboard or manually through the payment provider. This entry is for internal documentation."
-    : locale === "tr"
-    ? "İadeler Stripe panosu veya ödeme sağlayıcısı üzerinden manuel olarak işlenir. Bu kayıt iç belgeleme amaçlıdır."
-    : "Erstattungen werden über das Stripe-Dashboard oder manuell über den Zahlungsanbieter durchgeführt. Dieser Eintrag dient der internen Dokumentation.";
-  const processingLabel = locale === "en" ? "Processing…" : locale === "tr" ? "İşleniyor…" : "Verarbeite…";
-  const refundTitle = locale === "en" ? "Refund" : locale === "tr" ? "İade" : "Rückerstattung";
-  const orderLabel = locale === "en" ? "Order" : locale === "tr" ? "Sipariş" : "Bestellung";
-  const totalLabel = locale === "en" ? "Total" : locale === "tr" ? "Toplam" : "Gesamtbetrag";
-
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div style={{ background: "#fff", borderRadius: 12, width: 480, boxShadow: "0 20px 60px rgba(0,0,0,.2)", padding: 28 }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>{refundTitle}</h2>
+        <h2 style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>{c.refund}</h2>
         <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>
-          R-{ret.return_number} · {orderLabel} #{ret.order_number} · {totalLabel}: <strong>{fmtMoney(orderTotal, locale)}</strong>
+          R-{ret.return_number} · {c.order} #{ret.order_number} · {c.total}: <strong>{fmtMoney(orderTotal, locale)}</strong>
         </p>
 
         {/* Mode toggle */}
@@ -203,14 +186,14 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
                 border: mode === m ? "none" : "1px solid #e5e7eb",
               }}
             >
-              {m === "full" ? fullRefundLabel : partialRefundLabel}
+              {m === "full" ? c.fullRefund : c.partialRefund}
             </button>
           ))}
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>{amountLabel}</label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>{c.amountLabel}</label>
             <input
               type="number"
               step="0.01"
@@ -222,26 +205,26 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
             />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>{noteLabel}</label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>{c.internalNote}</label>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder={notePlaceholder}
+              placeholder={c.notePlaceholder}
               style={{ width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, height: 68, resize: "vertical", boxSizing: "border-box" }}
             />
           </div>
 
           {/* Payment method notice */}
           <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#1e40af" }}>
-            <strong>{paymentMethodLabel}:</strong> {ret.payment_method || unknownLabel}<br />
-            <span style={{ color: "#3b82f6" }}>{paymentNote}</span>
+            <strong>{c.paymentMethod}:</strong> {ret.payment_method || c.unknown}<br />
+            <span style={{ color: "#3b82f6" }}>{c.paymentNote}</span>
           </div>
 
           {error && <div style={{ color: "#b91c1c", fontSize: 12, marginBottom: 12 }}>{error}</div>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} style={{ padding: "8px 16px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 13 }}>{ui.cancel}</button>
             <button type="submit" disabled={saving} style={{ padding: "8px 20px", background: saving ? "#9ca3af" : "#2563eb", color: "#fff", border: "none", borderRadius: 7, cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}>
-              {saving ? processingLabel : `${fmtMoney(Math.round(parseFloat(amount || 0) * 100), locale)} ${locale === "en" ? "refund" : locale === "tr" ? "iade et" : "erstatten"}`}
+              {saving ? c.processing : `${fmtMoney(Math.round(parseFloat(amount || 0) * 100), locale)} ${c.refundVerb}`}
             </button>
           </div>
         </form>
@@ -253,6 +236,7 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
 /* ───────── DetailPanel (slide-out) ───────── */
 function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
   const ui = getUI(locale);
+  const c = getOrdersReturnsCopy(locale);
   const [showRefund, setShowRefund] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [sendingLabel, setSendingLabel] = useState(false);
@@ -268,27 +252,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
     setUpdating(false);
   };
 
-  const customerName = [ret.first_name, ret.last_name].filter(Boolean).join(" ") || (isSuperuser ? ret.email : null) || (locale === "en" ? "Unknown" : locale === "tr" ? "Bilinmiyor" : "Unbekannt");
-
-  const returnLabel = locale === "en" ? "Return" : locale === "tr" ? "İade" : "Retoure";
-  const approveLabel = locale === "en" ? "✓ Approve" : locale === "tr" ? "✓ Onayla" : "✓ Genehmigen";
-  const rejectLabel = locale === "en" ? "✕ Reject" : locale === "tr" ? "✕ Reddet" : "✕ Ablehnen";
-  const downloadLabelText = locale === "en" ? "⬇ Download label" : locale === "tr" ? "⬇ Etiketi indir" : "⬇ Label herunterladen";
-  const sendingText = locale === "en" ? "Sending…" : locale === "tr" ? "Gönderiliyor…" : "Senden…";
-  const labelSentText = locale === "en" ? "✓ Label sent" : locale === "tr" ? "✓ Etiket gönderildi" : "✓ Label gesendet";
-  const sendLabelText = locale === "en" ? "✉ Label by email" : locale === "tr" ? "✉ E-posta ile etiket" : "✉ Label per E-Mail";
-  const refundBtnText = locale === "en" ? "💶 Refund" : locale === "tr" ? "💶 İade et" : "💶 Erstatten";
-  const recordRefundText = locale === "en" ? "💶 Record refund" : locale === "tr" ? "💶 İadeyi kaydet" : "💶 Rückerstattung erfassen";
-  const customerLabel = locale === "en" ? "Customer" : locale === "tr" ? "Müşteri" : "Kunde";
-  const orderLabel = locale === "en" ? "Order" : locale === "tr" ? "Sipariş" : "Bestellung";
-  const orderTotalLabel = locale === "en" ? "Order total" : locale === "tr" ? "Sipariş toplamı" : "Bestellsumme";
-  const createdLabel = locale === "en" ? "Created" : locale === "tr" ? "Oluşturuldu" : "Erstellt";
-  const approvedLabel = locale === "en" ? "Approved" : locale === "tr" ? "Onaylandı" : "Genehmigt";
-  const returnReasonLabel = locale === "en" ? "Return reason" : locale === "tr" ? "İade nedeni" : "Rückgabegrund";
-  const itemsLabel = locale === "en" ? "Items" : locale === "tr" ? "Ürünler" : "Artikel";
-  const refundLabel = locale === "en" ? "Refund" : locale === "tr" ? "İade" : "Erstattung";
-  const changeStatusLabel = locale === "en" ? "Change status" : locale === "tr" ? "Durumu değiştir" : "Status ändern";
-  const labelSentOnText = locale === "en" ? "Label sent on" : locale === "tr" ? "Etiket gönderildi:" : "Label gesendet am";
+  const customerName = [ret.first_name, ret.last_name].filter(Boolean).join(" ") || (isSuperuser ? ret.email : null) || c.unknown;
 
   return (
     <>
@@ -300,7 +264,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
         <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>{returnLabel}</div>
+              <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>{c.returnWord}</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#111", marginTop: 2 }}>R-{ret.return_number || ret.id?.slice(0, 8)}</div>
             </div>
             <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, fontSize: 20, color: "#6b7280" }}>✕</button>
@@ -321,14 +285,14 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
                 disabled={updating}
                 style={{ flex: 1, padding: "10px 0", background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
               >
-                {approveLabel}
+                {c.approve}
               </button>
               <button
                 onClick={() => handleStatus("abgelehnt")}
                 disabled={updating}
                 style={{ flex: 1, padding: "10px 0", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
               >
-                {rejectLabel}
+                {c.reject}
               </button>
             </div>
           )}
@@ -339,7 +303,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
                   onClick={() => downloadRetourenschein(ret, locale)}
                   style={{ flex: 1, padding: "10px 0", background: "#111827", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
                 >
-                  {downloadLabelText}
+                  {c.downloadLabel}
                 </button>
                 <button
                   disabled={sendingLabel || !!ret.label_sent_at}
@@ -349,27 +313,25 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
                       const client = getMedusaAdminClient();
                       const res = await client.sendReturnLabel(ret.id);
                       onUpdate({ ...ret, label_sent_at: res?.label_sent_at || new Date().toISOString() });
-                      setLabelMsg(res?.emailSent
-                        ? (locale === "en" ? "✓ Email sent" : locale === "tr" ? "✓ E-posta gönderildi" : "✓ E-Mail gesendet")
-                        : (locale === "en" ? "✓ Marked (no SMTP configured)" : locale === "tr" ? "✓ İşaretlendi (SMTP yapılandırılmamış)" : "✓ Markiert (kein SMTP konfiguriert)"));
-                    } catch { setLabelMsg(locale === "en" ? "Error sending" : locale === "tr" ? "Gönderme hatası" : "Fehler beim Senden"); }
+                      setLabelMsg(res?.emailSent ? c.emailSent : c.markedNoSmtp);
+                    } catch { setLabelMsg(c.errorSending); }
                     setSendingLabel(false);
                   }}
                   style={{ flex: 1, padding: "10px 0", background: ret.label_sent_at ? "#f0fdf4" : "#2563eb", color: ret.label_sent_at ? "#15803d" : "#fff", border: ret.label_sent_at ? "1px solid #bbf7d0" : "none", borderRadius: 8, cursor: (sendingLabel || !!ret.label_sent_at) ? "default" : "pointer", fontSize: 13, fontWeight: 700 }}
                 >
-                  {sendingLabel ? sendingText : ret.label_sent_at ? labelSentText : sendLabelText}
+                  {sendingLabel ? c.sending : ret.label_sent_at ? c.labelSent : c.sendLabelEmail}
                 </button>
               </div>
               {labelMsg && <div style={{ fontSize: 12, color: "#15803d", marginBottom: 8 }}>{labelMsg}</div>}
               {ret.label_sent_at && (
-                <div style={{ fontSize: 11, color: "#6b7280" }}>{labelSentOnText} {fmtDate(ret.label_sent_at, locale)}</div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>{c.labelSentOn} {fmtDate(ret.label_sent_at, locale)}</div>
               )}
               {!ret.refund_status && (
                 <button
                   onClick={() => setShowRefund(true)}
                   style={{ width: "100%", marginTop: 8, padding: "10px 0", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
                 >
-                  {refundBtnText}
+                  {c.refundBtn}
                 </button>
               )}
             </div>
@@ -380,7 +342,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
                 onClick={() => setShowRefund(true)}
                 style={{ width: "100%", padding: "10px 0", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
               >
-                {recordRefundText}
+                {c.recordRefund}
               </button>
             </div>
           )}
@@ -388,12 +350,12 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
           {/* Info grid */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
             {[
-              [customerLabel, customerName],
-              ...(isSuperuser ? [["E-Mail", ret.email || "—"]] : []),
-              [orderLabel, ret.order_number ? `#${ret.order_number}` : "—"],
-              [orderTotalLabel, fmtMoney(ret.total_cents, locale)],
-              [createdLabel, fmtDate(ret.created_at, locale)],
-              [approvedLabel, fmtDate(ret.approved_at, locale)],
+              [c.customer, customerName],
+              ...(isSuperuser ? [[c.email, ret.email || "—"]] : []),
+              [c.order, ret.order_number ? `#${ret.order_number}` : "—"],
+              [c.orderTotal, fmtMoney(ret.total_cents, locale)],
+              [c.created, fmtDate(ret.created_at, locale)],
+              [c.approved, fmtDate(ret.approved_at, locale)],
             ].map(([label, val]) => (
               <div key={label}>
                 <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
@@ -404,7 +366,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
 
           {/* Reason / Notes */}
           <div style={{ background: "#f9fafb", borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>{returnReasonLabel}</div>
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>{c.returnReason}</div>
             <div style={{ fontSize: 14, color: "#111" }}>{ret.reason || "—"}</div>
             {ret.notes && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{ret.notes}</div>}
           </div>
@@ -412,10 +374,10 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
           {/* Items */}
           {ret.items && (Array.isArray(ret.items) ? ret.items : []).length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8 }}>{itemsLabel}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 8 }}>{c.items}</div>
               {(Array.isArray(ret.items) ? ret.items : []).map((item, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
-                  <span>{item.title || item.name || (locale === "en" ? "Item" : locale === "tr" ? "Ürün" : "Artikel")}</span>
+                  <span>{item.title || item.name || c.item}</span>
                   <span style={{ color: "#6b7280" }}>× {item.quantity || 1}</span>
                 </div>
               ))}
@@ -425,7 +387,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
           {/* Refund info */}
           {ret.refund_status && (
             <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: "#1e40af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>{refundLabel}</div>
+              <div style={{ fontSize: 11, color: "#1e40af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>{c.refund}</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: "#1d4ed8" }}>{fmtMoney(ret.refund_amount_cents, locale)}</span>
                 <Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} locale={locale} />
@@ -436,7 +398,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
 
           {/* Status change */}
           <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{changeStatusLabel}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{c.changeStatus}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {["offen", "genehmigt", "abgelehnt", "abgeschlossen"].map(s => (
                 <button
@@ -451,7 +413,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
                     border: ret.status === s ? `1px solid ${STATUS_COLORS[s]?.dot || "#e5e7eb"}` : "1px solid #e5e7eb",
                   }}
                 >
-                  {s}
+                  {localizeStatus(locale, s)}
                 </button>
               ))}
             </div>
@@ -474,6 +436,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
 /* ───────── NewReturnModal ───────── */
 function NewReturnModal({ onClose, onCreated, locale }) {
   const ui = getUI(locale);
+  const c = getOrdersReturnsCopy(locale);
   const [orderId, setOrderId] = useState("");
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
@@ -483,7 +446,7 @@ function NewReturnModal({ onClose, onCreated, locale }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!orderId.trim()) {
-      setError(locale === "en" ? "Order ID required" : locale === "tr" ? "Sipariş kimliği gerekli" : "Bestell-ID erforderlich");
+      setError(c.orderIdRequired);
       return;
     }
     setSaving(true);
@@ -493,20 +456,20 @@ function NewReturnModal({ onClose, onCreated, locale }) {
       onCreated(res?.return ?? res);
       onClose();
     } catch (err) {
-      setError(err?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : "Fehler"));
+      setError(err?.message || c.error);
     }
     setSaving(false);
   };
 
-  const titleText = locale === "en" ? "New return" : locale === "tr" ? "Yeni iade" : "Neue Rückgabe";
-  const orderIdLabel = locale === "en" ? "Order ID (UUID)" : locale === "tr" ? "Sipariş kimliği (UUID)" : "Bestell-ID (UUID)";
-  const orderIdPlaceholder = locale === "en" ? "order uuid" : locale === "tr" ? "sipariş uuid" : "uuid der Bestellung";
-  const reasonLabel = locale === "en" ? "Reason" : locale === "tr" ? "Neden" : "Grund";
-  const reasonPlaceholder = locale === "en" ? "e.g. Wrong product, Defective…" : locale === "tr" ? "ör. Yanlış ürün, Hatalı…" : "z.B. Falsches Produkt, Defekt…";
-  const notesLabel = locale === "en" ? "Notes" : locale === "tr" ? "Notlar" : "Notizen";
-  const notesPlaceholder = locale === "en" ? "Optional comments…" : locale === "tr" ? "İsteğe bağlı yorumlar…" : "Optionale Anmerkungen…";
-  const savingText = locale === "en" ? "Saving…" : locale === "tr" ? "Kaydediliyor…" : "Speichern…";
-  const createText = locale === "en" ? "Create" : locale === "tr" ? "Oluştur" : "Erstellen";
+  const titleText = c.newReturn;
+  const orderIdLabel = c.orderIdLabel;
+  const orderIdPlaceholder = c.orderIdPlaceholder;
+  const reasonLabel = c.reason;
+  const reasonPlaceholder = c.reasonPlaceholder;
+  const notesLabel = c.notes;
+  const notesPlaceholder = c.notesPlaceholder;
+  const savingText = c.saving;
+  const createText = c.create;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
@@ -542,6 +505,7 @@ function NewReturnModal({ onClose, onCreated, locale }) {
 export default function OrdersReturnsPage() {
   const locale = useLocale();
   const ui = getUI(locale);
+  const c = getOrdersReturnsCopy(locale);
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -573,22 +537,22 @@ export default function OrdersReturnsPage() {
   const totalRefunded = returns.filter(r => r.refund_status === "erstattet").reduce((s, r) => s + (r.refund_amount_cents || 0), 0);
 
   const COLS = [
-    locale === "en" ? "Return no." : locale === "tr" ? "İade no." : "Retoure-Nr.",
-    locale === "en" ? "Order" : locale === "tr" ? "Sipariş" : "Bestellung",
-    locale === "en" ? "Customer" : locale === "tr" ? "Müşteri" : "Kunde",
-    locale === "en" ? "Reason" : locale === "tr" ? "Neden" : "Grund",
+    c.colReturnNo,
+    c.order,
+    c.customer,
+    c.colReason,
     ui.status,
-    locale === "en" ? "Refund" : locale === "tr" ? "İade" : "Erstattung",
+    c.refund,
     ui.colDate,
     ui.colActions,
   ];
 
   const filterPillLabels = {
-    alle: locale === "en" ? "All" : locale === "tr" ? "Tümü" : "Alle",
-    offen: locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen",
-    genehmigt: locale === "en" ? "Approved" : locale === "tr" ? "Onaylı" : "Genehmigt",
-    abgelehnt: locale === "en" ? "Rejected" : locale === "tr" ? "Reddedildi" : "Abgelehnt",
-    abgeschlossen: locale === "en" ? "Closed" : locale === "tr" ? "Kapalı" : "Abgeschlossen",
+    alle: c.filterAll,
+    offen: c.filterOpen,
+    genehmigt: c.filterApproved,
+    abgelehnt: c.filterRejected,
+    abgeschlossen: c.filterClosed,
   };
 
   return (
@@ -596,24 +560,24 @@ export default function OrdersReturnsPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{locale === "en" ? "Returns & Refunds" : locale === "tr" ? "İadeler & Geri Ödemeler" : "Rückgaben & Erstattungen"}</h1>
-          <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{locale === "en" ? "Manage, approve and refund return requests" : locale === "tr" ? "İade taleplerini yönetin, onaylayın ve geri ödeyin" : "Rückgabeanfragen verwalten, genehmigen und erstatten"}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{c.pageTitle}</h1>
+          <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{c.pageSubtitle}</p>
         </div>
         <button
           onClick={() => setShowNew(true)}
           style={{ padding: "8px 16px", background: "#111827", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
         >
-          + {locale === "en" ? "New return" : locale === "tr" ? "Yeni iade" : "Neue Rückgabe"}
+          + {c.newReturn}
         </button>
       </div>
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         {[
-          { label: locale === "en" ? "Total" : locale === "tr" ? "Toplam" : "Gesamt", value: returns.length, color: "#111" },
-          { label: locale === "en" ? "Open" : locale === "tr" ? "Açık" : "Offen", value: counts.offen || 0, color: "#c2410c" },
-          { label: locale === "en" ? "Approved" : locale === "tr" ? "Onaylı" : "Genehmigt", value: counts.genehmigt || 0, color: "#15803d" },
-          { label: locale === "en" ? "Refunded" : locale === "tr" ? "İade edildi" : "Erstattet", value: fmtMoney(totalRefunded, locale), color: "#1d4ed8" },
+          { label: c.statTotal, value: returns.length, color: "#111" },
+          { label: c.filterOpen, value: counts.offen || 0, color: "#c2410c" },
+          { label: c.filterApproved, value: counts.genehmigt || 0, color: "#15803d" },
+          { label: c.statRefunded, value: fmtMoney(totalRefunded, locale), color: "#1d4ed8" },
         ].map(s => (
           <div key={s.label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px" }}>
             <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>{s.label}</div>
@@ -658,7 +622,7 @@ export default function OrdersReturnsPage() {
               <tr>
                 <td colSpan={8} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>↩️</div>
-                  <div>{locale === "en" ? "No return requests" : locale === "tr" ? "İade talebi yok" : "Keine Rückgabeanfragen"}</div>
+                  <div>{c.noReturns}</div>
                 </td>
               </tr>
             )}
@@ -724,7 +688,7 @@ export default function OrdersReturnsPage() {
                         <>
                           <button
                             onClick={(e) => { e.stopPropagation(); downloadRetourenschein(ret); }}
-                            title={locale === "en" ? "Download label" : locale === "tr" ? "Etiketi indir" : "Label herunterladen"}
+                            title={c.downloadLabelTitle}
                             style={{ padding: "3px 10px", background: "#f9fafb", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", fontSize: 11 }}
                           >
                             ⬇
@@ -739,7 +703,7 @@ export default function OrdersReturnsPage() {
                                 handleUpdate({ ...ret, label_sent_at: new Date().toISOString() });
                               } catch {}
                             }}
-                            title={ret.label_sent_at ? (locale === "en" ? "Label already sent" : locale === "tr" ? "Etiket zaten gönderildi" : "Label bereits gesendet") : (locale === "en" ? "Send label by email" : locale === "tr" ? "Etiketi e-posta ile gönder" : "Label per E-Mail senden")}
+                            title={ret.label_sent_at ? c.labelAlreadySent : c.sendLabelByEmail}
                             style={{ padding: "3px 10px", background: ret.label_sent_at ? "#f0fdf4" : "#eff6ff", color: ret.label_sent_at ? "#15803d" : "#2563eb", border: `1px solid ${ret.label_sent_at ? "#bbf7d0" : "#bfdbfe"}`, borderRadius: 6, cursor: ret.label_sent_at ? "default" : "pointer", fontSize: 11 }}
                           >
                             ✉

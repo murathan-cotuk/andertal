@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import styled from "styled-components";
 import { Card } from "@andertal/ui";
 import { useLocale } from "next-intl";
+import { userError } from "@/lib/api-error-messages";
+import { getOrdersReportsCopy } from "@/lib/orders-reports-i18n";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -48,6 +50,7 @@ const StatLabel = styled.div`
 
 export default function OrdersReportsPage() {
   const locale = useLocale();
+  const c = getOrdersReportsCopy(locale);
   const [exporting, setExporting] = useState("");
 
   const runExport = async (format) => {
@@ -55,7 +58,7 @@ export default function OrdersReportsPage() {
       setExporting(format);
       const token = typeof window !== "undefined" ? localStorage.getItem("sellerToken") : null;
       if (!token) {
-        alert(locale === "en" ? "Please log in again." : locale === "tr" ? "Lütfen tekrar giriş yapın." : "Bitte erneut einloggen.");
+        alert(c.loginAgain);
         return;
       }
       const response = await fetch("/api/import-export/export", {
@@ -67,7 +70,7 @@ export default function OrdersReportsPage() {
           format,
         }),
       });
-      if (!response.ok) throw new Error(`Export failed (${response.status})`);
+      if (!response.ok) throw new Error(`${c.exportFailed} (${response.status})`);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -78,7 +81,7 @@ export default function OrdersReportsPage() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(e?.message || "Export failed");
+      alert(userError(e, locale, c.exportFailed));
     } finally {
       setExporting("");
     }
@@ -86,38 +89,38 @@ export default function OrdersReportsPage() {
 
   return (
     <Container>
-      <Title>Order Reports</Title>
+      <Title>{c.title}</Title>
 
       <Section>
         <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-          Sales Overview
+          {c.salesOverview}
         </h2>
         <StatsGrid>
           <StatCard>
             <StatValue>€0.00</StatValue>
-            <StatLabel>Total Revenue</StatLabel>
+            <StatLabel>{c.totalRevenue}</StatLabel>
           </StatCard>
           <StatCard>
             <StatValue>0</StatValue>
-            <StatLabel>Total Orders</StatLabel>
+            <StatLabel>{c.totalOrders}</StatLabel>
           </StatCard>
           <StatCard>
             <StatValue>€0.00</StatValue>
-            <StatLabel>Average Order Value</StatLabel>
+            <StatLabel>{c.averageOrderValue}</StatLabel>
           </StatCard>
           <StatCard>
             <StatValue>0</StatValue>
-            <StatLabel>Pending Orders</StatLabel>
+            <StatLabel>{c.pendingOrders}</StatLabel>
           </StatCard>
         </StatsGrid>
       </Section>
 
       <Section>
         <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-          Export Reports
+          {c.exportReports}
         </h2>
         <p style={{ color: "#6b7280", marginBottom: "16px" }}>
-          Generate and download detailed order reports for your records
+          {c.exportDescription}
         </p>
         <div style={{ display: "flex", gap: "12px" }}>
           <button
@@ -134,7 +137,7 @@ export default function OrdersReportsPage() {
             }}
           >
             <i className="fas fa-file-excel" style={{ marginRight: "8px" }} />
-            {exporting === "xlsx" ? "Exporting..." : "Export to XLSX"}
+            {exporting === "xlsx" ? c.exporting : c.exportXlsx}
           </button>
           <button
             onClick={() => runExport("csv")}
@@ -150,7 +153,7 @@ export default function OrdersReportsPage() {
             }}
           >
             <i className="fas fa-file-csv" style={{ marginRight: "8px" }} />
-            {exporting === "csv" ? "Exporting..." : "Export to CSV"}
+            {exporting === "csv" ? c.exporting : c.exportCsv}
           </button>
         </div>
       </Section>

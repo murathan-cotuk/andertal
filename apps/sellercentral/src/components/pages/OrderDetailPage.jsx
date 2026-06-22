@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
@@ -11,14 +12,16 @@ import TrackingSection from "@/components/orders/TrackingSection";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
 import { statusLabel } from "@/lib/status-labels";
+import { userError } from "@/lib/api-error-messages";
+import { getOrderDetailCopy } from "@/lib/order-detail-i18n";
 
 function fmtCents(c, locale) {
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
 }
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   const dt = new Date(d);
   const date = dt.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
   const time = dt.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -96,6 +99,7 @@ export default function OrderDetailPage() {
   const id = params?.id;
   const locale = useLocale();
   const ui = getUI(locale);
+  const c = getOrderDetailCopy(locale);
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -126,7 +130,7 @@ export default function OrderDetailPage() {
       setPaymentStatus(o?.payment_status || "bezahlt");
       setDeliveryStatus(o?.delivery_status || "offen");
     } catch (e) {
-      setError(e?.message || (locale === "en" ? "Order could not be loaded" : locale === "tr" ? "Sipariş yüklenemedi" : "Bestellung konnte nicht geladen werden"));
+      setError(userError(e, locale, c.loadFailed));
     }
     setLoading(false);
   }, [id]);
@@ -158,19 +162,19 @@ export default function OrderDetailPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      setError(e?.message || (locale === "en" ? "Save failed" : locale === "tr" ? "Kaydetme başarısız" : "Speichern fehlgeschlagen"));
+      setError(userError(e, locale, c.saveFailed));
     }
     setSaving(false);
   };
 
   const handleDelete = async () => {
-    if (!(await confirmDelete(locale === "en" ? "Really delete order?" : locale === "tr" ? "Sipariş gerçekten silinsin mi?" : "Bestellung wirklich löschen?"))) return;
+    if (!(await confirmDelete(c.deleteConfirm))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteOrder(id);
       router.push(`/${locale}/orders`);
     } catch (e) {
-      setError(e?.message || (locale === "en" ? "Delete failed" : locale === "tr" ? "Silme başarısız" : "Löschen fehlgeschlagen"));
+      setError(userError(e, locale, c.deleteFailed));
     }
   };
 
@@ -259,7 +263,7 @@ export default function OrderDetailPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", minWidth: 0 }}>
           <Button onClick={() => router.push(`/${locale}/orders`)}>← {ui.orders}</Button>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-            {locale === "en" ? "Order" : locale === "tr" ? "Sipariş" : "Bestellung"} #{order?.order_number || "—"}
+            {c.orderTitle} #{order?.order_number || "—"}
           </h1>
           <span style={{ fontSize: 12, color: "#9ca3af" }}>{fmtDate(order?.created_at)}</span>
         </div>
@@ -350,7 +354,7 @@ export default function OrderDetailPage() {
                 {couponDisc > 0 && (
                   <tr>
                     <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>
-                      {locale === "en" ? "Coupon" : locale === "tr" ? "Kupon" : "Gutschein"}{order?.coupon_code ? ` (${order.coupon_code})` : ""}
+                      {c.coupon}{order?.coupon_code ? ` (${order.coupon_code})` : ""}
                     </td>
                     <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(couponDisc, locale)}</td>
                   </tr>
@@ -364,13 +368,13 @@ export default function OrderDetailPage() {
           </Section>
 
           {/* Status management */}
-          <Section title={locale === "en" ? "Manage status" : locale === "tr" ? "Durumu yönet" : "Status verwalten"}>
+          <Section title={c.manageStatus}>
             <StatusSelect label={ui.orderStatus} value={orderStatus} options={["offen", "in_bearbeitung", "abgeschlossen", "storniert"]} onChange={setOrderStatus} saving={saving} locale={locale} />
             <StatusSelect label={ui.paymentStatus} value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} locale={locale} />
             <StatusSelect label={ui.deliveryStatus} value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} locale={locale} />
             <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
               <Button variant="primary" onClick={handleSaveStatus} disabled={saving} loading={saving}>
-                {locale === "en" ? "Save status" : locale === "tr" ? "Durumu kaydet" : "Status speichern"}
+                {c.saveStatus}
               </Button>
               {saved && <span style={{ fontSize: 12, color: "#15803d" }}>✓ {ui.saved}</span>}
             </div>
@@ -382,14 +386,14 @@ export default function OrderDetailPage() {
             onOrderStatusChanged={loadOrder}
           />
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{locale === "en" ? "Edit shipping or mark as shipped" : locale === "tr" ? "Kargoyu düzenle veya kargoya verildi olarak işaretle" : "Versand bearbeiten oder als versendet markieren"}</span>
+            <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{c.editShippingOrMark}</span>
             <Button variant="primary" onClick={() => setShipModalOpen(true)}>
-              {locale === "en" ? "Edit shipping" : locale === "tr" ? "Kargoyu düzenle" : "Versand bearbeiten"}
+              {c.editShipping}
             </Button>
           </div>
 
           {/* Payment info */}
-          <Section title={locale === "en" ? "Payment info" : locale === "tr" ? "Ödeme bilgisi" : "Zahlungsinfo"}>
+          <Section title={c.paymentInfo}>
             <InfoRow label={ui.paymentMethod} value={formatPaymentMethod(order?.payment_method)} />
           </Section>
         </div>
@@ -419,15 +423,15 @@ export default function OrderDetailPage() {
 
           {/* Customer info — nur Superuser */}
           {isSuperuser && (
-          <Section title={locale === "en" ? "Customer info" : locale === "tr" ? "Müşteri bilgisi" : "Kundeninfo"}>
-            <InfoRow label={ui.accountType} value={order?.is_guest !== false ? ui.guestCustomer : (locale === "en" ? "Registered customer" : locale === "tr" ? "Kayıtlı müşteri" : "Registrierter Kunde")} />
-            <InfoRow label={locale === "en" ? "First order" : locale === "tr" ? "İlk sipariş" : "Erste Bestellung"} value={order?.is_first_order ? ui.yes : ui.no} />
-            <InfoRow label="Newsletter" value={order?.newsletter_opted_in ? ui.yes : ui.no} />
+          <Section title={c.customerInfo}>
+            <InfoRow label={ui.accountType} value={order?.is_guest !== false ? ui.guestCustomer : c.registeredCustomer} />
+            <InfoRow label={c.firstOrder} value={order?.is_first_order ? ui.yes : ui.no} />
+            <InfoRow label={c.newsletter} value={order?.newsletter_opted_in ? ui.yes : ui.no} />
           </Section>
           )}
 
           {/* Shipping address */}
-          <Section title={locale === "en" ? "Shipping address" : locale === "tr" ? "Teslimat adresi" : "Lieferadresse"}>
+          <Section title={c.shippingAddress}>
             <div style={{ fontSize: 13, lineHeight: 1.7, color: "#374151" }}>
               {[order?.first_name, order?.last_name].filter(Boolean).join(" ")}<br />
               {order?.address_line1 && <>{order.address_line1}<br /></>}
@@ -438,9 +442,9 @@ export default function OrderDetailPage() {
           </Section>
 
           {/* Billing address */}
-          <Section title={locale === "en" ? "Billing address" : locale === "tr" ? "Fatura adresi" : "Rechnungsadresse"}>
+          <Section title={c.billingAddress}>
             {billingSame ? (
-              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{locale === "en" ? "Same as shipping address" : locale === "tr" ? "Teslimat adresiyle aynı" : "gleich wie Lieferadresse"}</div>
+              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{c.sameAsShipping}</div>
             ) : hasBillingAddr ? (
               <div style={{ fontSize: 13, lineHeight: 1.7, color: "#374151" }}>
                 {[order?.first_name, order?.last_name].filter(Boolean).join(" ")}<br />
@@ -450,12 +454,12 @@ export default function OrderDetailPage() {
                 {order?.billing_country || ""}
               </div>
             ) : (
-              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{locale === "en" ? "Same as shipping address" : locale === "tr" ? "Teslimat adresiyle aynı" : "gleich wie Lieferadresse"}</div>
+              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{c.sameAsShipping}</div>
             )}
           </Section>
 
           {/* Summary */}
-          <Section title={locale === "en" ? "Summary" : locale === "tr" ? "Özet" : "Zusammenfassung"}>
+          <Section title={c.summary}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
               <span style={{ color: "#6b7280" }}>{ui.orderNumber}</span>
               <span style={{ fontWeight: 600 }}>#{order?.order_number || "—"}</span>
@@ -482,7 +486,7 @@ export default function OrderDetailPage() {
           {isSuperuser && (
           <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: 10, padding: 16 }}>
             <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#b91c1c" }}>{ui.deleteOrder}</h3>
-            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>{locale === "en" ? "This action cannot be undone." : locale === "tr" ? "Bu işlem geri alınamaz." : "Diese Aktion kann nicht rückgängig gemacht werden."}</p>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>{c.dangerText}</p>
             <button onClick={handleDelete} style={{ padding: "7px 14px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
               {ui.deleteOrder}
             </button>

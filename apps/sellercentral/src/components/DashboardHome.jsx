@@ -214,7 +214,7 @@ export default function DashboardHome() {
     [allReturns, selectedPeriod],
   );
 
-  const periodLabel = selectedPeriod?.label || "Abrechnungszeitraum";
+  const periodLabel = selectedPeriod?.label || t("Billing period", "Donem", "Periode de facturation", "Periodo de facturacion", "Periodo di fatturazione", "Abrechnungszeitraum");
 
   useEffect(() => {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
@@ -301,7 +301,7 @@ export default function DashboardHome() {
 
   if (loading) {
     return (
-      <Page title="Dashboard">
+      <Page title={t("Dashboard", "Kontrol paneli", "Tableau de bord", "Panel", "Dashboard", "Dashboard")}>
         <div style={{ display: "flex", justifyContent: "center", padding: 80 }}>
           <Spinner size="large" />
         </div>
@@ -311,7 +311,7 @@ export default function DashboardHome() {
 
   return (
     <Page
-      title="Dashboard"
+      title={t("Dashboard", "Kontrol paneli", "Tableau de bord", "Panel", "Dashboard", "Dashboard")}
       primaryAction={{ content: t("Add product", "Ürün ekle", "Ajouter produit", "Agregar producto", "Aggiungi prodotto", "Produkt anlegen"), onAction: () => router.push("/products/single-upload") }}
       secondaryActions={[{ content: ui.orders, onAction: () => router.push("/orders") }]}
     >

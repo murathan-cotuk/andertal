@@ -7,9 +7,11 @@ import {
 } from "@shopify/polaris";
 import { useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useSellerImpersonation } from "@/context/SellerImpersonationContext";
+import { userError } from "@/lib/api-error-messages";
 
 function getStatusMeta(status, locale) {
   const map = {
@@ -29,22 +31,22 @@ function getStatusMeta(status, locale) {
     suspended: "critical",
   };
   const entry = map[status];
-  const label = entry ? (locale === "en" ? entry.en : locale === "tr" ? entry.tr : entry.de) : status;
+  const label = entry ? lt(locale, entry.en, entry.tr, entry.en, entry.en, entry.en, entry.de) : status;
   return { label, tone: tones[status] || "info" };
 }
 
 function fmtCents(c, locale) {
   if (!c) {
-    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+    const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
     return (0).toLocaleString(loc, { style: "currency", currency: "EUR" });
   }
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return (c / 100).toLocaleString(loc, { style: "currency", currency: "EUR" });
 }
 
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -115,7 +117,7 @@ function SellerTable({ rows, router, onImpersonate, locale, headers }) {
                     size="slim"
                     onClick={(e) => { e.stopPropagation(); onImpersonate(seller); }}
                   >
-                    {locale === "en" ? "Log in as seller" : locale === "tr" ? "Satıcı olarak giriş" : "Als Seller anmelden"}
+                    {lt(locale, "Log in as seller", "Satıcı olarak giriş", "Log in as seller", "Log in as seller", "Log in as seller", "Als Seller anmelden")}
                   </Button>
                 </InlineStack>
               </td>
@@ -156,7 +158,7 @@ export default function SellersPage() {
         r.token
       );
     } catch (e) {
-      setError(e?.message || (locale === "en" ? "Impersonation failed" : locale === "tr" ? "Giriş başarısız" : "Impersonation fehlgeschlagen"));
+      setError(userError(e, locale, "Impersonation failed"));
     } finally {
       setImpersonateLoading(null);
     }
@@ -166,7 +168,7 @@ export default function SellersPage() {
     setLoading(true);
     client.getSellers()
       .then((r) => { setSellers(r.sellers || []); setError(null); })
-      .catch((e) => setError(e?.message || (locale === "en" ? "Error loading" : locale === "tr" ? "Yükleme hatası" : "Fehler beim Laden")))
+      .catch((e) => setError(userError(e, locale, "Error loading")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -198,7 +200,7 @@ export default function SellersPage() {
   const sellersFiltered = filtered.filter((s) => !isSellerSuperuser(s));
 
   const statusOptions = [
-    { label: locale === "en" ? "All statuses" : locale === "tr" ? "Tüm durumlar" : "Alle Status", value: "all" },
+    { label: lt(locale, "All statuses", "Tüm durumlar", "All statuses", "All statuses", "All statuses", "Alle Status"), value: "all" },
     ...["registered", "documents_submitted", "pending_approval", "approved", "rejected", "suspended"].map((k) => ({
       label: getStatusMeta(k, locale).label,
       value: k,
@@ -206,37 +208,37 @@ export default function SellersPage() {
   ];
 
   const tableHeaders = [
-    locale === "en" ? "Shop name" : locale === "tr" ? "Mağaza adı" : "Shop-Name",
+    lt(locale, "Shop name", "Mağaza adı", "Shop name", "Shop name", "Shop name", "Shop-Name"),
     "E-Mail",
-    locale === "en" ? "Company" : locale === "tr" ? "Firma" : "Firma",
+    lt(locale, "Company", "Firma", "Company", "Company", "Company", "Firma"),
     ui.status,
-    locale === "en" ? "Products" : locale === "tr" ? "Ürünler" : "Produkte",
-    locale === "en" ? "Revenue" : locale === "tr" ? "Gelir" : "Umsatz",
-    locale === "en" ? "Commission" : locale === "tr" ? "Komisyon" : "Provision",
+    lt(locale, "Products", "Ürünler", "Products", "Products", "Products", "Produkte"),
+    lt(locale, "Revenue", "Gelir", "Revenue", "Revenue", "Revenue", "Umsatz"),
+    lt(locale, "Commission", "Komisyon", "Commission", "Commission", "Commission", "Provision"),
     "IBAN",
-    locale === "en" ? "Joined" : locale === "tr" ? "Katıldı" : "Beigetreten",
+    lt(locale, "Joined", "Katıldı", "Joined", "Joined", "Joined", "Beigetreten"),
     "",
   ];
 
   return (
     <>
     <Page
-      title={locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer"}
-      subtitle={locale === "en" ? "Manage and approve all registered sellers" : locale === "tr" ? "Tüm kayıtlı satıcıları yönetin ve onaylayın" : "Alle registrierten Verkäufer verwalten und freischalten"}
+      title={lt(locale, "Sellers", "Satıcılar", "Sellers", "Sellers", "Sellers", "Verkäufer")}
+      subtitle={lt(locale, "Manage and approve all registered sellers", "Tüm kayıtlı satıcıları yönetin ve onaylayın", "Manage and approve all registered sellers", "Manage and approve all registered sellers", "Manage and approve all registered sellers", "Alle registrierten Verkäufer verwalten und freischalten")}
     >
       <BlockStack gap="500">
         {error && <Banner tone="critical" onDismiss={() => setError(null)}>{error}</Banner>}
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <StatCard
-            label={locale === "en" ? "Total sellers" : locale === "tr" ? "Toplam satıcı" : "Gesamt Verkäufer"}
+            label={lt(locale, "Total sellers", "Toplam satıcı", "Total sellers", "Total sellers", "Total sellers", "Gesamt Verkäufer")}
             value={sellers.length}
-            sub={`Superuser: ${superuserCount} · ${locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer"}: ${sellerOnlyCount}`}
+            sub={`Superuser: ${superuserCount} · ${lt(locale, "Sellers", "Satıcılar", "Sellers", "Sellers", "Sellers", "Verkäufer")}: ${sellerOnlyCount}`}
           />
-          <StatCard label={locale === "en" ? "Active / Approved" : locale === "tr" ? "Aktif / Onaylı" : "Aktiv / Genehmigt"} value={approvedCount} />
-          <StatCard label={locale === "en" ? "Pending approval" : locale === "tr" ? "Onay bekliyor" : "Warten auf Genehmigung"} value={pendingCount} />
-          <StatCard label={locale === "en" ? "Total revenue" : locale === "tr" ? "Toplam gelir" : "Gesamtumsatz"} value={fmtCents(totalRevenue, locale)} />
-          <StatCard label={locale === "en" ? "Commission (total)" : locale === "tr" ? "Komisyon (toplam)" : "Provision (gesamt)"} value={fmtCents(totalCommission, locale)} />
+          <StatCard label={lt(locale, "Active / Approved", "Aktif / Onaylı", "Active / Approved", "Active / Approved", "Active / Approved", "Aktiv / Genehmigt")} value={approvedCount} />
+          <StatCard label={lt(locale, "Pending approval", "Onay bekliyor", "Pending approval", "Pending approval", "Pending approval", "Warten auf Genehmigung")} value={pendingCount} />
+          <StatCard label={lt(locale, "Total revenue", "Toplam gelir", "Total revenue", "Total revenue", "Total revenue", "Gesamtumsatz")} value={fmtCents(totalRevenue, locale)} />
+          <StatCard label={lt(locale, "Commission (total)", "Komisyon (toplam)", "Commission (total)", "Commission (total)", "Commission (total)", "Provision (gesamt)")} value={fmtCents(totalCommission, locale)} />
         </div>
 
         <Card>
@@ -246,7 +248,7 @@ export default function SellersPage() {
                 <TextField
                   label=""
                   labelHidden
-                  placeholder={locale === "en" ? "Search shop name, email or ID…" : locale === "tr" ? "Mağaza adı, e-posta veya ID ara…" : "Shop-Name, E-Mail oder ID suchen…"}
+                  placeholder={lt(locale, "Search shop name, email or ID…", "Mağaza adı, e-posta veya ID ara…", "Search shop name, email or ID…", "Search shop name, email or ID…", "Search shop name, email or ID…", "Shop-Name, E-Mail oder ID suchen…")}
                   value={search}
                   onChange={setSearch}
                   autoComplete="off"
@@ -272,7 +274,7 @@ export default function SellersPage() {
               </Box>
             ) : filtered.length === 0 ? (
               <Box padding="800" background="bg-surface-secondary" borderRadius="200">
-                <Text as="p" tone="subdued" alignment="center">{locale === "en" ? "No sellers found." : locale === "tr" ? "Satıcı bulunamadı." : "Keine Verkäufer gefunden."}</Text>
+                <Text as="p" tone="subdued" alignment="center">{lt(locale, "No sellers found.", "Satıcı bulunamadı.", "No sellers found.", "No sellers found.", "No sellers found.", "Keine Verkäufer gefunden.")}</Text>
               </Box>
             ) : (
               <BlockStack gap="500">
@@ -281,12 +283,12 @@ export default function SellersPage() {
                     Superuser ({superusersFiltered.length})
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    {locale === "en" ? "Platform administrators with full access" : locale === "tr" ? "Tam erişimli platform yöneticileri" : "Plattform-Administratoren mit Vollzugriff"}
+                    {lt(locale, "Platform administrators with full access", "Tam erişimli platform yöneticileri", "Platform administrators with full access", "Platform administrators with full access", "Platform administrators with full access", "Plattform-Administratoren mit Vollzugriff")}
                   </Text>
                   <Box paddingBlockStart="300">
                     {superusersFiltered.length === 0 ? (
                       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                        <Text as="p" tone="subdued" alignment="center">{locale === "en" ? "No superusers for these filters." : locale === "tr" ? "Bu filtreler için süper kullanıcı yok." : "Keine Superuser für diese Filter."}</Text>
+                        <Text as="p" tone="subdued" alignment="center">{lt(locale, "No superusers for these filters.", "Bu filtreler için süper kullanıcı yok.", "No superusers for these filters.", "No superusers for these filters.", "No superusers for these filters.", "Keine Superuser für diese Filter.")}</Text>
                       </Box>
                     ) : (
                       <SellerTable rows={superusersFiltered} router={router} onImpersonate={handleImpersonate} locale={locale} headers={tableHeaders} />
@@ -295,15 +297,15 @@ export default function SellersPage() {
                 </div>
                 <div>
                   <Text as="h2" variant="headingSm" fontWeight="semibold">
-                    {locale === "en" ? "Sellers" : locale === "tr" ? "Satıcılar" : "Verkäufer"} ({sellersFiltered.length})
+                    {lt(locale, "Sellers", "Satıcılar", "Sellers", "Sellers", "Sellers", "Verkäufer")} ({sellersFiltered.length})
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    {locale === "en" ? "Regular shop operators" : locale === "tr" ? "Normal mağaza işletmecileri" : "Reguläre Shop-Betreiber"}
+                    {lt(locale, "Regular shop operators", "Normal mağaza işletmecileri", "Regular shop operators", "Regular shop operators", "Regular shop operators", "Reguläre Shop-Betreiber")}
                   </Text>
                   <Box paddingBlockStart="300">
                     {sellersFiltered.length === 0 ? (
                       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                        <Text as="p" tone="subdued" alignment="center">{locale === "en" ? "No sellers for these filters." : locale === "tr" ? "Bu filtreler için satıcı yok." : "Keine Verkäufer für diese Filter."}</Text>
+                        <Text as="p" tone="subdued" alignment="center">{lt(locale, "No sellers for these filters.", "Bu filtreler için satıcı yok.", "No sellers for these filters.", "No sellers for these filters.", "No sellers for these filters.", "Keine Verkäufer für diese Filter.")}</Text>
                       </Box>
                     ) : (
                       <SellerTable rows={sellersFiltered} router={router} onImpersonate={handleImpersonate} locale={locale} headers={tableHeaders} />

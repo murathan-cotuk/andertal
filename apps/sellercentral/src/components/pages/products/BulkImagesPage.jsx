@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import styled from "styled-components";
 import { Card, Button } from "@andertal/ui";
 import Link from "next/link";
+import { useLocale } from "next-intl";
+import { getBulkMediaCopy } from "@/lib/products-pages-i18n";
 
 const Container = styled.div`
   max-width: 1200px;
@@ -45,6 +47,8 @@ const UploadIcon = styled.div`
 
 export default function BulkImagesPage() {
   const [files, setFiles] = useState([]);
+  const locale = useLocale();
+  const copy = getBulkMediaCopy(locale, "image");
 
   const handleFileSelect = (e) => {
     const selectedFiles = Array.from(e.target.files);
@@ -53,15 +57,15 @@ export default function BulkImagesPage() {
 
   return (
     <Container>
-      <Title>Bulk Image Upload</Title>
+      <Title>{copy.title}</Title>
 
       <Section>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937" }}>Upload Multiple Images</h2>
+          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937" }}>{copy.sectionTitle}</h2>
           <Link href="/products/upload-templates">
             <Button variant="outline">
               <i className="fas fa-download" style={{ marginRight: "8px" }} />
-              Download Template
+              {copy.downloadTemplate}
             </Button>
           </Link>
         </div>
@@ -79,15 +83,15 @@ export default function BulkImagesPage() {
             <i className="fas fa-images" />
           </UploadIcon>
           <p style={{ fontSize: "16px", color: "#6b7280", marginBottom: "8px" }}>
-            Click to select images or drag and drop
+            {copy.dropText}
           </p>
-          <p style={{ fontSize: "14px", color: "#9ca3af" }}>Supports JPG, PNG, GIF. Maximum 10MB per file</p>
+          <p style={{ fontSize: "14px", color: "#9ca3af" }}>{copy.supportText}</p>
         </UploadArea>
 
         {files.length > 0 && (
           <div style={{ marginTop: "24px" }}>
             <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
-              Selected Images ({files.length})
+              {copy.selectedLabel} ({files.length})
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "16px" }}>
               {files.map((file, index) => (
@@ -114,7 +118,7 @@ export default function BulkImagesPage() {
             </div>
             <Button style={{ marginTop: "16px" }}>
               <i className="fas fa-upload" style={{ marginRight: "8px" }} />
-              Upload {files.length} Images
+              {copy.uploadButtonPrefix} {files.length} {copy.uploadButtonSuffix}
             </Button>
           </div>
         )}

@@ -302,7 +302,7 @@ function MenuEditorPanel(props) {
     const name = (localMenuName || "").trim();
     const slug = (localMenuSlug || slugFromName(localMenuName || "")).trim();
     if (!name || !slug) {
-      setError("Name and slug required");
+      setError(menusCopy.nameSlugRequired);
       return;
     }
     try {
@@ -370,25 +370,25 @@ function MenuEditorPanel(props) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <BlockStack gap="200">
                 <TextField
-                  label="Menu name"
+                  label={menusCopy.menuName}
                   value={localMenuName}
                   onChange={(value) => {
                     setLocalMenuName(value);
                     if (!menuSlugManuallyEdited) setLocalMenuSlug(slugFromName(value));
                   }}
-                  placeholder="e.g. Main menu"
+                  placeholder={menusCopy.menuNamePh}
                   autoComplete="off"
                 />
                 <TextField
-                  label="Key"
+                  label={menusCopy.itemSlug}
                   value={localMenuSlug}
                   onChange={(value) => {
                     setMenuSlugManuallyEdited(true);
                     setLocalMenuSlug(value);
                   }}
-                  placeholder="e.g. main-menu"
+                  placeholder={menusCopy.menuSlugPh}
                   autoComplete="off"
-                  helpText="Used in URLs. Auto-filled from name unless you edit it."
+                  helpText={menusCopy.slugHelp}
                 />
               </BlockStack>
             </div>
@@ -407,12 +407,12 @@ function MenuEditorPanel(props) {
             <InlineStack gap="200" blockAlign="center">
               {hasMenuId && (
                 <Button size="slim" variant="secondary" onClick={() => handleDuplicateMenu(panelMenu)} disabled={saving}>
-                  Duplicate
+                  {menusCopy.duplicate}
                 </Button>
               )}
               {hasMenuId && (
                 <Button size="slim" variant="critical" onClick={() => handleDeleteMenu(null, panelMenu || { id: panelMenuId, name: localMenuName })} disabled={saving}>
-                  Delete
+                  {menusCopy.delete}
                 </Button>
               )}
             </InlineStack>
@@ -422,7 +422,7 @@ function MenuEditorPanel(props) {
       <div style={{ padding: "24px 32px" }}>
         <BlockStack gap="400">
           <InlineStack align="space-between" blockAlign="center" wrap gap="300">
-            <Text as="h3" variant="headingMd" fontWeight="semibold">Menu items</Text>
+            <Text as="h3" variant="headingMd" fontWeight="semibold">{menusCopy.menuItems}</Text>
             <InlineStack gap="300" blockAlign="center">
               {hasMenuId && (
                 <button
@@ -448,12 +448,12 @@ function MenuEditorPanel(props) {
                       transition: "left 0.15s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
                     }} />
                   </span>
-                  Auto-show categories
+                  {menusCopy.categoriesWithProducts}
                 </button>
               )}
               {typeof onOpenImportCsv === "function" && (
                 <Button variant="secondary" size="slim" onClick={onOpenImportCsv}>
-                  Import from CSV
+                  {menusCopy.importCsv}
                 </Button>
               )}
             </InlineStack>
@@ -471,7 +471,7 @@ function MenuEditorPanel(props) {
             {panelMenu?.categories_with_products ? (
               <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border-subdued)", background: "#f0fdf4", display: "flex", alignItems: "center", gap: 8 }}>
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="#16a34a"><path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm3.707-9.293a1 1 0 0 0-1.414-1.414L9 10.586 7.707 9.293a1 1 0 0 0-1.414 1.414l2 2a1 1 0 0 0 1.414 0l4-4z" clipRule="evenodd" /></svg>
-                <Text as="p" tone="success">Auto-show categories is ON — the shop will display all categories in the dropdown (menu items below are ignored).</Text>
+                <Text as="p" tone="success">{menusCopy.autoCategoriesOn}</Text>
               </div>
             ) : null}
             {hasMenuId && (
@@ -508,7 +508,7 @@ function MenuEditorPanel(props) {
                         <span style={{ color: "var(--p-color-icon-highlight)", flexShrink: 0 }}>
                           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 5a.75.75 0 0 1 .75.75v3.5h3.5a.75.75 0 0 1 0 1.5h-3.5v3.5a.75.75 0 0 1-1.5 0v-3.5h-3.5a.75.75 0 0 1 0-1.5h3.5v-3.5A.75.75 0 0 1 10 5" /></svg>
                         </span>
-                        <span style={{ fontWeight: 500 }}>Add menu item</span>
+                        <span style={{ fontWeight: 500 }}>{menusCopy.addMenuItem}</span>
                       </button>
                     );
                   };
@@ -521,6 +521,7 @@ function MenuEditorPanel(props) {
                             <InlineItemRow
                               itemForm={itemForm}
                               setItemForm={setItemForm}
+                              menusCopy={menusCopy}
                               collections={collections}
                               categories={categories}
                               products={products}
@@ -613,7 +614,7 @@ function MenuEditorPanel(props) {
                                       type="button"
                                       onClick={(e) => { e.stopPropagation(); setExpandedIds((prev) => { const next = new Set(prev); if (next.has(node.id)) next.delete(node.id); else next.add(node.id); return next; }); }}
                                       style={{ padding: 4, border: "none", background: "none", cursor: "pointer", color: "var(--p-color-icon-subdued)", display: "flex" }}
-                                      aria-label={expanded ? "Collapse" : "Expand"}
+                                      aria-label={expanded ? menusCopy.remove : menusCopy.addItem}
                                     >
                                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ transform: expanded ? "rotate(0deg)" : "rotate(-90deg)" }}><path d="M4 6l4 4 4-4H4z" /></svg>
                                     </button>
@@ -665,8 +666,8 @@ function MenuEditorPanel(props) {
                                 </div>
                               </div>
                               <InlineStack gap="100" wrap={false}>
-                                <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={(e) => { e.stopPropagation(); if (isClickAfterDrag?.()) return; openEditItem(node); setInlineEditingId(node.id); }} />
-                                <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={(e) => { e.stopPropagation(); if (isClickAfterDrag?.()) return; handleDeleteItem(node); }} />
+                                <Button size="slim" variant="plain" tone="subdued" accessibilityLabel={menusCopy.edit} icon={EditIcon} onClick={(e) => { e.stopPropagation(); if (isClickAfterDrag?.()) return; openEditItem(node); setInlineEditingId(node.id); }} />
+                                <Button size="slim" variant="plain" tone="critical" accessibilityLabel={menusCopy.delete} icon={DeleteIcon} onClick={(e) => { e.stopPropagation(); if (isClickAfterDrag?.()) return; handleDeleteItem(node); }} />
                               </InlineStack>
                             </div>
                             {showBelow && (
@@ -692,6 +693,7 @@ function MenuEditorPanel(props) {
                           <InlineItemRow
                             itemForm={itemForm}
                             setItemForm={setItemForm}
+                            menusCopy={menusCopy}
                             collections={collections}
                             categories={categories}
                             products={products}
@@ -714,7 +716,7 @@ function MenuEditorPanel(props) {
             )}
             {!hasMenuId && (
               <div style={{ padding: "24px", color: "var(--p-color-text-subdued)" }}>
-                {isNew ? "Save the menu above to add items." : "Loading…"}
+                {isNew ? menusCopy.save : menusCopy.loading}
               </div>
             )}
           </div>
@@ -724,13 +726,13 @@ function MenuEditorPanel(props) {
   );
 }
 
-function InlineItemRow({ itemForm, setItemForm, collections, categories, products, pages, LINK_TYPES, apiFunctionOptions, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
+function InlineItemRow({ itemForm, setItemForm, menusCopy, collections, categories, products, pages, LINK_TYPES, apiFunctionOptions, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr auto", gap: "16px", padding: "14px 20px", alignItems: "center", background: "var(--p-color-bg-surface-secondary)", borderRadius: "8px", margin: "8px 12px" }}>
       <span />
       <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(160px, 220px)", gap: 8, alignItems: "center" }}>
         <TextField
-          label="Label"
+          label={LINK_TYPES?.length ? "Label" : "Label"}
           value={itemForm.label}
           onChange={(v) => setItemForm((p) => ({
             ...p,
@@ -738,12 +740,12 @@ function InlineItemRow({ itemForm, setItemForm, collections, categories, product
             slug: p.slug === normalizeItemSlug(p.label || "") || !p.slug ? normalizeItemSlug(v) : p.slug,
             custom_slug: p.custom_slug === normalizeItemSlug(p.label || "") || !p.custom_slug ? normalizeItemSlug(v) : p.custom_slug,
           }))}
-          placeholder="Label"
+          placeholder={LINK_TYPES?.length ? "Label" : "Label"}
           autoComplete="off"
           labelHidden
         />
         <TextField
-          label="Slug"
+          label={LINK_TYPES?.length ? "Slug" : "Slug"}
           value={itemForm.slug || ""}
           onChange={(v) => setItemForm((p) => ({ ...p, slug: normalizeItemSlug(v), custom_slug: normalizeItemSlug(v) }))}
           placeholder="slug"
@@ -767,13 +769,13 @@ function InlineItemRow({ itemForm, setItemForm, collections, categories, product
           </div>
         )}
         {itemForm.link_type === "collection" && (
-          <Select label="Collection" labelHidden options={[{ label: "— Select —", value: "" }, ...collections.map((c) => ({ label: c.title || c.handle, value: c.id }))]} value={itemForm.collection_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, collection_id: v }))} />
+          <Select label="Collection" labelHidden options={[{ label: `— ${menusCopy.selectMenu} —`, value: "" }, ...collections.map((c) => ({ label: c.title || c.handle, value: c.id }))]} value={itemForm.collection_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, collection_id: v }))} />
         )}
         {itemForm.link_type === "product" && (
-          <Select label="Product" labelHidden options={[{ label: "— Select —", value: "" }, ...(products || []).map((p) => ({ label: p.title || p.handle, value: p.id }))]} value={itemForm.product_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, product_id: v }))} />
+          <Select label="Product" labelHidden options={[{ label: `— ${menusCopy.selectMenu} —`, value: "" }, ...(products || []).map((p) => ({ label: p.title || p.handle, value: p.id }))]} value={itemForm.product_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, product_id: v }))} />
         )}
         {itemForm.link_type === "page" && (
-          <Select label="Page" labelHidden options={[{ label: "— Select page —", value: "" }, ...(pages || []).map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) }))]} value={itemForm.page_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, page_id: v }))} />
+          <Select label="Page" labelHidden options={[{ label: `— ${menusCopy.selectMenu} —`, value: "" }, ...(pages || []).map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) }))]} value={itemForm.page_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, page_id: v }))} />
         )}
         {itemForm.link_type === "api" && (
           <Select
@@ -789,8 +791,8 @@ function InlineItemRow({ itemForm, setItemForm, collections, categories, product
         )}
       </div>
       <InlineStack gap="100">
-        <Button size="slim" variant="primary" onClick={onSave} loading={saving} accessibilityLabel="Save" icon={CheckIcon} />
-        <Button size="slim" variant="plain" tone="critical" onClick={onCancel} accessibilityLabel="Cancel" icon={DeleteIcon} />
+        <Button size="slim" variant="primary" onClick={onSave} loading={saving} accessibilityLabel={menusCopy.save} icon={CheckIcon} />
+        <Button size="slim" variant="plain" tone="critical" onClick={onCancel} accessibilityLabel={menusCopy.cancel} icon={DeleteIcon} />
       </InlineStack>
     </div>
   );

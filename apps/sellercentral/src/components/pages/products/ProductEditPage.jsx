@@ -28,6 +28,7 @@ import {
 import { ProductIcon, MenuHorizontalIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getUI } from "@/lib/ui-strings";
+import { lt } from "@/lib/locale-text";
 import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
@@ -452,13 +453,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         setBaselineSnapshot(productSnapshot(localized));
       }
       await refetchPendingChangeRequests(product.id);
-      setMessage({ type: "success", text: locale === "tr" ? "Değişiklik onaylandı ve ürün güncellendi." : locale === "de" ? "Änderung genehmigt und Produkt aktualisiert." : "Change approved and product updated." });
+      setMessage({ type: "success", text: lt(locale, "Change approved and product updated.", "Değişiklik onaylandı ve ürün güncellendi.", "Modification approuvée et produit mis à jour.", "Cambio aprobado y producto actualizado.", "Modifica approvata e prodotto aggiornato.", "Änderung genehmigt und Produkt aktualisiert.") });
       onReload?.();
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
     } catch (err) {
-      setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Onaylama başarısız." : locale === "de" ? "Freigabe fehlgeschlagen." : "Approval failed.") });
+      setMessage({ type: "error", text: err?.message || lt(locale, "Approval failed.", "Onaylama başarısız.", "Échec de l'approbation.", "La aprobación falló.", "Approvazione non riuscita.", "Freigabe fehlgeschlagen.") });
     } finally {
       setChangeRequestActionId("");
     }
@@ -466,7 +467,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const editAndApproveChangeRequest = useCallback(async (cr) => {
     if (!cr?.id || !product?.id) return;
     const edited = window.prompt(
-      locale === "tr" ? "Yeni değeri düzenleyin ve onaylayın:" : locale === "de" ? "Neuen Wert bearbeiten und freigeben:" : "Edit new value and approve:",
+      lt(locale, "Edit new value and approve:", "Yeni değeri düzenleyin ve onaylayın:", "Modifiez la nouvelle valeur puis approuvez-la :", "Edita el nuevo valor y apruébalo:", "Modifica il nuovo valore e approva:", "Neuen Wert bearbeiten und freigeben:"),
       String(cr?.new_value || ""),
     );
     if (edited == null) return;
@@ -483,11 +484,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         setBaselineSnapshot(productSnapshot(localized));
       }
       await refetchPendingChangeRequests(product.id);
-      setMessage({ type: "success", text: locale === "tr" ? "Değişiklik düzenlenip onaylandı." : locale === "de" ? "Änderung bearbeitet und freigegeben." : "Change edited and approved." });
+      setMessage({ type: "success", text: lt(locale, "Change edited and approved.", "Değişiklik düzenlenip onaylandı.", "Modification modifiée et approuvée.", "Cambio editado y aprobado.", "Modifica modificata e approvata.", "Änderung bearbeitet und freigegeben.") });
       onReload?.();
       if (typeof window !== "undefined") window.dispatchEvent(new Event("andertal-notifications-refresh"));
     } catch (err) {
-      setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Düzenleme/onaylama başarısız." : locale === "de" ? "Bearbeiten/Freigabe fehlgeschlagen." : "Edit/approve failed.") });
+      setMessage({ type: "error", text: err?.message || lt(locale, "Edit/approve failed.", "Düzenleme/onaylama başarısız.", "Échec de la modification/approbation.", "Error al editar/aprobar.", "Modifica/approvazione non riuscita.", "Bearbeiten/Freigabe fehlgeschlagen.") });
     } finally {
       setChangeRequestActionId("");
     }
@@ -502,12 +503,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         body: JSON.stringify({ reviewer_note: "Rejected via product page" }),
       });
       await refetchPendingChangeRequests(product.id);
-      setMessage({ type: "success", text: locale === "tr" ? "Değişiklik reddedildi, ürün değerleri korunuyor." : locale === "de" ? "Änderung abgelehnt, Produktwerte bleiben unverändert." : "Change rejected, product values stay unchanged." });
+      setMessage({ type: "success", text: lt(locale, "Change rejected, product values stay unchanged.", "Değişiklik reddedildi, ürün değerleri korunuyor.", "Modification rejetée, les valeurs du produit restent inchangées.", "Cambio rechazado, los valores del producto se mantienen sin cambios.", "Modifica rifiutata, i valori del prodotto restano invariati.", "Änderung abgelehnt, Produktwerte bleiben unverändert.") });
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("andertal-notifications-refresh"));
       }
     } catch (err) {
-      setMessage({ type: "error", text: err?.message || (locale === "tr" ? "Reddetme başarısız." : locale === "de" ? "Ablehnung fehlgeschlagen." : "Rejection failed.") });
+      setMessage({ type: "error", text: err?.message || lt(locale, "Rejection failed.", "Reddetme başarısız.", "Échec du rejet.", "El rechazo falló.", "Rifiuto non riuscito.", "Ablehnung fehlgeschlagen.") });
     } finally {
       setChangeRequestActionId("");
     }
@@ -953,12 +954,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       if (missingVariantEan) {
         setMessage({
           type: "warning",
-          text:
-            locale === "tr"
-              ? "Kaydetmek için tüm varyantlarda EAN girilmelidir."
-              : locale === "de"
-                ? "Bitte EAN für alle Varianten eintragen, um zu speichern."
-                : "Enter EAN for all variants before saving.",
+          text: lt(locale, "Enter EAN for all variants before saving.", "Kaydetmek için tüm varyantlarda EAN girilmelidir.", "Saisissez un EAN pour toutes les variantes avant d'enregistrer.", "Introduce EAN para todas las variantes antes de guardar.", "Inserisci l'EAN per tutte le varianti prima di salvare.", "Bitte EAN für alle Varianten eintragen, um zu speichern."),
         });
         return false;
       }
@@ -969,12 +965,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       if (gpsrMissing.length > 0) {
         setMessage({
           type: "warning",
-          text:
-            locale === "tr"
-              ? `Kaydetmek için GPSR alanlarını doldurun: ${gpsrMissing.join(", ")}`
-              : locale === "de"
-                ? `Bitte folgende GPSR-Felder ausfüllen, um zu speichern: ${gpsrMissing.join(", ")}`
-                : `Fill in these GPSR fields to save: ${gpsrMissing.join(", ")}`,
+          text: lt(
+            locale,
+            `Fill in these GPSR fields to save: ${gpsrMissing.join(", ")}`,
+            `Kaydetmek için GPSR alanlarını doldurun: ${gpsrMissing.join(", ")}`,
+            `Remplissez ces champs GPSR pour enregistrer : ${gpsrMissing.join(", ")}`,
+            `Complete estos campos GPSR para guardar: ${gpsrMissing.join(", ")}`,
+            `Compila questi campi GPSR per salvare: ${gpsrMissing.join(", ")}`,
+            `Bitte folgende GPSR-Felder ausfüllen, um zu speichern: ${gpsrMissing.join(", ")}`,
+          ),
         });
         return false;
       }

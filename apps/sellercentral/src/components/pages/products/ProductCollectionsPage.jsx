@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import Link from "next/link";
 import {
   Page,
@@ -19,9 +20,13 @@ import {
 } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { getProductCollectionsCopy } from "@/lib/products-pages-i18n";
+import { userError } from "@/lib/api-error-messages";
 
 export default function ProductCollectionsPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const copy = getProductCollectionsCopy(locale);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -55,7 +60,7 @@ export default function ProductCollectionsPage() {
 
       setCollections(list);
     } catch (err) {
-      setError(err?.message || "Failed to load collections");
+      setError(userError(err, locale, copy.loadError));
       setCollections([]);
     } finally {
       setLoading(false);
@@ -78,7 +83,7 @@ export default function ProductCollectionsPage() {
       setDeleteId(null);
       await fetchCollections();
     } catch (err) {
-      setError(err?.message || "Failed to delete collection");
+      setError(userError(err, locale, copy.deleteError));
     } finally {
       setDeleting(false);
     }
@@ -86,9 +91,9 @@ export default function ProductCollectionsPage() {
 
   return (
     <Page
-      title="Collections"
-      subtitle="Add or edit a collection to open its full form in a new page."
-      primaryAction={{ content: "Add collection", onAction: openAdd }}
+      title={copy.pageTitle}
+      subtitle={copy.pageSubtitle}
+      primaryAction={{ content: copy.addCollection, onAction: openAdd }}
     >
       <Layout>
         {error && (
@@ -102,28 +107,28 @@ export default function ProductCollectionsPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingSm">
-                Collections
+                {copy.pageTitle}
               </Text>
               {loading ? (
                 <Box paddingBlock="400">
                   <Text as="p" tone="subdued">
-                    Loading…
+                    {copy.loading}
                   </Text>
                 </Box>
               ) : collections.length === 0 ? (
                 <EmptyState
-                  heading="No collections yet"
-                  action={{ content: "Add collection", onAction: openAdd }}
+                  heading={copy.emptyTitle}
+                  action={{ content: copy.addCollection, onAction: openAdd }}
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
-                  <p>Click &quot;Add collection&quot; to create a new collection. It will appear in this list.</p>
+                  <p>{copy.emptyBody}</p>
                 </EmptyState>
               ) : (
                 <IndexTable
-                  resourceName={{ singular: "collection", plural: "collections" }}
+                  resourceName={{ singular: copy.singular, plural: copy.plural }}
                   itemCount={collections.length}
                   selectable={false}
-                  headings={[{ title: "Title" }, { title: "Handle" }, { title: "ID" }, { title: "" }]}
+                  headings={[{ title: copy.titleCol }, { title: copy.handleCol }, { title: "ID" }, { title: "" }]}
                 >
                   {collections.map((col, index) => (
                     <IndexTable.Row id={col.id} key={col.id} position={index}>
@@ -144,8 +149,8 @@ export default function ProductCollectionsPage() {
                       </IndexTable.Cell>
                       <IndexTable.Cell>
                         <InlineStack gap="200">
-                          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel="Edit" icon={EditIcon} onClick={() => openEdit(col)} />
-                          <Button size="slim" variant="plain" tone="critical" accessibilityLabel="Delete" icon={DeleteIcon} onClick={() => setDeleteId(col.id)} />
+                          <Button size="slim" variant="plain" tone="subdued" accessibilityLabel={copy.edit} icon={EditIcon} onClick={() => openEdit(col)} />
+                          <Button size="slim" variant="plain" tone="critical" accessibilityLabel={copy.del} icon={DeleteIcon} onClick={() => setDeleteId(col.id)} />
                         </InlineStack>
                       </IndexTable.Cell>
                     </IndexTable.Row>
@@ -160,18 +165,18 @@ export default function ProductCollectionsPage() {
       <Modal
         open={!!deleteId}
         onClose={() => !deleting && setDeleteId(null)}
-        title="Delete collection"
+        title={copy.deleteTitle}
         primaryAction={{
-          content: deleting ? "Deleting…" : "Delete",
+          content: deleting ? copy.deleting : copy.del,
           destructive: true,
           onAction: handleDeleteCollection,
           loading: deleting,
         }}
-        secondaryActions={[{ content: "Cancel", onAction: () => setDeleteId(null) }]}
+        secondaryActions={[{ content: copy.cancel, onAction: () => setDeleteId(null) }]}
       >
         <Modal.Section>
           <Text as="p">
-            Are you sure you want to delete &quot;{collections.find((c) => c.id === deleteId)?.title || "this collection"}&quot;?
+            {copy.deleteConfirmPrefix} &quot;{collections.find((c) => c.id === deleteId)?.title || copy.thisCollection}&quot;?
           </Text>
         </Modal.Section>
       </Modal>

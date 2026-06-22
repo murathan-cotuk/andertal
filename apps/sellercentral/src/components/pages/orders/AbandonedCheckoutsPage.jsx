@@ -2,28 +2,26 @@
 
 import React, { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { getAbandonedCheckoutsCopy } from "@/lib/abandoned-checkouts-i18n";
 
 function fmtDate(d, locale) {
   if (!d) return "—";
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   const dt = new Date(d);
   return dt.toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" }) + " " + dt.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
 }
 
 function fmtCents(c, locale) {
-  const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+  const loc = lt(locale, "en-GB", "tr-TR", "en-GB", "en-GB", "en-GB", "de-DE");
   return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
 }
 
 function ExpandedCart({ cart, locale }) {
+  const c = getAbandonedCheckoutsCopy(locale);
   const items = cart.items || [];
-  const productLabel = locale === "en" ? "Product" : locale === "tr" ? "Ürün" : "Produkt";
-  const qtyLabel = locale === "en" ? "Qty" : locale === "tr" ? "Adet" : "Menge";
-  const unitPriceLabel = locale === "en" ? "Unit price" : locale === "tr" ? "Birim fiyat" : "Einzelpreis";
-  const totalLabel = locale === "en" ? "Total" : locale === "tr" ? "Toplam" : "Gesamt";
-  const noItemsLabel = locale === "en" ? "No items" : locale === "tr" ? "Ürün yok" : "Keine Artikel";
   return (
     <tr>
       <td colSpan={7} style={{ padding: 0, background: "#f9fafb" }}>
@@ -31,15 +29,15 @@ function ExpandedCart({ cart, locale }) {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                <th style={{ textAlign: "left", padding: "4px 8px" }}>{productLabel}</th>
-                <th style={{ textAlign: "right", padding: "4px 8px" }}>{qtyLabel}</th>
-                <th style={{ textAlign: "right", padding: "4px 8px" }}>{unitPriceLabel}</th>
-                <th style={{ textAlign: "right", padding: "4px 8px" }}>{totalLabel}</th>
+                <th style={{ textAlign: "left", padding: "4px 8px" }}>{c.product}</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>{c.qty}</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>{c.unitPrice}</th>
+                <th style={{ textAlign: "right", padding: "4px 8px" }}>{c.total}</th>
               </tr>
             </thead>
             <tbody>
               {items.length === 0 && (
-                <tr><td colSpan={4} style={{ padding: "8px", color: "#9ca3af", textAlign: "center" }}>{noItemsLabel}</td></tr>
+                <tr><td colSpan={4} style={{ padding: "8px", color: "#9ca3af", textAlign: "center" }}>{c.noItems}</td></tr>
               )}
               {items.map((it, i) => (
                 <tr key={i} style={{ borderTop: "1px solid #e5e7eb" }}>
@@ -65,6 +63,7 @@ function ExpandedCart({ cart, locale }) {
 export default function AbandonedCheckoutsPage() {
   const locale = useLocale();
   const ui = getUI(locale);
+  const c = getAbandonedCheckoutsCopy(locale);
   const [carts, setCarts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
@@ -83,27 +82,16 @@ export default function AbandonedCheckoutsPage() {
     })();
   }, []);
 
-  const pageTitle = locale === "en" ? "Abandoned Checkouts" : locale === "tr" ? "Yarım Kalan Siparişler" : "Abgebrochene Checkouts";
-  const pageSubtitle = locale === "en" ? "Carts that were not completed" : locale === "tr" ? "Tamamlanmayan alışveriş sepetleri" : "Warenkörbe, die nicht abgeschlossen wurden";
-  const cartsLabel = locale === "en" ? "carts" : locale === "tr" ? "sepet" : "Warenkörbe";
-  const customerLabel = locale === "en" ? "Customer" : locale === "tr" ? "Müşteri" : "Kunde";
-  const itemsLabel = locale === "en" ? "Items" : locale === "tr" ? "Ürünler" : "Artikel";
-  const valueLabel = locale === "en" ? "Value" : locale === "tr" ? "Değer" : "Wert";
-  const createdLabel = locale === "en" ? "Created" : locale === "tr" ? "Oluşturuldu" : "Erstellt";
-  const lastActiveLabel = locale === "en" ? "Last active" : locale === "tr" ? "Son aktiflik" : "Zuletzt aktiv";
-  const noCheckoutsLabel = locale === "en" ? "No abandoned checkouts" : locale === "tr" ? "Yarım kalan sipariş yok" : "Keine abgebrochenen Checkouts";
-  const itemCount = (count) => locale === "en" ? `${count} items` : locale === "tr" ? `${count} ürün` : `${count} Artikel`;
-
-  const COLS = ["", customerLabel, "Email", itemsLabel, valueLabel, createdLabel, lastActiveLabel];
+  const COLS = ["", c.customer, c.email, c.items, c.value, c.created, c.lastActive];
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{pageTitle}</h1>
-          <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{pageSubtitle}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{c.pageTitle}</h1>
+          <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{c.pageSubtitle}</p>
         </div>
-        <span style={{ fontSize: 13, color: "#6b7280" }}>{carts.length} {cartsLabel}</span>
+        <span style={{ fontSize: 13, color: "#6b7280" }}>{carts.length} {c.carts}</span>
       </div>
 
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "auto" }}>
@@ -125,7 +113,7 @@ export default function AbandonedCheckoutsPage() {
               <tr>
                 <td colSpan={7} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🛒</div>
-                  <div>{noCheckoutsLabel}</div>
+                  <div>{c.noCheckouts}</div>
                 </td>
               </tr>
             )}
@@ -148,7 +136,7 @@ export default function AbandonedCheckoutsPage() {
                   <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? (cart.email || "—") : "—"}</td>
                   <td style={{ padding: "10px 12px", textAlign: "center" }}>
                     <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#eff6ff", color: "#1d4ed8" }}>
-                      {itemCount(cart.item_count || 0)}
+                      {c.itemCount(cart.item_count || 0)}
                     </span>
                   </td>
                   <td style={{ padding: "10px 12px", fontWeight: 600 }}>

@@ -17,9 +17,12 @@ import {
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { lt } from "@/lib/locale-text";
+import { userError } from "@/lib/api-error-messages";
 
 export default function PlatformSettingsPage() {
   const locale = useLocale();
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const ui = getUI(locale);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,7 +52,7 @@ export default function PlatformSettingsPage() {
       setStorefrontUrl(su);
       setSnapshot(JSON.stringify({ pn, se, sn, su }));
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Loading failed." : locale === "tr" ? "Yükleme başarısız." : "Laden fehlgeschlagen."));
+      setErr(userError(e, locale, t("Loading failed.", "Yükleme başarısız.", "Échec du chargement.", "Error de carga.", "Caricamento non riuscito.", "Laden fehlgeschlagen.")));
     } finally {
       setLoading(false);
     }
@@ -77,10 +80,10 @@ export default function PlatformSettingsPage() {
         support_email: supportEmail.trim(),
         storefront_url: storefrontUrl.trim(),
       });
-      setOk(locale === "en" ? "Settings saved." : locale === "tr" ? "Ayarlar kaydedildi." : "Einstellungen gespeichert.");
+      setOk(t("Settings saved.", "Ayarlar kaydedildi.", "Paramètres enregistrés.", "Configuración guardada.", "Impostazioni salvate.", "Einstellungen gespeichert."));
       await load();
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Saving failed." : locale === "tr" ? "Kaydetme başarısız." : "Speichern fehlgeschlagen."));
+      setErr(userError(e, locale, t("Saving failed.", "Kaydetme başarısız.", "Échec de l'enregistrement.", "Error al guardar.", "Salvataggio non riuscito.", "Speichern fehlgeschlagen.")));
     } finally {
       setSaving(false);
     }
@@ -97,7 +100,7 @@ export default function PlatformSettingsPage() {
     setOk("");
   };
 
-  const pageTitle = locale === "en" ? "Platform Settings" : locale === "tr" ? "Platform Ayarları" : "Plattform-Einstellungen";
+  const pageTitle = t("Platform Settings", "Platform Ayarları", "Paramètres de la plateforme", "Configuración de plataforma", "Impostazioni piattaforma", "Plattform-Einstellungen");
 
   if (loading) {
     return (
@@ -115,7 +118,7 @@ export default function PlatformSettingsPage() {
         <Layout.Section>
           <BlockStack gap="400">
             <Text as="p" tone="subdued">
-              {locale === "en" ? "Global settings for the entire platform. Visible to superusers only." : locale === "tr" ? "Tüm platform için genel ayarlar. Yalnızca superkullanıcılar tarafından görülür." : "Globale Einstellungen für die gesamte Plattform. Nur für Superuser sichtbar."}
+              {t("Global settings for the entire platform. Visible to superusers only.", "Tüm platform için genel ayarlar. Yalnızca superkullanıcılar tarafından görülür.", "Paramètres globaux de la plateforme. Visible uniquement par les superutilisateurs.", "Configuración global de la plataforma. Visible solo para superusuarios.", "Impostazioni globali della piattaforma. Visibile solo ai superuser.", "Globale Einstellungen für die gesamte Plattform. Nur für Superuser sichtbar.")}
             </Text>
 
             {err && (
@@ -132,44 +135,44 @@ export default function PlatformSettingsPage() {
             <Card>
               <BlockStack gap="400">
                 <Text variant="headingMd" as="h2">
-                  {locale === "en" ? "General platform data" : locale === "tr" ? "Genel platform bilgileri" : "Allgemeine Plattformdaten"}
+                  {t("General platform data", "Genel platform bilgileri", "Données générales de la plateforme", "Datos generales de la plataforma", "Dati generali della piattaforma", "Allgemeine Plattformdaten")}
                 </Text>
                 <Text as="p" tone="subdued">
-                  {locale === "en" ? "These details appear in emails, invoices and the public imprint." : locale === "tr" ? "Bu bilgiler e-postalarda, faturalarda ve kamuya açık künye bölümünde görünür." : "Diese Angaben erscheinen in E-Mails, Rechnungen und im öffentlichen Impressum."}
+                  {t("These details appear in emails, invoices and the public imprint.", "Bu bilgiler e-postalarda, faturalarda ve kamuya açık künye bölümünde görünür.", "Ces informations apparaissent dans les e-mails, les factures et les mentions légales publiques.", "Estos datos aparecen en correos, facturas y aviso legal público.", "Questi dati compaiono in email, fatture e note legali pubbliche.", "Diese Angaben erscheinen in E-Mails, Rechnungen und im öffentlichen Impressum.")}
                 </Text>
                 <TextField
-                  label={locale === "en" ? "Platform name" : locale === "tr" ? "Platform adı" : "Plattformname"}
+                  label={t("Platform name", "Platform adı", "Nom de la plateforme", "Nombre de la plataforma", "Nome piattaforma", "Plattformname")}
                   value={platformName}
                   onChange={setPlatformName}
                   placeholder="e.g. Andertal Marketplace"
                   autoComplete="off"
-                  helpText={locale === "en" ? "Display name of the platform (visible in emails and the shop)" : locale === "tr" ? "Platformun görünen adı (e-postalarda ve mağazada görünür)" : "Anzeigename der Plattform (in E-Mails und im Shop sichtbar)"}
+                  helpText={t("Display name of the platform (visible in emails and the shop)", "Platformun görünen adı (e-postalarda ve mağazada görünür)", "Nom affiché de la plateforme (visible dans les e-mails et la boutique)", "Nombre visible de la plataforma (visible en correos y tienda)", "Nome visualizzato della piattaforma (visibile in email e negozio)", "Anzeigename der Plattform (in E-Mails und im Shop sichtbar)")}
                 />
                 <TextField
-                  label={locale === "en" ? "Shop/display name (internal)" : locale === "tr" ? "Mağaza/görünen adı (dahili)" : "Shop-/Anzeigename (intern)"}
+                  label={t("Shop/display name (internal)", "Mağaza/görünen adı (dahili)", "Nom boutique/affichage (interne)", "Nombre de tienda/visualización (interno)", "Nome negozio/visualizzazione (interno)", "Shop-/Anzeigename (intern)")}
                   value={storeName}
                   onChange={setStoreName}
                   placeholder="e.g. Andertal"
                   autoComplete="off"
-                  helpText={locale === "en" ? "Short name — shown in the Sellercentral header" : locale === "tr" ? "Kısa ad — Sellercentral başlığında gösterilir" : "Kurzname – wird im Sellercentral-Header angezeigt"}
+                  helpText={t("Short name — shown in the Sellercentral header", "Kısa ad — Sellercentral başlığında gösterilir", "Nom court — affiché dans l'en-tête Sellercentral", "Nombre corto — mostrado en el encabezado de Sellercentral", "Nome breve — mostrato nell'intestazione Sellercentral", "Kurzname – wird im Sellercentral-Header angezeigt")}
                 />
                 <TextField
-                  label={locale === "en" ? "Support email" : locale === "tr" ? "Destek e-postası" : "Support-E-Mail"}
+                  label={t("Support email", "Destek e-postası", "E-mail de support", "Correo de soporte", "Email supporto", "Support-E-Mail")}
                   value={supportEmail}
                   onChange={setSupportEmail}
                   type="email"
                   placeholder="support@andertal.de"
                   autoComplete="off"
-                  helpText={locale === "en" ? "Contact email for buyers and automated emails" : locale === "tr" ? "Alıcılar ve otomatik e-postalar için iletişim e-postası" : "Kontakt-E-Mail für Käufer und automatische E-Mails"}
+                  helpText={t("Contact email for buyers and automated emails", "Alıcılar ve otomatik e-postalar için iletişim e-postası", "E-mail de contact pour les acheteurs et les e-mails automatiques", "Correo de contacto para compradores y correos automáticos", "Email di contatto per clienti ed email automatiche", "Kontakt-E-Mail für Käufer und automatische E-Mails")}
                 />
                 <TextField
-                  label={locale === "en" ? "Shop URL" : locale === "tr" ? "Mağaza URL" : "Shop-URL"}
+                  label={t("Shop URL", "Mağaza URL", "URL de la boutique", "URL de la tienda", "URL negozio", "Shop-URL")}
                   value={storefrontUrl}
                   onChange={setStorefrontUrl}
                   type="url"
                   placeholder="https://www.andertal.com"
                   autoComplete="off"
-                  helpText={locale === "en" ? "Public URL of the shop — used in flow emails for links like 'View order'" : locale === "tr" ? "Mağazanın genel URL'si — akış e-postalarında 'Siparişi görüntüle' gibi bağlantılar için kullanılır" : "Öffentliche URL des Shops – wird in Flow-E-Mails für Links wie 'Bestellung ansehen' verwendet"}
+                  helpText={t("Public URL of the shop — used in flow emails for links like 'View order'", "Mağazanın genel URL'si — akış e-postalarında 'Siparişi görüntüle' gibi bağlantılar için kullanılır", "URL publique de la boutique — utilisée dans les e-mails flow pour des liens comme 'Voir la commande'", "URL pública de la tienda — usada en correos de flujo para enlaces como 'Ver pedido'", "URL pubblica del negozio — usata nelle email flow per link come 'Visualizza ordine'", "Öffentliche URL des Shops – wird in Flow-E-Mails für Links wie 'Bestellung ansehen' verwendet")}
                 />
               </BlockStack>
             </Card>
@@ -177,29 +180,29 @@ export default function PlatformSettingsPage() {
             <Card>
               <BlockStack gap="300">
                 <Text variant="headingMd" as="h2">
-                  {locale === "en" ? "More settings" : locale === "tr" ? "Daha fazla ayar" : "Weitere Einstellungen"}
+                  {t("More settings", "Daha fazla ayar", "Plus de paramètres", "Más ajustes", "Altre impostazioni", "Weitere Einstellungen")}
                 </Text>
                 <Divider />
                 {[
                   {
-                    label: locale === "en" ? "Checkout & Payments" : locale === "tr" ? "Ödeme & Ödemeler" : "Checkout & Zahlungen",
+                    label: t("Checkout & Payments", "Ödeme & Ödemeler", "Paiement & paiements", "Pago y cobros", "Checkout e pagamenti", "Checkout & Zahlungen"),
                     href: "/settings/checkout",
                     desc: "Stripe, PayPal, Klarna",
                   },
                   {
-                    label: locale === "en" ? "Branding & Styles" : locale === "tr" ? "Marka & Stiller" : "Branding & Stile",
+                    label: t("Branding & Styles", "Marka & Stiller", "Marque & styles", "Marca y estilos", "Branding e stili", "Branding & Stile"),
                     href: "/content/styles",
-                    desc: locale === "en" ? "Logos, colours, favicon" : locale === "tr" ? "Logolar, renkler, favicon" : "Logos, Farben, Favicon",
+                    desc: t("Logos, colours, favicon", "Logolar, renkler, favicon", "Logos, couleurs, favicon", "Logos, colores, favicon", "Loghi, colori, favicon", "Logos, Farben, Favicon"),
                   },
                   ...(isSuperuser ? [{
-                    label: locale === "en" ? "Email (SMTP)" : locale === "tr" ? "E-posta (SMTP)" : "E-Mail (SMTP)",
+                    label: t("Email (SMTP)", "E-posta (SMTP)", "E-mail (SMTP)", "Correo (SMTP)", "Email (SMTP)", "E-Mail (SMTP)"),
                     href: "/settings/integrations",
-                    desc: locale === "en" ? "Outgoing email configuration" : locale === "tr" ? "Giden e-posta yapılandırması" : "Ausgehende E-Mail-Konfiguration",
+                    desc: t("Outgoing email configuration", "Giden e-posta yapılandırması", "Configuration des e-mails sortants", "Configuración de correo saliente", "Configurazione email in uscita", "Ausgehende E-Mail-Konfiguration"),
                   }] : []),
                   {
-                    label: locale === "en" ? "Billbee Integration" : locale === "tr" ? "Billbee Entegrasyonu" : "Billbee-Integration",
+                    label: t("Billbee Integration", "Billbee Entegrasyonu", "Intégration Billbee", "Integración Billbee", "Integrazione Billbee", "Billbee-Integration"),
                     href: "/settings/integrations",
-                    desc: locale === "en" ? "Order processing & shipping" : locale === "tr" ? "Sipariş işleme & kargo" : "Auftragsabwicklung & Versand",
+                    desc: t("Order processing & shipping", "Sipariş işleme & kargo", "Traitement des commandes et expédition", "Procesamiento de pedidos y envío", "Elaborazione ordini e spedizione", "Auftragsabwicklung & Versand"),
                   },
                 ].map((item) => (
                   <InlineStack key={item.href} align="space-between" blockAlign="center" wrap={false}>
@@ -211,7 +214,7 @@ export default function PlatformSettingsPage() {
                       variant="plain"
                       url={item.href}
                     >
-                      {locale === "en" ? "Open" : locale === "tr" ? "Aç" : "Öffnen"}
+                      {t("Open", "Aç", "Ouvrir", "Abrir", "Apri", "Öffnen")}
                     </Button>
                   </InlineStack>
                 ))}
@@ -224,7 +227,7 @@ export default function PlatformSettingsPage() {
               </Button>
               {isDirty && (
                 <Button variant="plain" onClick={discard}>
-                  {locale === "en" ? "Discard" : locale === "tr" ? "Vazgeç" : "Verwerfen"}
+                  {t("Discard", "Vazgeç", "Annuler les changements", "Descartar", "Annulla modifiche", "Verwerfen")}
                 </Button>
               )}
             </InlineStack>

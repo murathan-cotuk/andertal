@@ -27,6 +27,7 @@ import {
   ProductSectionRule,
   PRODUCT_SECTION_STYLES,
 } from "@/components/products/ProductSection";
+import { lt } from "@/lib/locale-text";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -80,19 +81,19 @@ function optionDisplayLabel(opt, loc) {
   return String(opt ?? "").trim();
 }
 
-const STATUS_OPTIONS = [
-  { label: "Active", value: "published" },
-  { label: "Draft", value: "draft" },
-  { label: "Inactive", value: "archived" },
+const STATUS_OPTIONS = (locale) => [
+  { label: lt(locale, "Active", "Aktif", "Actif", "Activo", "Attivo", "Aktiv"), value: "published" },
+  { label: lt(locale, "Draft", "Taslak", "Brouillon", "Borrador", "Bozza", "Entwurf"), value: "draft" },
+  { label: lt(locale, "Inactive", "Pasif", "Inactif", "Inactivo", "Inattivo", "Inaktiv"), value: "archived" },
 ];
 
-const UNIT_TYPE_OPTIONS = [
-  { label: "— None —", value: "" },
+const UNIT_TYPE_OPTIONS = (locale) => [
+  { label: lt(locale, "— None —", "— Yok —", "— Aucun —", "— Ninguno —", "— Nessuno —", "— Keine —"), value: "" },
   { label: "kg", value: "kg" },
   { label: "g", value: "g" },
   { label: "L", value: "L" },
   { label: "ml", value: "ml" },
-  { label: "Piece", value: "stück" },
+  { label: lt(locale, "Piece", "Adet", "Pièce", "Pieza", "Pezzo", "Stück"), value: "stück" },
 ];
 
 function normalizeForCompareProduct(p) {
@@ -110,6 +111,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
   const unsaved = useUnsavedChanges();
+  const t = useCallback((en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de), [locale]);
 
   const optionKeyParts = useMemo(() => decodeVariantPathKey(variantKeySegment), [variantKeySegment]);
 
@@ -215,7 +217,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   })();
 
   const variantSummary = useMemo(() => {
-    if (!v?.option_values || !variantGroups.length) return v?.title || "Variant";
+    if (!v?.option_values || !variantGroups.length) return v?.title || t("Variant", "Varyant", "Variante", "Variante", "Variante", "Variante");
     return v.option_values
       .map((val, gi) => {
         const g = variantGroups[gi];
@@ -315,11 +317,11 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       setProduct(saved);
       setBaselineSnapshot(JSON.stringify(normalizeForCompareProduct(saved)));
       unsaved?.setDirty(false);
-      setMessage({ type: "success", text: "Saved" });
+      setMessage({ type: "success", text: t("Saved", "Kaydedildi", "Enregistré", "Guardado", "Salvato", "Gespeichert") });
       onReload?.();
       return true;
     } catch (err) {
-      setMessage({ type: "error", text: err?.message || "Save failed" });
+      setMessage({ type: "error", text: err?.message || t("Save failed", "Kaydetme başarısız", "Échec de l'enregistrement", "Error al guardar", "Salvataggio non riuscito", "Speichern fehlgeschlagen") });
       return false;
     } finally {
       setSaving(false);
@@ -378,10 +380,10 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
   if (optionKeyParts == null) {
     return (
-      <Page title="Variant">
-        <Banner tone="critical">Invalid variant link.</Banner>
+      <Page title={t("Variant", "Varyant", "Variante", "Variante", "Variante", "Variante")}>
+        <Banner tone="critical">{t("Invalid variant link.", "Geçersiz varyant bağlantısı.", "Lien de variante invalide.", "Enlace de variante inválido.", "Link variante non valido.", "Ungültiger Variantenlink.")}</Banner>
         <Box paddingBlockStart="400">
-          <Button onClick={() => router.push(`/products/${idOrHandle}`)}>Back to product</Button>
+          <Button onClick={() => router.push(`/products/${idOrHandle}`)}>{t("Back to product", "Ürüne dön", "Retour au produit", "Volver al producto", "Torna al prodotto", "Zurück zum Produkt")}</Button>
         </Box>
       </Page>
     );
@@ -389,10 +391,10 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
   if (!v) {
     return (
-      <Page title="Variant">
-        <Banner tone="critical">This variant no longer exists on the product.</Banner>
+      <Page title={t("Variant", "Varyant", "Variante", "Variante", "Variante", "Variante")}>
+        <Banner tone="critical">{t("This variant no longer exists on the product.", "Bu varyant artık üründe bulunmuyor.", "Cette variante n'existe plus sur le produit.", "Esta variante ya no existe en el producto.", "Questa variante non esiste più nel prodotto.", "Diese Variante existiert nicht mehr im Produkt.")}</Banner>
         <Box paddingBlockStart="400">
-          <Button onClick={() => router.push(`/products/${idOrHandle}`)}>Back to product</Button>
+          <Button onClick={() => router.push(`/products/${idOrHandle}`)}>{t("Back to product", "Ürüne dön", "Retour au produit", "Volver al producto", "Torna al prodotto", "Zurück zum Produkt")}</Button>
         </Box>
       </Page>
     );
@@ -741,7 +743,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
               <Select
                 label="Unit"
-                options={UNIT_TYPE_OPTIONS}
+                options={UNIT_TYPE_OPTIONS(locale)}
                 value={vm.unit_type ?? ""}
                 onChange={(v) => updateVariantMeta("unit_type", v)}
               />
@@ -863,7 +865,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               <Select
                 label="Status"
                 labelHidden
-                options={STATUS_OPTIONS}
+                options={STATUS_OPTIONS(locale)}
                 value={product.status || "draft"}
                 disabled
               />
@@ -871,7 +873,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 Change status on the main product page.
               </Text>
               <Divider />
-              <Button onClick={() => router.push(`/products/${idOrHandle}`)}>Back to product</Button>
+              <Button onClick={() => router.push(`/products/${idOrHandle}`)}>{t("Back to product", "Ürüne dön", "Retour au produit", "Volver al producto", "Torna al prodotto", "Zurück zum Produkt")}</Button>
             </BlockStack>
           </Card>
           </div>

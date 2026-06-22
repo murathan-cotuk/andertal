@@ -3,8 +3,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { Card, Button, Input } from "@andertal/ui";
+import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { userError } from "@/lib/api-error-messages";
+import { getCategoriesSettingsCopy } from "@/lib/settings-pages-i18n";
 
 /** Build nested tree from flat array using parent_id */
 function buildTree(flat) {
@@ -21,7 +24,7 @@ function buildTree(flat) {
   return roots;
 }
 
-function CategoryTreeNode({ node, depth = 0, onDelete, allOpen }) {
+function CategoryTreeNode({ node, depth = 0, onDelete, allOpen, copy }) {
   const [open, setOpen] = useState(allOpen);
   const hasChildren = node.children && node.children.length > 0;
   const indent = depth * 20;
@@ -43,20 +46,20 @@ function CategoryTreeNode({ node, depth = 0, onDelete, allOpen }) {
           <TreeName>{node.name}</TreeName>
           <TreeMeta>
             <span style={{ fontFamily: "monospace", fontSize: 11 }}>{node.slug}</span>
-            {node.is_visible && <Badge $color="#dbeafe" $text="#1e40af">Nav</Badge>}
-            {node.has_collection && <Badge $color="#d1fae5" $text="#065f46">Collection</Badge>}
-            {!node.active && <Badge $color="#fee2e2" $text="#991b1b">Pasif</Badge>}
-            {hasChildren && <Badge $color="#fef3c7" $text="#92400e">{node.children.length} alt</Badge>}
+            {node.is_visible && <Badge $color="#dbeafe" $text="#1e40af">{copy.navBadge}</Badge>}
+            {node.has_collection && <Badge $color="#d1fae5" $text="#065f46">{copy.collectionBadge}</Badge>}
+            {!node.active && <Badge $color="#fee2e2" $text="#991b1b">{copy.inactiveBadge}</Badge>}
+            {hasChildren && <Badge $color="#fef3c7" $text="#92400e">{copy.childrenCount(node.children.length)}</Badge>}
           </TreeMeta>
         </TreeInfo>
         <TreeActions>
-          <DeleteBtn onClick={() => onDelete(node)} title="Sil">✕</DeleteBtn>
+          <DeleteBtn onClick={() => onDelete(node)} title={copy.deleteTitle}>✕</DeleteBtn>
         </TreeActions>
       </TreeRow>
       {hasChildren && open && (
         <div>
           {node.children.map(child => (
-            <CategoryTreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} allOpen={allOpen} />
+            <CategoryTreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} allOpen={allOpen} copy={copy} />
           ))}
         </div>
       )}
@@ -234,6 +237,8 @@ const ErrorMessage = styled.div`
 
 
 export default function AdminCategoriesPage() {
+  const locale = useLocale();
+  const copy = getCategoriesSettingsCopy(locale);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
@@ -261,22 +266,22 @@ export default function AdminCategoriesPage() {
       setCategories(data.categories || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
-      setMessage({ type: "error", text: "Kategoriler yüklenemedi" });
+      setMessage({ type: "error", text: userError(error, locale, copy.errors.load) });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = useCallback(async (cat) => {
-    if (!(await confirmDelete(`"${cat.name}" kategorisini silmek istediğinize emin misiniz?`))) return;
+    if (!(await confirmDelete(copy.deleteConfirm(cat.name)))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteAdminHubCategory(cat.id);
       setCategories(prev => prev.filter(c => c.id !== cat.id));
     } catch (err) {
-      setMessage({ type: "error", text: err.message || "Silme işlemi başarısız" });
+      setMessage({ type: "error", text: userError(err, locale, copy.errors.delete) });
     }
-  }, []);
+  }, [copy, locale]);
 
   const handleSingleCreate = async (e) => {
     e.preventDefault();
@@ -285,7 +290,7 @@ export default function AdminCategoriesPage() {
 
     try {
       if (!singleCategory.name || !singleCategory.slug) {
-        throw new Error("Name ve slug zorunludur");
+        throw new Error(copy.errors.requiredNameSlug);
       }
 
       const client = getMedusaAdminClient();
@@ -301,14 +306,14 @@ export default function AdminCategoriesPage() {
 
       setMessage({
         type: "success",
-        text: "Kategori başarıyla eklendi!",
+        text: copy.success.created,
       });
       setSingleCategory({ name: "", slug: "", description: "", is_visible: true, has_collection: true });
       fetchCategories();
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.message || "Kategori eklenirken hata oluştu",
+        text: userError(error, locale, copy.errors.create),
       });
     } finally {
       setCreating(false);
@@ -323,7 +328,7 @@ export default function AdminCategoriesPage() {
     try {
       const categoriesToAdd = JSON.parse(bulkJson);
       if (!Array.isArray(categoriesToAdd)) {
-        throw new Error("JSON bir array olmalı");
+        throw new Error(copy.errors.jsonArray);
       }
 
       const results = [];
@@ -352,7 +357,7 @@ export default function AdminCategoriesPage() {
       if (results.length > 0) {
         setMessage({
           type: "success",
-          text: `${results.length} kategori başarıyla eklendi${errors.length > 0 ? `, ${errors.length} hata` : ""}`,
+          text: copy.success.bulkCreated(results.length, errors.length),
         });
         setBulkJson("");
         fetchCategories();
@@ -364,7 +369,7 @@ export default function AdminCategoriesPage() {
     } catch (error) {
       setMessage({
         type: "error",
-        text: error.message || "Kategoriler eklenirken hata oluştu",
+        text: userError(error, locale, copy.errors.create),
       });
     } finally {
       setCreating(false);
@@ -374,27 +379,27 @@ export default function AdminCategoriesPage() {
   return (
     <Container>
       <Header>
-        <Title>Category Management</Title>
-        <Subtitle>Manage platform categories - Single source of truth</Subtitle>
+        <Title>{copy.title}</Title>
+        <Subtitle>{copy.subtitle}</Subtitle>
       </Header>
 
       <Section>
         <h2 style={{ marginBottom: "16px", fontSize: "20px", fontWeight: "600" }}>
-          Add Single Category
+          {copy.addSingle}
         </h2>
         <Form onSubmit={handleSingleCreate}>
           <div>
-            <Label>Category Name *</Label>
+            <Label>{copy.categoryName}</Label>
             <Input
               type="text"
               value={singleCategory.name}
               onChange={(e) => setSingleCategory({ ...singleCategory, name: e.target.value })}
-              placeholder="Electronics"
+              placeholder="electronics"
               required
             />
           </div>
           <div>
-            <Label>Category Slug *</Label>
+            <Label>{copy.categorySlug}</Label>
             <Input
               type="text"
               value={singleCategory.slug}
@@ -403,15 +408,15 @@ export default function AdminCategoriesPage() {
               required
             />
             <small style={{ color: "#6b7280", marginTop: "4px", display: "block" }}>
-              URL-friendly slug (e.g., electronics, clothing)
+              {copy.slugHelp}
             </small>
           </div>
           <div>
-            <Label>Description</Label>
+            <Label>{copy.description}</Label>
             <TextArea
               value={singleCategory.description}
               onChange={(e) => setSingleCategory({ ...singleCategory, description: e.target.value })}
-              placeholder="Category description..."
+              placeholder={copy.descriptionPlaceholder}
               style={{ minHeight: "100px" }}
             />
           </div>
@@ -426,7 +431,7 @@ export default function AdminCategoriesPage() {
                 style={{ width: "18px", height: "18px", cursor: "pointer" }}
               />
               <Label htmlFor="is_visible" style={{ margin: 0, cursor: "pointer", fontWeight: "400" }}>
-                Visible in navigation
+                {copy.visibleInNav}
               </Label>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -438,7 +443,7 @@ export default function AdminCategoriesPage() {
                 style={{ width: "18px", height: "18px", cursor: "pointer" }}
               />
               <Label htmlFor="has_collection" style={{ margin: 0, cursor: "pointer", fontWeight: "400" }}>
-                Has collection page (/collections/slug)
+                {copy.hasCollectionPage}
               </Label>
             </div>
           </div>
@@ -452,25 +457,25 @@ export default function AdminCategoriesPage() {
           )}
 
           <Button type="submit" disabled={creating || !singleCategory.name || !singleCategory.slug}>
-            {creating ? "Adding Category..." : "Add Category"}
+            {creating ? copy.addingCategory : copy.addCategory}
           </Button>
         </Form>
       </Section>
 
       <Section>
         <h2 style={{ marginBottom: "16px", fontSize: "20px", fontWeight: "600" }}>
-          Bulk Add Categories (JSON)
+          {copy.addBulk}
         </h2>
         <Form onSubmit={handleBulkCreate}>
           <div>
-            <Label>Categories JSON</Label>
+            <Label>{copy.categoriesJson}</Label>
             <TextArea
               value={bulkJson}
               onChange={(e) => setBulkJson(e.target.value)}
               placeholder={`[\n  {\n    "name": "Electronics",\n    "slug": "electronics",\n    "description": "Electronic products"\n  },\n  {\n    "name": "Clothing",\n    "slug": "clothing",\n    "description": "Clothing and apparel"\n  }\n]`}
             />
             <small style={{ color: "#6b7280", marginTop: "8px", display: "block" }}>
-              JSON array format for bulk category creation.
+              {copy.bulkJsonHelp}
             </small>
           </div>
 
@@ -483,7 +488,7 @@ export default function AdminCategoriesPage() {
           )}
 
           <Button type="submit" disabled={creating || !bulkJson.trim()}>
-            {creating ? "Adding Categories..." : "Add Categories (Bulk)"}
+            {creating ? copy.addingCategories : copy.addCategoriesBulk}
           </Button>
         </Form>
       </Section>
@@ -491,33 +496,33 @@ export default function AdminCategoriesPage() {
       <Section>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
-            Kategoriler ({categories.length})
+            {copy.categoriesHeader(categories.length)}
           </h2>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => setAllOpen(true)}
               style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" }}
             >
-              Tümünü Aç
+              {copy.expandAll}
             </button>
             <button
               onClick={() => setAllOpen(false)}
               style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" }}
             >
-              Tümünü Kapat
+              {copy.collapseAll}
             </button>
           </div>
         </div>
         {loading ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>Yükleniyor…</div>
+          <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>{copy.loading}</div>
         ) : categories.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-            Henüz kategori yok. Yukarıdaki formdan ekleyin.
+            {copy.noCategories}
           </div>
         ) : (
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
             {buildTree(categories).map(node => (
-              <CategoryTreeNode key={node.id} node={node} depth={0} onDelete={handleDelete} allOpen={allOpen} />
+              <CategoryTreeNode key={node.id} node={node} depth={0} onDelete={handleDelete} allOpen={allOpen} copy={copy} />
             ))}
           </div>
         )}

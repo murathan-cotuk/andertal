@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import {
   Page,
   Layout,
@@ -20,8 +21,8 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import ProductDescriptionEditor from "@/components/inputs/ProductDescriptionEditor";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
-
-const DEFAULT_CATEGORIES = [{ id: "uncategorized", name: "Uncategorized" }];
+import { getSingleUploadCopy } from "@/lib/products-pages-i18n";
+import { userError } from "@/lib/api-error-messages";
 
 const VARIANT_TYPES = [
   { name: "Color", commonOptions: ["Black", "White", "Red", "Blue", "Green", "Yellow", "Pink", "Purple", "Orange", "Gray", "Brown", "Silver", "Gold"] },
@@ -58,6 +59,9 @@ function categoryLineageIdsFromFlatList(flatCategories, categoryId) {
 
 export default function SingleUploadPage() {
   const router = useRouter();
+  const locale = useLocale();
+  const copy = getSingleUploadCopy(locale);
+  const defaultCategories = [{ id: "uncategorized", name: copy.uncategorized }];
   const [formData, setFormData] = useState({
     title: "",
     SKU: "",
@@ -84,11 +88,11 @@ export default function SingleUploadPage() {
         setCategoriesApiFailed(false);
         const data = await medusaClient.getAdminHubCategories();
         const list = data.categories || [];
-        setCategories(list.length > 0 ? list : DEFAULT_CATEGORIES);
+        setCategories(list.length > 0 ? list : defaultCategories);
         if (list.length === 0) setCategoriesApiFailed(true);
       } catch (error) {
         console.error("Error fetching Admin Hub categories:", error);
-        setCategories(DEFAULT_CATEGORIES);
+        setCategories(defaultCategories);
         setCategoriesApiFailed(true);
       } finally {
         setCategoriesLoading(false);
@@ -157,7 +161,7 @@ export default function SingleUploadPage() {
     let sellerId = formData.seller || (typeof localStorage !== "undefined" ? localStorage.getItem("sellerId") : null);
 
     if (!sellerId) {
-      setMessage({ type: "error", text: "Seller ID is required. Please log in again." });
+      setMessage({ type: "error", text: copy.sellerRequired });
       return;
     }
 
@@ -204,7 +208,7 @@ export default function SingleUploadPage() {
     try {
       setCreating(true);
       await medusaClient.createAdminHubProduct(productData);
-      setMessage({ type: "success", text: "Product created successfully!" });
+      setMessage({ type: "success", text: copy.created });
       setFormData({
         title: "",
         SKU: "",
@@ -219,7 +223,7 @@ export default function SingleUploadPage() {
       });
     } catch (error) {
       console.error("Error creating product:", error);
-      const msg = error?.message || "An error occurred while creating the product.";
+      const msg = userError(error, locale, copy.creatingError);
       const hint = msg.includes("Backend unreachable") || msg.includes("NEXT_PUBLIC_MEDUSA_BACKEND_URL")
         ? " Set NEXT_PUBLIC_MEDUSA_BACKEND_URL in .env.local (e.g. https://api.andertal.com) and restart the dev server."
         : "";
@@ -230,17 +234,17 @@ export default function SingleUploadPage() {
   };
 
   const statusOptions = [
-    { label: "Draft", value: "draft" },
-    { label: "Published", value: "published" },
-    { label: "Archived", value: "archived" },
+    { label: copy.statusDraft, value: "draft" },
+    { label: copy.statusPublished, value: "published" },
+    { label: copy.statusArchived, value: "archived" },
   ];
 
   return (
     <Page
-      title="Add product"
-      backAction={{ content: "Inventory", onAction: () => router.push("/products/inventory") }}
+      title={copy.pageTitle}
+      backAction={{ content: copy.inventoryBack, onAction: () => router.push("/products/inventory") }}
       primaryAction={{
-        content: creating ? "Creating…" : "Create product",
+        content: creating ? copy.creating : copy.createProduct,
         onAction: handleSubmit,
         loading: creating,
         disabled: !formData.seller,
@@ -261,8 +265,7 @@ export default function SingleUploadPage() {
         {categoriesApiFailed && (
           <Layout.Section>
             <Banner tone="warning">
-              Categories could not be loaded from the backend (check NEXT_PUBLIC_MEDUSA_BACKEND_URL on Vercel, e.g.
-              https://api.andertal.com). Using default category for now.
+              {copy.categoriesFallback}
             </Banner>
           </Layout.Section>
         )}
@@ -271,62 +274,62 @@ export default function SingleUploadPage() {
           <Card>
             <BlockStack gap="400">
               <Text as="h2" variant="headingSm">
-                New product
+                {copy.newProduct}
               </Text>
               <Divider />
               <form onSubmit={handleSubmit}>
                 <BlockStack gap="400">
                   <FormLayout>
                     <TextField
-                      label="Product title"
+                      label={copy.productTitle}
                       value={formData.title}
                       onChange={(value) => setFormData((prev) => ({ ...prev, title: value }))}
                       autoComplete="off"
                       requiredIndicator
                     />
                     <TextField
-                      label="SKU (optional, auto-generated from title if empty)"
+                      label={copy.skuHelp}
                       value={formData.SKU}
                       onChange={(value) => setFormData((prev) => ({ ...prev, SKU: value }))}
                       placeholder="PRODUCT-SKU-001"
                       autoComplete="off"
                     />
                     <div>
-                      <Text as="label" variant="bodyMd" fontWeight="medium">Description</Text>
+                      <Text as="label" variant="bodyMd" fontWeight="medium">{copy.description}</Text>
                       <Box paddingBlockStart="100">
                         <ProductDescriptionEditor
                           value={formData.description}
                           onChange={(value) => setFormData((prev) => ({ ...prev, description: value }))}
-                          placeholder="Product description…"
+                          placeholder={copy.descriptionPlaceholder}
                         />
                       </Box>
                     </div>
 
                     <Box paddingBlockStart="200">
                       <Text as="span" variant="bodyMd" fontWeight="semibold">
-                        Category
+                        {copy.category}
                       </Text>
                       {categoriesLoading ? (
                         <Box paddingBlockStart="200">
                           <Text as="p" tone="subdued">
-                            Loading categories…
+                            {copy.loadingCategories}
                           </Text>
                         </Box>
                       ) : (
                         <CategoryDrilldownSelect
-                          label="Category"
+                          label={copy.category}
                           labelHidden
                           categories={categories || []}
                           value={formData.categories[0] || ""}
                           onChange={(v) => setFormData((prev) => ({ ...prev, categories: v ? [v] : [] }))}
-                          placeholder="Select category"
+                          placeholder={copy.selectCategory}
                         />
                       )}
                     </Box>
 
                     <FormLayout.Group>
                       <TextField
-                        label="Price (€)"
+                        label={copy.price}
                         type="number"
                         value={formData.price}
                         onChange={(value) => setFormData((prev) => ({ ...prev, price: value }))}
@@ -335,7 +338,7 @@ export default function SingleUploadPage() {
                         requiredIndicator
                       />
                       <TextField
-                        label="Inventory"
+                        label={copy.inventory}
                         type="number"
                         value={formData.inventory}
                         onChange={(value) => setFormData((prev) => ({ ...prev, inventory: value }))}
@@ -346,16 +349,16 @@ export default function SingleUploadPage() {
 
                     <FormLayout.Group>
                       <Select
-                        label="Status"
+                        label={copy.status}
                         options={statusOptions}
                         value={formData.status}
                         onChange={(value) => setFormData((prev) => ({ ...prev, status: value }))}
                       />
                       <TextField
-                        label="Seller ID"
+                        label={copy.sellerId}
                         value={formData.seller || (typeof localStorage !== "undefined" ? localStorage.getItem("sellerId") : "") || ""}
                         onChange={(value) => setFormData((prev) => ({ ...prev, seller: value }))}
-                        placeholder="From login"
+                        placeholder={copy.fromLogin}
                         autoComplete="off"
                         disabled={!!(typeof localStorage !== "undefined" && localStorage.getItem("sellerId"))}
                       />
@@ -365,9 +368,9 @@ export default function SingleUploadPage() {
                   <Divider />
                   <InlineStack align="space-between" blockAlign="center">
                     <Text as="h3" variant="headingSm">
-                      Variants (e.g. Color, Size)
+                      {copy.variantsHeading}
                     </Text>
-                    <Button onClick={addVariant}>Add variant</Button>
+                    <Button onClick={addVariant}>{copy.addVariant}</Button>
                   </InlineStack>
 
                   {formData.variants.map((variant, vIdx) => (
@@ -382,34 +385,34 @@ export default function SingleUploadPage() {
                           <InlineStack gap="200" blockAlign="center" wrap={false}>
                             <Box minWidth="140px">
                               <TextField
-                                label="Variant name"
+                                label={copy.variantName}
                                 labelHidden
                                 value={variant.name}
                                 onChange={(value) => updateVariant(vIdx, "name", value)}
-                                placeholder="e.g. Color, Size"
+                                placeholder={copy.variantNamePlaceholder}
                                 autoComplete="off"
                               />
                             </Box>
                             <Select
-                              label="Preset"
+                              label={copy.preset}
                               labelHidden
-                              options={[{ label: "Use common options…", value: "" }, ...VARIANT_TYPES.map((vt) => ({ label: vt.name, value: vt.name }))]}
+                              options={[{ label: copy.useCommonOptions, value: "" }, ...VARIANT_TYPES.map((vt) => ({ label: vt.name, value: vt.name }))]}
                               value=""
                               onChange={(value) => useCommonVariantOptions(vIdx, VARIANT_TYPES.find((v) => v.name === value))}
                             />
                           </InlineStack>
                           <Button variant="plain" tone="critical" onClick={() => removeVariant(vIdx)}>
-                            Remove variant
+                            {copy.removeVariant}
                           </Button>
                         </InlineStack>
                         {variant.options.map((opt, oIdx) => (
                           <InlineStack key={oIdx} gap="200" blockAlign="end" wrap>
                             <TextField
-                              label="Value"
+                              label={copy.value}
                               labelHidden
                               value={opt.value}
                               onChange={(value) => updateVariantOption(vIdx, oIdx, "value", value)}
-                              placeholder="Value"
+                              placeholder={copy.value}
                               autoComplete="off"
                             />
                             <TextField
@@ -434,7 +437,7 @@ export default function SingleUploadPage() {
                               type="number"
                               value={String(opt.inventory ?? "")}
                               onChange={(value) => updateVariantOption(vIdx, oIdx, "inventory", value ? parseInt(value, 10) : 0)}
-                              placeholder="Qty"
+                              placeholder={copy.qty}
                             />
                             <Button
                               variant="plain"
@@ -442,12 +445,12 @@ export default function SingleUploadPage() {
                               size="slim"
                               onClick={() => removeVariantOption(vIdx, oIdx)}
                             >
-                              Remove
+                              {copy.remove}
                             </Button>
                           </InlineStack>
                         ))}
                         <Button size="slim" onClick={() => addVariantOption(vIdx)}>
-                          Add option
+                          {copy.addOption}
                         </Button>
                       </BlockStack>
                     </Box>

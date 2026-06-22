@@ -7,6 +7,7 @@ import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
 import { confirmDelete } from "@/lib/confirm-delete";
+import { getMediaPageCopy } from "@/lib/media-page-i18n";
 
 /* ───────── helpers ───────── */
 function fmtSize(bytes) {
@@ -273,6 +274,7 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
 export default function MediaPage() {
   const locale = useLocale();
   const lt = useLt();
+  const c = getMediaPageCopy(locale);
   const ui = getUI(locale);
   const [media, setMedia] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -399,10 +401,10 @@ export default function MediaPage() {
 
   const totalCount = media.length;
   const folderLabel = activeFolder === "all"
-    ? (locale === "en" ? "All media" : locale === "tr" ? "Tüm medya" : "Alle Medien")
+    ? c.allMedia
     : activeFolder === "none"
-    ? (locale === "en" ? "Without folder" : locale === "tr" ? "Klasörsüz" : "Ohne Ordner")
-    : (folders.find(f => f.id === activeFolder)?.name || (locale === "en" ? "Folder" : locale === "tr" ? "Klasör" : "Ordner"));
+    ? c.withoutFolder
+    : (folders.find(f => f.id === activeFolder)?.name || c.folder);
 
   const handleDragEnter = (e) => {
     e.preventDefault();
@@ -441,20 +443,20 @@ export default function MediaPage() {
         }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 52, marginBottom: 12 }}>📂</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#2563eb" }}>{locale === "en" ? "Drop images here" : locale === "tr" ? "Görselleri buraya bırakın" : "Bilder hier ablegen"}</div>
-            <div style={{ fontSize: 13, color: "#3b82f6", marginTop: 4 }}>{locale === "en" ? "Release to upload" : locale === "tr" ? "Yüklemek için bırakın" : "Loslassen um hochzuladen"}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#2563eb" }}>{c.dropImages}</div>
+            <div style={{ fontSize: 13, color: "#3b82f6", marginTop: 4 }}>{c.releaseToUpload}</div>
           </div>
         </div>
       )}
       {/* Sidebar */}
       <div style={{ width: 220, background: "#fff", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "16px 16px 8px", borderBottom: "1px solid #f3f4f6" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>{locale === "en" ? "Media library" : locale === "tr" ? "Medya kütüphanesi" : "Mediathek"}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>{c.mediaLibrary}</div>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
           {[
-            { id: "all", label: locale === "en" ? "All media" : locale === "tr" ? "Tüm medya" : "Alle Medien", icon: "🖼" },
-            { id: "none", label: locale === "en" ? "Without folder" : locale === "tr" ? "Klasörsüz" : "Ohne Ordner", icon: "📄" },
+            { id: "all", label: c.allMedia, icon: "🖼" },
+            { id: "none", label: c.withoutFolder, icon: "📄" },
           ].map(item => (
             <button
               key={item.id}
@@ -472,7 +474,7 @@ export default function MediaPage() {
           ))}
 
           {folders.length > 0 && (
-            <div style={{ padding: "10px 16px 4px", fontSize: 10, color: "#9ca3af", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>{locale === "en" ? "Folders" : locale === "tr" ? "Klasörler" : "Ordner"}</div>
+            <div style={{ padding: "10px 16px 4px", fontSize: 10, color: "#9ca3af", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>{c.folders}</div>
           )}
           {folders.map(f => (
             <div key={f.id} style={{ display: "flex", alignItems: "center" }}>
@@ -492,14 +494,14 @@ export default function MediaPage() {
               </button>
               <button
                 onClick={async () => {
-                  if (!(await confirmDelete(locale === "en" ? `Delete folder "${f.name}"?` : locale === "tr" ? `"${f.name}" klasörünü sil?` : `Ordner "${f.name}" löschen?`))) return;
+                  if (!(await confirmDelete(c.deleteFolderConfirm(f.name)))) return;
                   const client = getMedusaAdminClient();
                   await client.deleteMediaFolder(f.id).catch(() => {});
                   setFolders(prev => prev.filter(x => x.id !== f.id));
                   if (activeFolder === f.id) handleFolderChange("all");
                 }}
                 style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 10px", color: "#d1d5db", fontSize: 12 }}
-                title={locale === "en" ? "Delete folder" : locale === "tr" ? "Klasörü sil" : "Ordner löschen"}
+                title={c.deleteFolder}
               >
                 ✕
               </button>
@@ -511,7 +513,7 @@ export default function MediaPage() {
             onClick={() => setShowCreateFolder(true)}
             style={{ width: "100%", padding: "7px 0", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151" }}
           >
-            {locale === "en" ? "+ New folder" : locale === "tr" ? "+ Yeni klasör" : "+ Neuer Ordner"}
+            {c.newFolder}
           </button>
         </div>
       </div>

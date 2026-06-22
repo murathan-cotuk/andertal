@@ -47,6 +47,7 @@ export default function CustomerNewsletterSubscribersPage() {
       colActions: "Aktionen",
       open: "Öffnen",
       delete: "Löschen",
+      refresh: "Aktualisieren",
       status_active: "Aktiv",
       status_unsubscribed: "Abgemeldet",
       status_deactivated: "Deaktiviert",
@@ -71,6 +72,7 @@ export default function CustomerNewsletterSubscribersPage() {
       colActions: "Aksiyonlar",
       open: "Aç",
       delete: "Sil",
+      refresh: "Yenile",
       status_active: "Kayıtlı",
       status_unsubscribed: "Çıkmış",
       status_deactivated: "Deaktif",
@@ -95,6 +97,7 @@ export default function CustomerNewsletterSubscribersPage() {
       colActions: "Actions",
       open: "Open",
       delete: "Delete",
+      refresh: "Refresh",
       status_active: "Registered",
       status_unsubscribed: "Unsubscribed",
       status_deactivated: "Deactivated",
@@ -119,6 +122,7 @@ export default function CustomerNewsletterSubscribersPage() {
       colActions: "Actions",
       open: "Ouvrir",
       delete: "Supprimer",
+      refresh: "Actualiser",
       status_active: "Inscrit",
       status_unsubscribed: "Désabonné",
       status_deactivated: "Désactivé",
@@ -143,6 +147,7 @@ export default function CustomerNewsletterSubscribersPage() {
       colActions: "Azioni",
       open: "Apri",
       delete: "Elimina",
+      refresh: "Aggiorna",
       status_active: "Iscritto",
       status_unsubscribed: "Disiscritto",
       status_deactivated: "Disattivato",
@@ -167,6 +172,7 @@ export default function CustomerNewsletterSubscribersPage() {
       colActions: "Acciones",
       open: "Abrir",
       delete: "Eliminar",
+      refresh: "Actualizar",
       status_active: "Registrado",
       status_unsubscribed: "Dado de baja",
       status_deactivated: "Desactivado",
@@ -301,7 +307,7 @@ export default function CustomerNewsletterSubscribersPage() {
                   <option value="deactivated">{t.status_deactivated}</option>
                 </select>
                 <Button onClick={loadSubscribers} disabled={loading}>
-                  Refresh
+                  {t.refresh}
                 </Button>
               </InlineStack>
 
