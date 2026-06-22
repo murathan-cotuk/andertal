@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale } from "next-intl";
-import { useLt, dateLocaleFor } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
+import { dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 function getSortOptions(lt) {

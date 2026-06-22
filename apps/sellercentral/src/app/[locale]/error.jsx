@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useLocale } from "next-intl";
-import { useLt } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
 import { reportSellerClientError } from "@/lib/report-seller-client-error";
 
 export default function SellerError({ error, reset }) {

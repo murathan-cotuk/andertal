@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useLt, dateLocaleFor } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
+import { dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import DashboardLayout from "@/components/DashboardLayout";
 

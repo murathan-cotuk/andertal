@@ -25,19 +25,22 @@ const Badge = styled.span`
 export default function BestsellerBadge({ children = "Bestseller", className, style }) {
   const shopStyles = useShopStyles();
   const imgUrl = shopStyles?.bestseller_badge?.image_url;
+  const badgeWidth = shopStyles?.bestseller_badge?.badge_width || 80;
+
+  if (imgUrl) {
+    return (
+      <img
+        src={imgUrl}
+        alt="Bestseller"
+        className={className}
+        style={{ width: badgeWidth, height: "auto", display: "inline-block", verticalAlign: "middle", flexShrink: 0, ...style }}
+      />
+    );
+  }
 
   return (
     <Badge className={className} style={style}>
-      {imgUrl ? (
-        <img
-          src={imgUrl}
-          alt=""
-          aria-hidden
-          style={{ width: 14, height: 14, objectFit: "contain", verticalAlign: "middle", flexShrink: 0 }}
-        />
-      ) : (
-        <span aria-hidden style={{ fontSize: 10, lineHeight: 1 }}>★</span>
-      )}
+      <span aria-hidden style={{ fontSize: 10, lineHeight: 1 }}>★</span>
       {children}
     </Badge>
   );

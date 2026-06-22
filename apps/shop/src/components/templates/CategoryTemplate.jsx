@@ -16,6 +16,8 @@ import {
   getFacetGroupTitle,
 } from "@/lib/catalog-listing";
 import { normCatId } from "@/lib/category-product-ids";
+import { getLocalizedCategory } from "@/lib/format";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import LandingContainers from "@/components/landing/LandingContainers";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import CustomCheckbox from "../ui/CustomCheckbox";
@@ -937,8 +939,8 @@ export default function CategoryTemplate() {
         setLoading(true);
         setError(null);
         const [catResBySlug, catResTree, productRes] = await Promise.all([
-          fetch(`/api/store-categories?slug=${encodeURIComponent(slug)}`).then((r) => r.json()).catch(() => ({ categories: [] })),
-          fetch(`/api/store-categories?tree=true&is_visible=true`).then((r) => r.json()).catch(() => ({ tree: [] })),
+          fetch(`/api/store-categories${storeCategoriesQuery(locale, { slug })}`).then((r) => r.json()).catch(() => ({ categories: [] })),
+          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`).then((r) => r.json()).catch(() => ({ tree: [] })),
           fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`).then((r) => r.json()).catch(() => ({ products: [] })),
         ]);
         if (cancelled) return;
@@ -987,9 +989,10 @@ export default function CategoryTemplate() {
   }, [slug]);
 
   const meta = parseCategoryMetadata(category);
+  const localizedName = getLocalizedCategory(category, locale).name;
   const displayTitle =
     (meta.display_title && String(meta.display_title).trim()) ||
-    category?.name ||
+    localizedName ||
     slug ||
     "Category";
   const rawBanner = safeUrl(category?.banner_image_url);
@@ -1017,7 +1020,7 @@ export default function CategoryTemplate() {
     const m = parseCategoryMetadata(category);
     const dt =
       (m.display_title && String(m.display_title).trim()) ||
-      category.name ||
+      getLocalizedCategory(category, locale).name ||
       slug ||
       "Category";
     const docTitle =

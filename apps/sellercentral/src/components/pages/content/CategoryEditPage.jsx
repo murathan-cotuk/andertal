@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import {
   Page, Layout, Card, Text, TextField, BlockStack, InlineStack,
   Box, Banner, Button, Divider, Checkbox, Badge, Thumbnail,
@@ -13,8 +14,9 @@ import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import { useLocale } from "next-intl";
 import { getCategoryEditCopy } from "@/lib/category-edit-i18n";
+import { categoryDisplayName, categoryNameForEditForm, normalizeCategoryLocale } from "@/lib/category-locale";
 import { userError } from "@/lib/api-error-messages";
-import { statusLabel } from "@/lib/status-labels";
+import { productStatusLabel, productStatusBadgeTone } from "@/lib/product-status-labels";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -118,6 +120,26 @@ function descriptionVisualToHtml(html) {
   return "<p>" + s + "</p>";
 }
 
+function productEditHref(product) {
+  const id = product?.id;
+  if (!id) return null;
+  return `/products/${id}`;
+}
+
+function ProductRowLink({ product, children }) {
+  const href = productEditHref(product);
+  if (!href) return children;
+  return (
+    <Link
+      href={href}
+      style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export default function CategoryEditPage({ category: initialCategory, onReload }) {
   const router = useRouter();
   const locale = useLocale();
@@ -137,7 +159,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
   const linkedCollectionId = meta.collection_id || null;
 
   const [form, setForm] = useState({
-    name: initialCategory?.name ?? "",
+    name: categoryNameForEditForm(initialCategory, locale),
     slug: initialCategory?.slug ?? "",
     long_content: initialCategory?.long_content ?? "",
     parent_id: initialCategory?.parent_id ?? "",
@@ -152,7 +174,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
   });
 
   const initialFormRef = useRef(JSON.parse(JSON.stringify({
-    name: initialCategory?.name ?? "",
+    name: categoryNameForEditForm(initialCategory, locale),
     slug: initialCategory?.slug ?? "",
     long_content: initialCategory?.long_content ?? "",
     parent_id: initialCategory?.parent_id ?? "",
@@ -202,6 +224,12 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     }
   }, [richtextMode]);
 
+  useEffect(() => {
+    if (!initialCategory) return;
+    const nextName = categoryNameForEditForm(initialCategory, locale);
+    setForm((prev) => ({ ...prev, name: nextName }));
+  }, [locale, initialCategory?.id]);
+
   // Load categories for parent selector
   useEffect(() => {
     client.getAdminHubCategories({ all: true })
@@ -230,8 +258,16 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     setSaving(true);
     setError(null);
     try {
+      const loc = normalizeCategoryLocale(locale);
+      const existingMeta = initialCategory.metadata && typeof initialCategory.metadata === "object"
+        ? { ...initialCategory.metadata }
+        : {};
+      const tr = { ...(existingMeta.translations || {}) };
+      const trimmedName = (form.name || "").trim();
+      tr[loc] = { ...(tr[loc] || {}), name: trimmedName };
+      const canonicalName = loc === "en" ? trimmedName : (initialCategory.name || "").trim();
       await client.updateAdminHubCategory(initialCategory.id, {
-        name: form.name,
+        name: canonicalName || initialCategory.name,
         slug: form.slug,
         long_content: form.long_content || null,
         parent_id: form.parent_id || null,
@@ -239,7 +275,8 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
         is_visible: form.is_visible,
         banner_image_url: form.banner_image_url || null,
         metadata: {
-          ...(initialCategory.metadata || {}),
+          ...existingMeta,
+          translations: tr,
           meta_title: form.meta_title || null,
           meta_description: form.meta_description || null,
           keywords: form.keywords || null,
@@ -338,7 +375,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
 
   const parentOptions = [
     { label: c.noParent, value: "" },
-    ...allCategories.map((c) => ({ label: c.name, value: String(c.id) })),
+    ...allCategories.map((cat) => ({ label: categoryDisplayName(cat, locale), value: String(cat.id) })),
   ];
 
   const categoryTreeRows = (() => {
@@ -362,14 +399,14 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     return descendants
       .map((id) => byId.get(String(id)))
       .filter(Boolean)
-      .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }))
-      .map((c) => ({ id: String(c.id), name: c.name || c.slug || c.id, slug: c.slug || "", depth: depthOf(c.id) }));
+      .sort((a, b) => categoryDisplayName(a, locale).localeCompare(categoryDisplayName(b, locale), undefined, { sensitivity: "base" }))
+      .map((c) => ({ id: String(c.id), name: categoryDisplayName(c, locale), slug: c.slug || "", depth: depthOf(c.id) }));
   })();
 
   return (
     <Page
       backAction={{ content: c.backCategories, url: "/content/categories" }}
-      title={form.name || initialCategory?.name || c.category}
+      title={form.name || categoryDisplayName(initialCategory, locale) || c.category}
       subtitle={`/${form.slug || initialCategory?.slug || ""}`}
       primaryAction={{ content: c.save, onAction: handleSave, loading: saving, disabled: saving || !isDirty }}
       secondaryActions={[{ content: c.discard, onAction: handleDiscard, disabled: !isDirty }]}
@@ -484,10 +521,14 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                         ) : (
                           <div style={{ width: 40, height: 40, background: "#f4f6f8", borderRadius: 4, flexShrink: 0 }} />
                         )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Text as="p" variant="bodyMd" fontWeight="medium" truncate>{p.title}</Text>
-                          <Text as="p" variant="bodySm" tone="subdued">{p.handle}</Text>
-                        </div>
+                        <ProductRowLink product={p}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text as="p" variant="bodyMd" fontWeight="medium" truncate>
+                              <span style={{ color: "var(--p-color-text-link)" }}>{p.title}</span>
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">{p.handle}</Text>
+                          </div>
+                        </ProductRowLink>
                         <Button
                           size="slim"
                           onClick={() => addProductToCategory(p.id)}

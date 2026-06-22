@@ -1274,7 +1274,7 @@ export default function StylesPage() {
               <Divider />
               <Text as="h3" variant="headingSm">{locale === "de" ? "Bestseller-Abzeichen Bild" : locale === "tr" ? "Çok Satan Rozet Görseli" : locale === "fr" ? "Image du badge Bestseller" : locale === "es" ? "Imagen de insignia Bestseller" : locale === "it" ? "Immagine badge Bestseller" : "Bestseller Badge Image"}</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                {locale === "de" ? "Optionales Bild-Icon für das Bestseller-Etikett — ersetzt den ★-Stern. Empfohlen: kleines transparentes PNG oder SVG (ca. 20×20 px)." : locale === "tr" ? "Çok satan etiketi için isteğe bağlı görsel ikon — ★ yıldızının yerini alır. Öneri: küçük şeffaf PNG veya SVG (yakl. 20×20 px)." : locale === "fr" ? "Icône image optionnelle pour l'étiquette Bestseller — remplace l'étoile ★. Recommandé : petit PNG ou SVG transparent (environ 20×20 px)." : locale === "es" ? "Ícono de imagen opcional para la etiqueta Bestseller — reemplaza la estrella ★. Recomendado: PNG o SVG pequeño y transparente (aprox. 20×20 px)." : locale === "it" ? "Icona immagine opzionale per l'etichetta Bestseller — sostituisce la stella ★. Consigliato: PNG o SVG piccolo e trasparente (circa 20×20 px)." : "Optional image icon for the bestseller label — replaces the ★ star. Recommended: small transparent PNG or SVG (approx. 20×20 px)."}
+                {locale === "tr" ? "Özel bir görsel eklendiğinde, tüm etiket bu görselle değiştirilir — arka plan olmadan. PNG veya SVG (şeffaf arka plan önerilir)." : locale === "de" ? "Eigenes Bild für das Bestseller-Etikett — ersetzt das gesamte Etikett ohne Hintergrund. PNG oder SVG (transparenter Hintergrund empfohlen)." : locale === "fr" ? "Image personnalisée pour l'étiquette Bestseller — remplace l'étiquette entière sans fond. PNG ou SVG (fond transparent recommandé)." : locale === "es" ? "Imagen personalizada para la etiqueta Bestseller — reemplaza la etiqueta completa sin fondo. PNG o SVG (fondo transparente recomendado)." : locale === "it" ? "Immagine personalizzata per il badge Bestseller — sostituisce l'intero badge senza sfondo. PNG o SVG (sfondo trasparente consigliato)." : "Custom image for the bestseller badge — replaces the entire badge with no background. PNG or SVG (transparent background recommended)."}
               </Text>
               <InlineStack gap="200" blockAlign="end" wrap>
                 <div style={{ flex: 1, minWidth: 280 }}>
@@ -1288,6 +1288,20 @@ export default function StylesPage() {
                       }))
                     }
                     placeholder="https://..."
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{ width: 100 }}>
+                  <TextField
+                    label={locale === "tr" ? "Genişlik (px)" : locale === "de" ? "Breite (px)" : "Width (px)"}
+                    type="number"
+                    value={String(styles?.bestseller_badge?.badge_width || 80)}
+                    onChange={(v) =>
+                      setStyles((prev) => ({
+                        ...prev,
+                        bestseller_badge: { ...(prev.bestseller_badge || {}), badge_width: Math.max(10, Number(v) || 80) },
+                      }))
+                    }
                     autoComplete="off"
                   />
                 </div>
@@ -1312,7 +1326,7 @@ export default function StylesPage() {
                 <img
                   src={styles.bestseller_badge.image_url}
                   alt=""
-                  style={{ maxWidth: 60, maxHeight: 60, objectFit: "contain", borderRadius: 6, border: "1px solid var(--p-color-border)" }}
+                  style={{ width: styles?.bestseller_badge?.badge_width || 80, height: "auto", objectFit: "contain" }}
                 />
               ) : null}
             </BlockStack>

@@ -28,7 +28,27 @@ export function getContentMenusCopy(locale) {
     locationMain: t("→ Shown in shop as Categories dropdown", "→ Mağazada Kategoriler açılır menüsü", "→ Menu déroulant Catégories", "→ Desplegable Categorías", "→ Menu a tendina Categorie", "→ Im Shop als Kategorien-Dropdown"),
     locationOther: t("→ Other locations (e.g. footer)", "→ Diğer konumlar (ör. footer)", "→ Autres emplacements (ex. pied de page)", "→ Otras ubicaciones (p. ej. pie)", "→ Altre posizioni (es. footer)", "→ Andere Positionen (z. B. Footer)"),
     duplicate: t("Duplicate", "Kopyala", "Dupliquer", "Duplicar", "Duplica", "Duplizieren"),
+    delete: t("Delete", "Sil", "Supprimer", "Eliminar", "Elimina", "Löschen"),
+    edit: t("Edit", "Düzenle", "Modifier", "Editar", "Modifica", "Bearbeiten"),
     deleteMenu: t("Delete menu", "Menüyü sil", "Supprimer le menu", "Eliminar menú", "Elimina menu", "Menü löschen"),
+    deleteMenuConfirmMessage: (name) =>
+      t(
+        `Delete menu "${name}"? All menu items will be removed.`,
+        `"${name}" menüsü silinsin mi? Tüm menü öğeleri kaldırılır.`,
+        `Supprimer le menu « ${name} » ? Tous les éléments seront supprimés.`,
+        `¿Eliminar el menú «${name}»? Se eliminarán todos los elementos.`,
+        `Eliminare il menu «${name}»? Tutte le voci verranno rimosse.`,
+        `Menü «${name}» löschen? Alle Menüeinträge werden entfernt.`,
+      ),
+    removeItemConfirmMessage: (label) =>
+      t(
+        `Remove "${label}" from this menu?`,
+        `"${label}" bu menüden kaldırılsın mı?`,
+        `Retirer « ${label} » de ce menu ?`,
+        `¿Quitar «${label}» de este menú?`,
+        `Rimuovere «${label}» da questo menu?`,
+        `«${label}» aus diesem Menü entfernen?`,
+      ),
     menuItems: t("Menu items", "Menü öğeleri", "Éléments du menu", "Elementos del menú", "Voci menu", "Menüeinträge"),
     autoCategoriesOn: t("Auto-show categories is ON — the shop will display all categories in the dropdown (menu items below are ignored).", "Otomatik kategori gösterimi AÇIK — mağaza tüm kategorileri gösterir (aşağıdaki menü öğeleri yok sayılır).", "Affichage auto des catégories ACTIVÉ — le shop affiche toutes les catégories.", "Mostrar categorías automáticamente ACTIVADO.", "Mostra categorie automaticamente ATTIVO.", "Kategorien automatisch AN — der Shop zeigt alle Kategorien (Menüeinträge unten werden ignoriert)."),
     importCsv: t("Import CSV", "CSV içe aktar", "Importer CSV", "Importar CSV", "Importa CSV", "CSV importieren"),

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
 import { lt } from "@/lib/locale-text";
+import { categoryDisplayName } from "@/lib/category-locale";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import DashboardLayout from "@/components/DashboardLayout";
 
@@ -21,7 +22,7 @@ function buildTree(flat) {
   return roots;
 }
 
-function Node({ cat, depth }) {
+function Node({ cat, depth, locale }) {
   const [open, setOpen] = useState(false);
   const kids = cat._children || [];
   const hasKids = kids.length > 0;
@@ -57,7 +58,7 @@ function Node({ cat, depth }) {
         }}>▶</span>
 
         <span style={{ fontWeight: depth === 0 ? 700 : 500, fontSize: 14, color: "#111827" }}>
-          {cat.name}
+          {categoryDisplayName(cat, locale)}
         </span>
 
         <span style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>
@@ -74,7 +75,7 @@ function Node({ cat, depth }) {
       {/* children */}
       {hasKids && open && (
         <div style={{ marginLeft: 20, marginBottom: 4, borderLeft: "2px solid #e5e7eb", paddingLeft: 8 }}>
-          {kids.map(k => <Node key={k.id} cat={k} depth={depth + 1} />)}
+          {kids.map(k => <Node key={k.id} cat={k} depth={depth + 1} locale={locale} />)}
         </div>
       )}
     </div>
@@ -128,7 +129,7 @@ export default function CategoriesPage() {
           <p style={{ color: "#6b7280" }}>{t("No categories found.", "Kategori bulunamadı.", "Aucune catégorie trouvée.", "No se encontraron categorías.", "Nessuna categoria trovata.", "Keine Kategorien gefunden.")}</p>
         ) : (
           <div key={key}>
-            {roots.map(r => <Node key={r.id} cat={r} depth={0} initialOpen={allOpen} />)}
+            {roots.map(r => <Node key={r.id} cat={r} depth={0} locale={locale} />)}
           </div>
         )}
       </div>

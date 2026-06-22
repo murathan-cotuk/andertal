@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Banner, BlockStack, Button, InlineStack, Spinner, Text } from "@shopify/polaris";
-import { useLt } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 

@@ -47,6 +47,10 @@ export function getContainerTypes(locale) {
       label: t(loc, "Bestseller carousel", "Bestseller Karuseli", "Carrousel bestsellers", "Carrusel más vendidos", "Carosello bestseller", "Bestseller-Karussell"),
       description: t(loc, "Top-selling products in a category with rank numbers", "Seçilen kategorinin en çok satılan ürünlerini sırayla gösterir", "Produits les plus vendus d'une catégorie avec rang", "Productos más vendidos de una categoría con ranking", "Prodotti più venduti di una categoria con posizione", "Die meistverkauften Produkte einer Kategorie mit Rang-Nummer"),
     },
+    seller_carousel: {
+      label: t(loc, "Seller carousel", "Satıcı Karuseli", "Carrousel vendeurs", "Carrusel vendedores", "Carosello venditori", "Händler-Karussell"),
+      description: t(loc, "Registered sellers as clickable shop cards", "Kayıtlı satıcıları tıklanabilir mağaza kartları olarak gösterir", "Vendeurs enregistrés comme cartes de boutique", "Vendedores registrados como tarjetas de tienda", "Venditori registrati come schede negozio", "Registrierte Händler als anklickbare Shop-Karten"),
+    },
     collections_carousel: {
       label: t(loc, "Collections carousel", "Koleksiyonlar Karuseli", "Carrousel collections", "Carrusel de colecciones", "Carosello collezioni", "Kollektionen-Karussell"),
       description: t(loc, "Multiple collections as clickable cards", "Birden fazla koleksiyonu tıklanabilir kartlar halinde gösterir", "Plusieurs collections en cartes cliquables", "Varias colecciones como tarjetas clicables", "Più collezioni come schede cliccabili", "Mehrere Kollektionen als anklickbare Karten"),

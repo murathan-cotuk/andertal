@@ -110,6 +110,7 @@ const CONTAINER_PADDING_DEFAULTS = {
   banner_cta: "32px 48px 40px 48px",
   collection_carousel: "32px 24px 32px 24px",
   bestseller_carousel: "32px 24px 32px 24px",
+  seller_carousel: "32px 24px 32px 24px",
   collections_carousel: "32px 24px 32px 24px",
   content_mosaic: "32px 24px 32px 24px",
   accordion: "48px 24px 48px 24px",
@@ -302,6 +303,8 @@ function newContainer(type) {
       return { ...base, title: "", collection_id: "", collection_handle: "", product_captions: "", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
     case "bestseller_carousel":
       return { ...base, title: "", category_slug: "", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
+    case "seller_carousel":
+      return { ...base, title: "", limit: 20, items_per_row: 4, items_per_row_mobile: 2, gap: 16, padding: "32px 24px", content_layout: "full" };
     case "collections_carousel":
       return {
         ...base,
@@ -1617,6 +1620,38 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
   );
 }
 
+function SellerCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
+  const c = useLandingCopy();
+  const isMobileView = deviceTab >= 1;
+  return (
+    <BlockStack gap="400">
+      <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <div style={EDITOR_FIELD_GRID}>
+        <Select
+          label={c.productsPerRow}
+          options={(isMobileView ? [1, 2, 3, 4] : [2, 3, 4, 5, 6]).map((n) => ({ label: String(n), value: String(n) }))}
+          value={String(isMobileView ? (container.items_per_row_mobile ?? 2) : (container.items_per_row || 4))}
+          onChange={(v) => onChange({ ...container, ...(isMobileView ? { items_per_row_mobile: Number(v) } : { items_per_row: Number(v) }) })}
+        />
+        <TextField
+          label={c.cardGapPx}
+          type="number"
+          value={String(container.gap ?? 16)}
+          onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })}
+          autoComplete="off"
+        />
+        <TextField
+          label="Max. Sellers"
+          type="number"
+          value={String(container.limit ?? 20)}
+          onChange={(v) => onChange({ ...container, limit: Math.max(1, Number(v) || 20) })}
+          autoComplete="off"
+        />
+      </div>
+    </BlockStack>
+  );
+}
+
 function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   const c = useLandingCopy();
   const isMobileView = deviceTab >= 1;
@@ -2700,6 +2735,7 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "banner_cta":           editor = <BannerCtaEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "collection_carousel":  editor = <CollectionCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "bestseller_carousel":  editor = <BestsellerCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
+    case "seller_carousel":      editor = <SellerCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "collections_carousel": editor = <CollectionsCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "accordion":            editor = <AccordionEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "tabs":                 editor = <TabsEditor container={container} onChange={onChange} editLang={editLang} />; break;

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, forwardRef, useMemo } from "react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
+import { lt } from "@/lib/locale-text";
 import {
   AppProvider,
   Frame,
@@ -431,6 +432,9 @@ export default function PolarisLayout({ children }) {
     }
   };
   const locale = useLocale();
+  useEffect(() => {
+    getMedusaAdminClient().setUiLocale(locale);
+  }, [locale]);
   const notifCopy = useMemo(() => getNotificationsCopy(locale), [locale]);
   const unsaved = useUnsavedChanges();
   const [showMobileNav, setShowMobileNav] = useState(false);
@@ -446,8 +450,14 @@ export default function PolarisLayout({ children }) {
   });
   const impersonation = useSellerImpersonation();
   const [confirmDeleteState, setConfirmDeleteState] = useState({ open: false, message: "" });
-  const tConfirmRaw = useTranslations("confirmDelete");
-  const tConfirm = useCallback((k) => { try { return tConfirmRaw(k); } catch { return k; } }, [tConfirmRaw]);
+  const confirmDeleteLabels = useMemo(
+    () => ({
+      title: lt(locale, "Confirm deletion", "Silme işlemini onayla", "Confirmer la suppression", "Confirmar eliminación", "Conferma eliminazione", "Löschen bestätigen"),
+      confirm: lt(locale, "Delete", "Sil", "Supprimer", "Eliminar", "Elimina", "Löschen"),
+      cancel: lt(locale, "Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen"),
+    }),
+    [locale],
+  );
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifData, setNotifData] = useState(null);
   const [msgUnread, setMsgUnread] = useState(0);
@@ -1276,14 +1286,14 @@ export default function PolarisLayout({ children }) {
           <Modal
             open
             onClose={() => __resolveConfirmModal(false)}
-            title={tConfirm("title")}
+            title={confirmDeleteLabels.title}
             primaryAction={{
-              content: tConfirm("confirm"),
+              content: confirmDeleteLabels.confirm,
               destructive: true,
               onAction: () => __resolveConfirmModal(true),
             }}
             secondaryActions={[
-              { content: tConfirm("cancel"), onAction: () => __resolveConfirmModal(false) },
+              { content: confirmDeleteLabels.cancel, onAction: () => __resolveConfirmModal(false) },
             ]}
           >
             <Modal.Section>

@@ -8,6 +8,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { userError } from "@/lib/api-error-messages";
 import { getCategoriesSettingsCopy } from "@/lib/settings-pages-i18n";
+import { categoryDisplayName } from "@/lib/category-locale";
 
 /** Build nested tree from flat array using parent_id */
 function buildTree(flat) {
@@ -24,7 +25,7 @@ function buildTree(flat) {
   return roots;
 }
 
-function CategoryTreeNode({ node, depth = 0, onDelete, allOpen, copy }) {
+function CategoryTreeNode({ node, depth = 0, onDelete, allOpen, copy, locale }) {
   const [open, setOpen] = useState(allOpen);
   const hasChildren = node.children && node.children.length > 0;
   const indent = depth * 20;
@@ -43,7 +44,7 @@ function CategoryTreeNode({ node, depth = 0, onDelete, allOpen, copy }) {
           )}
         </TreeToggle>
         <TreeInfo>
-          <TreeName>{node.name}</TreeName>
+          <TreeName>{categoryDisplayName(node, locale)}</TreeName>
           <TreeMeta>
             <span style={{ fontFamily: "monospace", fontSize: 11 }}>{node.slug}</span>
             {node.is_visible && <Badge $color="#dbeafe" $text="#1e40af">{copy.navBadge}</Badge>}
@@ -59,7 +60,7 @@ function CategoryTreeNode({ node, depth = 0, onDelete, allOpen, copy }) {
       {hasChildren && open && (
         <div>
           {node.children.map(child => (
-            <CategoryTreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} allOpen={allOpen} copy={copy} />
+            <CategoryTreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} allOpen={allOpen} copy={copy} locale={locale} />
           ))}
         </div>
       )}
@@ -273,7 +274,7 @@ export default function AdminCategoriesPage() {
   };
 
   const handleDelete = useCallback(async (cat) => {
-    if (!(await confirmDelete(copy.deleteConfirm(cat.name)))) return;
+    if (!(await confirmDelete(copy.deleteConfirm(categoryDisplayName(cat, locale))))) return;
     try {
       const client = getMedusaAdminClient();
       await client.deleteAdminHubCategory(cat.id);
@@ -522,7 +523,7 @@ export default function AdminCategoriesPage() {
         ) : (
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
             {buildTree(categories).map(node => (
-              <CategoryTreeNode key={node.id} node={node} depth={0} onDelete={handleDelete} allOpen={allOpen} copy={copy} />
+              <CategoryTreeNode key={node.id} node={node} depth={0} onDelete={handleDelete} allOpen={allOpen} copy={copy} locale={locale} />
             ))}
           </div>
         )}

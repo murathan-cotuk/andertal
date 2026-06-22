@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { getLocalizedCategory } from "@/lib/format";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { motion } from "framer-motion";
@@ -74,6 +75,7 @@ export default function CategoryShowcase({
   title,
   categories = [],
 }) {
+  const locale = useLocale();
   const tCommon = useTranslations("common");
   return (
     <Section>
@@ -88,7 +90,7 @@ export default function CategoryShowcase({
           >
             <PlaceholderBg />
             <Overlay className="overlay" />
-            <Label>{cat.title || cat.name || "Kategorie"}</Label>
+            <Label>{cat.title || getLocalizedCategory(cat, locale).name || "Kategorie"}</Label>
           </Card>
         ))}
       </Grid>

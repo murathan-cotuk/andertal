@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useLt } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
 
 export const EMPTY_CUSTOMER_FORM = {
   email: "",

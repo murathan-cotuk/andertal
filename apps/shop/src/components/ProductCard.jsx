@@ -94,7 +94,6 @@ const ImgPlaceholder = styled.div`
   text-transform: uppercase;
 `;
 
-/* Add to cart — always visible, minimal */
 const AddToCartBtn = styled.button`
   width: calc(100% - 12px);
   margin: 5px 6px 0;
@@ -110,7 +109,6 @@ const AddToCartBtn = styled.button`
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: background 0.15s, opacity 0.15s;
-
   &:hover:not(:disabled) { background: #333; }
   &:disabled { opacity: 0.5; cursor: not-allowed; background: #999; }
 `;
@@ -184,18 +182,6 @@ const CartNotice = styled.div`
   pointer-events: none;
 `;
 
-const DescriptionPreview = styled.p`
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: #6b7280;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-height: calc(12.5px * 1.45 * 2);
-`;
-
 const ReviewRow = styled.div`
   margin-top: 1px;
   height: 20px;
@@ -266,6 +252,7 @@ const Info = styled.div`
 `;
 
 const Name = styled.h3`
+  font-family: var(--h3-ff, inherit);
   font-size: 13px;
   font-weight: 500;
   color: #111;
@@ -290,7 +277,6 @@ const CurrentPrice = styled.span`
   font-size: 13.5px;
   font-weight: 600;
   color: ${(p) => (p.$sale ? "#e53e3e" : "#111")};
-
   @media (min-width: 768px) {
     font-size: 16px;
     font-weight: 700;
@@ -570,7 +556,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   const reviewCount = meta.review_count != null ? Number(meta.review_count) : 0;
 
   const productHandle = storefrontProductHandle(product, locale);
-  const productUrl = productHandle ? `/produkt/${productHandle}` : null;
+  const productUrl = productHandle ? `/${productHandle}` : null;
 
   const handleQuickAdd = async (e) => {
     e.preventDefault();
@@ -989,7 +975,7 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
   const reviewAvg = meta.review_avg != null ? Number(meta.review_avg) : 0;
   const reviewCount = meta.review_count != null ? Number(meta.review_count) : 0;
   const productHandle = storefrontProductHandle(product, locale);
-  const productUrl = productHandle ? `/produkt/${productHandle}` : "#";
+  const productUrl = productHandle ? `/${productHandle}` : "#";
 
   const handleQuickAdd = async (e) => {
     e.preventDefault();

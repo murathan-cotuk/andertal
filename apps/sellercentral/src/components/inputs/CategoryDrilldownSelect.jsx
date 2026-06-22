@@ -2,8 +2,10 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Text, TextField } from "@shopify/polaris";
+import { useLocale } from "next-intl";
+import { categoryDisplayName } from "@/lib/category-locale";
 
-function normalizeCategories(list) {
+function normalizeCategories(list, locale) {
   if (!Array.isArray(list)) return [];
   const byId = new Map();
   for (const c of list) {
@@ -14,19 +16,19 @@ function normalizeCategories(list) {
     const pid = node.parent_id;
     if (pid && byId.has(pid)) byId.get(pid).children.push(node);
   }
-  const sortNodes = (arr) =>
+  const sortNodes = (arr, locale) =>
     arr.sort((a, b) =>
-      String(a.name || a.slug || "").localeCompare(String(b.name || b.slug || ""), undefined, { sensitivity: "base" })
+      categoryDisplayName(a, locale).localeCompare(categoryDisplayName(b, locale), undefined, { sensitivity: "base" })
     );
   const roots = [];
   for (const node of byId.values()) {
     if (!node.parent_id || !byId.has(node.parent_id)) roots.push(node);
   }
-  const sortDeep = (arr) => {
-    sortNodes(arr);
-    arr.forEach((n) => n.children?.length && sortDeep(n.children));
+  const sortDeep = (arr, locale) => {
+    sortNodes(arr, locale);
+    arr.forEach((n) => n.children?.length && sortDeep(n.children, locale));
   };
-  sortDeep(roots);
+  sortDeep(roots, locale);
   return roots;
 }
 
@@ -39,13 +41,14 @@ export default function CategoryDrilldownSelect({
   placeholder = "Select category",
   noneLabel = "— None —",
 }) {
+  const locale = useLocale();
   const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const [search, setSearch] = useState("");
   const [pathIds, setPathIds] = useState([]);
 
-  const tree = useMemo(() => normalizeCategories(categories), [categories]);
+  const tree = useMemo(() => normalizeCategories(categories, locale), [categories, locale]);
   const byId = useMemo(() => {
     const map = new Map();
     const walk = (nodes) => {
@@ -64,11 +67,13 @@ export default function CategoryDrilldownSelect({
     const parts = [];
     let cur = selectedNode;
     while (cur) {
-      parts.unshift(cur.name || cur.slug || cur.id);
+      parts.unshift(categoryDisplayName(cur, locale));
       cur = cur.parent_id ? byId.get(cur.parent_id) : null;
     }
     return parts.join(" > ");
-  }, [selectedNode, byId]);
+  }, [selectedNode, byId, locale]);
+
+  const labelFor = (node) => categoryDisplayName(node, locale);
 
   const buildPathIds = (id) => {
     if (!id || !byId.has(id)) return [];
@@ -92,16 +97,17 @@ export default function CategoryDrilldownSelect({
     if (!q) return [];
     const rows = [];
     for (const n of byId.values()) {
-      const hay = `${n.name || ""} ${n.slug || ""}`.toLowerCase();
+      const display = labelFor(n);
+      const hay = `${display} ${n.name || ""} ${n.slug || ""}`.toLowerCase();
       if (!hay.includes(q)) continue;
       const breadcrumb = buildPathIds(n.id)
-        .map((id) => byId.get(id)?.name || byId.get(id)?.slug || id)
+        .map((id) => labelFor(byId.get(id) || { id }))
         .join(" > ");
-      rows.push({ id: n.id, label: n.name || n.slug || n.id, breadcrumb });
+      rows.push({ id: n.id, label: display, breadcrumb });
     }
     rows.sort((a, b) => a.breadcrumb.localeCompare(b.breadcrumb, undefined, { sensitivity: "base" }));
     return rows.slice(0, 100);
-  }, [search, byId]);
+  }, [search, byId, locale]);
 
   useEffect(() => {
     if (!open) return;
@@ -217,7 +223,7 @@ export default function CategoryDrilldownSelect({
 
           {!search.trim() && pathIds.length > 0 && (
             <div style={{ marginBottom: 8, fontSize: 12, color: "#6b7280" }}>
-              {pathIds.map((id) => byId.get(id)?.name || byId.get(id)?.slug || id).join(" > ")}
+              {pathIds.map((id) => labelFor(byId.get(id) || { id })).join(" > ")}
             </div>
           )}
 
@@ -261,7 +267,7 @@ export default function CategoryDrilldownSelect({
                       gap: 10,
                     }}
                   >
-                    <span style={{ fontSize: 13, color: "#111827" }}>{node.name || node.slug || node.id}</span>
+                    <span style={{ fontSize: 13, color: "#111827" }}>{labelFor(node)}</span>
                     <span style={{ fontSize: 12, color: "#9ca3af" }}>{node.children?.length ? `${node.children.length} ›` : ""}</span>
                   </button>
                 ))}

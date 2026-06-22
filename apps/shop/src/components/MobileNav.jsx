@@ -9,7 +9,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { LogoutButton } from "@andertal/ui";
 import { useCart } from "@/context/CartContext";
@@ -314,6 +315,7 @@ export default function MobileNav({ layout = "fixed" }) {
   const mc = shopStyles?.mobileChrome || {};
   const { mobileBottomNavScroll } = useMobileBottomNavScroll();
   const pathname = usePathname();
+  const locale = useLocale();
   const t = useTranslations("common");
   const tPanel = useTranslations("accountPanel");
   const tWishlist = useTranslations("wishlist");
@@ -349,7 +351,7 @@ export default function MobileNav({ layout = "fixed" }) {
 
   /* Fetch data once */
   useEffect(() => {
-    fetch("/api/store-categories?tree=true&is_visible=true")
+    fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`)
       .then((r) => r.json())
       .then((d) => {
         const tree = d?.tree || [];
@@ -368,7 +370,7 @@ export default function MobileNav({ layout = "fixed" }) {
         setCategories(roots);
       })
       .catch(() => {});
-  }, []);
+  }, [locale]);
 
   /* Close drawer on route change */
   useEffect(() => {

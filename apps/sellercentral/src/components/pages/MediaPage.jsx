@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
-import { useLt, dateLocaleFor } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
+import { dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
 import { confirmDelete } from "@/lib/confirm-delete";

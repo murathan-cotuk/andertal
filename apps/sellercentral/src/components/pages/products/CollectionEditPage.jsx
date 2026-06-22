@@ -96,6 +96,8 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
   const [removingProductId, setRemovingProductId] = useState(null);
   const [addProductSearch, setAddProductSearch] = useState("");
   const [addProductPopoverOpen, setAddProductPopoverOpen] = useState(false);
+  const [searchRect, setSearchRect] = useState(null);
+  const searchContainerRef = useRef(null);
   const initialFormRef = useRef(null);
   const unsaved = useUnsavedChanges();
 
@@ -168,6 +170,22 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
       setAllProducts(list);
     }).catch(() => setAllProducts([]));
   }, [collection?.id, client]);
+
+  useEffect(() => {
+    if (!addProductPopoverOpen) return;
+    const update = () => {
+      if (searchContainerRef.current) {
+        setSearchRect(searchContainerRef.current.getBoundingClientRect());
+      }
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [addProductPopoverOpen]);
 
   const addProductToCollection = async (productId) => {
     if (!collection?.id || !productId) return;
@@ -451,7 +469,7 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                   </div>
                 )}
                 <div style={{ marginTop: 16 }}>
-                  <div style={{ position: "relative" }}>
+                  <div ref={searchContainerRef} style={{ position: "relative" }}>
                     <TextField
                       label={c.addProduct}
                       value={addProductSearch}
@@ -460,46 +478,71 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                       placeholder={c.searchProducts}
                       autoComplete="off"
                     />
-                    {addProductPopoverOpen && (
+                    {addProductPopoverOpen && searchRect && (
                       <div
                         style={{
-                          position: "absolute",
-                          top: "100%",
-                          left: 0,
-                          right: 0,
-                          maxHeight: 280,
+                          position: "fixed",
+                          top: searchRect.bottom + 4,
+                          left: searchRect.left,
+                          width: searchRect.width,
+                          maxHeight: 320,
                           overflowY: "auto",
                           background: "var(--p-color-bg-surface)",
                           border: "1px solid var(--p-color-border)",
                           borderRadius: 8,
-                          marginTop: 4,
                           zIndex: 10002,
                           boxShadow: "var(--p-shadow-400)",
                         }}
                       >
-                        {productsNotInCollection
-                          .filter((p) => !addProductSearch.trim() || (p.title || p.handle || p.sku || "").toLowerCase().includes(addProductSearch.toLowerCase()))
-                          .slice(0, 80)
-                          .map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              style={{
-                                display: "block",
-                                width: "100%",
-                                padding: "8px 12px",
-                                textAlign: "left",
-                                border: "none",
-                                background: addingProductId === p.id ? "var(--p-color-bg-fill-secondary)" : "transparent",
-                                cursor: addingProductId ? "wait" : "pointer",
-                                fontSize: 13,
-                              }}
-                              onClick={() => addProductToCollection(p.id)}
-                              disabled={!!addingProductId}
-                            >
-                              {addingProductId === p.id ? `${c.adding} ` : ""}{p.title || p.handle || p.sku || p.id}
-                            </button>
-                          ))}
+                        {(() => {
+                          const term = addProductSearch.trim().toLowerCase();
+                          const filtered = productsNotInCollection
+                            .filter((p) => !term || (p.title || p.handle || p.sku || "").toLowerCase().includes(term))
+                            .slice(0, 100);
+                          if (filtered.length === 0) {
+                            return <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>{c.noProducts}</div>;
+                          }
+                          const groups = [];
+                          const map = new Map();
+                          for (const p of filtered) {
+                            const sid = String(p.seller_id || "");
+                            const label = p.seller_label || p.seller_store_name || p.seller_company_name || (sid ? sid.slice(0, 12) : "—");
+                            if (!map.has(sid)) {
+                              const g = { sid, label, products: [] };
+                              map.set(sid, g);
+                              groups.push(g);
+                            }
+                            map.get(sid).products.push(p);
+                          }
+                          return groups.map(({ sid, label, products }) => (
+                            <div key={sid || "no-seller"}>
+                              <div style={{ padding: "6px 12px 4px", fontSize: 11, fontWeight: 700, color: "var(--p-color-text-subdued)", textTransform: "uppercase", letterSpacing: "0.5px", background: "var(--p-color-bg-surface-secondary)", borderBottom: "1px solid var(--p-color-border-subdued)" }}>
+                                {label}
+                              </div>
+                              {products.map((p) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  style={{
+                                    display: "block",
+                                    width: "100%",
+                                    padding: "8px 12px 8px 20px",
+                                    textAlign: "left",
+                                    border: "none",
+                                    borderBottom: "1px solid var(--p-color-border-subdued)",
+                                    background: addingProductId === p.id ? "var(--p-color-bg-fill-secondary)" : "transparent",
+                                    cursor: addingProductId ? "wait" : "pointer",
+                                    fontSize: 13,
+                                  }}
+                                  onClick={() => { addProductToCollection(p.id); setAddProductPopoverOpen(false); }}
+                                  disabled={!!addingProductId}
+                                >
+                                  {addingProductId === p.id ? `${c.adding} ` : ""}{p.title || p.handle || p.sku || p.id}
+                                </button>
+                              ))}
+                            </div>
+                          ));
+                        })()}
                       </div>
                     )}
                     {addProductPopoverOpen && (

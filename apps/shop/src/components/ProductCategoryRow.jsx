@@ -278,7 +278,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
     variantImageUrlForLocale(variant, locale) || variantMedia[0] || product.images?.[0]?.url || product.thumbnail || localeMedia[0] || null;
   const imgSrc = resolveImg(rawImg);
   const productHandle = storefrontProductHandle(product, locale);
-  const productUrl = productHandle ? `/produkt/${productHandle}` : null;
+  const productUrl = productHandle ? `/${productHandle}` : null;
 
   const variantCountryPrice = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};

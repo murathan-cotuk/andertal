@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useLocale } from "next-intl";
-import { useLt, dateLocaleFor } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
+import { dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { confirmDelete } from "@/lib/confirm-delete";
+import { localizeShipmentEventDescription } from "@/lib/shipment-event-i18n";
 
 function getStatusMeta(lt) {
   return {
@@ -51,7 +52,6 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMsg, setRefreshMsg] = useState("");
-  const [deletingId, setDeletingId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({ status: "in_transit", description: "", location: "" });
   const [error, setError] = useState("");
@@ -126,18 +126,10 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
     setRefreshing(false);
   };
 
-  const handleDelete = async (eventId) => {
-    if (!(await confirmDelete(lt("Delete event?", "Olay silinsin mi?", "Supprimer l'événement ?", "¿Eliminar evento?", "Eliminare l'evento?", "Ereignis löschen?")))) return;
-    setDeletingId(eventId);
-    try {
-      const client = getMedusaAdminClient();
-      await client.deleteShipmentEvent(eventId);
-      setEvents((ev) => ev.filter((e) => e.id !== eventId));
-    } catch (e) {
-      setError(e?.message || lt("Error deleting", "Silme hatası", "Erreur de suppression", "Error al eliminar", "Errore di eliminazione", "Fehler beim Löschen"));
-    }
-    setDeletingId(null);
-  };
+  const eventDescription = useCallback(
+    (ev) => localizeShipmentEventDescription(locale, ev),
+    [locale],
+  );
 
   const hasTracking = order?.tracking_number?.trim();
   const carrierName = order?.carrier_name?.trim();
@@ -227,6 +219,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
           {events.map((ev, i) => {
             const m = statusMeta[ev.status] || statusMeta.manual;
             const isLast = i === events.length - 1;
+            const localizedDesc = eventDescription(ev);
             return (
               <div key={ev.id} style={{ position: "relative", marginBottom: isLast ? 0 : 16 }}>
                 <div style={{
@@ -246,17 +239,10 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
                       {ev.source === "auto" && <span style={{ fontSize: 10, color: "#9ca3af", fontStyle: "italic" }}>auto</span>}
                       {ev.source === "api" && <span style={{ fontSize: 10, color: "#0369a1", fontWeight: 600 }}>DHL API</span>}
                     </div>
-                    {ev.description && (
-                      <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{ev.description}</div>
+                    {localizedDesc && (
+                      <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{localizedDesc}</div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleDelete(ev.id)}
-                    disabled={deletingId === ev.id}
-                    style={{ padding: "2px 7px", fontSize: 11, color: "#ef4444", border: "1px solid #fecaca", borderRadius: 5, background: "#fef2f2", cursor: "pointer", flexShrink: 0, opacity: deletingId === ev.id ? 0.5 : 1 }}
-                  >
-                    ✕
-                  </button>
                 </div>
               </div>
             );

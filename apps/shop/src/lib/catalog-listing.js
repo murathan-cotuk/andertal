@@ -169,7 +169,10 @@ export function isRecentProduct(product, months = 2) {
 
 export function productSalesScore(product) {
   const meta = product?.metadata || {};
-  return Number(meta.sold_last_month || meta.sold || meta.sales_count || 0) || 0;
+  const score = Number(meta.sold_last_month || meta.sold || meta.sales_count || 0) || 0;
+  if (score > 0) return score;
+  if (meta.is_bestseller === true || meta.is_bestseller === "true" || String(meta.badge || "").toLowerCase().trim() === "bestseller") return 1;
+  return 0;
 }
 
 function isCleanValue(s) {
@@ -287,6 +290,9 @@ export function applyCatalogSort(sorted, sort, { bestsellerOnly = false } = {}) 
   const out = [...sorted];
   if (sort === "bestseller" || (bestsellerOnly && sort === "default")) {
     out.sort((a, b) => productSalesScore(b) - productSalesScore(a));
+  }
+  if (!sort || sort === "default") {
+    out.sort((a, b) => (productSalesScore(b) > 0 ? 1 : 0) - (productSalesScore(a) > 0 ? 1 : 0));
   }
   if (sort === "newest") {
     out.sort((a, b) => {

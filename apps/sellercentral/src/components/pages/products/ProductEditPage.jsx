@@ -333,6 +333,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [mediaDragOverIndex, setMediaDragOverIndex] = useState(null);
   const [collectionSearch, setCollectionSearch] = useState("");
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
+  const [collectionRect, setCollectionRect] = useState(null);
+  const collectionSearchRef = useRef(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [euOriginVerifying, setEuOriginVerifying] = useState(false);
   const [euOriginNotice, setEuOriginNotice] = useState("");
@@ -397,6 +399,22 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     if (collectionPopoverOpen) document.body.classList.add("andertal-collections-dropdown-open");
     else document.body.classList.remove("andertal-collections-dropdown-open");
     return () => document.body.classList.remove("andertal-collections-dropdown-open");
+  }, [collectionPopoverOpen]);
+
+  useEffect(() => {
+    if (!collectionPopoverOpen) return;
+    const update = () => {
+      if (collectionSearchRef.current) {
+        setCollectionRect(collectionSearchRef.current.getBoundingClientRect());
+      }
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [collectionPopoverOpen]);
 
   const [currentSellerId, setCurrentSellerId] = useState(null);
@@ -1640,13 +1658,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-media-picker-tick { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: var(--p-color-bg-fill-brand); color: #fff; display: inline-flex; align-items: center; justify-content: center; pointer-events: none; }
         .product-media-picker-tick svg { width: 16px; height: 16px; }
         .collection-dropdown-wrap { position: relative; }
-        .collection-dropdown-panel { position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--p-color-bg-surface); border: 1px solid var(--p-color-border); border-radius: 8px; box-shadow: var(--p-shadow-400); max-height: 280px; overflow-y: auto; z-index: 10002; opacity: 0; transform: translateY(-8px); transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none; }
-        .collection-dropdown-panel.open { opacity: 1; transform: translateY(0); pointer-events: auto; }
-        .collection-dropdown-card-wrap { position: relative; overflow: visible !important; }
-        .collection-dropdown-card-wrap.collections-open { z-index: 10000; }
-        .collection-dropdown-card-wrap .Polaris-Card { overflow: visible !important; }
-        .collection-dropdown-card-wrap .Polaris-LegacyCard { overflow: visible !important; }
-        .collection-dropdown-card-wrap .Polaris-BlockStack { overflow: visible !important; }
         .collection-dropdown-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; border: none; background: none; width: 100%; text-align: left; font-size: 14px; color: var(--p-color-text); }
         .collection-dropdown-item:hover { background: var(--p-color-bg-surface-hover); }
         .product-description-box { border: 1px solid var(--p-color-border); border-radius: 12px; overflow: hidden; background: var(--p-color-bg-surface); }
@@ -1993,8 +2004,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                           <BlockStack gap="300">
                             <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Collections" : locale === "tr" ? "Koleksiyonlar" : locale === "fr" ? "Collections" : locale === "es" ? "Colecciones" : locale === "it" ? "Collezioni" : "Kollektionen"}</Text>
                             <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Product can be assigned to multiple collections (e.g. Sale, Season)." : locale === "tr" ? "Ürün birden fazla koleksiyona atanabilir (örn. İndirim, Sezon)." : locale === "fr" ? "Le produit peut être assigné à plusieurs collections (ex. Soldes, Saison)." : locale === "es" ? "El producto puede asignarse a varias colecciones (ej. Rebajas, Temporada)." : locale === "it" ? "Il prodotto può essere assegnato a più collezioni (es. Saldo, Stagione)." : "Produkt kann mehreren Kollektionen zugeordnet werden (z. B. Sale, Saison)."}</Text>
-                            <div className={`collection-dropdown-card-wrap ${collectionPopoverOpen ? "collections-open" : ""}`} style={{ position: "relative", zIndex: collectionPopoverOpen ? 10000 : undefined, overflow: "visible", maxWidth: "100%" }}>
-                              <div className="collection-dropdown-wrap">
+                            <div>
+                              <div ref={collectionSearchRef} className="collection-dropdown-wrap">
                                 <TextField
                                   label={locale === "en" ? "Search collections" : locale === "tr" ? "Koleksiyon ara" : locale === "fr" ? "Rechercher des collections" : locale === "es" ? "Buscar colecciones" : locale === "it" ? "Cerca collezioni" : "Kollektionen durchsuchen"}
                                   labelHidden
@@ -2004,55 +2015,49 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                   placeholder={locale === "en" ? "Search collection…" : locale === "tr" ? "Koleksiyon ara…" : locale === "fr" ? "Rechercher une collection…" : locale === "es" ? "Buscar colección…" : locale === "it" ? "Cerca collezione…" : "Kollektion suchen…"}
                                   autoComplete="off"
                                 />
-                                <div className={`collection-dropdown-panel ${collectionPopoverOpen ? "open" : ""}`}>
-                                  {(collections || [])
-                                    .filter((c) => !collectionSearch.trim() || (c.title || c.handle || "").toLowerCase().includes(collectionSearch.toLowerCase()))
-                                    .map((c) => (
-                                      <button
-                                        key={c.id}
-                                        type="button"
-                                        className="collection-dropdown-item"
-                                        onClick={() => {
-                                          const next = collectionIds.includes(c.id) ? collectionIds.filter((id) => id !== c.id) : [...collectionIds, c.id];
-                                          updateMeta("collection_ids", next);
-                                        }}
-                                      >
-                                        <span className="checkbox-container" style={{ pointerEvents: "none" }}>
-                                          <input type="checkbox" checked={collectionIds.includes(c.id)} readOnly tabIndex={-1} />
-                                          <svg viewBox="0 0 64 64" height="1.25em" width="1.25em">
-                                            <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="checkbox-path" />
-                                          </svg>
-                                        </span>
-                                        <span>{c.title || c.handle || c.id}</span>
-                                      </button>
-                                    ))}
-                                </div>
+                                {collectionPopoverOpen && collectionRect && (
+                                  <div style={{ position: "fixed", top: collectionRect.bottom + 4, left: collectionRect.left, width: collectionRect.width, maxHeight: 280, overflowY: "auto", background: "var(--p-color-bg-surface)", border: "1px solid var(--p-color-border)", borderRadius: 8, boxShadow: "var(--p-shadow-400)", zIndex: 10002 }}>
+                                    {(collections || [])
+                                      .filter((c) => !collectionSearch.trim() || (c.title || c.handle || "").toLowerCase().includes(collectionSearch.toLowerCase()))
+                                      .map((c) => (
+                                        <button
+                                          key={c.id}
+                                          type="button"
+                                          className="collection-dropdown-item"
+                                          onClick={() => {
+                                            const next = collectionIds.includes(c.id) ? collectionIds.filter((id) => id !== c.id) : [...collectionIds, c.id];
+                                            updateMeta("collection_ids", next);
+                                          }}
+                                        >
+                                          <span className="checkbox-container" style={{ pointerEvents: "none" }}>
+                                            <input type="checkbox" checked={collectionIds.includes(c.id)} readOnly tabIndex={-1} />
+                                            <svg viewBox="0 0 64 64" height="1.25em" width="1.25em">
+                                              <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="checkbox-path" />
+                                            </svg>
+                                          </span>
+                                          <span>{c.title || c.handle || c.id}</span>
+                                        </button>
+                                      ))}
+                                  </div>
+                                )}
+                                {collectionPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setCollectionPopoverOpen(false)} aria-hidden />}
                               </div>
-                              {collectionPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setCollectionPopoverOpen(false)} aria-hidden />}
-                              {collectionIds.length > 0 && (
+                              {collectionIds.filter((id) => (collections || []).some((c) => c.id === id)).length > 0 && (
                                 <InlineStack gap="100" wrap>
-                                  {collectionIds.map((id) => {
-                                    const c = (collections || []).find((x) => x.id === id);
-                                    const collLabel = c ? (c.title || c.handle || id) : id;
-                                    return (
-                                      <span
-                                        key={id}
-                                        style={{
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          gap: 4,
-                                          padding: "4px 8px",
-                                          background: "var(--p-color-bg-fill-secondary)",
-                                          borderRadius: 6,
-                                          fontSize: 12,
-                                          color: "var(--p-color-text-subdued)",
-                                        }}
-                                      >
-                                        {collLabel || "—"}
-                                        <button type="button" onClick={() => updateMeta("collection_ids", collectionIds.filter((x) => x !== id))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
-                                      </span>
-                                    );
-                                  })}
+                                  {collectionIds
+                                    .filter((id) => (collections || []).some((c) => c.id === id))
+                                    .map((id) => {
+                                      const c = (collections || []).find((x) => x.id === id);
+                                      return (
+                                        <span
+                                          key={id}
+                                          style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
+                                        >
+                                          {c ? (c.title || c.handle || id) : id}
+                                          <button type="button" onClick={() => updateMeta("collection_ids", collectionIds.filter((x) => x !== id))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
+                                        </span>
+                                      );
+                                    })}
                                 </InlineStack>
                               )}
                             </div>

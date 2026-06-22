@@ -17,7 +17,7 @@ import {
 } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { useLocale } from "next-intl";
-import { useLt } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import FlowEmailBodyEditor, { htmlToPlainText } from "@/components/content/FlowEmailBodyEditor";
 import {

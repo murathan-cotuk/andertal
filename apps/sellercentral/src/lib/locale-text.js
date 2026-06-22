@@ -1,9 +1,4 @@
-"use client";
-
-import { useCallback } from "react";
-import { useLocale } from "next-intl";
-
-/** Pick localized UI string: en, tr, fr, es, it, de (default). */
+/** Pick localized UI string: en, tr, fr, es, it, de (default). Safe for server and client. */
 export function lt(locale, en, tr, fr, es, it, de) {
   const loc = String(locale || "de").slice(0, 2).toLowerCase();
   if (loc === "en") return en;
@@ -12,14 +7,6 @@ export function lt(locale, en, tr, fr, es, it, de) {
   if (loc === "es") return es;
   if (loc === "it") return it;
   return de;
-}
-
-export function useLt() {
-  const locale = useLocale();
-  return useCallback(
-    (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de),
-    [locale],
-  );
 }
 
 export function dateLocaleFor(locale) {

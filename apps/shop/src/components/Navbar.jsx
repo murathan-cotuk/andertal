@@ -8,7 +8,8 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
 import UserDropdown from "@/components/UserDropdown";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { getLocalizedCategory } from "@/lib/format";
 
 const Nav = styled.nav`
   background-color: white;
@@ -227,6 +228,7 @@ export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
   const tCommon = useTranslations("common");
+  const locale = useLocale();
 
   // Fetch store menus: prefer location "main" (navbar), else first menu; fallback to categories
   useEffect(() => {
@@ -289,7 +291,7 @@ export default function Navbar() {
           ) : categories.length > 0 ? (
             categories.map((category) => (
               <CategoryLink key={category.id} href={`/${category.slug}`}>
-                {category.name}
+                {getLocalizedCategory(category, locale).name}
               </CategoryLink>
             ))
           ) : null}

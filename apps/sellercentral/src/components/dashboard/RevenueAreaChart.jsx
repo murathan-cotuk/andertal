@@ -2,7 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import { useLocale } from "next-intl";
-import { useLt, dateLocaleFor, fmtMoney } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
+import { dateLocaleFor, fmtMoney } from "@/lib/locale-text";
 
 const DEFAULT_ACCENT = "#008060";
 

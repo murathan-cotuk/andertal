@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@shopify/polaris";
-import { useLt } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 function getPlatforms(lt) {

@@ -1015,7 +1015,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
 
   const handleDeleteMenu = async (e, menu) => {
     e?.stopPropagation?.();
-    if (!(await confirmDelete(`Delete menu "${menu.name}"? This will remove all its items.`))) return;
+    if (!(await confirmDelete(c.deleteMenuConfirmMessage(menu.name || "")))) return;
     try {
       setError(null);
       client.deleteMenu(menu.id).then(() => {
@@ -1141,7 +1141,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   };
 
   const handleDeleteItem = async (item) => {
-    if (!(await confirmDelete(`Remove "${item.label}" from menu?`))) return;
+    if (!(await confirmDelete(c.removeItemConfirmMessage(item.label || "")))) return;
     const menuId = effectiveMenuId ?? selectedMenuId;
     if (!menuId) return;
     setError(null);

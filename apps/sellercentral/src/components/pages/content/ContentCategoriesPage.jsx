@@ -24,6 +24,8 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
+import { useLocale } from "next-intl";
+import { categoryDisplayName } from "@/lib/category-locale";
 
 function slugFromName(name) {
   return titleToHandle(name || "");
@@ -87,7 +89,7 @@ function buildTree(flatList) {
   return roots;
 }
 
-function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect }) {
+function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect, locale }) {
   const [open, setOpen] = useState(false);
   const hasKids = node.children && node.children.length > 0;
   const router = useRouter();
@@ -131,7 +133,7 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect }) {
             style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
           >
             <Text as="span" variant="bodyMd" fontWeight={depth === 0 ? "semibold" : "regular"} tone="magic">
-              {node.name}
+              {categoryDisplayName(node, locale)}
             </Text>
           </button>
           {hasKids && (
@@ -165,7 +167,7 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect }) {
       {hasKids && open && (
         <div style={{ borderLeft: "3px solid #e5e7eb", marginLeft: 16 + depth * 8 + 20 }}>
           {node.children.map(child => (
-            <TreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} selectedIds={selectedIds} onToggleSelect={onToggleSelect} />
+            <TreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} selectedIds={selectedIds} onToggleSelect={onToggleSelect} locale={locale} />
           ))}
         </div>
       )}
@@ -198,6 +200,7 @@ const emptyForm = {
 const initialSlugTouched = false;
 
 export default function ContentCategoriesPage() {
+  const locale = useLocale();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -421,7 +424,7 @@ export default function ContentCategoriesPage() {
   };
 
   const tree = buildTree(categories);
-  const parentOptions = [{ label: "— None (top level) —", value: "" }, ...categories.filter((c) => !editId || c.id !== editId).map((c) => ({ label: c.name, value: c.id }))];
+  const parentOptions = [{ label: "— None (top level) —", value: "" }, ...categories.filter((c) => !editId || c.id !== editId).map((c) => ({ label: categoryDisplayName(c, locale), value: c.id }))];
 
 
   return (
@@ -500,7 +503,7 @@ export default function ContentCategoriesPage() {
                     <div style={{ flex: "0 0 140px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Status</Text></div>
                   </div>
                   {tree.map(node => (
-                    <TreeNode key={node.id} node={node} depth={0} onDelete={setDeleteId} selectedIds={selectedIds} onToggleSelect={toggleNodeSelection} />
+                    <TreeNode key={node.id} node={node} depth={0} onDelete={setDeleteId} selectedIds={selectedIds} onToggleSelect={toggleNodeSelection} locale={locale} />
                   ))}
                 </div>
               )}
@@ -583,7 +586,7 @@ export default function ContentCategoriesPage() {
       >
         <Modal.Section>
           <Text as="p">
-            Are you sure you want to delete &quot;{categories.find((c) => c.id === deleteId)?.name || "this category"}&quot;?
+            Are you sure you want to delete &quot;{categoryDisplayName(categories.find((c) => c.id === deleteId), locale) || "this category"}&quot;?
             {categories.some((c) => c.parent_id === deleteId) && " This category has subcategories; delete or move them first."}
           </Text>
         </Modal.Section>

@@ -23,6 +23,18 @@ class MedusaAdminClient {
   constructor(baseURL = MEDUSA_BACKEND_URL, overrideToken = null) {
     this.baseURL = (baseURL || MEDUSA_BACKEND_URL).replace(/\/$/, '');
     this.overrideToken = overrideToken || null;
+    this._uiLocale = null;
+  }
+
+  /** Panel shop locale for auto-translated category names (de, en, tr, …). */
+  setUiLocale(locale) {
+    const l = String(locale || '').slice(0, 2).toLowerCase();
+    this._uiLocale = l || null;
+  }
+
+  _categoryLocaleParam(extraLocale) {
+    const loc = extraLocale || this._uiLocale;
+    return loc ? `locale=${encodeURIComponent(String(loc).slice(0, 2).toLowerCase())}` : '';
   }
 
   /**
@@ -397,8 +409,10 @@ class MedusaAdminClient {
    * Production: NEXT_PUBLIC_MEDUSA_BACKEND_URL = https://api.andertal.com
    */
   async getAdminHubCategories(filters = {}) {
-    const { all, ...rest } = filters
-    const params = all ? rest : { active: 'true', ...rest }
+    const { all, locale, ...rest } = filters
+    const params = { ...(all ? rest : { active: 'true', ...rest }) }
+    const loc = locale || this._uiLocale
+    if (loc) params.locale = String(loc).slice(0, 2).toLowerCase()
     const queryParams = new URLSearchParams(params).toString()
     const paths = [
       `/admin-hub/categories?${queryParams}`,
@@ -463,8 +477,9 @@ class MedusaAdminClient {
   /**
    * Get single Admin Hub category by ID
    */
-  async getAdminHubCategory(id) {
-    const data = await this.request(`/admin-hub/v1/categories/${id}`)
+  async getAdminHubCategory(id, locale) {
+    const locQ = this._categoryLocaleParam(locale)
+    const data = await this.request(`/admin-hub/v1/categories/${id}${locQ ? `?${locQ}` : ''}`)
     return data?.category || null
   }
 

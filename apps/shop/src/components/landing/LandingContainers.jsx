@@ -1182,6 +1182,81 @@ function BestsellerCarousel({ container, locale = "de" }) {
   );
 }
 
+// ── Seller Carousel ────────────────────────────────────────────────────────────
+function SellerCarousel({ container, locale = "de" }) {
+  const tp = useTranslations("product");
+  const [sellers, setSellers] = useState(undefined);
+  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
+  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
+  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
+  const baseGap = container.gap != null ? Number(container.gap) : 16;
+  const gap = Number.isNaN(baseGap) ? 16 : baseGap;
+  const limit = container.limit != null ? Number(container.limit) : 20;
+
+  useEffect(() => {
+    fetch(`/api/store-sellers?limit=${encodeURIComponent(limit)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setSellers(Array.isArray(d?.sellers) ? d.sellers : []))
+      .catch(() => setSellers([]));
+  }, [limit]);
+
+  if (sellers === undefined) {
+    return (
+      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+        <div style={{ display: "flex", gap, overflow: "hidden" }}>
+          {Array.from({ length: itemsPerRow }).map((_, i) => (
+            <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 160, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!sellers.length) return null;
+
+  const title = lt(container, "title", locale);
+
+  return (
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+      <div style={getContentInnerStyle(container, 1280)}>
+        <Carousel
+          contained={false}
+          title={title || undefined}
+          visibleCount={itemsPerRow}
+          navOnSides
+          gap={gap}
+          showFade={false}
+          ariaLabel={title || tp("seller")}
+        >
+          {sellers.map((seller, i) => {
+            const name = seller.store_name || seller.seller_label || seller.company_name || seller.email || "";
+            const logoUrl = resolveUrl(seller.logo_url || seller.shop_logo_url || "");
+            const href = seller.slug ? `/sellers/${seller.slug}` : (seller.id ? `/sellers/${seller.id}` : "#");
+            return (
+              <div key={seller.id || i} style={{ minWidth: 0 }}>
+                <Link
+                  href={href}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 12px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fafafa", textDecoration: "none", color: "inherit", textAlign: "center" }}
+                >
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={name} style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 8 }} />
+                  ) : (
+                    <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#6b7280" }}>
+                      {(name[0] || "S").toUpperCase()}
+                    </div>
+                  )}
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", lineHeight: 1.3 }}>{name || tp("seller")}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb" }}>{tp("toShop")}</span>
+                </Link>
+              </div>
+            );
+          })}
+        </Carousel>
+      </div>
+    </div>
+  );
+}
+
 function CollectionsCarousel({ container, locale = "de" }) {
   const tNav = useTranslations("nav");
   const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
@@ -2441,6 +2516,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "banner_cta":           inner = <BannerCta container={c} locale={locale} />; break;
     case "collection_carousel":  inner = <CollectionCarousel container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "bestseller_carousel":  inner = <BestsellerCarousel container={c} locale={locale} />; break;
+    case "seller_carousel":      inner = <SellerCarousel container={c} locale={locale} />; break;
     case "content_mosaic":       inner = <ContentMosaic container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "collections_carousel": inner = <CollectionsCarousel container={c} locale={locale} />; break;
     case "accordion":            inner = <Accordion container={c} locale={locale} />; break;

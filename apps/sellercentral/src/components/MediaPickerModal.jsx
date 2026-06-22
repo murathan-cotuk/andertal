@@ -14,7 +14,7 @@ import {
   Divider,
   DropZone,
 } from "@shopify/polaris";
-import { useLt } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
 

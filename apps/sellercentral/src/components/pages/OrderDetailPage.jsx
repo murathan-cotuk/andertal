@@ -7,7 +7,6 @@ import { lt } from "@/lib/locale-text";
 import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
-import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 import TrackingSection from "@/components/orders/TrackingSection";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
@@ -106,7 +105,6 @@ export default function OrderDetailPage() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [shipModalOpen, setShipModalOpen] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
@@ -241,13 +239,6 @@ export default function OrderDetailPage() {
 
   return (
     <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
-      {shipModalOpen && order && (
-        <ShipOrdersModal
-          orders={[{ ...order, _items: order.items || [] }]}
-          onClose={() => setShipModalOpen(false)}
-          onDone={() => loadOrder()}
-        />
-      )}
       {/* Header */}
       <div
         style={{
@@ -385,12 +376,6 @@ export default function OrderDetailPage() {
             order={order}
             onOrderStatusChanged={loadOrder}
           />
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{c.editShippingOrMark}</span>
-            <Button variant="primary" onClick={() => setShipModalOpen(true)}>
-              {c.editShipping}
-            </Button>
-          </div>
 
           {/* Payment info */}
           <Section title={c.paymentInfo}>

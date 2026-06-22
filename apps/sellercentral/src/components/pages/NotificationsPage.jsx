@@ -5,7 +5,8 @@ import { Page, Card, Button, Checkbox, BlockStack, InlineStack, Text, Box } from
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
-import { useLt, dateLocaleFor } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
+import { dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getNotificationsPageCopy } from "@/lib/notifications-page-i18n";

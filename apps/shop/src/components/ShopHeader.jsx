@@ -42,7 +42,9 @@ import { menuItemHref } from "@/lib/shop-menu-href";
 import { buildHeaderSurfaceCssVarsFromRoute } from "@andertal/shop-theme";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
+import { getLocalizedCategory } from "@/lib/format";
 
 /** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
 const SCROLL_UP_DELTA = 6;
@@ -1186,7 +1188,7 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
+    fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" })
       .then((r) => r.json())
       .catch(() => ({ tree: [] }))
       .then((catRes) => {
@@ -1207,7 +1209,7 @@ export default function ShopHeader() {
         if (!cancelled) setCategoriesFetchDone(true);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     let ticking = false;
@@ -1389,7 +1391,7 @@ export default function ShopHeader() {
       .map((n) => ({
         key: String(n.id),
         id: String(n.id),
-        label: n.name || n.slug || "",
+        label: getLocalizedCategory(n, locale).name || n.slug || "",
         slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
         hasChildren: Array.isArray(n.children) && n.children.some((c) => c && c.has_products !== false),
         node: n,
@@ -1416,7 +1418,7 @@ export default function ShopHeader() {
       .map((n) => ({
         key: String(n.id),
         id: String(n.id),
-        label: n.name || n.slug || "",
+        label: getLocalizedCategory(n, locale).name || n.slug || "",
         slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
         hasChildren: Array.isArray(n.children) && n.children.some((c) => c && c.has_products !== false),
       }))

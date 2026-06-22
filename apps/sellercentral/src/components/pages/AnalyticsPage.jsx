@@ -30,7 +30,8 @@ import {
 } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { reportSellerClientError } from "@/lib/report-seller-client-error";
-import { useLt, dateLocaleFor } from "@/lib/locale-text";
+import { useLt } from "@/lib/use-locale-text";
+import { dateLocaleFor } from "@/lib/locale-text";
 import RevenueAreaChart from "@/components/dashboard/RevenueAreaChart";
 
 // ─── Constants ───────────────────────────────────────────────────────────────

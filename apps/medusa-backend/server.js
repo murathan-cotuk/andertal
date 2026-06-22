@@ -31,6 +31,7 @@ const { enqueueFlowEvent, startFlowQueueWorker, getFlowQueueStatus } = require('
 const { pingForHealth } = require('./src/redis')
 const { resolveSmtpSenderIdentity } = require('./src/smtp-sender-resolve')
 const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename } = require('./src/order-pdf-buffers')
+const { renderPeriodCommissionInvoiceDocument } = require('./src/order-pdf-layout')
 const { resolveOrderPaidTotalCents } = require('./src/order-money')
 
 let backendLinkModulesPath
@@ -1781,6 +1782,25 @@ async function start() {
     }
 
     /** Row mapper + PG fallback when AdminHubService loader fails (Medusa manager / TypeORM init issues). */
+    const categoryAutoTranslate = require('./src/category-auto-translate')
+    const resolveCategoryRequestLocale = (req) =>
+      categoryAutoTranslate.normalizeCategoryLocale(req.query.locale || req.headers['x-shop-locale'] || '')
+    const localizeCategoriesForRequest = async (categories, req, pgClient) => {
+      const locale = resolveCategoryRequestLocale(req)
+      if (!locale || !Array.isArray(categories) || categories.length === 0) return categories
+      try {
+        await categoryAutoTranslate.applyCategoryLocale(categories, locale, { pgClient })
+      } catch (e) {
+        console.warn('localizeCategoriesForRequest:', e?.message || e)
+      }
+      return categories
+    }
+    const localizeSingleCategoryForRequest = async (category, req, pgClient) => {
+      if (!category) return category
+      await localizeCategoriesForRequest([category], req, pgClient)
+      return category
+    }
+
     const mapAdminHubCategoryPgRow = (row) => ({
       id: row.id,
       name: row.name,
@@ -1918,9 +1938,14 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query(`SELECT * FROM admin_hub_categories WHERE id = $1::uuid`, [id])
+        if (!r.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Category not found' })
+        }
+        const category = mapAdminHubCategoryPgRow(r.rows[0])
+        await localizeSingleCategoryForRequest(category, req, client)
         await client.end()
-        if (!r.rows[0]) return res.status(404).json({ message: 'Category not found' })
-        return res.json({ category: mapAdminHubCategoryPgRow(r.rows[0]) })
+        return res.json({ category })
       } catch (e) {
         try {
           await client.end()
@@ -2121,6 +2146,7 @@ async function start() {
           const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 LIMIT 1`, [slug])
           if (!r.rows[0]) return res.status(404).json({ message: 'Category not found' })
           const category = mapAdminHubCategoryPgRow(r.rows[0])
+          await localizeSingleCategoryForRequest(category, req, client)
           return res.json({ category, categories: [category], count: 1 })
         }
 
@@ -2134,6 +2160,7 @@ async function start() {
             filtered = filtered.filter((c) => c.is_visible === vis)
           }
           const categoryTree = buildAdminHubCategoryTreeFromFlat(filtered)
+          await localizeCategoriesForRequest(categoryTree, req, client)
           return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
         }
 
@@ -2159,6 +2186,7 @@ async function start() {
         sql += ` ORDER BY sort_order ASC, name ASC`
         const r = await client.query(sql, params)
         const categories = r.rows.map(mapAdminHubCategoryPgRow)
+        await localizeCategoriesForRequest(categories, req, client)
         return res.json({ categories, count: categories.length })
       } catch (e) {
         const msg = e && e.message ? String(e.message) : ''
@@ -2181,12 +2209,14 @@ async function start() {
           if (slug && typeof slug === 'string') {
             const category = await adminHubService.getCategoryBySlug(slug)
             if (!category) return res.status(404).json({ message: 'Category not found' })
+            await localizeSingleCategoryForRequest(category, req, null)
             return res.json({ category, categories: [category], count: 1 })
           }
           if (tree === 'true') {
             const filters = {}
             if (is_visible !== undefined) filters.is_visible = is_visible === 'true'
             const categoryTree = await adminHubService.getCategoryTree(filters)
+            await localizeCategoriesForRequest(categoryTree, req, null)
             return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
           }
           const filters = {}
@@ -2194,6 +2224,7 @@ async function start() {
           if (parent_id !== undefined) filters.parent_id = parent_id === 'null' ? null : parent_id
           if (is_visible !== undefined) filters.is_visible = is_visible === 'true'
           const categories = await adminHubService.listCategories(filters)
+          await localizeCategoriesForRequest(categories, req, null)
           return res.json({ categories, count: categories.length })
         } catch (err) {
           console.warn('Admin Hub Categories GET (service) failed, PG fallback:', err && err.message)
@@ -2260,6 +2291,7 @@ async function start() {
         try {
           const category = await adminHubService.getCategoryById(req.params.id)
           if (!category) return res.status(404).json({ message: 'Category not found' })
+          await localizeSingleCategoryForRequest(category, req, null)
           return res.json({ category })
         } catch (err) {
           console.warn('Admin Hub Category GET (service) failed, PG fallback:', err && err.message)
@@ -2330,6 +2362,26 @@ async function start() {
     httpApp.get('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))
     httpApp.put('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdPUT(req, res))
     httpApp.delete('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdDELETE(req, res))
+
+    const adminHubCategoriesWarmTranslationsPOST = async (req, res) => {
+      const locale = categoryAutoTranslate.normalizeCategoryLocale(
+        (req.body && req.body.locale) || req.query.locale || '',
+      )
+      if (!locale) return res.status(400).json({ message: 'locale query/body required (de, en, tr, fr, es, it)' })
+      try {
+        const result = await categoryAutoTranslate.warmAllCategoryNames(locale)
+        return res.json({ ok: true, ...result })
+      } catch (e) {
+        console.error('categories warm-translations:', e)
+        return res.status(500).json({ message: (e && e.message) || 'warm failed' })
+      }
+    }
+    httpApp.post(
+      '/admin-hub/v1/categories/warm-translations',
+      requireSellerAuth,
+      requireSuperuser,
+      adminHubCategoriesWarmTranslationsPOST,
+    )
 
     // --- Ürünler: fallback her zaman kayıtlı (404 önlenir); .ts route varsa kullanılır ---
     const runHandler = (handler, req, res) => {
@@ -10446,16 +10498,18 @@ async function start() {
     httpApp.get('/store/collections', storeCollectionsGET)
 
     // GET /store/menus – Public menüler (Shop). Her menü SADECE kendi menu_id'sine ait item'ları alır (raw DB).
-    let storeCategoriesTreeCache = { at: 0, payload: null }
+    let storeCategoriesTreeCache = new Map()
     const STORE_CATEGORIES_TREE_TTL_MS = 45_000
     const storeCategoriesGET = async (req, res) => {
       const adminHubService = resolveAdminHub()
+      const requestLocale = resolveCategoryRequestLocale(req) || 'en'
       try {
         const slug = (req.query.slug || '').toString().trim()
         if (slug) {
           if (adminHubService) {
             const category = await adminHubService.getCategoryBySlug(slug)
             if (!category || category.active === false || category.is_visible === false) return res.status(404).json({ message: 'Category not found' })
+            await localizeSingleCategoryForRequest(category, req, null)
             const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
             const collectionId = category.has_collection && meta.collection_id ? meta.collection_id : null
             const rawBanner = category.banner_image_url != null ? category.banner_image_url : meta.banner_image_url
@@ -10475,9 +10529,13 @@ async function start() {
           if (!client) return res.status(404).json({ message: 'Category not found' })
           await client.connect()
           const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true LIMIT 1`, [slug])
-          await client.end()
-          if (!r.rows[0]) return res.status(404).json({ message: 'Category not found' })
+          if (!r.rows[0]) {
+            await client.end()
+            return res.status(404).json({ message: 'Category not found' })
+          }
           const category = mapAdminHubCategoryPgRow(r.rows[0])
+          await localizeSingleCategoryForRequest(category, req, client)
+          await client.end()
           const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
           const rawBanner = category.banner_image_url != null ? category.banner_image_url : meta.banner_image_url
           const cat = {
@@ -10492,9 +10550,11 @@ async function start() {
           return res.json({ category: cat, categories: [cat], count: 1 })
         }
 
+        const cacheKey = requestLocale
         const now = Date.now()
-        if (storeCategoriesTreeCache.payload && now - storeCategoriesTreeCache.at < STORE_CATEGORIES_TREE_TTL_MS) {
-          return res.json(storeCategoriesTreeCache.payload)
+        const cachedEntry = storeCategoriesTreeCache.get(cacheKey)
+        if (cachedEntry && now - cachedEntry.at < STORE_CATEGORIES_TREE_TTL_MS) {
+          return res.json(cachedEntry.payload)
         }
 
         let tree
@@ -10539,9 +10599,11 @@ async function start() {
           relaxAll(tree)
         }
 
+        await localizeCategoriesForRequest(tree, req, null)
+
         const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
         const payload = { categories, tree, count: categories.length }
-        storeCategoriesTreeCache = { at: now, payload }
+        storeCategoriesTreeCache.set(cacheKey, { at: now, payload })
         res.json(payload)
       } catch (err) {
         console.error('Store categories GET error:', err)
@@ -11597,7 +11659,7 @@ async function start() {
         const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('lieferschein', on, pdfLocale)}"`)
-        const doc = new PDFDocument({ margin: 48, size: 'A4' })
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         doc.pipe(res)
         renderLieferscheinPdfDocument(doc, {
           row,
@@ -12690,6 +12752,10 @@ async function start() {
           isSuperuser ? [eventId] : [eventId, callerSellerId]
         )
         if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Event not found' }) }
+        if (!isSuperuser) {
+          await client.end()
+          return res.status(403).json({ message: 'Shipment events cannot be deleted' })
+        }
         await client.query('DELETE FROM store_shipment_events WHERE id=$1::uuid', [eventId])
         await client.end()
         res.json({ success: true })
@@ -18992,115 +19058,26 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         const platformAddress = process.env.PLATFORM_INVOICE_ADDRESS || ''
         const platformVatId = process.env.PLATFORM_VAT_ID || ''
         const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
-        const pdfDeLatin = (s) => String(s || '').replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue').replace(/ß/g,'ss')
-        const fmtCents = (c) => (Number(c || 0) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' EUR'
-        const fmtDate = (d) => new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
         const ps = new Date(payout.period_start)
         const pe = new Date(payout.period_end)
         const periodLabel = `${ps.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} – ${pe.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
         const invoiceNum = `PROV-${String(payout.period_start).slice(0, 7).replace('-', '')}`
-        const commCents = Number(payout.commission_cents || 0)
-        const totalCents = Number(payout.total_cents || 0)
-        const vatPercent = Number(platformVatPercent || 0)
-        const vatCents = vatPercent > 0 ? Math.round(commCents * vatPercent / 100) : 0
-        const totalWithVat = commCents + vatCents
 
-        const sellerLines = [
-          payout.company_name || [payout.first_name, payout.last_name].filter(Boolean).join(' '),
-          payout.store_name,
-          payout.business_address,
-          payout.email,
-          payout.vat_id ? `USt-IdNr.: ${payout.vat_id}` : null,
-        ].filter(Boolean)
-
-        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false })
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="Provisionsfaktur-${invoiceNum}.pdf"`)
         doc.pipe(res)
-
-        const left = doc.page.margins.left
-        const right = doc.page.width - doc.page.margins.right
-        const cw = right - left
-
-        // Header
-        doc.rect(left, 30, cw, 50).fill('#1e293b')
-        doc.fillColor('#fff').font('Helvetica-Bold').fontSize(15).text(pdfDeLatin(shopName), left + 14, 44, { width: cw - 28, align: 'left' })
-        doc.fillColor('#94a3b8').font('Helvetica').fontSize(8).text('PROVISIONSFAKTUR', right - 130, 38, { width: 130, align: 'right' })
-        doc.fillColor('#fff').font('Helvetica-Bold').fontSize(11).text(invoiceNum, right - 130, 52, { width: 130, align: 'right' })
-
-        // Meta strip
-        doc.rect(left, 80, cw, 22).fill('#f1f5f9')
-        doc.fillColor('#374151').font('Helvetica').fontSize(8.5)
-        doc.text(`Datum: ${fmtDate(new Date())}`, left + 8, 88)
-        doc.text(`Abrechnungszeitraum: ${periodLabel}`, left + 150, 88)
-
-        // Addresses
-        const blockTop = 116
-        const colW2 = Math.round(cw / 2) - 12
-        const col2X = left + colW2 + 24
-        doc.rect(left, blockTop, colW2, 100).fill('#f8fafc').stroke('#e2e8f0')
-        doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5).text('EMPFAENGER (VERKAEUFER)', left + 10, blockTop + 10, { characterSpacing: 0.5 })
-        doc.fillColor('#111827').font('Helvetica').fontSize(9.5)
-        let addrY = blockTop + 24
-        sellerLines.forEach((l) => { doc.text(pdfDeLatin(l), left + 10, addrY, { width: colW2 - 20 }); addrY += 14 })
-        doc.rect(col2X, blockTop, colW2, 100).fill('#f8fafc').stroke('#e2e8f0')
-        doc.fillColor('#64748b').font('Helvetica-Bold').fontSize(7.5).text('AUSSTELLER (PLATTFORM)', col2X + 10, blockTop + 10, { characterSpacing: 0.5 })
-        doc.fillColor('#111827').font('Helvetica').fontSize(9.5)
-        let auY = blockTop + 24
-        doc.text(pdfDeLatin(shopName), col2X + 10, auY); auY += 14
-        if (platformAddress) { String(platformAddress).split(/[,\n]/).map(s=>s.trim()).filter(Boolean).forEach(l => { doc.text(pdfDeLatin(l), col2X + 10, auY, { width: colW2 - 20 }); auY += 14 }) }
-        if (platformVatId) { doc.text(`USt-IdNr.: ${platformVatId}`, col2X + 10, auY) }
-        else { doc.fontSize(8).fillColor('#6b7280').text(pdfDeLatin('Kleinunternehmer gem. §19 UStG'), col2X + 10, auY) }
-
-        // Orders table
-        const tTop = blockTop + 114
-        doc.rect(left, tTop, cw, 20).fill('#1e293b')
-        doc.fillColor('#fff').font('Helvetica-Bold').fontSize(8.5)
-        doc.text('BESTELLNR.', left + 8, tTop + 6, { width: 80 })
-        doc.text('DATUM', left + 90, tTop + 6, { width: 80 })
-        doc.text('WARENWERT', left + 180, tTop + 6, { width: 100, align: 'right' })
-        doc.text('PROVISION', right - 130, tTop + 6, { width: 130, align: 'right' })
-        doc.y = tTop + 24
-        orders.forEach((o, idx) => {
-          const sub = Number(o.subtotal_cents || 0)
-          const fee = Number(o.stripe_application_fee_cents || 0) || Math.round(sub * Number(payout.commission_rate || 0.12))
-          const rowH = 18
-          const y = doc.y
-          if (idx % 2 === 1) doc.rect(left, y, cw, rowH).fill('#f8fafc')
-          doc.fillColor('#111827').font('Helvetica').fontSize(9)
-          doc.text(`#${o.order_number || '—'}`, left + 8, y + 4, { width: 80 })
-          doc.text(fmtDate(o.created_at), left + 90, y + 4, { width: 80 })
-          doc.text(fmtCents(sub), left + 180, y + 4, { width: 100, align: 'right' })
-          doc.text(fmtCents(fee), right - 130, y + 4, { width: 130, align: 'right' })
-          doc.moveTo(left, y + rowH).lineTo(right, y + rowH).lineWidth(0.3).strokeColor('#e2e8f0').stroke()
-          doc.y = y + rowH
+        renderPeriodCommissionInvoiceDocument(doc, {
+          payout,
+          orders,
+          shopName,
+          platformAddress,
+          platformVatId,
+          platformVatPercent,
+          invoiceNumber: invoiceNum,
+          periodLabel,
         })
-        if (!orders.length) {
-          doc.fillColor('#9ca3af').font('Helvetica').fontSize(9).text('Keine Bestellungen im Zeitraum', left + 8, doc.y + 6)
-          doc.y += 22
-        }
-
-        // Totals
-        doc.y += 10
-        const drawTotal = (label, value, bold) => {
-          const y = doc.y
-          doc.rect(left, y, cw, 20).fill(bold ? '#1e293b' : '#f1f5f9')
-          doc.fillColor(bold ? '#fff' : '#374151').font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9.5)
-          doc.text(pdfDeLatin(label), left + 8, y + 5, { width: cw - 140 })
-          doc.text(value, right - 130, y + 5, { width: 130, align: 'right' })
-          doc.y = y + 24
-        }
-        drawTotal('Gesamtwarenwert (Periode)', fmtCents(totalCents))
-        drawTotal('Provision (netto)', fmtCents(commCents))
-        if (vatPercent > 0) drawTotal(`MwSt. ${vatPercent}%`, fmtCents(vatCents))
-        drawTotal('Provisionsbetrag gesamt', fmtCents(totalWithVat), true)
-
-        // Footer
-        doc.y += 14
-        doc.rect(left, doc.y, cw, 28).fill('#f1f5f9')
-        doc.fillColor('#64748b').font('Helvetica').fontSize(8)
-        doc.text(pdfDeLatin('Diese Rechnung wird vom Marktplatzbetreiber ausgestellt. Bitte beachten Sie die Zahlungsbedingungen.'), left + 8, doc.y + 10, { width: cw - 16 })
         doc.end()
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}

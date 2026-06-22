@@ -1,41 +1,6 @@
 22.06.
 
--- Superuser olarak products/inventory sayfasina gittigimde baska sellerlarin ürünler ile alakali degisiklik yapmak istedigine dair öneri bildirimi aliyorum. degisiklikleri görmek icin basiyorum ve popup aciliyor cok güzel. ancak örnek vermek acisindan söyle bir sey cikiyor:
-
-Mevcut değer
-
-1. name: Farbe
-options: [{"value":"Rot","swatch_image":"https://m.media-amazon.com/images/I/219wvc8zrtL._SS64_.jpg"},{"value":"Schwarz","swatch_image":"https://m.media-amazon.com/images/I/31rW-VrvodL._SS64_.jpg"},{"value":"Weiß","swatch_image":"https://m.media-amazon.com/images/I/21E2C91WHrL._SS64_.jpg"},{"value":"Grün","swatch_image":"https://m.media-amazon.com/images/I/21gv1atqjSL._SS64_.jpg"},{"value":"Blau","swatch_image":"https://m.media-amazon.com/images/I/21wjSXBD6NL._SS64_.jpg"},{"value":"Gelb","swatch_image":"https://m.media-amazon.com/images/I/21VelAb+XrL._SS64_.jpg"},{"value":"Lila","swatch_image":"https://m.media-amazon.com/images/I/21ftve6llML._SS64_.jpg"},{"value":"Braun","swatch_image":"https://m.media-amazon.com/images/I/211OPtWe3vL._SS64_.jpg"},{"value":"Rosa","swatch_image":"https://m.media-amazon.com/images/I/21+XzVSAjHL._SS64_.jpg"}]
-2. name: Größe
-options: [{"value":"S"},{"value":"M"},{"value":"L"},{"value":"XL"}]
-Önerilen değer
-
-1. name: Farbe
-options: [{"value":"Rot","swatch_image":"https://example.com/img/swatch-rot.jpg"}]
-2. name: Größe
-options: [{"value":"S"},{"value":"M"}]
-
-Bu hic aciklayici degil. cok fazla html var. txt olarak gelsin karsima. buydu, bunu yapmak istiyor gibi net bir sey olsun. yan yana olsun yani mevcut deger ve önerilen deger. altinda yazmasin. önerilen deger mevcut ile ayni ise gösterilmesin. 
-
--- diller birbirine girmis ya her yerde. mesela simdi sellercentraldeyim. ingilizce dili secili. bi ingilizce
-  icerik var bi almanca var. tüm sayfalarda her köselerde var bu sorun. sana tek tek izah etmem bile 3-4 saat   
-  sürer. sen simdi dil dil tüm sayfayi kontrol edicen ve dogru icerigi yazican kocum. anladin? ingilizceyle
-  basla. ingilizce dili olsun tüüüm icerikler ingilizce dili secili oldugunda. en ince ayrintisina kadar.
-  faturasindan lieferscheinina. müsteri bilgileri ayni kalacak sadece
-  
-  -- sellercentralde dashboard sayfasina bi el at kurban olayim. cok cirkin gözüküyor. daha detayli ve daha güzel sayfa yerlesimli bir dashboard imiz olsun. hizli erisim butonlari, raporlar, izlemeler vs aklina gelebilecek tüm detaylar cok güzelce kategorize edilmis olsun. overview kismi daha ölceklenmis olsun. siparisler gözükürken siparis numaralari vs gözüksün 1-2 tane mesela. grafikler gözüksün tablolar gözüksün. yani muhtesem, cagimiza uygun teknolojide cok shik bir dashboard istiyorum. ayrica superuserlar anlik olarak websitesindeki ziyaretcileri ip leri ve konumlarina göre görebilsin. total sayi gözüksün basta sadece. asagi actiginda altinda liste seklinde ciksin. sortieren ve filtern yapilabilsin bilgilere göre
-
-
-
---- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. seller olarak yükledim ve su uyariyi verdi:
-
-0 ürün oluşturuldu, 3 başarısız (Toplam: 3)
-
-eco-parent1-160526: EAN already exists: 1234567891
-eco-parent2-160526: EAN already exists: 2234567891
-eco-parent3-160526: EAN already exists: 3234567891
-
-ürünler zaten var diyor ancak seller olarak products/inventory sayfasinda bu ekledigim ürünleri göremiyorum. superuser olarak products/inventory sayfasinda superuser eklemis gibi görüyorum. sanirim database e seller_id eklenmedigi icin bu sellerla bagdastiramadi. ayrica sistemde eklenmek istenen ean mevcut olsa bile o ean eklendiginde hata almamaliyiz. basarili olarak eklenmeli. ancak database de kayitli bilgiler disinda bir sekilde yüklemeye calisirsa sellerlar, superuser a bildirim gidecek ve ilgili üründe degistirilmek istenen kisimlara degisiklik önerisi gelecekti. bu fonksiyon calisiyordu ancak görünüse göre su an problem var gibi. database de kayitli bilgilerin aynisi seklinde ekleyecekse eger sellerlar hicbir uyari olmadan listelenmis olmasi gerekiyor. degisiklik olsa bile hata olmadan eklenmesi lazim seller in envanterine. superuser panelinde baktigimizda o ürün, ürün sahibi seller altinda listelenmeli. ancak ürün icinde, hangi sellerlar tarafindan listelenmis oldugu görünmeli. yani adim adim saydigim bu problemleri halletmeni istiyorum.
+--- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. ürünler zaten var diyor ancak seller olarak products/inventory sayfasinda bu ekledigim ürünleri göremiyorum. superuser olarak products/inventory sayfasinda superuser eklemis gibi görüyorum. sanirim database e seller_id eklenmedigi icin bu sellerla bagdastiramadi. ayrica sistemde eklenmek istenen ean mevcut olsa bile o ean eklendiginde hata almamaliyiz. basarili olarak eklenmeli. ancak database de kayitli bilgiler disinda bir sekilde yüklemeye calisirsa sellerlar, superuser a bildirim gidecek ve ilgili üründe degistirilmek istenen kisimlara degisiklik önerisi gelecekti. bu fonksiyon calisiyordu ancak görünüse göre su an problem var gibi. database de kayitli bilgilerin aynisi seklinde ekleyecekse eger sellerlar hicbir uyari olmadan listelenmis olmasi gerekiyor. degisiklik olsa bile hata olmadan eklenmesi lazim seller in envanterine. superuser panelinde baktigimizda o ürün, ürün sahibi seller altinda listelenmeli. ancak ürün icinde, hangi sellerlar tarafindan listelenmis oldugu görünmeli. yani adim adim saydigim bu problemleri halletmeni istiyorum.
 
 
 --- saticilarin olusturdugu kampanyalari kontrol edip bagladigimiz marketing hesabinda tek tik ile yayinlayalim. saticilar zaten bütcelerini belirlemis olacak. belirlenen bütceleri sectigimiz platformlarda dagitilmis sekilde kampanyalarini olusturalim. mesela müsteri günlük 5 euro bütce ile reklam olusturdu. shoptaki algoritmada o sekilde islemeye devam etsin. müsteriden alinan bu 5 euro müsteriden tahsile edilecek ve stripe imiza düsecek. bu 5 farkli secilen google ads, meta gibi yerlerde 1er euro seklinde paylasilacak. ya da kac platform secildiyse reklam vermek icin ona bölünecek gibi. anladin mi?
