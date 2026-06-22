@@ -2,6 +2,7 @@
 
 import React from "react";
 import styled from "styled-components";
+import { useTranslations } from "next-intl";
 
 const Wrap = styled.div`
   display: flex;
@@ -123,6 +124,7 @@ export default function ProductQuantityStepper({
   decrementAria,
   incrementAria,
 }) {
+  const tp = useTranslations("product");
   const qty = clampQty(value, min, max);
 
   const setQty = (next) => {
@@ -135,7 +137,7 @@ export default function ProductQuantityStepper({
       <Stepper>
         <StepBtn
           type="button"
-          aria-label={decrementAria || "Menge verringern"}
+          aria-label={decrementAria || tp("decreaseQty")}
           disabled={disabled || qty <= min}
           onClick={() => setQty(qty - 1)}
         >
@@ -148,13 +150,13 @@ export default function ProductQuantityStepper({
           max={max}
           value={qty}
           disabled={disabled}
-          aria-label={label || "Menge"}
+          aria-label={label || tp("qty")}
           onChange={(e) => setQty(e.target.value)}
           onBlur={(e) => setQty(e.target.value)}
         />
         <StepBtn
           type="button"
-          aria-label={incrementAria || "Menge erhöhen"}
+          aria-label={incrementAria || tp("increaseQty")}
           disabled={disabled || qty >= max}
           onClick={() => setQty(qty + 1)}
         >

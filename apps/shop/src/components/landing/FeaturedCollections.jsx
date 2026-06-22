@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { motion } from "framer-motion";
@@ -52,12 +53,13 @@ const Banner = styled(motion(Link))`
 `;
 
 export default function FeaturedCollections({
-  title = "Ausgewählte Kollektionen",
+  title,
   collections = [],
 }) {
+  const tp = useTranslations("product");
   return (
     <Section>
-      <Title>{title}</Title>
+      <Title>{title ?? tp("featuredCollections")}</Title>
       <Grid>
         {(collections || []).slice(0, 4).map((col, i) => (
           <Banner

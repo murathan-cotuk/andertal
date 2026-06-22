@@ -17,6 +17,14 @@ export function getClientLocale() {
 
 /** Exact backend / API message → localized UI string. Keys are lowercase trimmed source text. */
 const MESSAGE_MAP = {
+  "too many requests": {
+    en: "Too many requests. Please wait a moment and try again.",
+    tr: "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin.",
+    fr: "Trop de requêtes. Veuillez patienter puis réessayer.",
+    es: "Demasiadas solicitudes. Espere un momento e inténtelo de nuevo.",
+    it: "Troppe richieste. Attendere un momento e riprovare.",
+    de: "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+  },
   "unauthorized": { en: "Unauthorized", tr: "Yetkisiz", fr: "Non autorisé", es: "No autorizado", it: "Non autorizzato", de: "Nicht autorisiert" },
   "order not found": { en: "Order not found", tr: "Sipariş bulunamadı", fr: "Commande introuvable", es: "Pedido no encontrado", it: "Ordine non trovato", de: "Bestellung nicht gefunden" },
   "category not found": { en: "Category not found", tr: "Kategori bulunamadı", fr: "Catégorie introuvable", es: "Categoría no encontrada", it: "Categoria non trovata", de: "Kategorie nicht gefunden" },

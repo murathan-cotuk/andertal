@@ -49,6 +49,48 @@ const TEXTS = {
     },
     privacyLink: "Privacy policy",
   },
+  fr: {
+    title: "Nous utilisons des cookies",
+    body: "Nous utilisons des cookies pour améliorer votre expérience, analyser le trafic et afficher du contenu personnalisé. Certains cookies sont nécessaires au fonctionnement du site.",
+    acceptAll: "Tout accepter",
+    necessary: "Nécessaires uniquement",
+    manage: "Paramètres",
+    save: "Enregistrer mes choix",
+    categories: {
+      necessary: { label: "Nécessaires", desc: "Indispensables au fonctionnement de base du site.", fixed: true },
+      analytics: { label: "Analytique", desc: "Nous aident à comprendre l'utilisation du site (ex. Google Analytics)." },
+      marketing: { label: "Marketing", desc: "Utilisés pour la publicité personnalisée et le suivi des conversions." },
+    },
+    privacyLink: "Politique de confidentialité",
+  },
+  es: {
+    title: "Usamos cookies",
+    body: "Usamos cookies para mejorar tu experiencia, analizar el tráfico y mostrar contenido personalizado. Algunas cookies son necesarias para el funcionamiento del sitio.",
+    acceptAll: "Aceptar todo",
+    necessary: "Solo necesarias",
+    manage: "Configuración",
+    save: "Guardar preferencias",
+    categories: {
+      necessary: { label: "Necesarias", desc: "Imprescindibles para las funciones básicas del sitio.", fixed: true },
+      analytics: { label: "Analíticas", desc: "Nos ayudan a entender el uso del sitio (p. ej. Google Analytics)." },
+      marketing: { label: "Marketing", desc: "Se usan para publicidad personalizada y seguimiento de conversiones." },
+    },
+    privacyLink: "Política de privacidad",
+  },
+  it: {
+    title: "Utilizziamo i cookie",
+    body: "Utilizziamo cookie per migliorare la tua esperienza, analizzare il traffico e mostrare contenuti personalizzati. Alcuni cookie sono necessari per il funzionamento del sito.",
+    acceptAll: "Accetta tutto",
+    necessary: "Solo necessari",
+    manage: "Impostazioni",
+    save: "Salva preferenze",
+    categories: {
+      necessary: { label: "Necessari", desc: "Indispensabili per le funzioni di base del sito.", fixed: true },
+      analytics: { label: "Analitici", desc: "Ci aiutano a capire come viene utilizzato il sito (es. Google Analytics)." },
+      marketing: { label: "Marketing", desc: "Utilizzati per pubblicità personalizzata e tracciamento delle conversioni." },
+    },
+    privacyLink: "Informativa sulla privacy",
+  },
 };
 
 function getTexts(locale) {

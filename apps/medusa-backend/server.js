@@ -15473,8 +15473,11 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             AND n.seller_id = $2
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
+        const sellerErrorsUnreadQ = sup
+          ? `SELECT COUNT(*)::int AS c FROM seller_error_logs WHERE is_read = false`
+          : `SELECT 0::int AS c`
 
-        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR] = await Promise.all([
+        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR, sellerErrorsR] = await Promise.all([
           client.query(ordersUnreadQ, [rk, sup, sid]),
           client.query(returnsUnreadQ, [rk, sup, sid]),
           sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
@@ -15482,6 +15485,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           sup ? client.query(metafieldUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           !sup && sid ? client.query(sellerNoticeUnreadQ, [rk, sid]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(campaignsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          sup ? client.query(sellerErrorsUnreadQ).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
         ])
 
         const recentOrders = await client.query(
@@ -15580,28 +15584,43 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           ).catch(() => ({ rows: [] }))
         }
 
+        let recentSellerErrors = { rows: [] }
+        if (sup) {
+          recentSellerErrors = await client.query(
+            `SELECT e.id, e.seller_id, e.error_code, e.error_message, e.context, e.created_at, e.is_read,
+                    s.store_name, s.email AS seller_email
+             FROM seller_error_logs e
+             LEFT JOIN seller_users s ON s.seller_id = e.seller_id
+             WHERE e.is_read = false
+             ORDER BY e.created_at DESC LIMIT 8`,
+          ).catch(() => ({ rows: [] }))
+        }
+
         await client.end()
         const verCount = verificationsR.rows[0]?.c || 0
         const crCount = changeReqR.rows[0]?.c || 0
         const mfCount = metafieldR.rows[0]?.c || 0
         const sellerNoticeCount = sellerNoticeR.rows[0]?.c || 0
         const campaignCount = campaignsR.rows[0]?.c || 0
+        const sellerErrorsCount = sellerErrorsR.rows[0]?.c || 0
         const ordCount = ordersR.rows[0]?.c || 0
         const retCount = returnsR.rows[0]?.c || 0
         res.json({
-          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount,
+          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount + sellerErrorsCount,
           orders: ordCount,
           returns: retCount,
           messages: messagesR.rows[0]?.c || 0,
           verifications: verCount,
           change_requests: crCount + mfCount,
           campaigns: campaignCount,
+          seller_errors: sellerErrorsCount,
           recent_orders: recentOrders.rows.map((r) => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_returns: recentReturns.rows.map((r) => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_verifications: recentVerifications.rows,
           recent_product_change_requests: [...(recentChangeRequests.rows || []), ...(recentMetafieldPending.rows || [])],
           recent_seller_notices: recentSellerNotices.rows || [],
           recent_campaigns_submitted: recentCampaignSubmitted.rows || [],
+          recent_seller_errors: recentSellerErrors.rows || [],
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -15736,6 +15755,19 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             [rk, sid],
           ).catch(() => ({ rows: [] }))
         }
+        const metaDefByKey = {}
+        if (sup && (metaPendingQ.rows || []).length > 0) {
+          const keys = [...new Set((metaPendingQ.rows || []).map((r) => r.key).filter(Boolean))]
+          if (keys.length > 0) {
+            const defQ = await client.query(
+              `SELECT key, label, values FROM admin_hub_metafield_definitions WHERE key = ANY($1::varchar[])`,
+              [keys],
+            ).catch(() => ({ rows: [] }))
+            for (const row of defQ.rows || []) {
+              metaDefByKey[row.key] = row
+            }
+          }
+        }
         await client.end()
 
         const crShortVal = (val) => {
@@ -15767,6 +15799,10 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             source_id: r.id,
             read: !!r.read,
             created_at: r.created_at,
+            order_number: r.order_number,
+            first_name: r.first_name,
+            last_name: r.last_name,
+            total_cents: r.total_cents,
             title: `Neue Bestellung #${r.order_number != null ? r.order_number : '—'}`,
             subtitle: `${r.first_name || ''} ${r.last_name || ''}`.trim() + (r.total_cents ? ` · ${(Number(r.total_cents) / 100).toLocaleString('de-DE', { minimumFractionDigits: 2 })} €` : ''),
             href: `/orders/${r.id}`,
@@ -15779,6 +15815,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             source_id: r.id,
             read: !!r.read,
             created_at: r.created_at,
+            return_number: r.return_number,
+            order_number: r.order_number,
+            status: r.status,
             title: `Rückgabeanfrage R-${r.return_number != null ? r.return_number : '—'}`,
             subtitle: `Bestellung #${r.order_number != null ? r.order_number : '—'} · ${r.status || ''}`,
             href: '/orders/returns',
@@ -15822,6 +15861,8 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
             subtitle: sub.length > 500 ? `${sub.slice(0, 499)}…` : sub,
             href: pid ? `/products/${pid}` : '/products/inventory',
             product_id: pid || undefined,
+            product_title: r.product_title || undefined,
+            seller_id: r.seller_id || undefined,
             field_name: r.field_name,
             old_value: r.old_value,
             new_value: r.new_value,
@@ -15829,14 +15870,23 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         }
         const metafieldSuggestionFeedItems = []
         for (const r of metaPendingQ.rows || []) {
+          const def = metaDefByKey[r.key]
+          const currentVals = Array.isArray(def?.values) ? def.values : []
+          const proposedVals = Array.isArray(r.proposed_values) ? r.proposed_values : []
           metafieldSuggestionFeedItems.push({
             source_type: 'metafield_pending',
             source_id: r.id,
             read: !!r.read,
             created_at: r.created_at,
             title: 'Metafield-Änderungsvorschlag',
-            subtitle: `${r.label || r.key} · Vorschläge: ${(Array.isArray(r.proposed_values) ? r.proposed_values : []).join(', ')}`,
+            subtitle: `${r.label || r.key} · Vorschläge: ${proposedVals.join(', ')}`,
             href: '/content/metaobjects',
+            metafield_key: r.key,
+            metafield_label: r.label || def?.label || r.key,
+            field_name: `metafield.${r.key}`,
+            old_value: JSON.stringify(currentVals),
+            new_value: JSON.stringify(proposedVals),
+            seller_id: r.seller_id || undefined,
           })
         }
         const sellerNoticeFeedItems = []
@@ -20221,6 +20271,58 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
+    /** Sellers report client/API errors — visible in /sellers/errors for superusers */
+    const adminHubSellerErrorsReportPOST = async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
+      if (req.sellerUser?.is_superuser) return res.json({ ok: true, skipped: true })
+      const body = req.body || {}
+      const error_message = String(body.error_message || '').trim()
+      if (!error_message) return res.status(400).json({ message: 'error_message required' })
+      const error_code = String(body.error_code || 'CLIENT_ERROR').slice(0, 100)
+      const context = String(body.context || body.page_url || '').slice(0, 255) || null
+      const terminal_output = body.terminal_output ? String(body.terminal_output).slice(0, 8000) : null
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const dup = await client.query(
+          `SELECT id FROM seller_error_logs
+           WHERE seller_id = $1 AND error_code = $2 AND COALESCE(context, '') = COALESCE($3::varchar, '')
+             AND created_at > now() - interval '15 minutes'
+           LIMIT 1`,
+          [sellerId, error_code, context],
+        )
+        if (dup.rows?.length) {
+          await client.end()
+          return res.json({ ok: true, duplicate: true })
+        }
+        const storeQ = await client.query(
+          `SELECT store_name, email FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+          [sellerId],
+        ).catch(() => ({ rows: [] }))
+        const storeName = storeQ.rows?.[0]?.store_name || storeQ.rows?.[0]?.email || sellerId
+        const r = await client.query(
+          `INSERT INTO seller_error_logs (seller_id, error_code, error_message, terminal_output, context)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [sellerId, error_code, error_message, terminal_output, context],
+        )
+        const logId = r.rows?.[0]?.id
+        const notifTitle = `Seller-Fehler: ${storeName}`
+        const notifBody = `[${error_code}] ${error_message.slice(0, 400)}${context ? ` · ${context}` : ''}`
+        await client.query(
+          `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+           VALUES ('seller_client_error', $1, $2, $3, $4)`,
+          [notifTitle, notifBody, sellerId, logId ? String(logId) : null],
+        ).catch(() => {})
+        await client.end()
+        res.json({ ok: true, id: logId })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const adminHubSellerErrorLogsPATCH = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
       const { id } = req.params
@@ -20583,6 +20685,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.delete('/admin-hub/v1/seller/locations/:id', requireSellerAuth, adminHubLocationsDELETE)
     httpApp.get('/admin-hub/v1/seller-errors', requireSellerAuth, adminHubSellerErrorLogsGET)
     httpApp.post('/admin-hub/v1/seller-errors', requireSellerAuth, adminHubSellerErrorLogsPOST)
+    httpApp.post('/admin-hub/v1/seller-errors/report', requireSellerAuth, adminHubSellerErrorsReportPOST)
     httpApp.patch('/admin-hub/v1/seller-errors/:id', requireSellerAuth, adminHubSellerErrorLogsPATCH)
     httpApp.delete('/admin-hub/v1/seller-errors/:id', requireSellerAuth, adminHubSellerErrorLogsDELETE)
     httpApp.post('/admin-hub/users/invite', requireSellerAuth, adminHubUsersInvitePOST)

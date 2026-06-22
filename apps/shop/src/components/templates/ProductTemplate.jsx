@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { Button } from "@andertal/ui";
@@ -16,7 +16,6 @@ import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } f
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
@@ -911,7 +910,7 @@ function ProductCampaignPriceBlock({
             {uvpCents != null && uvpCents > 0 && <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>}
           </PriceSubRow>
         )}
-        <TaxLine>inkl. MwSt. · zzgl. Versandkosten</TaxLine>
+        <TaxLine>{tp("taxLine")}</TaxLine>
         {grundpreis && (
           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
             {grundpreis.contentLabel && <span>{grundpreis.contentLabel} · </span>}
@@ -939,6 +938,7 @@ function findAncestors(nodes, slug, path = []) {
 export default function ProductTemplate() {
   const params = useParams();
   const locale = useLocale();
+  const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
@@ -1015,7 +1015,7 @@ export default function ProductTemplate() {
         if (res.status === 404 || !data?.product) {
           setMultiOffer(null);
           setProduct(null);
-          setError(res.status === 404 ? "Produkt nicht gefunden." : "Produkt konnte nicht geladen werden.");
+          setError(res.status === 404 ? tp("notFound") : tp("loadError"));
           return;
         }
         setMultiOffer(data.multi_offer || null);
@@ -1023,7 +1023,7 @@ export default function ProductTemplate() {
         setProduct(data.product);
       } catch (err) {
         console.error("Failed to fetch product:", err);
-        setError(err?.message || "Fehler beim Laden");
+        setError(err?.message || tp("loadError"));
         setProduct(null);
       } finally {
         setLoading(false);
@@ -1150,7 +1150,7 @@ export default function ProductTemplate() {
       .catch(() => {});
   }, [product?.id, multiOffer?.review_product_ids]);
 
-  if (loading) return <GlobalPageLoader />;
+  if (loading) return null;
   if (error) return <Container>Fehler: {error}</Container>;
   if (!product) return <Container>Produkt nicht gefunden.</Container>;
 
@@ -1177,8 +1177,8 @@ export default function ProductTemplate() {
   const shippingDisplay = hasShippingGroup
     ? (shippingPriceCents != null
         ? `${formatPriceCents(shippingPriceCents)} €`
-        : { de: "Nicht verfügbar in dieser Region", tr: "Bu bölgede mevcut değil", fr: "Non disponible dans cette région", it: "Non disponibile in questa regione", es: "No disponible en esta región" }[locale] ?? "Not available in this region")
-    : (meta.shipping_info || meta.versand || "Standardversand");
+        : tp("notAvailableRegion"))
+    : (meta.shipping_info || meta.versand || tp("standardShipping"));
   const rawVariants = product.variants || [];
   const variationGroups = product.variation_groups || null;
   const variants = normalizeVariants(rawVariants, variationGroups);
@@ -1295,7 +1295,8 @@ export default function ProductTemplate() {
   const effectiveDisplayCents = selectedSellerOffer != null ? Number(selectedSellerOffer.price_cents) : displayCents;
   const effectiveStoreName = selectedSellerOffer?.store_name || storeName;
   const returnDays = meta.return_days != null ? meta.return_days : 14;
-  const returnCost = meta.return_cost === false || meta.return_kostenlos === true ? "kostenlos" : (meta.return_cost || "kostenlos");
+  const returnCostRaw = meta.return_cost === false || meta.return_kostenlos === true ? "kostenlos" : (meta.return_cost || "kostenlos");
+  const returnCost = returnCostRaw === "kostenlos" ? tp("returnFree") : returnCostRaw;
   const titleDisplay = (effectiveTitle || displayTitle || "").slice(0, 120);
 
   const goPrev = () => setSelectedImage((i) => (i <= 0 ? displayImages.length - 1 : i - 1));
@@ -1303,7 +1304,7 @@ export default function ProductTemplate() {
   const shareProduct = async () => {
     if (typeof window === "undefined") return;
     const url = window.location.href;
-    const shareData = { title: titleDisplay || displayTitle || "Produkt", url };
+    const shareData = { title: titleDisplay || displayTitle || "Product", url };
     try {
       if (navigator.share) {
         await navigator.share(shareData);
@@ -1312,7 +1313,7 @@ export default function ProductTemplate() {
     } catch (_) {}
     try {
       await navigator.clipboard.writeText(url);
-      setCartNotice({ text: locale === "de" ? "Link kopiert" : "Link copied", visible: true });
+      setCartNotice({ text: tp("linkCopied"), visible: true });
       if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
       if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
       cartNoticeTimersRef.current.hide = window.setTimeout(() => {
@@ -1332,14 +1333,8 @@ export default function ProductTemplate() {
     if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
     if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
 
-    const successText = {
-      de: "Zum Warenkorb hinzugefügt", tr: "Sepete eklendi",
-      fr: "Ajouté au panier", it: "Aggiunto al carrello", es: "Añadido al carrito",
-    }[locale] ?? "Added to cart";
-    const errorText = {
-      de: "Hinzufügen fehlgeschlagen", tr: "Sepete eklenemedi",
-      fr: "Échec de l'ajout", it: "Aggiunta fallita", es: "Error al añadir",
-    }[locale] ?? "Add to cart failed";
+    const successText = tp("addedToCart");
+    const errorText = tp("addToCartFailed");
 
     try {
       const ok = await addToCart(variantId, quantity, selectedSellerId);
@@ -1631,7 +1626,7 @@ export default function ProductTemplate() {
                 </span>
               ) : null}
               <span style={{ fontSize: "0.8125rem", color: "#6b7280" }}>
-                {reviewCount > 0 ? `(${reviewCount} Bewertungen)` : "Noch keine Bewertungen"}
+                {reviewCount > 0 ? `(${reviewCount} ${tp("reviews")})` : tp("noReviews")}
               </span>
             </a>
             {(meta.brand_name || meta.brand) && (
@@ -1696,20 +1691,12 @@ export default function ProductTemplate() {
             <BuyboxInner>
               {multiOffer?.canonical_ean ? (
                 <p style={{ fontSize: 12, color: "#047857", margin: "0 0 10px", fontWeight: 600, lineHeight: 1.35 }}>
-                  {locale === "tr"
-                    ? "Öne çıkan teklif: en iyi fiyat ve mağaza puanı kombinasyonu."
-                    : locale === "de"
-                      ? "Empfohlenes Angebot: beste Kombination aus Preis und Verkäuferbewertung."
-                      : "Featured offer: best combination of price and seller rating."}
+                  {tp("featuredOffer")}
                   {multiOffer.landed_product_id &&
                   product?.id &&
                   String(multiOffer.landed_product_id) !== String(product.id) ? (
                     <span style={{ display: "block", fontWeight: 500, color: "#6b7280", marginTop: 4 }}>
-                      {locale === "tr"
-                        ? "Ziyaret ettiğiniz listeleme farklı bir satıcıya ait; sepete eklenen ürün öne çıkan tekliftendir."
-                        : locale === "de"
-                          ? "Sie haben eine andere Verkäufer-URL aufgerufen; Ihr Warenkorb nutzt das empfohlene Angebot."
-                          : "You opened another seller’s listing; checkout uses the featured offer."}
+                      {tp("sellerUrlWarning")}
                     </span>
                   ) : null}
                 </p>
@@ -1743,9 +1730,9 @@ export default function ProductTemplate() {
 
               <InfoList>
                 {[
-                  { label: { de: "Versand", tr: "Kargo", fr: "Livraison", it: "Spedizione", es: "Envío", en: "Shipping" }[locale] ?? "Versand", value: shippingDisplay },
-                  { label: { de: "Rückgabe", tr: "İade", fr: "Retour", it: "Reso", es: "Devolución", en: "Returns" }[locale] ?? "Rückgabe", value: `${returnDays} ${{ de: "Tage", tr: "gün", fr: "jours", it: "giorni", es: "días", en: "days" }[locale] ?? "Tage"}, ${returnCost}` },
-                  { label: { de: "Verkäufer", tr: "Satıcı", fr: "Vendeur", it: "Venditore", es: "Vendedor", en: "Seller" }[locale] ?? "Verkäufer", value: effectiveStoreName },
+                  { label: tp("shipping"), value: shippingDisplay },
+                  { label: tp("returns"), value: `${returnDays} ${tp("days")}, ${returnCost}` },
+                  { label: tp("seller"), value: effectiveStoreName },
                   ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
                   ...(meta.weee_number ? [{ label: localizeMetaKey("weee_number", locale), value: String(meta.weee_number) }] : []),
                 ].map(({ label, value }) => (
@@ -1771,29 +1758,25 @@ export default function ProductTemplate() {
                 onClick={() => setOtherSellersOpen((v) => !v)}
                 style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, marginBottom: 6, cursor: "pointer", fontWeight: 700, fontSize: 14, color: "#111827" }}
               >
-                {locale === "tr" ? `Diğer satıcılar (${multiOffer.other_sellers.length})` : locale === "de" ? `Other sellers (${multiOffer.other_sellers.length})` : `Other sellers (${multiOffer.other_sellers.length})`}
+                {`${tp("otherSellers")} (${multiOffer.other_sellers.length})`}
                 <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>{otherSellersOpen ? "▲" : "▼"}</span>
               </button>
               <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 8px", lineHeight: 1.35 }}>
-                {locale === "tr"
-                  ? "Aynı EAN için diğer mağazalar. Mağaza puanları tüm ürün yorumlarından türetilir."
-                  : locale === "de"
-                    ? "Weitere Händler mit derselben EAN. Verkäufersterne aus allen Produktbewertungen."
-                    : "More sellers for this EAN. Seller scores combine all their product reviews."}
+                {tp("otherSellersHint")}
               </p>
               {otherSellersOpen && (
                 <>
               {selectedSellerId && (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "6px 10px", marginBottom: 6, fontSize: 12 }}>
                   <span style={{ color: "#166534", fontWeight: 600 }}>
-                    {locale === "tr" ? "Seçili satıcıdan alıyorsunuz" : locale === "de" ? "Kauf beim ausgewählten Händler" : "Buying from selected seller"}
+                    {tp("buyingFromSeller")}
                   </span>
                   <button
                     type="button"
                     onClick={() => setSelectedSellerId(null)}
                     style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#6b7280", textDecoration: "underline", padding: 0 }}
                   >
-                    {locale === "tr" ? "Sıfırla" : locale === "de" ? "Zurücksetzen" : "Reset"}
+                    {tp("reset")}
                   </button>
                 </div>
               )}
@@ -1818,7 +1801,7 @@ export default function ProductTemplate() {
                         {o.seller_review_count > 0 && Number(o.seller_review_avg) > 0 ? (
                           <StarRating average={Number(o.seller_review_avg) || 0} count={Number(o.seller_review_count) || 0} />
                         ) : (
-                          <span>{locale === "tr" ? "Mağaza yorumu yok" : locale === "de" ? "Keine Verkäuferbewertungen" : "No seller reviews yet"}</span>
+                          <span>{tp("noSellerReviews")}</span>
                         )}
                       </div>
                       <div style={{ marginTop: 6 }}>
@@ -1834,10 +1817,10 @@ export default function ProductTemplate() {
                           }}
                         >
                           {isSelected
-                            ? (locale === "tr" ? "Seçildi ✓" : locale === "de" ? "Ausgewählt ✓" : "Selected ✓")
+                            ? tp("sellerSelected")
                             : !o.in_stock
-                              ? (locale === "tr" ? "Stokta yok" : locale === "de" ? "Ausverkauft" : "Out of stock")
-                              : (locale === "tr" ? "Bu satıcıdan al" : locale === "de" ? "Bei diesem Händler kaufen" : "Buy from this seller")}
+                              ? tp("sellerNoStock")
+                              : tp("buyFromSeller")}
                         </button>
                       </div>
                     </div>
@@ -1926,7 +1909,7 @@ export default function ProductTemplate() {
             </a>
           </div>
           <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
-            Bewertungen stammen aus diesem Shop. Darstellung im Trustpilot-Stil. Vollständiges Profil siehe Widget unten.
+            {tp("reviewsDisclaimer")}
           </p>
           <StarRating average={reviewAvg} count={reviewCount} />
           {productReviews.length > 0 ? (
@@ -1944,7 +1927,7 @@ export default function ProductTemplate() {
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
                     <span style={{ fontWeight: 600, fontSize: 14, color: "#191919" }}>
-                      {rv.customer_name || [rv.first_name, rv.last_name].filter(Boolean).join(" ") || "Verifizierter Kauf"}
+                      {rv.customer_name || [rv.first_name, rv.last_name].filter(Boolean).join(" ") || tp("verifiedPurchase")}
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: 16, letterSpacing: 1 }} aria-hidden>
@@ -1962,7 +1945,7 @@ export default function ProductTemplate() {
               ))}
             </div>
           ) : reviewCount === 0 ? (
-            <p className="text-gray-500 text-sm mt-2">Noch keine Bewertungen vorhanden.</p>
+            <p className="text-gray-500 text-sm mt-2">{tp("noReviews")}</p>
           ) : null}
           <TrustpilotTrustBox
             locale={locale === "en" ? "en-US" : "de-DE"}
@@ -1977,7 +1960,7 @@ export default function ProductTemplate() {
         <div style={{ marginBottom: 48 }}>
           <Carousel
             contained={false}
-            title="Kunden, die diesen Artikel gekauft haben, kauften auch"
+            title={tp("alsoViewed")}
             visibleCount={narrowMobile ? 2 : 5}
             gap={16}
             showFade={false}

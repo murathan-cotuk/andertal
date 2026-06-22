@@ -2,7 +2,7 @@
 
 import React, { useState, useContext, useRef } from "react";
 import { Link } from "@/i18n/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct, htmlToText } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
@@ -424,6 +424,7 @@ const MorePill = styled.button`
 
 export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: isBestsellerProp, rank }) {
   const locale = useLocale();
+  const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
@@ -580,10 +581,8 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
     if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
     if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
 
-    const successText =
-      locale === "tr" ? "Sepete eklendi" : locale === "de" ? "Zum Warenkorb hinzugefügt" : "Added to cart";
-    const errorText =
-      locale === "tr" ? "Sepete eklenemedi" : locale === "de" ? "Hinzufügen fehlgeschlagen" : "Add to cart failed";
+    const successText = tp("addedToCart");
+    const errorText = tp("addToCartFailed");
 
     try {
       const ok = await addToCart(vid, quantity);
@@ -647,11 +646,11 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
               {rank != null && <RankBadge>#{rank}</RankBadge>}
             </div>
           )}
-          {isComingSoon && <Badge $comingSoon>Pek yakında</Badge>}
+          {isComingSoon && <Badge $comingSoon>{tp("comingSoon")}</Badge>}
           {hasSale && !isComingSoon && <Badge $sale>Sale</Badge>}
           {isNew && !hasSale && !isComingSoon && <Badge>New</Badge>}
-          {shippingUnavailable && !isComingSoon && <Badge $sold>Nicht lieferbar</Badge>}
-          {outOfStock && !isComingSoon && <Badge $sold>Sold out</Badge>}
+          {shippingUnavailable && !isComingSoon && <Badge $sold>{tp("notAvailable")}</Badge>}
+          {outOfStock && !isComingSoon && <Badge $sold>{tp("outOfStock")}</Badge>}
         </Badges>
         {product?.id && (
           <WishlistHeartWrap
@@ -670,7 +669,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
         onClick={handleQuickAdd}
         disabled={cartLoading || adding || outOfStock || isComingSoon || shippingUnavailable}
       >
-        {adding ? "…" : isComingSoon ? "Pek yakında" : shippingUnavailable ? "Nicht lieferbar" : outOfStock ? "Sold out" : "Add to cart"}
+        {adding ? "…" : isComingSoon ? tp("comingSoon") : shippingUnavailable ? tp("notAvailable") : outOfStock ? tp("outOfStock") : tp("addToCart")}
       </AddToCartBtn>
 
       {cartNotice.text ? <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice> : null}
@@ -793,7 +792,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           type="button"
           onClick={() => setQuantity((q) => clampQty(q - 1))}
           disabled={quantity <= 1 || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label="Menge verringern"
+          aria-label={tp("decreaseQty")}
         >
           −
         </QtyBtn>
@@ -804,13 +803,13 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           onChange={(e) => setQuantity(clampQty(e.target.value))}
           onBlur={(e) => setQuantity(clampQty(e.target.value))}
           disabled={outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label="Menge"
+          aria-label={tp("qty")}
         />
         <QtyBtn
           type="button"
           onClick={() => setQuantity((q) => clampQty(q + 1))}
           disabled={quantity >= maxQty || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label="Menge erhöhen"
+          aria-label={tp("increaseQty")}
         >
           +
         </QtyBtn>
@@ -937,6 +936,7 @@ const ListBadge = styled.span`
 
 export function ProductListItem({ product, activeFilters = {}, isBestseller: isBestsellerProp }) {
   const locale = useLocale();
+  const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
@@ -998,8 +998,8 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
     setAdding(true);
     if (cartTimers.current.hide) clearTimeout(cartTimers.current.hide);
     if (cartTimers.current.clear) clearTimeout(cartTimers.current.clear);
-    const successText = locale === "de" ? "Zum Warenkorb hinzugefügt" : locale === "tr" ? "Sepete eklendi" : "Added to cart";
-    const errorText = locale === "de" ? "Hinzufügen fehlgeschlagen" : locale === "tr" ? "Sepete eklenemedi" : "Add to cart failed";
+    const successText = tp("addedToCart");
+    const errorText = tp("addToCartFailed");
     try {
       const ok = await addToCart(vid, 1);
       if (ok) openCartSidebar();
@@ -1012,10 +1012,10 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
     setAdding(false);
   };
 
-  const btnLabel = adding ? "…" : isComingSoon ? (locale === "de" ? "Bald verfügbar" : "Coming soon")
-    : shippingUnavailable ? (locale === "de" ? "Nicht lieferbar" : "Not available")
-    : outOfStock ? (locale === "de" ? "Ausverkauft" : "Sold out")
-    : (locale === "de" ? "In den Warenkorb" : locale === "tr" ? "Sepete Ekle" : "Add to cart");
+  const btnLabel = adding ? "…" : isComingSoon ? tp("comingSoon")
+    : shippingUnavailable ? tp("notAvailable")
+    : outOfStock ? tp("outOfStock")
+    : tp("addToCart");
 
   return (
     <ListCard>
@@ -1031,9 +1031,9 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
         {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 1 }}>
           {isBestseller && !isComingSoon && <ListBadge>★ Bestseller</ListBadge>}
-          {isComingSoon && <ListBadge $orange>Pek yakında</ListBadge>}
+          {isComingSoon && <ListBadge $orange>{tp("comingSoon")}</ListBadge>}
           {hasSale && !isComingSoon && <ListBadge $sale>Sale</ListBadge>}
-          {outOfStock && !isComingSoon && <ListBadge $gray>Ausverkauft</ListBadge>}
+          {outOfStock && !isComingSoon && <ListBadge $gray>{tp("outOfStock")}</ListBadge>}
         </div>
         <ListPriceRow>
           {hasSale && <ListPriceOld>{formatPriceCents(priceCents)} €</ListPriceOld>}
@@ -1041,7 +1041,7 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
         </ListPriceRow>
         {hasShippingGroup && shippingPriceCents != null && (
           <ListShippingLine>
-            {shippingPriceCents === 0 ? (locale === "de" ? "Kostenloser Versand" : "Free shipping") : `${locale === "de" ? "Versand" : "Shipping"}: ${formatPriceCents(shippingPriceCents)} €`}
+            {shippingPriceCents === 0 ? tp("freeShipping") : `${tp("shipping")}: ${formatPriceCents(shippingPriceCents)} €`}
           </ListShippingLine>
         )}
         <ListCartBtn

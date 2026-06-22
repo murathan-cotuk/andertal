@@ -315,6 +315,8 @@ export default function MobileNav({ layout = "fixed" }) {
   const { mobileBottomNavScroll } = useMobileBottomNavScroll();
   const pathname = usePathname();
   const t = useTranslations("common");
+  const tPanel = useTranslations("accountPanel");
+  const tWishlist = useTranslations("wishlist");
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
   const { ids: wishlistIds } = useWishlist();
@@ -454,11 +456,11 @@ export default function MobileNav({ layout = "fixed" }) {
       >
         {/* Drawer head */}
         <div style={css.drawerHead}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "0.01em" }}>Menü</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "0.01em" }}>{t("menu")}</span>
           <button
             type="button"
             onClick={closeDrawer}
-            aria-label="Menü schließen"
+            aria-label={t("closeMenu")}
             style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
             <IcoClose />
@@ -469,7 +471,7 @@ export default function MobileNav({ layout = "fixed" }) {
         <div ref={drawerBodyRef} style={css.drawerBody}>
           {categories.length > 0 && (
             <>
-              <div style={css.sectionLabel}>Kategorien</div>
+              <div style={css.sectionLabel}>{t("categories")}</div>
               <div>
                 {categories.slice(0, 18).map((cat) => (
                   <Link
@@ -493,7 +495,7 @@ export default function MobileNav({ layout = "fixed" }) {
             <>
               <div style={css.divider} />
               <HoverLink href="/account" onClick={closeDrawer} style={{ ...css.drawerLink, fontWeight: 700, color: TEAL }}>
-                <span>Konto Übersicht</span><IcoChevron />
+                <span>{tPanel("navOverview")}</span><IcoChevron />
               </HoverLink>
               <div style={{ padding: "8px 16px 4px" }}>
                 <LogoutButton
@@ -508,12 +510,12 @@ export default function MobileNav({ layout = "fixed" }) {
             </>
           ) : (
             <>
-              <div style={css.sectionLabel}>Konto</div>
+              <div style={css.sectionLabel}>{t("account")}</div>
               <HoverLink href="/login"    onClick={closeDrawer} style={{ ...css.drawerLink, fontWeight: 700, color: TEAL }}>
-                <span>Anmelden</span><IcoChevron />
+                <span>{t("login")}</span><IcoChevron />
               </HoverLink>
               <HoverLink href="/register" onClick={closeDrawer} style={css.drawerLink}>
-                <span>Registrieren</span><IcoChevron />
+                <span>{t("register")}</span><IcoChevron />
               </HoverLink>
             </>
           )}
@@ -533,10 +535,10 @@ export default function MobileNav({ layout = "fixed" }) {
           blur={mc.bottom_nav_blur}
           boxShadow={mc.bottom_nav_shadow}
           items={[
-            { key: "home", label: "Start", icon: <IcoHome />, href: "/", active: isHome },
+            { key: "home", label: t("home"), icon: <IcoHome />, href: "/", active: isHome },
             {
               key: "menu",
-              label: "Menü",
+              label: t("menu"),
               icon: <IcoMenu />,
               active: drawerOpen && drawerTarget === "menu",
               onClick: () => {
@@ -546,7 +548,7 @@ export default function MobileNav({ layout = "fixed" }) {
             },
             {
               key: "cart",
-              label: "Warenkorb",
+              label: t("cart"),
               icon: <IcoCart />,
               active: isCart,
               badge: itemCount || 0,
@@ -554,7 +556,7 @@ export default function MobileNav({ layout = "fixed" }) {
             },
             {
               key: "wishlist",
-              label: "Merkzettel",
+              label: tWishlist("title"),
               icon: <IcoHeart />,
               href: "/merkzettel",
               active: isMerkzettel,
@@ -563,14 +565,14 @@ export default function MobileNav({ layout = "fixed" }) {
             isAuthenticated
               ? {
                   key: "profile",
-                  label: "Profil",
+                  label: t("profile"),
                   icon: <IcoUser />,
                   href: "/account",
                   active: isProfile,
                 }
               : {
                   key: "profile",
-                  label: "Profil",
+                  label: t("profile"),
                   icon: <IcoUser />,
                   href: "/login",
                   active: isProfile,
@@ -591,7 +593,7 @@ export default function MobileNav({ layout = "fixed" }) {
         aria-hidden={bottomNavRecessProgress >= 0.98 ? true : undefined}
       >
         {/* Home */}
-        <Link href="/" style={css.barBtn(isHome)} aria-label="Startseite">
+        <Link href="/" style={css.barBtn(isHome)} aria-label={t("homepage")}>
           <IcoHome />
         </Link>
 
@@ -603,7 +605,7 @@ export default function MobileNav({ layout = "fixed" }) {
             setDrawerTarget("menu");
             setDrawerOpen((v) => !v);
           }}
-          aria-label="Menü öffnen"
+          aria-label={t("openMenu")}
           aria-expanded={drawerOpen}
         >
           <IcoMenu />
@@ -614,7 +616,7 @@ export default function MobileNav({ layout = "fixed" }) {
           type="button"
           style={css.barBtn(isCart)}
           onClick={openCartSidebar}
-          aria-label="Warenkorb"
+          aria-label={t("cart")}
         >
           <div style={{ position: "relative", display: "inline-flex" }}>
             <IcoCart />
@@ -625,7 +627,7 @@ export default function MobileNav({ layout = "fixed" }) {
         </button>
 
         {/* Merkzettel */}
-        <Link href="/merkzettel" style={css.barBtn(isMerkzettel)} aria-label="Merkzettel">
+        <Link href="/merkzettel" style={css.barBtn(isMerkzettel)} aria-label={tWishlist("title")}>
           <div style={{ position: "relative", display: "inline-flex" }}>
             <IcoHeart />
             {wishlistCount > 0 && (
@@ -639,7 +641,7 @@ export default function MobileNav({ layout = "fixed" }) {
           <button
             type="button"
             style={css.barBtn(drawerOpen && drawerTarget === "account")}
-            aria-label="Profil"
+            aria-label={t("profile")}
             onClick={() => {
               setDrawerTarget("account");
               setDrawerOpen(true);
@@ -654,7 +656,7 @@ export default function MobileNav({ layout = "fixed" }) {
           <Link
             href="/login"
             style={css.barBtn(isProfile)}
-            aria-label="Anmelden"
+            aria-label={t("login")}
           >
             <div style={{ position: "relative", display: "inline-flex" }}>
               <IcoUser />

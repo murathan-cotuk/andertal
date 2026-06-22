@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { menuItemHref } from "@/lib/shop-menu-href";
@@ -57,6 +58,7 @@ const rowStyle = {
  * scrollbar, startet unter der Second-Nav (Main beginnt danach) mit Seitenrändern.
  */
 export function HomeMobileSubnavRails({ children }) {
+  const tCommon = useTranslations("common");
   const pathname = usePathname() || "/";
   const [items, setItems] = useState([]);
   const [wideEnough, setWideEnough] = useState(false);
@@ -117,7 +119,7 @@ export function HomeMobileSubnavRails({ children }) {
 
   return (
     <div style={rowStyle}>
-      <aside style={{ ...railStyle, display: "block" }} aria-label="Kurznavigation links">
+      <aside style={{ ...railStyle, display: "block" }} aria-label={tCommon("categoryNavigation")}>
         {left.map((item) => {
           const raw = menuItemHref(item);
           const h = raw === "#" ? "/" : raw;
@@ -136,7 +138,7 @@ export function HomeMobileSubnavRails({ children }) {
         })}
       </aside>
       <div style={{ flex: 1, minWidth: 0, width: "100%" }}>{children}</div>
-      <aside style={{ ...railStyle, display: "block" }} aria-label="Kurznavigation rechts">
+      <aside style={{ ...railStyle, display: "block" }} aria-label={tCommon("categoryNavigation")}>
         {right.map((item) => {
           const raw = menuItemHref(item);
           const h = raw === "#" ? "/" : raw;

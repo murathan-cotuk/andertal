@@ -11,15 +11,15 @@ const ORANGE = "#ff971c";
 const DARK = "#1A1A1A";
 const BORDER = "#e5e7eb";
 
-const NAV = [
-  { label: "Übersicht", href: "/account" },
-  { label: "Meine Bestellungen", href: "/orders" },
-  { label: "Merkzettel", href: "/merkzettel" },
-  { label: "Adressen", href: "/addresses" },
-  { label: "Zahlungsmethoden", href: "/payment-methods" },
-  { label: "Nachrichten", href: "/nachrichten", badge: true },
-  { label: "Bewertungen", href: "/reviews" },
-  { label: "Bonuspunkte", href: "/bonus" },
+const NAV_KEYS = [
+  { key: "overview", href: "/account" },
+  { key: "orders", href: "/orders" },
+  { key: "wishlist", href: "/merkzettel" },
+  { key: "addresses", href: "/addresses" },
+  { key: "paymentMethods", href: "/payment-methods" },
+  { key: "messages", href: "/nachrichten", badge: true },
+  { key: "reviews", href: "/reviews" },
+  { key: "bonus", href: "/bonus" },
 ];
 
 function normalizePath(pathname) {
@@ -33,6 +33,7 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
   const appPath = normalizePath(pathname);
   const { user } = useAuth();
   const t = useTranslations("common");
+  const tNav = useTranslations("accountNav");
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
           {user.firstName} {user.lastName}
         </div>
       )}
-      {NAV.map((item) => {
+      {NAV_KEYS.map((item) => {
         const active =
           item.href === "/account"
             ? appPath === "/account"
@@ -73,7 +74,7 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
               transition: "all 0.1s",
             }}
           >
-            <span style={{ flex: 1 }}>{item.label}</span>
+            <span style={{ flex: 1 }}>{tNav(item.key)}</span>
             {item.badge && unreadCount > 0 && (
               <span style={{
                 background: "#ef4444", color: "#fff", borderRadius: "50%",

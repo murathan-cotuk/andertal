@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useState, useEffect, useCallback } from "react";
 import { useLocale } from "next-intl";
 import {
-  Page, Layout, Card, Text, BlockStack,
+  Page, Layout, Card, Text, BlockStack, InlineStack,
   Badge, Button, Banner, Box, Select,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";

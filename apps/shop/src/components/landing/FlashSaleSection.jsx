@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { tokens } from "@/design-system/tokens";
@@ -44,13 +45,15 @@ const Cta = styled(Link)`
 `;
 
 export default function FlashSaleSection({
-  title = "Angebote",
-  badgeText = "Angebot",
-  ctaText = "Jetzt entdecken",
+  title,
+  badgeText,
+  ctaText,
   ctaHref = "/sale",
   products = [],
   endDate,
 }) {
+  const tNav = useTranslations("nav");
+  const tp = useTranslations("product");
   const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
@@ -80,12 +83,13 @@ export default function FlashSaleSection({
 
   const list = (products || []).slice(0, 10);
 
+  const displayTitle = title ?? tNav("sale");
   const header = (
     <>
-      <Badge>{badgeText}</Badge>
-      <Title>{title}</Title>
+      <Badge>{badgeText ?? tNav("sale")}</Badge>
+      <Title>{displayTitle}</Title>
       {timeLeft ? <Timer>{timeLeft}</Timer> : null}
-      <Cta href={ctaHref}>{ctaText}</Cta>
+      <Cta href={ctaHref}>{ctaText ?? tp("discoverNow")}</Cta>
     </>
   );
 
@@ -96,7 +100,7 @@ export default function FlashSaleSection({
       navOnSides
       gap={16}
       showFade={false}
-      ariaLabel={title}
+      ariaLabel={displayTitle}
     >
       {list.map((product, i) => (
         <ProductCard key={product.id || i} product={product} plainImage />

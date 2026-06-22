@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { Link } from "@/i18n/navigation";
 import { useWishlist } from "@/context/WishlistContext";
+import { useTranslations } from "next-intl";
 
 const btnBase = {
   width: 36,
@@ -22,7 +23,9 @@ const btnBase = {
 /**
  * Merkzettel toggle on product card / PDP. Guests see login hint (no navigation away on first click).
  */
-export default function ProductWishlistHeart({ productId, title = "Merkzettel", positionAbsolute = true }) {
+export default function ProductWishlistHeart({ productId, positionAbsolute = true }) {
+  const tw = useTranslations("wishlist");
+  const tc = useTranslations("common");
   const { user } = useAuth();
   const { isInWishlist, toggle } = useWishlist();
   const [guestMsg, setGuestMsg] = useState(false);
@@ -58,8 +61,8 @@ export default function ProductWishlistHeart({ productId, title = "Merkzettel", 
       <button
         type="button"
         onClick={handleClick}
-        aria-label={on ? `${title} entfernen` : `${title}`}
-        title={!user?.id ? "Zum Merkzettel — Anmeldung erforderlich" : on ? "Vom Merkzettel entfernen" : "Auf den Merkzettel"}
+        aria-label={on ? tw("remove") : tw("add")}
+        title={!user?.id ? tw("loginRequired") : on ? tw("remove") : tw("add")}
         style={btnStyle}
         onMouseDown={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
@@ -86,11 +89,10 @@ export default function ProductWishlistHeart({ productId, title = "Merkzettel", 
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          Bitte{" "}
           <Link href="/login" style={{ color: "#fdba74", fontWeight: 700 }}>
-            anmelden
-          </Link>
-          , um Produkte auf Ihren Merkzettel zu legen.
+            {tc("login")}
+          </Link>{" "}
+          {tw("loginHint")}.
         </div>
       )}
       {apiErr && (

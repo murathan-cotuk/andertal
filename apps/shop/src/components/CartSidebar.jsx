@@ -488,6 +488,7 @@ function calcShipping(items, shippingGroups, country = "DE") {
 export default function CartSidebar() {
   const locale = useLocale();
   const tCart = useTranslations("cart");
+  const tPanel = useTranslations("accountPanel");
   const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, addToCart, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
   const allThresholds = useShippingThresholds();
@@ -555,10 +556,10 @@ export default function CartSidebar() {
   return (
     <>
       <Overlay $open={sidebarOpen} onClick={closeCartSidebar} aria-hidden="true" />
-      <Drawer $open={sidebarOpen} role="dialog" aria-label="Warenkorb">
+      <Drawer $open={sidebarOpen} role="dialog" aria-label={tCart("title")}>
         <Header>
-          <Title>Warenkorb</Title>
-          <CloseBtn type="button" onClick={closeCartSidebar} aria-label="Schließen">
+          <Title>{tCart("title")}</Title>
+          <CloseBtn type="button" onClick={closeCartSidebar} aria-label={tPanel("close")}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
               <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
             </svg>
@@ -567,22 +568,22 @@ export default function CartSidebar() {
         {items.length > 0 && (
           <MobileTopCheckout>
             <MobileTopCheckoutBtn href="/cart" onClick={closeCartSidebar}>
-              Zur Kasse
+              {tCart("checkout")}
             </MobileTopCheckoutBtn>
           </MobileTopCheckout>
         )}
         <Scroll>
           {items.length === 0 && !loading && (
             <>
-              <Empty>Ihr Warenkorb ist leer.</Empty>
+              <Empty>{tCart("empty")}</Empty>
               <RecommendedWrap>
-                <RecommendedTitle>Empfohlene Produkte</RecommendedTitle>
-                {recommendedLoading && <div style={{ color: "#9ca3af", fontSize: 13 }}>Wird geladen...</div>}
+                <RecommendedTitle>{tCart("recommendedTitle")}</RecommendedTitle>
+                {recommendedLoading && <div style={{ color: "#9ca3af", fontSize: 13 }}>{tCart("loading")}</div>}
                 {!recommendedLoading && recommended.length === 0 && (
-                  <div style={{ color: "#9ca3af", fontSize: 13 }}>Keine Empfehlungen verfügbar.</div>
+                  <div style={{ color: "#9ca3af", fontSize: 13 }}>{tCart("noRecommendations")}</div>
                 )}
                 {!recommendedLoading && recommended.length > 0 && (
-                  <RecommendedStrip role="region" aria-label="Empfohlene Produkte">
+                  <RecommendedStrip role="region" aria-label={tCart("recommendedTitle")}>
                     {recommended.map((p) => (
                       <RecommendedCard key={p.id}>
                         <RecommendedItemLink href={`/produkt/${p.handle}`} onClick={closeCartSidebar}>
@@ -598,8 +599,8 @@ export default function CartSidebar() {
                         </RecommendedItemLink>
                         <QuickAddBtn
                           type="button"
-                          title="Schnell hinzufügen"
-                          aria-label="Schnell hinzufügen"
+                          title={tCart("quickAdd")}
+                          aria-label={tCart("quickAdd")}
                           disabled={loading}
                           onClick={async (e) => {
                             e.preventDefault();
@@ -633,7 +634,7 @@ export default function CartSidebar() {
                     onClick={closeCartSidebar}
                     style={{ color: "inherit", textDecoration: "none" }}
                   >
-                    {getLocalizedCartLineTitle(item, locale) || "Artikel"}
+                    {getLocalizedCartLineTitle(item, locale) || tCart("item")}
                   </Link>
                   {isBestsellerMetadata(item?.product_metadata || {}) && (
                     <BestsellerBadge style={{ marginLeft: 8, verticalAlign: "middle" }} />
@@ -645,7 +646,7 @@ export default function CartSidebar() {
                     type="button"
                     disabled={loading || (item.quantity || 0) <= 1}
                     onClick={() => updateLineItem(item.id, Math.max(1, (item.quantity || 1) - 1))}
-                    aria-label="Menge verringern"
+                    aria-label={tCart("decreaseQty")}
                   >
                     −
                   </QtyBtn>
@@ -659,7 +660,7 @@ export default function CartSidebar() {
                     type="button"
                     disabled={loading}
                     onClick={() => updateLineItem(item.id, (item.quantity || 0) + 1)}
-                    aria-label="Menge erhöhen"
+                    aria-label={tCart("increaseQty")}
                   >
                     +
                   </QtyBtn>
@@ -669,8 +670,8 @@ export default function CartSidebar() {
                 type="button"
                 onClick={() => removeLineItem(item.id)}
                 disabled={loading}
-                aria-label="Aus Warenkorb entfernen"
-                title="Entfernen"
+                aria-label={tCart("remove")}
+                title={tCart("remove")}
               >
                 ×
               </RemoveBtn>
@@ -680,28 +681,28 @@ export default function CartSidebar() {
         {items.length > 0 && (
           <Footer>
             <Row>
-              <span>Zwischensumme</span>
+              <span>{tCart("subtotal")}</span>
               <span>{formatPriceCents(subtotalCents)}</span>
             </Row>
             {bonusDiscountCents > 0 && (
               <Row style={{ color: "#16a34a" }}>
-                <span>Bonusrabatt</span>
+                <span>{tCart("subtotal")}</span>
                 <span>−{formatPriceCents(bonusDiscountCents)} €</span>
               </Row>
             )}
             <Row>
-              <span>Versand</span>
+              <span>{tCart("shippingLabel")}</span>
               <span style={{ color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined }}>{shippingLabel}</span>
             </Row>
             <RowTotal>
-              <span>Gesamt</span>
+              <span>{tCart("total")}</span>
               <span>{formatPriceCents(Math.max(0, subtotalCents - bonusDiscountCents + (isFree || shippingCents === null ? 0 : shippingCents)))} €</span>
             </RowTotal>
             <FooterPrimaryBtn href="/cart" onClick={closeCartSidebar}>
-              Zur Kasse
+              {tCart("checkout")}
             </FooterPrimaryBtn>
             <TextLink href="/cart" onClick={closeCartSidebar}>
-              Warenkorb anzeigen
+              {tCart("viewCart")}
             </TextLink>
           </Footer>
         )}

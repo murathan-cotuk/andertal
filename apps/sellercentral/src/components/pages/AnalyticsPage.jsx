@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { useLocale } from "next-intl";
@@ -29,6 +29,7 @@ import {
   PersonIcon,
 } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { reportSellerClientError } from "@/lib/report-seller-client-error";
 import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import RevenueAreaChart from "@/components/dashboard/RevenueAreaChart";
 
@@ -331,50 +332,152 @@ export default function AnalyticsPage() {
     [dateRangeLabels]
   );
 
-  const rangeBounds = useMemo(() => {
-    const { start, end } = getDateRange(range);
-    if (range === "all") {
-      const dates = allOrders.map((o) => new Date(o.created_at)).filter((d) => !Number.isNaN(d.getTime()));
-      const minDate = dates.length ? new Date(Math.min(...dates)) : new Date();
-      minDate.setHours(0, 0, 0, 0);
-      const maxDate = new Date();
-      maxDate.setHours(0, 0, 0, 0);
-      return {
-        from: minDate.toISOString().slice(0, 10),
-        to: maxDate.toISOString().slice(0, 10),
-      };
+  const allOrdersEarliestTs = useMemo(() => {
+    if (!allOrders.length) return 0;
+    let min = Infinity;
+    for (const o of allOrders) {
+      const t = new Date(o.created_at).getTime();
+      if (Number.isFinite(t) && t < min) min = t;
     }
-    return {
-      from: start.toISOString().slice(0, 10),
-      to: end.toISOString().slice(0, 10),
-    };
-  }, [range, allOrders]);
+    return min === Infinity ? 0 : min;
+  }, [allOrders]);
+
+  const marketingDateKey = useMemo(() => {
+    if (range !== "all") {
+      const { start, end } = getDateRange(range);
+      return `${start.toISOString().slice(0, 10)}|${end.toISOString().slice(0, 10)}`;
+    }
+    if (!allOrders.length || !allOrdersEarliestTs) return null;
+    const min = new Date(allOrdersEarliestTs);
+    min.setHours(0, 0, 0, 0);
+    const max = new Date();
+    max.setHours(0, 0, 0, 0);
+    return `${min.toISOString().slice(0, 10)}|${max.toISOString().slice(0, 10)}`;
+  }, [range, allOrders.length, allOrdersEarliestTs]);
+
+  const ordersLoadRef = useRef(0);
 
   useEffect(() => {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
 
-  const loadOrders = useCallback(async () => {
+  const loadErrorMessage = useCallback(
+    () => lt(
+      "Error loading orders",
+      "Siparişler yüklenirken hata oluştu",
+      "Erreur lors du chargement des commandes",
+      "Error al cargar los pedidos",
+      "Errore durante il caricamento degli ordini",
+      "Fehler beim Laden der Bestellungen",
+    ),
+    [lt],
+  );
+
+  const rateLimitMessage = useCallback(
+    () => lt(
+      "Too many requests. Please wait a moment and try again.",
+      "Çok fazla istek gönderildi. Lütfen biraz bekleyip tekrar deneyin.",
+      "Trop de requêtes. Veuillez patienter puis réessayer.",
+      "Demasiadas solicitudes. Espere un momento e inténtelo de nuevo.",
+      "Troppe richieste. Attendere un momento e riprovare.",
+      "Zu viele Anfragen. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+    ),
+    [lt],
+  );
+
+  useEffect(() => {
+    const loadId = ++ordersLoadRef.current;
+    let cancelled = false;
+
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const client = getMedusaAdminClient();
+        const ordersData = await client.getOrders({ limit: 500, sort: "created_at_desc" });
+        if (cancelled || loadId !== ordersLoadRef.current) return;
+        setAllOrders(Array.isArray(ordersData?.orders) ? ordersData.orders : []);
+        if (ordersData?.rateLimited) {
+          setError(rateLimitMessage());
+          reportSellerClientError({
+            errorCode: "HTTP_429",
+            errorMessage: "Analytics orders feed rate limited",
+            context: "GET /admin-hub/v1/orders (analytics/reports)",
+          });
+        } else if (ordersData?.serverError) {
+          setError(loadErrorMessage());
+        }
+      } catch (e) {
+        if (!cancelled && loadId === ordersLoadRef.current) {
+          setError(e?.message || loadErrorMessage());
+          reportSellerClientError({
+            errorCode: e?.statusCode ? `HTTP_${e.statusCode}` : "ANALYTICS_LOAD",
+            errorMessage: e?.originalMessage || e?.message || loadErrorMessage(),
+            context: "analytics/reports loadOrders",
+          });
+        }
+      } finally {
+        if (!cancelled && loadId === ordersLoadRef.current) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [range, loadErrorMessage, rateLimitMessage]);
+
+  useEffect(() => {
+    if (!marketingDateKey) return;
+    let cancelled = false;
+    const [from, to] = marketingDateKey.split("|");
+
+    (async () => {
+      try {
+        const data = await getMedusaAdminClient().getMarketingAnalytics({ from, to });
+        if (!cancelled) setMarketing(data);
+      } catch {
+        if (!cancelled) setMarketing(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [marketingDateKey]);
+
+  const refreshData = useCallback(async () => {
+    const loadId = ++ordersLoadRef.current;
     setLoading(true);
     setError(null);
     try {
       const client = getMedusaAdminClient();
       const [ordersData, marketingData] = await Promise.all([
-        client.request("/admin-hub/v1/orders?limit=500&sort=created_at_desc"),
-        client.getMarketingAnalytics(rangeBounds).catch(() => null),
+        client.getOrders({ limit: 500, sort: "created_at_desc" }),
+        marketingDateKey
+          ? client.getMarketingAnalytics({
+              from: marketingDateKey.split("|")[0],
+              to: marketingDateKey.split("|")[1],
+            })
+          : Promise.resolve(null),
       ]);
+      if (loadId !== ordersLoadRef.current) return;
       setAllOrders(Array.isArray(ordersData?.orders) ? ordersData.orders : []);
       setMarketing(marketingData);
+      if (ordersData?.rateLimited) {
+        setError(rateLimitMessage());
+      }
     } catch (e) {
-      setError(e?.message || lt("Error loading orders", "Siparişler yüklenirken hata oluştu", "Erreur lors du chargement des commandes", "Error al cargar los pedidos", "Errore durante il caricamento degli ordini", "Fehler beim Laden der Bestellungen"));
+      if (loadId === ordersLoadRef.current) {
+        setError(e?.message || loadErrorMessage());
+      }
     } finally {
-      setLoading(false);
+      if (loadId === ordersLoadRef.current) {
+        setLoading(false);
+      }
     }
-  }, [rangeBounds, lt]);
-
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  }, [marketingDateKey, loadErrorMessage, rateLimitMessage]);
 
   const { start, end, prevStart, prevEnd } = useMemo(() => getDateRange(range), [range]);
 
@@ -577,13 +680,13 @@ export default function AnalyticsPage() {
       title={t("reports")}
       subtitle={isSuperuser ? t("reportsSubtitleAllSellers") : t("reportsSubtitle")}
       secondaryActions={[
-        { content: ui.refresh, onAction: loadOrders, disabled: loading },
+        { content: ui.refresh, onAction: refreshData, disabled: loading },
       ]}
     >
       <Layout>
         {error && (
           <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError("")} action={{ content: ui.retry, onAction: loadOrders }}>
+            <Banner tone="critical" onDismiss={() => setError("")} action={{ content: ui.retry, onAction: refreshData }}>
               {error}
             </Banner>
           </Layout.Section>

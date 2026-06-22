@@ -3,15 +3,20 @@
 import { useEffect } from "react";
 import { useLocale } from "next-intl";
 import { useLt } from "@/lib/locale-text";
+import { reportSellerClientError } from "@/lib/report-seller-client-error";
 
 export default function SellerError({ error, reset }) {
   const locale = useLocale();
   const lt = useLt();
 
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.error("[SellerError boundary]", error);
-    }
+    console.error("[SellerError boundary]", error);
+    reportSellerClientError({
+      errorCode: "REACT_ERROR_BOUNDARY",
+      errorMessage: error?.message || "Unexpected render error",
+      terminalOutput: error?.stack || null,
+      context: typeof window !== "undefined" ? window.location.pathname : "",
+    });
   }, [error]);
 
   return (

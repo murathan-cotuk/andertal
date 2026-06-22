@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { liteClient as algoliasearch } from "algoliasearch/lite";
@@ -285,6 +285,7 @@ function formatPriceCents(cents) {
 function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hideSearchIcon = false, pill = false }) {
   const router = useRouter();
   const locale = useLocale();
+  const ts = useTranslations("search");
   const isMobile = useMatchMediaOnce(MOBILE_MQ);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState([]);
@@ -444,10 +445,10 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
         }}
         role="dialog"
         aria-modal="true"
-        aria-label="Suche"
+        aria-label={ts("label")}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
-          <button type="button" onClick={() => setMobileOpen(false)} aria-label="Zurück" style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 40, height: 40, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>←</button>
+          <button type="button" onClick={() => setMobileOpen(false)} aria-label={ts("back")} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 40, height: 40, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>←</button>
           <input
             ref={mobileInputRef}
             type="search"
@@ -464,7 +465,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
             <>
               {recProducts.length > 0 && (
                 <>
-                  <MobileSectionTitle>Weiter einkaufen</MobileSectionTitle>
+                  <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
                   <WeiterScroll>
                     {recProducts.map((p) => {
                       const { title: pt } = getLocalizedProduct(p, locale);
@@ -480,9 +481,9 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
                   </WeiterScroll>
                 </>
               )}
-              <MobileSectionTitle>Letzte Suchen</MobileSectionTitle>
+              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
               {recentSearches.length === 0 ? (
-                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>Noch keine Suchbegriffe</div>
+                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
               ) : (
                 <div style={{ padding: "0 16px 16px" }}>
                   {recentSearches.map((term) => (
@@ -493,8 +494,8 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
             </>
           ) : (
             <>
-              {loading && hits.length === 0 && <div style={{ marginTop: 16 }}><Empty>Suche…</Empty></div>}
-              {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>Keine direkten Treffer — wir zeigen trotzdem Produkte.</Empty>}
+              {loading && hits.length === 0 && <div style={{ marginTop: 16 }}><Empty>{ts("searching")}</Empty></div>}
+              {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>{ts("noDirectResults")}</Empty>}
               {hits.length > 0 && <div style={{ padding: "8px 0" }}>{productHitList(() => { saveRecentSearch(q); setMobileOpen(false); setQ(""); })}</div>}
               {!loading && hits.length === 0 && fallbackHits.length > 0 && (
                 <div style={{ padding: "8px 0" }}>
@@ -534,7 +535,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setMobileOpen(true); } }}
           role="button"
           tabIndex={0}
-          aria-label="Suche öffnen"
+          aria-label={ts("open")}
         >
           {q || placeholder}
         </div>
@@ -552,15 +553,15 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
           placeholder={placeholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          aria-label="Suche"
+          aria-label={ts("label")}
           aria-expanded={showDropdown}
           $pill={pill}
         />
       </InputWrap>
       {showDropdown && (
         <Dropdown $maxHeight={maxHeight} role="listbox">
-          {loading && hits.length === 0 && <Empty>Suche...</Empty>}
-          {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>Keine direkten Treffer — wir zeigen trotzdem Produkte.</Empty>}
+          {loading && hits.length === 0 && <Empty>{ts("searching")}</Empty>}
+          {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>{ts("noDirectResults")}</Empty>}
           {productHitList(() => setOpen(false))}
           {!loading && hits.length === 0 && fallbackHits.length > 0 &&
             fallbackHits.map((product, i) => {
@@ -605,6 +606,7 @@ function SearchInputWithDropdown({
   const isMobile = useMatchMediaOnce(MOBILE_MQ);
   const router = useRouter();
   const locale = useLocale();
+  const ts = useTranslations("search");
   const { query, refine } = useSearchBox();
   const { hits } = useHits();
   const { status } = useInstantSearch();
@@ -722,7 +724,7 @@ function SearchInputWithDropdown({
         }}
         role="dialog"
         aria-modal="true"
-        aria-label="Suche"
+        aria-label={ts("label")}
       >
         <div
           style={{
@@ -737,7 +739,7 @@ function SearchInputWithDropdown({
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            aria-label="Zurück"
+            aria-label={ts("back")}
             style={{
               border: "none",
               background: "#f3f4f6",
@@ -780,7 +782,7 @@ function SearchInputWithDropdown({
             <>
               {recProducts.length > 0 && (
                 <>
-                  <MobileSectionTitle>Weiter einkaufen</MobileSectionTitle>
+                  <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
                   <WeiterScroll>
                     {recProducts.map((p) => {
                       const { title: pt } = getLocalizedProduct(p, locale);
@@ -803,9 +805,9 @@ function SearchInputWithDropdown({
                   </WeiterScroll>
                 </>
               )}
-              <MobileSectionTitle>Letzte Suchen</MobileSectionTitle>
+              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
               {recentSearches.length === 0 ? (
-                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>Noch keine Suchbegriffe</div>
+                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
               ) : (
                 <div style={{ padding: "0 16px 16px" }}>
                   {recentSearches.map((term) => (
@@ -840,10 +842,10 @@ function SearchInputWithDropdown({
             <>
               {loading && hits.length === 0 && (
                 <div style={{ marginTop: 16 }}>
-                  <Empty>Suche…</Empty>
+                  <Empty>{ts("searching")}</Empty>
                 </div>
               )}
-              {!loading && hits.length === 0 && <Empty>Keine Ergebnisse für &quot;{query}&quot;</Empty>}
+              {!loading && hits.length === 0 && <Empty>{ts("noResults", { query })}</Empty>}
               {hits.length > 0 && (
                 <div style={{ padding: "8px 0" }} role="listbox">
                   {hits.map((hit, i) => {
@@ -876,7 +878,7 @@ function SearchInputWithDropdown({
               )}
               {brandChips.length > 0 && (
                 <>
-                  <MobileSectionTitle>Vorschläge</MobileSectionTitle>
+                  <MobileSectionTitle>{ts("suggestions")}</MobileSectionTitle>
                   <div style={{ padding: "0 12px 24px" }}>
                     {brandChips.map((b) => (
                       <SuggestionChip
@@ -895,7 +897,7 @@ function SearchInputWithDropdown({
               )}
               {recentSearches.filter((r) => r.toLowerCase().includes(query.toLowerCase()) && r !== query).length > 0 && (
                 <>
-                  <MobileSectionTitle>Frühere Suchen</MobileSectionTitle>
+                  <MobileSectionTitle>{ts("previous")}</MobileSectionTitle>
                   <div style={{ padding: "0 12px 24px" }}>
                     {recentSearches
                       .filter((r) => r.toLowerCase().includes(query.toLowerCase()) && r.toLowerCase() !== query.toLowerCase())
@@ -957,7 +959,7 @@ function SearchInputWithDropdown({
           }}
           role="button"
           tabIndex={0}
-          aria-label="Suche öffnen"
+          aria-label={ts("open")}
         >
           {query || placeholder}
         </div>
@@ -985,8 +987,8 @@ function SearchInputWithDropdown({
       </InputWrap>
       {showDropdown && (
         <Dropdown id="search-hits" $maxHeight={maxHeight} role="listbox">
-          {loading && hits.length === 0 && <Empty>Searching...</Empty>}
-          {!loading && hits.length === 0 && <Empty>No results for &quot;{query}&quot;</Empty>}
+          {loading && hits.length === 0 && <Empty>{ts("searching")}</Empty>}
+          {!loading && hits.length === 0 && <Empty>{ts("noResults", { query })}</Empty>}
           {hits.map((hit, i) => {
             const url = getByPath(hit, urlKey);
             const link = url && (String(url).startsWith("/") ? url : `/produkt/${url}`);

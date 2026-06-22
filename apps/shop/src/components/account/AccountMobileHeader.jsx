@@ -12,15 +12,15 @@ const ORANGE = "#ff971c";
 const DARK = "#1A1A1A";
 const BORDER = "#e5e7eb";
 
-const NAV = [
-  { label: "Übersicht", href: "/account" },
-  { label: "Bestellungen", href: "/orders" },
-  { label: "Merkzettel", href: "/merkzettel" },
-  { label: "Adressen", href: "/addresses" },
-  { label: "Zahlungsmethoden", href: "/payment-methods" },
-  { label: "Nachrichten", href: "/nachrichten" },
-  { label: "Bewertungen", href: "/reviews" },
-  { label: "Bonuspunkte", href: "/bonus" },
+const NAV_KEYS = [
+  { key: "overview", href: "/account" },
+  { key: "orders", href: "/orders" },
+  { key: "wishlist", href: "/merkzettel" },
+  { key: "addresses", href: "/addresses" },
+  { key: "paymentMethods", href: "/payment-methods" },
+  { key: "messages", href: "/nachrichten" },
+  { key: "reviews", href: "/reviews" },
+  { key: "bonus", href: "/bonus" },
 ];
 
 const Wrap = styled.div`
@@ -100,16 +100,16 @@ function normalizePath(pathname) {
 export default function AccountMobileHeader({ onLogout }) {
   const { user } = useAuth();
   const t = useTranslations("common");
+  const tNav = useTranslations("accountNav");
+  const tPanel = useTranslations("accountPanel");
   const pathname = usePathname() || "/";
   const appPath = normalizePath(pathname);
   const firstName = user?.firstName || user?.first_name || "";
   const cno = user?.customer_number;
   const numSuffix = cno != null && cno !== "" ? ` #${cno}` : "";
   const greeting = firstName
-    ? `Hallo, ${firstName}${numSuffix}!`
-    : numSuffix
-      ? `Hallo!${numSuffix}`
-      : "Hallo!";
+    ? tPanel("hello", { name: `${firstName}${numSuffix}` })
+    : tPanel("helloNoName");
   const scrollRef = useRef(null);
   const activeRef = useRef(null);
 
@@ -130,14 +130,14 @@ export default function AccountMobileHeader({ onLogout }) {
         {user?.email && <GreetingMeta>{user.email}</GreetingMeta>}
       </Greeting>
       <NavScroll ref={scrollRef}>
-        {NAV.map((item) => {
+        {NAV_KEYS.map((item) => {
           const active =
             item.href === "/account"
               ? appPath === "/account"
               : appPath === item.href || appPath.startsWith(`${item.href}/`);
           return (
             <NavPill key={item.href} href={item.href} $active={active} ref={active ? activeRef : null}>
-              {item.label}
+              {tNav(item.key)}
             </NavPill>
           );
         })}

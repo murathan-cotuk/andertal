@@ -4,6 +4,7 @@ import React from "react";
 import styled from "styled-components";
 import { motion } from "framer-motion";
 import { tokens } from "@/design-system/tokens";
+import { useTranslations } from "next-intl";
 
 const Section = styled.section`
   padding: ${tokens.spacing.xl} ${tokens.containerPadding};
@@ -39,14 +40,14 @@ const Icon = styled.span`
   font-size: 18px;
 `;
 
-const DEFAULT_ITEMS = [
-  { icon: "🚚", text: "Schneller Versand" },
-  { icon: "↩️", text: "30 Tage Rückgabe" },
-  { icon: "🔒", text: "Sichere Zahlung" },
-  { icon: "✓", text: "Geprüfte Verkäufer" },
-];
-
-export default function TrustBar({ items = DEFAULT_ITEMS }) {
+export default function TrustBar({ items }) {
+  const t = useTranslations("trust");
+  const localizedItems = items || [
+    { icon: "🚚", text: t("fastShipping") },
+    { icon: "↩️", text: t("returns30") },
+    { icon: "🔒", text: t("securePayment") },
+    { icon: "✓", text: t("verifiedSellers") },
+  ];
   return (
     <Section>
       <Inner
@@ -54,7 +55,7 @@ export default function TrustBar({ items = DEFAULT_ITEMS }) {
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
       >
-        {(items || DEFAULT_ITEMS).map((item, i) => (
+        {localizedItems.map((item, i) => (
           <Item key={i}>
             <Icon>{item.icon}</Icon>
             <span>{item.text}</span>

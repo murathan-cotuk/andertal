@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useAuthGuard, getToken } from "@andertal/lib";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -36,6 +37,7 @@ const WishGrid = styled.div`
 export default function WishlistMerkzettelPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
   const { user, logout } = useAuth();
+  const tw = useTranslations("wishlist");
   const router = useRouter();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,13 +68,13 @@ export default function WishlistMerkzettelPage() {
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
-          <AccountPageLayout title="Merkzettel" onLogout={() => { logout(); router.push("/"); }}>
+          <AccountPageLayout title={tw("title")} onLogout={() => { logout(); router.push("/"); }}>
             <div>
               {loading ? (
                 <GlobalPageLoader />
               ) : products.length === 0 ? (
                 <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 40, textAlign: "center" }}>
-                  <p style={{ color: GRAY, marginBottom: 20 }}>Ihr Merkzettel ist noch leer.</p>
+                  <p style={{ color: GRAY, marginBottom: 20 }}>{tw("empty")}</p>
                   <Link
                     href="/"
                     style={{

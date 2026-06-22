@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { motion } from "framer-motion";
@@ -116,12 +117,13 @@ const CollectionCard = styled(motion(Link))`
 `;
 
 export default function HeroSection({
-  headline = "Premium Marktplatz",
-  subline = "Entdecken Sie ausgewählte Produkte von vertrauenswürdigen Verkäufern.",
-  ctaText = "Jetzt entdecken",
+  headline,
+  subline,
+  ctaText,
   ctaHref = "/collections",
   collections = [],
 }) {
+  const tp = useTranslations("product");
   return (
     <Section
       initial={{ opacity: 0 }}
@@ -130,9 +132,9 @@ export default function HeroSection({
     >
       <TopRow>
         <TextBlock>
-          <Headline>{headline}</Headline>
-          <Subline>{subline}</Subline>
-          <Cta href={ctaHref}>{ctaText}</Cta>
+          <Headline>{headline ?? tp("premiumMarketplace")}</Headline>
+          <Subline>{subline ?? tp("heroSubline")}</Subline>
+          <Cta href={ctaHref}>{ctaText ?? tp("discoverNow")}</Cta>
         </TextBlock>
         <VisualBlock
           initial={{ opacity: 0, x: 20 }}

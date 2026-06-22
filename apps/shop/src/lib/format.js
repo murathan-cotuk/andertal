@@ -19,20 +19,29 @@ export function formatPriceCents(cents) {
 
 /**
  * Get title and description for a product in the given locale (from metadata.translations).
- * Falls back to product.title / product.description when no translation exists.
+ * Fallback chain: requested locale → de → en → any available translation → product.title/description.
  */
 export function getLocalizedProduct(product, locale) {
   if (!product) return { title: "", description: "" };
   const tr = product.metadata?.translations;
-  if (tr && tr[locale]) {
-    return {
-      title: tr[locale].title ?? product.title ?? "",
-      description: tr[locale].description ?? product.description ?? "",
-    };
+  const fallbackOrder = [locale, "de", "en"];
+  const LOCALES = ["de", "en", "tr", "fr", "es", "it"];
+
+  function pickField(field, base) {
+    if (tr) {
+      for (const l of fallbackOrder) {
+        if (l && tr[l]?.[field]) return tr[l][field];
+      }
+      for (const l of LOCALES) {
+        if (tr[l]?.[field]) return tr[l][field];
+      }
+    }
+    return base ?? "";
   }
+
   return {
-    title: product.title ?? "",
-    description: product.description ?? "",
+    title: pickField("title", product.title),
+    description: pickField("description", product.description),
   };
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import styled from "styled-components";
 import { Link } from "@/i18n/navigation";
 import { resolveImageUrl } from "@/lib/image-url";
@@ -84,7 +85,8 @@ const Cta = styled(Link)`
   font-weight: 600;
 `;
 
-export function BrandCard({ brand, ctaLabel = "Zur Marke" }) {
+export function BrandCard({ brand, ctaLabel }) {
+  const tCommon = useTranslations("common");
   const name = (brand?.name || "").trim() || "Brand";
   const handle = (brand?.handle || "").trim();
   if (!handle) return null;
@@ -102,7 +104,7 @@ export function BrandCard({ brand, ctaLabel = "Zur Marke" }) {
           <Logo>{logo ? <img src={logo} alt={name} /> : null}</Logo>
           <Name title={name}>{name}</Name>
         </BrandLine>
-        <Cta href={`/brand/${handle}`}>{ctaLabel} →</Cta>
+        <Cta href={`/brand/${handle}`}>{ctaLabel ?? tCommon("toBrand")} →</Cta>
       </Body>
     </Card>
   );

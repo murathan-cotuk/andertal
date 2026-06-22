@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { useShopStyles } from "@/context/ShopStylesContext";
+import { useTranslations } from "next-intl";
 
 const Outer = styled.div`
   width: 100%;
@@ -139,6 +140,7 @@ function normalizeItems(tb) {
 }
 
 export default function ShopTopBar() {
+  const tc = useTranslations("common");
   const styles = useShopStyles();
   const tb = styles?.topbar || {};
   const enabled = isTopBarEnabled(tb);
@@ -216,7 +218,7 @@ export default function ShopTopBar() {
         {n > 1 && (
           <NavPrev
             type="button"
-            aria-label="Zurück"
+            aria-label={tc("back")}
             onClick={() => { goPrev(); pausedRef.current = true; }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -254,7 +256,7 @@ export default function ShopTopBar() {
         {n > 1 && (
           <NavNext
             type="button"
-            aria-label="Weiter"
+            aria-label={tc("next")}
             onClick={() => { goNext(); pausedRef.current = true; }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

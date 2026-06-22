@@ -1578,13 +1578,17 @@ export default function InventoryPage() {
                 </I18nLink>
               </Box>
             ) : null}
-            {changeRequestsModalItems.length === 0 ? (
+            {changeRequestsModalItems.filter((cr) => String(cr.old_value ?? "").trim() !== String(cr.new_value ?? "").trim()).length === 0 ? (
               <Text as="p" tone="subdued">
                 {locale === "en" ? "No pending change proposals." : locale === "tr" ? "Bekleyen değişiklik önerisi yok." : locale === "fr" ? "Aucune proposition de modification en attente." : locale === "es" ? "No hay propuestas de cambio pendientes." : locale === "it" ? "Nessuna proposta di modifica in sospeso." : "Keine ausstehenden Änderungsvorschläge."}
               </Text>
             ) : (
-              changeRequestsModalItems.map((cr) => {
+              changeRequestsModalItems
+                .filter((cr) => String(cr.old_value ?? "").trim() !== String(cr.new_value ?? "").trim())
+                .map((cr) => {
                 const field = String(cr.field_name || '');
+                const curLabel = l === "tr" ? "Mevcut değer" : l === "de" ? "Aktueller Wert" : l === "fr" ? "Valeur actuelle" : l === "es" ? "Valor actual" : l === "it" ? "Valore attuale" : "Current value";
+                const propLabel = l === "tr" ? "Önerilen değer" : l === "de" ? "Vorgeschlagener Wert" : l === "fr" ? "Valeur proposée" : l === "es" ? "Valor propuesto" : l === "it" ? "Valore proposto" : "Proposed value";
                 return (
                   <Card key={cr.id} padding="300" background="bg-surface-secondary" borderRadius="200">
                     <BlockStack gap="200">
@@ -1592,22 +1596,20 @@ export default function InventoryPage() {
                         {fieldNameDisplayLabel(field, l)}
                       </Text>
                       <Divider />
-                      <BlockStack gap="100">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {l === "tr" ? "Mevcut değer" : l === "de" ? "Aktueller Wert" : l === "fr" ? "Valeur actuelle" : l === "es" ? "Valor actual" : l === "it" ? "Valore attuale" : "Current value"}
-                        </Text>
-                        <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                          {formatChangeRequestValueForDisplay(cr.old_value)}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div>
+                          <Text as="p" variant="bodySm" tone="subdued">{curLabel}</Text>
+                          <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", marginTop: 4 }}>
+                            {formatChangeRequestValueForDisplay(cr.old_value)}
+                          </div>
                         </div>
-                      </BlockStack>
-                      <BlockStack gap="100">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {l === "tr" ? "Önerilen değer" : l === "de" ? "Vorgeschlagener Wert" : l === "fr" ? "Valeur proposée" : l === "es" ? "Valor propuesto" : l === "it" ? "Valore proposto" : "Proposed value"}
-                        </Text>
-                        <div style={{ fontSize: 13, lineHeight: 1.45, whiteSpace: "pre-wrap", wordBreak: "break-word", fontWeight: 600 }}>
-                          {formatChangeRequestValueForDisplay(cr.new_value)}
+                        <div>
+                          <Text as="p" variant="bodySm" tone="subdued">{propLabel}</Text>
+                          <div style={{ fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word", fontWeight: 600, marginTop: 4 }}>
+                            {formatChangeRequestValueForDisplay(cr.new_value)}
+                          </div>
                         </div>
-                      </BlockStack>
+                      </div>
                       {isSuperuser && (
                         <InlineStack gap="200">
                           <Button

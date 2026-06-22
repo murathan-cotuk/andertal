@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import styled from "styled-components";
 import { tokens } from "@/design-system/tokens";
+import { useTranslations } from "next-intl";
 
 /* ─── Section & layout ─────────────────────────────────────────────────── */
 const Section = styled.section`
@@ -297,6 +298,7 @@ export default function Carousel({
   children,
   className,
 }) {
+  const tc = useTranslations("common");
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -420,7 +422,7 @@ export default function Carousel({
                 type="button"
                 onClick={() => scroll(-1)}
                 disabled={!canScrollLeft}
-                aria-label="Vorherige Einträge"
+                aria-label={tc("previous")}
               >
                 <NavLeftSvg />
               </NavBtn>
@@ -428,7 +430,7 @@ export default function Carousel({
                 type="button"
                 onClick={() => scroll(1)}
                 disabled={!canScrollRight}
-                aria-label="Nächste Einträge"
+                aria-label={tc("next")}
               >
                 <NavRightSvg />
               </NavBtn>
@@ -449,7 +451,7 @@ export default function Carousel({
               type="button"
               onClick={() => scroll(-1)}
               disabled={!canScrollLeft}
-              aria-label="Vorherige Einträge"
+              aria-label={tc("previous")}
             >
               <NavLeftSvg />
             </NavLeftSide>
@@ -457,7 +459,7 @@ export default function Carousel({
               type="button"
               onClick={() => scroll(1)}
               disabled={!canScrollRight}
-              aria-label="Nächste Einträge"
+              aria-label={tc("next")}
             >
               <NavRightSvg />
             </NavRightSide>

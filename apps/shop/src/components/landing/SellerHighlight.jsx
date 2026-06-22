@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { motion } from "framer-motion";
@@ -77,12 +78,13 @@ const ZumShop = styled.span`
 `;
 
 export default function SellerHighlight({
-  title = "Unsere Verkäufer",
+  title,
   sellers = [],
 }) {
+  const tp = useTranslations("product");
   return (
     <Section>
-      <Title>{title}</Title>
+      <Title>{title ?? tp("otherSellers")}</Title>
       <Grid>
         {(sellers || []).slice(0, 6).map((seller, i) => (
           <Card
@@ -94,9 +96,9 @@ export default function SellerHighlight({
             transition={{ delay: i * 0.05 }}
           >
             <Logo>{seller.logoUrl ? "🖼" : (seller.name || "V")[0]}</Logo>
-            <Name>{seller.name || "Verkäufer"}</Name>
+            <Name>{seller.name || tp("seller")}</Name>
             {seller.rating != null && <Rating>★ {seller.rating}</Rating>}
-            <ZumShop>Zum Shop</ZumShop>
+            <ZumShop>{tp("toShop")}</ZumShop>
           </Card>
         ))}
       </Grid>

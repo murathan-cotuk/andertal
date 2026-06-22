@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
@@ -97,6 +98,7 @@ function popupMargin(position) {
 
 // ── Popup Modal ───────────────────────────────────────────────────────────────
 function PopupModal({ config, onClose }) {
+  const tc = useTranslations("common");
   const [visible, setVisible] = useState(false);
   const anim = ANIMATIONS[config.animation] || ANIMATIONS.fade;
   const flex = positionToFlex(config.position);
@@ -142,7 +144,7 @@ function PopupModal({ config, onClose }) {
         {config.show_close !== false && (
           <button
             onClick={onClose}
-            aria-label="Schließen"
+            aria-label={tc("close")}
             style={{
               position: "absolute",
               top: 12,

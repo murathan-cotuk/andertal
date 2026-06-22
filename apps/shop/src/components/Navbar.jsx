@@ -8,6 +8,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
 import UserDropdown from "@/components/UserDropdown";
+import { useTranslations } from "next-intl";
 
 const Nav = styled.nav`
   background-color: white;
@@ -225,6 +226,7 @@ export default function Navbar() {
   const [openCategoryId, setOpenCategoryId] = useState(null);
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount } = useCart();
+  const tCommon = useTranslations("common");
 
   // Fetch store menus: prefer location "main" (navbar), else first menu; fallback to categories
   useEffect(() => {
@@ -298,7 +300,7 @@ export default function Navbar() {
             user={user}
             onLogout={logout}
           />
-          <CartButton as="button" type="button" onClick={openCartSidebar} title="Warenkorb">
+          <CartButton as="button" type="button" onClick={openCartSidebar} title={tCommon("cart")}>
             <i className="fas fa-shopping-cart" style={{ fontSize: "20px", color: "#374151" }} />
             <CartBadge>{itemCount > 0 ? itemCount : 0}</CartBadge>
           </CartButton>

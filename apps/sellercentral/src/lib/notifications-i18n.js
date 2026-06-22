@@ -20,5 +20,7 @@ export function getNotificationsCopy(locale) {
     returns: t("Returns", "İadeler", "Retours", "Devoluciones", "Resi", "Rückgaben"),
     returnRequest: (n) => t(`Return request R-${n}`, `İade talebi R-${n}`, `Demande de retour R-${n}`, `Solicitud de devolución R-${n}`, `Richiesta di reso R-${n}`, `Rückgabeanfrage R-${n}`),
     orderRef: (n) => t(`Order #${n}`, `Sipariş #${n}`, `Commande #${n}`, `Pedido #${n}`, `Ordine #${n}`, `Bestellung #${n}`),
+    sellerErrors: t("Seller issues", "Satıcı sorunları", "Problèmes vendeurs", "Problemas de vendedores", "Problemi venditori", "Seller-Fehler"),
+    sellerErrorTitle: (name) => t(`Issue: ${name}`, `Sorun: ${name}`, `Problème : ${name}`, `Problema: ${name}`, `Problema: ${name}`, `Fehler: ${name}`),
   };
 }

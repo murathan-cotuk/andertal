@@ -48,22 +48,32 @@ export function variantMediaForLocale(variant, locale) {
 
 /**
  * Returns locale-specific variant content overrides (title, description, bullet_points).
- * Falls back to DE canonical fields when no locale translation exists.
+ * Fallback chain: requested locale → de → en → any available translation → base fields.
  */
 export function variantLocaleContent(variant, locale) {
   if (!variant) return {};
   const loc = String(locale || "de").toLowerCase();
   const vMeta = variant.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
   const trMap = vMeta.translations && typeof vMeta.translations === "object" ? vMeta.translations : {};
-  const tr = trMap[loc] || {};
-  const trDe = trMap.de || {};
+  const FALLBACK = [loc, "de", "en", "tr", "fr", "es", "it"];
+
+  function pick(field, base) {
+    for (const l of FALLBACK) {
+      if (trMap[l]?.[field]) return trMap[l][field];
+    }
+    return base ?? null;
+  }
+
+  function pickArr(field, base) {
+    for (const l of FALLBACK) {
+      if (Array.isArray(trMap[l]?.[field]) && trMap[l][field].length > 0) return trMap[l][field];
+    }
+    return Array.isArray(base) ? base : null;
+  }
+
   return {
-    title: tr.title || trDe.title || variant.title || null,
-    description: tr.description || trDe.description || vMeta.description || null,
-    bullet_points: Array.isArray(tr.bullet_points) && tr.bullet_points.length > 0
-      ? tr.bullet_points
-      : (Array.isArray(trDe.bullet_points) && trDe.bullet_points.length > 0
-          ? trDe.bullet_points
-          : (Array.isArray(vMeta.bullet_points) ? vMeta.bullet_points : null)),
+    title: pick("title", variant.title),
+    description: pick("description", vMeta.description),
+    bullet_points: pickArr("bullet_points", vMeta.bullet_points),
   };
 }

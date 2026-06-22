@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 export function Lightbox({ images = [], currentIndex = 0, onClose, onPrev, onNext }) {
+  const tc = useTranslations("common");
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === "Escape") onClose();
@@ -23,7 +25,7 @@ export function Lightbox({ images = [], currentIndex = 0, onClose, onPrev, onNex
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Bildergalerie"
+      aria-label={tc("imageGallery")}
     >
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         {src && (
@@ -33,8 +35,8 @@ export function Lightbox({ images = [], currentIndex = 0, onClose, onPrev, onNex
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             className="w-10 h-10 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center"
-            aria-label="Bild in neuem Tab öffnen"
-            title="In neuem Tab öffnen"
+            aria-label={tc("openInNewTab")}
+            title={tc("openInNewTab")}
           >
             <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
               <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
@@ -46,7 +48,7 @@ export function Lightbox({ images = [], currentIndex = 0, onClose, onPrev, onNex
           type="button"
           onClick={onClose}
           className="w-10 h-10 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center text-2xl"
-          aria-label="Schließen"
+          aria-label={tc("close")}
         >
           ×
         </button>
@@ -57,7 +59,7 @@ export function Lightbox({ images = [], currentIndex = 0, onClose, onPrev, onNex
             type="button"
             onClick={(e) => { e.stopPropagation(); onPrev(); }}
             className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center text-2xl"
-            aria-label="Vorheriges Bild"
+            aria-label={tc("previous")}
           >
             ‹
           </button>
@@ -65,7 +67,7 @@ export function Lightbox({ images = [], currentIndex = 0, onClose, onPrev, onNex
             type="button"
             onClick={(e) => { e.stopPropagation(); onNext(); }}
             className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center text-2xl"
-            aria-label="Nächstes Bild"
+            aria-label={tc("next")}
           >
             ›
           </button>

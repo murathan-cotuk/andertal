@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import styled from "styled-components";
 
 const Bar = styled.div`
@@ -31,12 +32,14 @@ const LinkItem = styled(Link)`
 `;
 
 export default function SlimBar() {
+  const t = useTranslations("slimbar");
+  const tn = useTranslations("nav");
   return (
     <Bar>
       <Container>
-        <LinkItem href="/bestsellers">Bestsellers</LinkItem>
-        <LinkItem href="/sale">Angebote</LinkItem>
-        <LinkItem href="/recommended">Für Sie empfohlen</LinkItem>
+        <LinkItem href="/bestsellers">{tn("bestsellers")}</LinkItem>
+        <LinkItem href="/sale">{t("sale")}</LinkItem>
+        <LinkItem href="/recommended">{t("recommended")}</LinkItem>
       </Container>
     </Bar>
   );

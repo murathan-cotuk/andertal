@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { motion } from "framer-motion";
@@ -70,12 +71,13 @@ const PlaceholderBg = styled.div`
 `;
 
 export default function CategoryShowcase({
-  title = "Kategorien",
+  title,
   categories = [],
 }) {
+  const tCommon = useTranslations("common");
   return (
     <Section>
-      <Title>{title}</Title>
+      <Title>{title ?? tCommon("categories")}</Title>
       <Grid>
         {categories.slice(0, 6).map((cat, i) => (
           <Card

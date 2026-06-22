@@ -1,4 +1,21 @@
-19.06.
+22.06.
+
+-- Superuser olarak products/inventory sayfasina gittigimde baska sellerlarin ürünler ile alakali degisiklik yapmak istedigine dair öneri bildirimi aliyorum. degisiklikleri görmek icin basiyorum ve popup aciliyor cok güzel. ancak örnek vermek acisindan söyle bir sey cikiyor:
+
+Mevcut değer
+
+1. name: Farbe
+options: [{"value":"Rot","swatch_image":"https://m.media-amazon.com/images/I/219wvc8zrtL._SS64_.jpg"},{"value":"Schwarz","swatch_image":"https://m.media-amazon.com/images/I/31rW-VrvodL._SS64_.jpg"},{"value":"Weiß","swatch_image":"https://m.media-amazon.com/images/I/21E2C91WHrL._SS64_.jpg"},{"value":"Grün","swatch_image":"https://m.media-amazon.com/images/I/21gv1atqjSL._SS64_.jpg"},{"value":"Blau","swatch_image":"https://m.media-amazon.com/images/I/21wjSXBD6NL._SS64_.jpg"},{"value":"Gelb","swatch_image":"https://m.media-amazon.com/images/I/21VelAb+XrL._SS64_.jpg"},{"value":"Lila","swatch_image":"https://m.media-amazon.com/images/I/21ftve6llML._SS64_.jpg"},{"value":"Braun","swatch_image":"https://m.media-amazon.com/images/I/211OPtWe3vL._SS64_.jpg"},{"value":"Rosa","swatch_image":"https://m.media-amazon.com/images/I/21+XzVSAjHL._SS64_.jpg"}]
+2. name: Größe
+options: [{"value":"S"},{"value":"M"},{"value":"L"},{"value":"XL"}]
+Önerilen değer
+
+1. name: Farbe
+options: [{"value":"Rot","swatch_image":"https://example.com/img/swatch-rot.jpg"}]
+2. name: Größe
+options: [{"value":"S"},{"value":"M"}]
+
+Bu hic aciklayici degil. cok fazla html var. txt olarak gelsin karsima. buydu, bunu yapmak istiyor gibi net bir sey olsun. yan yana olsun yani mevcut deger ve önerilen deger. altinda yazmasin. önerilen deger mevcut ile ayni ise gösterilmesin. 
 
 -- diller birbirine girmis ya her yerde. mesela simdi sellercentraldeyim. ingilizce dili secili. bi ingilizce
   icerik var bi almanca var. tüm sayfalarda her köselerde var bu sorun. sana tek tek izah etmem bile 3-4 saat   

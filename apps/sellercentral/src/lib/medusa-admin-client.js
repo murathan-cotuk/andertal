@@ -1,4 +1,5 @@
 ﻿import { formatApiError, getClientLocale } from './api-error-messages';
+import { reportSellerClientError } from './report-seller-client-error';
 
 /**
  * Medusa Admin API Client for Sellercentral
@@ -77,6 +78,15 @@ class MedusaAdminClient {
       } else {
         const errMsg = error?.message ?? (typeof error === 'string' ? error : 'Request failed');
         console.warn(`Medusa Admin API (${endpoint}):`, errMsg);
+      }
+      const statusCode = out.statusCode || error?.statusCode;
+      if (statusCode === 429 || statusCode >= 500 || isNetworkError) {
+        reportSellerClientError({
+          errorCode: statusCode ? `HTTP_${statusCode}` : 'NETWORK_ERROR',
+          errorMessage: out.originalMessage || rawFriendly,
+          context: `${method} ${endpoint}`,
+          terminalOutput: isNetworkError ? String(error?.message || '') : null,
+        }).catch(() => {});
       }
       throw out;
     }
@@ -786,7 +796,17 @@ class MedusaAdminClient {
       filteredParams.seller_id = sellerId;
     }
     const queryParams = new URLSearchParams(filteredParams).toString()
-    return this.request(`/admin-hub/v1/orders${queryParams ? `?${queryParams}` : ''}`)
+    try {
+      return await this.request(`/admin-hub/v1/orders${queryParams ? `?${queryParams}` : ''}`)
+    } catch (err) {
+      if (err?.statusCode === 429) {
+        return { orders: [], count: 0, rateLimited: true }
+      }
+      if (err?.statusCode >= 500 || err?.statusCode === 503) {
+        return { orders: [], count: 0, serverError: true }
+      }
+      throw err
+    }
   }
 
   async getOrder(id) {
@@ -1566,7 +1586,14 @@ class MedusaAdminClient {
     if (params.from) qs.set("from", params.from);
     if (params.to) qs.set("to", params.to);
     const q = qs.toString();
-    return this.request(`/admin-hub/v1/analytics/marketing${q ? "?" + q : ""}`);
+    try {
+      return await this.request(`/admin-hub/v1/analytics/marketing${q ? "?" + q : ""}`);
+    } catch (err) {
+      if (err?.statusCode === 429 || err?.statusCode >= 500 || err?.statusCode === 503) {
+        return null
+      }
+      throw err
+    }
   }
 
   // ── Platform Marketing Accounts (superuser) ─────────────────────────────────

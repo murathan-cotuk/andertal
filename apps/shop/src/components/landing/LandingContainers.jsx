@@ -9,7 +9,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { toSalesScore } from "@/lib/bestseller";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
 
@@ -272,6 +272,7 @@ function btnAlignSelf(justifyContent) {
 
 // ── Hero Banner Slider ────────────────────────────────────────────────────────
 function HeroBanner({ container, locale = "de" }) {
+  const tCommon = useTranslations("common");
   const isMobile = useIsNarrow(767);
   const [current, setCurrent] = useState(0);
   const timerRef = useRef(null);
@@ -425,8 +426,8 @@ function HeroBanner({ container, locale = "de" }) {
           <Dots mobile={false} />
           {slides.length > 1 && (
             <>
-              <button type="button" aria-label="Vorherige Folie" onClick={() => goTo((current - 1 + slides.length) % slides.length)} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>‹</button>
-              <button type="button" aria-label="Nächste Folie" onClick={() => goTo((current + 1) % slides.length)} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>›</button>
+              <button type="button" aria-label={tCommon("previous")} onClick={() => goTo((current - 1 + slides.length) % slides.length)} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>‹</button>
+              <button type="button" aria-label={tCommon("next")} onClick={() => goTo((current + 1) % slides.length)} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 44, height: 44, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 5 }}>›</button>
             </>
           )}
         </div>
@@ -688,6 +689,7 @@ function mosaicGridCellIndex(rows, rowIdx, colIdx) {
 
 // ── Content-Mosaic: Bilder ODER Kollektionsprodukte ODER Kollektionen, Raster frei wählbar ──
 function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
+  const tNav = useTranslations("nav");
   const isNarrow = useIsNarrow(1023);
   const source = String(container.source || "images");
   const baseGap = container.gap != null ? Number(container.gap) : 16;
@@ -831,10 +833,10 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
         {image ? (
           <img src={image} alt={c.title || ""} style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }} />
         ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>Keine Vorschau</div>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>{tNav("collection")}</div>
         )}
         <div style={{ position: "absolute", inset: "auto 0 0 0", padding: "12px 14px", background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)", color: "#fff" }}>
-          <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>{c.title || c.handle || `Kollektion ${i + 1}`}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>{c.title || c.handle || `${tNav("collection")} ${i + 1}`}</div>
         </div>
       </div>
     );
@@ -989,6 +991,7 @@ function BannerCta({ container, locale = "de" }) {
 
 // ── Collection Carousel ───────────────────────────────────────────────────────
 function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
+  const tNav = useTranslations("nav");
   // undefined = still loading, [] = loaded but empty, [...] = has products
   const [products, setProducts] = useState(preloadedProducts);
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
@@ -1054,7 +1057,7 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
             items={products}
             itemKey={(p, i) => p.id || i}
             renderItem={renderProductWithCaption}
-            ariaLabel={lt(container, "title", locale) || "Kollektion: Produkte"}
+            ariaLabel={lt(container, "title", locale) || tNav("product")}
           />
         </div>
       </div>
@@ -1180,6 +1183,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
 }
 
 function CollectionsCarousel({ container, locale = "de" }) {
+  const tNav = useTranslations("nav");
   const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
@@ -1261,7 +1265,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
             }}
           >
             <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
-              {collection.title || collection.handle || `Kollektion ${i + 1}`}
+              {collection.title || collection.handle || `${tNav("collection")} ${i + 1}`}
             </div>
           </div>
         </div>
@@ -1295,7 +1299,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
             items={collections}
             itemKey={(c, i) => c.id || i}
             renderItem={renderCollectionCell}
-            ariaLabel={lt(container, "title", locale) || "Kollektionen"}
+            ariaLabel={lt(container, "title", locale) || tNav("collection")}
           />
         </div>
       </div>
@@ -1349,7 +1353,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
                   }}
                 >
                   <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
-                    {collection.title || collection.handle || `Kollektion ${i + 1}`}
+                    {collection.title || collection.handle || `${tNav("collection")} ${i + 1}`}
                   </div>
                 </div>
               </div>
@@ -1562,6 +1566,8 @@ function BlogCarousel({ container, locale = "de" }) {
 
 // ── Newsletter (form POST to external URL or internal endpoint) ───────────────
 function NewsletterSignup({ container, locale = "de" }) {
+  const tNewsletter = useTranslations("newsletter");
+  const tAuth = useTranslations("auth");
   const action = (container.form_action || "").trim();
   const method = (container.form_method || "post").toLowerCase() === "get" ? "get" : "post";
   const firstNameFieldName = (container.first_name_field_name || "FNAME").trim() || "FNAME";
@@ -1652,8 +1658,8 @@ function NewsletterSignup({ container, locale = "de" }) {
               f && f.name ? <input key={i} type="hidden" name={String(f.name)} value={String(f.value ?? "")} /> : null
             ))}
             <div style={nameRowStyle}>
-              <input type="text" name={firstNameFieldName} required placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"} autoComplete="given-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
-              <input type="text" name={lastNameFieldName} required placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"} autoComplete="family-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
+              <input type="text" name={firstNameFieldName} required placeholder={lt(container, "first_name_placeholder", locale) || tAuth("firstName")} autoComplete="given-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
+              <input type="text" name={lastNameFieldName} required placeholder={lt(container, "last_name_placeholder", locale) || tAuth("lastName")} autoComplete="family-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
             </div>
             <input type="email" name={emailName} required placeholder={lt(container, "email_placeholder", locale) || "E-Mail"} autoComplete="email" style={sharedInputStyle} />
             <button type="submit" style={sharedBtnStyle}>{lt(container, "button_text", locale) || "Abonnieren"}</button>
@@ -1670,7 +1676,7 @@ function NewsletterSignup({ container, locale = "de" }) {
                 required
                 value={internalFirstName}
                 onChange={(e) => setInternalFirstName(e.target.value)}
-                placeholder={lt(container, "first_name_placeholder", locale) || "Vorname"}
+                placeholder={lt(container, "first_name_placeholder", locale) || tAuth("firstName")}
                 autoComplete="given-name"
                 style={{ ...sharedInputStyle, ...nameInputStyle }}
               />
@@ -1679,7 +1685,7 @@ function NewsletterSignup({ container, locale = "de" }) {
                 required
                 value={internalLastName}
                 onChange={(e) => setInternalLastName(e.target.value)}
-                placeholder={lt(container, "last_name_placeholder", locale) || "Nachname"}
+                placeholder={lt(container, "last_name_placeholder", locale) || tAuth("lastName")}
                 autoComplete="family-name"
                 style={{ ...sharedInputStyle, ...nameInputStyle }}
               />
@@ -1697,7 +1703,7 @@ function NewsletterSignup({ container, locale = "de" }) {
               {internalState === "loading" ? "…" : (lt(container, "button_text", locale) || "Abonnieren")}
             </button>
             {internalState === "error" && (
-              <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>Fehler beim Anmelden. Bitte erneut versuchen.</p>
+              <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>{tNewsletter("error")}</p>
             )}
           </form>
         )}

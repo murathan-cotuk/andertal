@@ -1019,6 +1019,7 @@ export default function ShopHeader() {
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
   const tAccountPanel = useTranslations("accountPanel");
+  const tSearch = useTranslations("search");
   const locale = useLocale();
 
   // Dynamically computed from shipping groups — only countries with configured prices
@@ -1619,7 +1620,7 @@ export default function ShopHeader() {
                       setMainMenuOpen((v) => !v);
                     }}
                     aria-expanded={mainMenuOpen}
-                    aria-label="Kategorien"
+                    aria-label={tCommon("categories")}
                   >
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path fillRule="evenodd" clipRule="evenodd" d="M2 5.75C2 5.33579 2.33579 5 2.75 5H21.25C21.6642 5 22 5.33579 22 5.75C22 6.16421 21.6642 6.5 21.25 6.5H2.75C2.33579 6.5 2 6.16421 2 5.75ZM2 12C2 11.5858 2.33579 11.25 2.75 11.25H21.25C21.6642 11.25 22 11.5858 22 12C22 12.4142 21.6642 12.75 21.25 12.75H2.75C2.33579 12.75 2 12.4142 2 12ZM2 18.25C2 17.8358 2.33579 17.5 2.75 17.5H21.25C21.6642 17.5 22 17.8358 22 18.25C22 18.6642 21.6642 19 21.25 19H2.75C2.33579 19 2 18.6642 2 18.25Z" />
@@ -1669,7 +1670,7 @@ export default function ShopHeader() {
                 <SearchBarForm $compactProgress={narrowCompactProgress} role="search">
                   <SearchBarButton
                     type="button"
-                    aria-label="Suchen"
+                    aria-label={tSearch("label")}
                     onClick={() => {}}
                   >
                     <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style={{ minWidth: 20, height: 20 }}>
@@ -1678,7 +1679,7 @@ export default function ShopHeader() {
                   </SearchBarButton>
                   <SearchBarInputWrap>
                     <DropdownSearch
-                      placeholder="Wunschprodukte suchen"
+                      placeholder={tSearch("placeholder")}
                       hitsPerPage={5}
                       attributes={algoliaAttributes}
                       maxHeight={tokens.search.dropdownMaxHeight}
@@ -1753,7 +1754,7 @@ export default function ShopHeader() {
                   onOpen={() => { setLocaleDropdownOpen(false); setMainMenuOpen(false); }}
                 />
               </MiddleBarUserWrap>
-              <MiddleBarCartBtn type="button" onClick={openCartSidebar} title="Warenkorb" aria-label="Warenkorb">
+              <MiddleBarCartBtn type="button" onClick={openCartSidebar} title={tCommon("cart")} aria-label={tCommon("cart")}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path fillRule="evenodd" clipRule="evenodd" d="M1 2.75C1 2.33579 1.33579 2 1.75 2H2.27029C3.34283 2 4.26626 2.75703 4.4766 3.80874L4.71485 5H20.2676C21.3791 5 22.209 6.02281 21.98 7.11052L20.5682 13.8165C20.3003 15.0891 19.1777 16 17.8772 16H7.63961C6.32874 16 5.20009 15.0747 4.94301 13.7893L3.00573 4.10291C2.93562 3.75234 2.6278 3.5 2.27029 3.5H1.75C1.33579 3.5 1 3.16421 1 2.75ZM6 19C6 17.8954 6.89543 17 8 17C9.10457 17 10 17.8954 10 19C10 20.1046 9.10457 21 8 21C6.89543 21 6 20.1046 6 19ZM15 19C15 17.8954 15.8954 17 17 17C18.1046 17 19 17.8954 19 19C19 20.1046 18.1046 21 17 21C15.8954 21 15 20.1046 15 19Z" />
                 </svg>

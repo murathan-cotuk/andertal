@@ -2,7 +2,7 @@
 
 import React, { useState, useContext, useMemo } from "react";
 import { Link } from "@/i18n/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
@@ -184,17 +184,17 @@ const Pill = styled.button`
   }
 `;
 
-function atcLabel(locale, adding, oos, soon, unavail) {
+function atcLabel(tp, adding, oos, soon, unavail) {
   if (adding) return "…";
-  if (locale === "de")
-    return soon ? "Demnächst" : unavail ? "Nicht lieferbar" : oos ? "Ausverkauft" : "In den Warenkorb";
-  if (locale === "tr")
-    return soon ? "Yakında" : unavail ? "Teslimat yok" : oos ? "Tükendi" : "Sepete ekle";
-  return soon ? "Coming soon" : unavail ? "Unavailable" : oos ? "Out of stock" : "Add to cart";
+  if (soon) return tp("comingSoon");
+  if (unavail) return tp("notAvailable");
+  if (oos) return tp("outOfStock");
+  return tp("addToCart");
 }
 
 export function ProductCategoryRow({ product, activeFilters = {} }) {
   const locale = useLocale();
+  const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
@@ -332,32 +332,17 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
   const showPills = variants.length > 1;
 
   const shipText = (() => {
-    if (shippingUnavailable) {
-      if (locale === "de") return "Versand: nicht verfügbar";
-      if (locale === "tr") return "Kargo: yok";
-      return "Shipping: unavailable";
-    }
+    if (shippingUnavailable) return tp("shippingUnavailable");
     if (!hasShippingGroup) return null;
-    if (shippingPriceCents === 0) {
-      if (locale === "de") return "Versand: kostenlos";
-      if (locale === "tr") return "Ücretsiz kargo";
-      return "Free shipping";
-    }
-    if (shippingPriceCents != null) {
-      const s = formatPriceCents(shippingPriceCents);
-      if (locale === "de") return `Versand: ${s} €`;
-      if (locale === "tr") return `Kargo: ${s} €`;
-      return `Shipping: ${s} €`;
-    }
+    if (shippingPriceCents === 0) return tp("freeShipping");
+    if (shippingPriceCents != null) return `${tp("shipping")}: ${formatPriceCents(shippingPriceCents)} €`;
     return null;
   })();
 
   const lowStockText = (() => {
     if (!lowStock || isComingSoon) return null;
     const n = Number(inventoryQty);
-    if (locale === "de") return `Nur ${n} auf Lager`;
-    if (locale === "tr") return `Sadece ${n} stokta`;
-    return `Only ${n} left in stock`;
+    return tp("lowStock", { n });
   })();
 
   const handleQuickAdd = async (e) => {
@@ -398,19 +383,13 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
         </div>
 
         <TagRow>
-          {isBestseller && !isComingSoon && (
-            <Tag $mut>{locale === "tr" ? "Çok satan" : "Bestseller"}</Tag>
-          )}
-          {isComingSoon && <Tag>{locale === "tr" ? "Yakında" : locale === "de" ? "Demnächst" : "Coming soon"}</Tag>}
-          {hasSale && !isComingSoon && (
-            <Tag $sale>{locale === "tr" ? "İndirim" : locale === "de" ? "Angebot" : "Sale"}</Tag>
-          )}
-          {isNew && !hasSale && !isComingSoon && (
-            <Tag>{locale === "tr" ? "Yeni" : locale === "de" ? "Neu" : "New"}</Tag>
-          )}
+          {isBestseller && !isComingSoon && <Tag $mut>{tp("bestseller")}</Tag>}
+          {isComingSoon && <Tag>{tp("comingSoon")}</Tag>}
+          {hasSale && !isComingSoon && <Tag $sale>{tp("sale")}</Tag>}
+          {isNew && !hasSale && !isComingSoon && <Tag>{tp("new")}</Tag>}
           {lowStockText && !isComingSoon && <Tag $mut>{lowStockText}</Tag>}
-          {shippingUnavailable && !isComingSoon && <Tag $mut>Nicht lieferbar</Tag>}
-          {outOfStock && !isComingSoon && <Tag $mut>{locale === "de" ? "Ausverkauft" : "Out of stock"}</Tag>}
+          {shippingUnavailable && !isComingSoon && <Tag $mut>{tp("notAvailable")}</Tag>}
+          {outOfStock && !isComingSoon && <Tag $mut>{tp("outOfStock")}</Tag>}
         </TagRow>
 
         <Prices>
@@ -463,7 +442,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
             onClick={handleQuickAdd}
             disabled={cartLoading || adding || outOfStock || isComingSoon || shippingUnavailable}
           >
-            {atcLabel(locale, adding, outOfStock, isComingSoon, shippingUnavailable)}
+            {atcLabel(tp, adding, outOfStock, isComingSoon, shippingUnavailable)}
           </Atc>
         </AtcRow>
       </Content>

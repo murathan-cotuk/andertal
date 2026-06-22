@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import styled, { keyframes, css } from "styled-components";
 import { CategoryProductListing } from "@/components/CategoryProductListing";
 import { Link } from "@/i18n/navigation";
@@ -875,6 +876,7 @@ function visibleSubcats(children) {
 }
 
 export default function CategoryTemplate() {
+  const tCommon = useTranslations("common");
   const params = useParams();
   const searchParams = useSearchParams();
   const slug = params?.slug ? String(params.slug) : params?.handle ? String(params.handle) : "";
@@ -1245,18 +1247,18 @@ export default function CategoryTemplate() {
             <SidebarHead>
               <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#1c1917" }}>
                 {showMobileCatNav && hasFacets
-                  ? (mobileDrawerTab === "categories" ? "Kategorien" : `Filter${activeCount > 0 ? ` (${activeCount})` : ""}`)
+                  ? (mobileDrawerTab === "categories" ? tCommon("categories") : `${tCommon("filter")}${activeCount > 0 ? ` (${activeCount})` : ""}`)
                   : hasFacets
-                    ? `Filter${activeCount > 0 ? ` (${activeCount})` : ""}`
-                    : "Kategorien"}
+                    ? `${tCommon("filter")}${activeCount > 0 ? ` (${activeCount})` : ""}`
+                    : tCommon("categories")}
               </span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {activeCount > 0 && (
                   <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "4px 10px", fontSize: 10 }}>
-                    Löschen
+                    {tCommon("clear")}
                   </ClearAllBtn>
                 )}
-                <button type="button" aria-label="Navigation schließen" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#57534e", lineHeight: 1, padding: 4 }}>×</button>
+                <button type="button" aria-label={tCommon("close")} onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#57534e", lineHeight: 1, padding: 4 }}>×</button>
               </div>
             </SidebarHead>
 
@@ -1327,9 +1329,9 @@ export default function CategoryTemplate() {
               )}
               <SidebarPane>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                  Filter
+                  {tCommon("filter")}
                   {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>Clear</ClearAllBtn>
+                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>{tCommon("clear")}</ClearAllBtn>
                   )}
                 </div>
                 {hasFacets ? (
@@ -1353,10 +1355,10 @@ export default function CategoryTemplate() {
                     </FilterGroup>
                   ))
                 ) : (
-                  <div style={{ fontSize: 12, color: "#8b8b8b", padding: "6px 2px" }}>Bu kategoride filtre bulunmuyor.</div>
+                  <div style={{ fontSize: 12, color: "#8b8b8b", padding: "6px 2px" }}>{tCommon("noFilters")}</div>
                 )}
                 {activeCount > 0 && (
-                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>Clear all filters</ClearAllBtn>
+                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>{tCommon("clearAllFilters")}</ClearAllBtn>
                 )}
               </SidebarPane>
             </SidebarSplit>
@@ -1365,7 +1367,7 @@ export default function CategoryTemplate() {
             {/* Mobile: tabs separate categories vs. product filters */}
             <MobileDrawerChrome>
               {showMobileCatNav && hasFacets ? (
-                <MobileDrawerSegments role="tablist" aria-label="Katalog Navigation">
+                <MobileDrawerSegments role="tablist" aria-label={tCommon("catalogNavigation")}>
                   <MobileDrawerSegmentBtn
                     type="button"
                     role="tab"
@@ -1373,7 +1375,7 @@ export default function CategoryTemplate() {
                     $active={mobileDrawerTab === "categories"}
                     onClick={() => setMobileDrawerTab("categories")}
                   >
-                    Kategorien
+                    {tCommon("categories")}
                   </MobileDrawerSegmentBtn>
                   <MobileDrawerSegmentBtn
                     type="button"
@@ -1382,14 +1384,14 @@ export default function CategoryTemplate() {
                     $active={mobileDrawerTab === "filters"}
                     onClick={() => setMobileDrawerTab("filters")}
                   >
-                    Filter{activeCount > 0 ? ` · ${activeCount}` : ""}
+                    {tCommon("filter")}{activeCount > 0 ? ` · ${activeCount}` : ""}
                   </MobileDrawerSegmentBtn>
                 </MobileDrawerSegments>
               ) : null}
 
               {showMobileCatNav && (!hasFacets || mobileDrawerTab === "categories") ? (
                 <MobileCategoriesScroll>
-                  <MobileCategoryBlockTitle>Kategorienavigation</MobileCategoryBlockTitle>
+                  <MobileCategoryBlockTitle>{tCommon("categoryNavigation")}</MobileCategoryBlockTitle>
                   {hasSubcategories ? (
                     <>
                       {parentCategory ? (
@@ -1480,7 +1482,7 @@ export default function CategoryTemplate() {
               {hasFacets && (!showMobileCatNav || mobileDrawerTab === "filters") ? (
                 <MobileFilterSplit>
                   <MobileFilterLeft>
-                    <MobileFilterRailHeader>Produkteigenschaften</MobileFilterRailHeader>
+                    <MobileFilterRailHeader>{tCommon("productProperties")}</MobileFilterRailHeader>
                     <MobileFilterLeftScroll>
                       {Object.entries(facets).map(([key]) => {
                         const cnt = (filters[key] || []).length;
@@ -1488,7 +1490,7 @@ export default function CategoryTemplate() {
                           <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
                             {getFacetGroupTitle(key)}
                             {cnt > 0 ? (
-                              <span style={{ display: "block", fontSize: 10, color: "#0f766e", fontWeight: 800, marginTop: 4 }}>{cnt} aktiv</span>
+                              <span style={{ display: "block", fontSize: 10, color: "#0f766e", fontWeight: 800, marginTop: 4 }}>{cnt} {tCommon("active")}</span>
                             ) : null}
                           </MobileFilterLeftBtn>
                         );
@@ -1500,7 +1502,7 @@ export default function CategoryTemplate() {
                       {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
                         <>
                           <MobileFilterRightHead>{getFacetGroupTitle(activeMobileFilterGroup)}</MobileFilterRightHead>
-                          <MobileFilterRightHint>Wählen Sie einen oder mehrere Werte. Tippen Sie erneut, um abzuwählen.</MobileFilterRightHint>
+                          <MobileFilterRightHint>{tCommon("filterHint")}</MobileFilterRightHint>
                           <MobileFilterPillGrid>
                             {facets[activeMobileFilterGroup].map((val) => {
                               const on = (filters[activeMobileFilterGroup] || []).includes(val);

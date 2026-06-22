@@ -995,7 +995,7 @@ export default function SearchTemplate() {
     if (!hasNavPane) return null;
     return (
       <div>
-        <div style={{ padding: "8px 8px 4px 11px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999" }}>Kategorien</div>
+        <div style={{ padding: "8px 8px 4px 11px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#999" }}>{tCommon("categories")}</div>
         {branchNav && hasSubcategories ? (
           <>
             {parentCategory && (
@@ -1150,12 +1150,12 @@ export default function SearchTemplate() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {activeCount > 0 && (
                     <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "2px 8px", fontSize: 10 }}>
-                      Löschen
+                      {tCommon("clear")}
                     </ClearAllBtn>
                   )}
                   <button
                     type="button"
-                    aria-label="Schließen"
+                    aria-label={tCommon("close")}
                     onClick={() => setPanelOpen(false)}
                     style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }}
                   >
@@ -1170,10 +1170,10 @@ export default function SearchTemplate() {
                   {renderDesktopNavPane()}
                   <SidebarPane>
                     <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                      Filter
+                      {tCommon("filter")}
                       {activeCount > 0 && (
                         <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
-                          Clear
+                          {tCommon("clear")}
                         </ClearAllBtn>
                       )}
                     </div>
@@ -1204,7 +1204,7 @@ export default function SearchTemplate() {
                     )}
                     {activeCount > 0 && (
                       <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }}>
-                        Clear all filters
+                        {tCommon("clearAllFilters")}
                       </ClearAllBtn>
                     )}
                   </SidebarPane>
@@ -1222,7 +1222,7 @@ export default function SearchTemplate() {
                       $active={mobileDrawerTab === "categories"}
                       onClick={() => setMobileDrawerTab("categories")}
                     >
-                      Kategorien
+                      {tCommon("categories")}
                     </MobileDrawerSegmentBtn>
                     <MobileDrawerSegmentBtn
                       type="button"
@@ -1231,7 +1231,7 @@ export default function SearchTemplate() {
                       $active={mobileDrawerTab === "filters"}
                       onClick={() => setMobileDrawerTab("filters")}
                     >
-                      Filter{activeCount > 0 ? ` · ${activeCount}` : ""}
+                      {tCommon("filter")}{activeCount > 0 ? ` · ${activeCount}` : ""}
                     </MobileDrawerSegmentBtn>
                   </MobileDrawerSegments>
                 )}
@@ -1239,7 +1239,7 @@ export default function SearchTemplate() {
                 {/* Category navigation tab */}
                 {hasNavPane && (!hasFacets || mobileDrawerTab === "categories") && (
                   <MobileCategoriesScroll>
-                    <MobileCategoryBlockTitle>Kategorienavigation</MobileCategoryBlockTitle>
+                    <MobileCategoryBlockTitle>{tCommon("categoryNavigation")}</MobileCategoryBlockTitle>
                     {branchNav && hasSubcategories ? (
                       <>
                         {parentCategory && (
@@ -1350,7 +1350,7 @@ export default function SearchTemplate() {
                         </MobileFilterPillGrid>
                       ) : (
                         <div style={{ color: "#a8a29e", fontSize: 13, lineHeight: 1.45, paddingTop: 8 }}>
-                          Wählen Sie links eine Produkteigenschaft.
+                          {tCommon("filterSelectHint")}
                         </div>
                       )}
                     </MobileFilterRight>

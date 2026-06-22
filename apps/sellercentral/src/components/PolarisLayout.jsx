@@ -878,10 +878,34 @@ export default function PolarisLayout({ children }) {
                     !notifData?.recent_returns?.length &&
                     !notifData?.recent_verifications?.length &&
                     !notifData?.recent_product_change_requests?.length &&
-                    !notifData?.recent_campaigns_submitted?.length) ? (
+                    !notifData?.recent_campaigns_submitted?.length &&
+                    !notifData?.recent_seller_errors?.length) ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>{notifCopy.empty}</div>
                   ) : (
                     <>
+                      {(notifData?.recent_seller_errors || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {notifCopy.sellerErrors}
+                        </div>
+                      )}
+                      {(notifData?.recent_seller_errors || []).map((e) => (
+                        <Link
+                          key={e.id}
+                          href="/sellers/errors"
+                          onClick={() => setNotifOpen(false)}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                        >
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                              {notifCopy.sellerErrorTitle(e.store_name || e.seller_email || e.seller_id || "—")}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2 }}>
+                              {e.error_code ? `[${e.error_code}] ` : ""}{String(e.error_message || "").slice(0, 120)}
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
                       {(notifData?.recent_campaigns_submitted || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.campaigns}

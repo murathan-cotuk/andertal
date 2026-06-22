@@ -9,6 +9,14 @@ import { useLt, dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getNotificationsPageCopy } from "@/lib/notifications-page-i18n";
+import {
+  getNotificationGroupLabel,
+  localizeNotificationItem,
+  changeSuggestionTypeLabel,
+  changeSuggestionItemLabel,
+  changeSuggestionFieldLabel,
+} from "@/lib/notifications-feed-localize";
+import { formatChangeRequestValueForDisplay } from "@/lib/product-change-request-format";
 
 function itemKey(it) {
   return `${it.source_type}:${it.source_id}`;
@@ -25,8 +33,105 @@ function formatDateDmy(value, locale) {
   });
 }
 
+const TABLE_GRID = "40px 100px 90px minmax(120px, 1fr) minmax(90px, 0.8fr) minmax(140px, 1.2fr) minmax(140px, 1.2fr) 100px";
+
+function cellStyle(extra = {}) {
+  return {
+    padding: "10px 12px",
+    borderRight: "1px solid #e5e7eb",
+    borderBottom: "1px solid #e5e7eb",
+    fontSize: 13,
+    lineHeight: 1.45,
+    verticalAlign: "top",
+    wordBreak: "break-word",
+    ...extra,
+  };
+}
+
+function ChangeSuggestionsTable({ items, busy, selected, onToggle, onDeleteOne, locale, c }) {
+  const tbl = c.changeTable;
+
+  return (
+    <div style={{ overflowX: "auto", width: "100%" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: TABLE_GRID,
+          minWidth: 960,
+          background: "#f3f4f6",
+          borderTop: "1px solid #e5e7eb",
+          borderLeft: "1px solid #e5e7eb",
+          fontWeight: 600,
+          fontSize: 11,
+          color: "#4b5563",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
+        <div style={cellStyle({ display: "flex", justifyContent: "center", alignItems: "center" })}>{tbl.colSelect}</div>
+        <div style={cellStyle()}>{tbl.colDate}</div>
+        <div style={cellStyle()}>{tbl.colType}</div>
+        <div style={cellStyle()}>{tbl.colItem}</div>
+        <div style={cellStyle()}>{tbl.colField}</div>
+        <div style={{ ...cellStyle(), background: "#fef2f2" }}>{tbl.colCurrent}</div>
+        <div style={{ ...cellStyle({ borderRight: "none" }), background: "#f0fdf4" }}>{tbl.colProposed}</div>
+        <div style={{ ...cellStyle({ borderRight: "none" }), background: "#f3f4f6" }}>{tbl.colActions}</div>
+      </div>
+
+      {items.map((raw, idx) => {
+        const it = localizeNotificationItem(raw, locale);
+        const k = itemKey(it);
+        const href = it.href || "#";
+        const currentVal = it.old_value != null ? formatChangeRequestValueForDisplay(it.old_value) : "—";
+        const proposedVal = it.new_value != null ? formatChangeRequestValueForDisplay(it.new_value) : "—";
+        const rowBg = idx % 2 === 0 ? "#fff" : "#fafafa";
+
+        return (
+          <div
+            key={k}
+            style={{
+              display: "grid",
+              gridTemplateColumns: TABLE_GRID,
+              minWidth: 960,
+              borderLeft: "1px solid #e5e7eb",
+              background: it.read ? rowBg : "#fffbeb",
+            }}
+          >
+            <div style={cellStyle({ display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 14 })}>
+              <Checkbox label="" labelHidden checked={selected.has(k)} onChange={() => onToggle(k)} />
+            </div>
+            <div style={cellStyle({ color: "#6b7280", whiteSpace: "nowrap" })}>{formatDateDmy(it.created_at, locale)}</div>
+            <div style={cellStyle({ fontWeight: 600 })}>{changeSuggestionTypeLabel(it, locale)}</div>
+            <div style={cellStyle()}>
+              <Link href={href} style={{ color: "#111827", fontWeight: 600, textDecoration: "none" }}>
+                {changeSuggestionItemLabel(it, locale)}
+              </Link>
+            </div>
+            <div style={cellStyle({ color: "#374151" })}>{changeSuggestionFieldLabel(it, locale)}</div>
+            <div style={{ ...cellStyle(), background: idx % 2 === 0 ? "#fffafa" : "#fef8f8", color: "#374151", whiteSpace: "pre-wrap" }}>
+              {currentVal}
+            </div>
+            <div style={{ ...cellStyle({ borderRight: "none" }), background: idx % 2 === 0 ? "#f8fffa" : "#f3fdf6", color: "#111827", fontWeight: 600, whiteSpace: "pre-wrap" }}>
+              {proposedVal}
+            </div>
+            <div style={{ ...cellStyle({ borderRight: "none" }), display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+              <Link href={href} style={{ fontSize: 12, fontWeight: 600, color: "#0284c7", textDecoration: "none" }}>
+                {tbl.open} →
+              </Link>
+              <Button size="slim" variant="plain" tone="critical" disabled={busy} onClick={() => onDeleteOne(it)}>
+                {c.removeFromList}
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) {
   const c = getNotificationsPageCopy(locale);
+  const localized = localizeNotificationItem(it, locale);
   const k = itemKey(it);
   const dt = formatDateDmy(it.created_at, locale);
   return (
@@ -59,11 +164,11 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) 
             />
           )}
           <Link href={it.href || "#"} style={{ textDecoration: "none", color: "inherit", fontWeight: it.read ? 500 : 700 }}>
-            <span style={{ fontSize: 14, color: "#111827" }}>{it.title}</span>
+            <span style={{ fontSize: 14, color: "#111827" }}>{localized.title}</span>
           </Link>
         </div>
-        {it.subtitle ? (
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, lineHeight: 1.4 }}>{it.subtitle}</div>
+        {localized.subtitle ? (
+          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, lineHeight: 1.4 }}>{localized.subtitle}</div>
         ) : null}
       </div>
       <div style={{ fontSize: 12, color: "#9ca3af", whiteSpace: "nowrap" }}>{dt}</div>
@@ -90,10 +195,9 @@ export default function NotificationsPage() {
   const [activeGroupKey, setActiveGroupKey] = useState(null);
 
   const flatItems = useMemo(() => groups.flatMap((g) => g.items || []), [groups]);
-  const activeGroupItems = useMemo(() => {
-    if (!activeGroupKey) return [];
-    return groups.find((g) => g.key === activeGroupKey)?.items || [];
-  }, [groups, activeGroupKey]);
+  const activeGroup = useMemo(() => groups.find((g) => g.key === activeGroupKey) || null, [groups, activeGroupKey]);
+  const activeGroupItems = useMemo(() => activeGroup?.items || [], [activeGroup]);
+  const isChangeSuggestionTab = activeGroupKey === "change_suggestion";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,7 +214,7 @@ export default function NotificationsPage() {
         setGrandTotal(typeof data.grand_total === "number" ? data.grand_total : (data.groups || []).reduce((s, g) => s + (g.items?.length || 0), 0));
       } else {
         const legacy = data.items || [];
-        const nextGroups = [{ key: "all", label_en: c.allFallback, label_tr: c.allFallback, label_de: c.allFallback, description_de: "", items: legacy, total: legacy.length }];
+        const nextGroups = [{ key: "all", label_de: c.allFallback, items: legacy, total: legacy.length }];
         setGroups(nextGroups);
         setActiveGroupKey("all");
         setGrandTotal(typeof data.total === "number" ? data.total : legacy.length);
@@ -121,7 +225,7 @@ export default function NotificationsPage() {
       setGrandTotal(0);
     }
     setLoading(false);
-  }, []);
+  }, [c.allFallback]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,7 +245,6 @@ export default function NotificationsPage() {
     };
   }, [load]);
 
-  const allKeys = useMemo(() => flatItems.map(itemKey), [flatItems]);
   const visibleKeys = useMemo(() => activeGroupItems.map(itemKey), [activeGroupItems]);
 
   const toggleOne = (k) => {
@@ -159,17 +262,6 @@ export default function NotificationsPage() {
       const n = new Set(prev);
       if (allVisibleSelected) visibleKeys.forEach((k) => n.delete(k));
       else visibleKeys.forEach((k) => n.add(k));
-      return n;
-    });
-  };
-
-  const toggleSectionKeys = (sectionItems) => {
-    const keys = sectionItems.map(itemKey);
-    const allIn = keys.length > 0 && keys.every((k) => selected.has(k));
-    setSelected((prev) => {
-      const n = new Set(prev);
-      if (allIn) keys.forEach((k) => n.delete(k));
-      else keys.forEach((k) => n.add(k));
       return n;
     });
   };
@@ -234,12 +326,6 @@ export default function NotificationsPage() {
   };
 
   const removeSelectedLabel = c.removeSelected(selected.size);
-
-  const getGroupLabel = (g) => {
-    if (locale === "en" && g.label_en) return g.label_en;
-    if (locale === "tr" && g.label_tr) return g.label_tr;
-    return g.label_de || g.key;
-  };
 
   const footerText = useMemo(() => {
     const hasVerif = groups.some((x) => x.key === "verification" || x.key === "change_suggestion");
@@ -318,43 +404,60 @@ export default function NotificationsPage() {
                         cursor: "pointer",
                       }}
                     >
-                      {getGroupLabel(g)} ({count})
+                      {getNotificationGroupLabel(g, locale)} ({count})
                     </button>
                   );
                 })}
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "40px 1fr auto auto",
-                  gap: 0,
-                  alignItems: "center",
-                  padding: "10px 16px",
-                  borderBottom: "1px solid #e5e7eb",
-                  fontWeight: 600,
-                  fontSize: 12,
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  background: "#fafafa",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                  <Checkbox
-                    label=""
-                    labelHidden
-                    checked={visibleKeys.length > 0 && visibleKeys.every((k) => selected.has(k))}
-                    onChange={toggleAllVisible}
-                  />
+              {!isChangeSuggestionTab && (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "40px 1fr auto auto",
+                    gap: 0,
+                    alignItems: "center",
+                    padding: "10px 16px",
+                    borderBottom: "1px solid #e5e7eb",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: "#6b7280",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    background: "#fafafa",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <Checkbox
+                      label=""
+                      labelHidden
+                      checked={visibleKeys.length > 0 && visibleKeys.every((k) => selected.has(k))}
+                      onChange={toggleAllVisible}
+                    />
+                  </div>
+                  <div>
+                    {getNotificationGroupLabel(activeGroup || {}, locale)} ({activeGroupItems.length})
+                  </div>
+                  <div style={{ textAlign: "right" }}>{ui.colDate}</div>
+                  <div />
                 </div>
-                <div>
-                  {getGroupLabel(groups.find((g) => g.key === activeGroupKey) || {})} (
-                  {activeGroupItems.length})
+              )}
+
+              {isChangeSuggestionTab && activeGroupItems.length > 0 && (
+                <div style={{ padding: "10px 16px", borderBottom: "1px solid #e5e7eb", background: "#fafafa" }}>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Checkbox
+                      label=""
+                      labelHidden
+                      checked={visibleKeys.length > 0 && visibleKeys.every((k) => selected.has(k))}
+                      onChange={toggleAllVisible}
+                    />
+                    <Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">
+                      {getNotificationGroupLabel(activeGroup || {}, locale)} ({activeGroupItems.length})
+                    </Text>
+                  </InlineStack>
                 </div>
-                <div style={{ textAlign: "right" }}>{ui.colDate}</div>
-                <div />
-              </div>
+              )}
 
               <div>
                 {activeGroupItems.length === 0 ? (
@@ -363,6 +466,16 @@ export default function NotificationsPage() {
                       {c.noInCategory}
                     </Text>
                   </Box>
+                ) : isChangeSuggestionTab ? (
+                  <ChangeSuggestionsTable
+                    items={activeGroupItems}
+                    busy={busy}
+                    selected={selected}
+                    onToggle={toggleOne}
+                    onDeleteOne={deleteOne}
+                    locale={locale}
+                    c={c}
+                  />
                 ) : (
                   activeGroupItems.map((it) => (
                     <NotificationRow
