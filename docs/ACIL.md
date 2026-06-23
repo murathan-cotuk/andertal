@@ -21,10 +21,11 @@ References:
 ## STATUS SNAPSHOT (every agent updates this at end of session)
 
 - Last update: 2026-06-23 by Agent-1 (Cursor on Murathan's main PC)
-- Active task: none (S1.1 just finished, no task in progress)
+- Active task: none (S1.1 + S1.2 finished, awaiting "continue?" decision)
 - Blocking decisions: none yet
-- Next agent should start with: S1.2 (Sellercentral middleware JWT verify)
-- Active branch: `fix/s1-1-rotate-secrets` — committed locally, awaiting user push or merge decision
+- Active branch: `fix/s1-1-rotate-secrets` (per user request, multiple sprint-1 tasks share one branch to keep PR count low)
+- Pushed to remote: NO (awaiting user push approval)
+- Next pending tasks (any order): S1.3 admin-route auth, S1.4 Sentry, S1.5 LAN IPs, S1.6 CI, S1.7 logger
 - All other sprints untouched
 
 ---
@@ -116,23 +117,43 @@ Risk realized: Zero impact on dev workflows. Production must set env vars before
 
 ---
 
-### S1.2 — Sellercentral middleware: verify JWT signature [ ]
+### S1.2 — Sellercentral middleware: verify JWT signature [x]
 
-Problem: `apps/sellercentral/src/middleware.js` only checks cookie presence (`if (!token)`), never verifies signature or expiration. Setting any value as `sc_token` cookie bypasses auth at the middleware level.
+Problem: `apps/sellercentral/src/middleware.js` only checked cookie presence (`if (!token)`), never verified signature or expiration. Setting any value as `sc_token` cookie bypassed auth at the middleware level.
 
 Subtasks:
-- [ ] Add `jose` (preferred for Edge runtime) to sellercentral deps.
-- [ ] In middleware: verify JWT signature using `JWT_SECRET` (HS256 short-term, RS256 long-term).
-- [ ] On invalid/expired token: clear cookie and redirect to login.
-- [ ] Test with a forged cookie.
+- [x] Add `jose@^5` (Edge-runtime-compatible — uses Web Crypto under the hood) to sellercentral deps.
+- [x] Rewrite middleware: verify JWT signature using `SELLER_JWT_SECRET || JWT_SECRET` (HS256, matches backend's existing `signSellerToken` in `server.js:5582-5588`).
+- [x] On invalid/expired token: redirect to login AND clear the `sc_token` cookie (maxAge=0).
+- [x] Production fail-safe: if secret unset in prod, log [middleware] error and treat all tokens as invalid (denial-of-access, not denial-of-security).
+- [x] Dev fallback: same placeholder secret as backend (`dev-only-seller-secret-do-not-use-in-prod`) so local dev tokens validate without env config.
+- [x] Add `SELLER_JWT_SECRET` / `JWT_SECRET` to `apps/sellercentral/.env.example`.
 
-Acceptance:
-- Setting `document.cookie="sc_token=garbage"` does not bypass middleware.
-- Expired token causes redirect + cookie clear.
+Acceptance — verified by `/tmp/andertal-middleware-test.js` (deleted after run), 7/7 pass:
+- [x] Valid HS256 token signed by backend's `signSellerToken` verifies via jose. PASS
+- [x] Tampered signature rejected (`ERR_JWS_SIGNATURE_VERIFICATION_FAILED`). PASS
+- [x] Tampered body rejected. PASS
+- [x] Expired token rejected (`ERR_JWT_EXPIRED`). PASS
+- [x] Wrong secret rejected. PASS
+- [x] Garbage / malformed token rejected (`ERR_JWS_INVALID`). PASS
+- [x] `alg=none` confusion attack rejected (`ERR_JOSE_ALG_NOT_ALLOWED`) — critical. PASS
 
-Risk: Medium. Wrong key resolution will lock everyone out. Stage carefully.
+Risk realized: Medium. Anyone whose `JWT_SECRET` is misaligned between backend and sellercentral will be logged out. Mitigation: backend reads `SELLER_JWT_SECRET` then falls back to `JWT_SECRET`; middleware does the same; both default to the same dev placeholder. As long as production sets the *same* value on both, no drift.
 
-Decision needed (default if no user input): use HS256 with `JWT_SECRET` env shared between backend and sellercentral middleware. This is the existing model — keep it simple for PR 1; RS256 migration is S2.x.
+### AGENT NOTES (S1.2)
+
+- Branch: continued on `fix/s1-1-rotate-secrets` (kullanıcı tek branch istedi — S1.1 ile aynı branch).
+- Files changed:
+  - `apps/sellercentral/package.json` — added `jose: ^5.10.0`
+  - `package-lock.json` (root) — auto-updated by npm
+  - `apps/sellercentral/src/middleware.js` — full rewrite, now async, uses `jwtVerify`
+  - `apps/sellercentral/.env.example` — added `SELLER_JWT_SECRET` and `JWT_SECRET` block with instructions
+- Verification:
+  - `npm run lint --workspace=apps/sellercentral` → clean
+  - Custom token-roundtrip test (sign with backend's HMAC-SHA256, verify with jose): 7/7 pass
+- USER ACTION REQUIRED:
+  - On Vercel (or wherever sellercentral is hosted), set `SELLER_JWT_SECRET` (or `JWT_SECRET`) to the **same value** as the backend's secret.
+  - If not set: middleware will redirect all authenticated requests to login (fails closed — correct behavior).
 
 ---
 
@@ -388,3 +409,4 @@ Same pre-checks as S4.1. Additionally:
 ## CHANGE LOG (every session appends a short entry)
 
 - 2026-06-23 Agent-1 (Murathan main PC): Created ACIL.md from prior audit findings. Completed S1.1 on branch `fix/s1-1-rotate-secrets`. Three test scenarios validated (dev OK, prod-no-env fails, prod-with-env OK). Branch ready for user review/push/merge.
+- 2026-06-23 Agent-1 (Murathan main PC): Completed S1.2 on same branch. Added `jose@^5` to sellercentral and rewrote middleware to verify HS256 JWT signature + expiry. 7/7 token-roundtrip tests passed including `alg=none` confusion attack rejection. Branch not yet pushed.
