@@ -325,7 +325,10 @@ export default function DashboardHome() {
         <div>
           <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800, color: "#111827" }}>{greeting}</h1>
           <p style={{ margin: 0, fontSize: 14, color: "#6b7280" }}>
-            {new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            {new Date().toLocaleDateString(
+              locale === "de" ? "de-DE" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "en-GB",
+              { weekday: "long", day: "numeric", month: "long", year: "numeric" }
+            )}
           </p>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>

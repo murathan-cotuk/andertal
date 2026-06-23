@@ -408,7 +408,7 @@ const MorePill = styled.button`
  *  Component
  * ─────────────────────────────────────────────────────────── */
 
-export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: isBestsellerProp, rank }) {
+export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: isBestsellerProp, rank, hideBestsellerBadge = false }) {
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -628,7 +628,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
         <Badges>
           {isBestseller && !isComingSoon && (
             <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              <BestsellerBadge />
+              {!hideBestsellerBadge && <BestsellerBadge />}
               {rank != null && <RankBadge>#{rank}</RankBadge>}
             </div>
           )}

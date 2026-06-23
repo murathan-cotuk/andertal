@@ -6641,7 +6641,7 @@ async function start() {
     }
     const isUuidLike = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((s || '').trim())
     const BESTSELLER_CACHE_TTL_MS = 5 * 60 * 1000
-    let bestsellerCache = { expiresAt: 0, ids: new Set() }
+    let bestsellerCache = { expiresAt: 0, ids: new Set(), scoresById: new Map() }
     const salesScoreFromMetadata = (metadata) => {
       const m = metadata && typeof metadata === 'object' ? metadata : {}
       const soldLastMonth = Number(m.sold_last_month ?? 0)
@@ -6692,10 +6692,12 @@ async function start() {
       all = all.filter((p) => (p.status || '').toLowerCase() === 'published' && isStoreVisibleSellerProduct(p, approvedSellerIds))
       const byCollection = new Map()
       const byCategory = new Map()
+      const allScoresById = new Map()
       for (const p of all) {
         // Real order data takes priority; metadata fields are fallback
         const score = realSalesById.get(String(p.id).trim()) || salesScoreFromMetadata(p.metadata)
         if (!(score > 0)) continue
+        allScoresById.set(String(p.id).trim(), score)
         const collectionKeys = productCollectionKeys(p)
         for (const key of collectionKeys) {
           const prev = byCollection.get(key)
@@ -6711,7 +6713,7 @@ async function start() {
         ...Array.from(byCollection.values()).map((x) => String(x.id)),
         ...Array.from(byCategory.values()).map((x) => String(x.id)),
       ])
-      bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids }
+      bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids, scoresById: allScoresById }
       return ids
     }
     const collectCategorySubtreeIdsBySlug = (tree, slug) => {
@@ -7132,6 +7134,10 @@ async function start() {
         }
       }
       const bestsellerIds = await getBestsellerProductIds()
+      const realSalesScore = bestsellerCache.scoresById?.get(String(productRow.id).trim())
+      if (realSalesScore > 0) {
+        mapped.metadata = { ...(mapped.metadata || {}), sales_count: realSalesScore }
+      }
       if (bestsellerIds.has(String(productRow.id))) {
         mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
       }
@@ -8289,10 +8295,31 @@ async function start() {
           }
         }
 
+        let customerSessionSecret = null
+        if (stripeCustomerId) {
+          try {
+            const cs = await stripe.customerSessions.create({
+              customer: stripeCustomerId,
+              components: {
+                payment_element: {
+                  enabled: true,
+                  features: {
+                    payment_method_save: 'enabled',
+                    payment_method_redisplay: 'enabled',
+                    payment_method_remove: 'enabled',
+                  },
+                },
+              },
+            })
+            customerSessionSecret = cs.client_secret
+          } catch (_) {}
+        }
+
         await client.end()
         res.json({
           client_secret: paymentIntent.client_secret,
           payment_intent_id: paymentIntent.id,
+          customer_session_secret: customerSessionSecret,
           amount_cents: payCents,
           subtotal_cents: subtotalCents,
           shipping_cents: shippingCents,
@@ -10635,7 +10662,7 @@ async function start() {
         const categoryKeys = new Set() // slug or id for link_type=category
         for (const menu of menus) {
           const itemsRes = await client.query(
-            'SELECT id, menu_id, label, link_type, link_value, parent_id, sort_order FROM admin_hub_menu_items WHERE menu_id = $1 ORDER BY sort_order ASC, label ASC',
+            'SELECT id, menu_id, label, slug, link_type, link_value, parent_id, sort_order FROM admin_hub_menu_items WHERE menu_id = $1 ORDER BY sort_order ASC, label ASC',
             [menu.id]
           )
           const rows = itemsRes.rows || []
@@ -10669,6 +10696,7 @@ async function start() {
             id: r.id,
             menu_id: r.menu_id,
             label: r.label,
+            slug: r.slug,
             link_type: r.link_type || 'url',
             link_value: r.link_value,
             parent_id: r.parent_id,

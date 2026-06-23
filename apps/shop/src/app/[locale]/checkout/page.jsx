@@ -1144,7 +1144,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
         <SectionTitle>{t("shippingAddress")}</SectionTitle>
         {savedAddresses.length > 0 && (
           <FieldWrap style={{ marginBottom: 16 }}>
-            <Label>Gespeicherte Adresse wählen</Label>
+            <Label>{t("selectSavedAddress")}</Label>
             <select
               value={shipAddrId}
               onChange={(e) => {
@@ -1174,7 +1174,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
                 boxSizing: "border-box",
               }}
             >
-              <option value="">Neue Adresse eingeben …</option>
+              <option value="">{t("enterNewAddress")}</option>
               {savedAddresses.map((a) => (
                 <option key={a.id} value={a.id}>
                   {[a.label, a.address_line1, a.zip_code, a.city].filter(Boolean).join(" · ")}
@@ -1256,7 +1256,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
           <SectionTitle>{t("billingAddress")}</SectionTitle>
           {savedAddresses.length > 0 && (
             <FieldWrap style={{ marginBottom: 16 }}>
-              <Label>Rechnungsadresse aus Konto</Label>
+              <Label>{t("billingAddressFromAccount")}</Label>
               <select
                 value={billAddrId}
                 onChange={(e) => {
@@ -1284,7 +1284,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
                   boxSizing: "border-box",
                 }}
               >
-                <option value="">Andere Rechnungsadresse eingeben …</option>
+                <option value="">{t("enterOtherBillingAddress")}</option>
                 {savedAddresses.map((a) => (
                   <option key={a.id} value={a.id}>
                     {[a.label, a.address_line1, a.zip_code, a.city].filter(Boolean).join(" · ")}
@@ -1678,7 +1678,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
         <SectionTitle>{t("shippingAddress")}</SectionTitle>
         {savedAddresses.length > 0 && (
           <FieldWrap style={{ marginBottom: 16 }}>
-            <Label>Gespeicherte Adresse wählen</Label>
+            <Label>{t("selectSavedAddress")}</Label>
             <select
               value={shipAddrId}
               onChange={(e) => {
@@ -1708,7 +1708,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
                 boxSizing: "border-box",
               }}
             >
-              <option value="">Neue Adresse eingeben …</option>
+              <option value="">{t("enterNewAddress")}</option>
               {savedAddresses.map((a) => (
                 <option key={a.id} value={a.id}>
                   {[a.label, a.address_line1, a.zip_code, a.city].filter(Boolean).join(" · ")}
@@ -1790,7 +1790,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           <SectionTitle>{t("billingAddress")}</SectionTitle>
           {savedAddresses.length > 0 && (
             <FieldWrap style={{ marginBottom: 16 }}>
-              <Label>Rechnungsadresse aus Konto</Label>
+              <Label>{t("billingAddressFromAccount")}</Label>
               <select
                 value={billAddrId}
                 onChange={(e) => {
@@ -1818,7 +1818,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
                   boxSizing: "border-box",
                 }}
               >
-                <option value="">Andere Rechnungsadresse eingeben …</option>
+                <option value="">{t("enterOtherBillingAddress")}</option>
                 {savedAddresses.map((a) => (
                   <option key={a.id} value={a.id}>
                     {[a.label, a.address_line1, a.zip_code, a.city].filter(Boolean).join(" · ")}
@@ -2019,6 +2019,7 @@ export default function CheckoutPage() {
   const [stripePkLoading, setStripePkLoading] = useState(true);
   const [paymentMethodTypes, setPaymentMethodTypes] = useState(["card"]);
   const [paymentMethodLayout, setPaymentMethodLayout] = useState("grid");
+  const [customerSessionSecret, setCustomerSessionSecret] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -2224,6 +2225,7 @@ export default function CheckoutPage() {
         if (data?.zero_checkout) {
           setZeroCheckoutMode(true);
           setClientSecret(null);
+          setCustomerSessionSecret(null);
           lastPaymentIntentIdRef.current = null;
           setPiError(null);
           setPayCents(0);
@@ -2232,6 +2234,7 @@ export default function CheckoutPage() {
         setZeroCheckoutMode(false);
         if (data?.client_secret) {
           setClientSecret(data.client_secret);
+          setCustomerSessionSecret(data.customer_session_secret || null);
           if (data.payment_intent_id) lastPaymentIntentIdRef.current = data.payment_intent_id;
           setPayCents(typeof data.amount_cents === "number" ? data.amount_cents : subtotalCents - bonusDiscountCents - Number(cart?.coupon_discount_cents || 0) + effectiveShippingCents);
         } else {
@@ -2374,7 +2377,7 @@ export default function CheckoutPage() {
                 )}
               </div>
               <div style={{ marginBottom: 16 }}>
-                <Label as="div" style={{ marginBottom: 8, display: "block" }}>Coupon code</Label>
+                <Label as="div" style={{ marginBottom: 8, display: "block" }}>{t("couponCode")}</Label>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <input
                     type="text"
@@ -2445,7 +2448,7 @@ export default function CheckoutPage() {
                       type="button"
                       onClick={removeBonusRedemption}
                       disabled={bonusApplying}
-                      title="Bonusrabatt entfernen"
+                      title={t("removeBonusDiscount")}
                       style={{
                         background: "none",
                         border: "none",
@@ -2468,7 +2471,7 @@ export default function CheckoutPage() {
               )}
               {Number(cart?.coupon_discount_cents || 0) > 0 && (
                 <SummaryRow style={{ color: "#16a34a" }}>
-                  <span>Coupon-Rabatt {(cart?.coupon_code || "").trim() ? `(${cart.coupon_code})` : ""}</span>
+                  <span>{t("couponDiscount")} {(cart?.coupon_code || "").trim() ? `(${cart.coupon_code})` : ""}</span>
                   <span>−{formatPriceCents(Number(cart?.coupon_discount_cents || 0))} €</span>
                 </SummaryRow>
               )}
@@ -2512,6 +2515,7 @@ export default function CheckoutPage() {
                   stripe={stripePromiseState}
                   options={{
                     clientSecret,
+                    ...(customerSessionSecret ? { customerSessionClientSecret: customerSessionSecret } : {}),
                     locale,
                     appearance: {
                       theme: "stripe",

@@ -11,7 +11,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { useCart } from "@/context/CartContext";
 import { COUNTRY_MAP, getShippableCountries } from "@/lib/countries";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 const ORANGE = "#ff971c";
 const DARK = "#1A1A1A";
@@ -33,6 +33,7 @@ export default function AddressesPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
   const { user, logout } = useAuth();
   const locale = useLocale();
+  const td = useTranslations("pages.addresses");
   const { shippingGroups } = useCart();
   const shippableCountries = useMemo(() => getShippableCountries(shippingGroups, locale), [shippingGroups, locale]);
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function AddressesPage() {
 
   const saveNew = async () => {
     if (!form.address_line1.trim()) {
-      setErr("Straße ist erforderlich");
+      setErr(td("streetRequired"));
       return;
     }
     setSaving(true);
@@ -106,7 +107,7 @@ export default function AddressesPage() {
       setAdding(false);
       await load();
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || td("error"));
     }
     setSaving(false);
   };
@@ -126,7 +127,7 @@ export default function AddressesPage() {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Diese Adresse wirklich löschen?")) return;
+    if (!window.confirm(td("deleteConfirm"))) return;
     const token = getToken("customer");
     const client = getMedusaClient();
     await client.deleteCustomerAddress(token, id);
@@ -147,7 +148,7 @@ export default function AddressesPage() {
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
-          <AccountPageLayout title="Adressen">
+          <AccountPageLayout title={td("title")}>
             <div>
               {loading ? (
                 <GlobalPageLoader />
@@ -175,28 +176,28 @@ export default function AddressesPage() {
                       <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8, fontSize: 12 }}>
                         {a.is_default_shipping && (
                           <span style={{ background: "#ecfdf5", color: "#065f46", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>
-                            Standard Lieferung
+                            {td("defaultShipping")}
                           </span>
                         )}
                         {a.is_default_billing && (
                           <span style={{ background: "#eff6ff", color: "#1d4ed8", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>
-                            Standard Rechnung
+                            {td("defaultBilling")}
                           </span>
                         )}
                       </div>
                       <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
                         {!a.is_default_shipping && (
                           <button type="button" onClick={() => setDefaultShip(a.id)} style={{ fontSize: 12, border: "none", background: "none", color: ORANGE, cursor: "pointer", fontWeight: 600 }}>
-                            Als Lieferadresse
+                            {td("setAsShipping")}
                           </button>
                         )}
                         {!a.is_default_billing && (
                           <button type="button" onClick={() => setDefaultBill(a.id)} style={{ fontSize: 12, border: "none", background: "none", color: "#2563eb", cursor: "pointer", fontWeight: 600 }}>
-                            Als Rechnungsadresse
+                            {td("setAsBilling")}
                           </button>
                         )}
                         <button type="button" onClick={() => remove(a.id)} style={{ fontSize: 12, border: "none", background: "none", color: "#ef4444", cursor: "pointer", marginLeft: "auto" }}>
-                          Löschen
+                          {td("delete")}
                         </button>
                       </div>
                     </div>
@@ -216,50 +217,50 @@ export default function AddressesPage() {
                     }}
                   >
                     <span style={{ fontSize: 42, color: GRAY, lineHeight: 1 }}>+</span>
-                    <span style={{ fontSize: 13, color: GRAY, marginTop: 8 }}>Neue Adresse</span>
+                    <span style={{ fontSize: 13, color: GRAY, marginTop: 8 }}>{td("newAddress")}</span>
                   </button>
                 </div>
               )}
 
               {adding && (
                 <div style={{ marginTop: 24, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 24, maxWidth: 520 }}>
-                  <h2 style={{ margin: "0 0 16px", fontSize: 16 }}>Neue Adresse</h2>
+                  <h2 style={{ margin: "0 0 16px", fontSize: 16 }}>{td("newAddress")}</h2>
                   <div style={{ display: "grid", gap: 12 }}>
-                    <input aria-label="Bezeichnung" style={inp} placeholder="Bezeichnung (optional)" value={form.label} onChange={(e) => set("label", e.target.value)} />
+                    <input aria-label={td("labelAria")} style={inp} placeholder={td("labelOptional")} value={form.label} onChange={(e) => set("label", e.target.value)} />
                     <input
-                      aria-label="Straße und Hausnummer"
+                      aria-label={td("streetAria")}
                       style={inp}
                       name="address_line1"
                       autoComplete="address-line1"
-                      placeholder="Straße & Hausnummer *"
+                      placeholder={td("streetPlaceholder")}
                       value={form.address_line1}
                       onChange={(e) => set("address_line1", e.target.value)}
                     />
                     <input
-                      aria-label="Adresszusatz"
+                      aria-label={td("addressLine2Aria")}
                       style={inp}
                       name="address_line2"
                       autoComplete="address-line2"
-                      placeholder="Adresszusatz"
+                      placeholder={td("addressLine2")}
                       value={form.address_line2}
                       onChange={(e) => set("address_line2", e.target.value)}
                     />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                      <input aria-label="Postleitzahl" style={inp} name="zip_code" autoComplete="postal-code" placeholder="PLZ" value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
-                      <input aria-label="Stadt" style={inp} name="city" autoComplete="address-level2" placeholder="Stadt" value={form.city} onChange={(e) => set("city", e.target.value)} />
+                      <input aria-label={td("postalAria")} style={inp} name="zip_code" autoComplete="postal-code" placeholder={td("postalCode")} value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} />
+                      <input aria-label={td("cityAria")} style={inp} name="city" autoComplete="address-level2" placeholder={td("city")} value={form.city} onChange={(e) => set("city", e.target.value)} />
                     </div>
-                    <select aria-label="Land" style={inp} name="country" autoComplete="country" value={shippableCountries.some((c) => c.code === form.country) ? form.country : (shippableCountries[0]?.code || "")} onChange={(e) => set("country", e.target.value)} disabled={!shippableCountries.length}>
+                    <select aria-label={td("countryAria")} style={inp} name="country" autoComplete="country" value={shippableCountries.some((c) => c.code === form.country) ? form.country : (shippableCountries[0]?.code || "")} onChange={(e) => set("country", e.target.value)} disabled={!shippableCountries.length}>
                       {shippableCountries.map((c) => (
                         <option key={c.code} value={c.code}>{c.flag ? `${c.flag} ` : ""}{c.label}</option>
                       ))}
                     </select>
                     <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                       <CustomCheckbox checked={form.is_default_shipping} onChange={(e) => set("is_default_shipping", e.target.checked)} size={18} />
-                      Standard-Lieferadresse
+                      {td("defaultShippingCheckbox")}
                     </label>
                     <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                       <CustomCheckbox checked={form.is_default_billing} onChange={(e) => set("is_default_billing", e.target.checked)} size={18} />
-                      Standard-Rechnungsadresse
+                      {td("defaultBillingCheckbox")}
                     </label>
                     {err && <p style={{ color: "#ef4444", fontSize: 13, margin: 0 }}>{err}</p>}
                     <div style={{ display: "flex", gap: 10 }}>
@@ -269,10 +270,10 @@ export default function AddressesPage() {
                         disabled={saving}
                         style={{ padding: "10px 20px", background: ORANGE, color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer" }}
                       >
-                        {saving ? "…" : "Speichern"}
+                        {saving ? td("saving") : td("save")}
                       </button>
                       <button type="button" onClick={() => setAdding(false)} style={{ padding: "10px 20px", border: `1px solid ${BORDER}`, borderRadius: 8, background: "#fff", cursor: "pointer" }}>
-                        Abbrechen
+                        {td("cancel")}
                       </button>
                     </div>
                   </div>

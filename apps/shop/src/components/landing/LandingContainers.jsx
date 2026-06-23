@@ -1127,7 +1127,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
 
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
   const renderItem = (product, i) => (
-    <ProductCard product={product} plainImage isBestseller rank={i + 1} />
+    <ProductCard product={product} plainImage isBestseller rank={i + 1} hideBestsellerBadge />
   );
 
   if (isNarrow && isGrid) {

@@ -5,6 +5,7 @@ import { useCustomerAuth as useAuth, useAuthGuard, getToken } from "@andertal/li
 import styled from "styled-components";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { Link, useRouter } from "@/i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
@@ -262,7 +263,7 @@ function Section({ title, children, action }) {
   );
 }
 
-function EditButton({ onClick }) {
+function EditButton({ onClick, label }) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -281,12 +282,12 @@ function EditButton({ onClick }) {
         transition: "all 0.15s",
       }}
     >
-      Bearbeiten
+      {label}
     </button>
   );
 }
 
-function SaveButton({ onClick, loading }) {
+function SaveButton({ onClick, loading, saveLabel, savingLabel }) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -308,20 +309,22 @@ function SaveButton({ onClick, loading }) {
         boxShadow: "0 2px 0 2px #000",
       }}
     >
-      {loading ? "Speichern…" : "Speichern"}
+      {loading ? savingLabel : saveLabel}
     </button>
   );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtEur(cents) {
-  return (Number(cents || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+function fmtEur(cents, locale) {
+  const loc = { de: "de-DE", en: "en-GB", tr: "tr-TR", fr: "fr-FR", es: "es-ES", it: "it-IT" }[String(locale || "de").slice(0, 2)] || "de-DE";
+  return (Number(cents || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
-function fmtDate(d) {
+function fmtDate(d, locale) {
   if (!d) return "";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const loc = { de: "de-DE", en: "en-GB", tr: "tr-TR", fr: "fr-FR", es: "es-ES", it: "it-IT" }[String(locale || "de").slice(0, 2)] || "de-DE";
+  return new Date(d).toLocaleDateString(loc, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 const STATUS_COLOR = {
@@ -330,14 +333,6 @@ const STATUS_COLOR = {
   bezahlt: "#166534", refunded: "#1d4ed8", retoure: "#b91c1c",
   retoure_anfrage: "#b45309", pending: "#92400e", shipped: "#6d28d9",
   delivered: "#166534", completed: "#166534", cancelled: "#991b1b",
-};
-
-const STATUS_LABEL = {
-  offen: "Offen", in_bearbeitung: "In Bearb.", versendet: "Versendet",
-  zugestellt: "Zugestellt", abgeschlossen: "Abgeschl.", storniert: "Storniert",
-  bezahlt: "Bezahlt", refunded: "Erstattet", retoure: "Retoure",
-  retoure_anfrage: "Rückg. läuft", pending: "Offen", shipped: "Versendet",
-  delivered: "Zugestellt", completed: "Abgeschl.", cancelled: "Storniert",
 };
 
 function shortTitle(raw) {
@@ -350,6 +345,20 @@ function shortTitle(raw) {
 
 export default function AccountPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
+
+  const locale = useLocale();
+  const ta = useTranslations("pages.account");
+  const tAuth = useTranslations("auth");
+  const tOrders = useTranslations("pages.orders.orderStatus");
+  const tPanel = useTranslations("accountPanel");
+
+  const orderStatusLabel = (status) => {
+    try {
+      return tOrders(status);
+    } catch {
+      return status;
+    }
+  };
 
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -374,19 +383,19 @@ export default function AccountPage() {
       try {
         setLoading(true);
         const token = getToken("customer");
-        if (!token) { setError("Nicht angemeldet"); return; }
+        if (!token) { setError(ta("notLoggedIn")); return; }
         const client = getMedusaClient();
         const result = await client.getCustomer(token);
         if (result?.customer) setCustomer(result.customer);
-        else setError("Profil konnte nicht geladen werden.");
+        else setError(ta("profileLoadFailed"));
       } catch (err) {
-        setError(err?.message || "Fehler");
+        setError(err?.message || ta("error"));
       } finally {
         setLoading(false);
       }
     };
     fetchCustomer();
-  }, [user?.id]);
+  }, [user?.id, ta]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -441,7 +450,7 @@ export default function AccountPage() {
         setEditSection(null);
       }
     } catch (e) {
-      setSaveErr(e?.message || "Fehler beim Speichern.");
+      setSaveErr(e?.message || ta("saveFailed"));
     }
     setSaving(false);
   };
@@ -454,19 +463,19 @@ export default function AccountPage() {
   const handleDeleteAccount = async () => {
     setDeleteErr("");
     if (!deleteUnderstand) {
-      setDeleteErr("Bitte bestätigen Sie, dass Sie die Folgen verstanden haben.");
+      setDeleteErr(ta("deleteUnderstandRequired"));
       return;
     }
     const token = getToken("customer");
     if (!token) {
-      setDeleteErr("Nicht angemeldet.");
+      setDeleteErr(ta("notLoggedIn"));
       return;
     }
     if (!deletePassword.trim()) {
-      setDeleteErr("Bitte geben Sie Ihr aktuelles Passwort ein.");
+      setDeleteErr(ta("deletePasswordRequired"));
       return;
     }
-    if (!window.confirm("Konto wirklich unwiderruflich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.")) {
+    if (!window.confirm(ta("deleteConfirmDialog"))) {
       return;
     }
     setDeleteBusy(true);
@@ -478,16 +487,16 @@ export default function AccountPage() {
       logout();
       router.push("/");
     } catch (e) {
-      setDeleteErr(e?.message || "Löschen fehlgeschlagen.");
+      setDeleteErr(e?.message || ta("deleteFailed"));
     } finally {
       setDeleteBusy(false);
     }
   };
 
   const accountTypeLabel = (t) => {
-    if (t === "gewerbe") return "Gewerbekunde";
-    if (t === "gastkunde") return "Gastkunde";
-    return "Privatkunde";
+    if (t === "gewerbe") return tAuth("business");
+    if (t === "gastkunde") return ta("accountTypeGuest");
+    return tAuth("private");
   };
 
   // Carousel data
@@ -555,39 +564,39 @@ export default function AccountPage() {
 
               {/* Personal data */}
               <Section
-                title="Persönliche Daten"
-                action={editSection !== "personal" && <EditButton onClick={() => startEdit("personal")} />}
+                title={ta("personalData")}
+                action={editSection !== "personal" && <EditButton label={ta("edit")} onClick={() => startEdit("personal")} />}
               >
                 {editSection === "personal" ? (
                   <div>
                     <EditFormGrid>
                       <div>
-                        <label htmlFor="acc-first_name" style={lbl}>Vorname</label>
+                        <label htmlFor="acc-first_name" style={lbl}>{tAuth("firstName")}</label>
                         <input id="acc-first_name" style={inp} value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
                       </div>
                       <div>
-                        <label htmlFor="acc-last_name" style={lbl}>Nachname</label>
+                        <label htmlFor="acc-last_name" style={lbl}>{tAuth("lastName")}</label>
                         <input id="acc-last_name" style={inp} value={form.last_name} onChange={(e) => set("last_name", e.target.value)} />
                       </div>
                       <div>
-                        <label htmlFor="acc-phone" style={lbl}>Telefon</label>
-                        <input id="acc-phone" style={inp} value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="+49 123 456789" />
+                        <label htmlFor="acc-phone" style={lbl}>{tAuth("phone")}</label>
+                        <input id="acc-phone" style={inp} value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder={tAuth("placeholderPhone")} />
                       </div>
                       <div>
-                        <label htmlFor="acc-account_type" style={lbl}>Kontotyp</label>
+                        <label htmlFor="acc-account_type" style={lbl}>{tAuth("accountType")}</label>
                         <select id="acc-account_type" style={inp} value={form.account_type} onChange={(e) => set("account_type", e.target.value)}>
-                          <option value="privat">Privatkunde</option>
-                          <option value="gewerbe">Gewerbekunde</option>
+                          <option value="privat">{tAuth("private")}</option>
+                          <option value="gewerbe">{tAuth("business")}</option>
                         </select>
                       </div>
                       {form.account_type === "gewerbe" && (
                         <>
                           <div>
-                            <label htmlFor="acc-company_name" style={lbl}>Firmenname</label>
+                            <label htmlFor="acc-company_name" style={lbl}>{tAuth("companyName")}</label>
                             <input id="acc-company_name" style={inp} value={form.company_name} onChange={(e) => set("company_name", e.target.value)} />
                           </div>
                           <div>
-                            <label htmlFor="acc-vat_number" style={lbl}>USt-IdNr.</label>
+                            <label htmlFor="acc-vat_number" style={lbl}>{tAuth("vatNumber")}</label>
                             <input id="acc-vat_number" style={inp} value={form.vat_number} onChange={(e) => set("vat_number", e.target.value)} />
                           </div>
                         </>
@@ -595,41 +604,42 @@ export default function AccountPage() {
                     </EditFormGrid>
                     {saveErr && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{saveErr}</p>}
                     <div style={{ display: "flex", gap: 10 }}>
-                      <SaveButton onClick={saveEdit} loading={saving} />
+                      <SaveButton onClick={saveEdit} loading={saving} saveLabel={ta("save")} savingLabel={ta("saving")} />
                       <button
                         onClick={() => setEditSection(null)}
                         style={{ padding: "10px 20px", border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 14, cursor: "pointer", background: "#fff", color: GRAY }}
                       >
-                        Abbrechen
+                        {ta("cancel")}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <InfoGrid>
-                    <InfoRow label="Vorname" value={customer?.first_name} />
-                    <InfoRow label="Nachname" value={customer?.last_name} />
-                    <InfoRow label="E-Mail" value={customer?.email} />
-                    <InfoRow label="Telefon" value={customer?.phone} />
-                    <InfoRow label="Kontotyp" value={accountTypeLabel(customer?.account_type)} />
-                    {customer?.company_name && <InfoRow label="Firma" value={customer.company_name} />}
-                    {customer?.vat_number && <InfoRow label="USt-IdNr." value={customer.vat_number} />}
+                    <InfoRow label={tAuth("firstName")} value={customer?.first_name} />
+                    <InfoRow label={tAuth("lastName")} value={customer?.last_name} />
+                    <InfoRow label={ta("email")} value={customer?.email} />
+                    <InfoRow label={tAuth("phone")} value={customer?.phone} />
+                    <InfoRow label={tAuth("accountType")} value={accountTypeLabel(customer?.account_type)} />
+                    {customer?.company_name && <InfoRow label={ta("company")} value={customer.company_name} />}
+                    {customer?.vat_number && <InfoRow label={tAuth("vatNumber")} value={customer.vat_number} />}
                   </InfoGrid>
                 )}
               </Section>
 
-              {/* Addresses */}
               <Section
-                title="Adressen"
+                title={ta("addresses")}
                 action={
                   <Link href="/addresses" style={{ fontSize: 13, fontWeight: 600, color: ORANGE, textDecoration: "none" }}>
-                    Alle verwalten →
+                    {ta("manageAll")}
                   </Link>
                 }
               >
                 <p style={{ fontSize: 14, color: DARK, margin: "0 0 8px", lineHeight: 1.5 }}>
                   {Array.isArray(customer?.addresses) && customer.addresses.length > 0
-                    ? `${customer.addresses.length} gespeicherte Adresse${customer.addresses.length === 1 ? "" : "n"} — Liefer- und Rechnungsadresse können Sie dort festlegen.`
-                    : "Noch keine Adressen im Konto. Speichern Sie Liefer- und Rechnungsadressen für schnelleres Bestellen."}
+                    ? (customer.addresses.length === 1
+                      ? ta("addressSummaryOne")
+                      : ta("addressSummaryMany", { count: customer.addresses.length }))
+                    : ta("addressSummaryEmpty")}
                 </p>
                 <Link
                   href="/addresses"
@@ -645,22 +655,21 @@ export default function AccountPage() {
                     textDecoration: "none",
                   }}
                 >
-                  Adressen bearbeiten
+                  {ta("editAddresses")}
                 </Link>
               </Section>
 
-              {/* Meine Bestellungen carousel */}
               {recentOrders.length > 0 && (
                 <CarouselSection>
                   <CarouselHeader>
-                    <CarouselTitle>Meine Bestellungen</CarouselTitle>
-                    <CarouselViewAll href="/orders">Alle ansehen →</CarouselViewAll>
+                    <CarouselTitle>{ta("myOrders")}</CarouselTitle>
+                    <CarouselViewAll href="/orders">{ta("seeAll")}</CarouselViewAll>
                   </CarouselHeader>
                   <CarouselTrack>
                     {recentOrders.map((order) => {
                       const status = getOrderStatus(order);
                       const statusColor = STATUS_COLOR[status] || GRAY;
-                      const statusLabel = STATUS_LABEL[status] || status;
+                      const statusLabel = orderStatusLabel(status);
                       const firstItem = (order.items || [])[0];
                       return (
                         <OrderCard key={order.id} href="/orders">
@@ -677,7 +686,7 @@ export default function AccountPage() {
                           </OrderCardImgWrap>
                           <OrderCardBody>
                             <OrderCardNum>#{order.order_number || order.id?.slice(0, 6)}</OrderCardNum>
-                            <OrderCardDate>{fmtDate(order.created_at)}</OrderCardDate>
+                            <OrderCardDate>{fmtDate(order.created_at, locale)}</OrderCardDate>
                             <OrderCardStatus>
                               <StatusDot $color={statusColor} />
                               <span style={{ color: statusColor }}>{statusLabel}</span>
@@ -694,7 +703,7 @@ export default function AccountPage() {
               {rebuyItems.length > 0 && (
                 <CarouselSection>
                   <CarouselHeader>
-                    <CarouselTitle>Erneut kaufen</CarouselTitle>
+                    <CarouselTitle>{tPanel("sectionBuyAgain")}</CarouselTitle>
                   </CarouselHeader>
                   <CarouselTrack>
                     {rebuyItems.map((item) => (
@@ -708,7 +717,7 @@ export default function AccountPage() {
                         </MiniImg>
                         <MiniBody>
                           <MiniName>{shortTitle(item.title)}</MiniName>
-                          {item.price_cents && <MiniPrice>{fmtEur(item.price_cents)}</MiniPrice>}
+                          {item.price_cents && <MiniPrice>{fmtEur(item.price_cents, locale)}</MiniPrice>}
                         </MiniBody>
                       </MiniCard>
                     ))}
@@ -720,7 +729,7 @@ export default function AccountPage() {
               {recentlyViewed.length > 0 && (
                 <CarouselSection>
                   <CarouselHeader>
-                    <CarouselTitle>Weiter einkaufen</CarouselTitle>
+                    <CarouselTitle>{tPanel("sectionContinue")}</CarouselTitle>
                   </CarouselHeader>
                   <CarouselTrack>
                     {recentlyViewed.map((p) => (
@@ -734,7 +743,7 @@ export default function AccountPage() {
                         </MiniImg>
                         <MiniBody>
                           <MiniName>{p.title || p.name || ""}</MiniName>
-                          {p.price_cents && <MiniPrice>{fmtEur(p.price_cents)}</MiniPrice>}
+                          {p.price_cents && <MiniPrice>{fmtEur(p.price_cents, locale)}</MiniPrice>}
                         </MiniBody>
                       </MiniCard>
                     ))}
@@ -742,10 +751,11 @@ export default function AccountPage() {
                 </CarouselSection>
               )}
 
-              <Section title="Konto löschen">
+              <Section title={ta("deleteAccount")}>
                 <p style={{ fontSize: 14, color: GRAY, margin: "0 0 14px", lineHeight: 1.55 }}>
-                  Wenn Sie Ihr Konto löschen, werden Ihr Profil, gespeicherte Adressen, Merkzettel und Bonuspunkte entfernt.
-                  Bestellhistorien können aus buchhalterischen Gründen weiterhin anonym gespeichert bleiben.
+                  {ta("deleteAccountBody1")}
+                  {" "}
+                  {ta("deleteAccountBody2")}
                 </p>
                 <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 14, fontSize: 14, color: DARK, lineHeight: 1.45 }}>
                   <input
@@ -754,10 +764,10 @@ export default function AccountPage() {
                     onChange={(e) => setDeleteUnderstand(e.target.checked)}
                     style={{ marginTop: 3, flexShrink: 0 }}
                   />
-                  <span>Ich möchte mein Kundenkonto dauerhaft löschen und habe die Hinweise gelesen.</span>
+                  <span>{ta("deleteConfirmCheckbox")}</span>
                 </label>
                 <div style={{ maxWidth: 360, marginBottom: 12 }}>
-                  <label htmlFor="acc-delete-password" style={lbl}>Passwort zur Bestätigung</label>
+                  <label htmlFor="acc-delete-password" style={lbl}>{ta("deletePasswordLabel")}</label>
                   <input
                     id="acc-delete-password"
                     type="password"
@@ -765,7 +775,7 @@ export default function AccountPage() {
                     style={inp}
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
-                    placeholder="Ihr aktuelles Passwort"
+                    placeholder={ta("deletePasswordPlaceholder")}
                   />
                 </div>
                 {deleteErr && <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>{deleteErr}</p>}
@@ -785,7 +795,7 @@ export default function AccountPage() {
                     boxShadow: "0 2px 0 2px #000",
                   }}
                 >
-                  {deleteBusy ? "Wird gelöscht…" : "Konto endgültig löschen"}
+                  {deleteBusy ? ta("deleting") : ta("deleteButton")}
                 </button>
               </Section>
 
