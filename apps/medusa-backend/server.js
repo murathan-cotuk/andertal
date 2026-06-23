@@ -1743,6 +1743,35 @@ async function start() {
       next()
     })
 
+    // ── Auth gatekeeper for /admin-hub (S1.3) ─────────────────────────────
+    // Default-deny on every /admin-hub/* request: must carry a valid seller
+    // bearer token via requireSellerAuth (see ~line 5630) UNLESS the path
+    // matches a known-public pattern below.
+    //
+    // Adding a new public endpoint requires updating ADMIN_HUB_PUBLIC_PATTERNS.
+    // requireSellerAuth is a function declaration (hoisted within this scope)
+    // so it is callable here at request time even though it is defined later
+    // in the file.
+    //
+    // NOTE: /admin/* (Medusa-style admin routes — see ~line 2427) is left as
+    // a separate task. The handlers there use a different runHandler pattern
+    // and may rely on Medusa's own admin session — adding generic JWT auth
+    // would break that path. Tracked as S1.3b in docs/ACIL.md.
+    const ADMIN_HUB_PUBLIC_PATTERNS = [
+      /^\/auth\/login(\/|\?|$)/,
+      /^\/auth\/register(\/|\?|$)/,
+      // Billbee integration callbacks use Basic Auth, not seller JWT.
+      /^\/v1\/integrations\/billbee\/webhook(\/|\?|$)/,
+    ]
+    httpApp.use('/admin-hub', (req, res, next) => {
+      if (req.method === 'OPTIONS') return next() // CORS preflight
+      const reqPath = req.path || '/'
+      if (ADMIN_HUB_PUBLIC_PATTERNS.some((re) => re.test(reqPath))) {
+        return next()
+      }
+      return requireSellerAuth(req, res, next)
+    })
+
     // Public store endpoints: stale-while-revalidate cache headers
     // Private paths (cart, orders, customer, payment) must NOT be cached publicly.
     httpApp.use('/store', (req, res, next) => {
