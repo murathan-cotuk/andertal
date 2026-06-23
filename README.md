@@ -284,12 +284,41 @@ Medusa v2 uses TypeORM for database management. Key entities:
 
 ## 🔐 Security
 
-- Never commit `.env` files
+### Required production secrets
+
+The backend (`apps/medusa-backend`) **will refuse to start in production** without the following environment variables. Generate each with:
+
+```bash
+# JWT_SECRET, SELLER_JWT_SECRET, CUSTOMER_JWT_SECRET, COOKIE_SECRET — 32 random bytes, base64-encoded
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# TOTP_ENCRYPTION_KEY — exactly 64 hex chars (32 bytes)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Required production env vars (see `apps/medusa-backend/.env.example` for full list):
+
+| Variable | Purpose | Why required |
+|---|---|---|
+| `DATABASE_URL` | Postgres connection string | Server cannot run without DB |
+| `JWT_SECRET` | Medusa core token signing | Fail-fast if missing in production |
+| `SELLER_JWT_SECRET` | Seller-auth token signing (custom backend) | Optional — falls back to `JWT_SECRET` |
+| `CUSTOMER_JWT_SECRET` | Customer-auth token signing | Optional — falls back to `JWT_SECRET` |
+| `COOKIE_SECRET` | Medusa core signed cookies | Fail-fast if missing in production |
+| `TOTP_ENCRYPTION_KEY` | At-rest encryption for 2FA secrets | Fail-fast if missing in production |
+| `CORS_ORIGINS` | Allowed frontend origins | If unset in prod, all cross-origin requests are blocked |
+| `SUPERUSER_EMAILS` | Initial superuser allowlist | Defaults exist; set explicitly in prod |
+
+> **History note (PR `fix/s1-1-rotate-secrets`)**: The previous `medusa-config.js` shipped hardcoded fallback values for `JWT_SECRET` and `COOKIE_SECRET`. Because the repo is public, those values are compromised. The fallback has been removed. If you are upgrading an existing deployment, you **must** generate new secrets and set them before pulling this change, otherwise the server will not start. Rotating these secrets invalidates all active user sessions — plan a maintenance window or notify users to re-login.
+
+### General security guidelines
+
+- Never commit `.env` files (already in `.gitignore`)
 - Use environment variables for all secrets
-- Enable CORS properly in production
+- Enable CORS properly in production (`CORS_ORIGINS` env)
 - Validate all user inputs
 - Use HTTPS in production
-- Secure PostgreSQL connection with SSL (production)
+- Secure PostgreSQL connection with SSL (`?sslmode=require` on Render etc.)
 
 ## 📝 Environment Variables for Production
 

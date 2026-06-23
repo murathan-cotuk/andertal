@@ -22,6 +22,43 @@ const SERVER_URL =
   (process.env.PORT ? `http://${HOST}:${PORT}` : "http://localhost:9000")
 
 const databaseUrl = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/medusa"
+
+// ── Production secret validation ──────────────────────────────────────────────
+// JWT_SECRET and COOKIE_SECRET must be supplied in production. Failing fast is
+// safer than silently using a hardcoded default that is visible in the public
+// repo (the previous fallback values v9jGV... and qR1it... are considered
+// compromised and were removed in PR fix/s1-1-rotate-secrets).
+const IS_PRODUCTION = process.env.NODE_ENV === "production"
+
+function readSecretOrFail(envName, devPlaceholder) {
+  const value = process.env[envName]
+  if (value && value.length >= 32) return value
+  if (IS_PRODUCTION) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[SECURITY] ${envName} is missing or shorter than 32 chars. ` +
+        `Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))" ` +
+        `and set it in your deployment environment before starting the server.`,
+    )
+    process.exit(1)
+  }
+  // Development only — use an obvious, non-secret placeholder. NEVER ship to prod.
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[SECURITY] ${envName} is unset — using a dev-only placeholder. ` +
+      `Add ${envName} to apps/medusa-backend/.env.local for real authentication.`,
+  )
+  return devPlaceholder
+}
+
+const RESOLVED_JWT_SECRET = readSecretOrFail(
+  "JWT_SECRET",
+  "dev-only-jwt-secret-do-not-use-in-prod",
+)
+const RESOLVED_COOKIE_SECRET = readSecretOrFail(
+  "COOKIE_SECRET",
+  "dev-only-cookie-secret-do-not-use-in-prod",
+)
 const isPostgres = databaseUrl.startsWith("postgres")
 const isRender = databaseUrl.includes("render.com")
 
@@ -53,12 +90,8 @@ let config = {
       authCors:
         process.env.AUTH_CORS ||
         [process.env.STORE_CORS || "http://localhost:3000", process.env.ADMIN_CORS || "http://localhost:3002"].join(","),
-      jwtSecret:
-        process.env.JWT_SECRET ||
-        "v9jGVPyXYhNkIEPcOAD85RRsPv8SgYJsqD/FgJ4wa6Q",
-      cookieSecret:
-        process.env.COOKIE_SECRET ||
-        "qR1itY6si1ntDASglX/OqHafAVxQuLt5hNPSwwlmJ9A",
+      jwtSecret: RESOLVED_JWT_SECRET,
+      cookieSecret: RESOLVED_COOKIE_SECRET,
     },
   },
   plugins: [],
