@@ -12,6 +12,7 @@
     "@andertal/lib": "file:../../packages/lib",
     "@andertal/shop-theme": "file:../../packages/shop-theme",
     "@andertal/ui": "file:../../packages/ui",
+    "@sentry/nextjs": "^10.35.0",
     "@shopify/polaris": "^13.0.0",
     "@shopify/polaris-icons": "^9.0.0",
     "@unkey/api": "^2.3.3",

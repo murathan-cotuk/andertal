@@ -9,6 +9,24 @@ try {
   require('dotenv').config({ path: '.env.local' })
 } catch (e) {}
 
+// ── Sentry init (S1.4) ──────────────────────────────────────────────────────
+// Must run BEFORE other modules are required so OpenTelemetry can patch them.
+// No-op if SENTRY_DSN is unset (typical for local dev) so nothing breaks.
+const Sentry = require('@sentry/node')
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development',
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
+    sendDefaultPii: false,
+    beforeSend(event, hint) {
+      const error = hint?.originalException || hint?.syntheticException
+      if (error && error.code === 'EPIPE') return null
+      return event
+    },
+  })
+}
+
 // TypeScript API routes (src/api) yüklenebilsin
 try {
   require('ts-node/register')
@@ -24397,6 +24415,17 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       mountBillbeeMarketplaceApi(httpApp, { getSellerDbClient, getProductsDbClient })
     } catch (e) {
       console.warn('Billbee marketplace API mount failed:', e?.message || e)
+    }
+
+    // ── Sentry Express error handler (S1.4) ──────────────────────────────
+    // Must be added AFTER all route handlers (so it sees their errors) and
+    // BEFORE listen(). No-op if Sentry was not initialized (no DSN).
+    if (process.env.SENTRY_DSN) {
+      try {
+        Sentry.setupExpressErrorHandler(httpApp)
+      } catch (e) {
+        console.warn('Sentry.setupExpressErrorHandler failed:', e?.message || e)
+      }
     }
 
     httpApp.listen(PORT, HOST, () => {

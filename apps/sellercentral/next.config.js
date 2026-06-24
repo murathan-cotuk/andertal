@@ -1,5 +1,6 @@
 ﻿const path = require('path');
 const createNextIntlPlugin = require("next-intl/plugin");
+const { withSentryConfig } = require("@sentry/nextjs");
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.js");
 
@@ -84,5 +85,15 @@ const nextConfig = {
   },
 };
 
-module.exports = withNextIntl(nextConfig);
+const sentryWrapped = withSentryConfig(withNextIntl(nextConfig), {
+  org: process.env.SENTRY_ORG || "murathan-cotuk",
+  project: process.env.SENTRY_PROJECT_SELLERCENTRAL || "andertal-sellercentral",
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  tunnelRoute: "/monitoring",
+  disableLogger: true,
+  hideSourceMaps: true,
+});
+
+module.exports = sentryWrapped;
 
