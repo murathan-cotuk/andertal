@@ -1770,11 +1770,6 @@ async function start() {
     // requireSellerAuth is a function declaration (hoisted within this scope)
     // so it is callable here at request time even though it is defined later
     // in the file.
-    //
-    // NOTE: /admin/* (Medusa-style admin routes — see ~line 2427) is left as
-    // a separate task. The handlers there use a different runHandler pattern
-    // and may rely on Medusa's own admin session — adding generic JWT auth
-    // would break that path. Tracked as S1.3b in docs/ACIL.md.
     const ADMIN_HUB_PUBLIC_PATTERNS = [
       /^\/auth\/login(\/|\?|$)/,
       /^\/auth\/register(\/|\?|$)/,
@@ -1787,6 +1782,28 @@ async function start() {
       if (ADMIN_HUB_PUBLIC_PATTERNS.some((re) => re.test(reqPath))) {
         return next()
       }
+      return requireSellerAuth(req, res, next)
+    })
+
+    // ── Auth gatekeeper for /admin/* (S1.3b) ──────────────────────────────
+    // The /admin-hub gatekeeper above does NOT cover /admin/*. Those routes
+    // (registered around line 2474+) ARE called by the live sellercentral
+    // MedusaAdminClient (see apps/sellercentral/src/lib/medusa-admin-client.js
+    // — getProducts, createProduct, getMedusaCollections({adminHub:false}),
+    // etc.) and were previously unauthenticated, allowing anyone to read or
+    // modify the product catalog. This middleware adds requireSellerAuth on
+    // the specific path prefixes we know are ours, leaving the rest of
+    // /admin/* (Medusa-managed admin routes, including framework auth flows
+    // like /admin/auth/*) untouched.
+    const ADMIN_PROTECTED_PREFIXES = [
+      '/admin/products',
+      '/admin/orders',
+      '/admin/collections',
+      '/admin/product-categories',
+      '/admin/regions',
+    ]
+    httpApp.use(ADMIN_PROTECTED_PREFIXES, (req, res, next) => {
+      if (req.method === 'OPTIONS') return next() // CORS preflight
       return requireSellerAuth(req, res, next)
     })
 

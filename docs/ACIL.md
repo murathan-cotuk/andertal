@@ -51,6 +51,8 @@ History: the work was originally on a feature branch `fix/s1-1-rotate-secrets` b
 | docs | `d22cca8` | docs(acil): rename 'Murathan main PC' to 'Work PC' across log |
 | S1.6 | `94e4209` | ci(s1.6): add typecheck/test/audit jobs and fix broken shop-theme test |
 | S1.7 | `49f8154` | refactor(logger): migrate src/*.js to pino logger via console-compatible wrapper |
+| S1.4b | `1d1bdea` | chore(sentry): make shop DSN env-driven with transition fallback |
+| S1.3b | (this commit) | fix(security): protect /admin/* product/order/collection routes with seller auth |
 
 Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
 
@@ -241,17 +243,63 @@ Risk realized: Low to medium. Existing route-level `requireSellerAuth` on protec
 - USER ACTION REQUIRED: After deploy, hit `/admin-hub/v1/categories` from sellercentral admin pages without being logged in — expect login redirect (sellercentral middleware) instead of category data leak. After logging in, the same path should return data.
 - Backward compatibility: If any code path inside sellercentral or shop was calling `/admin-hub/*` without a Bearer token (which would itself be a bug), it will now break with 401. Watch Sentry / logs after deploy.
 
-### S1.3b (follow-up, NEW) — Clean up redundant route-level auth and protect /admin/* [ ]
+### S1.3b — Protect /admin/* (specific prefixes) [x]
 
-Two follow-ups discovered while doing S1.3:
+When the original S1.3 work was done, `/admin/*` (the Medusa-style routes registered around `server.js:2474+`) was intentionally left out of the gatekeeper on the assumption it might rely on Medusa's own admin session. Audit during S1.3b proved that assumption wrong: the routes ARE called by the live sellercentral `MedusaAdminClient` (see `apps/sellercentral/src/lib/medusa-admin-client.js` — `getProducts`, `createProduct`, `updateProduct`, `deleteProduct`, `getMedusaCollections({ adminHub: false })`, `getCategories` deprecated). They were unauthenticated, so anyone could `curl https://api.andertal.com/admin/products` and read or modify the catalog. This was a real production gap.
 
-(a) Routes that already pass `requireSellerAuth` explicitly (e.g. `server.js:3101-3104` brands, `:5073-5251` products, `:11440-11449` media, `:13984-13986` sendcloud, `:14585-14588` shipping-groups, `:14597 reviews`, `:14603` provisionsfaktur, `:6132-6136` auth/me + 2FA endpoints, `:6137-6141` users, `:6369-6373` platform-checkout-settings, `:3117-3153` banners) now run `requireSellerAuth` twice (once via gatekeeper, once via explicit middleware). Harmless but wasteful. Cleanup: remove the now-redundant `requireSellerAuth` from each route registration. Keep `requireSuperuser` where present.
+Approach: added a second middleware (right after the /admin-hub gatekeeper, around `server.js:1796`) that mounts `requireSellerAuth` on a **specific list of prefixes** rather than blanket `/admin/*`. This avoids touching Medusa framework routes (e.g. `/admin/auth/*`, `/admin/users/*`) which may have their own session-based auth that we do not want to break.
 
-(b) `/admin/*` routes (e.g. `server.js:2427-2755`, ~7 routes) were intentionally left unprotected by the gatekeeper — they use a different `runHandler(...)` pattern that may rely on Medusa's own admin session. Need separate analysis: either remove those routes entirely (if dead code from the mock-Medusa migration), or add a proper Medusa-admin auth check.
+Protected prefixes:
+- `/admin/products` (and `/admin/products/:id`)
+- `/admin/orders`
+- `/admin/collections`
+- `/admin/product-categories`
+- `/admin/regions`
 
-Acceptance for S1.3b:
-- [ ] Audit `/admin/*` routes: confirm whether they are reachable by live frontend code. If not, delete. If yes, add appropriate auth.
-- [ ] (Optional) Remove redundant route-level `requireSellerAuth` calls in server.js — but only after gatekeeper is verified live on staging.
+Acceptance — verified by `/tmp/andertal-admin-gatekeeper-test.js` (deleted after run), 14/14 pass:
+- [x] GET `/admin/products` without token → 401
+- [x] POST `/admin/products` without token → 401 (catalog write was the critical gap)
+- [x] GET `/admin/products/:id` without token → 401
+- [x] GET `/admin/orders` without token → 401
+- [x] GET `/admin/collections` without token → 401
+- [x] POST `/admin/collections` without token → 401
+- [x] GET `/admin/product-categories` without token → 401
+- [x] GET `/admin/regions` without token → 401
+- [x] Bad token → 401
+- [x] Good token → 200 and `req.sellerUser` populated
+- [x] OPTIONS preflight → 200 (CORS not blocked)
+- [x] `POST /admin/auth/login` (Medusa framework path) → NOT blocked by gatekeeper — reaches handler. Critical regression check.
+- [x] `GET /admin/users/me` (Medusa framework path) → NOT blocked.
+- [x] `GET /admin/regions-other` (similar prefix but not in our list) → NOT blocked.
+
+Risk realized: Medium. If sellercentral ever invokes `/admin/products` from a code path that does not attach a Bearer token, those calls now break with 401. Audit of `MedusaAdminClient.request()` (line 54) confirms every call goes through the same Bearer-attaching helper, so no regression in normal flows. Watch Sentry after deploy.
+
+### AGENT NOTES (S1.3b)
+
+- Branch: `main` (direct).
+- Files changed:
+  - `apps/medusa-backend/server.js` — added 18 lines of new middleware between the existing /admin-hub gatekeeper and the /store cache-headers block (right around the previous line 1796). Also removed an obsolete comment in the /admin-hub block that referred to S1.3b as "tracked but not done" — now that S1.3b is closed, the comment was misleading.
+  - `docs/ACIL.md` — task marked done with full acceptance log + this AGENT NOTES block.
+- Verification:
+  - `node --check apps/medusa-backend/server.js` clean.
+  - Isolated express test harness, 14/14 pass (output captured in this entry).
+- USER ACTION REQUIRED: After deploy, verify sellercentral product list / create / edit flows still work. They should — `MedusaAdminClient` always attaches `Authorization: Bearer <sellerToken>`. If you see new 401s in Sentry for /admin/products, check whether the token is being attached (browser DevTools → Network).
+- Backward compatibility: Server.js still has individual `requireSellerAuth` middleware on many `/admin-hub/*` routes (`brands`, `products`, `media`, etc.). They now run twice (once via gatekeeper, once via explicit middleware). Harmless but wasteful — cleanup is **S1.3c** (NEW follow-up below), deferred to a later quiet day.
+
+### S1.3c (NEW follow-up) — Clean up redundant route-level requireSellerAuth in server.js [ ]
+
+After the gatekeepers in S1.3 + S1.3b, ~30 `/admin-hub/*` route registrations still pass `requireSellerAuth` as explicit middleware. They run twice (once via gatekeeper, once at route level). Harmless but wasteful. Cleanup pattern:
+
+```js
+// Before:
+httpApp.get('/admin-hub/v1/banners', requireSellerAuth, requireSuperuser, async (req, res) => { ... })
+// After:
+httpApp.get('/admin-hub/v1/banners', requireSuperuser, async (req, res) => { ... })
+```
+
+Keep `requireSuperuser` wherever present. Only remove `requireSellerAuth`.
+
+Do this AFTER the gatekeeper has been verified on staging — once a few deploy cycles pass without /admin-hub auth regressions in Sentry, it is safe to make this purely-cosmetic change.
 
 ---
 
