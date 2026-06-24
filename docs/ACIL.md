@@ -305,9 +305,37 @@ Risk realized: Low.
   3. Set on backend Render: `SENTRY_DSN`, `SENTRY_ENVIRONMENT=production`, `SENTRY_TRACES_SAMPLE_RATE=0.1`.
   4. Trigger a test error in each environment and verify it lands in Sentry.
 
-### S1.4b (NEW follow-up) — Migrate shop hardcoded DSN to env [ ]
+### S1.4b — Migrate shop hardcoded DSN to env [x]
 
-`apps/shop/sentry.server.config.js`, `sentry.edge.config.js`, and `instrumentation-client.js` still have the DSN hardcoded. For consistency and per least-surprise, switch these to read `NEXT_PUBLIC_SENTRY_DSN` (with the hardcoded value retained as a temporary fallback during transition). Small, isolated change. Low priority but useful for hygiene.
+Subtasks:
+- [x] `apps/shop/sentry.server.config.js` — DSN now reads from `SENTRY_DSN || NEXT_PUBLIC_SENTRY_DSN`, hardcoded value kept as named constant `HARDCODED_FALLBACK_DSN_TRANSITION` so production Sentry never goes dark during the env-rollout window. Logs a `console.warn` if the fallback is used in production (so the gap is visible in logs).
+- [x] `apps/shop/sentry.edge.config.js` — same pattern, no production-warn since edge runtime has no useful console.
+- [x] `apps/shop/instrumentation-client.js` — reads from `NEXT_PUBLIC_SENTRY_DSN` only (client bundle cannot access non-public env vars by Next.js design), with the same hardcoded fallback constant.
+- [x] `apps/shop/.env.example` — new Sentry section documenting `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, and the optional source-map upload vars. Explicitly notes that DSNs are public-by-design (not a secret).
+
+Acceptance:
+- [x] `git grep "358d148bbc5d3fff"` only matches the three fallback constants — no other hardcoded DSN literals in source.
+- [x] All three files pass `node --check` and ESLint.
+- [x] Production Sentry remains functional even if env vars are not yet set on deploy targets.
+
+Note: a future cleanup task **S1.4c** is implicit here — once the user has set `NEXT_PUBLIC_SENTRY_DSN` on every deploy target (Vercel for shop), the `HARDCODED_FALLBACK_DSN_TRANSITION` constants and the warn-block should be removed. Not urgent.
+
+### AGENT NOTES (S1.4b)
+
+- Branch: `main` (direct, per new policy).
+- Files changed:
+  - `apps/shop/sentry.server.config.js` — 3 import lines + ~15 lines of env+fallback resolution above `Sentry.init`. `dsn:` field now references `SENTRY_DSN` const.
+  - `apps/shop/sentry.edge.config.js` — same pattern, minus the production-warn block.
+  - `apps/shop/instrumentation-client.js` — same pattern, client-only env var.
+  - `apps/shop/.env.example` — appended Sentry config section.
+- Verification:
+  ```powershell
+  node --check apps/shop/sentry.server.config.js
+  node --check apps/shop/sentry.edge.config.js
+  node --check apps/shop/instrumentation-client.js
+  npm run lint --workspace=@andertal/shop
+  ```
+- USER ACTION REQUIRED (optional, low priority): set `NEXT_PUBLIC_SENTRY_DSN` on the shop's Vercel project so the hardcoded fallback never fires. Same value that is currently hardcoded works. Then later (S1.4c) the fallback can be deleted.
 
 ---
 

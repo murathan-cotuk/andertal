@@ -4,8 +4,16 @@
 
 import * as Sentry from "@sentry/nextjs";
 
+// Client-side DSN MUST come from NEXT_PUBLIC_SENTRY_DSN (only NEXT_PUBLIC_*
+// env vars are exposed to the browser bundle). Hardcoded fallback kept
+// during S1.4b transition; remove once env is set on all deploy targets.
+const HARDCODED_FALLBACK_DSN_TRANSITION =
+  "https://358d148bbc5d3fff71871cae743477ec@o4510747557822464.ingest.de.sentry.io/4510747562475600";
+const SENTRY_DSN =
+  process.env.NEXT_PUBLIC_SENTRY_DSN || HARDCODED_FALLBACK_DSN_TRANSITION;
+
 Sentry.init({
-  dsn: "https://358d148bbc5d3fff71871cae743477ec@o4510747557822464.ingest.de.sentry.io/4510747562475600",
+  dsn: SENTRY_DSN,
 
   // Add optional integrations for additional features
   integrations: [
