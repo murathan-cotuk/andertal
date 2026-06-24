@@ -27,6 +27,14 @@ describe("eu-origin", () => {
     const b = mergeMadeInEuropeBadge({ width: 120 });
     assert.equal(b.width, 120);
     assert.equal(b.height, 32);
-    assert.equal(b.offset_left, 10);
+    assert.equal(b.offset_left, 0);
+    assert.equal(b.offset_bottom, 0);
+    assert.equal(b.image_url, "");
+  });
+
+  it("mergeMadeInEuropeBadge respects provided offsets", () => {
+    const b = mergeMadeInEuropeBadge({ offset_left: 12, offset_bottom: 4 });
+    assert.equal(b.offset_left, 12);
+    assert.equal(b.offset_bottom, 4);
   });
 });

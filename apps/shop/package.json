@@ -6,7 +6,8 @@
     "dev": "next dev -p 3000 --webpack",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "eslint . --max-warnings 0"
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@andertal/lib": "file:../../packages/lib",

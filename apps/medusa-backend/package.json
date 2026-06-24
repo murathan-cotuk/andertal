@@ -21,7 +21,9 @@
     "postinstall": "node scripts/patch-link-modules.js",
     "patch": "node scripts/patch-link-modules.js",
     "test:eu-origin": "node --test src/eu-origin/metadata.test.js",
-    "test:media-filename": "node --test src/media-filename.test.js"
+    "test:media-filename": "node --test src/media-filename.test.js",
+    "test": "node --test --test-reporter=spec src/eu-origin/metadata.test.js src/media-filename.test.js",
+    "typecheck": "node --check server.js && node --check medusa-config.js"
   },
   "keywords": [
     "medusa",
