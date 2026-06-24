@@ -56,7 +56,8 @@ The test scripts cited in each task's "Acceptance" section were created in `C:\U
 
 ## STATUS SNAPSHOT (every agent updates this at end of session)
 
-- Last update: 2026-06-24 by Agent-1 (Cursor on Murathan's main PC)
+- Last update: 2026-06-24 by Agent-1 (Cursor on Work PC)
+- Device naming convention: this repo is mirrored across two machines. **Work PC** = the office machine where S1.1-S1.5 were done. **Home PC** = the other machine the user switches to in the evenings. Either agent may pick up where the other left off — that is the whole point of this file.
 - Active task: none (S1.1 + S1.2 + S1.3 + S1.4 + S1.5 finished, awaiting "continue?" decision)
 - Blocking decisions: none yet
 - Active branch: `fix/s1-1-rotate-secrets` (per user request, multiple sprint-1 tasks share one branch to keep PR count low)
@@ -541,9 +542,9 @@ Same pre-checks as S4.1. Additionally:
 
 ## CHANGE LOG (every session appends a short entry)
 
-- 2026-06-23 Agent-1 (Murathan main PC): Created ACIL.md from prior audit findings. Completed S1.1 on branch `fix/s1-1-rotate-secrets`. Three test scenarios validated (dev OK, prod-no-env fails, prod-with-env OK). Branch ready for user review/push/merge.
-- 2026-06-23 Agent-1 (Murathan main PC): Completed S1.2 on same branch. Added `jose@^5` to sellercentral and rewrote middleware to verify HS256 JWT signature + expiry. 7/7 token-roundtrip tests passed including `alg=none` confusion attack rejection. Branch not yet pushed.
-- 2026-06-23 Agent-1 (Murathan main PC): Completed S1.3 on same branch. Inserted /admin-hub gatekeeper at server.js:1746. 14/14 integration tests passed including prefix-smuggling attack rejection. Spawned follow-up task S1.3b (clean up redundant explicit auth + handle /admin/*).
-- 2026-06-24 Agent-1 (Murathan main PC): Completed S1.4 on same branch. Added Sentry to backend (`@sentry/node`) and sellercentral (`@sentry/nextjs`). All env-driven, no-op when DSN unset. 14/14 sanity tests passed. Branch still not pushed.
-- 2026-06-24 Agent-1 (Murathan main PC): Completed S1.5 on same branch. Removed hardcoded LAN IP `192.168.1.240` from shop next.config.js and `192.168.2.127` from sellercentral CSP. Added `SC_ALLOWED_DEV_BACKEND_HOSTS` env (dev-only, production-gated). 11/11 CSP integrity tests passed. Branch still not pushed.
-- 2026-06-24 Agent-1 (Murathan main PC): Handover audit. Verified all S1.1-S1.5 code is in place via spot-check (readSecretOrFail, jwtVerify, ADMIN_HUB_PUBLIC_PATTERNS, setupExpressErrorHandler, devBackendHosts). Found and fixed two leftover LAN IP literals in `.env.example` example comments (`apps/sellercentral/.env.example`, `apps/shop/.env.example` — both changed `192.168.2.127` to `192.168.x.x` placeholder). Added ONBOARDING and COMMIT MAP sections to top of this file so a fresh agent on a different PC can self-bootstrap.
+- 2026-06-23 Agent-1 (Work PC): Created ACIL.md from prior audit findings. Completed S1.1 on branch `fix/s1-1-rotate-secrets`. Three test scenarios validated (dev OK, prod-no-env fails, prod-with-env OK). Branch ready for user review/push/merge.
+- 2026-06-23 Agent-1 (Work PC): Completed S1.2 on same branch. Added `jose@^5` to sellercentral and rewrote middleware to verify HS256 JWT signature + expiry. 7/7 token-roundtrip tests passed including `alg=none` confusion attack rejection. Branch not yet pushed.
+- 2026-06-23 Agent-1 (Work PC): Completed S1.3 on same branch. Inserted /admin-hub gatekeeper at server.js:1746. 14/14 integration tests passed including prefix-smuggling attack rejection. Spawned follow-up task S1.3b (clean up redundant explicit auth + handle /admin/*).
+- 2026-06-24 Agent-1 (Work PC): Completed S1.4 on same branch. Added Sentry to backend (`@sentry/node`) and sellercentral (`@sentry/nextjs`). All env-driven, no-op when DSN unset. 14/14 sanity tests passed. Branch still not pushed.
+- 2026-06-24 Agent-1 (Work PC): Completed S1.5 on same branch. Removed hardcoded LAN IP `192.168.1.240` from shop next.config.js and `192.168.2.127` from sellercentral CSP. Added `SC_ALLOWED_DEV_BACKEND_HOSTS` env (dev-only, production-gated). 11/11 CSP integrity tests passed. Branch still not pushed.
+- 2026-06-24 Agent-1 (Work PC): Handover audit. Verified all S1.1-S1.5 code is in place via spot-check (readSecretOrFail, jwtVerify, ADMIN_HUB_PUBLIC_PATTERNS, setupExpressErrorHandler, devBackendHosts). Found and fixed two leftover LAN IP literals in `.env.example` example comments (`apps/sellercentral/.env.example`, `apps/shop/.env.example` — both changed `192.168.2.127` to `192.168.x.x` placeholder). Added ONBOARDING and COMMIT MAP sections to top of this file so a fresh agent on a different PC can self-bootstrap. Established device naming: Work PC vs Home PC.
