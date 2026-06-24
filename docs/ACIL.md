@@ -52,7 +52,8 @@ History: the work was originally on a feature branch `fix/s1-1-rotate-secrets` b
 | S1.6 | `94e4209` | ci(s1.6): add typecheck/test/audit jobs and fix broken shop-theme test |
 | S1.7 | `49f8154` | refactor(logger): migrate src/*.js to pino logger via console-compatible wrapper |
 | S1.4b | `1d1bdea` | chore(sentry): make shop DSN env-driven with transition fallback |
-| S1.3b | (this commit) | fix(security): protect /admin/* product/order/collection routes with seller auth |
+| S1.3b | `dcb1689` | fix(security): protect /admin/* product/order/collection routes with seller auth |
+| S3.15 | (this commit) | fix(shop): cart race — side cart opened empty after add-to-cart |
 
 Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
 
@@ -66,14 +67,12 @@ The test scripts cited in each task's "Acceptance" section were created in `C:\U
 
 - Last update: 2026-06-24 by Agent-1 (Cursor on Work PC)
 - Device naming convention: this repo is mirrored across two machines. **Work PC** = the office machine where S1.1-S1.5 were done. **Home PC** = the other machine the user switches to in the evenings. Either agent may pick up where the other left off — that is the whole point of this file.
-- Active task: none (S1.1 + S1.2 + S1.3 + S1.4 + S1.5 + S1.6 + S1.7 finished, awaiting "continue?" decision)
-- Blocking decisions: none yet
-- Active branch: `main` (per user request, no more feature branches — all sprint-1 work was rebased onto main and the feature branch was deleted)
-- Pushed to remote: user pushes `main` themselves after each session (do NOT push to remote automatically).
-- Stash present: `stash@{0}: On main: temp-before-rebase-for-push` from a prior session — left alone, user can drop it if obsolete
-- SPRINT 1 STATUS: all primary tasks (S1.1–S1.7) complete. Follow-ups remain (S1.3b, S1.4b, S1.6b, S1.6c, S1.7b) but none are blockers for SPRINT 2.
-- Next pending tasks: SPRINT 1 follow-ups (S1.3b, S1.4b, S1.6b, S1.6c, S1.7b) or start SPRINT 2 (recommended: S2.7 keep-or-drop-Medusa decision first, since it unlocks S1.7b and reduces audit findings).
-- All other sprints untouched
+- Active task: none
+- Active branch: `main` (direct commits only — no feature branches)
+- Pushed to remote: user pushes `main` themselves (do NOT push automatically)
+- SPRINT 1 STATUS: primary tasks S1.1–S1.7 complete. Follow-ups: S1.3b ✅, S1.4b ✅, S1.6b partial (see notes), S1.6c pending, S1.7b blocked on S2.7
+- SPRINT 3 started: S3.15 (add-to-cart race) fixed
+- Next pending: S3.16 order confirmation page, S3.17 order status abgeschlossen logic, S1.6c e2e CI job, S2.7 Medusa decision
 
 ---
 
@@ -465,9 +464,12 @@ Risk: Low. The biggest risk was a hidden broken test (found and fixed). The audi
 - Rollback: `git revert <commit-sha>` for the CI commit. Workflow is fully additive; the only behavior change to local devs is that running `npm run test` at root now actually does something.
 - USER ACTION REQUIRED: After pushing this branch, watch the first CI run on GitHub Actions. Expected outcome: lint ✅, typecheck ✅, test ✅, audit ⚠ (non-blocking — yellow-ish), build ✅.
 
-### S1.6b (NEW follow-up) — Reduce npm audit findings to zero high [ ]
+### S1.6b (NEW follow-up) — Reduce npm audit findings to zero high [~]
 
-The audit job currently reports 63 high + 9 critical vulnerabilities, almost all transitive through old `@medusajs/*` packages. Once S2.7 is decided (keep or drop Medusa), this will largely resolve itself. In the meantime: run `npm audit fix` (non-force) for the small set of fixable direct deps and commit.
+Partial progress on 2026-06-24:
+- [x] Fixed invalid root dependency `@sentry/nextjs@^10.43.0` → `^10.35.0` (10.43.0 does not exist on npm; blocked `npm audit fix`).
+- [ ] `npm audit fix` (non-force) still fails: npm tries to bump `ioredis` to `5.10.1` which also does not exist (latest is 5.9.3). Remaining 63 high + 9 critical are almost all transitive through `@medusajs/*`.
+- **Blocked on S2.7**: dropping Medusa removes the bulk of audit noise. Do not run `npm audit fix --force` — it will break the monolith.
 
 ### S1.6c (NEW follow-up) — Add Playwright e2e smoke job to CI [ ]
 
@@ -650,6 +652,30 @@ BLOCKING (S2.7):
 
 Each item references the corresponding paragraph in `docs/TALIMAT.md`. Order is not strict — pick by impact.
 
+### S3.15 — Add to cart broken when side cart opens [x]
+
+Problem (TALIMAT line 49): clicking "Add to cart" opened the side cart drawer but the item was not in the cart.
+
+Root cause: `CartLocaleRefetch` in `apps/shop/src/context/CartContext.jsx` had `cart?.id` in its `useEffect` dependency array. When `addToCart` called `createCart()` for a first-time cart, setting the new cart id triggered a parallel `fetchCart(id)` while the line-item POST was still in flight. The stale empty-cart response from `fetchCart` overwrote the cart state that `addToCart` had just set with the new line item — drawer opened (because add returned truthy briefly) or opened on a subsequent add with empty items visible.
+
+Fix:
+- Removed `cart?.id` from `CartLocaleRefetch` deps — refetch now runs **only on locale change**, not when a cart id first appears.
+- Hardened `addToCart` success check: only return truthy (and open sidebar) when `updated.items` has quantity > 0.
+
+Files changed:
+- `apps/shop/src/context/CartContext.jsx`
+
+Verification:
+- Add item on product page with empty cart → side cart shows item + correct count.
+- Switch locale with items in cart → titles refresh (locale refetch still works).
+- `npm run lint --workspace=@andertal/shop` clean.
+
+### AGENT NOTES (S3.15)
+
+- Branch: `main`
+- Rollback: `git revert <sha>`
+
+---
 - [ ] S3.1 — Excel import: seller_id binding fix; EAN conflict should not error; submit change-suggestion to superuser if data differs (TALIMAT lines 3, 12)
 - [ ] S3.2 — Marketing campaigns: multi-platform budget split with single click publish (TALIMAT line 6)
 - [ ] S3.3 — Multi-seller buy box algorithm; show all sellers under product, not just latest (TALIMAT lines 8, 32)
@@ -664,7 +690,7 @@ Each item references the corresponding paragraph in `docs/TALIMAT.md`. Order is 
 - [ ] S3.12 — Brands page missing latest brand (TALIMAT line 43)
 - [ ] S3.13 — Shop URL canonicalization (TALIMAT line 45) — depends on S2.1
 - [ ] S3.14 — Geolocation-based locale routing (TALIMAT line 47)
-- [ ] S3.15 — Add to cart broken when side cart opens (TALIMAT line 49)
+- [x] S3.15 — Add to cart broken when side cart opens (TALIMAT line 49)
 - [ ] S3.16 — Order confirmation page restored (TALIMAT line 51)
 - [ ] S3.17 — Order status: only zugestellt -> abgeschlossen, not versendet (TALIMAT line 55)
 
@@ -707,3 +733,5 @@ Same pre-checks as S4.1. Additionally:
 - 2026-06-24 Agent-1 (Work PC): Completed S1.6 on same branch. CI workflow rewritten with 5 jobs (lint, typecheck, test, audit-with-continue-on-error, build-depends-on-lint+typecheck). Added typecheck script to shop (tsc --noEmit) and medusa-backend (node --check). Added test script to medusa-backend. Added root `typecheck` and `test` turbo entrypoints. Fixed pre-existing broken assertion in `packages/shop-theme/src/eu-origin.test.js` (offset_left default is 0, not 10) — this surfaced only after wiring CI. 10/10 unit tests pass locally. Spawned S1.6b (audit findings cleanup) and S1.6c (Playwright e2e job) as follow-ups.
 - 2026-06-24 Agent-1 (Work PC): Branch policy change per user. Rebased `fix/s1-1-rotate-secrets` (9 commits) onto `main` (which had moved to `beffef9 update` while the user pushed unrelated order-pdf changes). No conflicts (disjoint files). Fast-forward merged into `main`, deleted the feature branch both locally and on origin. New SHAs recorded in COMMIT MAP above. Convention going forward: work directly on `main`, no more feature branches.
 - 2026-06-24 Agent-1 (Work PC): Completed S1.7 directly on `main`. Logger.js rewritten with a console-compatible wrapper so multi-arg pino calls behave like `console.*` (pino natively drops the 2nd arg unless the 1st has a printf placeholder, which would have silently truncated 29 existing log statements). Migrated all live `apps/medusa-backend/src/*.js` files (flow-automation.js 23 calls, flow-queue.js 4, category-auto-translate.js 2 = 29 total). TS dead-code files under `src/api/admin*/` deferred to S1.7b pending S2.7 decision. All tests still pass. SPRINT 1 primary tasks now 100% complete.
+- 2026-06-24 Agent-1 (Work PC): S1.6b partial — fixed invalid root `@sentry/nextjs@^10.43.0` (version does not exist). `npm audit fix` still blocked by non-existent ioredis@5.10.1 suggestion + Medusa transitive deps.
+- 2026-06-24 Agent-1 (Work PC): S3.15 fixed on `main`. Cart add-to-cart race: `CartLocaleRefetch` no longer refetches on new cart id (only on locale change). `addToCart` now requires lineCount > 0 before opening sidebar.

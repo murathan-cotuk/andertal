@@ -16,8 +16,13 @@ function CartLocaleRefetch() {
   const { cart, fetchCart } = useContext(CartContext);
   useEffect(() => {
     const id = cart?.id;
-    if (id) fetchCart(id);
-  }, [locale, cart?.id, fetchCart]);
+    if (!id) return;
+    fetchCart(id);
+    // Intentionally omit cart?.id from deps: refetch only on locale change, not when a new
+    // cart id appears (e.g. createCart during addToCart). Including cart?.id caused a race
+    // where fetchCart(empty) overwrote the line item just added — side cart opened empty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale, fetchCart]);
   return null;
 }
 
@@ -103,7 +108,8 @@ export function CartProvider({ children }) {
       // If add explicitly failed, do not open sidebar
       if (res?.__error) return null;
       const updated = res?.cart;
-      if (updated) {
+      const lineCount = (updated?.items || []).reduce((sum, i) => sum + (i.quantity || 0), 0);
+      if (updated && lineCount > 0) {
         setCart(updated);
         return updated;
       }
@@ -114,7 +120,7 @@ export function CartProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [cart, createCart, fetchCart]);
+  }, [cart, createCart]);
 
   const updateLineItem = useCallback(async (lineId, quantity) => {
     if (!cart?.id) return null;
