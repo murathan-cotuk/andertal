@@ -30,6 +30,8 @@ let warnedMissingSecret = false;
 function resolveSellerSecret() {
   const raw = process.env.SELLER_JWT_SECRET || process.env.JWT_SECRET;
   if (raw) {
+    const src = process.env.SELLER_JWT_SECRET ? "SELLER_JWT_SECRET" : "JWT_SECRET";
+    console.log("[SC auth] secret source:", src, "| len:", raw.length, "| first3:", raw.slice(0, 3));
     return new TextEncoder().encode(raw);
   }
   if (process.env.NODE_ENV === "production") {

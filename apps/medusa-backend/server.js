@@ -5643,6 +5643,7 @@ async function start() {
       process.exit(1)
     }
     const SELLER_JWT_SECRET = _rawSellerSecret || 'dev-only-seller-secret-do-not-use-in-prod'
+    console.log('[SELLER_AUTH] secret source:', process.env.SELLER_JWT_SECRET ? 'SELLER_JWT_SECRET' : process.env.JWT_SECRET ? 'JWT_SECRET' : 'DEV_FALLBACK', '| len:', SELLER_JWT_SECRET.length, '| first3:', SELLER_JWT_SECRET.slice(0, 3))
 
     // Token lifetime: 7 days (previously 30 days — too long for stolen-token exposure window)
     const SELLER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
