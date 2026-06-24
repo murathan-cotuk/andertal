@@ -47,7 +47,7 @@ If you are picking this up on a new machine and have never seen this project bef
 | S1.5 | `00b7228` | chore(security): move hardcoded LAN IPs out of production code |
 | docs | `62d2db6` | docs(acil): add onboarding + commit map for cross-PC handover |
 | docs | `09e5558` | docs(acil): rename 'Murathan main PC' to 'Work PC' across log |
-| S1.6 | (this commit) | ci: add typecheck/test/audit jobs and fix broken shop-theme test |
+| S1.6 | `16145bb` | ci(s1.6): add typecheck/test/audit jobs and fix broken shop-theme test |
 
 Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
 
