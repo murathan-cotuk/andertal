@@ -44,14 +44,10 @@ Su an mesela bir ürünün breadcrumbsunda bu yaziyor ancak home yazmamali. "Kol
 
 --- shopta url neden /produkt/vampirevape... seklinde? andertal.com/de/de/ yazdiktan sonra hemen ürün bilgileri görünmeli. shopta bu sorun her yerde var. page olanlara /pages yaziliyor falan. ürün sayfasi acildiginda yalnizca o ürüne ait url gözüksün.
 
---- konuma göre tespit edilip o sayfada acilmali shop. almanyadan giriyorum ancak gb/gb seklinde aciliyor link. bu yanlis
-
---- sepet mantigini bozmussun baska seyler yaparken. ürünü sepete ekleye basiyorum, side cart aciliyor ancak sepete ürün eklenmemis oluyor. düzelt. sepete ürün ekle dedigimde eklensin. her yerde ayarla shopta
-
 --- shopta müsteri olarak siparis verdigimde siparis onay sayfasi gözükmüyor. direkt /order sayfasina yönlendiriyor. bi sayfa cikiyordu önceden siparis alindi diyordu, yesil yuvarlak icinde tik isareti oluyordu, altinda siparisler sayfasina git tarzinda buton oluyordu. o sekilde olsun tekrardan
 
 --- sellercentralde siparise kargo takip numarasi gelince lieferstatus otomatik versendet olmali. ancak olmuyor.
 
 --- zahlungsstatus bezahlt oldugunda ve lieferstatus zugestellt oldugunda bestellt status abgeschlossen olmali. ancak lieferstatus versendet oldugunda da absgeschlossen oluyor. buna dikkat et.
 
---- siparis icine eklenen siparis numarasindan sonra direkt Paket wurde versendet durum güncellemesi geliyor. cok iyi. ancak diger durum güncellemeleri gelmiyor. mesela dhl, dpd, gls,ups ile farkli farkli siparisler denedim. hepsiyle paket gönderdim. ancak kargo durumu buraya yansimiyor. neden? ne yapabiliriz?
+--- siparis icine eklenen kargo takip numarasindan sonra direkt Paket wurde versendet durum güncellemesi geliyor. cok iyi. ancak diger durum güncellemeleri gelmiyor. mesela dhl, dpd, gls,ups ile farkli farkli siparisler denedim. hepsiyle paket gönderdim. ancak kargo durumu buraya yansimiyor. neden? ne yapabiliriz?

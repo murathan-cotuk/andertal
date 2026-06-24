@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import { useRouter, Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -9,6 +10,7 @@ import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
+import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 
 const ORANGE = "#ff971c";
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -324,6 +326,130 @@ function MessageModal({ order, onClose }) {
   );
 }
 
+/* ── Post-checkout confirmation (S3.16) ── */
+function OrderConfirmationView({ order }) {
+  const t = useTranslations("order");
+  const locale = useLocale();
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const settlement = order?.settlement_breakdown || null;
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
+      <ShopHeader />
+      <main style={{ flex: 1, maxWidth: 680, margin: "0 auto", width: "100%", padding: "40px 16px 60px", textAlign: "center" }}>
+        <div style={{
+          width: 72, height: 72, borderRadius: "50%", background: "#d1fae5",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          margin: "0 auto 24px",
+        }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#111827", margin: "0 0 12px" }}>
+          {t("confirmationTitle")}
+        </h1>
+        <p style={{ fontSize: "1rem", color: "#6b7280", margin: "0 0 32px", lineHeight: 1.5 }}>
+          {t("confirmationSubtitle")}
+        </p>
+
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, textAlign: "left", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
+            <span style={{ fontWeight: 500, color: "#374151" }}>{t("orderNumber")}</span>
+            <span style={{ fontFamily: "monospace", fontSize: "0.875rem" }}>
+              #{order.order_number || order.id?.slice(0, 8).toUpperCase()}
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: order.email ? "1px solid #f3f4f6" : "none" }}>
+            <span style={{ fontWeight: 500, color: "#374151" }}>{t("orderDate")}</span>
+            <span>{fmtDate(order.created_at)}</span>
+          </div>
+          {order.email && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0" }}>
+              <span style={{ fontWeight: 500, color: "#374151" }}>E-Mail</span>
+              <span>{order.email}</span>
+            </div>
+          )}
+        </div>
+
+        {settlement && (
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, textAlign: "left", marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, color: "#111827", marginBottom: 12, fontSize: "0.9375rem" }}>
+              {t("settlementHeading")}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
+              <span style={{ fontWeight: 500, color: "#374151" }}>{t("paymentFlow")}</span>
+              <span>
+                {settlement.checkout_payment_kind === "platform_loyalty"
+                  ? t("paymentFlowPlatform")
+                  : t("paymentFlowStripe")}
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0" }}>
+              <span style={{ fontWeight: 500, color: "#374151" }}>{t("paidTotal")}</span>
+              <span>{formatPriceCents(settlement.customer_paid_cents || 0)} €</span>
+            </div>
+          </div>
+        )}
+
+        {items.length > 0 && (
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, textAlign: "left", marginBottom: 24 }}>
+            <div style={{ fontWeight: 600, color: "#111827", marginBottom: 12, fontSize: "0.9375rem" }}>
+              {t("items")}
+            </div>
+            {items.map((item, i) => (
+              <div key={item.id || i} style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "12px 0",
+                borderBottom: i < items.length - 1 ? "1px solid #f3f4f6" : "none",
+              }}>
+                <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3f4f6" }}>
+                  {item.thumbnail ? (
+                    <img src={resolveImageUrl(item.thumbnail)} alt={item.title || ""} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "0.9375rem", fontWeight: 500, color: "#111827" }}>
+                    {getLocalizedCartLineTitle(item, locale)}
+                  </div>
+                  <div style={{ fontSize: "0.8125rem", color: "#6b7280" }}>× {item.quantity}</div>
+                </div>
+                <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>
+                  {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
+                </div>
+              </div>
+            ))}
+            <div style={{
+              display: "flex", justifyContent: "space-between", fontSize: "1.0625rem",
+              fontWeight: 700, color: "#111827", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb",
+            }}>
+              <span>{t("total")}</span>
+              <span>{formatPriceCents(order.total_cents || 0)} €</span>
+            </div>
+          </div>
+        )}
+
+        <Link
+          href="/orders"
+          style={{
+            display: "inline-block", padding: "14px 32px", background: ORANGE, color: "#fff",
+            fontWeight: 700, fontSize: "1rem", borderRadius: 8, textDecoration: "none",
+          }}
+        >
+          {t("viewOrders")}
+        </Link>
+        <div style={{ marginTop: 12 }}>
+          <Link href="/" style={{ fontSize: "0.875rem", fontWeight: 600, color: "#6b7280", textDecoration: "none" }}>
+            {t("continueShopping")}
+          </Link>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
+
 /* ── Main page ── */
 export default function OrderDetailPage() {
   const params = useParams();
@@ -390,6 +516,10 @@ export default function OrderDetailPage() {
     );
   }
 
+  if (isConfirmed) {
+    return <OrderConfirmationView order={order} />;
+  }
+
   const items = order.items || [];
   const returns = order.returns || [];
   const status = displayStatus(order);
@@ -447,19 +577,6 @@ export default function OrderDetailPage() {
             Alle Bestellungen
           </button>
         </div>
-
-        {/* Confirmation banner */}
-        {isConfirmed && (
-          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#d1fae5", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#166534" }}>Vielen Dank für Ihre Bestellung!</div>
-              <div style={{ fontSize: 13, color: "#15803d", marginTop: 2 }}>Wir haben Ihre Bestellung erhalten und bearbeiten sie in Kürze. Eine Bestätigung wird an {order.email} gesendet.</div>
-            </div>
-          </div>
-        )}
 
         {/* Action message */}
         {actionMsg && (

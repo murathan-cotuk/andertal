@@ -67,14 +67,14 @@ The test scripts cited in each task's "Acceptance" section were created in `C:\U
 
 ## STATUS SNAPSHOT (every agent updates this at end of session)
 
-- Last update: 2026-06-24 by Agent-1 (Cursor on Work PC)
+- Last update: 2026-06-24 by Agent-2 (Cursor on Home PC)
 - Device naming convention: this repo is mirrored across two machines. **Work PC** = the office machine where S1.1-S1.5 were done. **Home PC** = the other machine the user switches to in the evenings. Either agent may pick up where the other left off — that is the whole point of this file.
-- Active task: none
+- Active task: none (pick next from S3.1–S3.14)
 - Active branch: `main` (direct commits only — no feature branches)
 - Pushed to remote: user pushes `main` themselves (do NOT push automatically)
-- SPRINT 1 STATUS: primary S1.1–S1.7 complete. Follow-ups: S1.3b ✅, S1.3c ✅, S1.4b ✅, S1.6b partial, S1.6c in progress, S1.7b blocked on S2.7
-- SPRINT 3: S3.15 ✅
-- Next pending: S1.6c e2e CI, S3.16, S3.17, S2.7
+- SPRINT 1 STATUS: primary S1.1–S1.7 complete. Follow-ups: S1.3b ✅, S1.3c ✅, S1.4b ✅, S1.6b partial, S1.6c ✅, S1.7b blocked on S2.7
+- SPRINT 3: S3.7 ✅, S3.12 ✅, S3.15 ✅, S3.16 ✅, S3.17 ✅
+- Next pending: S3.1–S3.6, S3.8–S3.11, S3.13–S3.14, S2.7
 
 ---
 
@@ -707,23 +707,79 @@ Verification:
 - Rollback: `git revert <sha>`
 
 ---
+
+### S3.16 — Order confirmation page restored [x]
+
+Problem (TALIMAT line 51): after checkout, customers were redirected straight to the full order detail page instead of the dedicated "order received" confirmation screen (green checkmark circle, thank-you message, button to orders list).
+
+Root cause: `order/[id]/page.jsx` was rewritten as a full order-detail view (invoice, return, tracking actions). The old confirmation UI was reduced to a small banner when `?confirmed=1` was present — and the Stripe 3DS redirect path omitted `?confirmed=1` entirely.
+
+Fix:
+- Restored dedicated `OrderConfirmationView` when `?confirmed=1` (green circle + checkmark, i18n title/subtitle, order summary card, primary CTA → `/orders`, secondary → continue shopping).
+- Fixed Stripe redirect-return handler in `checkout/page.jsx` to append `?confirmed=1` (was missing; only the inline-payment path had it).
+
+Files changed:
+- `apps/shop/src/app/[locale]/order/[id]/page.jsx`
+- `apps/shop/src/app/[locale]/checkout/page.jsx`
+- `apps/shop/messages/{de,en,tr,fr,es,it}.json` — added `order.viewOrders`
+
+Verification:
+- Complete checkout (card, no 3DS) → lands on confirmation page with checkmark, not order detail.
+- Complete checkout via 3DS redirect → same confirmation page (`?confirmed=1` on URL).
+- Click "Zu meinen Bestellungen" → `/orders`.
+- Navigate to `/order/{id}` without `?confirmed=1` → full order detail (unchanged).
+
+### AGENT NOTES (S3.16)
+
+- Branch: `main` (uncommitted on Home PC at handover)
+- Rollback: `git revert <sha>`
+
+---
+
+### S3.17 — Order status: abgeschlossen only on zugestellt [x]
+
+Problem (TALIMAT line 55): when `lieferstatus` was `versendet`, `bestellt status` (`order_status`) incorrectly showed `abgeschlossen`. Should only become `abgeschlossen` when `zahlungsstatus=bezahlt` AND `lieferstatus=zugestellt`.
+
+Root causes:
+1. Sellercentral `OrderDetailPage`: changing delivery away from `zugestellt` did not clear stale `abgeschlossen` in local state — save then persisted `order_status=abgeschlossen` with `delivery_status=versendet`.
+2. SendCloud webhook: `abgeschlossen` UPDATE lacked `delivery_status='zugestellt'` guard (ran on any `bezahlt` order when Sendcloud reported delivered).
+3. Backend PATCH: no reverse guard to demote `abgeschlossen` → `in_bearbeitung` when delivery is not `zugestellt`.
+
+Fix:
+- `OrderDetailPage.jsx`: `handleDeliveryChange` resets `abgeschlossen` → `in_bearbeitung` when delivery is not `zugestellt`.
+- `server.js` adminHub order PATCH: added reverse guard query after auto-complete block.
+- `server.js` SendCloud webhook: added `delivery_status='zugestellt'` to abgeschlossen UPDATE.
+
+Files: `apps/sellercentral/src/components/pages/OrderDetailPage.jsx`, `apps/medusa-backend/server.js`
+
+Verification:
+- Set delivery versendet + payment bezahlt → order_status stays `in_bearbeitung` (or `offen`), not `abgeschlossen`.
+- Set delivery zugestellt + payment bezahlt → order_status becomes `abgeschlossen`.
+- `node --check apps/medusa-backend/server.js` clean.
+
+### AGENT NOTES (S3.17)
+
+- Branch: `main` (uncommitted on Home PC)
+- Rollback: `git revert <sha>`
+
+---
 - [ ] S3.1 — Excel import: seller_id binding fix; EAN conflict should not error; submit change-suggestion to superuser if data differs (TALIMAT lines 3, 12)
 - [ ] S3.2 — Marketing campaigns: multi-platform budget split with single click publish (TALIMAT line 6)
 - [ ] S3.3 — Multi-seller buy box algorithm; show all sellers under product, not just latest (TALIMAT lines 8, 32)
 - [ ] S3.4 — Excel: add `per_unit` column next to unit_type/unit_value (TALIMAT line 10)
 - [ ] S3.5 — 2nd seller adding existing EAN: status=draft, empty fields per the spec; save bug fix (TALIMAT line 32)
 - [ ] S3.6 — Tracking number triggers carrier polling, syncs lieferstatus (TALIMAT lines 18, 53, 57)
-- [ ] S3.7 — Product breadcrumbs: actual category, not "Koleksiyon" (TALIMAT line 21-27)
+- [x] S3.7 — Product breadcrumbs: actual category, not "Koleksiyon" (TALIMAT line 21-27)
 - [ ] S3.8 — Coupon validation in checkout: superuser vs seller coupon categorization (TALIMAT line 30)
 - [ ] S3.9 — Bestseller badge in product cards everywhere (TALIMAT line 34)
 - [ ] S3.10 — QR sign endpoint with signature pad + long legal docs in all locales (TALIMAT line 37)
 - [ ] S3.11 — Bestseller carousel container template for landing pages (TALIMAT line 39, 41)
-- [ ] S3.12 — Brands page missing latest brand (TALIMAT line 43)
+- [x] S3.12 — Brands page missing latest brand (TALIMAT line 43)
 - [ ] S3.13 — Shop URL canonicalization (TALIMAT line 45) — depends on S2.1
 - [ ] S3.14 — Geolocation-based locale routing (TALIMAT line 47)
 - [x] S3.15 — Add to cart broken when side cart opens (TALIMAT line 49)
-- [ ] S3.16 — Order confirmation page restored (TALIMAT line 51)
-- [ ] S3.17 — Order status: only zugestellt -> abgeschlossen, not versendet (TALIMAT line 55)
+- [x] S3.16 — Order confirmation page restored (TALIMAT line 51)
+- [x] S3.17 — Order status: only zugestellt -> abgeschlossen, not versendet (TALIMAT line 55)
 
 ---
 
@@ -767,3 +823,7 @@ Same pre-checks as S4.1. Additionally:
 - 2026-06-24 Agent-1 (Work PC): S1.6b partial — fixed invalid root `@sentry/nextjs@^10.43.0` (version does not exist). `npm audit fix` still blocked by non-existent ioredis@5.10.1 suggestion + Medusa transitive deps.
 - 2026-06-24 Agent-1 (Work PC): S3.15 fixed on `main`. Cart add-to-cart race in CartContext.jsx.
 - 2026-06-24 Agent-1 (Work PC): S1.3c on `main`. Removed ~100 redundant `requireSellerAuth` middleware from `/admin-hub/*` route registrations (gatekeeper already enforces auth). S1.6c on `main`. Added Playwright e2e CI job (continue-on-error) + fixed playwright webServer to start shop app.
+- 2026-06-24 Agent-2 (Home PC): S3.16 on `main`. Restored post-checkout confirmation screen (`OrderConfirmationView` when `?confirmed=1`); fixed Stripe 3DS redirect to pass `?confirmed=1`. Added `order.viewOrders` i18n key in all locales.
+- 2026-06-24 Agent-2 (Home PC): S3.17 on `main`. Fixed order_status incorrectly becoming abgeschlossen when delivery_status is versendet (sellercentral state + backend guard + SendCloud webhook).
+- 2026-06-24 Agent-2 (Home PC): S3.7 on `main`. Product PDP breadcrumbs: removed Home; resolve category chain from `admin_category_id` via backend enrichment + shop tree lookup; only show crumbs when category resolves in tree (no collection/Koleksiyon fallback).
+- 2026-06-24 Agent-2 (Home PC): S3.12 on `main`. Brands list: stop ON CONFLICT handle merge on create (unique suffix instead); include brands with empty handle (id fallback); sort newest first; brand detail no longer 404 when zero products.

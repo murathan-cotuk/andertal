@@ -140,6 +140,7 @@ export default function OrderDetailPage() {
   const handleDeliveryChange = (val) => {
     setDeliveryStatus(val);
     if (val === "zugestellt" && paymentStatus === "bezahlt") setOrderStatus("abgeschlossen");
+    else if (val !== "zugestellt" && orderStatus === "abgeschlossen") setOrderStatus("in_bearbeitung");
   };
   const handlePaymentChange = (val) => {
     setPaymentStatus(val);

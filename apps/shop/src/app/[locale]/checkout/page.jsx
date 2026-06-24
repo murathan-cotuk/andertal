@@ -915,7 +915,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             window.localStorage.removeItem("andertal_cart_id");
           } catch (_) {}
           setCart(null);
-          router.replace(`/${locale}/order/${orderId}`);
+          router.replace(`/${locale}/order/${orderId}?confirmed=1`);
         } else {
           returnRunRef.current = false;
           setError(data?.message || t("paymentError"));

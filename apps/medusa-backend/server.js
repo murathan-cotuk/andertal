@@ -3075,7 +3075,7 @@ async function start() {
       const body = req.body || {}
       const name = (body.name || '').trim()
       if (!name) return res.status(400).json({ message: 'name is required' })
-      const handle = (body.handle || '').trim() || slugifyTitle(name) || ('brand-' + Date.now())
+      const baseHandle = slugifyTitle((body.handle || '').trim()) || slugifyTitle(name) || ('brand-' + Date.now())
       const logo_image = (body.logo_image || body.logo || '').trim() || null
       const banner_image = (body.banner_image || '').trim() || null
       const address = (body.address || '').trim() || null
@@ -3084,8 +3084,17 @@ async function start() {
       if (!client) return res.status(500).json({ message: 'Database unavailable' })
       try {
         await client.connect()
+        let handle = baseHandle
+        for (let i = 0; i < 100; i++) {
+          const ex = await client.query(
+            'SELECT id FROM admin_hub_brands WHERE LOWER(TRIM(handle)) = LOWER(TRIM($1)) LIMIT 1',
+            [handle]
+          )
+          if (!ex.rows || !ex.rows.length) break
+          handle = `${baseHandle}-${i + 1}`
+        }
         const r = await client.query(
-          'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address, seller_id) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (handle) DO UPDATE SET name = $1, logo_image = $3, banner_image = $4, address = $5, updated_at = now() RETURNING id, name, handle, logo_image, banner_image, address, seller_id, created_at',
+          'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address, seller_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, handle, logo_image, banner_image, address, seller_id, created_at',
           [name, handle, logo_image, banner_image, address, callerSellerId]
         )
         await client.end()
@@ -6563,6 +6572,25 @@ async function start() {
       }
     }
 
+    const getCategoryById = async (categoryId) => {
+      const id = (categoryId || '').toString().trim()
+      if (!id) return null
+      const client = getBrandsDbClient()
+      if (!client) return null
+      try {
+        await client.connect()
+        const r = await client.query(
+          'SELECT id, name, slug, parent_id, active, is_visible FROM admin_hub_categories WHERE id = $1::uuid',
+          [id]
+        )
+        await client.end()
+        return r.rows && r.rows[0] ? r.rows[0] : null
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        return null
+      }
+    }
+
     // Store API: list/detail from Admin Hub so shop shows image, price, EAN, brand
     const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
       const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
@@ -7188,6 +7216,20 @@ async function start() {
           mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
         }
       }
+      const metaIn = mapped.metadata && typeof mapped.metadata === 'object' ? mapped.metadata : {}
+      const categoryId = (metaIn.admin_category_id || metaIn.category_id || '').toString().trim()
+      if (categoryId) {
+        const category = await getCategoryById(categoryId)
+        if (category && category.slug) {
+          mapped.metadata = {
+            ...(mapped.metadata || {}),
+            admin_category_id: category.id,
+            category_id: category.id,
+            category_slug: String(category.slug).replace(/^\//, ''),
+            category_name: category.name || metaIn.category_name || null,
+          }
+        }
+      }
       const brandId = mapped.metadata && mapped.metadata.brand_id
       if (brandId) {
         const brand = await getBrandById(brandId)
@@ -7330,21 +7372,26 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query(
-          `SELECT id, name, handle, logo_image, banner_image, address
+          `SELECT id, name, handle, logo_image, banner_image, address, created_at
            FROM admin_hub_brands
-           WHERE handle IS NOT NULL AND LENGTH(TRIM(handle)) > 0
-           ORDER BY LOWER(name), created_at DESC`
+           ORDER BY created_at DESC NULLS LAST, LOWER(name)`
         )
         await client.end()
         const brands = (r.rows || [])
-          .map((row) => ({
-          id: row.id,
-          name: row.name,
-          handle: row.handle,
-          logo_image: row.logo_image || null,
-          banner_image: row.banner_image || null,
-          address: row.address || null,
-        }))
+          .map((row) => {
+            const rawHandle = (row.handle || '').trim()
+            const handle = rawHandle || ('brand-' + String(row.id || '').replace(/-/g, '').slice(0, 12))
+            return {
+              id: row.id,
+              name: row.name,
+              handle,
+              logo_image: row.logo_image || null,
+              banner_image: row.banner_image || null,
+              address: row.address || null,
+              created_at: row.created_at || null,
+            }
+          })
+          .filter((b) => b && b.handle)
         res.json({ brands, count: brands.length })
       } catch (e) {
         try { await client.end() } catch (_) {}
@@ -7372,7 +7419,6 @@ async function start() {
           p.metadata &&
           String(p.metadata.brand_id) === String(brand.id)
         )
-        if (!list.length) return res.status(404).json({ message: 'Brand not found' })
         const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim()).filter(Boolean))]
         const storeNamesBySeller = {}
         await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
@@ -7441,11 +7487,11 @@ async function start() {
       const r = await client.query(
         `SELECT *
          FROM admin_hub_coupons
-         WHERE seller_id = ANY($1)
+         WHERE COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = ANY($1)
            AND lower(code) = lower($2)
            AND active = true
            AND (expires_at IS NULL OR expires_at > now())
-         ORDER BY CASE WHEN seller_id = $3 THEN 0 ELSE 1 END
+         ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = $3 THEN 0 ELSE 1 END
          LIMIT 1`,
         [sellerIds, normalizedCode, effectiveSellerId],
       )
@@ -7467,7 +7513,7 @@ async function start() {
     const couponEligibleSubtotalCents = (items, couponRow) => {
       if (!couponRow) return 0
       const list = Array.isArray(items) ? items : []
-      const couponSeller = String(couponRow.seller_id || 'default')
+      const couponSeller = String(couponRow.seller_id || 'default').trim() || 'default'
       if (couponSeller === 'default') {
         return list.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
       }
@@ -7509,10 +7555,10 @@ async function start() {
         `SELECT *
          FROM admin_hub_coupons
          WHERE lower(code) = lower($1)
-           AND seller_id = ANY($2::varchar[])
+           AND COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = ANY($2::varchar[])
            AND active = true
            AND (expires_at IS NULL OR expires_at > now())
-         ORDER BY CASE WHEN seller_id = 'default' THEN 1 ELSE 0 END, seller_id ASC`,
+         ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = 'default' THEN 1 ELSE 0 END, seller_id ASC`,
         [normalizedInput, sellerCandidates],
       )
       const candidates = (r.rows || []).filter((row) => {
@@ -7529,7 +7575,7 @@ async function start() {
         candidates.find((c) => String(c.seller_id || 'default') !== 'default' && allSellerIds.has(String(c.seller_id))) ||
         candidates.find((c) => String(c.seller_id || 'default') === 'default') ||
         candidates[0]
-      const couponSeller = String(couponRow.seller_id || 'default')
+      const couponSeller = String(couponRow.seller_id || 'default').trim() || 'default'
       // For seller coupons, compute eligible subtotal using full cart (since master products map to 'default')
       const eligible = couponSeller === 'default'
         ? list.reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
@@ -11877,11 +11923,18 @@ async function start() {
         if (delivery_status === 'zugestellt' && delivery_date === undefined) {
           await client.query(`UPDATE store_orders SET delivery_date = COALESCE(delivery_date, now()), updated_at = now() WHERE id = $1::uuid`, [id])
         }
-        // Auto-complete: if payment is paid and delivery is delivered, mark order as completed — do not override Retoure / Rückgabe / Erstattung
+        // Auto-complete: paid + delivered → abgeschlossen (never when only versendet)
         await client.query(
           `UPDATE store_orders SET order_status = 'abgeschlossen', updated_at = now()
            WHERE id = $1::uuid AND payment_status = 'bezahlt' AND delivery_status = 'zugestellt'
            AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`,
+          [id]
+        )
+        // Guard: abgeschlossen only valid when zugestellt — revert stale state after versendet/offen
+        await client.query(
+          `UPDATE store_orders SET order_status = 'in_bearbeitung', updated_at = now()
+           WHERE id = $1::uuid AND order_status = 'abgeschlossen' AND delivery_status != 'zugestellt'
+           AND order_status NOT IN ('retoure','retoure_anfrage','refunded','storniert')`,
           [id]
         )
         // Auto-create shipment events for status transitions
@@ -18740,9 +18793,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         // Superuser without explicit seller_id → 'default' (platform-wide coupon)
         // Superuser with explicit seller_id → coupon for that specific seller
         // Normal seller → always their own seller_id
-        const sellerId = isSuperuser
+        const sellerId = (isSuperuser
           ? String(body.seller_id || 'default')
-          : String(callerSellerId || 'default')
+          : String(callerSellerId || 'default')).trim() || 'default'
         if (!isSuperuser && sellerId !== callerSellerId) {
           await client.end()
           return res.status(403).json({ message: 'Forbidden' })
@@ -23290,7 +23343,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
           // Update order status
           if (internalStatus === 'zugestellt' && order.delivery_status !== 'zugestellt') {
             await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid`, [order.id])
-            await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
+            await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
           } else if (internalStatus === 'versendet' || internalStatus === 'in_transit') {
             await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
           }

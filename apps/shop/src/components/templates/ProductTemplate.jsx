@@ -862,6 +862,30 @@ function findCategoryNodeBySlug(nodes, slug) {
   return null;
 }
 
+function findCategoryNodeById(nodes, id) {
+  const norm = String(id || "").trim();
+  if (!norm) return null;
+  for (const n of nodes || []) {
+    if (!n) continue;
+    if (String(n.id || "").trim() === norm) return n;
+    const child = findCategoryNodeById(n.children, id);
+    if (child) return child;
+  }
+  return null;
+}
+
+function findAncestorsById(nodes, id, path = []) {
+  const norm = String(id || "").trim();
+  if (!norm) return null;
+  for (const n of nodes || []) {
+    if (!n) continue;
+    if (String(n.id || "").trim() === norm) return path;
+    const found = findAncestorsById(n.children, id, [...path, n]);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 /** PDP buybox: seller campaign discount overlay on top of listing price. */
 function ProductCampaignPriceBlock({
   productId,
@@ -1065,10 +1089,11 @@ export default function ProductTemplate() {
     link.href = href;
   }, [product, locale]);
 
-  // Breadcrumb: show full category chain (root → … → current) if product has `metadata.category_slug`.
+  // Breadcrumb: full category chain from admin_category_id / category_slug (no Home, no collection fallback).
   useEffect(() => {
     const categorySlug = product?.metadata?.category_slug;
-    if (!categorySlug) {
+    const categoryId = product?.metadata?.admin_category_id || product?.metadata?.category_id;
+    if (!categorySlug && !categoryId) {
       setCategoryAncestors([]);
       setCategoryCurrentNode(null);
       return;
@@ -1081,8 +1106,16 @@ export default function ProductTemplate() {
         if (cancelled) return;
         const tree = data?.tree || data?.categories || [];
         const roots = Array.isArray(tree) ? tree : [tree];
-        const ancestors = findAncestors(roots, categorySlug) || [];
-        const currentNode = findCategoryNodeBySlug(roots, categorySlug) || null;
+        let currentNode = null;
+        let ancestors = [];
+        if (categorySlug) {
+          ancestors = findAncestors(roots, categorySlug) || [];
+          currentNode = findCategoryNodeBySlug(roots, categorySlug) || null;
+        }
+        if (!currentNode && categoryId) {
+          currentNode = findCategoryNodeById(roots, categoryId) || null;
+          ancestors = findAncestorsById(roots, categoryId) || [];
+        }
         setCategoryAncestors(ancestors);
         setCategoryCurrentNode(currentNode);
       })
@@ -1095,7 +1128,7 @@ export default function ProductTemplate() {
     return () => {
       cancelled = true;
     };
-  }, [product?.id, product?.metadata?.category_slug]);
+  }, [product?.id, product?.metadata?.category_slug, product?.metadata?.admin_category_id, product?.metadata?.category_id]);
 
   useEffect(() => {
     if (!product?.variation_groups?.length || !product?.variants?.length) return;
@@ -1358,22 +1391,19 @@ export default function ProductTemplate() {
     }
   };
 
-  const categorySlugNorm = meta.category_slug ? String(meta.category_slug).replace(/^\//, "") : "";
-  const categoryCurrentLabel =
-    categoryCurrentNode?.name ||
-    meta.category_name ||
-    (categorySlugNorm
-      ? categorySlugNorm.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase())
-      : "");
+  const resolvedCategorySlug = String(
+    categoryCurrentNode?.slug || categoryCurrentNode?.handle || meta.category_slug || ""
+  ).replace(/^\//, "");
+  const categorySlugNorm = resolvedCategorySlug;
+  const categoryCurrentLabel = categoryCurrentNode?.name || meta.category_name || "";
 
   const breadcrumbItems = [
-    { label: "Home", href: "/" },
     ...(categoryAncestors || []).map((anc) => {
       const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
       return { label: anc.name || ancSlug, href: ancSlug ? `/${ancSlug}` : null };
     }),
-    ...(categorySlugNorm
-      ? [{ label: categoryCurrentLabel, href: `/${categorySlugNorm}` }]
+    ...(categoryCurrentNode && categorySlugNorm
+      ? [{ label: categoryCurrentLabel || categorySlugNorm, href: `/${categorySlugNorm}` }]
       : []),
     { label: displayTitle, href: null },
   ];
