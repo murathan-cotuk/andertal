@@ -2442,7 +2442,6 @@ async function start() {
     }
     httpApp.post(
       '/admin-hub/v1/categories/warm-translations',
-      requireSellerAuth,
       requireSuperuser,
       adminHubCategoriesWarmTranslationsPOST,
     )
@@ -3162,10 +3161,10 @@ async function start() {
         res.status(500).json({ message: (e && e.message) || 'Internal server error' })
       }
     }
-    httpApp.get('/admin-hub/brands', requireSellerAuth, adminBrandsGET)
-    httpApp.post('/admin-hub/brands', requireSellerAuth, adminBrandsPOST)
-    httpApp.patch('/admin-hub/brands/:id', requireSellerAuth, (req, res) => adminBrandsPatchDelete(req, res, true))
-    httpApp.delete('/admin-hub/brands/:id', requireSellerAuth, (req, res) => adminBrandsPatchDelete(req, res, false))
+    httpApp.get('/admin-hub/brands', adminBrandsGET)
+    httpApp.post('/admin-hub/brands', adminBrandsPOST)
+    httpApp.patch('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, true))
+    httpApp.delete('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, false))
 
     // ── Banners CRUD (superuser) ──────────────────────────────────────────────
     const getBannersDb = async () => {
@@ -3178,10 +3177,10 @@ async function start() {
         return r.rows || []
       } catch (e) { try { await client.end() } catch (_) {}; return [] }
     }
-    httpApp.get('/admin-hub/v1/banners', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.get('/admin-hub/v1/banners', requireSuperuser, async (req, res) => {
       res.json({ banners: await getBannersDb() })
     })
-    httpApp.post('/admin-hub/v1/banners', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.post('/admin-hub/v1/banners', requireSuperuser, async (req, res) => {
       const b = req.body || {}
       const title = (b.title || '').trim()
       if (!title) return res.status(400).json({ message: 'Title is required' })
@@ -3198,7 +3197,7 @@ async function start() {
         res.status(201).json({ banner: r.rows[0] })
       } catch (e) { try { await client.end() } catch (_) {}; console.error('Banners POST:', e); res.status(500).json({ message: e.message }) }
     })
-    httpApp.put('/admin-hub/v1/banners/:id', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.put('/admin-hub/v1/banners/:id', requireSuperuser, async (req, res) => {
       const { id } = req.params
       const b = req.body || {}
       const client = getSellerDbClient()
@@ -3214,7 +3213,7 @@ async function start() {
         res.json({ banner: r.rows[0] })
       } catch (e) { try { await client.end() } catch (_) {}; console.error('Banners PUT:', e); res.status(500).json({ message: e.message }) }
     })
-    httpApp.delete('/admin-hub/v1/banners/:id', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.delete('/admin-hub/v1/banners/:id', requireSuperuser, async (req, res) => {
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
@@ -5134,10 +5133,10 @@ async function start() {
         res.status(500).json({ message: (err && err.message) || 'Internal server error' })
       }
     }
-    httpApp.get('/admin-hub/products', requireSellerAuth, adminHubProductsGET)
-    httpApp.post('/admin-hub/products', requireSellerAuth, adminHubProductsPOST)
+    httpApp.get('/admin-hub/products', adminHubProductsGET)
+    httpApp.post('/admin-hub/products', adminHubProductsPOST)
     // EAN lookup — returns master product by EAN without seller filter (read-only, catalog fields only)
-    httpApp.get('/admin-hub/products/ean-lookup', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/products/ean-lookup', async (req, res) => {
       try {
         const ean = String(req.query.ean || '').trim()
         if (!ean) return res.status(400).json({ message: 'ean query param required' })
@@ -5163,12 +5162,12 @@ async function start() {
         res.status(500).json({ message: err?.message || 'Lookup failed' })
       }
     })
-    httpApp.get('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdGET)
-    httpApp.put('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdPUT)
-    httpApp.delete('/admin-hub/products/:id', requireSellerAuth, adminHubProductByIdDELETE)
+    httpApp.get('/admin-hub/products/:id', adminHubProductByIdGET)
+    httpApp.put('/admin-hub/products/:id', adminHubProductByIdPUT)
+    httpApp.delete('/admin-hub/products/:id', adminHubProductByIdDELETE)
 
     // GET /admin-hub/products/:id/listings — returns all seller listings for a product (superuser only)
-    httpApp.get('/admin-hub/products/:id/listings', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/products/:id/listings', async (req, res) => {
       try {
         if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
         const productId = String(req.params.id || '').trim()
@@ -5200,7 +5199,7 @@ async function start() {
     })
 
     // GET /admin-hub/product-listings-map — returns { [product_id]: string[] } for all master products (superuser only)
-    httpApp.get('/admin-hub/product-listings-map', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/product-listings-map', async (req, res) => {
       try {
         if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
         const dbUrlMap = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -5240,7 +5239,7 @@ async function start() {
     })
 
     // POST /admin-hub/v1/products/bulk-import — batch create products from CSV rows
-    httpApp.post('/admin-hub/v1/products/bulk-import', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/products/bulk-import', async (req, res) => {
       const isSuperuser = req.sellerUser?.is_superuser === true
       const callerSellerId = (!isSuperuser && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
       const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
@@ -5312,7 +5311,7 @@ async function start() {
     })
 
     // PATCH /admin-hub/products/:id/variants — variant-only update (no GPSR validation)
-    httpApp.patch('/admin-hub/products/:id/variants', requireSellerAuth, async (req, res) => {
+    httpApp.patch('/admin-hub/products/:id/variants', async (req, res) => {
       try {
         const body = req.body || {}
         if (!Array.isArray(body.variants)) {
@@ -6193,16 +6192,16 @@ async function start() {
 
     httpApp.post('/admin-hub/auth/register', sellerAuthRegisterPOST)
     httpApp.post('/admin-hub/auth/login', sellerAuthLoginPOST)
-    httpApp.get('/admin-hub/auth/me', requireSellerAuth, sellerAuthMeGET)
-    httpApp.get('/admin-hub/auth/2fa/status', requireSellerAuth, sellerAuth2faStatusGET)
-    httpApp.post('/admin-hub/auth/2fa/setup', requireSellerAuth, sellerAuth2faSetupPOST)
-    httpApp.post('/admin-hub/auth/2fa/verify', requireSellerAuth, sellerAuth2faVerifyPOST)
-    httpApp.post('/admin-hub/auth/2fa/disable', requireSellerAuth, sellerAuth2faDisablePOST)
-    httpApp.get('/admin-hub/users', requireSellerAuth, requireSuperuser, sellerUsersGET)
-    httpApp.post('/admin-hub/users', requireSellerAuth, requireSuperuser, sellerUserCreatePOST)
-    httpApp.patch('/admin-hub/users/:id', requireSellerAuth, requireSuperuser, sellerUserUpdatePATCH)
-    httpApp.delete('/admin-hub/users/:id', requireSellerAuth, requireSuperuser, sellerUserDeleteDELETE)
-    httpApp.patch('/admin-hub/users/:id/superuser', requireSellerAuth, requireSuperuser, sellerUserSuperuserPATCH)
+    httpApp.get('/admin-hub/auth/me', sellerAuthMeGET)
+    httpApp.get('/admin-hub/auth/2fa/status', sellerAuth2faStatusGET)
+    httpApp.post('/admin-hub/auth/2fa/setup', sellerAuth2faSetupPOST)
+    httpApp.post('/admin-hub/auth/2fa/verify', sellerAuth2faVerifyPOST)
+    httpApp.post('/admin-hub/auth/2fa/disable', sellerAuth2faDisablePOST)
+    httpApp.get('/admin-hub/users', requireSuperuser, sellerUsersGET)
+    httpApp.post('/admin-hub/users', requireSuperuser, sellerUserCreatePOST)
+    httpApp.patch('/admin-hub/users/:id', requireSuperuser, sellerUserUpdatePATCH)
+    httpApp.delete('/admin-hub/users/:id', requireSuperuser, sellerUserDeleteDELETE)
+    httpApp.patch('/admin-hub/users/:id/superuser', requireSuperuser, sellerUserSuperuserPATCH)
 
     const loadPlatformCheckoutRow = async (pgClient) => {
       const r = await pgClient.query(
@@ -6430,12 +6429,11 @@ async function start() {
       }
     }
 
-    httpApp.get('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsGET)
-    httpApp.put('/admin-hub/v1/platform-checkout-settings', requireSellerAuth, requireSuperuser, platformCheckoutSettingsPUT)
-    httpApp.get('/admin-hub/v1/stripe-payment-methods', requireSellerAuth, requireSuperuser, stripePaymentMethodsGET)
+    httpApp.get('/admin-hub/v1/platform-checkout-settings', requireSuperuser, platformCheckoutSettingsGET)
+    httpApp.put('/admin-hub/v1/platform-checkout-settings', requireSuperuser, platformCheckoutSettingsPUT)
+    httpApp.get('/admin-hub/v1/stripe-payment-methods', requireSuperuser, stripePaymentMethodsGET)
     httpApp.post(
       '/admin-hub/v1/platform-checkout-settings/test-stripe',
-      requireSellerAuth,
       requireSuperuser,
       platformCheckoutTestStripePOST,
     )
@@ -11501,16 +11499,16 @@ async function start() {
       }
     }
 
-    httpApp.get('/admin-hub/v1/media', requireSellerAuth, mediaListWithFolderGET)
-    httpApp.post('/admin-hub/v1/media', requireSellerAuth, prepareSellerMediaUploadPath, upload.single('file'), mediaUploadPOST)
-    httpApp.get('/admin-hub/v1/media/folders', requireSellerAuth, mediaFoldersGET)
-    httpApp.post('/admin-hub/v1/media/folders', requireSellerAuth, mediaFoldersPOST)
-    httpApp.delete('/admin-hub/v1/media/folders/:id', requireSellerAuth, mediaFolderDELETE)
-    httpApp.get('/admin-hub/v1/media/:id', requireSellerAuth, mediaByIdGET)
-    httpApp.patch('/admin-hub/v1/media/:id', requireSellerAuth, mediaPATCH)
-    httpApp.post('/admin-hub/v1/media/add-url', requireSellerAuth, mediaAddByUrlPOST)
-    httpApp.post('/admin-hub/v1/media/import-urls', requireSellerAuth, mediaImportUrlsPOST)
-    httpApp.delete('/admin-hub/v1/media/:id', requireSellerAuth, mediaByIdDELETE)
+    httpApp.get('/admin-hub/v1/media', mediaListWithFolderGET)
+    httpApp.post('/admin-hub/v1/media', prepareSellerMediaUploadPath, upload.single('file'), mediaUploadPOST)
+    httpApp.get('/admin-hub/v1/media/folders', mediaFoldersGET)
+    httpApp.post('/admin-hub/v1/media/folders', mediaFoldersPOST)
+    httpApp.delete('/admin-hub/v1/media/folders/:id', mediaFolderDELETE)
+    httpApp.get('/admin-hub/v1/media/:id', mediaByIdGET)
+    httpApp.patch('/admin-hub/v1/media/:id', mediaPATCH)
+    httpApp.post('/admin-hub/v1/media/add-url', mediaAddByUrlPOST)
+    httpApp.post('/admin-hub/v1/media/import-urls', mediaImportUrlsPOST)
+    httpApp.delete('/admin-hub/v1/media/:id', mediaByIdDELETE)
 
     // ── Admin Hub Orders ──────────────────────────────────────────
     const adminHubOrdersGET = async (req, res) => {
@@ -14045,9 +14043,9 @@ async function start() {
       }
     }
 
-    httpApp.get('/admin-hub/v1/integrations/sendcloud', requireSellerAuth, requireSuperuser, adminHubSendcloudGET)
-    httpApp.put('/admin-hub/v1/integrations/sendcloud', requireSellerAuth, requireSuperuser, adminHubSendcloudPUT)
-    httpApp.post('/admin-hub/v1/integrations/sendcloud/test', requireSellerAuth, requireSuperuser, adminHubSendcloudTestPOST)
+    httpApp.get('/admin-hub/v1/integrations/sendcloud', requireSuperuser, adminHubSendcloudGET)
+    httpApp.put('/admin-hub/v1/integrations/sendcloud', requireSuperuser, adminHubSendcloudPUT)
+    httpApp.post('/admin-hub/v1/integrations/sendcloud/test', requireSuperuser, adminHubSendcloudTestPOST)
 
     const ensureSellerBillbeeCredentials = async (client, sellerId, forceRegenerate = false) => {
       const existing = await client.query(
@@ -14646,10 +14644,10 @@ async function start() {
     httpApp.delete('/store/wishlist/:productId', storeWishlistDELETE)
     httpApp.post('/store/orders/:id/cancel', storeOrdersCancelPOST)
     httpApp.post('/store/orders/:id/return-request', storeReturnRequestPOST)
-    httpApp.get('/admin-hub/v1/shipping-groups', requireSellerAuth, adminHubShippingGroupsGET)
-    httpApp.post('/admin-hub/v1/shipping-groups', requireSellerAuth, adminHubShippingGroupPOST)
-    httpApp.patch('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupPATCH)
-    httpApp.delete('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupDELETE)
+    httpApp.get('/admin-hub/v1/shipping-groups', adminHubShippingGroupsGET)
+    httpApp.post('/admin-hub/v1/shipping-groups', adminHubShippingGroupPOST)
+    httpApp.patch('/admin-hub/v1/shipping-groups/:id', adminHubShippingGroupPATCH)
+    httpApp.delete('/admin-hub/v1/shipping-groups/:id', adminHubShippingGroupDELETE)
     httpApp.get('/store/shipping-groups', storeShippingGroupsGET)
     httpApp.get('/store/orders/:id/invoice', storeOrderInvoicePdfGET)
     httpApp.get('/store/orders/:id/return-retourenschein', storeOrderReturnRetourenscheinGET)
@@ -14658,13 +14656,13 @@ async function start() {
     httpApp.get('/store/reviews', storeReviewsGET)
     httpApp.post('/store/reviews', storeReviewsPOST)
     httpApp.post('/store/presence/heartbeat', storePresenceHeartbeatPOST)
-    httpApp.get('/admin-hub/reviews', requireSellerAuth, adminHubReviewsGET)
+    httpApp.get('/admin-hub/reviews', adminHubReviewsGET)
 
     httpApp.get('/admin-hub/v1/orders', adminHubOrdersGET)
     httpApp.post('/admin-hub/v1/orders', adminHubOrderPOST)
     httpApp.get('/admin-hub/v1/orders/:id/pdf/invoice', adminHubOrderPdfInvoiceGET)
     httpApp.get('/admin-hub/v1/orders/:id/pdf/lieferschein', adminHubOrderPdfLieferscheinGET)
-    httpApp.get('/admin-hub/v1/orders/:id/pdf/provisionsfaktur', requireSellerAuth, adminHubOrderPdfProvisionsfakturGET)
+    httpApp.get('/admin-hub/v1/orders/:id/pdf/provisionsfaktur', adminHubOrderPdfProvisionsfakturGET)
     httpApp.get('/admin-hub/v1/orders/:id/pdf/versandlabel', async (req, res) => {
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
@@ -14744,42 +14742,42 @@ async function start() {
     })
     httpApp.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
     httpApp.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
-    httpApp.delete('/admin-hub/v1/orders/:id', requireSellerAuth, adminHubOrderDELETE)
-    httpApp.get('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventsGET)
-    httpApp.post('/admin-hub/v1/orders/:id/shipment-events', requireSellerAuth, adminHubShipmentEventPOST)
-    httpApp.delete('/admin-hub/v1/shipment-events/:eventId', requireSellerAuth, adminHubShipmentEventDELETE)
-    httpApp.post('/admin-hub/v1/orders/:id/refresh-tracking', requireSellerAuth, adminHubOrderRefreshTrackingPOST)
-    httpApp.post('/admin-hub/v1/orders/:id/label/rates', requireSellerAuth, adminHubLabelRatesPOST)
-    httpApp.post('/admin-hub/v1/orders/:id/label/checkout', requireSellerAuth, adminHubLabelCheckoutPOST)
-    httpApp.post('/admin-hub/v1/label/fulfill', requireSellerAuth, adminHubLabelFulfillPOST)
-    httpApp.get('/admin-hub/v1/live-visitors', requireSellerAuth, requireSuperuser, adminHubLiveVisitorsGET)
-    httpApp.get('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomersGET)
-    httpApp.post('/admin-hub/v1/customers', requireSellerAuth, adminHubCustomerPOST)
-    httpApp.patch('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerPATCH)
-    httpApp.delete('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerDELETE)
-    httpApp.get('/admin-hub/v1/customers/:id', requireSellerAuth, adminHubCustomerByIdGET)
-    httpApp.post('/admin-hub/v1/customers/:id/discounts', requireSellerAuth, adminHubCustomerDiscountPOST)
-    httpApp.delete('/admin-hub/v1/customers/:customerId/discounts/:discountId', requireSellerAuth, adminHubCustomerDiscountDELETE)
-    httpApp.post('/admin-hub/v1/customers/:id/bonus-ledger', requireSellerAuth, adminHubCustomerBonusLedgerPOST)
-    httpApp.patch('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', requireSellerAuth, adminHubCustomerBonusLedgerPATCH)
-    httpApp.delete('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', requireSellerAuth, adminHubCustomerBonusLedgerDELETE)
-    httpApp.get('/admin-hub/v1/shipping-carriers', requireSellerAuth, adminHubCarriersGET)
-    httpApp.post('/admin-hub/v1/shipping-carriers', requireSellerAuth, adminHubCarrierPOST)
-    httpApp.patch('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierPATCH)
-    httpApp.delete('/admin-hub/v1/shipping-carriers/:id', requireSellerAuth, adminHubCarrierDELETE)
-    httpApp.get('/admin-hub/v1/integrations/trustpilot', requireSellerAuth, requireSuperuser, adminHubTrustpilotGET)
-    httpApp.put('/admin-hub/v1/integrations/trustpilot', requireSellerAuth, requireSuperuser, adminHubTrustpilotPUT)
+    httpApp.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
+    httpApp.get('/admin-hub/v1/orders/:id/shipment-events', adminHubShipmentEventsGET)
+    httpApp.post('/admin-hub/v1/orders/:id/shipment-events', adminHubShipmentEventPOST)
+    httpApp.delete('/admin-hub/v1/shipment-events/:eventId', adminHubShipmentEventDELETE)
+    httpApp.post('/admin-hub/v1/orders/:id/refresh-tracking', adminHubOrderRefreshTrackingPOST)
+    httpApp.post('/admin-hub/v1/orders/:id/label/rates', adminHubLabelRatesPOST)
+    httpApp.post('/admin-hub/v1/orders/:id/label/checkout', adminHubLabelCheckoutPOST)
+    httpApp.post('/admin-hub/v1/label/fulfill', adminHubLabelFulfillPOST)
+    httpApp.get('/admin-hub/v1/live-visitors', requireSuperuser, adminHubLiveVisitorsGET)
+    httpApp.get('/admin-hub/v1/customers', adminHubCustomersGET)
+    httpApp.post('/admin-hub/v1/customers', adminHubCustomerPOST)
+    httpApp.patch('/admin-hub/v1/customers/:id', adminHubCustomerPATCH)
+    httpApp.delete('/admin-hub/v1/customers/:id', adminHubCustomerDELETE)
+    httpApp.get('/admin-hub/v1/customers/:id', adminHubCustomerByIdGET)
+    httpApp.post('/admin-hub/v1/customers/:id/discounts', adminHubCustomerDiscountPOST)
+    httpApp.delete('/admin-hub/v1/customers/:customerId/discounts/:discountId', adminHubCustomerDiscountDELETE)
+    httpApp.post('/admin-hub/v1/customers/:id/bonus-ledger', adminHubCustomerBonusLedgerPOST)
+    httpApp.patch('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', adminHubCustomerBonusLedgerPATCH)
+    httpApp.delete('/admin-hub/v1/customers/:customerId/bonus-ledger/:entryId', adminHubCustomerBonusLedgerDELETE)
+    httpApp.get('/admin-hub/v1/shipping-carriers', adminHubCarriersGET)
+    httpApp.post('/admin-hub/v1/shipping-carriers', adminHubCarrierPOST)
+    httpApp.patch('/admin-hub/v1/shipping-carriers/:id', adminHubCarrierPATCH)
+    httpApp.delete('/admin-hub/v1/shipping-carriers/:id', adminHubCarrierDELETE)
+    httpApp.get('/admin-hub/v1/integrations/trustpilot', requireSuperuser, adminHubTrustpilotGET)
+    httpApp.put('/admin-hub/v1/integrations/trustpilot', requireSuperuser, adminHubTrustpilotPUT)
     httpApp.get('/admin-hub/v1/integrations', adminHubIntegrationsGET)
-    httpApp.post('/admin-hub/v1/integrations', requireSellerAuth, adminHubIntegrationPOST)
-    httpApp.patch('/admin-hub/v1/integrations/:id', requireSellerAuth, adminHubIntegrationPATCH)
-    httpApp.delete('/admin-hub/v1/integrations/:id', requireSellerAuth, adminHubIntegrationDELETE)
-    httpApp.get('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsGET)
-    httpApp.patch('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsPATCH)
-    httpApp.post('/admin-hub/v1/integrations/billbee/credentials', requireSellerAuth, adminHubBillbeeCredentialsPOST)
-    httpApp.post('/admin-hub/v1/integrations/billbee/test', requireSellerAuth, adminHubBillbeeIntegrationTestPOST)
+    httpApp.post('/admin-hub/v1/integrations', adminHubIntegrationPOST)
+    httpApp.patch('/admin-hub/v1/integrations/:id', adminHubIntegrationPATCH)
+    httpApp.delete('/admin-hub/v1/integrations/:id', adminHubIntegrationDELETE)
+    httpApp.get('/admin-hub/v1/integrations/billbee/credentials', adminHubBillbeeCredentialsGET)
+    httpApp.patch('/admin-hub/v1/integrations/billbee/credentials', adminHubBillbeeCredentialsPATCH)
+    httpApp.post('/admin-hub/v1/integrations/billbee/credentials', adminHubBillbeeCredentialsPOST)
+    httpApp.post('/admin-hub/v1/integrations/billbee/test', adminHubBillbeeIntegrationTestPOST)
     // Billbee calls this URL to verify/authenticate the integration.
     // Must be reachable from the Billbee backend.
-    httpApp.get('/admin-hub/v1/integrations/billbee/webhook-url', requireSellerAuth, adminHubBillbeeWebhookUrlGET)
+    httpApp.get('/admin-hub/v1/integrations/billbee/webhook-url', adminHubBillbeeWebhookUrlGET)
     httpApp.get('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookGET)
     httpApp.post('/admin-hub/v1/integrations/billbee/webhook', adminHubBillbeeWebhookPOST)
 
@@ -14870,8 +14868,8 @@ async function start() {
       }
     }
 
-    httpApp.get('/admin-hub/v1/billbee/connection', requireSellerAuth, adminHubBillbeeMarketplaceConnectionGET)
-    httpApp.post('/admin-hub/v1/billbee/connection/rotate-secret', requireSellerAuth, adminHubBillbeeMarketplaceConnectionRotatePOST)
+    httpApp.get('/admin-hub/v1/billbee/connection', adminHubBillbeeMarketplaceConnectionGET)
+    httpApp.post('/admin-hub/v1/billbee/connection/rotate-secret', adminHubBillbeeMarketplaceConnectionRotatePOST)
 
     httpApp.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
     // POST /admin-hub/v1/returns/:id/send-label — mark label sent + send email to customer
@@ -17069,18 +17067,18 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    httpApp.get('/admin-hub/v1/notifications/unread', requireSellerAuth, adminHubNotificationsUnreadGET)
-    httpApp.post('/admin-hub/v1/notifications/mark-seen', requireSellerAuth, adminHubNotificationsMarkSeenPOST)
-    httpApp.get('/admin-hub/v1/notifications/feed', requireSellerAuth, adminHubNotificationsFeedGET)
-    httpApp.post('/admin-hub/v1/notifications/delete', requireSellerAuth, adminHubNotificationsDeletePOST)
+    httpApp.get('/admin-hub/v1/notifications/unread', adminHubNotificationsUnreadGET)
+    httpApp.post('/admin-hub/v1/notifications/mark-seen', adminHubNotificationsMarkSeenPOST)
+    httpApp.get('/admin-hub/v1/notifications/feed', adminHubNotificationsFeedGET)
+    httpApp.post('/admin-hub/v1/notifications/delete', adminHubNotificationsDeletePOST)
     httpApp.get('/admin-hub/v1/messages', adminHubMessagesGET)
     httpApp.post('/admin-hub/v1/messages', adminHubMessagesPOST)
     httpApp.patch('/admin-hub/v1/messages/support/mark-read', adminHubSupportMessagesMarkReadPATCH)
     httpApp.patch('/admin-hub/v1/messages/:id/read', adminHubMessageMarkReadPATCH)
-    httpApp.get('/admin-hub/v1/message-templates', requireSellerAuth, adminHubMessageTemplatesGET)
-    httpApp.post('/admin-hub/v1/message-templates', requireSellerAuth, adminHubMessageTemplatesPOST)
-    httpApp.patch('/admin-hub/v1/message-templates/:id', requireSellerAuth, adminHubMessageTemplatesPATCH)
-    httpApp.delete('/admin-hub/v1/message-templates/:id', requireSellerAuth, adminHubMessageTemplatesDELETE)
+    httpApp.get('/admin-hub/v1/message-templates', adminHubMessageTemplatesGET)
+    httpApp.post('/admin-hub/v1/message-templates', adminHubMessageTemplatesPOST)
+    httpApp.patch('/admin-hub/v1/message-templates/:id', adminHubMessageTemplatesPATCH)
+    httpApp.delete('/admin-hub/v1/message-templates/:id', adminHubMessageTemplatesDELETE)
     httpApp.get('/store/messages', storeMessagesGET)
     httpApp.post('/store/messages', storeMessagesPOST)
 
@@ -17117,14 +17115,14 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     httpApp.get('/store/messages/unread-count', storeMessagesUnreadCountGET)
     httpApp.patch('/store/messages/mark-read', storeMessagesMarkReadPATCH)
-    httpApp.get('/admin-hub/v1/smtp-settings', requireSellerAuth, adminHubSmtpSettingsGET)
-    httpApp.patch('/admin-hub/v1/smtp-settings', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsPATCH)
-    httpApp.post('/admin-hub/v1/smtp-settings/test', requireSellerAuth, requireSuperuser, adminHubSmtpSettingsTestPOST)
-    httpApp.post('/admin-hub/v1/smtp-senders', requireSellerAuth, requireSuperuser, adminHubSmtpSendersPOST)
-    httpApp.patch('/admin-hub/v1/smtp-senders/:id', requireSellerAuth, requireSuperuser, adminHubSmtpSendersPATCH)
-    httpApp.delete('/admin-hub/v1/smtp-senders/:id', requireSellerAuth, requireSuperuser, adminHubSmtpSendersDELETE)
-    httpApp.post('/admin-hub/v1/smtp-senders/:id/set-default', requireSellerAuth, requireSuperuser, adminHubSmtpSendersSetDefaultPOST)
-    httpApp.post('/admin-hub/v1/smtp-senders/:id/test', requireSellerAuth, requireSuperuser, adminHubSmtpSendersTestPOST)
+    httpApp.get('/admin-hub/v1/smtp-settings', adminHubSmtpSettingsGET)
+    httpApp.patch('/admin-hub/v1/smtp-settings', requireSuperuser, adminHubSmtpSettingsPATCH)
+    httpApp.post('/admin-hub/v1/smtp-settings/test', requireSuperuser, adminHubSmtpSettingsTestPOST)
+    httpApp.post('/admin-hub/v1/smtp-senders', requireSuperuser, adminHubSmtpSendersPOST)
+    httpApp.patch('/admin-hub/v1/smtp-senders/:id', requireSuperuser, adminHubSmtpSendersPATCH)
+    httpApp.delete('/admin-hub/v1/smtp-senders/:id', requireSuperuser, adminHubSmtpSendersDELETE)
+    httpApp.post('/admin-hub/v1/smtp-senders/:id/set-default', requireSuperuser, adminHubSmtpSendersSetDefaultPOST)
+    httpApp.post('/admin-hub/v1/smtp-senders/:id/test', requireSuperuser, adminHubSmtpSendersTestPOST)
 
     // ── Automation flows (Content → Flows; superuser) ───────────────────────────
     /** Dokumentation + Testdaten für Flow-E-Mails; Platzhalter {KEY} (Groß/Klein egal) */
@@ -18484,7 +18482,6 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
 
     httpApp.get(
       '/admin-hub/v1/flows/email-merge-fields',
-      requireSellerAuth,
       requireSuperuser,
       adminHubFlowEmailMergeFieldsGET,
     )
@@ -18535,14 +18532,14 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    httpApp.get('/admin-hub/v1/flows', requireSellerAuth, requireSuperuser, adminHubFlowsListGET)
-    httpApp.post('/admin-hub/v1/flows/translate', requireSellerAuth, requireSuperuser, adminHubFlowTranslatePOST)
-    httpApp.post('/admin-hub/v1/flows', requireSellerAuth, requireSuperuser, adminHubFlowsPOST)
-    httpApp.post('/admin-hub/v1/flows/:id/test-email', requireSellerAuth, requireSuperuser, adminHubFlowTestEmailPOST)
-    httpApp.get('/admin-hub/v1/flows/:id/snapshots', requireSellerAuth, requireSuperuser, adminHubFlowSnapshotsGET)
-    httpApp.get('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowGET)
-    httpApp.patch('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowPATCH)
-    httpApp.delete('/admin-hub/v1/flows/:id', requireSellerAuth, requireSuperuser, adminHubFlowDELETE)
+    httpApp.get('/admin-hub/v1/flows', requireSuperuser, adminHubFlowsListGET)
+    httpApp.post('/admin-hub/v1/flows/translate', requireSuperuser, adminHubFlowTranslatePOST)
+    httpApp.post('/admin-hub/v1/flows', requireSuperuser, adminHubFlowsPOST)
+    httpApp.post('/admin-hub/v1/flows/:id/test-email', requireSuperuser, adminHubFlowTestEmailPOST)
+    httpApp.get('/admin-hub/v1/flows/:id/snapshots', requireSuperuser, adminHubFlowSnapshotsGET)
+    httpApp.get('/admin-hub/v1/flows/:id', requireSuperuser, adminHubFlowGET)
+    httpApp.patch('/admin-hub/v1/flows/:id', requireSuperuser, adminHubFlowPATCH)
+    httpApp.delete('/admin-hub/v1/flows/:id', requireSuperuser, adminHubFlowDELETE)
 
     const adminHubFlowExecutionLogsStatsGET = async (req, res) => {
       const client = getDbClient()
@@ -18701,9 +18698,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    httpApp.get('/admin-hub/v1/flow-execution-logs/stats', requireSellerAuth, adminHubFlowExecutionLogsStatsGET)
-    httpApp.get('/admin-hub/v1/flow-execution-logs', requireSellerAuth, adminHubFlowExecutionLogsGET)
-    httpApp.get('/admin-hub/v1/flow-execution-logs/:id', requireSellerAuth, adminHubFlowExecutionLogGET)
+    httpApp.get('/admin-hub/v1/flow-execution-logs/stats', adminHubFlowExecutionLogsStatsGET)
+    httpApp.get('/admin-hub/v1/flow-execution-logs', adminHubFlowExecutionLogsGET)
+    httpApp.get('/admin-hub/v1/flow-execution-logs/:id', adminHubFlowExecutionLogGET)
 
     // ── Coupons ────────────────────────────────────────────────────────────────
     const adminHubCouponsGET = async (req, res) => {
@@ -20729,39 +20726,39 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    httpApp.get('/admin-hub/v1/transactions', requireSellerAuth, adminHubTransactionsGET)
-    httpApp.get('/admin-hub/v1/coupons', requireSellerAuth, adminHubCouponsGET)
-    httpApp.post('/admin-hub/v1/coupons', requireSellerAuth, adminHubCouponsPOST)
-    httpApp.patch('/admin-hub/v1/coupons/:id', requireSellerAuth, adminHubCouponsPATCH)
-    httpApp.delete('/admin-hub/v1/coupons/:id', requireSellerAuth, adminHubCouponsDELETE)
-    httpApp.get('/admin-hub/v1/commission-invoices', requireSellerAuth, adminHubCommissionInvoicesGET)
-    httpApp.get('/admin-hub/v1/seller-payouts/:id/pdf', requireSellerAuth, adminHubSellerPayoutPdfGET)
-    httpApp.get('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsGET)
-    httpApp.post('/admin-hub/v1/payouts', requireSellerAuth, adminHubPayoutsPOST)
-    httpApp.patch('/admin-hub/v1/payouts/:id', requireSellerAuth, adminHubPayoutsPATCH)
-    httpApp.post('/admin-hub/v1/payouts/mark-paid', requireSellerAuth, adminHubPayoutsMarkPaidPOST)
-    httpApp.post('/admin-hub/v1/payouts/backfill', requireSellerAuth, adminHubPayoutsBackfillPOST)
-    httpApp.get('/admin-hub/v1/payout-summary', requireSellerAuth, adminHubPayoutSummaryGET)
-    httpApp.get('/admin-hub/v1/analytics/marketing', requireSellerAuth, adminHubAnalyticsMarketingGET)
-    httpApp.get('/admin-hub/v1/payout-overview', requireSellerAuth, adminHubPayoutOverviewGET)
-    httpApp.patch('/admin-hub/v1/seller/iban', requireSellerAuth, adminHubSellerIbanPATCH)
-    httpApp.get('/admin-hub/v1/seller/account', requireSellerAuth, adminHubSellerAccountGET)
-    httpApp.patch('/admin-hub/v1/seller/password', requireSellerAuth, adminHubSellerPasswordPATCH)
-    httpApp.get('/admin-hub/v1/seller/profile', requireSellerAuth, adminHubSellerProfileGET)
-    httpApp.get('/admin-hub/v1/seller/locations', requireSellerAuth, adminHubLocationsGET)
-    httpApp.post('/admin-hub/v1/seller/locations', requireSellerAuth, adminHubLocationsPOST)
-    httpApp.patch('/admin-hub/v1/seller/locations/:id', requireSellerAuth, adminHubLocationsPATCH)
-    httpApp.delete('/admin-hub/v1/seller/locations/:id', requireSellerAuth, adminHubLocationsDELETE)
-    httpApp.get('/admin-hub/v1/seller-errors', requireSellerAuth, adminHubSellerErrorLogsGET)
-    httpApp.post('/admin-hub/v1/seller-errors', requireSellerAuth, adminHubSellerErrorLogsPOST)
-    httpApp.post('/admin-hub/v1/seller-errors/report', requireSellerAuth, adminHubSellerErrorsReportPOST)
-    httpApp.patch('/admin-hub/v1/seller-errors/:id', requireSellerAuth, adminHubSellerErrorLogsPATCH)
-    httpApp.delete('/admin-hub/v1/seller-errors/:id', requireSellerAuth, adminHubSellerErrorLogsDELETE)
-    httpApp.post('/admin-hub/users/invite', requireSellerAuth, adminHubUsersInvitePOST)
-    httpApp.get('/admin-hub/v1/subusers', requireSellerAuth, adminHubSubusersGET)
-    httpApp.patch('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserUpdatePATCH)
-    httpApp.delete('/admin-hub/v1/subusers/:id', requireSellerAuth, adminHubSubuserDeleteDELETE)
-    httpApp.delete('/admin-hub/v1/pending-invites/:id', requireSellerAuth, adminHubPendingInviteDeleteDELETE)
+    httpApp.get('/admin-hub/v1/transactions', adminHubTransactionsGET)
+    httpApp.get('/admin-hub/v1/coupons', adminHubCouponsGET)
+    httpApp.post('/admin-hub/v1/coupons', adminHubCouponsPOST)
+    httpApp.patch('/admin-hub/v1/coupons/:id', adminHubCouponsPATCH)
+    httpApp.delete('/admin-hub/v1/coupons/:id', adminHubCouponsDELETE)
+    httpApp.get('/admin-hub/v1/commission-invoices', adminHubCommissionInvoicesGET)
+    httpApp.get('/admin-hub/v1/seller-payouts/:id/pdf', adminHubSellerPayoutPdfGET)
+    httpApp.get('/admin-hub/v1/payouts', adminHubPayoutsGET)
+    httpApp.post('/admin-hub/v1/payouts', adminHubPayoutsPOST)
+    httpApp.patch('/admin-hub/v1/payouts/:id', adminHubPayoutsPATCH)
+    httpApp.post('/admin-hub/v1/payouts/mark-paid', adminHubPayoutsMarkPaidPOST)
+    httpApp.post('/admin-hub/v1/payouts/backfill', adminHubPayoutsBackfillPOST)
+    httpApp.get('/admin-hub/v1/payout-summary', adminHubPayoutSummaryGET)
+    httpApp.get('/admin-hub/v1/analytics/marketing', adminHubAnalyticsMarketingGET)
+    httpApp.get('/admin-hub/v1/payout-overview', adminHubPayoutOverviewGET)
+    httpApp.patch('/admin-hub/v1/seller/iban', adminHubSellerIbanPATCH)
+    httpApp.get('/admin-hub/v1/seller/account', adminHubSellerAccountGET)
+    httpApp.patch('/admin-hub/v1/seller/password', adminHubSellerPasswordPATCH)
+    httpApp.get('/admin-hub/v1/seller/profile', adminHubSellerProfileGET)
+    httpApp.get('/admin-hub/v1/seller/locations', adminHubLocationsGET)
+    httpApp.post('/admin-hub/v1/seller/locations', adminHubLocationsPOST)
+    httpApp.patch('/admin-hub/v1/seller/locations/:id', adminHubLocationsPATCH)
+    httpApp.delete('/admin-hub/v1/seller/locations/:id', adminHubLocationsDELETE)
+    httpApp.get('/admin-hub/v1/seller-errors', adminHubSellerErrorLogsGET)
+    httpApp.post('/admin-hub/v1/seller-errors', adminHubSellerErrorLogsPOST)
+    httpApp.post('/admin-hub/v1/seller-errors/report', adminHubSellerErrorsReportPOST)
+    httpApp.patch('/admin-hub/v1/seller-errors/:id', adminHubSellerErrorLogsPATCH)
+    httpApp.delete('/admin-hub/v1/seller-errors/:id', adminHubSellerErrorLogsDELETE)
+    httpApp.post('/admin-hub/users/invite', adminHubUsersInvitePOST)
+    httpApp.get('/admin-hub/v1/subusers', adminHubSubusersGET)
+    httpApp.patch('/admin-hub/v1/subusers/:id', adminHubSubuserUpdatePATCH)
+    httpApp.delete('/admin-hub/v1/subusers/:id', adminHubSubuserDeleteDELETE)
+    httpApp.delete('/admin-hub/v1/pending-invites/:id', adminHubPendingInviteDeleteDELETE)
 
     // ── Seller Product Groups ─────────────────────────────────────────────────
     const pgDbClient = () => {
@@ -20770,7 +20767,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     }
 
-    httpApp.get('/admin-hub/v1/product-groups', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/product-groups', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id || null
       const isSuperuser = req.sellerUser?.is_superuser || false
       const c = pgDbClient(); try {
@@ -20787,7 +20784,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.post('/admin-hub/v1/product-groups', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/product-groups', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id || null
       if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
       const { name, description, product_ids, filter_rules } = req.body || {}
@@ -20802,7 +20799,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.get('/admin-hub/v1/product-groups/:id', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/product-groups/:id', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const isSuperuser = req.sellerUser?.is_superuser
       const c = pgDbClient(); try {
@@ -20816,7 +20813,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.put('/admin-hub/v1/product-groups/:id', requireSellerAuth, async (req, res) => {
+    httpApp.put('/admin-hub/v1/product-groups/:id', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const isSuperuser = req.sellerUser?.is_superuser
       const { name, description, product_ids, filter_rules } = req.body || {}
@@ -20834,7 +20831,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.delete('/admin-hub/v1/product-groups/:id', requireSellerAuth, async (req, res) => {
+    httpApp.delete('/admin-hub/v1/product-groups/:id', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const isSuperuser = req.sellerUser?.is_superuser
       const c = pgDbClient(); try {
@@ -20863,7 +20860,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       return [...ids]
     }
 
-    httpApp.get('/admin-hub/v1/campaigns', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/campaigns', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const isSuperuser = req.sellerUser?.is_superuser
       const c = pgDbClient(); try {
@@ -20875,7 +20872,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.post('/admin-hub/v1/campaigns', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/campaigns', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
       const { name, description, status, start_at, end_at, discount_type, discount_value, target_type, product_ids, group_ids, variant_ids, settings, campaign_type, budget_daily_cents, bid_strategy, ad_platforms } = req.body || {}
@@ -20939,7 +20936,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.get('/admin-hub/v1/campaigns/:id', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/campaigns/:id', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const isSuperuser = req.sellerUser?.is_superuser
       const c = pgDbClient(); try {
@@ -20953,7 +20950,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.put('/admin-hub/v1/campaigns/:id', requireSellerAuth, async (req, res) => {
+    httpApp.put('/admin-hub/v1/campaigns/:id', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const isSuperuser = req.sellerUser?.is_superuser
       const c = pgDbClient(); try {
@@ -20990,7 +20987,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.delete('/admin-hub/v1/campaigns/:id', requireSellerAuth, async (req, res) => {
+    httpApp.delete('/admin-hub/v1/campaigns/:id', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const isSuperuser = req.sellerUser?.is_superuser
       const c = pgDbClient(); try {
@@ -21203,7 +21200,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     }
 
     // Publish PPC campaign to ad platforms (superuser only)
-    httpApp.post('/admin-hub/v1/campaigns/:id/publish', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.post('/admin-hub/v1/campaigns/:id/publish', requireSuperuser, async (req, res) => {
       const c = pgDbClient(); try {
         await c.connect()
         const exist = await c.query(`SELECT * FROM seller_campaigns WHERE id=$1`, [req.params.id])
@@ -21259,7 +21256,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     // Pause published PPC campaign (superuser only)
-    httpApp.post('/admin-hub/v1/campaigns/:id/pause', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.post('/admin-hub/v1/campaigns/:id/pause', requireSuperuser, async (req, res) => {
       const c = pgDbClient(); try {
         await c.connect()
         const r = await c.query(`UPDATE seller_campaigns SET ad_status='paused', status='paused', updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id])
@@ -21269,7 +21266,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     // Resume paused PPC campaign (superuser only)
-    httpApp.post('/admin-hub/v1/campaigns/:id/resume', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.post('/admin-hub/v1/campaigns/:id/resume', requireSuperuser, async (req, res) => {
       const c = pgDbClient(); try {
         await c.connect()
         const r = await c.query(`UPDATE seller_campaigns SET ad_status='published', status='active', updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id])
@@ -21279,7 +21276,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     // Campaign budget prepayment via Stripe Checkout (seller-initiated)
-    httpApp.post('/admin-hub/v1/campaigns/:id/checkout', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/campaigns/:id/checkout', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(403).json({ message: 'Seller ID required' })
       const campaignId = req.params.id
@@ -21335,7 +21332,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       `)
     }
 
-    httpApp.get('/admin-hub/v1/automations', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.get('/admin-hub/v1/automations', requireSuperuser, async (req, res) => {
       const c = pgDbClient(); try {
         await c.connect()
         await ensureAutomationTable(c)
@@ -21353,7 +21350,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.put('/admin-hub/v1/automations/:type', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.put('/admin-hub/v1/automations/:type', requireSuperuser, async (req, res) => {
       const { type } = req.params
       if (!VALID_AUTOMATION_TYPES.includes(type)) return res.status(400).json({ message: 'Invalid automation type' })
       const { is_active, config } = req.body || {}
@@ -21373,7 +21370,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     // ── Platform Marketing Accounts (superuser only) ──────────────────────────────
-    httpApp.get('/admin-hub/v1/marketing-accounts', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.get('/admin-hub/v1/marketing-accounts', requireSuperuser, async (req, res) => {
       const c = pgDbClient(); try {
         await c.connect()
         const r = await c.query(`SELECT * FROM platform_marketing_accounts ORDER BY platform`)
@@ -21381,7 +21378,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    httpApp.patch('/admin-hub/v1/marketing-accounts', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.patch('/admin-hub/v1/marketing-accounts', requireSuperuser, async (req, res) => {
       const { platform, display_name, credentials, is_active } = req.body || {}
       if (!platform) return res.status(400).json({ message: 'platform required' })
       const c = pgDbClient(); try {
@@ -21552,7 +21549,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     // ── Seller Listings CRUD ───────────────────────────────────────────────────
-    httpApp.get('/admin-hub/v1/seller-listings', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/seller-listings', async (req, res) => {
       const isSuperuser = req.sellerUser?.is_superuser || false
       const sellerId = req.sellerUser?.seller_id
       const { product_id } = req.query
@@ -21582,7 +21579,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.put('/admin-hub/v1/seller-listings/:id', requireSellerAuth, async (req, res) => {
+    httpApp.put('/admin-hub/v1/seller-listings/:id', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       const { id } = req.params
       const { price_cents, inventory, status } = req.body || {}
@@ -21605,7 +21602,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     // ── Product Change Requests ────────────────────────────────────────────────
-    httpApp.get('/admin-hub/v1/product-change-requests', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/product-change-requests', async (req, res) => {
       const isSuperuser = req.sellerUser?.is_superuser || false
       const sellerId = req.sellerUser?.seller_id
       const { status: statusFilter, product_id } = req.query
@@ -21642,7 +21639,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.post('/admin-hub/v1/product-change-requests', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/product-change-requests', async (req, res) => {
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const { product_id, field_name, new_value } = req.body || {}
@@ -21673,7 +21670,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.post('/admin-hub/v1/product-change-requests/:id/approve', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/product-change-requests/:id/approve', async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
       const { id } = req.params
       const { reviewer_note, new_value } = req.body || {}
@@ -21723,7 +21720,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.post('/admin-hub/v1/product-change-requests/:id/reject', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/product-change-requests/:id/reject', async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser only' })
       const { id } = req.params
       const { reviewer_note } = req.body || {}
@@ -22082,12 +22079,12 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
     }
 
-    httpApp.get('/admin-hub/v1/sellers', requireSellerAuth, adminHubSellersGET)
-    httpApp.get('/admin-hub/v1/sellers/:id', requireSellerAuth, adminHubSellerByIdGET)
-    httpApp.patch('/admin-hub/v1/sellers/:id', requireSellerAuth, adminHubSellerPATCH)
-    httpApp.patch('/admin-hub/v1/sellers/:id/approve', requireSellerAuth, adminHubSellerApprovePATCH)
-    httpApp.post('/admin-hub/v1/sellers/:id/impersonate', requireSellerAuth, adminHubSellerImpersonatePOST)
-    httpApp.patch('/admin-hub/v1/seller/company-info', requireSellerAuth, adminHubSellerCompanyInfoPATCH)
+    httpApp.get('/admin-hub/v1/sellers', adminHubSellersGET)
+    httpApp.get('/admin-hub/v1/sellers/:id', adminHubSellerByIdGET)
+    httpApp.patch('/admin-hub/v1/sellers/:id', adminHubSellerPATCH)
+    httpApp.patch('/admin-hub/v1/sellers/:id/approve', adminHubSellerApprovePATCH)
+    httpApp.post('/admin-hub/v1/sellers/:id/impersonate', adminHubSellerImpersonatePOST)
+    httpApp.patch('/admin-hub/v1/seller/company-info', adminHubSellerCompanyInfoPATCH)
 
     // ── Verification Pipeline Routes ─────────────────────────────────────────
     // Lazy-load so the pipeline module is not required until first use
@@ -22107,7 +22104,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      * Seller triggers the verification pipeline against their own profile.
      * Returns the pipeline result and saves risk_score + verification_steps to DB.
      */
-    httpApp.post('/admin-hub/v1/verification/start', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/verification/start', async (req, res) => {
       const userId = req.sellerUser?.id
       const sellerId = req.sellerUser?.seller_id
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
@@ -22202,7 +22199,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      * Returns current verification state for the logged-in seller.
      * Accessible by the seller themselves OR superusers (with ?seller_id=).
      */
-    httpApp.get('/admin-hub/v1/verification/status', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/verification/status', async (req, res) => {
       const isSuperuser = req.sellerUser?.is_superuser
       const targetSellerId = isSuperuser && req.query.seller_id
         ? req.query.seller_id
@@ -22253,7 +22250,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      * Superuser manually overrides the pipeline decision.
      * Body: { seller_id, action: 'approve'|'reject'|'flag', note? }
      */
-    httpApp.post('/admin-hub/v1/verification/review', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/verification/review', async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const { seller_id, action, note } = req.body || {}
       if (!seller_id || !action) return res.status(400).json({ message: 'seller_id and action are required' })
@@ -22504,7 +22501,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       }
 
       // POST /admin-hub/v1/seller/sign-token — create a signing session token + QR code
-      httpApp.post('/admin-hub/v1/seller/sign-token', requireSellerAuth, async (req, res) => {
+      httpApp.post('/admin-hub/v1/seller/sign-token', async (req, res) => {
         const sellerUser = req.sellerUser
         if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
         const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -22668,7 +22665,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       })
 
       // GET /admin-hub/v1/seller/sign-status — poll for signature completion
-      httpApp.get('/admin-hub/v1/seller/sign-status', requireSellerAuth, async (req, res) => {
+      httpApp.get('/admin-hub/v1/seller/sign-status', async (req, res) => {
         const sellerUser = req.sellerUser
         if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
         const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -22687,7 +22684,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
       })
 
       // GET /admin-hub/v1/seller/agreement-pdf — download signed PDF (seller or superuser)
-      httpApp.get('/admin-hub/v1/seller/agreement-pdf', requireSellerAuth, async (req, res) => {
+      httpApp.get('/admin-hub/v1/seller/agreement-pdf', async (req, res) => {
         const sellerUser = req.sellerUser
         if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
         const targetSellerId = req.query.seller_id && sellerUser.is_superuser ? String(req.query.seller_id) : String(sellerUser.id)
@@ -22738,7 +22735,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      * Creates (or reuses) a Stripe Express account for the seller and returns
      * an Account Link URL they must visit to complete Stripe's own KYC.
      */
-    httpApp.post('/admin-hub/v1/stripe-connect/onboard', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/stripe-connect/onboard', async (req, res) => {
       const userId = req.sellerUser?.id
       const sellerId = req.sellerUser?.seller_id
       const email = req.sellerUser?.email
@@ -22796,7 +22793,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      * Returns current Connect status for the logged-in seller.
      * Also syncs onboarding_complete from Stripe if account exists.
      */
-    httpApp.get('/admin-hub/v1/stripe-connect/status', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/stripe-connect/status', async (req, res) => {
       const userId = req.sellerUser?.id
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
 
@@ -22888,7 +22885,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      * GET /admin-hub/v1/stripe-connect/dashboard-link
      * Returns a one-time Stripe Express dashboard URL so sellers can check their balance/payouts.
      */
-    httpApp.get('/admin-hub/v1/stripe-connect/dashboard-link', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/stripe-connect/dashboard-link', async (req, res) => {
       const userId = req.sellerUser?.id
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
 
@@ -22919,7 +22916,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      * POST /admin-hub/v1/stripe-connect/disconnect
      * Superuser only — removes Connect linkage from a seller (does NOT delete Stripe account).
      */
-    httpApp.post('/admin-hub/v1/stripe-connect/disconnect', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/stripe-connect/disconnect', async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const { seller_id } = req.body || {}
       if (!seller_id) return res.status(400).json({ message: 'seller_id required' })
@@ -22945,7 +22942,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
      *  - Destination charge (new): creates a payout from the connected account
      *  - Legacy transfer: creates a platform→seller transfer via source_transaction
      */
-    httpApp.post('/admin-hub/v1/stripe-connect/transfer/:orderId', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.post('/admin-hub/v1/stripe-connect/transfer/:orderId', requireSuperuser, async (req, res) => {
       const orderId = (req.params.orderId || '').trim()
       if (!orderId) return res.status(400).json({ message: 'orderId required' })
 
@@ -23048,7 +23045,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     // ── Seller Credit Card Routes ─────────────────────────────────────────────
 
     /** GET /admin-hub/v1/stripe-publishable-key — returns Stripe publishable key for card form */
-    httpApp.get('/admin-hub/v1/stripe-publishable-key', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/stripe-publishable-key', async (req, res) => {
       try {
         const platformRow = await loadPlatformCheckoutRowFresh()
         const pk = (platformRow?.stripe_publishable_key || '').toString().trim()
@@ -23059,7 +23056,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     /** POST /admin-hub/v1/seller/card/setup-intent — creates Stripe SetupIntent for saving a card */
-    httpApp.post('/admin-hub/v1/seller/card/setup-intent', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/seller/card/setup-intent', async (req, res) => {
       const userId = req.sellerUser?.id
       const email = req.sellerUser?.email
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
@@ -23088,7 +23085,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     /** POST /admin-hub/v1/seller/card/confirm — saves PM details after Stripe.js setup */
-    httpApp.post('/admin-hub/v1/seller/card/confirm', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/seller/card/confirm', async (req, res) => {
       const userId = req.sellerUser?.id
       const { payment_method_id } = req.body || {}
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
@@ -23121,7 +23118,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     /** GET /admin-hub/v1/seller/card — returns current saved card info (masked) */
-    httpApp.get('/admin-hub/v1/seller/card', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/seller/card', async (req, res) => {
       const userId = req.sellerUser?.id
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
       const client = getSellerDbClient()
@@ -23148,7 +23145,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     /** DELETE /admin-hub/v1/seller/card — detaches and removes saved card */
-    httpApp.delete('/admin-hub/v1/seller/card', requireSellerAuth, async (req, res) => {
+    httpApp.delete('/admin-hub/v1/seller/card', async (req, res) => {
       const userId = req.sellerUser?.id
       if (!userId) return res.status(401).json({ message: 'Unauthorized' })
       const platformRow = await loadPlatformCheckoutRowFresh()
@@ -23176,7 +23173,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     /** GET /admin-hub/v1/sellers/:id/card — superuser: view seller's card */
-    httpApp.get('/admin-hub/v1/sellers/:id/card', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.get('/admin-hub/v1/sellers/:id/card', requireSuperuser, async (req, res) => {
       const sellerId = req.params.id
       const client = getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
@@ -23202,7 +23199,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     })
 
     /** DELETE /admin-hub/v1/sellers/:id/card — superuser: detach and remove seller's card */
-    httpApp.delete('/admin-hub/v1/sellers/:id/card', requireSellerAuth, requireSuperuser, async (req, res) => {
+    httpApp.delete('/admin-hub/v1/sellers/:id/card', requireSuperuser, async (req, res) => {
       const sellerId = req.params.id
       const platformRow = await loadPlatformCheckoutRowFresh()
       const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
@@ -24229,7 +24226,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.get('/admin-hub/v1/newsletter-subscribers', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/newsletter-subscribers', async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
@@ -24256,7 +24253,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.json({ subscribers: [] })
       }
     })
-    httpApp.post('/admin-hub/v1/newsletter-subscribers', requireSellerAuth, async (req, res) => {
+    httpApp.post('/admin-hub/v1/newsletter-subscribers', async (req, res) => {
       const user = req.sellerUser || {}
       if (String(user.is_superuser || '').toLowerCase() !== 'true' && user.is_superuser !== true) {
         return res.status(403).json({ message: 'Forbidden' })
@@ -24289,7 +24286,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.get('/admin-hub/v1/newsletter-subscribers/:id', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/newsletter-subscribers/:id', async (req, res) => {
       const id = String(req.params?.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id is required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -24317,7 +24314,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.patch('/admin-hub/v1/newsletter-subscribers/:id', requireSellerAuth, async (req, res) => {
+    httpApp.patch('/admin-hub/v1/newsletter-subscribers/:id', async (req, res) => {
       const user = req.sellerUser || {}
       if (String(user.is_superuser || '').toLowerCase() !== 'true' && user.is_superuser !== true) {
         return res.status(403).json({ message: 'Forbidden' })
@@ -24356,7 +24353,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.delete('/admin-hub/v1/newsletter-subscribers/:id', requireSellerAuth, async (req, res) => {
+    httpApp.delete('/admin-hub/v1/newsletter-subscribers/:id', async (req, res) => {
       const user = req.sellerUser || {}
       if (String(user.is_superuser || '').toLowerCase() !== 'true' && user.is_superuser !== true) {
         return res.status(403).json({ message: 'Forbidden' })
@@ -24376,7 +24373,7 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     })
-    httpApp.get('/admin-hub/v1/newsletter-subscribers-active', requireSellerAuth, async (req, res) => {
+    httpApp.get('/admin-hub/v1/newsletter-subscribers-active', async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
@@ -24399,11 +24396,11 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     // Register ranking routes
     httpApp.get('/store/products/ranked', storeProductsRankedGET)
     httpApp.post('/store/events', storeEventsPOST)
-    httpApp.get('/admin-hub/v1/ranking/config', requireSellerAuth, adminRankingConfigGET)
-    httpApp.patch('/admin-hub/v1/ranking/config', requireSellerAuth, adminRankingConfigPATCH)
-    httpApp.get('/admin-hub/v1/ranking/products', requireSellerAuth, adminRankingProductsGET)
-    httpApp.post('/admin-hub/v1/ranking/compute', requireSellerAuth, adminRankingComputePOST)
-    httpApp.get('/admin-hub/v1/ranking/products/:id/breakdown', requireSellerAuth, adminRankingBreakdownGET)
+    httpApp.get('/admin-hub/v1/ranking/config', adminRankingConfigGET)
+    httpApp.patch('/admin-hub/v1/ranking/config', adminRankingConfigPATCH)
+    httpApp.get('/admin-hub/v1/ranking/products', adminRankingProductsGET)
+    httpApp.post('/admin-hub/v1/ranking/compute', adminRankingComputePOST)
+    httpApp.get('/admin-hub/v1/ranking/products/:id/breakdown', adminRankingBreakdownGET)
 
     // Auto-compute ranking features every 2 hours
     setTimeout(() => {

@@ -27,9 +27,10 @@ module.exports = defineConfig({
 
   webServer: process.env.CI
     ? {
-        command: "npm run start",
+        command: "npm run start --workspace=@andertal/shop",
         url: "http://localhost:3000",
         reuseExistingServer: false,
+        timeout: 120_000,
       }
     : undefined,
 });
