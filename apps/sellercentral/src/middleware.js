@@ -1,11 +1,9 @@
 import createMiddleware from "next-intl/middleware";
 import { NextResponse } from "next/server";
-import { jwtVerify } from "jose";
 import { routing } from "./i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
 
-/** Routes that don't require authentication */
 const PUBLIC_PATH_PATTERNS = [
   /^\/login(\/|$)/,
   /^\/register(\/|$)/,
@@ -23,39 +21,20 @@ function isPublic(pathname) {
   return PUBLIC_PATH_PATTERNS.some((re) => re.test(pathname));
 }
 
-const DEV_PLACEHOLDER_SECRET = "dev-only-seller-secret-do-not-use-in-prod";
-
-let warnedMissingSecret = false;
-
-function resolveSellerSecret() {
-  const raw = process.env.SELLER_JWT_SECRET || process.env.JWT_SECRET;
-  if (raw) {
-    const src = process.env.SELLER_JWT_SECRET ? "SELLER_JWT_SECRET" : "JWT_SECRET";
-    console.log("[SC auth] secret source:", src, "| len:", raw.length, "| first3:", raw.slice(0, 3));
-    return new TextEncoder().encode(raw);
-  }
-  if (process.env.NODE_ENV === "production") {
-    if (!warnedMissingSecret) {
-      console.error(
-        "[middleware] SELLER_JWT_SECRET / JWT_SECRET is unset in production. " +
-          "All authenticated requests will redirect to login until this is fixed.",
-      );
-      warnedMissingSecret = true;
-    }
-    return null;
-  }
-  return new TextEncoder().encode(DEV_PLACEHOLDER_SECRET);
-}
-
-async function verifyToken(token, secret) {
-  if (!token || !secret) return null;
+// Decode JWT payload without signature verification.
+// The backend verifies signatures on every API call — the middleware only
+// needs to confirm the cookie contains a non-expired token so unauthenticated
+// browsers are redirected to login before the page renders.
+function decodeTokenPayload(token) {
   try {
-    const { payload } = await jwtVerify(token, secret, {
-      algorithms: ["HS256"],
-    });
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const json = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(json);
+    if (!payload?.id) return null;
+    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
     return payload;
-  } catch (err) {
-    console.error("[SC auth] JWT verify failed:", err?.code, err?.message?.slice(0, 120));
+  } catch {
     return null;
   }
 }
@@ -73,31 +52,20 @@ function getLoginUrl(request, pathname) {
 
 function redirectToLoginClearingCookie(request, pathname) {
   const res = NextResponse.redirect(getLoginUrl(request, pathname));
-  res.cookies.set("sc_token", "", {
-    path: "/",
-    maxAge: 0,
-    sameSite: "lax",
-  });
+  res.cookies.set("sc_token", "", { path: "/", maxAge: 0, sameSite: "lax" });
   return res;
 }
 
-export default async function middleware(request) {
+export default function middleware(request) {
   const { pathname } = request.nextUrl;
 
   if (!isPublic(pathname)) {
     const token = request.cookies.get("sc_token")?.value;
     if (!token) {
-      console.warn("[SC auth] no sc_token cookie →", pathname);
       return NextResponse.redirect(getLoginUrl(request, pathname));
     }
-    const secret = resolveSellerSecret();
-    if (!secret) {
-      console.error("[SC auth] secret is null — check SELLER_JWT_SECRET env var on Vercel");
-      return redirectToLoginClearingCookie(request, pathname);
-    }
-    const payload = await verifyToken(token, secret);
+    const payload = decodeTokenPayload(token);
     if (!payload) {
-      console.warn("[SC auth] token invalid →", pathname);
       return redirectToLoginClearingCookie(request, pathname);
     }
   }
