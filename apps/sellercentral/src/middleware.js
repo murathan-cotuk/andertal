@@ -29,13 +29,13 @@ let warnedMissingSecret = false;
 
 function resolveSellerSecret() {
   const raw = process.env.SELLER_JWT_SECRET || process.env.JWT_SECRET;
-  if (raw && raw.length >= 16) {
+  if (raw) {
     return new TextEncoder().encode(raw);
   }
   if (process.env.NODE_ENV === "production") {
     if (!warnedMissingSecret) {
       console.error(
-        "[middleware] SELLER_JWT_SECRET / JWT_SECRET is unset or too short in production. " +
+        "[middleware] SELLER_JWT_SECRET / JWT_SECRET is unset in production. " +
           "All authenticated requests will redirect to login until this is fixed.",
       );
       warnedMissingSecret = true;

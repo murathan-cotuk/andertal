@@ -84,7 +84,7 @@ function isProtectedPath(pathname) {
   return parts.some(p => PROTECTED_SEGMENTS.has(p));
 }
 
-/** Market-prefix middleware — re-exported as default from middleware.js. */
+/** Next.js 16+: request interception lives in `proxy.js` (not `middleware.js`). */
 export default function proxy(request) {
   const pathname = request.nextUrl.pathname || "";
 
