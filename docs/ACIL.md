@@ -36,22 +36,24 @@ If you are picking this up on a new machine and have never seen this project bef
 
 ---
 
-## COMMIT MAP (work already done on branch `fix/s1-1-rotate-secrets`)
+## COMMIT MAP (work merged into `main` on 2026-06-24)
+
+History: the work was originally on a feature branch `fix/s1-1-rotate-secrets` but per user request was rebased onto `main` (on top of `beffef9 update`) and merged in as fast-forward. The feature branch was then deleted both locally and on the remote. There are NO open PRs for this work — it lives directly on `main`.
 
 | Task | Commit SHA | Title |
 |------|-----------|-------|
-| S1.1 | `1a8bc42` | fix(security): rotate JWT/cookie secrets and enforce env in production |
-| S1.2 | `578b3ec` | fix(security): verify JWT signature in sellercentral middleware |
-| S1.3 | `5f04748` | fix(security): add /admin-hub auth gatekeeper to close unprotected routes |
-| S1.4 | `f1c84df` | feat(observability): wire Sentry into backend and sellercentral |
-| S1.5 | `00b7228` | chore(security): move hardcoded LAN IPs out of production code |
-| docs | `62d2db6` | docs(acil): add onboarding + commit map for cross-PC handover |
-| docs | `09e5558` | docs(acil): rename 'Murathan main PC' to 'Work PC' across log |
-| S1.6 | `16145bb` | ci(s1.6): add typecheck/test/audit jobs and fix broken shop-theme test |
+| S1.1 | `eda8322` | fix(security): rotate JWT/cookie secrets and enforce env in production |
+| S1.2 | `36647be` | fix(security): verify JWT signature in sellercentral middleware |
+| S1.3 | `3310abd` | fix(security): add /admin-hub auth gatekeeper to close unprotected routes |
+| S1.4 | `bb2469c` | feat(observability): wire Sentry into backend and sellercentral |
+| S1.5 | `e46fa1a` | chore(security): move hardcoded LAN IPs out of production code |
+| docs | `1d1fcbd` | docs(acil): add onboarding + commit map for cross-PC handover |
+| docs | `d22cca8` | docs(acil): rename 'Murathan main PC' to 'Work PC' across log |
+| S1.6 | `94e4209` | ci(s1.6): add typecheck/test/audit jobs and fix broken shop-theme test |
 
 Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
 
-The branch base is `main` HEAD `07e89ef`. Run `git diff main..HEAD --stat` on the branch to see the full cumulative diff of all 5 tasks.
+The branch base for these 9 commits is `beffef9 update` on `main`. Run `git diff beffef9..HEAD --stat` to see the full cumulative diff.
 
 The test scripts cited in each task's "Acceptance" section were created in `C:\Users\murat\AppData\Local\Temp\andertal-*-test.js` and deleted after passing. They are NOT in the repo. To re-verify, recreate them from the inline descriptions in this file or run the verification commands documented in each AGENT NOTES block.
 
@@ -63,10 +65,9 @@ The test scripts cited in each task's "Acceptance" section were created in `C:\U
 - Device naming convention: this repo is mirrored across two machines. **Work PC** = the office machine where S1.1-S1.5 were done. **Home PC** = the other machine the user switches to in the evenings. Either agent may pick up where the other left off — that is the whole point of this file.
 - Active task: none (S1.1 + S1.2 + S1.3 + S1.4 + S1.5 + S1.6 finished, awaiting "continue?" decision)
 - Blocking decisions: none yet
-- Active branch: `fix/s1-1-rotate-secrets` (per user request, multiple sprint-1 tasks share one branch to keep PR count low)
-- Pushed to remote: NO (awaiting user push approval — if a new agent on a different PC cannot see the branch, this is the reason)
-- Working tree extras: `apps/medusa-backend/src/order-pdf-*.js` (3 files) have unstaged changes from a prior session — NOT touched by this work, leave alone unless the user says otherwise
-- Stash present: `stash@{0}: On main: temp-before-rebase-for-push` — also from a prior session
+- Active branch: `main` (per user request, no more feature branches — all sprint-1 work was rebased onto main and the feature branch was deleted)
+- Pushed to remote: user pushes `main` themselves after each session (do NOT push to remote automatically). The 9 sprint-1 commits were pushed by the user manually after the rebase+merge.
+- Stash present: `stash@{0}: On main: temp-before-rebase-for-push` from a prior session — left alone, user can drop it if obsolete
 - Next pending tasks (any order, but SPRINT 1 first): S1.3b admin-route follow-up, S1.4b shop DSN migration, S1.6b audit cleanup, S1.6c e2e job, S1.7 logger migration
 - All other sprints untouched
 
@@ -587,4 +588,5 @@ Same pre-checks as S4.1. Additionally:
 - 2026-06-24 Agent-1 (Work PC): Completed S1.4 on same branch. Added Sentry to backend (`@sentry/node`) and sellercentral (`@sentry/nextjs`). All env-driven, no-op when DSN unset. 14/14 sanity tests passed. Branch still not pushed.
 - 2026-06-24 Agent-1 (Work PC): Completed S1.5 on same branch. Removed hardcoded LAN IP `192.168.1.240` from shop next.config.js and `192.168.2.127` from sellercentral CSP. Added `SC_ALLOWED_DEV_BACKEND_HOSTS` env (dev-only, production-gated). 11/11 CSP integrity tests passed. Branch still not pushed.
 - 2026-06-24 Agent-1 (Work PC): Handover audit. Verified all S1.1-S1.5 code is in place via spot-check (readSecretOrFail, jwtVerify, ADMIN_HUB_PUBLIC_PATTERNS, setupExpressErrorHandler, devBackendHosts). Found and fixed two leftover LAN IP literals in `.env.example` example comments (`apps/sellercentral/.env.example`, `apps/shop/.env.example` — both changed `192.168.2.127` to `192.168.x.x` placeholder). Added ONBOARDING and COMMIT MAP sections to top of this file so a fresh agent on a different PC can self-bootstrap. Established device naming: Work PC vs Home PC.
-- 2026-06-24 Agent-1 (Work PC): Completed S1.6 on same branch. CI workflow rewritten with 5 jobs (lint, typecheck, test, audit-with-continue-on-error, build-depends-on-lint+typecheck). Added typecheck script to shop (tsc --noEmit) and medusa-backend (node --check). Added test script to medusa-backend. Added root `typecheck` and `test` turbo entrypoints. Fixed pre-existing broken assertion in `packages/shop-theme/src/eu-origin.test.js` (offset_left default is 0, not 10) — this surfaced only after wiring CI. 10/10 unit tests pass locally. Spawned S1.6b (audit findings cleanup) and S1.6c (Playwright e2e job) as follow-ups. Branch still not pushed.
+- 2026-06-24 Agent-1 (Work PC): Completed S1.6 on same branch. CI workflow rewritten with 5 jobs (lint, typecheck, test, audit-with-continue-on-error, build-depends-on-lint+typecheck). Added typecheck script to shop (tsc --noEmit) and medusa-backend (node --check). Added test script to medusa-backend. Added root `typecheck` and `test` turbo entrypoints. Fixed pre-existing broken assertion in `packages/shop-theme/src/eu-origin.test.js` (offset_left default is 0, not 10) — this surfaced only after wiring CI. 10/10 unit tests pass locally. Spawned S1.6b (audit findings cleanup) and S1.6c (Playwright e2e job) as follow-ups.
+- 2026-06-24 Agent-1 (Work PC): Branch policy change per user. Rebased `fix/s1-1-rotate-secrets` (9 commits) onto `main` (which had moved to `beffef9 update` while the user pushed unrelated order-pdf changes). No conflicts (disjoint files). Fast-forward merged into `main`, deleted the feature branch both locally and on origin. New SHAs recorded in COMMIT MAP above. Convention going forward: work directly on `main`, no more feature branches.
