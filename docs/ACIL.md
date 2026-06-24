@@ -21,11 +21,11 @@ References:
 ## STATUS SNAPSHOT (every agent updates this at end of session)
 
 - Last update: 2026-06-23 by Agent-1 (Cursor on Murathan's main PC)
-- Active task: none (S1.1 + S1.2 + S1.3 + S1.4 finished, awaiting "continue?" decision)
+- Active task: none (S1.1 + S1.2 + S1.3 + S1.4 + S1.5 finished, awaiting "continue?" decision)
 - Blocking decisions: none yet
 - Active branch: `fix/s1-1-rotate-secrets` (per user request, multiple sprint-1 tasks share one branch to keep PR count low)
 - Pushed to remote: NO (awaiting user push approval)
-- Next pending tasks (any order): S1.3b admin-route follow-up, S1.4b shop DSN migration, S1.5 LAN IPs, S1.6 CI, S1.7 logger
+- Next pending tasks (any order): S1.3b admin-route follow-up, S1.4b shop DSN migration, S1.6 CI, S1.7 logger
 - All other sprints untouched
 
 ---
@@ -266,19 +266,39 @@ Risk realized: Low.
 
 ---
 
-### S1.5 — Move hardcoded LAN IPs out of production code [ ]
+### S1.5 — Move hardcoded LAN IPs out of production code [x]
 
-Problem: `apps/shop/next.config.js:33` has `http://192.168.1.240:3000`. `apps/sellercentral/next.config.js:55` has `http://192.168.2.127:9000` in CSP. These should not ship to production.
+Problem: `apps/shop/next.config.js:33` had a hardcoded `http://192.168.1.240:3000` in `allowedDevOrigins`. `apps/sellercentral/next.config.js:55` had hardcoded `http://localhost:9000 http://192.168.2.127:9000` baked into the production CSP `connect-src`. Both ship to production.
 
 Subtasks:
-- [ ] In both next.config.js files, gate dev-only origins by `process.env.NODE_ENV !== 'production'`.
-- [ ] Move dev IPs into `SHOP_ALLOWED_DEV_ORIGINS` env (pattern already exists in shop, extend to sellercentral).
-- [ ] Document in `.env.example`.
+- [x] Shop: removed the hardcoded `192.168.1.240:3000` line. The existing `SHOP_ALLOWED_DEV_ORIGINS` env (already wired) is now the only way to add LAN IPs. Loopback (`localhost:3000`, `127.0.0.1:3000`) remains as default for local dev convenience.
+- [x] Sellercentral: introduced new env `SC_ALLOWED_DEV_BACKEND_HOSTS` (comma-separated, default `http://localhost:9000`). Gate behind `NODE_ENV !== 'production'` — in production the CSP `connect-src` becomes pure `'self' https: wss:`, so no LAN IP can leak there even if the env is set by accident.
+- [x] Documented `SC_ALLOWED_DEV_BACKEND_HOSTS` in `apps/sellercentral/.env.example` with example and explicit "production ignores this list" warning.
+- [x] Removed the only remaining LAN-IP-looking string from a code comment (`192.168.2.127` → `192.168.x.x` placeholder).
 
-Acceptance:
-- Production build CSP does not contain any 192.168 or 10.x IPs.
+Acceptance — verified by `/tmp/andertal-csp-test.js` (deleted after run), 11/11 pass:
+- [x] No `192.168.x.x` IP in shop next.config.js source.
+- [x] No `192.168.x.x` IP in sellercentral next.config.js source (placeholder text only).
+- [x] Production CSP excludes LAN IPs even when `SC_ALLOWED_DEV_BACKEND_HOSTS` env is set — `connect-src 'self' https: wss:`.
+- [x] Dev CSP defaults to `http://localhost:9000` when env unset.
+- [x] Dev CSP includes user-provided LAN IPs when env is set.
+- [x] `npm run lint --workspace=apps/sellercentral` clean.
+- [x] `npm run lint --workspace=apps/shop` clean.
+- [x] `node --check apps/shop/next.config.js` and `node --check apps/sellercentral/next.config.js` clean.
 
-Risk: Low.
+Risk realized: Zero in production. In dev, users who relied on the old LAN IPs need to add them to env (one-line change in `.env.local`).
+
+### AGENT NOTES (S1.5)
+
+- Branch: continued on `fix/s1-1-rotate-secrets`.
+- Files changed:
+  - `apps/shop/next.config.js` — removed line `"http://192.168.1.240:3000",` from allowedDevOrigins. Added a 4-line comment explaining how to extend via env.
+  - `apps/sellercentral/next.config.js` — added `isProduction` + `devBackendHosts` computation near top; CSP `connect-src` now uses `devBackendHosts.join(" ")`.
+  - `apps/sellercentral/.env.example` — new section documenting `SC_ALLOWED_DEV_BACKEND_HOSTS` with production-safety note.
+- Verification: 11/11 test scenarios + 2 lint runs + 2 syntax checks all green.
+- USER ACTION: After deploy, no action required for production (LAN IPs already excluded). For local dev with cross-device testing, set in each app's `.env.local`:
+  - shop: `SHOP_ALLOWED_DEV_ORIGINS=http://<your-lan-ip>:3000`
+  - sellercentral: `SC_ALLOWED_DEV_BACKEND_HOSTS=http://localhost:9000,http://<your-lan-ip>:9000`
 
 ---
 
@@ -487,3 +507,4 @@ Same pre-checks as S4.1. Additionally:
 - 2026-06-23 Agent-1 (Murathan main PC): Completed S1.2 on same branch. Added `jose@^5` to sellercentral and rewrote middleware to verify HS256 JWT signature + expiry. 7/7 token-roundtrip tests passed including `alg=none` confusion attack rejection. Branch not yet pushed.
 - 2026-06-23 Agent-1 (Murathan main PC): Completed S1.3 on same branch. Inserted /admin-hub gatekeeper at server.js:1746. 14/14 integration tests passed including prefix-smuggling attack rejection. Spawned follow-up task S1.3b (clean up redundant explicit auth + handle /admin/*).
 - 2026-06-24 Agent-1 (Murathan main PC): Completed S1.4 on same branch. Added Sentry to backend (`@sentry/node`) and sellercentral (`@sentry/nextjs`). All env-driven, no-op when DSN unset. 14/14 sanity tests passed. Branch still not pushed.
+- 2026-06-24 Agent-1 (Murathan main PC): Completed S1.5 on same branch. Removed hardcoded LAN IP `192.168.1.240` from shop next.config.js and `192.168.2.127` from sellercentral CSP. Added `SC_ALLOWED_DEV_BACKEND_HOSTS` env (dev-only, production-gated). 11/11 CSP integrity tests passed. Branch still not pushed.

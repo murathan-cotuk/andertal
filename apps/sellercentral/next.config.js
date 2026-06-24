@@ -6,6 +6,20 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.js");
 
 const monorepoRoot = path.join(__dirname, "../..");
 
+// Extra dev-only backend origins for CSP `connect-src` (S1.5).
+// Set SC_ALLOWED_DEV_BACKEND_HOSTS in apps/sellercentral/.env.local with a
+// comma-separated list like:
+//   SC_ALLOWED_DEV_BACKEND_HOSTS=http://localhost:9000,http://192.168.x.x:9000
+// In production this list is ignored — production CSP only allows
+// 'self' https: wss:.
+const isProduction = process.env.NODE_ENV === "production";
+const devBackendHosts = isProduction
+  ? []
+  : (process.env.SC_ALLOWED_DEV_BACKEND_HOSTS || "http://localhost:9000")
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: monorepoRoot,
@@ -52,8 +66,9 @@ const nextConfig = {
       // User-uploaded images can come from the backend or any HTTPS CDN
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
-      // XHR/fetch to backend API; wss for any future WebSocket features
-      "connect-src 'self' https: wss: http://localhost:9000 http://192.168.2.127:9000",
+      // XHR/fetch to backend API; wss for any future WebSocket features.
+      // Dev-only backend origins come from SC_ALLOWED_DEV_BACKEND_HOSTS env.
+      `connect-src 'self' https: wss:${devBackendHosts.length ? " " + devBackendHosts.join(" ") : ""}`,
       // Admin panel must never be embeddable in any frame
       "frame-src 'none'",
       "frame-ancestors 'none'",

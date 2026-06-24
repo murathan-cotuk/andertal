@@ -27,10 +27,13 @@ const extraAllowedDevOrigins = (process.env.SHOP_ALLOWED_DEV_ORIGINS || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
+// Default dev origins only allow loopback. Add LAN IPs (or any other origin)
+// via SHOP_ALLOWED_DEV_ORIGINS=http://192.168.x.x:3000,http://10.x.x.x:3000
+// in .env.local. Production builds ignore this list entirely (Next.js only
+// applies allowedDevOrigins to the dev server).
 const allowedDevOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
-  "http://192.168.1.240:3000",
   devHost,
   ...extraAllowedDevOrigins,
 ].filter(Boolean);
