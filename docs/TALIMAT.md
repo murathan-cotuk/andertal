@@ -1,4 +1,4 @@
-23.06.
+24.06.
 
 --- sellercentralde import-export sayfasindan ürün import etmek icin excel hazirladim. ürünler zaten var diyor ancak seller olarak products/inventory sayfasinda bu ekledigim ürünleri göremiyorum. superuser olarak products/inventory sayfasinda superuser eklemis gibi görüyorum. sanirim database e seller_id eklenmedigi icin bu sellerla bagdastiramadi. ayrica sistemde eklenmek istenen ean mevcut olsa bile o ean eklendiginde hata almamaliyiz. basarili olarak eklenmeli. ancak database de kayitli bilgiler disinda bir sekilde yüklemeye calisirsa sellerlar, superuser a bildirim gidecek ve ilgili üründe degistirilmek istenen kisimlara degisiklik önerisi gelecekti. bu fonksiyon calisiyordu ancak görünüse göre su an problem var gibi. database de kayitli bilgilerin aynisi seklinde ekleyecekse eger sellerlar hicbir uyari olmadan listelenmis olmasi gerekiyor. degisiklik olsa bile hata olmadan eklenmesi lazim seller in envanterine. superuser panelinde baktigimizda o ürün, ürün sahibi seller altinda listelenmeli. ancak ürün icinde, hangi sellerlar tarafindan listelenmis oldugu görünmeli. yani adim adim saydigim bu problemleri halletmeni istiyorum.
 
