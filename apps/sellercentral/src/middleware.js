@@ -52,7 +52,8 @@ async function verifyToken(token, secret) {
       algorithms: ["HS256"],
     });
     return payload;
-  } catch {
+  } catch (err) {
+    console.error("[SC auth] JWT verify failed:", err?.code, err?.message?.slice(0, 120));
     return null;
   }
 }
@@ -84,11 +85,17 @@ export default async function middleware(request) {
   if (!isPublic(pathname)) {
     const token = request.cookies.get("sc_token")?.value;
     if (!token) {
+      console.warn("[SC auth] no sc_token cookie →", pathname);
       return NextResponse.redirect(getLoginUrl(request, pathname));
     }
     const secret = resolveSellerSecret();
+    if (!secret) {
+      console.error("[SC auth] secret is null — check SELLER_JWT_SECRET env var on Vercel");
+      return redirectToLoginClearingCookie(request, pathname);
+    }
     const payload = await verifyToken(token, secret);
     if (!payload) {
+      console.warn("[SC auth] token invalid →", pathname);
       return redirectToLoginClearingCookie(request, pathname);
     }
   }

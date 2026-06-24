@@ -119,12 +119,15 @@ export default function Login() {
     localStorage.setItem("sellerIsSuperuser", data.user.is_superuser ? "true" : "false");
     localStorage.setItem("sellerPermissions", data.user.permissions ? JSON.stringify(data.user.permissions) : "null");
     localStorage.setItem("sellerLoggedIn", "true");
-    // Also persist token in httpOnly cookie (XSS-safe session gate)
-    await fetch("/api/auth/session", {
+    const sessionRes = await fetch("/api/auth/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: data.token }),
-    }).catch(() => {}); // non-fatal — localStorage remains the primary auth source
+    });
+    if (!sessionRes.ok) {
+      const body = await sessionRes.json().catch(() => ({}));
+      throw new Error(body?.error || `Session error ${sessionRes.status}`);
+    }
     router.push("/dashboard");
   };
 
@@ -141,7 +144,7 @@ export default function Login() {
         return;
       }
       if (!data?.token) throw new Error("Login failed");
-      finishLogin(data);
+      await finishLogin(data);
     } catch (err) {
       setError(err?.message || t("errorFailed"));
     } finally {
@@ -157,7 +160,7 @@ export default function Login() {
     try {
       const data = await getMedusaAdminClient().loginSeller(email.trim().toLowerCase(), password, { totp_code: totpCode });
       if (!data?.token) throw new Error("Login failed");
-      finishLogin(data);
+      await finishLogin(data);
     } catch (err) {
       setError(err?.message || t("totpInvalid"));
     } finally {
