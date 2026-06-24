@@ -47,7 +47,6 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
 
   renderRetailOrderDocument(doc, {
     docTitle: s.invoiceTitle,
-    docNumber: `${s.invoiceNoLabel}: ${displayNumber}`,
     row,
     itemRows,
     shopName,
@@ -58,6 +57,7 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     totalsLines,
     amountDueCents: grandTotal,
     footerText: s.invoiceFooter,
+    invoiceNumber: displayNumber,
   })
 }
 
@@ -67,7 +67,6 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
 
   renderRetailOrderDocument(doc, {
     docTitle: s.deliveryTitle,
-    docNumber: `${s.deliveryNoLabel}: ${displayNumber}`,
     row,
     itemRows,
     shopName,
@@ -76,6 +75,7 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
     locale,
     kind: 'lieferschein',
     footerText: s.deliveryFooter,
+    invoiceNumber: displayNumber,
   })
 }
 
