@@ -1,4 +1,5 @@
 const { Queue, Worker } = require('bullmq')
+const logger = require('./logger')
 
 const FLOW_QUEUE_NAME = 'flow-email-events'
 
@@ -24,7 +25,7 @@ function getQueue() {
   if (queueSingleton) return queueSingleton
   const redisUrl = getRedisUrl()
   if (!redisUrl) {
-    console.warn('[flow-queue] queue disabled: REDIS_URL missing')
+    logger.warn('[flow-queue] queue disabled: REDIS_URL missing')
     return null
   }
   const opts = createConnectionOpts(redisUrl)
@@ -76,18 +77,18 @@ function startFlowQueueWorker({ onOrderEvent, onCustomerEvent }) {
     },
   )
   worker.on('failed', (job, err) => {
-    console.error(
+    logger.error(
       `[flow-queue] job failed name=${job?.name || ''} id=${job?.id || ''}:`,
       err?.message || err,
     )
   })
   worker.on('completed', (job) => {
     if (String(process.env.NOTIFICATION_QUEUE_VERBOSE || '').toLowerCase() === 'true') {
-      console.log(`[flow-queue] job completed name=${job?.name || ''} id=${job?.id || ''}`)
+      logger.info(`[flow-queue] job completed name=${job?.name || ''} id=${job?.id || ''}`)
     }
   })
   workerSingleton = worker
-  console.log('[flow-queue] worker started')
+  logger.info('[flow-queue] worker started')
   return workerSingleton
 }
 

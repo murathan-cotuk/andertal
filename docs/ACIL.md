@@ -50,6 +50,7 @@ History: the work was originally on a feature branch `fix/s1-1-rotate-secrets` b
 | docs | `1d1fcbd` | docs(acil): add onboarding + commit map for cross-PC handover |
 | docs | `d22cca8` | docs(acil): rename 'Murathan main PC' to 'Work PC' across log |
 | S1.6 | `94e4209` | ci(s1.6): add typecheck/test/audit jobs and fix broken shop-theme test |
+| S1.7 | (this commit) | refactor(logger): migrate src/*.js to pino logger via console-compatible wrapper |
 
 Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
 
@@ -63,12 +64,13 @@ The test scripts cited in each task's "Acceptance" section were created in `C:\U
 
 - Last update: 2026-06-24 by Agent-1 (Cursor on Work PC)
 - Device naming convention: this repo is mirrored across two machines. **Work PC** = the office machine where S1.1-S1.5 were done. **Home PC** = the other machine the user switches to in the evenings. Either agent may pick up where the other left off — that is the whole point of this file.
-- Active task: none (S1.1 + S1.2 + S1.3 + S1.4 + S1.5 + S1.6 finished, awaiting "continue?" decision)
+- Active task: none (S1.1 + S1.2 + S1.3 + S1.4 + S1.5 + S1.6 + S1.7 finished, awaiting "continue?" decision)
 - Blocking decisions: none yet
 - Active branch: `main` (per user request, no more feature branches — all sprint-1 work was rebased onto main and the feature branch was deleted)
-- Pushed to remote: user pushes `main` themselves after each session (do NOT push to remote automatically). The 9 sprint-1 commits were pushed by the user manually after the rebase+merge.
+- Pushed to remote: user pushes `main` themselves after each session (do NOT push to remote automatically).
 - Stash present: `stash@{0}: On main: temp-before-rebase-for-push` from a prior session — left alone, user can drop it if obsolete
-- Next pending tasks (any order, but SPRINT 1 first): S1.3b admin-route follow-up, S1.4b shop DSN migration, S1.6b audit cleanup, S1.6c e2e job, S1.7 logger migration
+- SPRINT 1 STATUS: all primary tasks (S1.1–S1.7) complete. Follow-ups remain (S1.3b, S1.4b, S1.6b, S1.6c, S1.7b) but none are blockers for SPRINT 2.
+- Next pending tasks: SPRINT 1 follow-ups (S1.3b, S1.4b, S1.6b, S1.6c, S1.7b) or start SPRINT 2 (recommended: S2.7 keep-or-drop-Medusa decision first, since it unlocks S1.7b and reduces audit findings).
 - All other sprints untouched
 
 ---
@@ -400,19 +402,57 @@ Skipped during S1.6 because `e2e/shop.spec.js` is minimal (2 trivial tests) and 
 
 ---
 
-### S1.7 — Logger usage in src/ files (excluding server.js for now) [ ]
+### S1.7 — Logger usage in src/ files (excluding server.js for now) [x]
 
-Problem: `apps/medusa-backend/src/logger.js` exists with pino but is not imported anywhere. All logging in src/ uses `console.log`.
+Problem: `apps/medusa-backend/src/logger.js` existed with pino but was not imported anywhere. All logging in src/ used `console.log/warn/error`. Result: no structured fields, no log levels in production, no easy redirection to a sink.
+
+Scope decision: the task name says "src/ files" but the `src/` tree also contains `.ts` files under `src/api/admin*/` and `src/api/admin-hub/` (15 files, ~45 console.error calls). These TS files are intended for Medusa's automatic route discovery but the current monolith `server.js` never mounts them — they are dead code candidates pending the S2.7 keep-or-drop-Medusa decision. Migrating dead code is wasteful and slightly risky (different ESM/CJS interop than the running JS files), so this task migrated the **live `.js` files only**. TS migration is tracked as new follow-up S1.7b below.
 
 Subtasks:
-- [ ] In each file under `apps/medusa-backend/src/` (except logger.js itself and `*.test.js`): replace `console.log` with `logger.info`, `console.warn` with `logger.warn`, `console.error` with `logger.error`.
-- [ ] Add `const logger = require('./logger')` import at top of each file (relative path may vary).
-- [ ] Do not touch `server.js` — that is S2.5 (separate task because of size).
+- [x] Upgraded `apps/medusa-backend/src/logger.js`: it now wraps the pino instance with a console-compatible adapter so multi-argument calls (`logger.warn('foo:', err?.message || err)`) behave like `console.warn` instead of dropping the second argument (which is pino's native behavior unless the message contains a printf placeholder). `child(bindings)` still works (returns a wrapped child). Errors keep their stack trace.
+- [x] Migrated `apps/medusa-backend/src/flow-automation.js`: added `const logger = require('./logger')`, replaced 23 calls (3× `console.log`→`logger.info`, 16× `console.warn`→`logger.warn`, 4× `console.error`→`logger.error`).
+- [x] Migrated `apps/medusa-backend/src/flow-queue.js`: added `const logger = require('./logger')`, replaced 4 calls (2× log→info, 1× warn→warn, 1× error→error).
+- [x] Migrated `apps/medusa-backend/src/category-auto-translate.js`: added `const logger = require('./logger')`, replaced 2 calls (both warn→warn).
+- [x] `server.js` intentionally not touched — that is S2.5 (separate task because of size: 206 calls in 24k lines).
 
 Acceptance:
-- No `console.*` calls in `apps/medusa-backend/src/*.js` files (besides server.js, logger.js, *.test.js).
+- [x] `git grep "console\." apps/medusa-backend/src/*.js` returns no matches outside `logger.js` (the fallback path) — confirmed.
+- [x] `node --check` clean on all 4 changed files.
+- [x] Existing unit tests pass (6/6 medusa-backend tests, 10/10 total in turbo).
+- [x] Smoke test: `node -e "require('./apps/medusa-backend/src/flow-automation')"` etc. — all 3 modules load and exports preserved.
+- [x] Manual logger sanity test with multi-arg, Error object, and structured object — all formatted correctly.
 
-Risk: Low.
+Risk realized: Low. The wrapper is the only structural change to the logger; existing per-module behavior is unchanged, only the underlying transport. If `pino-pretty` is unavailable in some environment, the fallback in `logger.js` still routes to `console.*`.
+
+### AGENT NOTES (S1.7)
+
+- Branch: `main` (direct, per new policy).
+- Files changed:
+  - `apps/medusa-backend/src/logger.js` — full rewrite with `wrap()` adapter. Exports a wrapped logger; the underlying pino instance is reachable via `logger._pino` if ever needed.
+  - `apps/medusa-backend/src/flow-automation.js` — `+1 require`, `-23 console.*`, `+23 logger.*`.
+  - `apps/medusa-backend/src/flow-queue.js` — `+1 require`, `-4 console.*`, `+4 logger.*`.
+  - `apps/medusa-backend/src/category-auto-translate.js` — `+1 require`, `-2 console.warn`, `+2 logger.warn`.
+- Verification:
+  ```powershell
+  node --check apps/medusa-backend/src/flow-automation.js
+  node --check apps/medusa-backend/src/flow-queue.js
+  node --check apps/medusa-backend/src/category-auto-translate.js
+  node --check apps/medusa-backend/src/logger.js
+  npm run test                  # 10/10 pass
+  node -e "const l = require('./apps/medusa-backend/src/logger'); l.warn('foo:', 'bar', new Error('x'))"
+  ```
+- Rollback: `git revert <commit-sha>`. The logger wrapper is backward-compatible (any code that was already calling `logger.info/warn/error` on the bare pino still works), so even partial reverts are safe.
+- USER ACTION REQUIRED: none. In production, `LOG_LEVEL=info` is the default — set `LOG_LEVEL=debug` temporarily if you need more verbose logs from these three modules.
+
+### S1.7b (NEW follow-up) — Logger in /api/admin*/route.ts files [ ]
+
+15 TS files under `apps/medusa-backend/src/api/admin/` and `apps/medusa-backend/src/api/admin-hub/` contain ~45 `console.error("...", error)` calls. They are intended for Medusa's framework auto-mount but are not actually invoked by the current `server.js` monolith — they are dead-code candidates pending S2.7 (keep or drop Medusa).
+
+Once S2.7 is decided:
+- If Medusa is kept: migrate these files using `import logger from "../../../../logger"` (relative depth varies by file). Pattern: `import` instead of `require` for ESM/TS.
+- If Medusa is dropped: delete the entire `src/api/admin*/` tree along with the unused `services/admin-hub-service.*` and the migration becomes moot.
+
+Do not migrate these files preemptively — wait for S2.7.
 
 ---
 
@@ -590,3 +630,4 @@ Same pre-checks as S4.1. Additionally:
 - 2026-06-24 Agent-1 (Work PC): Handover audit. Verified all S1.1-S1.5 code is in place via spot-check (readSecretOrFail, jwtVerify, ADMIN_HUB_PUBLIC_PATTERNS, setupExpressErrorHandler, devBackendHosts). Found and fixed two leftover LAN IP literals in `.env.example` example comments (`apps/sellercentral/.env.example`, `apps/shop/.env.example` — both changed `192.168.2.127` to `192.168.x.x` placeholder). Added ONBOARDING and COMMIT MAP sections to top of this file so a fresh agent on a different PC can self-bootstrap. Established device naming: Work PC vs Home PC.
 - 2026-06-24 Agent-1 (Work PC): Completed S1.6 on same branch. CI workflow rewritten with 5 jobs (lint, typecheck, test, audit-with-continue-on-error, build-depends-on-lint+typecheck). Added typecheck script to shop (tsc --noEmit) and medusa-backend (node --check). Added test script to medusa-backend. Added root `typecheck` and `test` turbo entrypoints. Fixed pre-existing broken assertion in `packages/shop-theme/src/eu-origin.test.js` (offset_left default is 0, not 10) — this surfaced only after wiring CI. 10/10 unit tests pass locally. Spawned S1.6b (audit findings cleanup) and S1.6c (Playwright e2e job) as follow-ups.
 - 2026-06-24 Agent-1 (Work PC): Branch policy change per user. Rebased `fix/s1-1-rotate-secrets` (9 commits) onto `main` (which had moved to `beffef9 update` while the user pushed unrelated order-pdf changes). No conflicts (disjoint files). Fast-forward merged into `main`, deleted the feature branch both locally and on origin. New SHAs recorded in COMMIT MAP above. Convention going forward: work directly on `main`, no more feature branches.
+- 2026-06-24 Agent-1 (Work PC): Completed S1.7 directly on `main`. Logger.js rewritten with a console-compatible wrapper so multi-arg pino calls behave like `console.*` (pino natively drops the 2nd arg unless the 1st has a printf placeholder, which would have silently truncated 29 existing log statements). Migrated all live `apps/medusa-backend/src/*.js` files (flow-automation.js 23 calls, flow-queue.js 4, category-auto-translate.js 2 = 29 total). TS dead-code files under `src/api/admin*/` deferred to S1.7b pending S2.7 decision. All tests still pass. SPRINT 1 primary tasks now 100% complete.

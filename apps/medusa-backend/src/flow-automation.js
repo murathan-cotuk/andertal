@@ -5,6 +5,7 @@
 
 const crypto = require('crypto')
 const { Client } = require('pg')
+const logger = require('./logger')
 const { resolveSmtpSenderIdentity } = require('./smtp-sender-resolve')
 const { resolveOrderPaidTotalCents } = require('./order-money')
 const { resolveFlowMailProvider, sendFlowOutboundEmail } = require('./email-providers')
@@ -315,7 +316,7 @@ async function loadOrderContext(client, orderId) {
   }
   const siteUrl = resolvePublicShopBaseUrl() || dbStorefrontUrl
   if (!siteUrl) {
-    console.warn(
+    logger.warn(
       '[flow-automation] Public shop URL missing: set STOREFRONT_PUBLIC_URL on the backend or configure it in Sellercentral → Settings → Plattform — otherwise tokens like {ORDER_DETAIL_URL} stay empty in emails.',
     )
   }
@@ -640,7 +641,7 @@ async function sendImmediateStepsForFlow({
     if (s.step_type === 'wait_hours') {
       const wh = Number(s.wait_hours || 0)
       if (wh > 0) {
-        console.warn(
+        logger.warn(
           `[flow-automation] order ${orderId} flow ${flowId}: wait_hours=${wh} stops immediate sends — delayed steps are not scheduled yet. Put "Send email" as the first step (or 0h wait) for instant mail after checkout.`,
         )
         break
@@ -674,7 +675,7 @@ async function sendImmediateStepsForFlow({
       metadata: { templateLocale, step_type: s.step_type, channel: 'email' },
     })
     if (reserved && reserved.attempts > 1 && reserved.status === 'sent') {
-      console.log(
+      logger.info(
         `[flow-automation] idempotent-skip trigger=${triggerKey} flow=${flowId} step=${stepOrder} recipient=${String(toEmail || '').toLowerCase()}`,
       )
       idx += 1
@@ -686,7 +687,7 @@ async function sendImmediateStepsForFlow({
         status: 'skipped',
         errorMessage: 'template_empty',
       })
-      console.warn(
+      logger.warn(
         `[flow-automation] flow ${flowId} step ${idx + 1}: skipped — email subject/body is empty. Fill in the template in Content → Flows.`,
       )
       idx += 1
@@ -711,7 +712,7 @@ async function sendImmediateStepsForFlow({
       try {
         attachments = await buildFlowEmailPdfAttachments(client, oid, keys)
       } catch (e) {
-        console.error('[flow-automation] pdf attachments', e?.message || e)
+        logger.error('[flow-automation] pdf attachments', e?.message || e)
       }
     }
     const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, s.smtp_sender_id)
@@ -760,7 +761,7 @@ async function sendImmediateStepsForFlow({
         errorMessage: sendErr?.message || String(sendErr || 'send_failed'),
         metadata: { channel: 'email', ab_variant: abVariant },
       })
-      console.error(
+      logger.error(
         `[flow-automation] send failed trigger=${triggerKey} flow=${flowId} step=${stepOrder}:`,
         sendErr?.message || sendErr,
       )
@@ -789,7 +790,7 @@ async function sendImmediateStepsForFlow({
   }
   const hasSendEmailStep = steps.some((x) => x.step_type === 'send_email')
   if (hasSendEmailStep && emailsSent === 0) {
-    console.warn(
+    logger.warn(
       `[flow-automation] order ${orderId} flow ${flowId}: send_email step(s) but nothing delivered (empty templates, missing From, or wait > 0 before any email).`,
     )
   }
@@ -805,7 +806,7 @@ async function sendImmediateStepsForFlow({
 async function runAutomationFlowsForOrder(opts) {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   if (!dbUrl || !dbUrl.startsWith('postgres')) {
-    console.warn('[flow-automation] skip: DATABASE_URL missing')
+    logger.warn('[flow-automation] skip: DATABASE_URL missing')
     return
   }
 
@@ -820,7 +821,7 @@ async function runAutomationFlowsForOrder(opts) {
 
     const ctx = await loadOrderContext(client, orderId)
     if (!ctx) {
-      console.warn('[flow-automation] skip: order not found', orderId)
+      logger.warn('[flow-automation] skip: order not found', orderId)
       return
     }
 
@@ -829,13 +830,13 @@ async function runAutomationFlowsForOrder(opts) {
     if (!useResend) {
       transport = await getSmtpTransport(client)
       if (!transport) {
-        console.warn('[flow-automation] skip: SMTP not configured (store_smtp_settings needs host + username)')
+        logger.warn('[flow-automation] skip: SMTP not configured (store_smtp_settings needs host + username)')
         return
       }
     } else {
       const key = String(process.env.RESEND_API_KEY || '').trim()
       if (!key) {
-        console.warn('[flow-automation] skip: FLOW_MAIL_PROVIDER=resend but RESEND_API_KEY missing')
+        logger.warn('[flow-automation] skip: FLOW_MAIL_PROVIDER=resend but RESEND_API_KEY missing')
         return
       }
     }
@@ -861,7 +862,7 @@ async function runAutomationFlowsForOrder(opts) {
 
     const flowRows = flowsR.rows || []
     if (!flowRows.length) {
-      console.warn(
+      logger.warn(
         `[flow-automation] no active flow for trigger "${triggerKey}" — enable the flow (status Active, not Draft) and matching trigger in Content → Flows`,
       )
       return
@@ -888,7 +889,7 @@ async function runAutomationFlowsForOrder(opts) {
         templateLocale = 'de'
         const sid = ctx.order.seller_id
         if (!sid) {
-          console.warn(`[flow-automation] skip flow ${flowId}: seller audience but order has no seller_id`)
+          logger.warn(`[flow-automation] skip flow ${flowId}: seller audience but order has no seller_id`)
           continue
         }
         const sur = await client.query(
@@ -899,7 +900,7 @@ async function runAutomationFlowsForOrder(opts) {
       }
 
       if (!toEmail) {
-        console.warn(
+        logger.warn(
           `[flow-automation] skip flow ${flowId} (${audience}): no recipient — customer order needs email; seller flow needs seller account email`,
         )
         continue
@@ -922,14 +923,14 @@ async function runAutomationFlowsForOrder(opts) {
       totalEmails += n
     }
     if (totalEmails > 0) {
-      console.log(`[flow-automation] ${triggerKey} order=${orderId}: sent ${totalEmails} email(s)`)
+      logger.info(`[flow-automation] ${triggerKey} order=${orderId}: sent ${totalEmails} email(s)`)
     } else if (flowRows.length > 0) {
-      console.warn(
+      logger.warn(
         `[flow-automation] ${triggerKey} order=${orderId}: matched ${flowRows.length} flow(s) but 0 emails — see warnings above (draft→active, wait step first, SMTP, templates).`,
       )
     }
   } catch (e) {
-    console.error('[flow-automation]', opts.triggerKey, opts.orderId, e?.message || e)
+    logger.error('[flow-automation]', opts.triggerKey, opts.orderId, e?.message || e)
   } finally {
     if (client)
       try {
@@ -944,7 +945,7 @@ async function runAutomationFlowsForOrder(opts) {
 async function runAutomationFlowsForCustomerEvent(opts) {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   if (!dbUrl || !dbUrl.startsWith('postgres')) {
-    console.warn('[flow-automation] skip customer event: DATABASE_URL missing')
+    logger.warn('[flow-automation] skip customer event: DATABASE_URL missing')
     return
   }
   const triggerKey = String(opts.triggerKey || '').trim()
@@ -961,11 +962,11 @@ async function runAutomationFlowsForCustomerEvent(opts) {
     if (!useResend) {
       transport = await getSmtpTransport(client)
       if (!transport) {
-        console.warn('[flow-automation] skip customer event: SMTP not configured')
+        logger.warn('[flow-automation] skip customer event: SMTP not configured')
         return
       }
     } else if (!String(process.env.RESEND_API_KEY || '').trim()) {
-      console.warn('[flow-automation] skip customer event: RESEND_API_KEY missing')
+      logger.warn('[flow-automation] skip customer event: RESEND_API_KEY missing')
       return
     }
 
@@ -990,7 +991,7 @@ async function runAutomationFlowsForCustomerEvent(opts) {
       cust = { email: fallbackEmail, first_name: '', last_name: '', phone: '', country: '' }
     }
     if (!cust) {
-      console.warn(`[flow-automation] skip customer event ${triggerKey}: recipient not found`)
+      logger.warn(`[flow-automation] skip customer event ${triggerKey}: recipient not found`)
       return
     }
 
@@ -1034,10 +1035,10 @@ async function runAutomationFlowsForCustomerEvent(opts) {
       total += n
     }
     if (total > 0) {
-      console.log(`[flow-automation] ${triggerKey} customer=${toEmail}: sent ${total} email(s)`)
+      logger.info(`[flow-automation] ${triggerKey} customer=${toEmail}: sent ${total} email(s)`)
     }
   } catch (e) {
-    console.error('[flow-automation] customer event failed', triggerKey, customerId || fallbackEmail, e?.message || e)
+    logger.error('[flow-automation] customer event failed', triggerKey, customerId || fallbackEmail, e?.message || e)
   } finally {
     if (client) {
       try {

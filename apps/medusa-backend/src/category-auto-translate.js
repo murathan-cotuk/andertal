@@ -3,6 +3,8 @@
  * Manual overrides in metadata.translations[locale].name take precedence.
  */
 
+const logger = require('./logger')
+
 const ALLOWED = new Set(['en', 'de', 'tr', 'fr', 'es', 'it'])
 const CHUNK_SIZE = 50
 const DEFAULT_SYNC_LIMIT = 120
@@ -146,7 +148,7 @@ async function translateAndCache(client, texts, sourceLang, targetLang) {
       }
       if (client && pairs.length) await savePairsToCache(client, sourceLang, targetLang, pairs)
     } catch (e) {
-      console.warn('category-auto-translate chunk failed:', e?.message || e)
+      logger.warn('category-auto-translate chunk failed:', e?.message || e)
     }
   }
   return cached
@@ -175,7 +177,7 @@ function queueBackgroundWarmup(texts, sourceLang, targetLang) {
         await new Promise((r) => setTimeout(r, 250))
       }
     } catch (e) {
-      console.warn('category-auto-translate warmup:', e?.message || e)
+      logger.warn('category-auto-translate warmup:', e?.message || e)
     } finally {
       if (client) await client.end().catch(() => {})
       state.running = false
