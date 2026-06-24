@@ -18,10 +18,6 @@ function CartLocaleRefetch() {
     const id = cart?.id;
     if (!id) return;
     fetchCart(id);
-    // Intentionally omit cart?.id from deps: refetch only on locale change, not when a new
-    // cart id appears (e.g. createCart during addToCart). Including cart?.id caused a race
-    // where fetchCart(empty) overwrote the line item just added — side cart opened empty.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale, fetchCart]);
   return null;
 }
