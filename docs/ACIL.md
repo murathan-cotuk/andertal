@@ -50,7 +50,7 @@ History: the work was originally on a feature branch `fix/s1-1-rotate-secrets` b
 | docs | `1d1fcbd` | docs(acil): add onboarding + commit map for cross-PC handover |
 | docs | `d22cca8` | docs(acil): rename 'Murathan main PC' to 'Work PC' across log |
 | S1.6 | `94e4209` | ci(s1.6): add typecheck/test/audit jobs and fix broken shop-theme test |
-| S1.7 | (this commit) | refactor(logger): migrate src/*.js to pino logger via console-compatible wrapper |
+| S1.7 | `49f8154` | refactor(logger): migrate src/*.js to pino logger via console-compatible wrapper |
 
 Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
 
