@@ -54,7 +54,8 @@ History: the work was originally on a feature branch `fix/s1-1-rotate-secrets` b
 | S1.4b | `1d1bdea` | chore(sentry): make shop DSN env-driven with transition fallback |
 | S1.3b | `dcb1689` | fix(security): protect /admin/* product/order/collection routes with seller auth |
 | S3.15 | `2616de2` | fix(shop): cart race — side cart opened empty after add-to-cart |
-| S1.3c | (this commit) | refactor(security): remove redundant requireSellerAuth from admin-hub routes |
+| S1.3c | `2cca4cf` | refactor(security): remove redundant requireSellerAuth from admin-hub routes |
+| S1.6c | `2cca4cf` | ci: add Playwright e2e smoke job (same commit as S1.3c) |
 
 Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
 
