@@ -18,14 +18,52 @@ References:
 
 ---
 
+## ONBOARDING for a fresh agent on a different PC
+
+If you are picking this up on a new machine and have never seen this project before, run these steps **in order** before you start coding:
+
+1. **Pull latest** — `git fetch --all && git status`. Active branch is recorded in STATUS SNAPSHOT below. If you don't see it locally:
+   - It may live only on the original machine (see "Pushed to remote" field). Ask the user to push, or merge the branch in via the user's preferred path.
+   - As of 2026-06-24, branch `fix/s1-1-rotate-secrets` (5 commits: see COMMIT MAP) has never been pushed. To bring it to a new PC the user must either `git push -u origin fix/s1-1-rotate-secrets` from the original machine or carry the work over manually.
+2. **Read the docs**, in this order: this file (ACIL.md, top to bottom), then `docs/TALIMAT.md`, `docs/developer.md`, `docs/affiliate.md`. Each is 50–500 lines.
+3. **Install dependencies** — `npm install` at the repo root (turborepo workspaces).
+4. **Local DB** — Postgres at `localhost:5432`, database `medusa`. See `apps/medusa-backend/.env.example` for the connection string.
+5. **Start the stack** — `npm run dev` at root spins up turbo with shop (3000), sellercentral (3002), medusa-backend (9000).
+6. **Smoke test** — open `http://localhost:3000` (shop) and `http://localhost:3002/de/login` (sellercentral). Both should load.
+7. **Then start work** by picking the first `[ ]` task in SPRINT 1 order, marking it `[->]`, doing it, and following WORKING RULES below.
+
+**Never push to `main`. Never force-push. Never amend commits that you already pushed.** See WORKING RULES.
+
+---
+
+## COMMIT MAP (work already done on branch `fix/s1-1-rotate-secrets`)
+
+| Task | Commit SHA | Title |
+|------|-----------|-------|
+| S1.1 | `1a8bc42` | fix(security): rotate JWT/cookie secrets and enforce env in production |
+| S1.2 | `578b3ec` | fix(security): verify JWT signature in sellercentral middleware |
+| S1.3 | `5f04748` | fix(security): add /admin-hub auth gatekeeper to close unprotected routes |
+| S1.4 | `f1c84df` | feat(observability): wire Sentry into backend and sellercentral |
+| S1.5 | `00b7228` | chore(security): move hardcoded LAN IPs out of production code |
+
+Inspect any commit with `git show <sha> --stat` for the file list, or `git show <sha>` for full diff.
+
+The branch base is `main` HEAD `07e89ef`. Run `git diff main..HEAD --stat` on the branch to see the full cumulative diff of all 5 tasks.
+
+The test scripts cited in each task's "Acceptance" section were created in `C:\Users\murat\AppData\Local\Temp\andertal-*-test.js` and deleted after passing. They are NOT in the repo. To re-verify, recreate them from the inline descriptions in this file or run the verification commands documented in each AGENT NOTES block.
+
+---
+
 ## STATUS SNAPSHOT (every agent updates this at end of session)
 
-- Last update: 2026-06-23 by Agent-1 (Cursor on Murathan's main PC)
+- Last update: 2026-06-24 by Agent-1 (Cursor on Murathan's main PC)
 - Active task: none (S1.1 + S1.2 + S1.3 + S1.4 + S1.5 finished, awaiting "continue?" decision)
 - Blocking decisions: none yet
 - Active branch: `fix/s1-1-rotate-secrets` (per user request, multiple sprint-1 tasks share one branch to keep PR count low)
-- Pushed to remote: NO (awaiting user push approval)
-- Next pending tasks (any order): S1.3b admin-route follow-up, S1.4b shop DSN migration, S1.6 CI, S1.7 logger
+- Pushed to remote: NO (awaiting user push approval — if a new agent on a different PC cannot see the branch, this is the reason)
+- Working tree extras: `apps/medusa-backend/src/order-pdf-*.js` (3 files) have unstaged changes from a prior session — NOT touched by this work, leave alone unless the user says otherwise
+- Stash present: `stash@{0}: On main: temp-before-rebase-for-push` — also from a prior session
+- Next pending tasks (any order, but SPRINT 1 first): S1.3b admin-route follow-up, S1.4b shop DSN migration, S1.6 CI, S1.7 logger
 - All other sprints untouched
 
 ---
@@ -508,3 +546,4 @@ Same pre-checks as S4.1. Additionally:
 - 2026-06-23 Agent-1 (Murathan main PC): Completed S1.3 on same branch. Inserted /admin-hub gatekeeper at server.js:1746. 14/14 integration tests passed including prefix-smuggling attack rejection. Spawned follow-up task S1.3b (clean up redundant explicit auth + handle /admin/*).
 - 2026-06-24 Agent-1 (Murathan main PC): Completed S1.4 on same branch. Added Sentry to backend (`@sentry/node`) and sellercentral (`@sentry/nextjs`). All env-driven, no-op when DSN unset. 14/14 sanity tests passed. Branch still not pushed.
 - 2026-06-24 Agent-1 (Murathan main PC): Completed S1.5 on same branch. Removed hardcoded LAN IP `192.168.1.240` from shop next.config.js and `192.168.2.127` from sellercentral CSP. Added `SC_ALLOWED_DEV_BACKEND_HOSTS` env (dev-only, production-gated). 11/11 CSP integrity tests passed. Branch still not pushed.
+- 2026-06-24 Agent-1 (Murathan main PC): Handover audit. Verified all S1.1-S1.5 code is in place via spot-check (readSecretOrFail, jwtVerify, ADMIN_HUB_PUBLIC_PATTERNS, setupExpressErrorHandler, devBackendHosts). Found and fixed two leftover LAN IP literals in `.env.example` example comments (`apps/sellercentral/.env.example`, `apps/shop/.env.example` — both changed `192.168.2.127` to `192.168.x.x` placeholder). Added ONBOARDING and COMMIT MAP sections to top of this file so a fresh agent on a different PC can self-bootstrap.
