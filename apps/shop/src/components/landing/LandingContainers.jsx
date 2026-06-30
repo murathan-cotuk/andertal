@@ -1090,7 +1090,7 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
 // ── Bestseller Carousel ───────────────────────────────────────────────────────
 function BestsellerCarousel({ container, locale = "de" }) {
   const [products, setProducts] = useState(undefined);
-  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
+  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 5;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
   const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const isNarrow = useIsNarrow(1023);

@@ -114,7 +114,7 @@ function productCategoryKeys(product) {
 
 export default function BestsellersPage() {
   const locale = useLocale();
-  const itemsPerRow = useResponsiveColumnCount(4, 2);
+  const itemsPerRow = useResponsiveColumnCount(5, 2);
   const [collections, setCollections] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -248,7 +248,7 @@ export default function BestsellersPage() {
               <Carousel
                 contained={false}
                 navOnSides
-                gap={16}
+                gap={12}
                 visibleCount={itemsPerRow}
                 showFade={false}
                 ariaLabel={collection.title || collection.name || collection.handle || "Bestsellers category"}
