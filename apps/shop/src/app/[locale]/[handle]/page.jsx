@@ -13,6 +13,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
+import { baseHandleFromUrl } from "@/lib/product-url-handle";
 import { getMedusaClient } from "@/lib/medusa-client";
 import {
   SORT_OPTIONS,
@@ -767,12 +768,19 @@ export default function CollectionPage() {
               setIsCategorySlug(true); setLoading(false); return;
             }
           }
-          // Fallback 4: product by handle
-          const productRes = await fetch(`/api/store-products/${encodeURIComponent(handle)}`, { cache: "no-store" }).catch(() => null);
-          if (productRes?.ok) {
-            const productData = await productRes.json().catch(() => null);
-            if (productData?.product?.id) { setIsProduct(true); setLoading(false); return; }
+          // Fallback 4: product by handle (supports {handle}-{8char-id} URL format)
+          const tryProductHandle = async (h) => {
+            const r = await fetch(`/api/store-products/${encodeURIComponent(h)}`, { cache: "no-store" }).catch(() => null);
+            if (!r?.ok) return null;
+            return r.json().catch(() => null);
+          };
+          let productData = await tryProductHandle(handle);
+          if (!productData?.product?.id) {
+            // Strip 8-char short code suffix (e.g. "some-handle-ab12cd34")
+            const base = baseHandleFromUrl(handle);
+            if (base !== handle) productData = await tryProductHandle(base);
           }
+          if (productData?.product?.id) { setIsProduct(true); setLoading(false); return; }
           setNotFoundSt(true); setLoading(false); return;
         }
         setCollection(col);
