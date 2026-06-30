@@ -878,6 +878,7 @@ function ProductCampaignPriceBlock({
   uvpCents,
   grundpreis,
 }) {
+  const tp = useTranslations("product");
   const { promo: campaignPromo, finalPriceCents: campaignFinalCents } = useStoreCampaignDiscount({
     productId,
     variantId,
