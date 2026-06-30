@@ -24,7 +24,7 @@ function menuItemHref(item) {
   }
   if (item.link_type === "page") {
     const pageSlug = parsed?.slug || parsed?.label_slug || itemSlug || slugify(item.label);
-    return pageSlug ? `/${pageSlug}` : "#";
+    return pageSlug ? `/pages/${pageSlug}` : "#";
   }
   if (item.link_type === "api") {
     const fn = String(parsed?.function || parsed?.api_function || value || "").trim().toLowerCase();
@@ -34,6 +34,18 @@ function menuItemHref(item) {
     if (fn === "bestsellers") return "/bestsellers";
     return "#";
   }
+  if (item.link_type === "category") {
+    const slug = (parsed?.slug || parsed?.handle || itemSlug || "").replace(/^\//, "").trim();
+    return slug ? `/${slug}` : "#";
+  }
+  if (item.link_type === "collection") {
+    const handle = (parsed?.handle || parsed?.slug || itemSlug || "").replace(/^\//, "").trim();
+    return handle ? `/${handle}` : "#";
+  }
+  if (item.link_type === "product") {
+    const handle = (parsed?.handle || itemSlug || "").replace(/^\//, "").trim();
+    return handle ? `/${handle}` : "#";
+  }
   if (parsed) {
     if (itemSlug) value = itemSlug;
     else if (parsed.handle) value = parsed.handle;
@@ -42,8 +54,6 @@ function menuItemHref(item) {
     value = itemSlug;
   }
   if (item.link_type === "url" && value) return String(value).startsWith("http") ? value : `/${String(value).replace(/^\//, "")}`;
-  if ((item.link_type === "category" || item.link_type === "collection") && value) return `/${value}`;
-  if (item.link_type === "product" && value) return `/${value}`;
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }
 
