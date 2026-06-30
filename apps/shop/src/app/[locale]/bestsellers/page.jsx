@@ -20,67 +20,57 @@ const PageWrap = styled.div`
 
 const Main = styled.main`
   flex: 1;
-  display: flex;
-`;
-
-const Sidebar = styled.aside`
-  width: 220px;
-  min-width: 220px;
-  padding: 24px 16px;
-  border-right: 1px solid #e5e7eb;
-  background: #fff;
-
-  @media (max-width: 767px) {
-    display: none;
-  }
-`;
-
-const SidebarTitle = styled.div`
-  font-size: 12px;
-  font-weight: 700;
-  color: #6b7280;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-`;
-
-const CollectionItem = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 4px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #374151;
-  border-radius: 6px;
-
-  &:hover {
-    background: #f3f4f6;
-  }
-`;
-
-const Content = styled.div`
-  flex: 1;
-  min-width: 0;
 `;
 
 const Intro = styled.section`
-  max-width: 100%;
-  padding: 24px 24px 8px;
+  padding: 28px 24px 16px;
 
   @media (max-width: 767px) {
-    padding: 20px 16px 6px;
+    padding: 20px 16px 12px;
   }
 `;
 
 const IntroTitle = styled.h1`
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 `;
 
 const IntroText = styled.p`
   margin: 0;
   color: #6b7280;
   font-size: 14px;
+`;
+
+const FilterBar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px 20px;
+  flex-wrap: wrap;
+
+  @media (max-width: 767px) {
+    padding: 0 16px 16px;
+    gap: 6px;
+  }
+`;
+
+const FilterChip = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1.5px solid ${(p) => (p.$active ? "#111827" : "#d1d5db")};
+  background: ${(p) => (p.$active ? "#111827" : "#fff")};
+  color: ${(p) => (p.$active ? "#fff" : "#374151")};
+  font-size: 13px;
+  font-weight: ${(p) => (p.$active ? 600 : 400)};
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+
+  &:hover {
+    border-color: #111827;
+  }
 `;
 
 const SeeAll = styled(Link)`
@@ -159,9 +149,9 @@ export default function BestsellersPage() {
   }, []);
 
   const copy = useMemo(() => {
-    if (locale === "de") return { title: "Bestsellers", text: "Meistverkaufte Produkte nach Kategorien", seeAll: "Alle ansehen", empty: "Keine Bestseller gefunden.", collections: "Kategorien" };
-    if (locale === "tr") return { title: "Cok Satanlar", text: "Kategorilere gore en cok satilan urunler", seeAll: "Tumunu gor", empty: "Cok satan urun bulunamadi.", collections: "Kategoriler" };
-    return { title: "Bestsellers", text: "Top-selling products by category", seeAll: "See all", empty: "No bestsellers found.", collections: "Categories" };
+    if (locale === "de") return { title: "Bestsellers", text: "Meistverkaufte Produkte nach Kategorien", seeAll: "Alle ansehen", empty: "Keine Bestseller gefunden.", all: "Alle" };
+    if (locale === "tr") return { title: "Cok Satanlar", text: "Kategorilere gore en cok satilan urunler", seeAll: "Tumunu gor", empty: "Cok satan urun bulunamadi.", all: "Tumu" };
+    return { title: "Bestsellers", text: "Top-selling products by category", seeAll: "See all", empty: "No bestsellers found.", all: "All" };
   }, [locale]);
 
   const rows = useMemo(() => {
@@ -197,7 +187,7 @@ export default function BestsellersPage() {
     return list;
   }, [collections, products]);
 
-  const sidebarCollections = useMemo(() => rows.map((r) => r.collection), [rows]);
+  const filterCollections = useMemo(() => rows.map((r) => r.collection), [rows]);
 
   const visibleRows = useMemo(() => {
     if (selectedCollections.size === 0) return rows;
@@ -217,68 +207,67 @@ export default function BestsellersPage() {
     <PageWrap>
       <ShopHeader />
       <Main>
-        {/* Left sidebar — collection filter */}
-        {!loading && !error && sidebarCollections.length > 0 && (
-          <Sidebar>
-            <SidebarTitle>{copy.collections}</SidebarTitle>
-            {sidebarCollections.map((c) => {
+        <Intro>
+          <IntroTitle className="shop-typo-catalog-title">{copy.title}</IntroTitle>
+          <IntroText>{copy.text}</IntroText>
+        </Intro>
+
+        {/* Horizontal category filter chips */}
+        {!loading && !error && filterCollections.length > 0 && (
+          <FilterBar>
+            <FilterChip
+              $active={selectedCollections.size === 0}
+              onClick={() => setSelectedCollections(new Set())}
+            >
+              {copy.all}
+            </FilterChip>
+            {filterCollections.map((c) => {
               const key = String(c.id || c.handle);
               return (
-                <CollectionItem key={key}>
-                  <input
-                    type="checkbox"
-                    checked={selectedCollections.has(key)}
-                    onChange={() => toggleCollection(key)}
-                    style={{ width: 14, height: 14, accentColor: "#111" }}
-                  />
+                <FilterChip
+                  key={key}
+                  $active={selectedCollections.has(key)}
+                  onClick={() => toggleCollection(key)}
+                >
                   {c.title || c.name || c.handle}
-                </CollectionItem>
+                </FilterChip>
               );
             })}
-          </Sidebar>
+          </FilterBar>
         )}
 
-        {/* Main content */}
-        <Content>
-          <Intro>
-            <IntroTitle className="shop-typo-catalog-title">{copy.title}</IntroTitle>
-            <IntroText>{copy.text}</IntroText>
-          </Intro>
+        {loading ? <GlobalPageLoader /> : null}
+        {error ? <p style={{ color: "#b91c1c", padding: "0 24px" }}>{error}</p> : null}
+        {!loading && !error && rows.length === 0 ? (
+          <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
+        ) : null}
 
-          {loading ? <GlobalPageLoader /> : null}
-          {error ? <p style={{ color: "#b91c1c", padding: "0 24px" }}>{error}</p> : null}
-          {!loading && !error && rows.length === 0 ? (
-            <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
-          ) : null}
-
-          {!loading && !error && visibleRows.map(({ collection, products: list }) => (
-            /* padding: 0 24px here so CarouselWrap's margin: 0 -24px cancels it correctly */
-            <div key={collection.id || collection.handle} style={{ padding: "8px 24px 28px" }}>
-              <div style={{ maxWidth: 1280, margin: "0 auto" }}>
-                <Carousel
-                  contained={false}
-                  navOnSides
-                  gap={16}
-                  visibleCount={itemsPerRow}
-                  showFade={false}
-                  ariaLabel={collection.title || collection.name || collection.handle || "Bestsellers category"}
-                  header={(
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
-                      <h2 className="shop-typo-h2" style={{ margin: 0 }}>
-                        {collection.title || collection.name || collection.handle}
-                      </h2>
-                      <SeeAll href={`/${collection.handle}?bestseller=1`}>{copy.seeAll} →</SeeAll>
-                    </div>
-                  )}
-                >
-                  {list.map((p) => (
-                    <ProductCard key={p.id} product={p} plainImage hideBestsellerBadge />
-                  ))}
-                </Carousel>
-              </div>
+        {!loading && !error && visibleRows.map(({ collection, products: list }) => (
+          <div key={collection.id || collection.handle} style={{ padding: "8px 24px 28px" }}>
+            <div style={{ width: "100%", maxWidth: 1280, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
+              <Carousel
+                contained={false}
+                navOnSides
+                gap={16}
+                visibleCount={itemsPerRow}
+                showFade={false}
+                ariaLabel={collection.title || collection.name || collection.handle || "Bestsellers category"}
+                header={(
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
+                    <h2 className="shop-typo-h2" style={{ margin: 0 }}>
+                      {collection.title || collection.name || collection.handle}
+                    </h2>
+                    <SeeAll href={`/${collection.handle}?bestseller=1`}>{copy.seeAll} →</SeeAll>
+                  </div>
+                )}
+              >
+                {list.map((p) => (
+                  <ProductCard key={p.id} product={p} plainImage hideBestsellerBadge />
+                ))}
+              </Carousel>
             </div>
-          ))}
-        </Content>
+          </div>
+        ))}
       </Main>
       <Footer />
     </PageWrap>
