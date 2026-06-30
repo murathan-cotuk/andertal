@@ -38,6 +38,20 @@ export function menuItemHref(item) {
     if (fn === "bestsellers") return "/bestsellers";
     return "#";
   }
+  // For category/collection/product: always use the stored handle/slug from link_value,
+  // NOT the menu item's own label-derived slug (itemSlug), because they refer to different things.
+  if (item.link_type === "category") {
+    const slug = (parsed?.slug || parsed?.handle || itemSlug || "").replace(/^\//, "").trim();
+    return slug ? `/${slug}` : "#";
+  }
+  if (item.link_type === "collection") {
+    const handle = (parsed?.handle || parsed?.slug || itemSlug || "").replace(/^\//, "").trim();
+    return handle ? `/${handle}` : "#";
+  }
+  if (item.link_type === "product") {
+    const handle = (parsed?.handle || itemSlug || "").replace(/^\//, "").trim();
+    return handle ? `/${handle}` : "#";
+  }
   if (parsed) {
     if (itemSlug) value = itemSlug;
     else if (parsed.handle) value = parsed.handle;
@@ -47,14 +61,6 @@ export function menuItemHref(item) {
   }
   if (item.link_type === "url" && value) {
     return String(value).startsWith("http") ? value : `/${String(value).replace(/^\//, "")}`;
-  }
-  if (item.link_type === "product" && value) return `/${value}`;
-  if (item.link_type === "category") {
-    const slug = value ? String(value).replace(/^\//, "").trim() : "";
-    return slug ? `/${slug}` : "#";
-  }
-  if (item.link_type === "collection") {
-    return value ? `/${String(value).replace(/^\//, "")}` : "#";
   }
   return value ? `/${String(value).replace(/^\//, "")}` : "#";
 }
