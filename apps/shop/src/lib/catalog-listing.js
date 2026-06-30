@@ -144,8 +144,17 @@ export function getProductBasePriceCents(product) {
 }
 
 export function isDiscountedProduct(product) {
+  const meta = product?.metadata || {};
+  // New price structure: metadata.prices.DE.sale_cents vs brutto_cents
+  const dePrice = meta.prices?.DE;
+  if (dePrice) {
+    const base = dePrice.brutto_cents != null ? Number(dePrice.brutto_cents) : null;
+    const sale = dePrice.sale_cents != null ? Number(dePrice.sale_cents) : null;
+    if (base != null && sale != null && sale > 0 && sale < base) return true;
+  }
+  // Legacy: metadata.rabattpreis_cents
   const base = getProductBasePriceCents(product);
-  const sale = product?.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
+  const sale = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null;
   return sale != null && sale > 0 && sale < base;
 }
 

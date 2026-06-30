@@ -350,6 +350,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
   const dragGroupIdx = useRef(null);
   const [eanLookupState, setEanLookupState] = useState(null); // null | "loading" | "found" | "not_found"
+  const [urlSearchTerm, setUrlSearchTerm] = useState(""); // shop URL or handle to search
+  const [urlSearchState, setUrlSearchState] = useState(null); // null | "loading" | "found" | "not_found"
   // Variant image picker: null = closed, option_values[] = target variant being edited
   const [variantImgPickerTarget, setVariantImgPickerTarget] = useState(null);
   // Swatch image picker: null = closed, {gi, oi} = target group/option
@@ -705,7 +707,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             handle: master.handle || prev.handle,
             metadata: mergedMeta,
             variants: Array.isArray(master.variants) && master.variants.length > 0
-              ? master.variants.map((v) => ({ ...v, sku: "", ean: "", inventory: 0, price: undefined, price_cents: 0 }))
+              ? master.variants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
               : prev.variants,
           };
         });
@@ -717,6 +719,74 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setEanLookupState(null);
     }
   }, [isNew, product, client]);
+
+  // Shop URL / handle search: find an existing master product by its shop URL code (8-char suffix or handle).
+  const handleUrlSearch = useCallback(async () => {
+    const raw = urlSearchTerm.trim();
+    if (!raw) return;
+    // Extract path segment: if full URL, take last non-empty path part
+    let segment = raw;
+    try {
+      const parsed = new URL(raw);
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if (parts.length > 0) segment = parts[parts.length - 1];
+    } catch (_) {
+      // not a URL, use raw string as-is
+    }
+    // Strip 8-char alphanumeric suffix to get the base handle
+    const baseHandle = (() => {
+      const lastDash = segment.lastIndexOf("-");
+      if (lastDash >= 1) {
+        const suffix = segment.slice(lastDash + 1);
+        if (/^[a-z0-9]{8}$/i.test(suffix)) return segment.slice(0, lastDash);
+      }
+      return segment;
+    })();
+    setUrlSearchState("loading");
+    try {
+      // Try base handle first, then full segment as fallback
+      let match = null;
+      for (const h of [...new Set([baseHandle, segment])]) {
+        if (!h) continue;
+        try {
+          const { product: found } = await client.getAdminHubProductFull(h);
+          if (found?.id) { match = found; break; }
+        } catch (_) {}
+      }
+      if (match) {
+        setUrlSearchState("found");
+        setProduct((prev) => {
+          if (!prev) return prev;
+          const masterMeta = (match.metadata && typeof match.metadata === "object") ? { ...match.metadata } : {};
+          const mergedMeta = {
+            ...masterMeta,
+            sku: prev.metadata?.sku || "",
+            seller_id: prev.metadata?.seller_id,
+            shop_name: prev.metadata?.shop_name,
+            seller_name: prev.metadata?.seller_name,
+            brand_id: prev.metadata?.brand_id,
+            shipping_group_id: prev.metadata?.shipping_group_id,
+            related_product_ids: [],
+          };
+          return {
+            ...prev,
+            title: match.title || prev.title,
+            description: match.description || prev.description,
+            handle: match.handle || prev.handle,
+            metadata: mergedMeta,
+            variants: Array.isArray(match.variants) && match.variants.length > 0
+              ? match.variants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
+              : prev.variants,
+          };
+        });
+      } else {
+        setUrlSearchState("not_found");
+        setTimeout(() => setUrlSearchState(null), 3000);
+      }
+    } catch (_) {
+      setUrlSearchState(null);
+    }
+  }, [urlSearchTerm, client]);
 
   // New product: URL handle follows the current locale title automatically (SEO slug).
   useEffect(() => {
@@ -1858,6 +1928,54 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           </>
         )}
       </div>
+
+      {isNew && (
+        <Box padding="400" paddingBlockEnd="0">
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingSm">
+                {locale === "tr" ? "Sistemde Kayıtlı Ürün Ara" : "Search Existing Product"}
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {locale === "tr"
+                  ? "Shopdaki ürün URL'sini (örn: andertal.com/de/urün-adi-ab12cd34) veya ürün handle'ını girerek sistemde kayıtlı ürünü bulabilirsin."
+                  : "Enter the shop product URL (e.g. andertal.com/de/product-name-ab12cd34) or the product handle to find an existing product and pre-fill the form."}
+              </Text>
+              <InlineStack gap="200" blockAlign="center">
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label=""
+                    labelHidden
+                    placeholder={locale === "tr" ? "Shop URL veya ürün kodu..." : "Shop URL or product handle..."}
+                    value={urlSearchTerm}
+                    onChange={(v) => { setUrlSearchTerm(v); setUrlSearchState(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleUrlSearch(); }}
+                    autoComplete="off"
+                    suffix={
+                      urlSearchState === "loading" ? "⏳" :
+                      urlSearchState === "found" ? "✓" :
+                      urlSearchState === "not_found" ? "✗" : undefined
+                    }
+                  />
+                </div>
+                <Button onClick={handleUrlSearch} loading={urlSearchState === "loading"} variant="primary">
+                  {locale === "tr" ? "Ara" : "Search"}
+                </Button>
+              </InlineStack>
+              {urlSearchState === "found" && (
+                <Banner tone="success">
+                  {locale === "tr" ? "Ürün bulundu. Form verilerle dolduruldu — kendi fiyatını, SKU'nu ve gönderim bilgilerini ekleyebilirsin." : "Product found. Form pre-filled — add your own price, SKU, and shipping details."}
+                </Banner>
+              )}
+              {urlSearchState === "not_found" && (
+                <Banner tone="warning">
+                  {locale === "tr" ? "Ürün bulunamadı. Yeni ürün olarak devam ediliyor." : "Product not found. Continuing as a new product."}
+                </Banner>
+              )}
+            </BlockStack>
+          </Card>
+        </Box>
+      )}
 
       <Layout>
         <Layout.Section>

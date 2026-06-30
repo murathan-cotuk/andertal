@@ -1068,6 +1068,20 @@ export default function CollectionPage() {
                   </>
                 </FilterBtn>
               )}
+              {/* Sale toggle */}
+              <FilterBtn
+                type="button"
+                $active={saleOnly}
+                onClick={() => {
+                  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+                  if (saleOnly) params.delete("sale"); else params.set("sale", "1");
+                  const qs = params.toString();
+                  router.replace(`/${locale}/${collection?.handle || handle}${qs ? `?${qs}` : ""}`, { scroll: false });
+                }}
+                style={{ gap: 4 }}
+              >
+                % {locale === "de" ? "Sale" : locale === "tr" ? "İndirim" : "Sale"}
+              </FilterBtn>
             </SortBarLeft>
             <SortWrap>
               <SortLabel>Sort:</SortLabel>

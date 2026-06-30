@@ -9,6 +9,8 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
+import { getProductBasePriceCents } from "@/lib/catalog-listing";
+import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -58,16 +60,16 @@ const SeeAll = styled(Link)`
   padding: 8px 12px;
 `;
 
-function getProductBasePriceCents(product) {
-  const firstVariantPrice = product?.variants?.[0]?.prices?.[0]?.amount;
-  if (firstVariantPrice != null) return Number(firstVariantPrice) || 0;
-  if (product?.price != null) return Math.round(Number(product.price) * 100) || 0;
-  return 0;
-}
-
 function isDiscountedProduct(product) {
+  const meta = product?.metadata || {};
+  const dePrice = meta.prices?.DE;
+  if (dePrice) {
+    const base = dePrice.brutto_cents != null ? Number(dePrice.brutto_cents) : null;
+    const sale = dePrice.sale_cents != null ? Number(dePrice.sale_cents) : null;
+    if (base != null && sale != null && sale > 0 && sale < base) return true;
+  }
   const base = getProductBasePriceCents(product);
-  const sale = product?.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
+  const sale = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null;
   return sale != null && sale > 0 && sale < base;
 }
 
@@ -98,6 +100,7 @@ function productCategoryKeys(product) {
 
 export default function SalesPage() {
   const locale = useLocale();
+  const itemsPerRow = useResponsiveColumnCount(5, 2);
   const [collections, setCollections] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -185,27 +188,30 @@ export default function SalesPage() {
         ) : null}
 
         {!loading && !error && rows.map(({ collection, products: list }) => (
-          <Carousel
-            key={collection.id || collection.handle}
-            contained={false}
-            navOnSides
-            gap={16}
-            visibleCount={2}
-            showFade={false}
-            ariaLabel={collection.title || collection.name || collection.handle || "Sales category"}
-            header={(
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
-                <h2 className="shop-typo-h2" style={{ margin: 0 }}>
-                  {collection.title || collection.name || collection.handle}
-                </h2>
-                <SeeAll href={`/${collection.handle}?sale=1`}>{copy.seeAll} →</SeeAll>
-              </div>
-            )}
-          >
-            {list.map((p) => (
-              <ProductCard key={p.id} product={p} plainImage />
-            ))}
-          </Carousel>
+          <div key={collection.id || collection.handle} style={{ padding: "8px 24px 28px" }}>
+            <div style={{ width: "100%", maxWidth: 1280, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
+              <Carousel
+                contained={false}
+                navOnSides
+                gap={12}
+                visibleCount={itemsPerRow}
+                showFade={false}
+                ariaLabel={collection.title || collection.name || collection.handle || "Sales category"}
+                header={(
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
+                    <h2 className="shop-typo-h2" style={{ margin: 0 }}>
+                      {collection.title || collection.name || collection.handle}
+                    </h2>
+                    <SeeAll href={`/${collection.handle}?sale=1`}>{copy.seeAll} →</SeeAll>
+                  </div>
+                )}
+              >
+                {list.map((p) => (
+                  <ProductCard key={p.id} product={p} plainImage />
+                ))}
+              </Carousel>
+            </div>
+          </div>
         ))}
       </Main>
       <Footer />

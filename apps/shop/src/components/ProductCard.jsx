@@ -523,10 +523,13 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           : (parentCountryPrice != null
               ? parentCountryPrice
               : (product.price != null ? Math.round(Number(product.price) * 100) : 0)));
-  const saleCents =
-    product.metadata?.rabattpreis_cents != null
-      ? Number(product.metadata.rabattpreis_cents)
-      : null;
+  const _deSaleCents = product.metadata?.prices?.DE?.sale_cents != null
+    ? Number(product.metadata.prices.DE.sale_cents)
+    : null;
+  const _legacySaleCents = product.metadata?.rabattpreis_cents != null
+    ? Number(product.metadata.rabattpreis_cents)
+    : null;
+  const saleCents = _deSaleCents ?? _legacySaleCents;
   const hasSale = saleCents != null && saleCents > 0 && saleCents < priceCents;
 
   /* Flags */
