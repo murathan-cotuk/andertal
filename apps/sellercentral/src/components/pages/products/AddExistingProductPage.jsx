@@ -17,34 +17,33 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-function t(en, tr, de) {
-  return { en, tr, de };
-}
-
 const copy = {
-  title: t("Add Existing Product", "Mevcut Ürün Ekle", "Bestehendes Produkt hinzufügen"),
-  subtitle: t(
-    "Search for an existing product in the catalog by EAN, product ID, or shop link. The form will be pre-filled with the product's data — add your own price, SKU, and shipping details.",
-    "EAN, ürün kimliği veya shop linki ile mevcut bir ürünü kataloğda ara. Form ürün verileriyle doldurulur — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle.",
-    "Suche ein bestehendes Produkt im Katalog per EAN, Produkt-ID oder Shop-Link. Das Formular wird mit den Produktdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu.",
-  ),
-  eanLabel: t("EAN / Barcode", "EAN / Barkod", "EAN / Barcode"),
-  eanPlaceholder: t("e.g. 4012345678901", "örn. 4012345678901", "z. B. 4012345678901"),
-  idLabel: t("Product ID", "Ürün Kimliği", "Produkt-ID"),
-  idPlaceholder: t("UUID from sellercentral", "Sellercentral'dan UUID", "UUID aus dem Sellercentral"),
-  urlLabel: t("Shop URL or handle", "Shop URL veya handle", "Shop-URL oder Handle"),
-  urlPlaceholder: t("andertal.com/de/product-name-ab12cd34", "andertal.com/de/urun-adi-ab12cd34", "andertal.com/de/produktname-ab12cd34"),
-  search: t("Search", "Ara", "Suchen"),
-  found: t(
-    "Product found. Click \"Add to my products\" to create a new listing with pre-filled catalog data.",
-    "Ürün bulundu. Katalog verileriyle doldurulmuş yeni listeleme oluşturmak için \"Ürünlerime ekle\"ye tıkla.",
-    "Produkt gefunden. Klicke auf „Zu meinen Produkten hinzufügen", um ein neues Listing mit vorausgefüllten Katalogdaten zu erstellen.",
-  ),
-  notFound: t("No product found for this input.", "Bu giriş için ürün bulunamadı.", "Für diese Eingabe wurde kein Produkt gefunden."),
-  addBtn: t("Add to my products", "Ürünlerime ekle", "Zu meinen Produkten hinzufügen"),
-  back: t("Back to inventory", "Envantera dön", "Zurück zum Bestand"),
-  orDivider: t("or", "veya", "oder"),
-  productTitle: t("Product", "Ürün", "Produkt"),
+  title: { en: "Add Existing Product", tr: "Mevcut Ürün Ekle", de: "Bestehendes Produkt hinzufügen" },
+  subtitle: {
+    en: "Search for an existing product in the catalog by EAN, product ID, or shop link. The form will be pre-filled with the product's data — add your own price, SKU, and shipping details.",
+    tr: "EAN, ürün kimliği veya shop linki ile mevcut bir ürünü kataloğda ara. Form ürün verileriyle doldurulur — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle.",
+    de: "Suche ein bestehendes Produkt im Katalog per EAN, Produkt-ID oder Shop-Link. Das Formular wird mit den Katalogdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu.",
+  },
+  eanLabel: { en: "EAN / Barcode", tr: "EAN / Barkod", de: "EAN / Barcode" },
+  eanPlaceholder: { en: "e.g. 4012345678901", tr: "örn. 4012345678901", de: "z. B. 4012345678901" },
+  idLabel: { en: "Product ID", tr: "Ürün Kimliği", de: "Produkt-ID" },
+  idPlaceholder: { en: "UUID from sellercentral", tr: "Sellercentral'dan UUID", de: "UUID aus dem Sellercentral" },
+  urlLabel: { en: "Shop URL or handle", tr: "Shop URL veya handle", de: "Shop-URL oder Handle" },
+  urlPlaceholder: { en: "andertal.com/de/product-name-ab12cd34", tr: "andertal.com/de/urun-adi-ab12cd34", de: "andertal.com/de/produktname-ab12cd34" },
+  search: { en: "Search", tr: "Ara", de: "Suchen" },
+  found: {
+    en: "Product found. Click \"Add to my products\" to create a new listing with pre-filled catalog data.",
+    tr: "Ürün bulundu. Katalog verileriyle doldurulmuş yeni listeleme oluşturmak için \"Ürünlerime ekle\"ye tıkla.",
+    de: "Produkt gefunden. Klicke auf „Zu meinen Produkten hinzufügen", um ein neues Listing mit vorausgefüllten Katalogdaten zu erstellen.",
+  },
+  notFound: { en: "No product found for this input.", tr: "Bu giriş için ürün bulunamadı.", de: "Für diese Eingabe wurde kein Produkt gefunden." },
+  addBtn: { en: "Add to my products", tr: "Ürünlerime ekle", de: "Zu meinen Produkten hinzufügen" },
+  back: { en: "Back to inventory", tr: "Envantera dön", de: "Zurück zum Bestand" },
+  matchedVariant: { en: "Matched variant", tr: "Eşleşen varyasyon", de: "Übereinstimmende Variante" },
+  otherVariants: { en: "Other variants in this product", tr: "Bu ürüne ait diğer varyasyonlar", de: "Weitere Varianten dieses Produkts" },
+  showVariants: { en: "Show all variants", tr: "Tüm varyasyonları göster", de: "Alle Varianten anzeigen" },
+  hideVariants: { en: "Hide variants", tr: "Varyasyonları gizle", de: "Varianten ausblenden" },
+  variantCount: { en: (n) => `${n} variants total`, tr: (n) => `Toplam ${n} varyasyon`, de: (n) => `${n} Varianten insgesamt` },
 };
 
 function useT() {
@@ -67,6 +66,56 @@ function stripHandleSuffix(handle) {
   return handle;
 }
 
+function getVariantLabel(v) {
+  if (!v) return "";
+  const opts = Array.isArray(v.option_values) ? v.option_values : [];
+  if (opts.length > 0) {
+    const parts = opts.map((o) => {
+      if (!o) return "";
+      if (typeof o === "string") return o;
+      return String(o.label || o.value || "").trim();
+    }).filter(Boolean);
+    if (parts.length > 0) return parts.join(" / ");
+  }
+  return String(v.value || v.option || v.name || v.title || "").trim();
+}
+
+function ProductThumb({ product }) {
+  const media = product.metadata?.media?.[0];
+  const src = typeof media === "string" ? media : (media?.url || product.image_url || "");
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, flexShrink: 0 }}
+    />
+  );
+}
+
+function VariantRow({ v, isMatch }) {
+  const label = getVariantLabel(v);
+  const ean = v.ean || v.metadata?.ean || "";
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "6px 10px",
+      borderRadius: 6,
+      background: isMatch ? "var(--p-color-bg-success-subdued, #f0fdf4)" : "var(--p-color-bg-surface-secondary)",
+      border: isMatch ? "1px solid #86efac" : "1px solid transparent",
+    }}>
+      {isMatch && <span style={{ fontSize: 12, color: "#15803d", fontWeight: 600 }}>✓</span>}
+      <BlockStack gap="050">
+        {label && <Text as="p" variant="bodySm" fontWeight={isMatch ? "semibold" : "regular"}>{label}</Text>}
+        {ean && <Text as="p" variant="bodySm" tone="subdued">EAN: {ean}</Text>}
+        {v.sku && <Text as="p" variant="bodySm" tone="subdued">SKU: {v.sku}</Text>}
+      </BlockStack>
+    </div>
+  );
+}
+
 export default function AddExistingProductPage() {
   const router = useRouter();
   const t = useT();
@@ -75,9 +124,11 @@ export default function AddExistingProductPage() {
   const [ean, setEan] = useState("");
   const [productId, setProductId] = useState("");
   const [shopUrl, setShopUrl] = useState("");
+  const [searchedEan, setSearchedEan] = useState("");
 
   const [state, setState] = useState(null); // null | "loading" | "found" | "not_found"
   const [foundProduct, setFoundProduct] = useState(null);
+  const [siblingsOpen, setSiblingsOpen] = useState(false);
 
   const search = useCallback(async () => {
     const eanTrim = ean.trim();
@@ -88,16 +139,16 @@ export default function AddExistingProductPage() {
 
     setState("loading");
     setFoundProduct(null);
+    setSiblingsOpen(false);
+    setSearchedEan(eanTrim);
 
     try {
       let found = null;
 
-      // 1. Try EAN
       if (!found && eanTrim) {
         found = await client.lookupProductByEan(eanTrim).catch(() => null);
       }
 
-      // 2. Try product ID directly
       if (!found && idTrim) {
         try {
           const { product } = await client.getAdminHubProductFull(idTrim);
@@ -105,7 +156,6 @@ export default function AddExistingProductPage() {
         } catch (_) {}
       }
 
-      // 3. Try shop URL / handle
       if (!found && urlTrim) {
         let segment = urlTrim;
         try {
@@ -139,6 +189,14 @@ export default function AddExistingProductPage() {
     router.push(`/products/new?existing_id=${encodeURIComponent(foundProduct.id)}`);
   };
 
+  const variants = Array.isArray(foundProduct?.variants) ? foundProduct.variants : [];
+  const matchedVariant = searchedEan
+    ? variants.find((v) => String(v?.ean || v?.metadata?.ean || "").trim() === searchedEan)
+    : null;
+  const siblingVariants = matchedVariant
+    ? variants.filter((v) => v !== matchedVariant)
+    : [];
+
   return (
     <Page
       title={t("title")}
@@ -156,7 +214,7 @@ export default function AddExistingProductPage() {
                 <TextField
                   label={t("eanLabel")}
                   value={ean}
-                  onChange={(v) => { setEan(v); setState(null); setFoundProduct(null); }}
+                  onChange={(v) => { setEan(v); setState(null); setFoundProduct(null); setSearchedEan(""); }}
                   placeholder={t("eanPlaceholder")}
                   autoComplete="off"
                   onKeyDown={(e) => { if (e.key === "Enter") search(); }}
@@ -169,7 +227,7 @@ export default function AddExistingProductPage() {
                 <TextField
                   label={t("idLabel")}
                   value={productId}
-                  onChange={(v) => { setProductId(v); setState(null); setFoundProduct(null); }}
+                  onChange={(v) => { setProductId(v); setState(null); setFoundProduct(null); setSearchedEan(""); }}
                   placeholder={t("idPlaceholder")}
                   autoComplete="off"
                   onKeyDown={(e) => { if (e.key === "Enter") search(); }}
@@ -182,7 +240,7 @@ export default function AddExistingProductPage() {
                 <TextField
                   label={t("urlLabel")}
                   value={shopUrl}
-                  onChange={(v) => { setShopUrl(v); setState(null); setFoundProduct(null); }}
+                  onChange={(v) => { setShopUrl(v); setState(null); setFoundProduct(null); setSearchedEan(""); }}
                   placeholder={t("urlPlaceholder")}
                   autoComplete="off"
                   onKeyDown={(e) => { if (e.key === "Enter") search(); }}
@@ -207,28 +265,77 @@ export default function AddExistingProductPage() {
               <Banner tone="success">
                 <Text as="p">{t("found")}</Text>
               </Banner>
+
+              {/* Product header */}
               <div style={{ padding: "12px 16px", background: "var(--p-color-bg-surface-secondary)", borderRadius: 8, display: "flex", alignItems: "center", gap: 16 }}>
-                {(foundProduct.metadata?.media?.[0] || foundProduct.image_url) && (
-                  <img
-                    src={typeof (foundProduct.metadata?.media?.[0]) === "string"
-                      ? foundProduct.metadata.media[0]
-                      : (foundProduct.metadata?.media?.[0]?.url || foundProduct.image_url || "")}
-                    alt=""
-                    style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, flexShrink: 0 }}
-                  />
-                )}
+                <ProductThumb product={foundProduct} />
                 <BlockStack gap="100">
                   <Text as="p" variant="bodyMd" fontWeight="semibold">
                     {foundProduct.title || foundProduct.handle || foundProduct.id}
                   </Text>
-                  {foundProduct.sku && (
-                    <Text as="p" variant="bodySm" tone="subdued">SKU: {foundProduct.sku}</Text>
+                  {variants.length > 0 && (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {typeof t("variantCount") === "function" ? t("variantCount")(variants.length) : `${variants.length} variants`}
+                    </Text>
                   )}
-                  {(foundProduct.metadata?.ean || foundProduct.ean) && (
+                  {(foundProduct.metadata?.ean || foundProduct.ean) && variants.length === 0 && (
                     <Text as="p" variant="bodySm" tone="subdued">EAN: {foundProduct.metadata?.ean || foundProduct.ean}</Text>
                   )}
                 </BlockStack>
               </div>
+
+              {/* Matched variant highlight */}
+              {matchedVariant && (
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodySm" fontWeight="semibold" tone="success">{t("matchedVariant")}</Text>
+                  <VariantRow v={matchedVariant} isMatch />
+                </BlockStack>
+              )}
+
+              {/* Sibling variants */}
+              {siblingVariants.length > 0 && (
+                <BlockStack gap="200">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="p" variant="bodySm" tone="subdued">{t("otherVariants")} ({siblingVariants.length})</Text>
+                    <Button
+                      variant="plain"
+                      onClick={() => setSiblingsOpen((o) => !o)}
+                    >
+                      {siblingsOpen ? t("hideVariants") : t("showVariants")}
+                    </Button>
+                  </InlineStack>
+                  {siblingsOpen && (
+                    <BlockStack gap="150">
+                      {siblingVariants.map((v, i) => (
+                        <VariantRow key={v.id || i} v={v} isMatch={false} />
+                      ))}
+                    </BlockStack>
+                  )}
+                </BlockStack>
+              )}
+
+              {/* No variant match but has variants — show all */}
+              {!matchedVariant && variants.length > 0 && (
+                <BlockStack gap="200">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="p" variant="bodySm" tone="subdued">{t("otherVariants")} ({variants.length})</Text>
+                    <Button
+                      variant="plain"
+                      onClick={() => setSiblingsOpen((o) => !o)}
+                    >
+                      {siblingsOpen ? t("hideVariants") : t("showVariants")}
+                    </Button>
+                  </InlineStack>
+                  {siblingsOpen && (
+                    <BlockStack gap="150">
+                      {variants.map((v, i) => (
+                        <VariantRow key={v.id || i} v={v} isMatch={false} />
+                      ))}
+                    </BlockStack>
+                  )}
+                </BlockStack>
+              )}
+
               <Button variant="primary" onClick={handleAdd}>{t("addBtn")}</Button>
             </BlockStack>
           )}

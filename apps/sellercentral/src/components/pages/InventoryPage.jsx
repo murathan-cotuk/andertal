@@ -1140,6 +1140,30 @@ export default function InventoryPage() {
     });
   }, [sellerGroups, sellerSearchFilter, sellerLabelById]);
 
+  // Group own products that share the same master_product_id under a parent header.
+  const sortedOwnRows = useMemo(() => {
+    const sorted = sortProductsList(ownProducts, locale, inventorySort);
+    const groupMap = new Map(); // masterId → index in result
+    const result = [];
+    for (const p of sorted) {
+      const masterId = String(p.metadata?.master_product_id || "").trim();
+      if (!masterId) {
+        result.push({ type: "standalone", product: p });
+      } else if (groupMap.has(masterId)) {
+        result[groupMap.get(masterId)].items.push(p);
+      } else {
+        groupMap.set(masterId, result.length);
+        result.push({ type: "group", masterId, items: [p] });
+      }
+    }
+    // Groups with only 1 item → treat as standalone
+    return result.map((entry) =>
+      entry.type === "group" && entry.items.length === 1
+        ? { type: "standalone", product: entry.items[0] }
+        : entry
+    );
+  }, [ownProducts, locale, inventorySort]);
+
   const openDuplicateModal = (product) => {
     setMenuOpenId(null);
     setDuplicateSourceId(product.id);
@@ -1168,6 +1192,35 @@ export default function InventoryPage() {
       ui={ui}
     />
   );
+
+  const renderParentGroup = (masterId, items) => {
+    const groupTitle = getLocalizedTitle(items[0], locale);
+    return (
+      <React.Fragment key={masterId}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: INVENTORY_ROW_GRID,
+          background: "#f3f4f6",
+          borderBottom: EXCEL_BORDER,
+        }}>
+          <div style={{ gridColumn: "1 / -1", padding: "7px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+            <Text as="span" variant="bodySm" fontWeight="semibold">{groupTitle}</Text>
+            <Text as="span" variant="bodySm" tone="subdued">
+              — {items.length} {locale === "tr" ? "varyasyon" : locale === "de" ? "Varianten" : "variants"}
+            </Text>
+          </div>
+        </div>
+        {items.map((product) => renderRow(product))}
+      </React.Fragment>
+    );
+  };
+
+  const renderOwnRows = () =>
+    sortedOwnRows.map((entry) =>
+      entry.type === "group"
+        ? renderParentGroup(entry.masterId, entry.items)
+        : renderRow(entry.product)
+    );
 
   const closeDuplicateModal = () => {
     setDuplicateModalOpen(false);
@@ -1399,7 +1452,7 @@ export default function InventoryPage() {
                 ) : (
                   <TableShell>
                     {renderInventoryHeader()}
-                    {sortProductsList(ownProducts, locale, inventorySort).map((product) => renderRow(product))}
+                    {renderOwnRows()}
                   </TableShell>
                 )}
               </BlockStack>
@@ -1435,7 +1488,7 @@ export default function InventoryPage() {
                   ) : (
                     <TableShell>
                       {renderInventoryHeader()}
-                      {sortProductsList(ownProducts, locale, inventorySort).map((product) => renderRow(product))}
+                      {renderOwnRows()}
                     </TableShell>
                   )}
                 </BlockStack>

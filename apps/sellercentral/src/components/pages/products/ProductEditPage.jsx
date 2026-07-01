@@ -805,6 +805,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           const masterMeta = (found.metadata && typeof found.metadata === "object") ? { ...found.metadata } : {};
           const mergedMeta = {
             ...masterMeta,
+            master_product_id: existingId,
             sku: prev.metadata?.sku || "",
             seller_id: prev.metadata?.seller_id,
             shop_name: prev.metadata?.shop_name,
