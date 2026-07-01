@@ -502,45 +502,26 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                           if (filtered.length === 0) {
                             return <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>{c.noProducts}</div>;
                           }
-                          const groups = [];
-                          const map = new Map();
-                          for (const p of filtered) {
-                            const sid = String(p.seller_id || "");
-                            const label = p.seller_label || p.seller_store_name || p.seller_company_name || (sid ? sid.slice(0, 12) : "—");
-                            if (!map.has(sid)) {
-                              const g = { sid, label, products: [] };
-                              map.set(sid, g);
-                              groups.push(g);
-                            }
-                            map.get(sid).products.push(p);
-                          }
-                          return groups.map(({ sid, label, products }) => (
-                            <div key={sid || "no-seller"}>
-                              <div style={{ padding: "6px 12px 4px", fontSize: 11, fontWeight: 700, color: "var(--p-color-text-subdued)", textTransform: "uppercase", letterSpacing: "0.5px", background: "var(--p-color-bg-surface-secondary)", borderBottom: "1px solid var(--p-color-border-subdued)" }}>
-                                {label}
-                              </div>
-                              {products.map((p) => (
-                                <button
-                                  key={p.id}
-                                  type="button"
-                                  style={{
-                                    display: "block",
-                                    width: "100%",
-                                    padding: "8px 12px 8px 20px",
-                                    textAlign: "left",
-                                    border: "none",
-                                    borderBottom: "1px solid var(--p-color-border-subdued)",
-                                    background: addingProductId === p.id ? "var(--p-color-bg-fill-secondary)" : "transparent",
-                                    cursor: addingProductId ? "wait" : "pointer",
-                                    fontSize: 13,
-                                  }}
-                                  onClick={() => { addProductToCollection(p.id); setAddProductPopoverOpen(false); }}
-                                  disabled={!!addingProductId}
-                                >
-                                  {addingProductId === p.id ? `${c.adding} ` : ""}{p.title || p.handle || p.sku || p.id}
-                                </button>
-                              ))}
-                            </div>
+                          return filtered.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                padding: "8px 12px",
+                                textAlign: "left",
+                                border: "none",
+                                borderBottom: "1px solid var(--p-color-border-subdued)",
+                                background: addingProductId === p.id ? "var(--p-color-bg-fill-secondary)" : "transparent",
+                                cursor: addingProductId ? "wait" : "pointer",
+                                fontSize: 13,
+                              }}
+                              onClick={() => { addProductToCollection(p.id); setAddProductPopoverOpen(false); }}
+                              disabled={!!addingProductId}
+                            >
+                              {addingProductId === p.id ? `${c.adding} ` : ""}{p.title || p.handle || p.sku || p.id}
+                            </button>
                           ));
                         })()}
                       </div>

@@ -43,8 +43,10 @@ export default function CategoryDrilldownSelect({
 }) {
   const locale = useLocale();
   const wrapperRef = useRef(null);
+  const triggerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
+  const [triggerRect, setTriggerRect] = useState(null);
   const [search, setSearch] = useState("");
   const [pathIds, setPathIds] = useState([]);
 
@@ -115,6 +117,24 @@ export default function CategoryDrilldownSelect({
   }, [open, value]);
 
   useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (triggerRef.current) {
+        const rect = triggerRef.current.getBoundingClientRect();
+        setTriggerRect(rect);
+        setOpenUpward(window.innerHeight - rect.bottom < 340);
+      }
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open]);
+
+  useEffect(() => {
     const onDown = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
     };
@@ -139,15 +159,9 @@ export default function CategoryDrilldownSelect({
         </div>
       )}
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => {
-          if (!open && wrapperRef.current) {
-            const rect = wrapperRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            setOpenUpward(spaceBelow < 340);
-          }
-          setOpen((v) => !v);
-        }}
+        onClick={() => setOpen((v) => !v)}
         style={{
           width: "100%",
           minHeight: 36,
@@ -168,15 +182,15 @@ export default function CategoryDrilldownSelect({
         <span style={{ float: "right", color: "var(--p-color-text-subdued)" }}>{open ? "▴" : "▾"}</span>
       </button>
 
-      {open && (
+      {open && triggerRect && (
         <div
           style={{
-            position: "absolute",
+            position: "fixed",
             ...(openUpward
-              ? { bottom: "100%", marginBottom: 4 }
-              : { top: "100%", marginTop: 4 }),
-            left: 0,
-            right: 0,
+              ? { bottom: window.innerHeight - triggerRect.top + 4 }
+              : { top: triggerRect.bottom + 4 }),
+            left: triggerRect.left,
+            width: triggerRect.width,
             zIndex: 10020,
             background: "var(--p-color-bg-surface)",
             border: "1px solid var(--p-color-border)",

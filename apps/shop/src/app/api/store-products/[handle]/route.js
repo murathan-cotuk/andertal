@@ -3,6 +3,22 @@ import { NextResponse } from "next/server";
 const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
+function stripHandleSuffix(handle) {
+  const lastDash = handle.lastIndexOf("-");
+  if (lastDash < 1) return null;
+  const suffix = handle.slice(lastDash + 1);
+  if (/^[a-z0-9]{8}$/.test(suffix)) return handle.slice(0, lastDash);
+  return null;
+}
+
+async function fetchFromBackend(base, handle) {
+  const res = await fetch(`${base}/store/products/${encodeURIComponent(handle)}`, {
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+  return res;
+}
+
 export async function GET(request, context) {
   const params = await Promise.resolve(context.params || {});
   const handle = params.handle;
@@ -11,11 +27,14 @@ export async function GET(request, context) {
   }
   try {
     const base = getBackendUrl();
-    const url = `${base}/store/products/${encodeURIComponent(handle)}`;
-    const res = await fetch(url, {
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-    });
+    let res = await fetchFromBackend(base, handle);
+
+    // If not found, try stripping the 8-char short-code suffix
+    if (res.status === 404) {
+      const baseHandle = stripHandleSuffix(handle);
+      if (baseHandle) res = await fetchFromBackend(base, baseHandle);
+    }
+
     if (res.status === 404) {
       return NextResponse.json({ product: null }, { status: 404 });
     }
