@@ -1,53 +1,35 @@
 "use client";
 
 import React from "react";
-import { Link, usePathname } from "@/i18n/navigation";
-import { restPathFromPathname } from "@/lib/shop-market";
+import { Link } from "@/i18n/navigation";
 
 /**
- * @param {Object} props
- * @param {string} [props.title] - Override label for the last segment
- * @param {{ label: string, href: string | null }[]} [props.items] - Custom breadcrumb items (e.g. Home, Collection, Product). If set, pathname is ignored.
+ * @param {{ label: string, href: string | null }[]} [props.items]
  */
-export default function Breadcrumbs({ title, items: customItems }) {
-  const pathname = usePathname() || "";
-  const crumbPath = restPathFromPathname(pathname);
-  const segments = crumbPath.split("/").filter(Boolean);
+export default function Breadcrumbs({ items: customItems }) {
+  const items = Array.isArray(customItems) ? customItems.filter((i) => i?.label) : [];
 
-  let items;
-  if (Array.isArray(customItems) && customItems.length > 0) {
-    items = customItems;
-  } else {
-    items = [{ label: "Home", href: "/" }];
-    let href = "";
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
-      const skip = segment === "product" || segment === "collections";
-      if (skip) {
-        href += "/" + segment;
-        continue;
-      }
-      href += "/" + segment;
-      const isLast = i === segments.length - 1;
-      const label = isLast && title ? title : decodeURIComponent(segment.replace(/-/g, " "));
-      items.push({ label, href: isLast ? null : href });
-    }
-  }
-
-  if (items.length <= 1) return null;
+  if (items.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" className="hidden md:block text-sm text-gray-500 mb-4">
-      <ol className="flex flex-wrap items-center gap-1">
+    <nav aria-label="Breadcrumb" style={{ marginBottom: 12 }}>
+      <ol style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 6px", listStyle: "none", margin: 0, padding: 0 }}>
         {items.map((item, i) => (
-          <li key={i} className="flex items-center gap-1">
-            {i > 0 && <span className="text-gray-400">/</span>}
+          <li key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {i > 0 && (
+              <span style={{ color: "#9ca3af", fontSize: 12, userSelect: "none" }}>›</span>
+            )}
             {item.href ? (
-              <Link href={item.href} className="hover:text-gray-700 transition-colors">
+              <Link
+                href={item.href}
+                style={{ color: "#9ca3af", fontSize: 12, textDecoration: "none", transition: "color 0.15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "#6b7280"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "#9ca3af"; }}
+              >
                 {item.label}
               </Link>
             ) : (
-              <span className="text-gray-900 font-medium">{item.label}</span>
+              <span style={{ color: "#9ca3af", fontSize: 12 }}>{item.label}</span>
             )}
           </li>
         ))}

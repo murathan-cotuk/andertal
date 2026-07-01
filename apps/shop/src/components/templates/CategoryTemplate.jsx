@@ -14,6 +14,7 @@ import {
   filterProductsByFacets,
   applyCatalogSort,
   getFacetGroupTitle,
+  isDiscountedProduct,
 } from "@/lib/catalog-listing";
 import { normCatId } from "@/lib/category-product-ids";
 import { getLocalizedCategory } from "@/lib/format";
@@ -1122,7 +1123,10 @@ export default function CategoryTemplate() {
     setPage(1);
   };
 
+  const saleOnly = searchParams?.get("sale") === "1";
+
   let filtered = [...products];
+  if (saleOnly) filtered = filtered.filter(isDiscountedProduct);
   filtered = filterProductsByFacets(filtered, filters);
   const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
   const total = sorted.length;

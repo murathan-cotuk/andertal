@@ -9,8 +9,10 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
-import { getProductBasePriceCents } from "@/lib/catalog-listing";
+import { isDiscountedProduct } from "@/lib/catalog-listing";
+import { getLocalizedCategory } from "@/lib/format";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -39,12 +41,6 @@ const IntroTitle = styled.h1`
   margin: 0 0 8px;
 `;
 
-const IntroText = styled.p`
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-`;
-
 const SeeAll = styled(Link)`
   display: inline-flex;
   align-items: center;
@@ -58,19 +54,23 @@ const SeeAll = styled(Link)`
   font-weight: 600;
   line-height: 1;
   padding: 8px 12px;
+  white-space: nowrap;
 `;
 
-function isDiscountedProduct(product) {
-  const meta = product?.metadata || {};
-  const dePrice = meta.prices?.DE;
-  if (dePrice) {
-    const base = dePrice.brutto_cents != null ? Number(dePrice.brutto_cents) : null;
-    const sale = dePrice.sale_cents != null ? Number(dePrice.sale_cents) : null;
-    if (base != null && sale != null && sale > 0 && sale < base) return true;
+const MAX_ITEMS_PER_CAROUSEL = 10;
+
+/** Walk category tree and build: categoryId → root category node */
+function buildCategoryRootMap(nodes, root = null) {
+  const map = new Map();
+  for (const node of nodes || []) {
+    if (!node) continue;
+    const r = root ?? node;
+    const id = String(node.id || "").trim();
+    if (id) map.set(id, r);
+    const childMap = buildCategoryRootMap(node.children || [], r);
+    for (const [k, v] of childMap) map.set(k, v);
   }
-  const base = getProductBasePriceCents(product);
-  const sale = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null;
-  return sale != null && sale > 0 && sale < base;
+  return map;
 }
 
 function productPerfScore(product) {
@@ -82,26 +82,22 @@ function productPerfScore(product) {
   return sold * 1000 + views * 10 + reviewAvg * reviewCount * 5;
 }
 
-function productCategoryKeys(product) {
-  const out = [];
-  const collectionId = product?.collection?.id || product?.metadata?.collection_id || null;
-  const collectionHandle = product?.collection?.handle || product?.metadata?.collection_handle || null;
-  if (collectionId) out.push(`id:${String(collectionId)}`);
-  if (collectionHandle) out.push(`handle:${String(collectionHandle).toLowerCase()}`);
-
-  const ids = product?.metadata?.collection_ids;
-  if (Array.isArray(ids)) {
-    ids.forEach((id) => {
-      if (id) out.push(`id:${String(id)}`);
-    });
-  }
-  return [...new Set(out)];
-}
+const pageCopy = {
+  de: { title: "Angebote", empty: "Keine reduzierten Produkte gefunden.", seeAll: "Alle ansehen" },
+  tr: { title: "İndirimler", empty: "İndirimli ürün bulunamadı.", seeAll: "Tümünü gör" },
+  fr: { title: "Promotions", empty: "Aucun produit en promotion.", seeAll: "Tout voir" },
+  es: { title: "Ofertas", empty: "No se encontraron productos en oferta.", seeAll: "Ver todo" },
+  it: { title: "Offerte", empty: "Nessun prodotto in offerta.", seeAll: "Vedi tutto" },
+  en: { title: "Sales", empty: "No discounted products found.", seeAll: "See all" },
+};
 
 export default function SalesPage() {
   const locale = useLocale();
+  const l = String(locale || "en").toLowerCase();
+  const copy = pageCopy[l] || pageCopy.en;
   const itemsPerRow = useResponsiveColumnCount(5, 2);
-  const [collections, setCollections] = useState([]);
+
+  const [categoryTree, setCategoryTree] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -112,14 +108,14 @@ export default function SalesPage() {
       try {
         setLoading(true);
         setError("");
-        const [colRes, prRes] = await Promise.all([
-          fetch("/api/store-collections", { cache: "no-store" }),
+        const [catRes, prRes] = await Promise.all([
+          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
           fetch("/api/store-products?limit=1200", { cache: "no-store" }),
         ]);
-        const colData = colRes.ok ? await colRes.json() : { collections: [] };
+        const catData = catRes.ok ? await catRes.json() : { tree: [] };
         const prData = prRes.ok ? await prRes.json() : { products: [] };
         if (!cancelled) {
-          setCollections(Array.isArray(colData?.collections) ? colData.collections : []);
+          setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
         }
       } catch (e) {
@@ -128,49 +124,40 @@ export default function SalesPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const copy = useMemo(() => {
-    if (locale === "de") return { title: "Sales", text: "Alle Kategorien mit reduzierten Produkten", seeAll: "Alle ansehen", empty: "Keine reduzierten Produkte gefunden." };
-    if (locale === "tr") return { title: "Indirimler", text: "Indirimli urun bulunan tum kategoriler", seeAll: "Tumunu gor", empty: "Indirimli urun bulunamadi." };
-    return { title: "Sales", text: "Categories with discounted products", seeAll: "See all", empty: "No discounted products found." };
+    return () => { cancelled = true; };
   }, [locale]);
 
   const rows = useMemo(() => {
     const discounted = products.filter(isDiscountedProduct);
-    if (!discounted.length) return [];
+    if (!discounted.length || !categoryTree.length) return [];
 
-    const byCollection = new Map();
-    const byKey = new Map();
-    collections.forEach((c) => {
-      if (c?.id) byKey.set(`id:${String(c.id)}`, c);
-      if (c?.handle) byKey.set(`handle:${String(c.handle).toLowerCase()}`, c);
-    });
+    // Only top-level (root) categories with products
+    const rootCategories = categoryTree.filter((n) => n && n.has_products !== false);
+    if (!rootCategories.length) return [];
 
-    discounted.forEach((p) => {
-      const keys = productCategoryKeys(p);
-      const key = keys.find((k) => byKey.has(k));
-      if (!key) return;
-      const c = byKey.get(key);
-      if (!c?.handle) return;
-      const mapKey = String(c.id || c.handle);
-      if (!byCollection.has(mapKey)) byCollection.set(mapKey, { collection: c, products: [] });
-      byCollection.get(mapKey).products.push(p);
-    });
+    const catRootMap = buildCategoryRootMap(rootCategories);
 
-    const list = [...byCollection.values()]
-      .map((entry) => ({
-        collection: entry.collection,
-        products: entry.products.sort((a, b) => productPerfScore(b) - productPerfScore(a)),
+    const byRoot = new Map(); // rootCategoryId → { category, products[] }
+    for (const p of discounted) {
+      const catId = String(p.metadata?.admin_category_id || p.metadata?.category_id || "").trim();
+      if (!catId) continue;
+      const root = catRootMap.get(catId);
+      if (!root?.id) continue;
+      const key = String(root.id);
+      if (!byRoot.has(key)) byRoot.set(key, { category: root, products: [] });
+      byRoot.get(key).products.push(p);
+    }
+
+    return [...byRoot.values()]
+      .map(({ category, products: list }) => ({
+        category,
+        products: list
+          .sort((a, b) => productPerfScore(b) - productPerfScore(a))
+          .slice(0, MAX_ITEMS_PER_CAROUSEL),
       }))
-      .filter((entry) => entry.products.length > 0)
+      .filter((r) => r.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
-
-    return list;
-  }, [collections, products]);
+  }, [categoryTree, products]);
 
   return (
     <PageWrap>
@@ -178,7 +165,6 @@ export default function SalesPage() {
       <Main>
         <Intro>
           <IntroTitle className="shop-typo-catalog-title">{copy.title}</IntroTitle>
-          <IntroText>{copy.text}</IntroText>
         </Intro>
 
         {loading ? <GlobalPageLoader /> : null}
@@ -187,35 +173,38 @@ export default function SalesPage() {
           <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
         ) : null}
 
-        {!loading && !error && rows.map(({ collection, products: list }) => (
-          <div key={collection.id || collection.handle} style={{ padding: "8px 24px 28px" }}>
-            <div style={{ width: "100%", maxWidth: 1280, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
-              <Carousel
-                contained={false}
-                navOnSides
-                gap={12}
-                visibleCount={itemsPerRow}
-                showFade={false}
-                ariaLabel={collection.title || collection.name || collection.handle || "Sales category"}
-                header={(
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
-                    <h2 className="shop-typo-h2" style={{ margin: 0 }}>
-                      {collection.title || collection.name || collection.handle}
-                    </h2>
-                    <SeeAll href={`/${collection.handle}?sale=1`}>{copy.seeAll} →</SeeAll>
-                  </div>
-                )}
-              >
-                {list.map((p) => (
-                  <ProductCard key={p.id} product={p} plainImage />
-                ))}
-              </Carousel>
+        {!loading && !error && rows.map(({ category, products: list }) => {
+          const catName = getLocalizedCategory(category, locale).name || category.name || category.slug || "";
+          const catSlug = String(category.slug || category.handle || "").replace(/^\//, "");
+          return (
+            <div key={category.id} style={{ padding: "8px 24px 28px" }}>
+              <div style={{ width: "100%", maxWidth: 1280, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
+                <Carousel
+                  contained={false}
+                  navOnSides
+                  gap={12}
+                  visibleCount={itemsPerRow}
+                  showFade={false}
+                  ariaLabel={catName}
+                  header={(
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
+                      <h2 className="shop-typo-h2" style={{ margin: 0 }}>{catName}</h2>
+                      {catSlug && (
+                        <SeeAll href={`/${catSlug}?sale=1`}>{copy.seeAll} →</SeeAll>
+                      )}
+                    </div>
+                  )}
+                >
+                  {list.map((p) => (
+                    <ProductCard key={p.id} product={p} plainImage />
+                  ))}
+                </Carousel>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </Main>
       <Footer />
     </PageWrap>
   );
 }
-

@@ -8,7 +8,7 @@ import styled from "styled-components";
 import { Button } from "@andertal/ui";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { CartContext } from "@/context/CartContext";
-import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
+import { formatPriceCents, getLocalizedProduct, getLocalizedCategory } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
@@ -1436,17 +1436,17 @@ export default function ProductTemplateMobile() {
     categoryCurrentNode?.slug || categoryCurrentNode?.handle || meta.category_slug || ""
   ).replace(/^\//, "");
   const categorySlugNorm = resolvedCategorySlug;
-  const categoryCurrentLabel = categoryCurrentNode?.name || meta.category_name || "";
+  const categoryCurrentLabel = getLocalizedCategory(categoryCurrentNode, locale).name || categoryCurrentNode?.name || meta.category_name || "";
 
   const breadcrumbItems = [
     ...(categoryAncestors || []).map((anc) => {
       const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
-      return { label: anc.name || ancSlug, href: ancSlug ? `/${ancSlug}` : null };
+      const ancLabel = getLocalizedCategory(anc, locale).name || anc.name || ancSlug;
+      return { label: ancLabel, href: ancSlug ? `/${ancSlug}` : null };
     }),
     ...(categoryCurrentNode && categorySlugNorm
       ? [{ label: categoryCurrentLabel || categorySlugNorm, href: `/${categorySlugNorm}` }]
       : []),
-    { label: displayTitle, href: null },
   ];
 
 
