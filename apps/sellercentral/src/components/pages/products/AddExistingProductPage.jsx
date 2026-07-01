@@ -34,7 +34,7 @@ const copy = {
   found: {
     en: "Product found. Click \"Add to my products\" to create a new listing with pre-filled catalog data.",
     tr: "Ürün bulundu. Katalog verileriyle doldurulmuş yeni listeleme oluşturmak için \"Ürünlerime ekle\"ye tıkla.",
-    de: "Produkt gefunden. Klicke auf „Zu meinen Produkten hinzufügen", um ein neues Listing mit vorausgefüllten Katalogdaten zu erstellen.",
+    de: 'Produkt gefunden. Klicke auf „Zu meinen Produkten hinzufügen“, um ein neues Listing mit vorausgefüllten Katalogdaten zu erstellen.',
   },
   notFound: { en: "No product found for this input.", tr: "Bu giriş için ürün bulunamadı.", de: "Für diese Eingabe wurde kein Produkt gefunden." },
   addBtn: { en: "Add to my products", tr: "Ürünlerime ekle", de: "Zu meinen Produkten hinzufügen" },
