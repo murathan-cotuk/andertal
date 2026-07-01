@@ -827,7 +827,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         });
       } catch (_) {}
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // run only on mount
 
   // New product: URL handle follows the current locale title automatically (SEO slug).
   useEffect(() => {
