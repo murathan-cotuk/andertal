@@ -1,0 +1,615 @@
+'use strict'
+const { Router } = require('express')
+const { z } = require('zod')
+
+// ── Zod schemas ───────────────────────────────────────────────────────────────
+const zEmail    = z.string().email('Invalid email address').max(254)
+const zPassword = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[a-zA-Z]/, 'Password must contain at least one letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+
+function validate(schema, body, res) {
+  const result = schema.safeParse(body)
+  if (!result.success) {
+    const first = result.error.errors[0]
+    const msg = first ? `${first.path.join('.') || 'field'}: ${first.message}` : 'Invalid input'
+    res.status(400).json({ message: msg })
+    return null
+  }
+  return result.data
+}
+
+// ── Crypto helpers ────────────────────────────────────────────────────────────
+const _SELLER_JWT_SECRET = (() => {
+  const s = process.env.SELLER_JWT_SECRET || process.env.JWT_SECRET || ''
+  if (!s && process.env.NODE_ENV === 'production') {
+    console.error('[SECURITY] SELLER_JWT_SECRET env var is not set in production!')
+    process.exit(1)
+  }
+  return s || 'dev-only-seller-secret-do-not-use-in-prod'
+})()
+
+const SELLER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
+
+const INITIAL_SUPERUSER_EMAILS = (process.env.SUPERUSER_EMAILS || 'murathan.cotuk@gmail.com')
+  .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+
+function signSellerToken(payload) {
+  const _c = require('crypto')
+  const header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + SELLER_TOKEN_TTL_SECONDS })).toString('base64url')
+  const sig = _c.createHmac('sha256', _SELLER_JWT_SECRET).update(`${header}.${body}`).digest('base64url')
+  return `${header}.${body}.${sig}`
+}
+
+function verifySellerToken(token) {
+  if (!token) return null
+  try {
+    const _c = require('crypto')
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const [header, body, sig] = parts
+    const expected = _c.createHmac('sha256', _SELLER_JWT_SECRET).update(`${header}.${body}`).digest('base64url')
+    if (sig !== expected) return null
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString())
+    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null
+    return payload
+  } catch { return null }
+}
+
+function hashSellerPassword(password) {
+  const _c = require('crypto')
+  const salt = _c.randomBytes(16).toString('hex')
+  const hash = _c.scryptSync(password, salt, 64).toString('hex')
+  return `${salt}:${hash}`
+}
+
+function verifySellerPassword(password, stored) {
+  try {
+    const _c = require('crypto')
+    const [salt, hash] = stored.split(':')
+    if (!salt || !hash) return false
+    return _c.scryptSync(password, salt, 64).toString('hex') === hash
+  } catch { return false }
+}
+
+function validatePasswordStrength(password) {
+  if (!password || typeof password !== 'string') return 'Password is required.'
+  if (password.length < 8) return 'Password must be at least 8 characters.'
+  if (!/[a-zA-Z]/.test(password)) return 'Password must contain at least one letter.'
+  if (!/[0-9]/.test(password)) return 'Password must contain at least one number.'
+  return null
+}
+
+// AES-256-GCM TOTP encryption (reads TOTP_ENCRYPTION_KEY from process.env at call time)
+function _getTotpKeyBuf() {
+  const key = process.env.TOTP_ENCRYPTION_KEY || ''
+  if (!key || key.length !== 64) return null
+  return Buffer.from(key, 'hex')
+}
+
+function encryptTotp(plaintext) {
+  const crypto = require('crypto')
+  const keyBuf = _getTotpKeyBuf()
+  if (!keyBuf) throw new Error('TOTP_ENCRYPTION_KEY not configured')
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv)
+  const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return `enc:${iv.toString('hex')}:${tag.toString('hex')}:${enc.toString('hex')}`
+}
+
+function decryptTotp(stored) {
+  if (!stored || !stored.startsWith('enc:')) return stored
+  const crypto = require('crypto')
+  const keyBuf = _getTotpKeyBuf()
+  if (!keyBuf) return null
+  const parts = stored.split(':')
+  if (parts.length !== 4) return stored
+  const [, ivHex, tagHex, ctHex] = parts
+  try {
+    const iv = Buffer.from(ivHex, 'hex')
+    const tag = Buffer.from(tagHex, 'hex')
+    const ct = Buffer.from(ctHex, 'hex')
+    const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv)
+    decipher.setAuthTag(tag)
+    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8')
+  } catch (e) {
+    console.error('TOTP decrypt failed:', e.message)
+    return null
+  }
+}
+
+// ── DB ────────────────────────────────────────────────────────────────────────
+function getSellerDbClient() {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
+  const { Client } = require('pg')
+  return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+}
+
+// ── Middleware (exported so server.js can mount at /admin-hub before routes) ──
+
+function requireSellerAuth(req, res, next) {
+  const auth = req.headers['authorization'] || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+  const payload = verifySellerToken(token)
+  if (!payload) return res.status(401).json({ message: 'Unauthorized' })
+  req.sellerUser = payload
+  next()
+}
+
+function requireSuperuser(req, res, next) {
+  if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+  next()
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+async function notifySuperusersNewSeller({ email, store_name, seller_id, first_name, last_name }) {
+  if (!process.env.SMTP_HOST) return
+  const superuserEmails = (process.env.SUPERUSER_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean)
+  if (!superuserEmails.length) return
+  const nodemailer = require('nodemailer')
+  const transport = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+  })
+  const sellerCentralUrl = process.env.SELLER_CENTRAL_URL || 'https://andertal-sellercentral.vercel.app'
+  const displayName = [first_name, last_name].filter(Boolean).join(' ') || email
+  const subject = `Neuer Seller registriert: ${store_name || email}`
+  const html = `
+<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1f2937">
+  <div style="font-size:22px;font-weight:900;letter-spacing:0.14em;color:#111;margin-bottom:24px">ANDERTAL</div>
+  <h2 style="font-size:17px;font-weight:700;margin:0 0 16px">Neuer Seller registriert</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px">
+    <tr><td style="padding:7px 0;color:#6b7280;width:120px">Name</td><td style="padding:7px 0;font-weight:500">${displayName}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">E-Mail</td><td style="padding:7px 0">${email}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Shop-Name</td><td style="padding:7px 0">${store_name || '—'}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Seller ID</td><td style="padding:7px 0;font-family:monospace;font-size:12px">${seller_id}</td></tr>
+    <tr><td style="padding:7px 0;color:#6b7280">Registriert</td><td style="padding:7px 0">${new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' })}</td></tr>
+  </table>
+  <a href="${sellerCentralUrl}/de/settings/users-permissions"
+     style="display:inline-block;padding:11px 22px;background:#ff971c;color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">
+    Seller freischalten →
+  </a>
+  <p style="margin-top:24px;font-size:12px;color:#9ca3af">Diese E-Mail wurde automatisch generiert.</p>
+</div>`
+  await transport.sendMail({
+    from: process.env.SMTP_FROM || '"Andertal Sellercentral" <noreply@andertal.de>',
+    to: superuserEmails.join(', '),
+    subject,
+    html,
+    text: `Neuer Seller registriert\n\nName: ${displayName}\nE-Mail: ${email}\nShop: ${store_name || '—'}\nSeller ID: ${seller_id}\n\nFreischalten: ${sellerCentralUrl}/de/settings/users-permissions`,
+  })
+}
+
+// ── Route handlers ────────────────────────────────────────────────────────────
+
+const SellerRegisterSchema = z.object({
+  email:        zEmail,
+  password:     zPassword,
+  store_name:   z.string().max(120).optional(),
+  storeName:    z.string().max(120).optional(),
+  invite_token: z.string().max(200).optional(),
+  first_name:   z.string().max(60).optional(),
+  last_name:    z.string().max(60).optional(),
+  agreement_accepted: z.boolean().optional(),
+  agreement_version:  z.string().optional(),
+})
+const sellerAuthRegisterPOST = async (req, res) => {
+  const parsed = validate(SellerRegisterSchema, req.body || {}, res)
+  if (!parsed) return
+  const body = parsed
+  const email = body.email.trim().toLowerCase()
+  const password = body.password
+  const store_name = (body.store_name || body.storeName || '').trim()
+  const invite_token = (body.invite_token || '').trim()
+  const first_name = (body.first_name || '').trim()
+  const last_name = (body.last_name || '').trim()
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const existing = await client.query('SELECT id FROM seller_users WHERE email = $1', [email])
+    if (existing.rows.length > 0) {
+      await client.end()
+      return res.status(409).json({ message: 'An account with this email already exists' })
+    }
+    let invite = null
+    if (invite_token) {
+      const invRes = await client.query(
+        `SELECT * FROM seller_invitations WHERE token = $1 AND accepted_at IS NULL AND expires_at > now()`,
+        [invite_token]
+      )
+      if (invRes.rows.length > 0) invite = invRes.rows[0]
+    }
+    if (!invite) {
+      const invByEmail = await client.query(
+        `SELECT * FROM seller_invitations WHERE LOWER(email) = $1 AND accepted_at IS NULL AND expires_at > now() ORDER BY created_at DESC LIMIT 1`,
+        [email]
+      )
+      if (invByEmail.rows.length > 0) invite = invByEmail.rows[0]
+    }
+    if (store_name && !invite) {
+      const storeCheck = await client.query(`SELECT id FROM seller_users WHERE LOWER(store_name) = LOWER($1)`, [store_name])
+      if (storeCheck.rows.length > 0) {
+        await client.end()
+        return res.status(409).json({ message: 'Dieser Store-Name ist bereits vergeben. Bitte wählen Sie einen anderen Namen.' })
+      }
+      const settingsCheck = await client.query(`SELECT seller_id FROM admin_hub_seller_settings WHERE LOWER(store_name) = LOWER($1) LIMIT 1`, [store_name]).catch(() => ({ rows: [] }))
+      if (settingsCheck.rows.length > 0) {
+        await client.end()
+        return res.status(409).json({ message: 'Dieser Store-Name ist bereits vergeben. Bitte wählen Sie einen anderen Namen.' })
+      }
+    }
+    const is_superuser = INITIAL_SUPERUSER_EMAILS.includes(email)
+    const password_hash = hashSellerPassword(password)
+    const own_seller_id = `seller_${require('crypto').randomBytes(8).toString('hex')}`
+    const sub_of_seller_id = invite ? invite.invited_by_seller_id : null
+    const effective_permissions = invite?.permissions || null
+    const display_first = first_name || invite?.first_name || null
+    const display_last = last_name || invite?.last_name || null
+    const effective_store_name = sub_of_seller_id ? null : (store_name || null)
+    const agreement_accepted = !!body.agreement_accepted
+    const agreement_accepted_at = agreement_accepted ? new Date().toISOString() : null
+    const agreement_version = body.agreement_version || '1.0'
+    const agreement_ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null
+    const r = await client.query(
+      `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name, agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+       RETURNING id, email, store_name, seller_id, is_superuser, sub_of_seller_id, permissions, first_name, last_name, created_at`,
+      [email, password_hash, effective_store_name, own_seller_id, is_superuser, sub_of_seller_id, effective_permissions ? JSON.stringify(effective_permissions) : null, display_first, display_last, agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip]
+    )
+    if (effective_store_name && !sub_of_seller_id) {
+      await client.query(
+        `INSERT INTO admin_hub_seller_settings (seller_id, store_name, updated_at) VALUES ($1, $2, now()) ON CONFLICT (seller_id) DO UPDATE SET store_name = $2, updated_at = now()`,
+        [own_seller_id, effective_store_name]
+      ).catch(() => {})
+    }
+    if (invite) {
+      await client.query(`UPDATE seller_invitations SET accepted_at = now() WHERE id = $1`, [invite.id]).catch(() => {})
+    }
+    const user = r.rows[0]
+    const effectiveSellerId = user.sub_of_seller_id || user.seller_id
+    let displayStoreName = user.store_name || ''
+    if (user.sub_of_seller_id) {
+      const parentRow = await client.query(`SELECT store_name FROM seller_users WHERE seller_id = $1 LIMIT 1`, [user.sub_of_seller_id]).catch(() => ({ rows: [] }))
+      displayStoreName = parentRow.rows[0]?.store_name || ''
+    }
+    await client.end()
+    const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName })
+    res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName } })
+    if (!is_superuser && !sub_of_seller_id) {
+      notifySuperusersNewSeller({ email: user.email, store_name: displayStoreName, seller_id: effectiveSellerId, first_name: user.first_name, last_name: user.last_name }).catch((e) => console.error('notifySuperusersNewSeller:', e.message))
+    }
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    console.error('sellerAuthRegisterPOST:', err)
+    res.status(500).json({ message: err?.message || 'Registration failed' })
+  }
+}
+
+const SellerLoginSchema = z.object({
+  email:     zEmail,
+  password:  z.string().min(1, 'Password is required').max(256),
+  totp_code: z.string().max(8).optional(),
+})
+const sellerAuthLoginPOST = async (req, res) => {
+  const parsed = validate(SellerLoginSchema, req.body || {}, res)
+  if (!parsed) return
+  const body = parsed
+  const email = body.email.trim().toLowerCase()
+  const password = body.password
+  const totpCode = (body.totp_code || '').trim().replace(/\s/g, '')
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const r = await client.query('SELECT id, email, password_hash, store_name, seller_id, sub_of_seller_id, is_superuser, permissions, totp_secret, totp_enabled FROM seller_users WHERE email = $1', [email])
+    const user = r.rows[0]
+    if (!user) { await client.end(); return res.status(401).json({ message: 'Invalid email or password' }) }
+    const shouldBeSuperuser = user.is_superuser || INITIAL_SUPERUSER_EMAILS.includes(email)
+    if (!verifySellerPassword(password, user.password_hash)) { await client.end(); return res.status(401).json({ message: 'Invalid email or password' }) }
+    if (user.totp_enabled && user.totp_secret) {
+      if (!totpCode) {
+        await client.end()
+        return res.status(200).json({ totp_required: true, message: 'Two-factor authentication code required.' })
+      }
+      const speakeasy = require('speakeasy')
+      const totpPlain = decryptTotp(user.totp_secret)
+      if (!totpPlain) { await client.end(); return res.status(500).json({ message: 'Internal error during 2FA verification.' }) }
+      const valid = speakeasy.totp.verify({ secret: totpPlain, encoding: 'base32', token: totpCode, window: 1 })
+      if (!valid) { await client.end(); return res.status(401).json({ message: 'Invalid two-factor authentication code.' }) }
+    }
+    if (shouldBeSuperuser && !user.is_superuser) {
+      await client.query('UPDATE seller_users SET is_superuser = true WHERE id = $1', [user.id]).catch(() => {})
+      user.is_superuser = true
+    }
+    const effectiveSellerId = user.sub_of_seller_id || user.seller_id
+    let displayStoreName = (user.store_name || '').trim()
+    if (user.sub_of_seller_id) {
+      const pr = await client.query(
+        `SELECT COALESCE(NULLIF(TRIM(ss.store_name), ''), NULLIF(TRIM(su.store_name), '')) AS sn FROM seller_users su LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = su.seller_id WHERE su.seller_id = $1 LIMIT 1`,
+        [user.sub_of_seller_id]
+      )
+      displayStoreName = (pr.rows[0]?.sn || '').trim()
+    }
+    if (!displayStoreName && effectiveSellerId) {
+      const ss = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [effectiveSellerId])
+      displayStoreName = (ss.rows[0]?.store_name || '').trim()
+    }
+    await client.end()
+    const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName })
+    res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, permissions: user.permissions || null } })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    console.error('sellerAuthLoginPOST:', err)
+    res.status(500).json({ message: err?.message || 'Login failed' })
+  }
+}
+
+const sellerAuthMeGET = async (req, res) => {
+  const user = req.sellerUser
+  if (!user) return res.status(401).json({ message: 'Unauthorized' })
+  res.json({ user })
+}
+
+const sellerAuth2faSetupPOST = async (req, res) => {
+  const sellerUser = req.sellerUser
+  if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+  try {
+    const speakeasy = require('speakeasy')
+    const QRCode = require('qrcode')
+    const secret = speakeasy.generateSecret({ name: `Andertal Sellercentral (${sellerUser.email})`, issuer: 'Andertal', length: 32 })
+    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+    const { Client } = require('pg')
+    const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await lc.connect()
+    await lc.query(`UPDATE seller_users SET totp_secret = $1, totp_enabled = false WHERE id = $2`, [encryptTotp(secret.base32), sellerUser.id])
+    await lc.end()
+    const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url)
+    res.json({ qr_code: qrDataUrl, ...(process.env.NODE_ENV !== 'production' && { secret: secret.base32 }) })
+  } catch (err) {
+    console.error('2fa setup:', err)
+    res.status(500).json({ message: err?.message || '2FA setup failed' })
+  }
+}
+
+const sellerAuth2faVerifyPOST = async (req, res) => {
+  const sellerUser = req.sellerUser
+  if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+  const code = String(req.body?.code || '').trim().replace(/\s/g, '')
+  if (!code) return res.status(400).json({ message: 'Code is required' })
+  try {
+    const speakeasy = require('speakeasy')
+    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+    const { Client } = require('pg')
+    const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await lc.connect()
+    const ur = await lc.query('SELECT totp_secret, totp_enabled FROM seller_users WHERE id = $1', [sellerUser.id])
+    const row = ur.rows[0]
+    if (!row || !row.totp_secret) { await lc.end(); return res.status(400).json({ message: 'No pending 2FA setup. Run setup first.' }) }
+    const totpPlain = decryptTotp(row.totp_secret)
+    if (!totpPlain) { await lc.end(); return res.status(500).json({ message: 'Internal error during 2FA verification.' }) }
+    const valid = speakeasy.totp.verify({ secret: totpPlain, encoding: 'base32', token: code, window: 1 })
+    if (!valid) { await lc.end(); return res.status(400).json({ message: 'Invalid code. Check your authenticator app.' }) }
+    await lc.query('UPDATE seller_users SET totp_enabled = true WHERE id = $1', [sellerUser.id])
+    await lc.end()
+    res.json({ ok: true, message: '2FA enabled successfully.' })
+  } catch (err) {
+    console.error('2fa verify:', err)
+    res.status(500).json({ message: err?.message || '2FA verify failed' })
+  }
+}
+
+const sellerAuth2faDisablePOST = async (req, res) => {
+  const sellerUser = req.sellerUser
+  if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+  const code = String(req.body?.code || '').trim().replace(/\s/g, '')
+  const password = String(req.body?.password || '')
+  if (!code && !password) return res.status(400).json({ message: 'Provide current TOTP code or password to disable 2FA.' })
+  try {
+    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+    const { Client } = require('pg')
+    const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await lc.connect()
+    const ur = await lc.query('SELECT totp_secret, totp_enabled, password_hash FROM seller_users WHERE id = $1', [sellerUser.id])
+    const row = ur.rows[0]
+    if (!row) { await lc.end(); return res.status(404).json({ message: 'User not found' }) }
+    if (!row.totp_enabled) { await lc.end(); return res.status(400).json({ message: '2FA is not enabled.' }) }
+    let authorized = false
+    if (code && row.totp_secret) {
+      const speakeasy = require('speakeasy')
+      const totpPlain = decryptTotp(row.totp_secret)
+      if (totpPlain) authorized = speakeasy.totp.verify({ secret: totpPlain, encoding: 'base32', token: code, window: 1 })
+    }
+    if (!authorized && password) authorized = verifySellerPassword(password, row.password_hash)
+    if (!authorized) { await lc.end(); return res.status(401).json({ message: 'Invalid code or password.' }) }
+    await lc.query('UPDATE seller_users SET totp_secret = NULL, totp_enabled = false WHERE id = $1', [sellerUser.id])
+    await lc.end()
+    res.json({ ok: true, message: '2FA disabled.' })
+  } catch (err) {
+    console.error('2fa disable:', err)
+    res.status(500).json({ message: err?.message || '2FA disable failed' })
+  }
+}
+
+const sellerAuth2faStatusGET = async (req, res) => {
+  const sellerUser = req.sellerUser
+  if (!sellerUser) return res.status(401).json({ message: 'Unauthorized' })
+  try {
+    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+    const { Client } = require('pg')
+    const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await lc.connect()
+    const ur = await lc.query('SELECT totp_enabled FROM seller_users WHERE id = $1', [sellerUser.id])
+    await lc.end()
+    res.json({ totp_enabled: ur.rows[0]?.totp_enabled || false })
+  } catch (err) {
+    res.status(500).json({ message: err?.message })
+  }
+}
+
+const sellerUsersGET = async (req, res) => {
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const r = await client.query(
+      `SELECT id, email, store_name, seller_id, is_superuser, created_at,
+              approval_status, company_name, authorized_person_name, tax_id, vat_id,
+              business_address, phone, iban, documents, rejection_reason, approved_at, permissions
+       FROM seller_users ORDER BY created_at DESC`
+    )
+    await client.end()
+    res.json({ users: r.rows })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message })
+  }
+}
+
+const sellerUserSuperuserPATCH = async (req, res) => {
+  const { id } = req.params
+  const { is_superuser } = req.body || {}
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const r = await client.query('UPDATE seller_users SET is_superuser = $1, updated_at = now() WHERE id = $2 RETURNING id, email, is_superuser', [!!is_superuser, id])
+    await client.end()
+    if (!r.rows.length) return res.status(404).json({ message: 'User not found' })
+    res.json({ user: r.rows[0] })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message })
+  }
+}
+
+const sellerUserCreatePOST = async (req, res) => {
+  const body = req.body || {}
+  const email = (body.email || '').trim().toLowerCase()
+  const password = (body.password || '').toString()
+  const store_name = (body.store_name || '').trim()
+  const is_superuser = !!body.is_superuser
+  const permissions = body.permissions || null
+  if (!email || !password) return res.status(400).json({ message: 'Email and password required' })
+  const pwErr = validatePasswordStrength(password)
+  if (pwErr) return res.status(400).json({ message: pwErr })
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const existing = await client.query('SELECT id FROM seller_users WHERE email = $1', [email])
+    if (existing.rows.length) { await client.end(); return res.status(409).json({ message: 'An account with this email already exists' }) }
+    const password_hash = hashSellerPassword(password)
+    const seller_id = `seller_${require('crypto').randomBytes(8).toString('hex')}`
+    const r = await client.query(
+      `INSERT INTO seller_users (email, password_hash, store_name, seller_id, is_superuser, permissions) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, store_name, seller_id, is_superuser, permissions, created_at`,
+      [email, password_hash, store_name || null, seller_id, is_superuser, permissions ? JSON.stringify(permissions) : null]
+    )
+    if (store_name) {
+      await client.query(
+        `INSERT INTO admin_hub_seller_settings (seller_id, store_name, updated_at) VALUES ($1, $2, now()) ON CONFLICT (seller_id) DO UPDATE SET store_name = $2, updated_at = now()`,
+        [seller_id, store_name]
+      ).catch(() => {})
+    }
+    await client.end()
+    res.json({ user: r.rows[0] })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message || 'Create failed' })
+  }
+}
+
+const sellerUserUpdatePATCH = async (req, res) => {
+  const { id } = req.params
+  const body = req.body || {}
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const sets = ['updated_at = now()']
+    const params = []
+    if (body.store_name !== undefined) { params.push(body.store_name || null); sets.push(`store_name = $${params.length}`) }
+    if (body.is_superuser !== undefined) { params.push(!!body.is_superuser); sets.push(`is_superuser = $${params.length}`) }
+    if (body.permissions !== undefined) { params.push(body.permissions ? JSON.stringify(body.permissions) : null); sets.push(`permissions = $${params.length}`) }
+    if (body.password) {
+      const pwErr = validatePasswordStrength(body.password)
+      if (pwErr) return res.status(400).json({ message: pwErr })
+      params.push(hashSellerPassword(body.password)); sets.push(`password_hash = $${params.length}`)
+    }
+    params.push(id)
+    const r = await client.query(
+      `UPDATE seller_users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING id, email, store_name, seller_id, is_superuser, permissions, created_at`,
+      params
+    )
+    await client.end()
+    if (!r.rows.length) return res.status(404).json({ message: 'User not found' })
+    const u = r.rows[0]
+    if (body.store_name !== undefined && u.seller_id) {
+      const c2 = getSellerDbClient()
+      try {
+        await c2.connect()
+        await c2.query(`INSERT INTO admin_hub_seller_settings (seller_id, store_name, updated_at) VALUES ($1, $2, now()) ON CONFLICT (seller_id) DO UPDATE SET store_name = $2, updated_at = now()`, [u.seller_id, body.store_name || ''])
+        await c2.end()
+      } catch (_) {}
+    }
+    res.json({ user: u })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message })
+  }
+}
+
+const sellerUserDeleteDELETE = async (req, res) => {
+  const { id } = req.params
+  const myId = req.sellerUser?.id
+  if (id === myId) return res.status(400).json({ message: 'Cannot delete yourself' })
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    await client.query('DELETE FROM seller_users WHERE id = $1', [id])
+    await client.end()
+    res.json({ success: true })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message })
+  }
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
+module.exports = function createSellerAuthRouter() {
+  const router = Router()
+
+  router.post('/admin-hub/auth/register', sellerAuthRegisterPOST)
+  router.post('/admin-hub/auth/login', sellerAuthLoginPOST)
+  router.get('/admin-hub/auth/me', sellerAuthMeGET)
+  router.get('/admin-hub/auth/2fa/status', sellerAuth2faStatusGET)
+  router.post('/admin-hub/auth/2fa/setup', sellerAuth2faSetupPOST)
+  router.post('/admin-hub/auth/2fa/verify', sellerAuth2faVerifyPOST)
+  router.post('/admin-hub/auth/2fa/disable', sellerAuth2faDisablePOST)
+  router.get('/admin-hub/users', requireSuperuser, sellerUsersGET)
+  router.post('/admin-hub/users', requireSuperuser, sellerUserCreatePOST)
+  router.patch('/admin-hub/users/:id', requireSuperuser, sellerUserUpdatePATCH)
+  router.delete('/admin-hub/users/:id', requireSuperuser, sellerUserDeleteDELETE)
+  router.patch('/admin-hub/users/:id/superuser', requireSuperuser, sellerUserSuperuserPATCH)
+
+  return router
+}
+
+module.exports.requireSellerAuth = requireSellerAuth
+module.exports.requireSuperuser = requireSuperuser
+module.exports.verifySellerToken = verifySellerToken
+module.exports.signSellerToken = signSellerToken
+module.exports.validatePasswordStrength = validatePasswordStrength
+module.exports.encryptTotp = encryptTotp
+module.exports.decryptTotp = decryptTotp
+module.exports.hashSellerPassword = hashSellerPassword
+module.exports.verifySellerPassword = verifySellerPassword
+module.exports.getSellerDbClient = getSellerDbClient
