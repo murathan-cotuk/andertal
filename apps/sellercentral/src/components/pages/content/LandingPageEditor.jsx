@@ -3064,9 +3064,8 @@ export default function LandingPageEditor() {
   const [categorySettings, setCategorySettings] = useState({ show_submenu_left: false });
 
   useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
     Promise.all([
-      fetch(`${backendUrl}/admin-hub/v1/pages`).then((r) => r.json()).catch(() => ({ pages: [] })),
+      client.getPages({ limit: 200 }).catch(() => ({ pages: [] })),
       client.getAdminHubCategories().catch(() => ({ categories: [] })),
     ])
       .then(([r, catRes]) => {

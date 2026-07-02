@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import ShopHeader from "@/components/ShopHeader";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
@@ -11,55 +11,193 @@ import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { isDiscountedProduct } from "@/lib/catalog-listing";
 import { getLocalizedCategory } from "@/lib/format";
-import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
 
 const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #fafafa;
+  background: #f5f5f5;
 `;
 
 const Main = styled.main`
   flex: 1;
 `;
 
-const Intro = styled.section`
-  max-width: 1280px;
+/* ── Two-column layout ───────────────────────────────── */
+const Inner = styled.div`
+  max-width: 1380px;
   margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 24px 24px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+`;
 
-  @media (max-width: 767px) {
-    padding: 20px 16px 6px;
+/* ── Left sidebar ─────────────────────────────────────── */
+const Sidebar = styled.aside`
+  width: 200px;
+  flex-shrink: 0;
+  padding: 16px 0 40px 16px;
+  position: sticky;
+  top: 72px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+
+  @media (max-width: 960px) {
+    display: none;
   }
 `;
 
-const IntroTitle = styled.h1`
-  margin: 0 0 8px;
+const SidebarTitle = styled.div`
+  font-size: 12px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e5e7eb;
+`;
+
+const SidebarList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+`;
+
+const SidebarItem = styled.a`
+  display: block;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: ${(p) => (p.$active ? "700" : "500")};
+  color: ${(p) => (p.$active ? "#111" : "#374151")};
+  background: ${(p) => (p.$active ? "#dbeafe" : "transparent")};
+  text-decoration: none;
+  line-height: 1.35;
+  border-left: 3px solid ${(p) => (p.$active ? "#2563eb" : "transparent")};
+  transition: background 0.12s, color 0.12s;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #111;
+  }
+`;
+
+/* ── Mobile category pills ─────────────────────────── */
+const MobilePills = styled.div`
+  display: none;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 10px 16px 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+
+  @media (max-width: 960px) {
+    display: flex;
+  }
+`;
+
+const Pill = styled.a`
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover { background: #f3f4f6; }
+`;
+
+/* ── Main content column ─────────────────────────────── */
+const ContentCol = styled.div`
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px 40px;
+
+  @media (max-width: 960px) {
+    padding: 4px 0 40px;
+  }
+`;
+
+const PageHeader = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 8px 4px;
+
+  @media (max-width: 960px) {
+    padding: 10px 16px 4px;
+  }
+`;
+
+const PageTitle = styled.h1`
+  margin: 0;
+  font-size: clamp(17px, 2vw, 22px);
+  font-weight: 700;
+  color: #111;
+`;
+
+const ProductCount = styled.span`
+  font-size: 13px;
+  color: #6b7280;
+`;
+
+/* ── Section (one per category) ─────────────────────── */
+const Section = styled.section`
+  background: #fff;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+
+  @media (max-width: 960px) {
+    border-radius: 0;
+    margin-bottom: 6px;
+  }
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 6px;
+  flex-wrap: wrap;
+`;
+
+const SectionTitle = styled.h2`
+  margin: 0;
+  font-size: clamp(14px, 1.8vw, 16px);
+  font-weight: 700;
+  color: #111;
 `;
 
 const SeeAll = styled(Link)`
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   text-decoration: none;
-  color: #111827;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 999px;
+  color: #2563eb;
   font-size: 12px;
   font-weight: 600;
-  line-height: 1;
-  padding: 8px 12px;
   white-space: nowrap;
+
+  &:hover { text-decoration: underline; }
 `;
 
-const MAX_ITEMS_PER_CAROUSEL = 10;
+const MAX_ITEMS_PER_CAROUSEL = 20;
+const CARD_WIDTH = 180;
+const CARD_GAP = 10;
 
-/** Walk category tree and build: categoryId → root category node */
 function buildCategoryRootMap(nodes, root = null) {
   const map = new Map();
   for (const node of nodes || []) {
@@ -95,12 +233,13 @@ export default function SalesPage() {
   const locale = useLocale();
   const l = String(locale || "en").toLowerCase();
   const copy = pageCopy[l] || pageCopy.en;
-  const itemsPerRow = useResponsiveColumnCount(5, 2);
 
   const [categoryTree, setCategoryTree] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeId, setActiveId] = useState(null);
+  const observerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,13 +270,12 @@ export default function SalesPage() {
     const discounted = products.filter(isDiscountedProduct);
     if (!discounted.length || !categoryTree.length) return [];
 
-    // Only top-level (root) categories with products
     const rootCategories = categoryTree.filter((n) => n && n.has_products !== false);
     if (!rootCategories.length) return [];
 
     const catRootMap = buildCategoryRootMap(rootCategories);
 
-    const byRoot = new Map(); // rootCategoryId → { category, products[] }
+    const byRoot = new Map();
     for (const p of discounted) {
       const catId = String(p.metadata?.admin_category_id || p.metadata?.category_id || "").trim();
       if (!catId) continue;
@@ -159,50 +297,114 @@ export default function SalesPage() {
       .sort((a, b) => b.products.length - a.products.length);
   }, [categoryTree, products]);
 
+  // Sidebar active section via IntersectionObserver
+  useEffect(() => {
+    if (!rows.length) return;
+    if (observerRef.current) observerRef.current.disconnect();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveId(entry.target.id);
+        }
+      },
+      { rootMargin: "-64px 0px -55% 0px", threshold: 0 },
+    );
+    observerRef.current = observer;
+
+    for (const { category } of rows) {
+      const el = document.getElementById(`cat-${category.id}`);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [rows]);
+
+  const totalCount = rows.reduce((s, r) => s + r.products.length, 0);
+  const showContent = !loading && !error;
+
   return (
     <PageWrap>
       <ShopHeader />
       <Main>
-        <Intro>
-          <IntroTitle className="shop-typo-catalog-title">{copy.title}</IntroTitle>
-        </Intro>
+        {/* Mobile category pills */}
+        {showContent && rows.length > 0 && (
+          <MobilePills>
+            {rows.map(({ category }) => {
+              const catName = getLocalizedCategory(category, locale).name || category.name || "";
+              return (
+                <Pill key={category.id} href={`#cat-${category.id}`}>{catName}</Pill>
+              );
+            })}
+          </MobilePills>
+        )}
 
-        {loading ? <GlobalPageLoader /> : null}
-        {error ? <p style={{ color: "#b91c1c", padding: "0 24px" }}>{error}</p> : null}
-        {!loading && !error && rows.length === 0 ? (
-          <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
-        ) : null}
+        <Inner>
+          {/* Left sidebar */}
+          {showContent && rows.length > 0 && (
+            <Sidebar>
+              <SidebarTitle>{copy.title}</SidebarTitle>
+              <SidebarList>
+                {rows.map(({ category }) => {
+                  const catName = getLocalizedCategory(category, locale).name || category.name || "";
+                  const id = `cat-${category.id}`;
+                  return (
+                    <li key={id}>
+                      <SidebarItem href={`#${id}`} $active={activeId === id}>
+                        {catName}
+                      </SidebarItem>
+                    </li>
+                  );
+                })}
+              </SidebarList>
+            </Sidebar>
+          )}
 
-        {!loading && !error && rows.map(({ category, products: list }) => {
-          const catName = getLocalizedCategory(category, locale).name || category.name || category.slug || "";
-          const catSlug = String(category.slug || category.handle || "").replace(/^\//, "");
-          return (
-            <div key={category.id} style={{ padding: "8px 24px 28px" }}>
-              <div style={{ width: "100%", maxWidth: 1280, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
-                <Carousel
-                  contained={false}
-                  navOnSides
-                  gap={12}
-                  visibleCount={itemsPerRow}
-                  showFade={false}
-                  ariaLabel={catName}
-                  header={(
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
-                      <h2 className="shop-typo-h2" style={{ margin: 0 }}>{catName}</h2>
-                      {catSlug && (
-                        <SeeAll href={`/${catSlug}?sale=1`}>{copy.seeAll} →</SeeAll>
-                      )}
-                    </div>
-                  )}
-                >
-                  {list.map((p) => (
-                    <ProductCard key={p.id} product={p} plainImage />
-                  ))}
-                </Carousel>
-              </div>
-            </div>
-          );
-        })}
+          {/* Main content */}
+          <ContentCol>
+            {loading ? (
+              <GlobalPageLoader />
+            ) : error ? (
+              <p style={{ color: "#b91c1c", padding: "16px" }}>{error}</p>
+            ) : rows.length === 0 ? (
+              <p style={{ color: "#6b7280", padding: "16px" }}>{copy.empty}</p>
+            ) : (
+              <>
+                <PageHeader>
+                  <PageTitle>{copy.title}</PageTitle>
+                  {totalCount > 0 && <ProductCount>{totalCount}</ProductCount>}
+                </PageHeader>
+
+                {rows.map(({ category, products: list }) => {
+                  const catName = getLocalizedCategory(category, locale).name || category.name || category.slug || "";
+                  const catSlug = String(category.slug || category.handle || "").replace(/^\//, "");
+                  return (
+                    <Section key={category.id} id={`cat-${category.id}`}>
+                      <SectionHeader>
+                        <SectionTitle>{catName}</SectionTitle>
+                        {catSlug && (
+                          <SeeAll href={`/${catSlug}?sale=1`}>{copy.seeAll} →</SeeAll>
+                        )}
+                      </SectionHeader>
+                      <Carousel
+                        contained={false}
+                        navOnSides
+                        itemWidth={CARD_WIDTH}
+                        gap={CARD_GAP}
+                        showFade={false}
+                        ariaLabel={catName}
+                      >
+                        {list.map((p) => (
+                          <ProductCard key={p.id} product={p} plainImage />
+                        ))}
+                      </Carousel>
+                    </Section>
+                  );
+                })}
+              </>
+            )}
+          </ContentCol>
+        </Inner>
       </Main>
       <Footer />
     </PageWrap>

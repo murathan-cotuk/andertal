@@ -1090,12 +1090,9 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
 // ── Bestseller Carousel ───────────────────────────────────────────────────────
 function BestsellerCarousel({ container, locale = "de" }) {
   const [products, setProducts] = useState(undefined);
-  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 5;
-  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
-  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const isNarrow = useIsNarrow(1023);
-  const baseGap = container.gap != null ? Number(container.gap) : 16;
-  const gap = Number.isNaN(baseGap) ? 16 : baseGap;
+  const baseGap = container.gap != null ? Number(container.gap) : 10;
+  const gap = Number.isNaN(baseGap) ? 10 : baseGap;
 
   useEffect(() => {
     if (!container.category_slug) { setProducts([]); return; }
@@ -1111,10 +1108,10 @@ function BestsellerCarousel({ container, locale = "de" }) {
 
   if (products === undefined) {
     return (
-      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+      <div style={{ ...getContainerPadding(container, "24px 16px"), background: "#fff" }}>
         <div style={{ display: "flex", gap, overflow: "hidden" }}>
-          {Array.from({ length: itemsPerRow }).map((_, i) => (
-            <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 280, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ flex: "0 0 180px", height: 240, borderRadius: 8, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
           ))}
         </div>
       </div>
@@ -1132,7 +1129,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
 
   if (isNarrow && isGrid) {
     return (
-      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+      <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
         <div style={getContentInnerStyle(container, 1280)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
@@ -1145,8 +1142,8 @@ function BestsellerCarousel({ container, locale = "de" }) {
             ariaLabel={lt(container, "title", locale) || "Bestseller"}
           />
           {categoryUrl && (
-            <div style={{ textAlign: "center", marginTop: 12 }}>
-              <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#111", textDecoration: "underline" }}>Mehr anzeigen</Link>
+            <div style={{ textAlign: "center", marginTop: 10 }}>
+              <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", textDecoration: "underline" }}>Mehr anzeigen</Link>
             </div>
           )}
         </div>
@@ -1155,12 +1152,12 @@ function BestsellerCarousel({ container, locale = "de" }) {
   }
 
   return (
-    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+    <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
-          visibleCount={itemsPerRow}
+          itemWidth={180}
           navOnSides
           gap={gap}
           showFade={false}
@@ -1173,8 +1170,8 @@ function BestsellerCarousel({ container, locale = "de" }) {
           ))}
         </Carousel>
         {categoryUrl && (
-          <div style={{ textAlign: "center", marginTop: 16 }}>
-            <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#111", textDecoration: "underline" }}>Mehr anzeigen</Link>
+          <div style={{ textAlign: "center", marginTop: 12 }}>
+            <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", textDecoration: "underline" }}>Mehr anzeigen</Link>
           </div>
         )}
       </div>
