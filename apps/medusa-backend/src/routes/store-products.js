@@ -1,0 +1,750 @@
+'use strict'
+const { Router } = require('express')
+const { resolveAdminHub, mapAdminHubCategoryPgRow, buildAdminHubCategoryTreeFromFlat, getCategoriesPgClient } = require('../categories-helpers')
+const { getAdminHubProductByIdOrHandleDb, listAdminHubProductsDb, getProductsDbClient } = require('./admin-products')
+const { getSellerStoreName, getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct, storePublishedStatusSql } = require('./seller-settings')
+
+// ── DB ────────────────────────────────────────────────────────────────────────
+const getDbClient = () => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
+  const { Client } = require('pg')
+  return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+}
+
+// Brands use same DATABASE_URL as other tables
+const getBrandsDbClient = () => getDbClient()
+
+// ── URL resolver ──────────────────────────────────────────────────────────────
+const _SERVER_URL = (() => (process.env.SERVER_URL || `http://localhost:${process.env.PORT || 9000}`).replace(/\/$/, ''))
+
+const resolveUploadUrl = (url) => {
+  if (url == null || url === '') return null
+  if (typeof url === 'object' && url !== null) {
+    const nested = url.url != null ? url.url : url.src != null ? url.src : url.path != null ? url.path : null
+    if (nested != null && nested !== url) return resolveUploadUrl(nested)
+    return null
+  }
+  const s = typeof url === 'string' ? url : String(url)
+  const t = s.trim()
+  if (!t) return null
+  if (t.startsWith('[')) {
+    try {
+      const arr = JSON.parse(t)
+      if (Array.isArray(arr) && arr[0]) return resolveUploadUrl(arr[0])
+    } catch (_) {}
+    return null
+  }
+  if (t.startsWith('http') || t.startsWith('//')) return t
+  return `${_SERVER_URL()}${t.startsWith('/') ? '' : '/'}${t}`
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const isUuidLike = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((s || '').trim())
+
+const getBrandById = async (brandId) => {
+  if (!brandId) return null
+  const client = getBrandsDbClient()
+  if (!client) return null
+  try {
+    await client.connect()
+    const r = await client.query('SELECT id, name, handle, logo_image, banner_image FROM admin_hub_brands WHERE id = $1', [brandId])
+    await client.end()
+    return r.rows && r.rows[0] ? r.rows[0] : null
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    return null
+  }
+}
+
+const getCategoryById = async (categoryId) => {
+  const id = (categoryId || '').toString().trim()
+  if (!id) return null
+  const client = getBrandsDbClient()
+  if (!client) return null
+  try {
+    await client.connect()
+    const r = await client.query('SELECT id, name, slug, parent_id, active, is_visible FROM admin_hub_categories WHERE id = $1::uuid', [id])
+    await client.end()
+    return r.rows && r.rows[0] ? r.rows[0] : null
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    return null
+  }
+}
+
+const getAdminHubCollectionById = async (collectionId) => {
+  if (!collectionId) return null
+  let client
+  try {
+    client = getDbClient()
+    if (!client) return null
+    await client.connect()
+    const res = await client.query('SELECT id, title, handle FROM admin_hub_collections WHERE id = $1', [collectionId])
+    const r = res.rows && res.rows[0]
+    await client.end()
+    return r ? { id: r.id, title: r.title, handle: r.handle } : null
+  } catch (e) {
+    try { if (client) await client.end() } catch (_) {}
+    return null
+  }
+}
+
+const getAdminHubCollectionIdByHandle = async (handle) => {
+  if (!handle) return null
+  let client
+  try {
+    client = getDbClient()
+    if (!client) return null
+    await client.connect()
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle.trim())
+    const res = isUuid
+      ? await client.query('SELECT id FROM admin_hub_collections WHERE id = $1::uuid', [handle])
+      : await client.query('SELECT id FROM admin_hub_collections WHERE LOWER(handle) = LOWER($1)', [handle])
+    await client.end()
+    return res.rows && res.rows[0] ? res.rows[0].id : null
+  } catch (e) {
+    try { if (client) await client.end() } catch (_) {}
+    return null
+  }
+}
+
+const BESTSELLER_CACHE_TTL_MS = 5 * 60 * 1000
+let bestsellerCache = { expiresAt: 0, ids: new Set(), scoresById: new Map() }
+
+const salesScoreFromMetadata = (metadata) => {
+  const m = metadata && typeof metadata === 'object' ? metadata : {}
+  const soldLastMonth = Number(m.sold_last_month ?? 0)
+  const salesCount = Number(m.sales_count ?? 0)
+  return Math.max(soldLastMonth, salesCount)
+}
+
+const getBestsellerProductIds = async () => {
+  const now = Date.now()
+  if (bestsellerCache.expiresAt > now && bestsellerCache.ids && bestsellerCache.ids.size > 0) return bestsellerCache.ids
+  const realSalesById = new Map()
+  const dbSalesClient = getProductsDbClient()
+  if (dbSalesClient) {
+    try {
+      await dbSalesClient.connect()
+      const res = await dbSalesClient.query(`
+        SELECT oi.product_id, SUM(oi.quantity)::int AS total_sold
+        FROM store_order_items oi JOIN store_orders o ON o.id = oi.order_id
+        WHERE o.payment_status = 'bezahlt' AND oi.product_id IS NOT NULL AND oi.product_id <> ''
+        GROUP BY oi.product_id
+      `)
+      for (const row of res.rows) {
+        if (row.product_id && Number(row.total_sold) > 0) realSalesById.set(String(row.product_id).trim(), Number(row.total_sold))
+      }
+      await dbSalesClient.end()
+    } catch (_) { try { await dbSalesClient.end() } catch (__) {} }
+  }
+  const metaClient = getProductsDbClient()
+  const allScoresById = new Map(realSalesById)
+  if (metaClient) {
+    try {
+      await metaClient.connect()
+      const res = await metaClient.query('SELECT id, metadata FROM admin_hub_products WHERE metadata IS NOT NULL')
+      for (const row of res.rows) {
+        const metaScore = salesScoreFromMetadata(row.metadata)
+        const pid = String(row.id).trim()
+        const real = realSalesById.get(pid) || 0
+        if (metaScore > 0 || real > 0) allScoresById.set(pid, Math.max(metaScore, real))
+      }
+      await metaClient.end()
+    } catch (_) { try { await metaClient.end() } catch (__) {} }
+  }
+  const threshold = 1
+  const ids = new Set([...allScoresById.entries()].filter(([, s]) => s >= threshold).map(([id]) => id))
+  bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids, scoresById: allScoresById }
+  return ids
+}
+
+const normalizeStoreEan = (raw) => {
+  if (raw == null || raw === '') return ''
+  const d = String(raw).replace(/\D/g, '')
+  return d.length >= 8 ? d : ''
+}
+
+const parseVariantsArray = (p) => {
+  const v = p && p.variants
+  if (Array.isArray(v)) return v
+  if (typeof v === 'string' && v) {
+    try { const j = JSON.parse(v); return Array.isArray(j) ? j : [] } catch (_) { return [] }
+  }
+  return []
+}
+
+const extractEanFromHubProductRow = (p) => {
+  if (!p) return ''
+  const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+  let e = normalizeStoreEan(meta.ean)
+  if (e) return e
+  for (const row of parseVariantsArray(p)) {
+    e = normalizeStoreEan(row && row.ean)
+    if (e) return e
+  }
+  return ''
+}
+
+const primaryPriceCentsHubProduct = (p) => {
+  const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+  const prices = meta.prices && typeof meta.prices === 'object' ? meta.prices : {}
+  const pick = prices.DE || prices.AT || prices.CH || Object.values(prices)[0]
+  if (pick && typeof pick === 'object') {
+    const sale = pick.sale_cents != null ? Number(pick.sale_cents) : null
+    const brut = pick.brutto_cents != null ? Number(pick.brutto_cents) : null
+    const c = sale != null && sale > 0 ? sale : brut
+    if (c != null && c > 0) return Math.round(c)
+  }
+  for (const v of parseVariantsArray(p)) {
+    if (v && v.price_cents != null && Number(v.price_cents) > 0) return Math.round(Number(v.price_cents))
+  }
+  if (p.price_cents != null && Number(p.price_cents) > 0) return Math.round(Number(p.price_cents))
+  if (p.price != null && Number(p.price) > 0) return Math.round(Number(p.price) * 100)
+  return 0
+}
+
+const totalInventoryHubProduct = (p) => {
+  const vars = parseVariantsArray(p)
+  if (vars.length) return vars.reduce((s, v) => s + (parseInt(v && v.inventory, 10) || 0), 0)
+  return parseInt(p.inventory, 10) || 0
+}
+
+const computeBuyBoxScore = (priceCents, sellerAvg, sellerCount, inv) => {
+  const p = Number(priceCents) || 0
+  return (p > 0 ? 10000000 / p : 0) + (Number(sellerAvg) || 0) * 2500 + Math.log1p(Math.max(0, Number(sellerCount) || 0)) * 200 + (inv > 0 ? 1200 : -8000)
+}
+
+const loadSellerReviewStatsBatch = async (sellerIds) => {
+  const ids = [...new Set((sellerIds || []).map((s) => String(s || '').trim()).filter(Boolean))]
+  if (!ids.length) return new Map()
+  let client
+  try {
+    client = getDbClient()
+    if (!client) return new Map()
+    await client.connect()
+    const r = await client.query(
+      `SELECT seller_id, ROUND(AVG(rating)::numeric, 2)::float AS avg, COUNT(*)::int AS cnt FROM store_product_reviews WHERE seller_id = ANY($1::text[]) GROUP BY seller_id`,
+      [ids]
+    )
+    await client.end()
+    const m = new Map()
+    for (const row of r.rows || []) m.set(String(row.seller_id).trim(), { avg: parseFloat(row.avg || 0), count: row.cnt || 0 })
+    for (const id of ids) { if (!m.has(id)) m.set(id, { avg: 0, count: 0 }) }
+    return m
+  } catch (_) {
+    try { if (client) await client.end() } catch (__) {}
+    return new Map()
+  }
+}
+
+const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
+  const ean = normalizeStoreEan(canonicalEan)
+  if (!ean) return []
+  let list = await listAdminHubProductsDb({ limit: 5000 })
+  list = list.filter((row) => isStorePublishedStatus(row.status) && isStoreVisibleSellerProduct(row, approvedSellerIds))
+  const legacyOffers = list.filter((row) => extractEanFromHubProductRow(row) === ean && row.seller_id)
+  const masterRow = list.find((row) => extractEanFromHubProductRow(row) === ean && !row.seller_id)
+  const allEanPublishedRows = masterRow ? [masterRow, ...legacyOffers] : legacyOffers
+  let listingOffers = []
+  const productIdsForListings = [...new Set(allEanPublishedRows.map((r) => String(r.id)))]
+  if (productIdsForListings.length > 0) {
+    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+    if (dbUrl && dbUrl.startsWith('postgres')) {
+      try {
+        const { Client } = require('pg')
+        const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await lc.connect()
+        const lr = await lc.query(
+          `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
+          [productIdsForListings]
+        )
+        await lc.end()
+        const productById = new Map(allEanPublishedRows.map((r) => [String(r.id), r]))
+        listingOffers = (lr.rows || [])
+          .filter((l) => !approvedSellerIds || approvedSellerIds.size === 0 || approvedSellerIds.has(l.seller_id))
+          .map((l) => {
+            const baseRow = productById.get(String(l.product_id)) || masterRow || legacyOffers[0]
+            return { ...baseRow, id: String(l.product_id) + '-listing-' + l.seller_id, _listing_id: String(l.product_id), seller_id: l.seller_id, price_cents: l.price_cents, inventory: l.inventory, _orders_count: l.orders_count }
+          })
+      } catch (_) {}
+    }
+  }
+  const sellersCoveredByListings = new Set(listingOffers.map((o) => o.seller_id))
+  return [...listingOffers, ...legacyOffers.filter((o) => !sellersCoveredByListings.has(o.seller_id))]
+}
+
+const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
+  const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+  const media = meta.media
+  let rawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
+  if (rawMediaList.length === 0 && (meta.image_url || meta.image)) rawMediaList = [meta.image_url || meta.image]
+  if (rawMediaList.length === 0 && Array.isArray(p.variants) && p.variants.length > 0) {
+    for (const v of p.variants) {
+      const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
+      const firstVMedia = Array.isArray(vMeta.media) && vMeta.media.length > 0 ? vMeta.media[0] : null
+      const vImg = firstVMedia || v.image_url || v.image || null
+      if (vImg) { rawMediaList = [vImg]; break }
+    }
+  }
+  const thumb = resolveUploadUrl(rawMediaList[0] || null)
+  const imagesResolved = rawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
+  const country = String(marketCountry || 'DE').toUpperCase()
+  const parentPriceByCountry = meta.prices && typeof meta.prices === 'object' ? meta.prices[country] : null
+  const priceCents = parentPriceByCountry && parentPriceByCountry.brutto_cents != null
+    ? Number(parentPriceByCountry.brutto_cents)
+    : (p.price != null ? Math.round(Number(p.price) * 100) : 0)
+  const rawVariants = Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []
+  const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : null
+  const variants = rawVariants.length > 0
+    ? rawVariants.map((v, i) => {
+        const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
+        const vPriceByCountry = vMeta.prices && typeof vMeta.prices === 'object' ? vMeta.prices[country] : null
+        const vPriceCents = vPriceByCountry && vPriceByCountry.brutto_cents != null
+          ? Number(vPriceByCountry.brutto_cents)
+          : (v.price_cents != null ? Number(v.price_cents) : (v.price != null ? Math.round(Number(v.price) * 100) : priceCents))
+        const vCompareCents = vPriceByCountry && vPriceByCountry.uvp_cents != null
+          ? Number(vPriceByCountry.uvp_cents)
+          : (v.compare_at_price_cents != null ? Number(v.compare_at_price_cents) : null)
+        const optionValues = Array.isArray(v.option_values) ? v.option_values : (v.value != null ? [v.value] : null)
+        let image_urls = null
+        if (v.image_urls && typeof v.image_urls === 'object' && !Array.isArray(v.image_urls)) {
+          const m = {}
+          for (const [k, u] of Object.entries(v.image_urls)) {
+            const rk = (k || '').toString().toLowerCase().trim()
+            if (!rk) continue
+            const resolved = resolveUploadUrl(u || null)
+            if (resolved) m[rk] = resolved
+          }
+          if (Object.keys(m).length > 0) image_urls = m
+        }
+        const vImages = Array.isArray(vMeta.media)
+          ? vMeta.media.map((u) => resolveUploadUrl(u)).filter(Boolean)
+          : []
+        const translations = vMeta.translations && typeof vMeta.translations === 'object'
+          ? Object.fromEntries(
+              Object.entries(vMeta.translations).map(([loc, tr]) => {
+                const trOut = { ...(tr && typeof tr === 'object' ? tr : {}) }
+                if (Array.isArray(tr.media)) trOut.media = tr.media.map((u) => resolveUploadUrl(u)).filter(Boolean)
+                return [loc, trOut]
+              })
+            )
+          : undefined
+        const optionLabels = variationGroups && variationGroups[i] ? variationGroups[i].labels || null : null
+        return {
+          id: v.id || `${p.id}-variant-${i}`,
+          title: v.title || v.label || `Variant ${i + 1}`,
+          sku: v.sku || null,
+          ean: v.ean || null,
+          price_cents: vPriceCents,
+          compare_at_price_cents: vCompareCents,
+          inventory_quantity: parseInt(v.inventory, 10) || 0,
+          option_values: optionValues,
+          option_labels: optionLabels,
+          image_url: resolveUploadUrl(v.image_url || v.image || null) || null,
+          swatch_image_url: resolveUploadUrl(v.swatch_image_url || v.swatch_image || null) || null,
+          image_urls,
+          images: vImages,
+          weight: v.weight || vMeta.weight || null,
+          metadata: { ...(vMeta || {}), ...(translations ? { translations } : {}) },
+        }
+      })
+    : []
+  const compareCents = parentPriceByCountry && parentPriceByCountry.uvp_cents != null
+    ? Number(parentPriceByCountry.uvp_cents)
+    : null
+  const metaTranslations = meta.translations && typeof meta.translations === 'object'
+    ? Object.fromEntries(
+        Object.entries(meta.translations).map(([loc, tr]) => {
+          const trOut = { ...(tr && typeof tr === 'object' ? tr : {}) }
+          if (Array.isArray(tr && tr.media)) trOut.media = tr.media.map((u) => resolveUploadUrl(u)).filter(Boolean)
+          return [loc, trOut]
+        })
+      )
+    : undefined
+  const variantOptionKeys = variationGroups
+    ? variationGroups.map((g) => g?.key || g?.option_key || null).filter(Boolean)
+    : null
+  return {
+    id: p.id,
+    title: p.title,
+    handle: p.handle,
+    slug: p.handle,
+    description: p.description,
+    sku: p.sku || null,
+    ean: extractEanFromHubProductRow(p) || null,
+    status: p.status,
+    seller_id: p.seller_id || null,
+    collection_id: p.collection_id || null,
+    thumbnail: thumb || null,
+    images: imagesResolved,
+    price_cents: priceCents,
+    compare_at_price_cents: compareCents,
+    price: priceCents > 0 ? priceCents / 100 : 0,
+    inventory_quantity: parseInt(p.inventory, 10) || (variants.reduce((s, v) => s + (v.inventory_quantity || 0), 0)),
+    variants,
+    variant_option_keys: variantOptionKeys,
+    metadata: { ...meta, ...(metaTranslations ? { translations: metaTranslations } : {}), thumbnail: thumb || meta.thumbnail || null, images: imagesResolved },
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+  }
+}
+
+const collectCategorySubtreeIdsBySlug = (tree, slug) => {
+  const norm = (s) => String(s || '').replace(/^\//, '').toLowerCase().trim()
+  const target = norm(slug)
+  const findNode = (nodes) => {
+    for (const n of nodes || []) {
+      if (!n) continue
+      if (norm(n.slug) === target || norm(n.handle) === target) return n
+      const x = findNode(n.children)
+      if (x) return x
+    }
+    return null
+  }
+  const ids = new Set()
+  const addTree = (n) => {
+    if (!n || n.id == null) return
+    ids.add(String(n.id).trim().toLowerCase())
+    for (const c of n.children || []) addTree(c)
+  }
+  const node = findNode(Array.isArray(tree) ? tree : [])
+  if (!node) return null
+  addTree(node)
+  return ids
+}
+
+const storeProductCategoryIds = (p) => {
+  const meta = p?.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+  const out = []
+  const push = (x) => { if (x == null) return; const s = String(x).trim().toLowerCase(); if (s) out.push(s) }
+  push(meta.admin_category_id)
+  push(meta.category_id)
+  if (Array.isArray(meta.category_ids)) {
+    meta.category_ids.forEach(push)
+  } else if (typeof meta.category_ids === 'string' && meta.category_ids.trim().startsWith('[')) {
+    try { const parsed = JSON.parse(meta.category_ids); if (Array.isArray(parsed)) parsed.forEach(push) } catch (_) {}
+  }
+  if (Array.isArray(p?.categories)) p.categories.forEach((c) => push(c?.id))
+  return out
+}
+
+const enrichMappedStoreProduct = async (productRow, mapped) => {
+  const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
+  if (!existingSeller && productRow.seller_id) {
+    const storeName = await getSellerStoreName(productRow.seller_id)
+    if (storeName) mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
+  }
+  const metaIn = mapped.metadata && typeof mapped.metadata === 'object' ? mapped.metadata : {}
+  const categoryId = (metaIn.admin_category_id || metaIn.category_id || '').toString().trim()
+  if (categoryId) {
+    const category = await getCategoryById(categoryId)
+    if (category && category.slug) {
+      mapped.metadata = { ...(mapped.metadata || {}), admin_category_id: category.id, category_id: category.id, category_slug: String(category.slug).replace(/^\//, ''), category_name: category.name || metaIn.category_name || null }
+    }
+  }
+  const brandId = mapped.metadata && mapped.metadata.brand_id
+  if (brandId) {
+    const brand = await getBrandById(brandId)
+    if (brand) mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
+  }
+  const bsIds = await getBestsellerProductIds()
+  const realSalesScore = bestsellerCache.scoresById?.get(String(productRow.id).trim())
+  if (realSalesScore > 0) mapped.metadata = { ...(mapped.metadata || {}), sales_count: realSalesScore }
+  if (bsIds.has(String(productRow.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+  const sid = String(productRow.seller_id || '').trim()
+  if (sid) {
+    let client
+    try {
+      client = getDbClient()
+      if (client) {
+        await client.connect()
+        const sr = await client.query('SELECT review_avg, review_count FROM admin_hub_seller_settings WHERE seller_id = $1', [sid])
+        await client.end()
+        const row = sr.rows && sr.rows[0]
+        if (row && (Number(row.review_count) > 0 || row.review_avg != null)) {
+          mapped.metadata = { ...(mapped.metadata || {}), seller_review_avg: row.review_avg != null ? parseFloat(row.review_avg) : null, seller_review_count: row.review_count != null ? Number(row.review_count) : 0 }
+        }
+      }
+    } catch (_) { try { if (client) await client.end() } catch (__) {} }
+  }
+  return mapped
+}
+
+// ── Handlers ──────────────────────────────────────────────────────────────────
+
+const storeProductsFromAdminHubGET = async (req, res) => {
+  try {
+    const query = req.query || {}
+    const searchQ = (query.q || '').toString().trim().toLowerCase()
+    const limitForSearch = searchQ ? 8 : (parseInt(query.limit, 10) || 100)
+    const categorySlugFilter = (query.category || query.category_slug || '').toString().trim()
+    let allowedCategoryIds = null
+    if (categorySlugFilter) {
+      const subtreeIdsForSlug = (tree) => collectCategorySubtreeIdsBySlug(tree, categorySlugFilter)
+      const ah = resolveAdminHub()
+      if (ah) {
+        try { allowedCategoryIds = subtreeIdsForSlug(await ah.getCategoryTree({ is_visible: true })) } catch (_) { allowedCategoryIds = null }
+      }
+      if (!allowedCategoryIds || allowedCategoryIds.size === 0) {
+        let fbClient
+        try {
+          fbClient = getProductsDbClient()
+          if (fbClient) {
+            await fbClient.connect()
+            const cr = await fbClient.query(`SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`)
+            await fbClient.end()
+            fbClient = null
+            const flat = (cr.rows || []).map(mapAdminHubCategoryPgRow).filter((c) => c && c.is_visible !== false)
+            allowedCategoryIds = subtreeIdsForSlug(buildAdminHubCategoryTreeFromFlat(flat))
+          }
+        } catch (__) { try { if (fbClient) await fbClient.end() } catch (___) {} }
+      }
+    }
+    let collectionId = (query.collection_id || '').toString().trim()
+    const collectionHandle = (query.collection_handle || query.collection || '').toString().trim()
+    if (collectionId && !isUuidLike(collectionId)) {
+      const resolvedId = await getAdminHubCollectionIdByHandle(collectionId)
+      if (resolvedId) collectionId = resolvedId
+    }
+    if (!collectionId && collectionHandle) {
+      const resolvedId = await getAdminHubCollectionIdByHandle(collectionHandle)
+      if (resolvedId) collectionId = resolvedId
+    }
+    const queryWithId = collectionId ? { ...query, collection_id: collectionId } : query
+    const categoryIdAllowlist = allowedCategoryIds && allowedCategoryIds.size > 0 ? [...allowedCategoryIds] : undefined
+    let list = await listAdminHubProductsDb({ ...queryWithId, limit: searchQ ? 200 : (categorySlugFilter ? Math.max(parseInt(query.limit, 10) || 3000, 500) : (query.limit || 100)), category: categorySlugFilter || undefined, category_id_allowlist: categoryIdAllowlist })
+    if (collectionId) {
+      const norm = (s) => (s || '').toString().trim().toLowerCase()
+      const cidNorm = norm(collectionId)
+      list = list.filter((p) => {
+        const primaryMatch = norm(p.collection_id) === cidNorm
+        const metaIds = Array.isArray(p?.metadata?.collection_ids) ? p.metadata.collection_ids.map((x) => norm(x)) : []
+        return primaryMatch || metaIds.includes(cidNorm)
+      })
+    }
+    const approvedSellerIds = await getApprovedSellerIdsSet()
+    list = list.filter((p) => isStorePublishedStatus(p.status) && isStoreVisibleSellerProduct(p, approvedSellerIds))
+    if (searchQ) {
+      list = list.filter((p) => {
+        const t = (p.title || '').toLowerCase(), d = (p.description || '').toLowerCase()
+        const h = (p.handle || '').toLowerCase(), sku = (p.sku || '').toLowerCase()
+        const ean = (p.metadata?.ean != null ? String(p.metadata.ean) : '').toLowerCase()
+        if (t.includes(searchQ) || d.includes(searchQ) || h.includes(searchQ) || sku.includes(searchQ) || ean.includes(searchQ)) return true
+        return Array.isArray(p.variants) && p.variants.some((v) =>
+          (v.sku || '').toLowerCase().includes(searchQ) || (v.ean != null ? String(v.ean) : '').toLowerCase().includes(searchQ)
+        )
+      }).slice(0, limitForSearch)
+    }
+    const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim() || 'default').filter(Boolean))]
+    const storeNamesBySeller = {}
+    await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
+    const brandIds = [...new Set(list.map((p) => (p.metadata && p.metadata.brand_id) || null).filter(Boolean))]
+    const brandsById = {}
+    await Promise.all(brandIds.map(async (bid) => { const b = await getBrandById(bid); if (b) brandsById[bid] = b }))
+    const collIds = [...new Set(list.flatMap((p) => {
+      const ids = []
+      if (p.collection_id) ids.push(String(p.collection_id).trim())
+      const m = Array.isArray(p?.metadata?.collection_ids) ? p.metadata.collection_ids : []
+      for (const x of m) { if (x != null && String(x).trim()) ids.push(String(x).trim()) }
+      return ids
+    }))].filter((id) => id && isUuidLike(id))
+    const collToLinkedCat = new Map()
+    if (collIds.length > 0) {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      if (dbUrl && dbUrl.startsWith('postgres')) {
+        let cClient
+        try {
+          const { Client } = require('pg')
+          cClient = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          await cClient.connect()
+          const cr = await cClient.query('SELECT id, metadata FROM admin_hub_collections WHERE id = ANY($1::uuid[])', [collIds])
+          await cClient.end()
+          cClient = null
+          for (const row of cr.rows || []) {
+            const cmeta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
+            const lc = cmeta.linked_category_id != null ? String(cmeta.linked_category_id).trim() : ''
+            if (lc) collToLinkedCat.set(String(row.id).trim().toLowerCase(), lc.trim().toLowerCase())
+          }
+        } catch (e) { try { if (cClient) await cClient.end() } catch (_) {}; console.warn('Store products: linked_category:', e?.message) }
+      }
+    }
+    const mergeCategoryIdsFromCollections = (p, mapped) => {
+      if (!collToLinkedCat.size) return
+      const linked = []
+      const addColl = (cid) => { if (!cid) return; const catId = collToLinkedCat.get(String(cid).trim().toLowerCase()); if (catId && !linked.includes(catId)) linked.push(catId) }
+      if (p.collection_id) addColl(p.collection_id)
+      if (Array.isArray(p?.metadata?.collection_ids)) for (const c of p.metadata.collection_ids) addColl(c)
+      if (!linked.length) return
+      const meta = { ...(mapped.metadata || {}) }
+      const existingArr = Array.isArray(meta.category_ids) ? meta.category_ids.map((x) => String(x).trim().toLowerCase()) : []
+      for (const catId of linked) { if (!existingArr.includes(catId)) existingArr.push(catId) }
+      meta.category_ids = existingArr
+      const primary = linked[0]
+      if (!meta.admin_category_id) meta.admin_category_id = primary
+      if (!meta.category_id) meta.category_id = primary
+      mapped.metadata = meta
+    }
+    const bestsellerIds = await getBestsellerProductIds()
+    let products = list.map((p) => {
+      const mapped = mapAdminHubToStoreProduct(p, query.country || 'DE')
+      mergeCategoryIdsFromCollections(p, mapped)
+      const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
+      if (!existingSeller && p.seller_id && storeNamesBySeller[(p.seller_id || 'default').toString().trim()]) {
+        const storeName = storeNamesBySeller[(p.seller_id || 'default').toString().trim()]
+        mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
+      }
+      const brandId = mapped.metadata && mapped.metadata.brand_id
+      if (brandId && brandsById[brandId]) {
+        const b = brandsById[brandId]
+        mapped.metadata = { ...(mapped.metadata || {}), brand_name: b.name, brand_logo: b.logo_image || null, brand_handle: b.handle || null }
+      }
+      if (bestsellerIds.has(String(p.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+      return mapped
+    })
+    if (categorySlugFilter) {
+      if (!allowedCategoryIds || allowedCategoryIds.size === 0) {
+        products = []
+      } else {
+        products = products.filter((p) => { const ids = storeProductCategoryIds(p); return ids.some((id) => allowedCategoryIds.has(id)) })
+      }
+    }
+    res.json({ products, count: products.length })
+  } catch (err) {
+    console.error('Store products GET (admin hub):', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
+const storeProductByIdFromAdminHubGET = async (req, res) => {
+  try {
+    const idOrHandle = (req.params.idOrHandle || req.params.id || '').toString().trim()
+    if (!idOrHandle) return res.status(400).json({ message: 'Product id or handle required' })
+    const landed = await getAdminHubProductByIdOrHandleDb(idOrHandle)
+    const approvedSellerIds = await getApprovedSellerIdsSet()
+    if (!landed || !isStorePublishedStatus(landed.status) || !isStoreVisibleSellerProduct(landed, approvedSellerIds)) {
+      return res.status(404).json({ message: 'Product not found' })
+    }
+    const canonicalEan = extractEanFromHubProductRow(landed)
+    let winnerRow = landed, multiOffer = null
+    if (canonicalEan) {
+      const offers = await findEanOffersFromHub(canonicalEan, approvedSellerIds)
+      if (offers.length >= 1) {
+        const sellerKeys = offers.map((p) => String(p.seller_id || 'default').trim() || 'default')
+        const statsMap = await loadSellerReviewStatsBatch(sellerKeys)
+        const scored = offers.map((p) => {
+          const sid = String(p.seller_id || 'default').trim() || 'default'
+          const st = statsMap.get(sid) || { avg: 0, count: 0 }
+          const price = primaryPriceCentsHubProduct(p)
+          const inv = totalInventoryHubProduct(p)
+          return { p, score: computeBuyBoxScore(price, st.avg, st.count, inv), price, inv, stats: st, sid }
+        })
+        scored.sort((a, b) => { const diff = b.score - a.score; return diff !== 0 ? diff : new Date(a.p.created_at || 0) - new Date(b.p.created_at || 0) })
+        winnerRow = scored[0].p
+        const uniqueSellers = [...new Set(scored.map((x) => x.sid))]
+        const storeNames = {}
+        await Promise.all(uniqueSellers.map(async (sid) => { storeNames[sid] = (await getSellerStoreName(sid)) || sid }))
+        const reviewProductIds = offers.map((p) => String(p._listing_id || p.id))
+        const otherSellers = scored.slice(1).map(({ p, price, stats, sid }) => {
+          const realProductId = p._listing_id || String(p.id)
+          const masterP = p._listing_id ? (scored.find((x) => String(x.p.id) === p._listing_id)?.p || p) : p
+          const m = masterP.metadata && typeof masterP.metadata === 'object' ? masterP.metadata : {}
+          const rawMediaList = Array.isArray(m.media) ? m.media : (typeof m.media === 'string' && m.media ? [m.media] : [])
+          const thumb = resolveUploadUrl((typeof rawMediaList[0] === 'string' ? rawMediaList[0] : (rawMediaList[0] && rawMediaList[0].url) || null) || m.thumbnail || null)
+          return { product_id: realProductId, handle: masterP.handle || p.handle, title: masterP.title || p.title || '', seller_id: sid, store_name: storeNames[sid] || sid, price_cents: price, seller_review_avg: stats.avg, seller_review_count: stats.count, in_stock: (p.inventory != null ? p.inventory : totalInventoryHubProduct(p)) > 0, thumbnail: thumb || null }
+        })
+        if (offers.length > 1) multiOffer = { canonical_ean: canonicalEan, review_product_ids: reviewProductIds, landed_product_id: String(landed.id), buy_box_product_id: String(winnerRow._listing_id || winnerRow.id), other_sellers: otherSellers }
+      }
+    }
+    if (winnerRow.collection_id) {
+      const collection = await getAdminHubCollectionById(winnerRow.collection_id)
+      if (collection) winnerRow.collection = collection
+    }
+    const mapped = mapAdminHubToStoreProduct(winnerRow, (req.query && req.query.country) || 'DE')
+    await enrichMappedStoreProduct(winnerRow, mapped)
+    res.json({ product: mapped, multi_offer: multiOffer })
+  } catch (err) {
+    console.error('Store product by id GET (admin hub):', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
+module.exports = function createStoreProductsRouter() {
+  const router = Router()
+
+  router.get('/store/products', storeProductsFromAdminHubGET)
+  router.get('/store/products/:idOrHandle', storeProductByIdFromAdminHubGET)
+
+  router.get('/store/brands', async (_req, res) => {
+    const client = getBrandsDbClient()
+    if (!client) return res.status(500).json({ message: 'Database unavailable' })
+    try {
+      await client.connect()
+      const r = await client.query(`SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands ORDER BY created_at DESC NULLS LAST, LOWER(name)`)
+      await client.end()
+      const brands = (r.rows || []).map((row) => {
+        const rawHandle = (row.handle || '').trim()
+        const handle = rawHandle || ('brand-' + String(row.id || '').replace(/-/g, '').slice(0, 12))
+        return { id: row.id, name: row.name, handle, logo_image: row.logo_image || null, banner_image: row.banner_image || null, address: row.address || null, created_at: row.created_at || null }
+      }).filter((b) => b && b.handle)
+      res.json({ brands, count: brands.length })
+    } catch (e) {
+      try { await client.end() } catch (_) {}
+      console.error('Store brands list GET:', e)
+      res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+    }
+  })
+
+  router.get('/store/brands/:handle', async (req, res) => {
+    const handle = (req.params.handle || '').trim().toLowerCase()
+    if (!handle) return res.status(400).json({ message: 'handle required' })
+    const client = getBrandsDbClient()
+    if (!client) return res.status(500).json({ message: 'Database unavailable' })
+    try {
+      await client.connect()
+      const br = await client.query(
+        `SELECT id, name, handle, logo_image, banner_image, address FROM admin_hub_brands WHERE LOWER(TRIM(COALESCE(handle,''))) = $1 OR id::text = $1 LIMIT 1`,
+        [handle]
+      )
+      const brand = br.rows && br.rows[0]
+      if (!brand) { await client.end(); return res.status(404).json({ message: 'Brand not found' }) }
+      await client.end()
+      const approvedSellerIds = await getApprovedSellerIdsSet()
+      let list = await listAdminHubProductsDb({ limit: 3000 })
+      list = list.filter((p) => isStorePublishedStatus(p.status) && isStoreVisibleSellerProduct(p, approvedSellerIds) && (p.metadata && p.metadata.brand_id) === brand.id)
+      const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim() || 'default').filter(Boolean))]
+      const storeNamesBySeller = {}
+      await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
+      const bestsellerIds = await getBestsellerProductIds()
+      const products = list.map((p) => {
+        const mapped = mapAdminHubToStoreProduct(p, (req.query && req.query.country) || 'DE')
+        const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
+        if (!existingSeller && p.seller_id && storeNamesBySeller[(p.seller_id || 'default').toString().trim()]) {
+          const storeName = storeNamesBySeller[(p.seller_id || 'default').toString().trim()]
+          mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
+        }
+        mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
+        if (bestsellerIds.has(String(p.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+        return mapped
+      })
+      res.json({ brand, products, count: products.length })
+    } catch (e) {
+      console.error('Store brands GET:', e)
+      res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+    }
+  })
+
+  return router
+}
+
+module.exports.mapAdminHubToStoreProduct = mapAdminHubToStoreProduct
+module.exports.resolveUploadUrl = resolveUploadUrl
+module.exports.extractEanFromHubProductRow = extractEanFromHubProductRow
+module.exports.normalizeStoreEan = normalizeStoreEan
+module.exports.parseVariantsArray = parseVariantsArray
+module.exports.getBestsellerProductIds = getBestsellerProductIds
+module.exports.isUuidLike = isUuidLike
+module.exports.getAdminHubCollectionIdByHandle = getAdminHubCollectionIdByHandle
