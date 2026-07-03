@@ -45,7 +45,7 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const ALLOWED_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || '').trim()
 const CLAUDE_BIN = process.env.CLAUDE_BIN || (process.platform === 'win32' ? 'claude.cmd' : 'claude')
 const WORKDIR = process.env.CLAUDE_WORKDIR || __dirname
-const TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || '600000', 10) // 10 dk
+const TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || '3600000', 10) // 60 dk
 const CHUNK_SIZE = 3800 // Telegram 4096 sınırının altında güvenli pay
 
 if (!TOKEN) {
@@ -137,7 +137,7 @@ function resetSession() {
 
 // ── Claude CLI'yi güvenli çalıştır (shell yok, argüman dizisi) ─────────────
 // Claude'un yanıtını her zaman Türkçe ve sade vermesi için önek talimat.
-const TR_PREAMBLE = 'Talimat: Yanıtını HER ZAMAN Türkçe, kısa, sade ve bir insanın kolayca anlayacağı şekilde ver. Ham log/stack-trace yığını yapıştırma; incele, analiz et ve özetle.\n\nKullanıcı mesajı:\n'
+const TR_PREAMBLE = 'Talimat: Yanıtını HER ZAMAN Türkçe ver. Yaptığın her adımı DETAYLI raporla: hangi dosyayı oluşturduğunu, kaç satır olduğunu, hangi satırları server.js\'ten sildiğini, commit hash\'ini, push edilip edilmediğini açıkça belirt. "Şunu yaptım, bunu yaptım, commit hash: xxx, push edildi." şeklinde konuşarak anlat. Ham log/stack-trace yapıştırma; hataları analiz edip özetle.\n\nKullanıcı mesajı:\n'
 
 function runClaude(prompt) {
   return new Promise((resolve) => {
