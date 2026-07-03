@@ -5560,74 +5560,9 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
     httpApp.put('/admin-hub/landing-page/:pageId', landingPageByIdPUT)
     httpApp.get('/store/landing-page/:pageId', landingPageByIdGET)
 
-    // ── Styles ───────────────────────────────────────────────────────────────
-    const stylesGET = async (req, res) => {
-      const client = getDbClient()
-      if (!client) return res.status(503).json({ message: 'Database not configured' })
-      try {
-        await client.connect()
-        const r = await client.query('SELECT key, value FROM admin_hub_styles')
-        const data = {}
-        r.rows.forEach(row => { data[row.key] = row.value })
-        res.set('Cache-Control', 'no-store, max-age=0')
-        res.json({ styles: data.styles || { colors: {}, buttons: {} } })
-      } catch (err) {
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
-      } finally {
-        await client.end().catch(() => {})
-      }
-    }
-    const stylesPUT = async (req, res) => {
-      const client = getDbClient()
-      if (!client) return res.status(503).json({ message: 'Database not configured' })
-      try {
-        await client.connect()
-        const styles = req.body?.styles || { colors: {}, buttons: {} }
-        await client.query(
-          `INSERT INTO admin_hub_styles (key, value) VALUES ('styles', $1)
-           ON CONFLICT (key) DO UPDATE SET value = $1`,
-          [JSON.stringify(styles)]
-        )
-        res.json({ ok: true, styles })
-      } catch (err) {
-        res.status(500).json({ message: (err && err.message) || 'Internal server error' })
-      } finally {
-        await client.end().catch(() => {})
-      }
-    }
-    httpApp.get('/admin-hub/styles', stylesGET)
-    httpApp.put('/admin-hub/styles', stylesPUT)
-    httpApp.get('/store/styles', stylesGET) // public — no auth
-
-    // ── Public Trustpilot widget config (Business Unit ID is public in TrustBox embeds) ──
-    const storeTrustpilotConfigGET = async (req, res) => {
-      const client = getDbClient()
-      if (!client) return res.json({ enabled: false, businessUnitId: null, templateId: null, evaluateUrl: null })
-      try {
-        await client.connect()
-        const r = await client.query(
-          `SELECT api_key, config FROM store_integrations WHERE LOWER(TRIM(slug)) = 'trustpilot' AND is_active = true LIMIT 1`
-        )
-        const row = r.rows[0]
-        const bu = row && row.api_key ? String(row.api_key).trim() : ''
-        if (!bu) return res.json({ enabled: false, businessUnitId: null, templateId: null, evaluateUrl: null })
-        let cfg = {}
-        try {
-          const c = row.config
-          cfg = typeof c === 'string' ? JSON.parse(c) : (c && typeof c === 'object' ? c : {})
-        } catch (_) {}
-        const templateId = (cfg.template_id || cfg.templateId || '').toString().trim() || '5419b732-fbfb-4c9d-8b9d-0a9952a935df'
-        const evaluateUrl = (cfg.evaluate_url || cfg.evaluateUrl || '').toString().trim()
-        const evaluateOut = /^https:\/\//i.test(evaluateUrl) ? evaluateUrl : null
-        res.json({ enabled: true, businessUnitId: bu, templateId, evaluateUrl: evaluateOut })
-      } catch (err) {
-        console.error('storeTrustpilotConfigGET:', err)
-        res.json({ enabled: false, businessUnitId: null, templateId: null, evaluateUrl: null })
-      } finally {
-        await client.end().catch(() => {})
-      }
-    }
-    httpApp.get('/store/trustpilot-config', storeTrustpilotConfigGET)
+    // --- Styles + Public Trustpilot Config: extracted to src/routes/styles.js ---
+    const createStylesRouter = require('./src/routes/styles')
+    httpApp.use('/', createStylesRouter())
 
 
     // ── Notifications (per-recipient read/delete state: seller_hub_notification_state) ──
