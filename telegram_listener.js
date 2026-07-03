@@ -45,7 +45,7 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const ALLOWED_CHAT_ID = String(process.env.TELEGRAM_CHAT_ID || '').trim()
 const CLAUDE_BIN = process.env.CLAUDE_BIN || (process.platform === 'win32' ? 'claude.cmd' : 'claude')
 const WORKDIR = process.env.CLAUDE_WORKDIR || __dirname
-const TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || '3600000', 10) // 60 dk
+const TIMEOUT_MS = parseInt(process.env.CLAUDE_TIMEOUT_MS || '7200000', 10) // 120 dk (sınırsız için çok büyük)
 const CHUNK_SIZE = 3800 // Telegram 4096 sınırının altında güvenli pay
 
 if (!TOKEN) {
