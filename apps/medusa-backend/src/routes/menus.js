@@ -314,3 +314,5 @@ module.exports = function createMenusRouter() {
 
   return router
 }
+
+module.exports.resolveMenuService = resolveMenuService

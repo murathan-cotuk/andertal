@@ -748,3 +748,4 @@ module.exports.parseVariantsArray = parseVariantsArray
 module.exports.getBestsellerProductIds = getBestsellerProductIds
 module.exports.isUuidLike = isUuidLike
 module.exports.getAdminHubCollectionIdByHandle = getAdminHubCollectionIdByHandle
+module.exports.storeProductCategoryIds = storeProductCategoryIds

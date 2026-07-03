@@ -1178,3 +1178,4 @@ module.exports = function createAdminProductsRouter() {
 module.exports.getAdminHubProductByIdOrHandleDb = getAdminHubProductByIdOrHandleDb
 module.exports.updateAdminHubProductDb = updateAdminHubProductDb
 module.exports.getProductsDbClient = getProductsDbClient
+module.exports.listAdminHubProductsDb = listAdminHubProductsDb

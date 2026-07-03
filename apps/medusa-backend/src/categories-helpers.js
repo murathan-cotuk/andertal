@@ -88,6 +88,7 @@ function categoriesPgUnavailable(res) {
 
 module.exports = {
   resolveAdminHub,
+  resolveCategoryRequestLocale,
   localizeCategoriesForRequest,
   localizeSingleCategoryForRequest,
   mapAdminHubCategoryPgRow,
