@@ -501,33 +501,6 @@ async function start() {
     const { expressLoader } = require('@medusajs/framework/http')
     const { app: httpApp } = await expressLoader({ app, container })
 
-    // Helper: resolve relative upload URLs to absolute using the current server URL.
-    // Old uploads stored as absolute localhost URLs are returned as-is; new uploads
-    // stored as relative paths (/uploads/...) get the current SERVER_URL prepended.
-    const CURRENT_SERVER_URL = (process.env.SERVER_URL || `http://localhost:${PORT}`).replace(/\/$/, '')
-    /** Accepts string, { url }, { src }, { path }, or other primitives; avoids url.startsType errors. */
-    const resolveUploadUrl = (url) => {
-      if (url == null || url === '') return null
-      if (typeof url === 'object' && url !== null) {
-        const nested = url.url != null ? url.url : url.src != null ? url.src : url.path != null ? url.path : null
-        if (nested != null && nested !== url) return resolveUploadUrl(nested)
-        return null
-      }
-      const s = typeof url === 'string' ? url : String(url)
-      const t = s.trim()
-      if (!t) return null
-      // Handle JSON-array-encoded URLs: '["https://..."]' stored by old media picker bug
-      if (t.startsWith('[')) {
-        try {
-          const arr = JSON.parse(t)
-          if (Array.isArray(arr) && arr[0]) return resolveUploadUrl(arr[0])
-        } catch (_) {}
-        return null
-      }
-      if (t.startsWith('http') || t.startsWith('//')) return t
-      return `${CURRENT_SERVER_URL}${t.startsWith('/') ? '' : '/'}${t}`
-    }
-
     // Explicit OPTIONS preflight handler on httpApp so Medusa's own CORS does not
     // override the custom allowed headers (sentry-trace, baggage etc.) for all routes.
     const ALLOWED_HEADERS = 'Content-Type,Authorization,sentry-trace,baggage,sentry-baggage'
