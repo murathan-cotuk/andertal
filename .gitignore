@@ -115,3 +115,7 @@ desktop.ini
 .env
 .env.local
 .env*.local
+
+# Telegram bot aktivite logu + oturum kimliği (yerel, repoda olmasın)
+telegram_activity.log
+.telegram_session

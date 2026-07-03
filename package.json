@@ -15,6 +15,8 @@
     "postinstall": "patch-package || true",
     "patch:backend": "node apps/medusa-backend/scripts/patch-link-modules.js",
     "start": "node apps/medusa-backend/server.js",
+    "telegram": "node telegram_listener.js",
+    "telegram:report": "node telegram_report.js",
     "storybook": "npm run storybook --workspace=packages/ui",
     "test:e2e": "playwright test"
   },
