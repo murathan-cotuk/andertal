@@ -1,0 +1,252 @@
+'use strict'
+const { Router } = require('express')
+const { appendBonusLedger } = require('./store-checkout')
+
+const adminHubAbandonedCartsGET = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    // Carts that have items but no corresponding order
+    const r = await client.query(`
+      SELECT c.id, c.created_at, c.updated_at,
+        c.email, c.first_name, c.last_name, c.phone,
+        json_agg(json_build_object('id',ci.id,'title',ci.title,'quantity',ci.quantity,'unit_price_cents',ci.unit_price_cents,'thumbnail',ci.thumbnail,'product_handle',ci.product_handle)) as items,
+        COUNT(ci.id)::int as item_count,
+        SUM(ci.unit_price_cents * ci.quantity) as cart_total
+      FROM store_carts c
+      JOIN store_cart_items ci ON ci.cart_id = c.id
+      WHERE NOT EXISTS (SELECT 1 FROM store_orders o WHERE o.cart_id = c.id)
+      GROUP BY c.id, c.created_at, c.updated_at, c.email, c.first_name, c.last_name, c.phone
+      ORDER BY c.updated_at DESC
+      LIMIT 100
+    `)
+    await client.end()
+    res.json({ carts: r.rows || [] })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.json({ carts: [] })
+  }
+}
+
+const adminHubReturnsGET = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const sellerId = (req.query.seller_id || '').trim()
+    const params = []
+    let where = ''
+    if (sellerId) { params.push(sellerId); where = `WHERE o.seller_id = $${params.length}` }
+    const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method, o.seller_id FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ${where} ORDER BY r.created_at DESC LIMIT 100`, params)
+    await client.end()
+    res.json({ returns: (r.rows || []).map(row => ({ ...row, return_number: row.return_number ? Number(row.return_number) : null, order_number: row.order_number ? Number(row.order_number) : null })) })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.json({ returns: [] })
+  }
+}
+
+const adminHubReturnsPOST = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  const { order_id, reason, notes, items } = req.body || {}
+  if (!order_id) return res.status(400).json({ message: 'order_id required' })
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query('INSERT INTO store_returns (order_id, reason, notes, items) VALUES ($1::uuid, $2, $3, $4) RETURNING *', [order_id, reason || null, notes || null, items ? JSON.stringify(items) : null])
+    const row = r.rows && r.rows[0]
+    await client.end()
+    res.status(201).json({ return: { ...row, return_number: row?.return_number ? Number(row.return_number) : null } })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
+const adminHubReturnPATCH = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  const id = (req.params.id || '').trim()
+  const { status, notes, refund_amount_cents, refund_status, refund_note } = req.body || {}
+  const sets = []; const params = []
+  if (status) {
+    params.push(status); sets.push(`status = $${params.length}`)
+    if (status === 'genehmigt') { sets.push('approved_at = now()') }
+    if (status === 'abgelehnt') { sets.push('rejected_at = now()') }
+  }
+  if (notes !== undefined) { params.push(notes); sets.push(`notes = $${params.length}`) }
+  if (refund_amount_cents !== undefined) { params.push(refund_amount_cents); sets.push(`refund_amount_cents = $${params.length}`) }
+  if (refund_status !== undefined) { params.push(refund_status); sets.push(`refund_status = $${params.length}`) }
+  if (refund_note !== undefined) { params.push(refund_note); sets.push(`refund_note = $${params.length}`) }
+  if (!sets.length) return res.status(400).json({ message: 'Nothing to update' })
+  sets.push('updated_at = now()')
+  params.push(id)
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    await client.query(`UPDATE store_returns SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
+    if (status === 'genehmigt') {
+      await client.query(
+        `UPDATE store_orders SET order_status = 'retoure', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
+        [id],
+      ).catch(() => {})
+    }
+    if (status === 'abgelehnt') {
+      await client.query(
+        `UPDATE store_orders SET order_status = CASE
+           WHEN payment_status = 'bezahlt' AND delivery_status = 'zugestellt' THEN 'abgeschlossen'
+           ELSE order_status
+         END, updated_at = now()
+         WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
+        [id],
+      ).catch(() => {})
+    }
+    // If refund processed, also mark order as refunded
+    if (refund_status === 'erstattet') {
+      await client.query(
+        `UPDATE store_orders SET order_status = 'refunded', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
+        [id]
+      ).catch(() => {})
+      // Auto-reverse bonus points on refund
+      try {
+        const retRow = await client.query(
+          `SELECT r.order_id, o.customer_id, o.order_number, COALESCE(o.bonus_points_redeemed, 0)::int AS bonus_points_redeemed
+           FROM store_returns r
+           LEFT JOIN store_orders o ON o.id = r.order_id
+           WHERE r.id = $1::uuid`,
+          [id]
+        )
+        const rr = retRow.rows[0]
+        if (rr?.customer_id && rr?.order_id) {
+          const alreadyEarnedDone = await client.query(
+            `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return_earn' LIMIT 1`,
+            [rr.order_id]
+          )
+          const alreadyRedeemDone = await client.query(
+            `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return_redeem' LIMIT 1`,
+            [rr.order_id]
+          )
+          if (!alreadyEarnedDone.rows.length || !alreadyRedeemDone.rows.length) {
+            const earned = await client.query(
+              `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_earn'`,
+              [rr.order_id]
+            )
+            const earnedPts = Number(earned.rows[0]?.total || 0)
+            const redeemed = await client.query(
+              `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_redeem'`,
+              [rr.order_id]
+            )
+            const redeemedPts = Number(redeemed.rows[0]?.total || 0)
+            if (earnedPts > 0 && !alreadyEarnedDone.rows.length) {
+              await appendBonusLedger(client, {
+                customerId: rr.customer_id, pointsDelta: -earnedPts,
+                description: `Retoure Bestellung #${rr.order_number} — Punkte zurückgebucht (−${earnedPts} Punkte)`,
+                source: 'order_return_earn', orderId: rr.order_id,
+              })
+            }
+            const redeemedFromOrder = Number(rr.bonus_points_redeemed || 0)
+            const pointsToGiveBack = redeemedPts < 0 ? -redeemedPts : redeemedFromOrder
+            if (pointsToGiveBack > 0 && !alreadyRedeemDone.rows.length) {
+              await appendBonusLedger(client, {
+                customerId: rr.customer_id, pointsDelta: pointsToGiveBack,
+                description: `Retoure Bestellung #${rr.order_number} — eingelöste Punkte zurückgegeben (+${pointsToGiveBack} Punkte)`,
+                source: 'order_return_redeem', orderId: rr.order_id,
+              })
+            }
+          }
+        }
+      } catch (bonusErr) {
+        console.warn('bonus reversal on return:', bonusErr?.message)
+      }
+    }
+    const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`, [id])
+    await client.end()
+    const row = r.rows && r.rows[0]
+    res.json({ return: { ...row, return_number: row?.return_number ? Number(row.return_number) : null, order_number: row?.order_number ? Number(row.order_number) : null } })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
+// POST /admin-hub/v1/returns/:id/send-label — mark label sent + send email to customer
+const adminHubReturnSendLabelPOST = async (req, res) => {
+  const id = (req.params.id || '').trim()
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(
+      `SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method
+       FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`,
+      [id]
+    )
+    const row = r.rows && r.rows[0]
+    if (!row) { await client.end(); return res.status(404).json({ message: 'Return not found' }) }
+    await client.query(`UPDATE store_returns SET label_sent_at = now(), updated_at = now() WHERE id = $1::uuid`, [id])
+    await client.end()
+
+    let emailSent = false
+    if (row.email && process.env.SMTP_HOST) {
+      try {
+        const nodemailer = require('nodemailer')
+        const transport = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+        })
+        const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ') || row.email
+        const fmtDate = (d) => d ? new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
+        const labelHtml = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Retoureschein</title></head><body style="font-family:Arial,sans-serif;margin:40px;color:#111">
+<h1 style="font-size:22px">Retoureschein</h1>
+<p style="color:#6b7280;font-size:13px;margin-bottom:24px">Retoure-Nr.: <strong>R-${row.return_number || '—'}</strong> · Bestellung: <strong>#${row.order_number || '—'}</strong></p>
+<div style="border:2px dashed #e5e7eb;border-radius:8px;padding:20px;text-align:center;margin:24px 0">
+  <div style="font-size:32px;font-weight:800;letter-spacing:4px">R-${row.return_number || '—'}</div>
+  <small style="color:#6b7280;font-size:11px">Retoure-Nummer – bitte gut sichtbar auf das Paket kleben</small>
+</div>
+<p><strong>Rückgabegrund:</strong> ${row.reason || 'Kein Grund angegeben'}</p>
+${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
+<p style="margin-top:32px;font-size:11px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px">
+  Erstellt am ${fmtDate(row.created_at)} · Bitte legen Sie diesen Schein dem Paket bei.
+</p>
+</body></html>`
+        await transport.sendMail({
+          from: process.env.SMTP_FROM || '"Andertal Shop" <noreply@andertal.de>',
+          to: row.email,
+          subject: `Ihr Retoureschein R-${row.return_number} – Bestellung #${row.order_number}`,
+          html: `<p>Hallo ${customerName},</p><p>Ihre Retouranfrage wurde genehmigt. Anbei finden Sie Ihren Retoureschein.</p><p>Bitte legen Sie den Retoureschein dem Paket bei und senden Sie es an uns zurück.</p>${labelHtml}`,
+        })
+        emailSent = true
+      } catch (emailErr) {
+        console.error('Return label email error:', emailErr?.message)
+      }
+    }
+    res.json({ success: true, emailSent, label_sent_at: new Date().toISOString() })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
+module.exports = function createReturnsRouter() {
+  const router = Router()
+
+  router.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
+  router.get('/admin-hub/v1/returns', adminHubReturnsGET)
+  router.post('/admin-hub/v1/returns', adminHubReturnsPOST)
+  router.patch('/admin-hub/v1/returns/:id', adminHubReturnPATCH)
+  router.post('/admin-hub/v1/returns/:id/send-label', adminHubReturnSendLabelPOST)
+
+  return router
+}
