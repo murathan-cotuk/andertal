@@ -193,11 +193,20 @@ async function processQueue() {
     logLine('KOMUT ÇALIŞIYOR', job.prompt)
     await sendSafe(job.chatId, '⏳ İşleniyor...')
     let res = await runClaude(job.prompt)
-    // Oturum kaybolmuşsa (disk temizlenmiş vb.) otomatik yeni oturum aç ve tekrar dene.
-    if (!res.ok && sessionExists && /no conversation|session|resume|not found|bulunamad/i.test(res.output || '')) {
-      logLine('OTURUM SIFIRLANDI', 'önceki oturum bulunamadı, yeni sohbet başlatılıyor')
-      resetSession()
-      res = await runClaude(job.prompt)
+    // Oturum durumu bozulmuşsa otomatik onar ve bir kez tekrar dene.
+    if (!res.ok) {
+      const out = (res.output || '').toLowerCase()
+      if (/already in use|already exists/.test(out)) {
+        // --session-id ile oluşturmaya çalıştık ama oturum zaten var → --resume'a geç.
+        logLine('OTURUM DÜZELTME', 'oturum zaten mevcut, --resume moduna geçiliyor')
+        persistSession() // sessionExists=true yapar + dosyaya yazar
+        res = await runClaude(job.prompt)
+      } else if (/no conversation|not found|no such session|does not exist|bulunamad/.test(out)) {
+        // --resume başarısız → oturum yok, sıfırdan yeni oturum aç.
+        logLine('OTURUM SIFIRLANDI', 'önceki oturum bulunamadı, yeni sohbet başlatılıyor')
+        resetSession()
+        res = await runClaude(job.prompt)
+      }
     }
     const header = res.ok ? '✅ Tamamlandı\n\n' : `⚠️ Hata (çıkış kodu: ${res.code ?? 'yok'})\n\n`
     logLine(res.ok ? 'CEVAP' : 'CEVAP (hata)', res.output)
