@@ -2074,6 +2074,16 @@ async function start() {
     httpApp.use('/', createWebhooksRouter({ getSellerDbClient, loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform }))
 
     // ── Marketplace tables ────────────────────────────────────────────────────
+    // dbQ was originally defined here and got removed when the metafields section
+    // (which sat right above this block) was extracted to src/routes/metafields.js —
+    // that extraction kept its own copy of dbQ, but this block still needs one too.
+    const dbQ = async (sql, params = []) => {
+      const { Client } = require('pg')
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+      await client.connect()
+      try { const r = await client.query(sql, params); return r } finally { await client.end() }
+    }
     await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_seller_listings (
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       product_id  uuid NOT NULL REFERENCES admin_hub_products(id) ON DELETE CASCADE,
