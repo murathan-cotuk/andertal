@@ -1584,7 +1584,10 @@ async function start() {
     })
 
     // --- Seller Auth: extracted to src/routes/seller-auth.js ---
-    const { createSellerAuthRouter, requireSellerAuth, requireSuperuser, verifySellerToken, signSellerToken, validatePasswordStrength, encryptTotp, decryptTotp, hashSellerPassword, verifySellerPassword, getSellerDbClient } = require('./src/routes/seller-auth')
+    // seller-auth.js's module.exports IS createSellerAuthRouter itself (static props attached to the function) —
+    // destructuring createSellerAuthRouter as a property of the require() result gave `undefined`.
+    const createSellerAuthRouter = require('./src/routes/seller-auth')
+    const { requireSellerAuth, requireSuperuser, verifySellerToken, signSellerToken, validatePasswordStrength, encryptTotp, decryptTotp, hashSellerPassword, verifySellerPassword, getSellerDbClient } = createSellerAuthRouter
     // ── Auth gatekeeper for /admin-hub (S1.3) ─────────────────────────────
     // Default-deny on every /admin-hub/* request: must carry a valid seller
     // bearer token via requireSellerAuth (see ~line 5630) UNLESS the path
@@ -1696,26 +1699,44 @@ async function start() {
     httpApp.use('/', createMenusRouter())
 
     // --- Admin Hub Products: extracted to src/routes/admin-products.js ---
-    const { createAdminProductsRouter, getAdminHubProductByIdOrHandleDb, updateAdminHubProductDb, getProductsDbClient } = require('./src/routes/admin-products')
+    // admin-products.js's module.exports IS the router factory function itself (with
+    // getAdminHubProductByIdOrHandleDb/updateAdminHubProductDb/getProductsDbClient/listAdminHubProductsDb
+    // attached as static properties on it) — destructuring `createAdminProductsRouter` as if it
+    // were a property of a plain exports object gave `undefined`, causing
+    // "TypeError: createAdminProductsRouter is not a function" on every boot.
+    const createAdminProductsRouter = require('./src/routes/admin-products')
+    const { getAdminHubProductByIdOrHandleDb, updateAdminHubProductDb, getProductsDbClient } = createAdminProductsRouter
     httpApp.use('/', createAdminProductsRouter())
 
     // --- Seller Settings: extracted to src/routes/seller-settings.js ---
-    const { createSellerSettingsRouter, normalizeHubCountryCode, normalizeThresholdsObject, STORE_PUBLISHED_STATUSES, isStorePublishedStatus, storePublishedStatusSql, getSellerStoreName, getApprovedSellerIdsSet, isStoreVisibleSellerProduct } = require('./src/routes/seller-settings')
+    // seller-settings.js's module.exports IS createSellerSettingsRouter itself (static props attached to it) —
+    // destructuring createSellerSettingsRouter as a property of the require() result gave `undefined`.
+    const createSellerSettingsRouter = require('./src/routes/seller-settings')
+    const { normalizeHubCountryCode, normalizeThresholdsObject, STORE_PUBLISHED_STATUSES, isStorePublishedStatus, storePublishedStatusSql, getSellerStoreName, getApprovedSellerIdsSet, isStoreVisibleSellerProduct } = createSellerSettingsRouter
     httpApp.use('/', createSellerSettingsRouter())
 
     // ── Seller Auth ───────────────────────────────────────────────────────────
     httpApp.use('/', createSellerAuthRouter())
 
     // --- Platform Checkout + Store Public: extracted to src/routes/platform-checkout.js ---
-    const { createPlatformCheckoutRouter, loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform, resolveStripePublishableFromPlatform, paymentMethodTypesFromPlatformRow } = require('./src/routes/platform-checkout')
+    // platform-checkout.js's module.exports IS createPlatformCheckoutRouter itself (static props attached to it) —
+    // destructuring createPlatformCheckoutRouter as a property of the require() result gave `undefined`.
+    const createPlatformCheckoutRouter = require('./src/routes/platform-checkout')
+    const { loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform, resolveStripePublishableFromPlatform, paymentMethodTypesFromPlatformRow } = createPlatformCheckoutRouter
     httpApp.use('/', createPlatformCheckoutRouter({ requireSuperuser }))
 
     // --- Store Products + Brands: extracted to src/routes/store-products.js ---
-    const { createStoreProductsRouter, normalizeStoreEan, parseVariantsArray, extractEanFromHubProductRow, resolveUploadUrl, mapAdminHubToStoreProduct, getBestsellerProductIds, isUuidLike, getAdminHubCollectionIdByHandle } = require('./src/routes/store-products')
+    // store-products.js's module.exports IS createStoreProductsRouter itself (static props attached to it) —
+    // destructuring createStoreProductsRouter as a property of the require() result gave `undefined`.
+    const createStoreProductsRouter = require('./src/routes/store-products')
+    const { normalizeStoreEan, parseVariantsArray, extractEanFromHubProductRow, resolveUploadUrl, mapAdminHubToStoreProduct, getBestsellerProductIds, isUuidLike, getAdminHubCollectionIdByHandle } = createStoreProductsRouter
     httpApp.use('/', createStoreProductsRouter())
 
     // --- Store Checkout (carts, payment intent, orders, customers, shipping groups): extracted to src/routes/store-checkout.js ---
-    const { createStoreCheckoutRouter, verifyCustomerToken, signCustomerToken, customerIdForPg, appendBonusLedger, stripLegacyBonusLedgerVersandSuffix, buildOrderSettlementBreakdown, sellerOrderRevenueBasisCents, resolvePlatformApplicationFeeCents, platformCommissionCentsFromMerchandise, normalizeCouponCode, bonusPointsEarnedFromOrderPaidCents, getOrderWithItems, resolveSellerDisplayNameForStripe, truncateForStripeDescription, computeCartCheckoutMoney } = require('./src/routes/store-checkout')
+    // store-checkout.js's module.exports IS createStoreCheckoutRouter itself (static props attached to it) —
+    // destructuring createStoreCheckoutRouter as a property of the require() result gave `undefined`.
+    const createStoreCheckoutRouter = require('./src/routes/store-checkout')
+    const { verifyCustomerToken, signCustomerToken, customerIdForPg, appendBonusLedger, stripLegacyBonusLedgerVersandSuffix, buildOrderSettlementBreakdown, sellerOrderRevenueBasisCents, resolvePlatformApplicationFeeCents, platformCommissionCentsFromMerchandise, normalizeCouponCode, bonusPointsEarnedFromOrderPaidCents, getOrderWithItems, resolveSellerDisplayNameForStripe, truncateForStripeDescription, computeCartCheckoutMoney } = createStoreCheckoutRouter
     httpApp.use('/', createStoreCheckoutRouter())
 
     // --- Store Public (collections, categories, menus, page-by-label-slug): extracted to src/routes/store-public.js ---
