@@ -1865,7 +1865,7 @@ async function start() {
       try {
         await client.connect()
         const r = await client.query(
-          `SELECT o.id, o.carrier_name, o.tracking_number, o.postal_code
+          `SELECT o.id, o.seller_id, o.carrier_name, o.tracking_number, o.postal_code
            FROM store_orders o
            WHERE o.tracking_number IS NOT NULL AND o.tracking_number != ''
              AND o.delivery_status NOT IN ('zugestellt', 'storniert')
@@ -1879,7 +1879,8 @@ async function start() {
           const isDHL = cn === 'dhl' || cn.startsWith('dhl')
           const isDPD = cn === 'dpd' || cn.startsWith('dpd')
           const isGLS = cn === 'gls' || cn.startsWith('gls')
-          if (!isDHL && !isDPD && !isGLS) continue
+          const isUPS = cn === 'ups' || cn.startsWith('ups')
+          if (!isDHL && !isDPD && !isGLS && !isUPS) continue
           try {
             const dbUrl2 = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
             const { Client: PgClient2 } = require('pg')
@@ -1891,7 +1892,13 @@ async function start() {
 
             if (isDHL) {
               const envDhlKey = (process.env.DHL_API_KEY || process.env.DHL_TRACK_API_KEY || process.env.DHLPARCEL_API_KEY || '').toString().trim()
-              const cq = await c2.query('SELECT api_key FROM store_shipping_carriers WHERE LOWER(TRIM(name)) LIKE $1 AND is_active=true LIMIT 1', ['dhl%'])
+              // Prefer this order's own seller's DHL config, fall back to the platform-wide entry (seller_id IS NULL)
+              const cq = await c2.query(
+                `SELECT api_key FROM store_shipping_carriers
+                 WHERE LOWER(TRIM(name)) LIKE $1 AND is_active=true AND (seller_id = $2 OR seller_id IS NULL)
+                 ORDER BY (seller_id IS NOT NULL) DESC LIMIT 1`,
+                ['dhl%', order.seller_id || null]
+              )
               const apiKey = (cq.rows[0]?.api_key && String(cq.rows[0].api_key).trim()) || envDhlKey
               if (!apiKey) { await c2.end(); continue }
               const pc = String(order.postal_code || '').trim().replace(/\s+/g, '')
@@ -1955,6 +1962,51 @@ async function start() {
                   }
                 }
               }
+            } else if (isUPS) {
+              // Prefer this order's own seller's UPS config, fall back to the platform-wide entry (seller_id IS NULL)
+              const cq = await c2.query(
+                `SELECT api_key, api_secret FROM store_shipping_carriers
+                 WHERE LOWER(TRIM(name)) LIKE $1 AND is_active=true AND (seller_id = $2 OR seller_id IS NULL)
+                 ORDER BY (seller_id IS NOT NULL) DESC LIMIT 1`,
+                ['ups%', order.seller_id || null]
+              )
+              const upsKey = (cq.rows[0]?.api_key && String(cq.rows[0].api_key).trim()) || ''
+              const upsSecret = (cq.rows[0]?.api_secret && String(cq.rows[0].api_secret).trim()) || ''
+              if (upsKey) {
+                const creds = Buffer.from(`${upsKey}:${upsSecret}`).toString('base64')
+                const tokenBody = 'grant_type=client_credentials'
+                const tokenData = await new Promise((resolve) => {
+                  const req2 = https.request(
+                    { hostname: 'onlinetools.ups.com', path: '/security/v1/oauth/token', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${creds}`, 'Content-Length': Buffer.byteLength(tokenBody) } },
+                    (resp) => { let b = ''; resp.on('data', d => { b += d }); resp.on('end', () => { try { resolve(JSON.parse(b)) } catch { resolve({}) } }) }
+                  )
+                  req2.on('error', () => resolve({})); req2.write(tokenBody); req2.end()
+                })
+                const accessToken = tokenData.access_token
+                if (accessToken) {
+                  const upsData = await new Promise((resolve) => {
+                    const req2 = https.request(
+                      { hostname: 'onlinetools.ups.com', path: `/api/track/v1/details/${encodeURIComponent(trackingNumber)}`, method: 'GET', headers: { Authorization: `Bearer ${accessToken}`, transId: `order-${order.id}`, transactionSrc: 'andertal', Accept: 'application/json' } },
+                      (resp) => { let b = ''; resp.on('data', d => { b += d }); resp.on('end', () => { try { resolve({ data: JSON.parse(b), ok: resp.statusCode < 400 }) } catch { resolve({ data: {}, ok: false }) } }) }
+                    )
+                    req2.on('error', () => resolve({ data: {}, ok: false })); req2.end()
+                  })
+                  if (upsData.ok) {
+                    const activities = upsData.data?.trackResponse?.shipment?.[0]?.package?.[0]?.activity || []
+                    for (const act of activities) {
+                      const desc = (act.status?.description || '').trim()
+                      const loc = [act.location?.address?.city, act.location?.address?.countryCode].filter(Boolean).join(', ') || null
+                      const d = act.date || ''; const t = act.time || '000000'
+                      const ts = d.length === 8 ? new Date(`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}T${t.slice(0,2)}:${t.slice(2,4)}:${t.slice(4,6)}`).toISOString() : new Date().toISOString()
+                      const statusCode = String(act.status?.type || '').toUpperCase()
+                      let status = 'in_transit'
+                      if (statusCode === 'D' || statusCode === 'P') status = 'zugestellt'
+                      else if (statusCode === 'M' || statusCode === 'O') status = 'versendet'
+                      bgEvents.push({ status, description: desc || null, location: loc, event_time: ts })
+                    }
+                  }
+                }
+              }
             }
 
             let mostRecentStatus = null
@@ -1978,9 +2030,12 @@ async function start() {
               await c2.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
             }
             await c2.end()
-          } catch (_) {}
+          } catch (e) {
+            console.warn(`[runAutoTrackingRefresh] order ${order.id} (${order.carrier_name}) refresh failed:`, e?.message || e)
+          }
         }
-      } catch (_) {
+      } catch (e) {
+        console.warn('[runAutoTrackingRefresh] batch query failed:', e?.message || e)
         try { await client.end() } catch (_2) {}
       }
     }

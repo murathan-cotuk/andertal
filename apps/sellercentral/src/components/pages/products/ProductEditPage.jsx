@@ -1140,18 +1140,24 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       }
       const updatedRaw = await client.updateAdminHubProduct(idOrHandle, payload);
 
-      // Handle suggestion_submitted (superuser review needed for shared catalog changes)
+      // Handle suggestion_submitted (superuser review needed for shared catalog changes).
+      // Note: a request can carry BOTH a shared-field change proposal AND the caller's own
+      // price/inventory/etc — when listing_saved is also true, fall through to that handling
+      // below instead of returning early, otherwise the seller's own saved fields never reach
+      // local state even though the backend persisted them.
       if (updatedRaw?.suggestion_submitted) {
-        setMessage({ type: "success", text: locale === "en" ? "Your change suggestion has been submitted. A superuser will review it." : locale === "tr" ? "Değişiklik öneriniz gönderildi. Bir süper kullanıcı inceleyecek." : locale === "fr" ? "Votre suggestion de modification a été soumise. Un superuser va l'examiner." : locale === "es" ? "Tu sugerencia de cambio ha sido enviada. Un superusuario la revisará." : locale === "it" ? "Il tuo suggerimento di modifica è stato inviato. Un superuser lo esaminerà." : "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
         if (typeof window !== "undefined") {
           window.dispatchEvent(new Event("andertal-notifications-refresh"));
         }
-        const merged = { ...product, ...payload, metadata: payload.metadata ?? product.metadata };
-        setProduct(merged);
-        setBaselineSnapshot(productSnapshot(merged));
-        unsaved?.setDirty(false);
         await refetchPendingChangeRequests(product.id);
-        return true;
+        if (!updatedRaw?.listing_saved) {
+          setMessage({ type: "success", text: locale === "en" ? "Your change suggestion has been submitted. A superuser will review it." : locale === "tr" ? "Değişiklik öneriniz gönderildi. Bir süper kullanıcı inceleyecek." : locale === "fr" ? "Votre suggestion de modification a été soumise. Un superuser va l'examiner." : locale === "es" ? "Tu sugerencia de cambio ha sido enviada. Un superusuario la revisará." : locale === "it" ? "Il tuo suggerimento di modifica è stato inviato. Un superuser lo esaminerà." : "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
+          const merged = { ...product, ...payload, metadata: payload.metadata ?? product.metadata };
+          setProduct(merged);
+          setBaselineSnapshot(productSnapshot(merged));
+          unsaved?.setDirty(false);
+          return true;
+        }
       }
 
       // Handle listing_saved (seller-specific fields saved to listing, not master product)
@@ -1174,7 +1180,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setProduct(savedProduct);
       setBaselineSnapshot(productSnapshot(savedProduct));
       unsaved?.setDirty(false);
-      setMessage({ type: "success", text: updatedRaw?.listing_saved ? (locale === "en" ? "Price, inventory and own data saved." : locale === "tr" ? "Fiyat, stok ve özel veriler kaydedildi." : locale === "fr" ? "Prix, stock et données propres enregistrés." : locale === "es" ? "Precio, inventario y datos propios guardados." : locale === "it" ? "Prezzo, inventario e dati propri salvati." : "Preis, Bestand und eigene Daten gespeichert.") : ui.saved });
+      setMessage({ type: "success", text: updatedRaw?.listing_saved
+        ? (updatedRaw?.suggestion_submitted
+            ? (locale === "en" ? "Price and inventory saved. Your shared-field change suggestion was submitted for superuser review." : locale === "tr" ? "Fiyat ve stok bilgileriniz kaydedildi. Ortak alan değişiklik öneriniz superuser onayına gönderildi." : locale === "fr" ? "Prix et stock enregistrés. Votre suggestion de modification a été soumise pour examen par un superuser." : locale === "es" ? "Precio e inventario guardados. Tu sugerencia de cambio fue enviada para revisión del superusuario." : locale === "it" ? "Prezzo e inventario salvati. Il tuo suggerimento di modifica è stato inviato per la revisione del superuser." : "Preis und Bestand gespeichert. Dein Änderungsvorschlag wurde zur Prüfung durch einen Superuser eingereicht.")
+            : (locale === "en" ? "Price, inventory and own data saved." : locale === "tr" ? "Fiyat, stok ve özel veriler kaydedildi." : locale === "fr" ? "Prix, stock et données propres enregistrés." : locale === "es" ? "Precio, inventario y datos propios guardados." : locale === "it" ? "Prezzo, inventario e dati propri salvati." : "Preis, Bestand und eigene Daten gespeichert."))
+        : ui.saved });
       await refetchPendingChangeRequests(savedProduct.id);
       onReload?.();
       return true;

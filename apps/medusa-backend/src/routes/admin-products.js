@@ -537,6 +537,7 @@ const adminHubProductsPOST = async (req, res) => {
       await lc.connect()
       const effectiveSellerId = callerSellerId || null
       let listing = null
+      let newListingCreated = false
       if (effectiveSellerId) {
         const existListing = await lc.query(
           'SELECT id, price_cents, inventory, status FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2',
@@ -547,12 +548,38 @@ const adminHubProductsPOST = async (req, res) => {
         } else {
           const priceCents = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
           const inventory = parseInt(body.inventory, 10) || 0
+          // New cross-seller listings start as 'draft' so they never appear live/in the buy box
+          // until the seller (or superuser review) activates them explicitly.
           const lr = await lc.query(
             'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-            [masterProduct.id, effectiveSellerId, priceCents || masterProduct.price_cents || 0, inventory, 'active']
+            [masterProduct.id, effectiveSellerId, priceCents || masterProduct.price_cents || 0, inventory, 'draft']
           )
           listing = lr.rows[0]
+          newListingCreated = true
         }
+      }
+      if (newListingCreated && effectiveSellerId) {
+        try {
+          const sellerNameR = await lc.query(
+            `SELECT s.store_name AS settings_store_name, u.store_name AS user_store_name, u.company_name, u.email
+             FROM seller_users u
+             LEFT JOIN admin_hub_seller_settings s ON s.seller_id = u.seller_id
+             WHERE u.seller_id = $1 AND u.sub_of_seller_id IS NULL LIMIT 1`,
+            [effectiveSellerId]
+          )
+          const sRow = sellerNameR.rows[0] || {}
+          const sellerDisplayName = (sRow.settings_store_name && String(sRow.settings_store_name).trim()) || (sRow.user_store_name && String(sRow.user_store_name).trim()) || (sRow.company_name && String(sRow.company_name).trim()) || sRow.email || effectiveSellerId
+          await lc.query(
+            `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+             VALUES ('seller_listing_pending', $1, $2, $3, $4)`,
+            [
+              `Neuer Verkäufer für vorhandenes Produkt: ${masterProduct.title || masterProduct.id}`,
+              `${sellerDisplayName} hat "${masterProduct.title || masterProduct.id}" (bereits vorhandene EAN) zu seinem/ihrem Bestand hinzugefügt. Der Eintrag ist als Entwurf gespeichert und muss vor Veröffentlichung freigegeben/aktiviert werden.`,
+              effectiveSellerId,
+              masterProduct.id,
+            ],
+          ).catch(() => {})
+        } catch (_) {}
       }
       await lc.end()
 
@@ -703,11 +730,34 @@ const adminHubProductsPOST = async (req, res) => {
             if (!fallbackListing) {
               const priceCentsFb = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
               const inventoryFb = parseInt(body.inventory, 10) || 0
+              // New cross-seller listings start as 'draft' so they never appear live/in the buy box
+              // until the seller (or superuser review) activates them explicitly.
               const lrFb = await lc2.query(
                 'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-                [fallbackMaster.id, callerSellerId, priceCentsFb || fallbackMaster.price_cents || 0, inventoryFb, 'active']
+                [fallbackMaster.id, callerSellerId, priceCentsFb || fallbackMaster.price_cents || 0, inventoryFb, 'draft']
               )
               fallbackListing = lrFb.rows[0] || null
+              try {
+                const sellerNameR = await lc2.query(
+                  `SELECT s.store_name AS settings_store_name, u.store_name AS user_store_name, u.company_name, u.email
+                   FROM seller_users u
+                   LEFT JOIN admin_hub_seller_settings s ON s.seller_id = u.seller_id
+                   WHERE u.seller_id = $1 AND u.sub_of_seller_id IS NULL LIMIT 1`,
+                  [callerSellerId]
+                )
+                const sRow = sellerNameR.rows[0] || {}
+                const sellerDisplayName = (sRow.settings_store_name && String(sRow.settings_store_name).trim()) || (sRow.user_store_name && String(sRow.user_store_name).trim()) || (sRow.company_name && String(sRow.company_name).trim()) || sRow.email || callerSellerId
+                await lc2.query(
+                  `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+                   VALUES ('seller_listing_pending', $1, $2, $3, $4)`,
+                  [
+                    `Neuer Verkäufer für vorhandenes Produkt: ${fallbackMaster.title || fallbackMaster.id}`,
+                    `${sellerDisplayName} hat "${fallbackMaster.title || fallbackMaster.id}" (bereits vorhandene EAN) zu seinem/ihrem Bestand hinzugefügt. Der Eintrag ist als Entwurf gespeichert und muss vor Veröffentlichung freigegeben/aktiviert werden.`,
+                    callerSellerId,
+                    fallbackMaster.id,
+                  ],
+                ).catch(() => {})
+              } catch (_) {}
             }
             await lc2.end()
             return res.status(200).json({ product: fallbackMaster, listing: fallbackListing, deduplicated: true, is_new_master: false, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
@@ -847,7 +897,9 @@ const adminHubProductByIdPUT = async (req, res) => {
             ])
           }
         } finally { try { await qc.end() } catch (_) {} }
-        return res.status(202).json({ message: queuedMetaSuggestionCount > 0 ? 'Change proposal submitted. Metafield suggestions were also queued for superuser approval.' : 'Change proposal submitted. A superuser will review it.', suggestion_submitted: true, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
+        // Do NOT return here: a request can carry both a shared-field change proposal
+        // AND the caller's own price/inventory/status/sku — both must be persisted below,
+        // otherwise the seller-specific fields from this same request are silently lost.
       }
 
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -877,6 +929,27 @@ const adminHubProductByIdPUT = async (req, res) => {
           [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate]
         )
         listing = ir.rows[0] || null
+        try {
+          const sellerNameR = await lc.query(
+            `SELECT s.store_name AS settings_store_name, u.store_name AS user_store_name, u.company_name, u.email
+             FROM seller_users u
+             LEFT JOIN admin_hub_seller_settings s ON s.seller_id = u.seller_id
+             WHERE u.seller_id = $1 AND u.sub_of_seller_id IS NULL LIMIT 1`,
+            [callerSellerId]
+          )
+          const sRow = sellerNameR.rows[0] || {}
+          const sellerDisplayName = (sRow.settings_store_name && String(sRow.settings_store_name).trim()) || (sRow.user_store_name && String(sRow.user_store_name).trim()) || (sRow.company_name && String(sRow.company_name).trim()) || sRow.email || callerSellerId
+          await lc.query(
+            `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+             VALUES ('seller_listing_pending', $1, $2, $3, $4)`,
+            [
+              `Neuer Verkäufer für vorhandenes Produkt: ${existing.title || existing.id}`,
+              `${sellerDisplayName} hat "${existing.title || existing.id}" (bereits vorhandene EAN) zu seinem/ihrem Bestand hinzugefügt. Der Eintrag ist als Entwurf gespeichert und muss vor Veröffentlichung freigegeben/aktiviert werden.`,
+              callerSellerId,
+              existing.id,
+            ],
+          ).catch(() => {})
+        } catch (_) {}
       }
       await lc.end()
       return res.json({
@@ -887,6 +960,13 @@ const adminHubProductByIdPUT = async (req, res) => {
           metadata: { ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}), ...(listing?.shipping_group_id ? { shipping_group_id: listing.shipping_group_id } : {}), ...(listing?.brand_id ? { brand_id: listing.brand_id } : {}), ...(listing?.publish_date ? { publish_date: listing.publish_date } : {}) },
         },
         listing, listing_saved: true, shared_change_blocked: true,
+        suggestion_submitted: wantsSharedChange,
+        metafield_suggestions_submitted: queuedMetaSuggestionCount > 0,
+        message: wantsSharedChange
+          ? (queuedMetaSuggestionCount > 0
+              ? 'Fiyat/stok bilgileriniz kaydedildi. Ortak ürün bilgisi değişiklik öneriniz (metafield önerileriyle birlikte) superuser onayına gönderildi.'
+              : 'Fiyat/stok bilgileriniz kaydedildi. Ortak ürün bilgisi değişiklik öneriniz superuser onayına gönderildi.')
+          : undefined,
       })
     }
 
@@ -912,8 +992,8 @@ const adminHubProductByIdPUT = async (req, res) => {
           }
           await qc.end()
         } catch (_) { try { await qc.end() } catch (__) {} }
-        res.status(202).json({ message: queuedMetaSuggestionCount > 0 ? 'Degisiklik oneriniz superuser onayina gonderildi. Metafield onerileri de siraya alindi.' : 'Degisiklik oneriniz superuser onayina gonderildi.', suggestion_submitted: true, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
-        return
+        // Do NOT return here: the caller's own price/inventory/status/sku from this same
+        // request must still be saved below, in addition to the change-request rows above.
       }
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
@@ -942,6 +1022,27 @@ const adminHubProductByIdPUT = async (req, res) => {
           [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate]
         )
         listing = ir.rows[0] || null
+        try {
+          const sellerNameR = await lc.query(
+            `SELECT s.store_name AS settings_store_name, u.store_name AS user_store_name, u.company_name, u.email
+             FROM seller_users u
+             LEFT JOIN admin_hub_seller_settings s ON s.seller_id = u.seller_id
+             WHERE u.seller_id = $1 AND u.sub_of_seller_id IS NULL LIMIT 1`,
+            [callerSellerId]
+          )
+          const sRow = sellerNameR.rows[0] || {}
+          const sellerDisplayName = (sRow.settings_store_name && String(sRow.settings_store_name).trim()) || (sRow.user_store_name && String(sRow.user_store_name).trim()) || (sRow.company_name && String(sRow.company_name).trim()) || sRow.email || callerSellerId
+          await lc.query(
+            `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+             VALUES ('seller_listing_pending', $1, $2, $3, $4)`,
+            [
+              `Neuer Verkäufer für vorhandenes Produkt: ${existing.title || existing.id}`,
+              `${sellerDisplayName} hat "${existing.title || existing.id}" (bereits vorhandene EAN) zu seinem/ihrem Bestand hinzugefügt. Der Eintrag ist als Entwurf gespeichert und muss vor Veröffentlichung freigegeben/aktiviert werden.`,
+              callerSellerId,
+              existing.id,
+            ],
+          ).catch(() => {})
+        } catch (_) {}
       }
       await lc.end()
       const productWithListingData = {
@@ -950,7 +1051,17 @@ const adminHubProductByIdPUT = async (req, res) => {
         inventory: listing?.inventory || 0, status: listing?.status || existing.status, sku: listing?.sku || null,
         metadata: { ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}), ...(listing?.shipping_group_id ? { shipping_group_id: listing.shipping_group_id } : {}), ...(listing?.brand_id ? { brand_id: listing.brand_id } : {}), ...(listing?.publish_date ? { publish_date: listing.publish_date } : {}) },
       }
-      res.json({ product: productWithListingData, listing, listing_saved: true, shared_change_blocked: false, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
+      res.json({
+        product: productWithListingData,
+        listing, listing_saved: true, shared_change_blocked: false,
+        suggestion_submitted: wantsSharedChange,
+        metafield_suggestions_submitted: queuedMetaSuggestionCount > 0,
+        message: wantsSharedChange
+          ? (queuedMetaSuggestionCount > 0
+              ? 'Fiyat/stok bilgileriniz kaydedildi. Ortak ürün bilgisi değişiklik öneriniz (metafield önerileriyle birlikte) superuser onayına gönderildi.'
+              : 'Fiyat/stok bilgileriniz kaydedildi. Ortak ürün bilgisi değişiklik öneriniz superuser onayına gönderildi.')
+          : undefined,
+      })
       return
     }
 

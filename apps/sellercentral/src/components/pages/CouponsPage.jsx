@@ -165,7 +165,7 @@ export default function CouponsPage() {
         discount_value: dVal,
         min_subtotal_cents: Math.round(Number(form.min_subtotal_cents || 0) * 100),
         usage_limit: form.usage_limit === "" ? null : Number(form.usage_limit),
-        expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
+        expires_at: form.expires_at ? new Date(`${form.expires_at}T23:59:59.999`).toISOString() : null,
       });
       setForm({ code: "", discount_type: "percent", discount_value: "", min_subtotal_cents: "", usage_limit: "", expires_at: "" });
       setMsg({ tone: "success", text: lt(locale, "Coupon created.", "Kupon oluşturuldu.", "Coupon created.", "Coupon created.", "Coupon created.", "Coupon erstellt.") });
@@ -230,7 +230,7 @@ export default function CouponsPage() {
         discount_value: discountValue,
         min_subtotal_cents: Math.round(Number(editForm.min_subtotal_euros || 0) * 100),
         usage_limit: editForm.usage_limit === "" ? null : Number(editForm.usage_limit),
-        expires_at: editForm.expires_at ? new Date(editForm.expires_at).toISOString() : null,
+        expires_at: editForm.expires_at ? new Date(`${editForm.expires_at}T23:59:59.999`).toISOString() : null,
       });
       setMsg({ tone: "success", text: lt(locale, "Coupon updated.", "Kupon güncellendi.", "Coupon updated.", "Coupon updated.", "Coupon updated.", "Coupon aktualisiert.") });
       closeEdit();

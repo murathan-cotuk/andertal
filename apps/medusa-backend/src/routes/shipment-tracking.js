@@ -173,17 +173,22 @@ module.exports = function createShipmentTrackingRouter({
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const ownerQ = await client.query(
-          'SELECT id, carrier_name, tracking_number, postal_code FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
+          'SELECT id, seller_id, carrier_name, tracking_number, postal_code FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
           isSuperuser ? [id] : [id, callerSellerId]
         )
         if (!ownerQ.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const order = ownerQ.rows[0]
         if (!order.tracking_number) { await client.end(); return res.json({ events: [], message: 'No tracking number' }) }
 
-        // Look up carrier API key + tracking URL template from DB (env fallback so tracking works without per-carrier key)
+        // Look up carrier API key + tracking URL template from DB (env fallback so tracking works without per-carrier key).
+        // Prefer the order's OWN seller's carrier config (each seller can register their own account/credentials
+        // for the same carrier brand), falling back to the platform-wide entry (seller_id IS NULL) if the seller
+        // hasn't configured one themselves.
         const carrierQ = await client.query(
-          'SELECT name, tracking_url_template, api_key FROM store_shipping_carriers WHERE LOWER(TRIM(name))=LOWER(TRIM($1)) AND is_active=true LIMIT 1',
-          [order.carrier_name || '']
+          `SELECT name, tracking_url_template, api_key, api_secret FROM store_shipping_carriers
+           WHERE LOWER(TRIM(name))=LOWER(TRIM($1)) AND is_active=true AND (seller_id = $2 OR seller_id IS NULL)
+           ORDER BY (seller_id IS NOT NULL) DESC LIMIT 1`,
+          [order.carrier_name || '', order.seller_id || null]
         )
         const carrierRow = carrierQ.rows[0] || {}
         const carrierName = String(order.carrier_name || '').trim().toLowerCase()
