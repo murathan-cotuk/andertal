@@ -304,6 +304,29 @@ const validateRequiredGpsrMetadata = (meta) => {
   return { ok: false, message: `GPSR required fields missing: ${missing.join(', ')}` }
 }
 
+/**
+ * Brand authorization publish gate (docs/BRAND.md Faz 4/2).
+ * Only enforced when the product is being PUBLISHED and carries a brand_id.
+ * Draft/archived products are never blocked so sellers can keep working.
+ * Uses the already-connected pg client to avoid a second connection.
+ */
+const validateBrandForPublish = async (client, meta, status) => {
+  try {
+    if (String(status || '').toLowerCase() !== 'published') return { ok: true }
+    const m = meta && typeof meta === 'object' ? meta : {}
+    const brandId = String(m.brand_id || '').trim()
+    if (!brandId) return { ok: true }
+    const r = await client.query('SELECT status, name FROM admin_hub_brands WHERE id = $1', [brandId])
+    const row = r.rows && r.rows[0]
+    if (!row) return { ok: true } // unknown/deleted brand ref → don't block on brand grounds
+    if (String(row.status || 'active') === 'active') return { ok: true }
+    return { ok: false, message: `Brand authorization pending: "${row.name || brandId}" is not approved yet (status: ${row.status}).` }
+  } catch (_) {
+    // Fail open: if the brand table/columns are not migrated yet, do not block publishing
+    return { ok: true }
+  }
+}
+
 const createAdminHubProductDb = async (body) => {
   const client = getProductsDbClient()
   if (!client) return null
@@ -321,6 +344,8 @@ const createAdminHubProductDb = async (body) => {
     const variants = variantsArr ? JSON.stringify(variantsArr) : null
     const eanValidation = await validateProductEansDb(client, metaObj && metaObj.ean, collectVariantEans(variantsArr || []), null)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
+    const brandGate = await validateBrandForPublish(client, metaObj || {}, (body.status || 'draft').trim())
+    if (!brandGate.ok) { await client.end(); return { __error: brandGate.message || 'Brand authorization pending' } }
     const res = await client.query(
       `INSERT INTO admin_hub_products (title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -420,6 +445,10 @@ const updateAdminHubProductDb = async (id, body) => {
       : (Array.isArray(existing.variants) ? existing.variants : [])
     const eanValidation = await validateProductEansDb(client, metadataObj && metadataObj.ean, collectVariantEans(nextVariantsArr), uuid)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
+    if (!onlyVariantPatch) {
+      const brandGate = await validateBrandForPublish(client, metadataObj || {}, status)
+      if (!brandGate.ok) { await client.end(); return { __error: brandGate.message || 'Brand authorization pending' } }
+    }
     const metadata = Object.keys(metadataObj).length ? JSON.stringify(metadataObj) : null
     const variants = body.variants !== undefined ? (Array.isArray(body.variants) ? JSON.stringify(body.variants) : null) : (existing.variants ? JSON.stringify(existing.variants) : null)
     const collection_id = body.collection_id !== undefined ? body.collection_id || null : existing.collection_id

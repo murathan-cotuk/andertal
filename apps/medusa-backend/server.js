@@ -603,6 +603,38 @@ async function start() {
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_brands_handle ON admin_hub_brands(handle);')
         await client.query('ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS banner_image text;')
         await client.query('ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL;')
+        // ── Brand authorization workflow (docs/BRAND.md Faz 1) ──
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS status varchar(20) DEFAULT 'active';`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS brand_type varchar(30) DEFAULT 'own';`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS trademark_number varchar(120) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS trademark_jurisdiction varchar(40) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS approved_at timestamp DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS approved_by varchar(255) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS rejection_reason text DEFAULT NULL;`).catch(() => {})
+        // Existing brands = own brands, already active (non-breaking migration)
+        await client.query(`UPDATE admin_hub_brands SET status = 'active' WHERE status IS NULL;`).catch(() => {})
+        await client.query(`UPDATE admin_hub_brands SET brand_type = 'own' WHERE brand_type IS NULL;`).catch(() => {})
+        // Rename old 'registered' → 'own_registered' (brand type rename)
+        await client.query(`UPDATE admin_hub_brands SET brand_type = 'own_registered' WHERE brand_type = 'registered';`).catch(() => {})
+        // verification_level: own brands = unverified (no trademark proof), approved registered = verified
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS verification_level varchar(20) DEFAULT NULL;`).catch(() => {})
+        await client.query(`UPDATE admin_hub_brands SET verification_level = 'unverified' WHERE brand_type = 'own' AND verification_level IS NULL;`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_brand_authorization_documents (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            brand_id uuid NOT NULL,
+            seller_id varchar(255),
+            document_type varchar(40) NOT NULL,
+            file_url text NOT NULL,
+            file_name text,
+            status varchar(20) NOT NULL DEFAULT 'pending',
+            reviewer_id varchar(255),
+            reviewer_note text,
+            reviewed_at timestamp,
+            uploaded_at timestamp NOT NULL DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query('CREATE INDEX IF NOT EXISTS idx_brand_auth_docs_brand ON admin_hub_brand_authorization_documents(brand_id);').catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_carts (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),

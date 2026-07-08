@@ -17,25 +17,35 @@ const requireSuperuser = (req, res, next) => {
 
 // ── Brands ───────────────────────────────────────────────────────────────────
 
+const BRAND_SELECT_COLS = 'id, name, handle, logo_image, banner_image, address, seller_id, status, brand_type, trademark_number, trademark_jurisdiction, approved_at, approved_by, rejection_reason, verification_level, created_at'
+
+const mapBrandRow = (row) => ({
+  id: row.id,
+  name: row.name,
+  handle: row.handle,
+  logo_image: row.logo_image || null,
+  banner_image: row.banner_image || null,
+  address: row.address || null,
+  seller_id: row.seller_id || null,
+  status: row.status || 'active',
+  brand_type: row.brand_type || 'own',
+  trademark_number: row.trademark_number || null,
+  trademark_jurisdiction: row.trademark_jurisdiction || null,
+  approved_at: row.approved_at || null,
+  approved_by: row.approved_by || null,
+  rejection_reason: row.rejection_reason || null,
+  verification_level: row.verification_level || null,
+  created_at: row.created_at,
+})
+
 const adminBrandsGET = async (req, res) => {
   const client = getCategoriesPgClient()
   if (!client) return res.status(500).json({ message: 'Database unavailable' })
   try {
     await client.connect()
-    const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands ORDER BY name')
+    const r = await client.query(`SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands ORDER BY name`)
     await client.end()
-    res.json({
-      brands: (r.rows || []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        handle: row.handle,
-        logo_image: row.logo_image || null,
-        banner_image: row.banner_image || null,
-        address: row.address || null,
-        seller_id: row.seller_id || null,
-        created_at: row.created_at,
-      })),
-    })
+    res.json({ brands: (r.rows || []).map(mapBrandRow) })
   } catch (e) {
     try { await client.end() } catch (_) {}
     console.error('Brands GET:', e)
@@ -52,6 +62,24 @@ const adminBrandsPOST = async (req, res) => {
   const banner_image = (body.banner_image || '').trim() || null
   const address = (body.address || '').trim() || null
   const callerSellerId = req.sellerUser?.seller_id || null
+  const isSuperuser = req.sellerUser?.is_superuser === true
+  // Brand type:
+  //   'own'               → Satıcının tescilsiz markası. Anında active, verification_level='unverified'.
+  //   'own_registered'    → Tescilli marka (EUIPO/WIPO/ulusal). trademark_number + sertifika zorunlu → pending.
+  //   'authorized_reseller' → Başka markanın yetkili bayisi. Yetki belgesi zorunlu → pending.
+  let brandType = String(body.brand_type || 'own').trim().toLowerCase()
+  if (!['own', 'own_registered', 'authorized_reseller'].includes(brandType)) brandType = 'own'
+  // own_registered requires trademark proof fields at creation time
+  const trademarkNumber = (body.trademark_number || '').trim() || null
+  const trademarkJurisdiction = (body.trademark_jurisdiction || '').trim() || null
+  if (brandType === 'own_registered' && !isSuperuser) {
+    if (!trademarkNumber) return res.status(400).json({ message: 'trademark_number is required for registered brand claims' })
+    if (!trademarkJurisdiction) return res.status(400).json({ message: 'trademark_jurisdiction is required for registered brand claims (e.g. EUIPO, DE, TR)' })
+  }
+  const needsApproval = (brandType === 'own_registered' || brandType === 'authorized_reseller') && !isSuperuser
+  const status = needsApproval ? 'pending' : 'active'
+  // verification_level: own=unverified (no proof), needs-approval=null until reviewed, superuser=verified
+  const verificationLevel = brandType === 'own' ? 'unverified' : (isSuperuser ? 'verified' : null)
   const client = getCategoriesPgClient()
   if (!client) return res.status(500).json({ message: 'Database unavailable' })
   try {
@@ -66,15 +94,163 @@ const adminBrandsPOST = async (req, res) => {
       handle = `${baseHandle}-${i + 1}`
     }
     const r = await client.query(
-      'INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address, seller_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, handle, logo_image, banner_image, address, seller_id, created_at',
-      [name, handle, logo_image, banner_image, address, callerSellerId]
+      `INSERT INTO admin_hub_brands (name, handle, logo_image, banner_image, address, seller_id, status, brand_type, trademark_number, trademark_jurisdiction, approved_at, approved_by, verification_level)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING ${BRAND_SELECT_COLS}`,
+      [
+        name, handle, logo_image, banner_image, address, callerSellerId,
+        status, brandType, trademarkNumber, trademarkJurisdiction,
+        status === 'active' ? new Date() : null,
+        status === 'active' && isSuperuser ? (req.sellerUser?.id || 'superuser') : null,
+        verificationLevel,
+      ]
     )
-    await client.end()
     const row = r.rows && r.rows[0]
-    res.status(201).json({ brand: row })
+    // Notify superuser when a brand claim needs review
+    if (needsApproval && row) {
+      const notifBody = brandType === 'own_registered'
+        ? `Bir satıcı tescilli marka "${name}" (${trademarkJurisdiction || '?'}, no: ${trademarkNumber || '?'}) için onay bekliyor.`
+        : `Bir satıcı "${name}" markası için yetkili bayi belgesi yükledi, onay bekliyor.`
+      await client.query(
+        `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+         VALUES ('brand_authorization_pending', $1, $2, $3, $4)`,
+        [
+          'Marka yetkilendirme bekliyor',
+          notifBody,
+          callerSellerId,
+          row.id,
+        ]
+      ).catch(() => {})
+    }
+    await client.end()
+    res.status(201).json({ brand: row ? mapBrandRow(row) : null })
   } catch (e) {
     try { await client.end() } catch (_) {}
     console.error('Brands POST:', e)
+    res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+  }
+}
+
+// ── Brand authorization documents + superuser review ─────────────────────────
+
+const brandAuthDocsPOST = async (req, res) => {
+  const brandId = (req.params.id || '').trim()
+  if (!brandId) return res.status(400).json({ message: 'brand id required' })
+  const body = req.body || {}
+  const fileUrl = (body.file_url || '').trim()
+  if (!fileUrl) return res.status(400).json({ message: 'file_url is required' })
+  let docType = String(body.document_type || '').trim().toLowerCase()
+  const allowedTypes = ['purchase_invoice', 'distribution_agreement', 'trademark_certificate', 'authorization_letter']
+  if (!allowedTypes.includes(docType)) docType = 'purchase_invoice'
+  const fileName = (body.file_name || '').trim() || null
+  const callerSellerId = req.sellerUser?.seller_id || null
+  const isSuperuser = req.sellerUser?.is_superuser === true
+  const client = getCategoriesPgClient()
+  if (!client) return res.status(500).json({ message: 'Database unavailable' })
+  try {
+    await client.connect()
+    const brand = await client.query('SELECT id, seller_id FROM admin_hub_brands WHERE id = $1', [brandId])
+    if (!brand.rows || !brand.rows[0]) { await client.end(); return res.status(404).json({ message: 'Brand not found' }) }
+    const isOwner = callerSellerId && brand.rows[0].seller_id === callerSellerId
+    if (!isSuperuser && !isOwner) { await client.end(); return res.status(403).json({ message: 'You can only upload documents for your own brand claim' }) }
+    const r = await client.query(
+      `INSERT INTO admin_hub_brand_authorization_documents (brand_id, seller_id, document_type, file_url, file_name)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id, brand_id, seller_id, document_type, file_url, file_name, status, uploaded_at`,
+      [brandId, callerSellerId, docType, fileUrl, fileName]
+    )
+    await client.end()
+    res.status(201).json({ document: r.rows[0] })
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    console.error('Brand auth doc POST:', e)
+    res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+  }
+}
+
+const brandPendingAuthorizationsGET = async (req, res) => {
+  const client = getCategoriesPgClient()
+  if (!client) return res.status(500).json({ message: 'Database unavailable' })
+  try {
+    await client.connect()
+    const brands = await client.query(
+      `SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands WHERE status = 'pending' ORDER BY created_at DESC`
+    )
+    const ids = (brands.rows || []).map((b) => b.id)
+    let docsByBrand = {}
+    if (ids.length) {
+      const docs = await client.query(
+        `SELECT id, brand_id, seller_id, document_type, file_url, file_name, status, uploaded_at
+         FROM admin_hub_brand_authorization_documents WHERE brand_id = ANY($1::uuid[]) ORDER BY uploaded_at DESC`,
+        [ids]
+      )
+      for (const d of docs.rows || []) {
+        if (!docsByBrand[d.brand_id]) docsByBrand[d.brand_id] = []
+        docsByBrand[d.brand_id].push(d)
+      }
+    }
+    await client.end()
+    res.json({
+      brands: (brands.rows || []).map((b) => ({ ...mapBrandRow(b), documents: docsByBrand[b.id] || [] })),
+    })
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    console.error('Brand pending authorizations GET:', e)
+    res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+  }
+}
+
+const brandAuthReview = async (req, res, approve) => {
+  const brandId = (req.params.id || '').trim()
+  if (!brandId) return res.status(400).json({ message: 'brand id required' })
+  const body = req.body || {}
+  const reviewerId = req.sellerUser?.id || 'superuser'
+  const reason = (body.rejection_reason || body.reason || '').trim() || null
+  const client = getCategoriesPgClient()
+  if (!client) return res.status(500).json({ message: 'Database unavailable' })
+  try {
+    await client.connect()
+    const existing = await client.query('SELECT id, name, seller_id, brand_type FROM admin_hub_brands WHERE id = $1', [brandId])
+    if (!existing.rows || !existing.rows[0]) { await client.end(); return res.status(404).json({ message: 'Brand not found' }) }
+    const brand = existing.rows[0]
+    if (approve) {
+      const approvedVerificationLevel = brand.brand_type === 'authorized_reseller' ? 'reseller' : 'verified'
+      await client.query(
+        `UPDATE admin_hub_brands SET status = 'active', approved_at = now(), approved_by = $1, rejection_reason = NULL, verification_level = $2, updated_at = now() WHERE id = $3`,
+        [reviewerId, approvedVerificationLevel, brandId]
+      )
+      await client.query(
+        `UPDATE admin_hub_brand_authorization_documents SET status = 'approved', reviewer_id = $1, reviewed_at = now() WHERE brand_id = $2 AND status = 'pending'`,
+        [reviewerId, brandId]
+      ).catch(() => {})
+    } else {
+      await client.query(
+        `UPDATE admin_hub_brands SET status = 'rejected', rejection_reason = $1, approved_by = $2, updated_at = now() WHERE id = $3`,
+        [reason, reviewerId, brandId]
+      )
+      await client.query(
+        `UPDATE admin_hub_brand_authorization_documents SET status = 'rejected', reviewer_id = $1, reviewer_note = $2, reviewed_at = now() WHERE brand_id = $3 AND status = 'pending'`,
+        [reviewerId, reason, brandId]
+      ).catch(() => {})
+    }
+    if (brand.seller_id) {
+      await client.query(
+        `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+         VALUES ('brand_authorization_reviewed', $1, $2, $3, $4)`,
+        [
+          approve ? 'Marke freigegeben' : 'Markenautorisierung abgelehnt',
+          approve
+            ? `Ihre Marke "${brand.name}" wurde freigegeben und kann jetzt für Produkte verwendet werden.`
+            : `Ihre Markenautorisierung für "${brand.name}" wurde abgelehnt.${reason ? ` Grund: ${reason}` : ''}`,
+          brand.seller_id,
+          brandId,
+        ]
+      ).catch(() => {})
+    }
+    const r = await client.query(`SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands WHERE id = $1`, [brandId])
+    await client.end()
+    res.json({ brand: r.rows && r.rows[0] ? mapBrandRow(r.rows[0]) : null })
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    console.error('Brand auth review:', e)
     res.status(500).json({ message: (e && e.message) || 'Internal server error' })
   }
 }
@@ -117,19 +293,19 @@ const adminBrandsPatchDelete = async (req, res, isPatch) => {
       if (banner_image !== undefined) { updates.push('banner_image = $' + n); params.push(banner_image || null); n++ }
       if (address !== undefined) { updates.push('address = $' + n); params.push(address || null); n++ }
       if (updates.length === 0) {
-        const r = await client.query('SELECT id, name, handle, logo_image, banner_image, address, seller_id, created_at FROM admin_hub_brands WHERE id = $1', [id])
+        const r = await client.query(`SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands WHERE id = $1`, [id])
         await client.end()
-        return res.json({ brand: r.rows[0] })
+        return res.json({ brand: r.rows[0] ? mapBrandRow(r.rows[0]) : null })
       }
       updates.push('updated_at = now()')
       params.push(id)
       const r = await client.query(
-        'UPDATE admin_hub_brands SET ' + updates.join(', ') + ' WHERE id = $' + n + ' RETURNING id, name, handle, logo_image, banner_image, address, seller_id, created_at',
+        'UPDATE admin_hub_brands SET ' + updates.join(', ') + ' WHERE id = $' + n + ` RETURNING ${BRAND_SELECT_COLS}`,
         params
       )
       await client.end()
       if (!r.rows || !r.rows[0]) return res.status(404).json({ message: 'Brand not found' })
-      res.json({ brand: r.rows[0] })
+      res.json({ brand: mapBrandRow(r.rows[0]) })
     } else {
       const r = await client.query('DELETE FROM admin_hub_brands WHERE id = $1 RETURNING id', [id])
       await client.end()
@@ -227,7 +403,12 @@ module.exports = function createBrandsRouter() {
   const router = Router()
 
   router.get('/admin-hub/brands', adminBrandsGET)
+  // Superuser: pending brand authorization claims — MUST be before /:id patterns
+  router.get('/admin-hub/brands/pending-authorizations', requireSuperuser, brandPendingAuthorizationsGET)
   router.post('/admin-hub/brands', adminBrandsPOST)
+  router.post('/admin-hub/brands/:id/authorization-documents', brandAuthDocsPOST)
+  router.post('/admin-hub/brands/:id/authorization/approve', requireSuperuser, (req, res) => brandAuthReview(req, res, true))
+  router.post('/admin-hub/brands/:id/authorization/reject', requireSuperuser, (req, res) => brandAuthReview(req, res, false))
   router.patch('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, true))
   router.delete('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, false))
 

@@ -1,0 +1,144 @@
+{
+  "_meta": {
+    "description": "Category-based EU compliance profiles (docs/HUKUKI.md Faz 1). NOT legal advice — verify with a qualified compliance advisor before production. GPSR is the general base layer; product-type profiles add CE/WEEE/EPREL/etc. Marketplace (country) overlays live in marketplace-overlays.json.",
+    "version": 1,
+    "legal_disclaimer": "Bu liste hukuki tavsiye değildir. Canlıya almadan önce avukat/onaylı compliance danışmanı ile doğrulanmalıdır."
+  },
+  "profiles": {
+    "general_consumer_gpsr": {
+      "label": "Allgemeine Verbraucherprodukte (GPSR)",
+      "required_fields": ["hersteller", "hersteller_information", "verantwortliche_person_information"],
+      "optional_fields": ["safety_warnings", "recall_procedure"],
+      "blocked_publish_without": ["hersteller", "hersteller_information", "verantwortliche_person_information"]
+    },
+    "electronics_weee": {
+      "label": "Elektro-/Elektronikgeräte (WEEE/ElektroG)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["weee_number"],
+      "optional_fields": ["ce_declaration_url", "rohs_declaration"],
+      "blocked_publish_without": ["weee_number"]
+    },
+    "energy_labeled_eprel": {
+      "label": "Energieverbrauchskennzeichnung (EPREL)",
+      "inherits": "electronics_weee",
+      "required_fields": ["eprel_number"],
+      "optional_fields": ["energy_label_image", "energy_label_qr"],
+      "blocked_publish_without": ["eprel_number"]
+    },
+    "battery_containing": {
+      "label": "Batterien / Akkus (Batterieverordnung 2023/1542)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["battery_chemistry", "battery_capacity_wh"],
+      "optional_fields": ["battery_register_number", "battery_recycling_symbol"],
+      "blocked_publish_without": ["battery_chemistry"]
+    },
+    "cosmetics": {
+      "label": "Kosmetik (VO 1223/2009)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["inci_list", "responsible_person_eu"],
+      "optional_fields": ["cpnp_reference"],
+      "blocked_publish_without": ["inci_list", "responsible_person_eu"]
+    },
+    "food": {
+      "label": "Lebensmittel (LMIV)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["ingredients", "allergens", "best_before", "nutrition_values"],
+      "optional_fields": ["origin_country", "storage_instructions"],
+      "blocked_publish_without": ["ingredients", "allergens"]
+    },
+    "food_supplement": {
+      "label": "Nahrungsergänzungsmittel",
+      "inherits": "food",
+      "required_fields": ["daily_dose", "warning_text"],
+      "optional_fields": [],
+      "blocked_publish_without": ["daily_dose", "warning_text"]
+    },
+    "toys": {
+      "label": "Spielzeug (2009/48/EG, EN71)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["ce_declaration_url", "age_warning"],
+      "optional_fields": ["en71_test_report"],
+      "blocked_publish_without": ["ce_declaration_url", "age_warning"]
+    },
+    "textiles": {
+      "label": "Textilien / Bekleidung",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["fiber_composition"],
+      "optional_fields": ["care_symbols"],
+      "blocked_publish_without": ["fiber_composition"]
+    },
+    "chemicals_reach": {
+      "label": "Chemikalien (REACH/CLP)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["safety_data_sheet_url"],
+      "optional_fields": ["hazard_pictograms", "signal_word"],
+      "blocked_publish_without": ["safety_data_sheet_url"]
+    },
+    "books_media": {
+      "label": "Bücher / Medien",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": [],
+      "optional_fields": ["isbn"],
+      "blocked_publish_without": []
+    },
+    "digital_goods": {
+      "label": "Digitale Produkte / Downloads",
+      "required_fields": [],
+      "optional_fields": ["license_type"],
+      "blocked_publish_without": []
+    },
+    "nicotine_tpd": {
+      "label": "Nikotinprodukte (TPD)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["tpd_compliance_ref", "age_verification"],
+      "optional_fields": ["nicotine_strength"],
+      "blocked_publish_without": ["tpd_compliance_ref", "age_verification"]
+    },
+    "medical_device": {
+      "label": "Medizinprodukt (MDR 2017/745)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["ce_class", "udi", "authorized_representative"],
+      "optional_fields": [],
+      "blocked_publish_without": ["ce_class", "udi", "authorized_representative"],
+      "superuser_only": true,
+      "note": "High risk on a marketplace — requires separate superuser approval."
+    },
+    "ce_marked_general": {
+      "label": "CE-pflichtige Produkte (allgemein)",
+      "inherits": "general_consumer_gpsr",
+      "required_fields": ["ce_declaration_url"],
+      "optional_fields": ["test_report_reference"],
+      "blocked_publish_without": ["ce_declaration_url"]
+    }
+  },
+  "field_definitions": {
+    "hersteller": { "type": "text", "label_i18n": { "de": "Hersteller", "en": "Manufacturer", "tr": "Üretici" }, "validation_regex": null, "help_text_i18n": { "de": "Name des Herstellers", "en": "Manufacturer name", "tr": "Üretici adı" } },
+    "hersteller_information": { "type": "text", "label_i18n": { "de": "Herstellerinformationen", "en": "Manufacturer info", "tr": "Üretici bilgisi" }, "validation_regex": null, "help_text_i18n": { "de": "Adresse und Kontakt des Herstellers", "en": "Manufacturer address and contact", "tr": "Üretici adres/iletişim" } },
+    "verantwortliche_person_information": { "type": "text", "label_i18n": { "de": "Verantwortliche Person (EU)", "en": "Responsible person (EU)", "tr": "AB'de sorumlu kişi" }, "validation_regex": null, "help_text_i18n": { "de": "In der EU ansässige verantwortliche Person", "en": "EU-based responsible person", "tr": "AB'de yerleşik sorumlu kişi" } },
+    "weee_number": { "type": "text", "label_i18n": { "de": "WEEE-Nummer", "en": "WEEE number", "tr": "WEEE numarası" }, "validation_regex": null, "help_text_i18n": { "de": "Nationale WEEE-Registrierungsnummer", "en": "National WEEE registration number", "tr": "Ulusal WEEE kayıt no." } },
+    "eprel_number": { "type": "text", "label_i18n": { "de": "EPREL-Nummer", "en": "EPREL number", "tr": "EPREL numarası" }, "validation_regex": null, "help_text_i18n": { "de": "EPREL-Datenbanknummer", "en": "EPREL database number", "tr": "EPREL veritabanı no." } },
+    "energy_label_image": { "type": "file", "label_i18n": { "de": "Energielabel", "en": "Energy label", "tr": "Enerji etiketi" }, "validation_regex": null, "help_text_i18n": {} },
+    "energy_label_qr": { "type": "text", "label_i18n": { "de": "Energielabel QR", "en": "Energy label QR", "tr": "Enerji etiketi QR" }, "validation_regex": null, "help_text_i18n": {} },
+    "ce_declaration_url": { "type": "file", "label_i18n": { "de": "CE-Konformitätserklärung", "en": "CE declaration", "tr": "CE uygunluk beyanı" }, "validation_regex": null, "help_text_i18n": {} },
+    "battery_chemistry": { "type": "select", "label_i18n": { "de": "Batteriechemie", "en": "Battery chemistry", "tr": "Batarya kimyası" }, "options": ["li-ion", "li-po", "nimh", "alkaline", "lead-acid", "other"], "validation_regex": null, "help_text_i18n": {} },
+    "battery_capacity_wh": { "type": "number", "label_i18n": { "de": "Kapazität (Wh)", "en": "Capacity (Wh)", "tr": "Kapasite (Wh)" }, "validation_regex": null, "help_text_i18n": {} },
+    "inci_list": { "type": "text", "label_i18n": { "de": "INCI-Liste", "en": "INCI list", "tr": "INCI listesi" }, "validation_regex": null, "help_text_i18n": {} },
+    "responsible_person_eu": { "type": "text", "label_i18n": { "de": "Verantwortliche Person (Kosmetik)", "en": "Responsible person (cosmetics)", "tr": "Sorumlu kişi (kozmetik)" }, "validation_regex": null, "help_text_i18n": {} },
+    "ingredients": { "type": "text", "label_i18n": { "de": "Zutaten", "en": "Ingredients", "tr": "İçindekiler" }, "validation_regex": null, "help_text_i18n": {} },
+    "allergens": { "type": "text", "label_i18n": { "de": "Allergene", "en": "Allergens", "tr": "Alerjenler" }, "validation_regex": null, "help_text_i18n": {} },
+    "best_before": { "type": "text", "label_i18n": { "de": "Mindesthaltbarkeit", "en": "Best before", "tr": "Son kullanma" }, "validation_regex": null, "help_text_i18n": {} },
+    "nutrition_values": { "type": "text", "label_i18n": { "de": "Nährwerte", "en": "Nutrition values", "tr": "Besin değerleri" }, "validation_regex": null, "help_text_i18n": {} },
+    "daily_dose": { "type": "text", "label_i18n": { "de": "Tagesdosis", "en": "Daily dose", "tr": "Günlük doz" }, "validation_regex": null, "help_text_i18n": {} },
+    "warning_text": { "type": "text", "label_i18n": { "de": "Warnhinweis", "en": "Warning text", "tr": "Uyarı metni" }, "validation_regex": null, "help_text_i18n": {} },
+    "age_warning": { "type": "text", "label_i18n": { "de": "Altersempfehlung", "en": "Age warning", "tr": "Yaş uyarısı" }, "validation_regex": null, "help_text_i18n": {} },
+    "fiber_composition": { "type": "text", "label_i18n": { "de": "Faserzusammensetzung", "en": "Fiber composition", "tr": "Elyaf kompozisyonu" }, "validation_regex": null, "help_text_i18n": {} },
+    "care_symbols": { "type": "text", "label_i18n": { "de": "Pflegesymbole", "en": "Care symbols", "tr": "Bakım sembolleri" }, "validation_regex": null, "help_text_i18n": {} },
+    "safety_data_sheet_url": { "type": "file", "label_i18n": { "de": "Sicherheitsdatenblatt (SDB)", "en": "Safety data sheet", "tr": "Güvenlik bilgi formu" }, "validation_regex": null, "help_text_i18n": {} },
+    "tpd_compliance_ref": { "type": "text", "label_i18n": { "de": "TPD-Referenz", "en": "TPD reference", "tr": "TPD referansı" }, "validation_regex": null, "help_text_i18n": {} },
+    "age_verification": { "type": "select", "label_i18n": { "de": "Altersverifikation", "en": "Age verification", "tr": "Yaş doğrulama" }, "options": ["18+", "21+"], "validation_regex": null, "help_text_i18n": {} },
+    "ce_class": { "type": "text", "label_i18n": { "de": "CE-Klasse", "en": "CE class", "tr": "CE sınıfı" }, "validation_regex": null, "help_text_i18n": {} },
+    "udi": { "type": "text", "label_i18n": { "de": "UDI", "en": "UDI", "tr": "UDI" }, "validation_regex": null, "help_text_i18n": {} },
+    "authorized_representative": { "type": "text", "label_i18n": { "de": "Bevollmächtigter", "en": "Authorized representative", "tr": "Yetkili temsilci" }, "validation_regex": null, "help_text_i18n": {} },
+    "isbn": { "type": "text", "label_i18n": { "de": "ISBN", "en": "ISBN", "tr": "ISBN" }, "validation_regex": null, "help_text_i18n": {} }
+  }
+}

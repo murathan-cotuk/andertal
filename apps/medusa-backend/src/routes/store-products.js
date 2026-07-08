@@ -683,7 +683,9 @@ module.exports = function createStoreProductsRouter() {
     if (!client) return res.status(500).json({ message: 'Database unavailable' })
     try {
       await client.connect()
-      const r = await client.query(`SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands ORDER BY created_at DESC NULLS LAST, LOWER(name)`)
+      // Only surface approved brands in the shop (docs/BRAND.md Faz 4).
+      // NULL status = legacy brand (pre-migration) → treated as active.
+      const r = await client.query(`SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands WHERE status IS NULL OR status = 'active' ORDER BY created_at DESC NULLS LAST, LOWER(name)`)
       await client.end()
       const brands = (r.rows || []).map((row) => {
         const rawHandle = (row.handle || '').trim()

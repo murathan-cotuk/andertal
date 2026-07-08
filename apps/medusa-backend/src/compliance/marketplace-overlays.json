@@ -1,0 +1,93 @@
+{
+  "_meta": {
+    "description": "Country/marketplace overlays (docs/HUKUKI.md Faz 1, section B). Applied ON TOP of a product-type compliance profile. Adds national registration numbers, label language, packaging registers, etc. NOT legal advice.",
+    "version": 1,
+    "field_model": "extra_required_fields = always required for this marketplace. national_register_fields = CONDITIONAL: each entry {field, requires_if_base_field} is only required when the base product-type profile already requires the trigger field (e.g. weee_number_fr only if the profile requires weee_number). This prevents 'books need WEEE' false positives."
+  },
+  "overlays": {
+    "EU": {
+      "label": "EU (Basis)",
+      "label_language": null,
+      "extra_required_fields": [],
+      "national_register_fields": []
+    },
+    "DE": {
+      "label": "Deutschland",
+      "label_language": "de",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "weee_number", "requires_if_base_field": "weee_number" },
+        { "field": "battery_register_de", "requires_if_base_field": "battery_chemistry" },
+        { "field": "packaging_register_de", "requires_if_base_field": null },
+        { "field": "pfand_system", "requires_if_base_field": null }
+      ],
+      "notes": "ElektroG → Stiftung EAR; VerpackG → LUCID; BattG; Pfand für Getränkeflaschen"
+    },
+    "FR": {
+      "label": "France",
+      "label_language": "fr",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "weee_number_fr", "requires_if_base_field": "weee_number" },
+        { "field": "triman_label_required", "requires_if_base_field": null },
+        { "field": "nutri_score", "requires_if_base_field": "ingredients" }
+      ],
+      "notes": "AGEC/Triman, Nutri-Score (Lebensmittel), Eco-organisme WEEE"
+    },
+    "IT": {
+      "label": "Italia",
+      "label_language": "it",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "weee_number_it", "requires_if_base_field": "weee_number" },
+        { "field": "packaging_register_it", "requires_if_base_field": null }
+      ],
+      "notes": "RAEE, CONAI"
+    },
+    "ES": {
+      "label": "España",
+      "label_language": "es",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "weee_number_es", "requires_if_base_field": "weee_number" }
+      ],
+      "notes": "RAEE / envío verde"
+    },
+    "AT": {
+      "label": "Österreich",
+      "label_language": "de",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "weee_number_at", "requires_if_base_field": "weee_number" }
+      ],
+      "notes": "ARA/UFH Verpackung + WEEE"
+    },
+    "NL": {
+      "label": "Nederland",
+      "label_language": "nl",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "weee_number_nl", "requires_if_base_field": "weee_number" }
+      ],
+      "notes": "OPEN WEEE / Afvalfonds"
+    },
+    "PL": {
+      "label": "Polska",
+      "label_language": "pl",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "bdo_number", "requires_if_base_field": "weee_number" }
+      ],
+      "notes": "BDO Registrierung"
+    },
+    "SE": {
+      "label": "Sverige",
+      "label_language": "sv",
+      "extra_required_fields": [],
+      "national_register_fields": [
+        { "field": "weee_number_se", "requires_if_base_field": "weee_number" }
+      ],
+      "notes": "FTI Verpackung"
+    }
+  }
+}
