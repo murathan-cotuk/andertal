@@ -449,6 +449,15 @@ class MedusaAdminClient {
   }
 
   /**
+   * Resolved compliance schema (required/optional fields) for a category + marketplace
+   * (docs/HUKUKI.md). Read-only — not wired into any save/publish flow yet.
+   */
+  async getCategoryComplianceSchema(categoryId, marketplace = 'DE') {
+    if (!categoryId) return null
+    return this.request(`/admin-hub/categories/${categoryId}/compliance-schema?marketplace=${encodeURIComponent(marketplace)}`)
+  }
+
+  /**
    * Bulk import Admin Hub categories (POST /admin-hub/categories/import)
    * Body: { items: [ { key, label, parentKey, sortOrder } ] }
    */
@@ -539,6 +548,30 @@ class MedusaAdminClient {
 
   async deleteBrand(id) {
     return this.request(`/admin-hub/brands/${id}`, { method: 'DELETE' })
+  }
+
+  /** Upload a brand authorization document (trademark certificate, invoice, distribution agreement...) */
+  async uploadBrandAuthDocument(brandId, body) {
+    const res = await this.request(`/admin-hub/brands/${brandId}/authorization-documents`, { method: 'POST', body: JSON.stringify(body || {}) })
+    return res.document ?? res
+  }
+
+  /** Superuser: list brands pending authorization review (own_registered / authorized_reseller), with their documents */
+  async getPendingBrandAuthorizations() {
+    const data = await this.request('/admin-hub/brands/pending-authorizations').catch(() => ({ brands: [] }))
+    return { brands: data.brands || [] }
+  }
+
+  /** Superuser: approve a pending brand authorization claim */
+  async approveBrandAuthorization(brandId) {
+    const res = await this.request(`/admin-hub/brands/${brandId}/authorization/approve`, { method: 'POST', body: JSON.stringify({}) })
+    return res.brand ?? res
+  }
+
+  /** Superuser: reject a pending brand authorization claim */
+  async rejectBrandAuthorization(brandId, rejection_reason) {
+    const res = await this.request(`/admin-hub/brands/${brandId}/authorization/reject`, { method: 'POST', body: JSON.stringify({ rejection_reason: rejection_reason || '' }) })
+    return res.brand ?? res
   }
 
   /** Get single collection by id (standalone admin_hub_collections only) */

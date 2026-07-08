@@ -211,17 +211,20 @@ TALİMAT A — Kategori + ülke bazlı compliance sistemi
 
 > Faz 1'in TEMEL veri modeli + resolve motoru kuruldu (saf ek dosyalar, hiçbir şeyi kırmıyor). **Backend'e BAĞLANMADI** — çünkü GPSR'yi profile-koşullu yapmadan önce kategori→profil ataması (Faz 1 adım 3) şart; aksi halde satıcılar yanlış profille ürün yayınlayamaz (Yüksek risk). Commit/push YAPILMADI.
 
-## Faz 1 — Veri modeli ✅ KISMEN (temel hazır, bağlanmadı)
+## 📋 EK DURUM RAPORU (Claude — 2026-07-08, ikinci oturum)
+> Faz 1 adım 3 (kategori→profil atama scripti) ve Faz 2 adım 2 (route wrapper) tamamlandı. **Asıl validation gate hâlâ bağlanmadı** — bu bilinçli, aynı risk gerekçesiyle: script canlı DB'ye karşı henüz hiç çalıştırılmadı (bu ortamdan production veritabanına güvenli bağlantı yoktu), o yüzden hangi kategorinin hangi profile düştüğü henüz doğrulanmadı. Gate'i bağlamadan önce scripti `--dry-run` ile çalıştırıp dağılımı gözden geçirmek şart.
+
+## Faz 1 — Veri modeli ✅ TAMAMLANDI (adım 3 dahil)
 - ✅ `apps/medusa-backend/src/compliance/compliance-profiles.json` — 15 profil: general_consumer_gpsr, electronics_weee, energy_labeled_eprel, battery_containing, cosmetics, food, food_supplement, toys, textiles, chemicals_reach, books_media, digital_goods, nicotine_tpd, medical_device (superuser_only), ce_marked_general. `inherits` zinciri + `field_definitions` (i18n label/help, type, validation_regex).
 - ✅ `apps/medusa-backend/src/compliance/marketplace-overlays.json` — 9 overlay: EU, DE, FR, IT, ES, AT, NL, PL, SE. Ulusal kayıt alanları **KOŞULLU** (`requires_if_base_field`): örn. `weee_number_fr` yalnızca profil WEEE gerektiriyorsa zorunlu → "kitap WEEE ister" hatası çözüldü.
 - ✅ `apps/medusa-backend/src/compliance/resolve-compliance.js` — `resolveComplianceProfile(profileId, marketplace)` (inheritance+overlay merge), `validateProductCompliance(meta, profileId, marketplace, {forPublish})`, `listProfiles()`, `listMarketplaces()`. Saf, bağımlılıksız. Test edildi (kitap+DE sadece GPSR; elektronik+FR weee_number_fr ister; kitap+FR istemez).
-- ❌ GEREKLİ (Faz 1 adım 3): `admin_hub_categories.metadata.compliance_profile_id` yazımı + parent→child inheritance. Script `scripts/assign-compliance-profiles.js` (CSV: category_slug_prefix → profile_id). **Bu yapılmadan validation bağlanmamalı.**
+- ✅ **YENİ (2026-07-08)**: `apps/medusa-backend/scripts/assign-compliance-profiles.js` — kategori adı+slug'ında DE/EN/TR anahtar kelime araması (ör. "elektronik"/"electronic" → electronics_weee, "kitap"/"buch"/"book" → books_media), eşleşme yoksa parent→child inheritance, kök kategoride de eşleşme yoksa `general_consumer_gpsr`'a düşer. `--dry-run` (yazmadan önizleme), `--force` (var olanların üzerine yaz), `--csv path` (manuel prefix→profil override) destekliyor. **Henüz gerçek veritabanına karşı ÇALIŞTIRILMADI** — bu ortamdan production DB'ye güvenli/hızlı bağlantı yoktu (daha önceki oturumlarda da aynı sorun yaşandı). Kullanıcının kendi ortamından `node apps/medusa-backend/scripts/assign-compliance-profiles.js --dry-run` ile önce dağılımı görmesi gerekiyor.
 
-## Faz 2 — Backend validation ❌ YAPILMADI (bilinçli — riskli)
-- ❌ `admin-products.js`: `validateRequiredGpsrMetadata` şu an TÜM ürünlerde çalışmaya devam ediyor (DEĞİŞTİRİLMEDİ — mevcut davranış korundu). Profile-koşullu hale getirmek Faz 1 adım 3 (kategori→profil) tamamlanınca yapılmalı; aksi halde profil bilgisi olmayan ürünler için yanlış alanlar zorunlu olur.
-- ❌ `GET /admin-hub/categories/:id/compliance-schema?marketplace=DE` endpoint'i — resolve-compliance.js zaten bu şemayı üretiyor, sadece route sarmalayıcı gerekiyor.
+## Faz 2 — Backend validation ⚠️ KISMEN (route wrapper hazır, gate hâlâ bağlı değil — bilinçli)
+- ❌ `admin-products.js`: `validateRequiredGpsrMetadata` hâlâ TÜM ürünlerde koşulsuz çalışıyor (DEĞİŞTİRİLMEDİ — mevcut davranış korundu, kasıtlı). Kategori atamaları `--dry-run` ile doğrulanıp gerçek DB'ye yazılmadan bu adıma geçilmemeli.
+- ✅ **YENİ (2026-07-08)**: `GET /admin-hub/categories/:id/compliance-schema?marketplace=DE` endpoint'i eklendi (`categories.js`). resolve-compliance.js'i sarmalıyor; kategori kendi `metadata.compliance_profile_id`'sini taşımıyorsa parent zincirini yukarı doğru gezip ilk atanmış profili buluyor, o da yoksa `general_consumer_gpsr`'a düşüyor. **Salt okunur** — hiçbir save/publish akışını etkilemiyor, güvenle deploy edilebilir. `medusa-admin-client.js`'e karşılık gelen `getCategoryComplianceSchema(categoryId, marketplace)` metodu da eklendi.
 - ❌ Excel import validation.
-- 📝 NOT: `resolve-compliance.js` motor hazır. Faz 2 için gereken tek şey: (1) kategori→profil ataması, (2) route wrapper, (3) admin-products.js'de `validateRequiredGpsrMetadata` çağrısını `validateProductCompliance(meta, resolvedProfileId, marketplace, {forPublish:true})` ile değiştirmek.
+- 📝 NOT: Kalan tek adım — kategori ataması `--dry-run` ile doğrulandıktan ve gerçek DB'ye yazıldıktan SONRA, `admin-products.js`'de `validateRequiredGpsrMetadata` çağrısını `validateProductCompliance(meta, resolvedProfileId, marketplace, {forPublish:true})` ile değiştirmek. Bunu şimdi yapmadım çünkü kategori ataması henüz canlıda doğrulanmadı — riski dosyanın kendi notuyla tutarlı şekilde erteledim.
 
 ## Faz 3 — Sellercentral UI ❌ YAPILMADI
 - ❌ `ProductEditPage.jsx` sabit WEEE/EPREL/GPSR blokları duruyor; dinamik `ComplianceFieldsSection` yapılmadı.
@@ -244,9 +247,14 @@ TALİMAT A — Kategori + ülke bazlı compliance sistemi
 - `apps/medusa-backend/src/compliance/resolve-compliance.js` (YENİ)
 - (admin-products.js compliance için DEĞİŞTİRİLMEDİ — sadece BRAND.md publish gate eklendi)
 
+## Değişen/eklenen dosyalar (2026-07-08, ikinci oturum)
+- `apps/medusa-backend/scripts/assign-compliance-profiles.js` (YENİ — henüz çalıştırılmadı)
+- `apps/medusa-backend/src/routes/categories.js` (compliance-schema endpoint)
+- `apps/sellercentral/src/lib/medusa-admin-client.js` (`getCategoryComplianceSchema`)
+
 ## Sıradaki adım (öneri, sırayla)
-1. Kategori→profil ataması: `admin_hub_categories.metadata.compliance_profile_id` + `assign-compliance-profiles.js` (prefix eşleme + parent inherit).
-2. `GET /admin-hub/categories/:id/compliance-schema` route wrapper (resolve-compliance.js sarmalar).
-3. Faz 2 validation'ı **draft'ta kal, superuser override, needs_compliance_review flag** ile açmak.
+1. ~~Kategori→profil ataması: `admin_hub_categories.metadata.compliance_profile_id` + `assign-compliance-profiles.js`~~ **[Script YAZILDI, henüz ÇALIŞTIRILMADI]** — önce `node apps/medusa-backend/scripts/assign-compliance-profiles.js --dry-run` çalıştırıp dağılımı gözden geçirin, sonra `--dry-run` bayrağı olmadan gerçek yazımı yapın.
+2. ~~`GET /admin-hub/categories/:id/compliance-schema` route wrapper~~ **[TAMAMLANDI]**
+3. Faz 2 validation'ı **draft'ta kal, superuser override, needs_compliance_review flag** ile açmak — kategori ataması canlıda doğrulanmadan yapılmamalı.
 4. Faz 3 UI.
 > ⚠️ Bu bir hukuki tavsiye değildir; canlıya almadan önce avukat/compliance danışmanı doğrulaması şart (JSON `_meta.legal_disclaimer`).

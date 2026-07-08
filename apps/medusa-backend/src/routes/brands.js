@@ -148,7 +148,7 @@ const brandAuthDocsPOST = async (req, res) => {
   if (!client) return res.status(500).json({ message: 'Database unavailable' })
   try {
     await client.connect()
-    const brand = await client.query('SELECT id, seller_id FROM admin_hub_brands WHERE id = $1', [brandId])
+    const brand = await client.query('SELECT id, seller_id, status FROM admin_hub_brands WHERE id = $1', [brandId])
     if (!brand.rows || !brand.rows[0]) { await client.end(); return res.status(404).json({ message: 'Brand not found' }) }
     const isOwner = callerSellerId && brand.rows[0].seller_id === callerSellerId
     if (!isSuperuser && !isOwner) { await client.end(); return res.status(403).json({ message: 'You can only upload documents for your own brand claim' }) }
@@ -157,6 +157,10 @@ const brandAuthDocsPOST = async (req, res) => {
        VALUES ($1, $2, $3, $4, $5) RETURNING id, brand_id, seller_id, document_type, file_url, file_name, status, uploaded_at`,
       [brandId, callerSellerId, docType, fileUrl, fileName]
     )
+    // Re-upload after rejection puts the claim back in the superuser review queue.
+    if (brand.rows[0].status === 'rejected') {
+      await client.query(`UPDATE admin_hub_brands SET status = 'pending', rejection_reason = NULL, updated_at = now() WHERE id = $1`, [brandId]).catch(() => {})
+    }
     await client.end()
     res.status(201).json({ document: r.rows[0] })
   } catch (e) {
@@ -187,9 +191,23 @@ const brandPendingAuthorizationsGET = async (req, res) => {
         docsByBrand[d.brand_id].push(d)
       }
     }
+    const sellerIds = [...new Set((brands.rows || []).map((b) => b.seller_id).filter(Boolean))]
+    let sellerNameById = {}
+    if (sellerIds.length) {
+      const sellerRows = await client.query(
+        `SELECT s.seller_id, s.store_name AS settings_store_name, u.store_name AS user_store_name, u.company_name, u.email
+         FROM seller_users u
+         LEFT JOIN admin_hub_seller_settings s ON s.seller_id = u.seller_id
+         WHERE u.seller_id = ANY($1::varchar[]) AND u.sub_of_seller_id IS NULL`,
+        [sellerIds]
+      ).catch(() => ({ rows: [] }))
+      for (const r of sellerRows.rows || []) {
+        sellerNameById[r.seller_id] = (r.settings_store_name && String(r.settings_store_name).trim()) || (r.user_store_name && String(r.user_store_name).trim()) || (r.company_name && String(r.company_name).trim()) || r.email || r.seller_id
+      }
+    }
     await client.end()
     res.json({
-      brands: (brands.rows || []).map((b) => ({ ...mapBrandRow(b), documents: docsByBrand[b.id] || [] })),
+      brands: (brands.rows || []).map((b) => ({ ...mapBrandRow(b), documents: docsByBrand[b.id] || [], seller_name: sellerNameById[b.seller_id] || b.seller_id })),
     })
   } catch (e) {
     try { await client.end() } catch (_) {}

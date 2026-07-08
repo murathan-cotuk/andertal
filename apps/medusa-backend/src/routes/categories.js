@@ -495,6 +495,47 @@ const adminHubCategoriesWarmTranslationsPOST = async (req, res) => {
   }
 }
 
+// ── Compliance schema (docs/HUKUKI.md Faz 2 step 2) ───────────────────────────
+// Read-only: resolves which product fields are required/optional for a category,
+// merging inheritance (compliance-profiles.json) + marketplace overlay
+// (marketplace-overlays.json). Does NOT change any validation behavior — nothing
+// calls this to block a save yet. Safe to ship ahead of the actual gate.
+const adminHubCategoryComplianceSchemaGET = async (req, res) => {
+  const id = (req.params.id || '').trim()
+  if (!id) return res.status(400).json({ message: 'category id required' })
+  const marketplace = String(req.query.marketplace || 'DE').toUpperCase()
+  const client = getCategoriesPgClient()
+  if (!client) return categoriesPgUnavailable(res)
+  try {
+    const { resolveComplianceProfile, DEFAULT_PROFILE_ID } = require('../compliance/resolve-compliance')
+    await client.connect()
+    const r = await client.query('SELECT id, slug, parent_id, metadata FROM admin_hub_categories WHERE id = $1', [id])
+    if (!r.rows[0]) { await client.end(); return res.status(404).json({ message: 'Category not found' }) }
+
+    // Walk up the parent chain until a metadata.compliance_profile_id is found
+    // (covers categories created/edited after assign-compliance-profiles.js last ran).
+    let cursor = r.rows[0]
+    let profileId = null
+    const seen = new Set()
+    while (cursor && !seen.has(cursor.id)) {
+      seen.add(cursor.id)
+      const meta = cursor.metadata && typeof cursor.metadata === 'object' ? cursor.metadata : {}
+      if (meta.compliance_profile_id) { profileId = meta.compliance_profile_id; break }
+      if (!cursor.parent_id) break
+      const pr = await client.query('SELECT id, slug, parent_id, metadata FROM admin_hub_categories WHERE id = $1', [cursor.parent_id])
+      cursor = pr.rows[0] || null
+    }
+    await client.end()
+
+    const resolved = resolveComplianceProfile(profileId || DEFAULT_PROFILE_ID, marketplace)
+    res.json({ category_id: id, resolved_from: profileId ? 'category_or_ancestor' : 'default_fallback', ...resolved })
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    console.error('Category compliance-schema GET:', e)
+    res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 module.exports = function createCategoriesRouter() {
@@ -503,12 +544,14 @@ module.exports = function createCategoriesRouter() {
   router.get('/admin-hub/categories', (req, res) => adminHubCategoriesGET(req, res))
   router.post('/admin-hub/categories', (req, res) => adminHubCategoriesPOST(req, res))
   router.post('/admin-hub/categories/import', (req, res) => adminHubCategoriesImportPOST(req, res))
+  router.get('/admin-hub/categories/:id/compliance-schema', (req, res) => adminHubCategoryComplianceSchemaGET(req, res))
   router.get('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))
   router.put('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdPUT(req, res))
   router.delete('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdDELETE(req, res))
 
   router.get('/admin-hub/v1/categories', (req, res) => adminHubCategoriesGET(req, res))
   router.post('/admin-hub/v1/categories', (req, res) => adminHubCategoriesPOST(req, res))
+  router.get('/admin-hub/v1/categories/:id/compliance-schema', (req, res) => adminHubCategoryComplianceSchemaGET(req, res))
   router.get('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))
   router.put('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdPUT(req, res))
   router.delete('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdDELETE(req, res))

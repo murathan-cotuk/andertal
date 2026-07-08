@@ -2108,9 +2108,25 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                         <Box minWidth="240px" flex="1">
                           <Select
                             label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
-                            options={[{ label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" }, ...(brands || []).map((b) => ({ label: b.name, value: b.id }))]}
+                            options={[
+                              { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" },
+                              ...(brands || [])
+                                .filter((b) => (b.status || "active") === "active" || b.id === getMeta(product, "brand_id"))
+                                .map((b) => {
+                                  const pending = (b.status || "active") !== "active";
+                                  const pendingSuffix = pending
+                                    ? ` (${locale === "en" ? "pending authorization" : locale === "tr" ? "onay bekliyor" : locale === "fr" ? "autorisation en attente" : locale === "es" ? "autorización pendiente" : locale === "it" ? "autorizzazione in attesa" : "Autorisierung ausstehend"})`
+                                    : "";
+                                  return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
+                                }),
+                            ]}
                             value={getMeta(product, "brand_id") || ""}
                             onChange={(v) => updateMeta("brand_id", v || undefined)}
+                            helpText={
+                              (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
+                                ? (locale === "en" ? "This brand is pending authorization and can't be published yet." : locale === "tr" ? "Bu marka onay bekliyor, henüz yayınlanamaz." : locale === "fr" ? "Cette marque est en attente d'autorisation et ne peut pas encore être publiée." : locale === "es" ? "Esta marca está pendiente de autorización y aún no se puede publicar." : locale === "it" ? "Questo brand è in attesa di autorizzazione e non può ancora essere pubblicato." : "Diese Marke wartet auf Autorisierung und kann noch nicht veröffentlicht werden.")
+                                : undefined
+                            }
                           />
                         </Box>
                         <Box minWidth="240px" flex="1">

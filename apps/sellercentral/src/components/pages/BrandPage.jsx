@@ -6,6 +6,7 @@ import {
   Card,
   Button,
   TextField,
+  Select,
   Text,
   BlockStack,
   InlineStack,
@@ -22,12 +23,26 @@ import { confirmDelete } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
 import { getBrandPageCopy } from "@/lib/brand-page-i18n";
 import { userError } from "@/lib/api-error-messages";
+import { appendMediaFileToFormData } from "@/lib/media-upload";
 
 const getDefaultBaseUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "") ||
   (typeof window !== "undefined" ? "http://localhost:9000" : "");
 
-const EMPTY_FORM = { name: "", handle: "", logo_image: "", banner_image: "", address: "" };
+const EMPTY_FORM = {
+  name: "", handle: "", logo_image: "", banner_image: "", address: "",
+  brand_type: "own", trademark_number: "", trademark_jurisdiction: "",
+};
+
+// Brand status/verification badge (docs/BRAND.md)
+function BrandStatusBadge({ brand, copy }) {
+  if (brand.status === "pending") return <Badge tone="attention">{copy.statusPending}</Badge>;
+  if (brand.status === "rejected") return <Badge tone="critical">{copy.statusRejected}</Badge>;
+  if (brand.verification_level === "verified") return <Badge tone="success">{copy.statusVerified}</Badge>;
+  if (brand.verification_level === "reseller") return <Badge tone="success">{copy.statusReseller}</Badge>;
+  if (brand.verification_level === "unverified") return <Badge>{copy.statusUnverified}</Badge>;
+  return null;
+}
 
 // ── Brand card (display only) ──────────────────────────────────────────────
 function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, copy }) {
@@ -55,7 +70,10 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, copy }) {
           )}
         </div>
         <BlockStack gap="050">
-          <Text as="p" variant="bodyMd" fontWeight="semibold">{brand.name}</Text>
+          <InlineStack gap="150" blockAlign="center">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">{brand.name}</Text>
+            <BrandStatusBadge brand={brand} copy={copy} />
+          </InlineStack>
           {brand.handle && <Text as="p" variant="bodySm" tone="subdued">{brand.handle}</Text>}
           {brand.address && <Text as="p" variant="bodySm" tone="subdued">{brand.address}</Text>}
         </BlockStack>
@@ -98,7 +116,52 @@ export default function BrandPage() {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [authFile, setAuthFile] = useState(null); // { url, name } once uploaded
+  const [authFileUploading, setAuthFileUploading] = useState(false);
+  const [reuploading, setReuploading] = useState(false);
   const copy = getBrandPageCopy(locale, isSuperuser);
+
+  const handleAuthFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAuthFileUploading(true);
+    setMessage({ type: "", text: "" });
+    try {
+      const fd = new FormData();
+      appendMediaFileToFormData(fd, file);
+      const r = await client.uploadMedia(fd);
+      if (r.url) setAuthFile({ url: r.url, name: file.name });
+    } catch (e2) {
+      setMessage({ type: "error", text: userError(e2, locale, copy.documentUploadError) });
+    } finally {
+      setAuthFileUploading(false);
+    }
+  };
+
+  const documentTypeForBrandType = (brandType) =>
+    brandType === "own_registered" ? "trademark_certificate" : "authorization_letter";
+
+  const handleReuploadDocument = async (brand) => {
+    if (!authFile) return;
+    setReuploading(true);
+    setMessage({ type: "", text: "" });
+    try {
+      await client.uploadBrandAuthDocument(brand.id, {
+        document_type: documentTypeForBrandType(brand.brand_type),
+        file_url: authFile.url,
+        file_name: authFile.name,
+      });
+      setAuthFile(null);
+      setMessage({ type: "success", text: copy.resubmitSuccess });
+      closeModal();
+      loadBrands();
+    } catch (e2) {
+      setMessage({ type: "error", text: userError(e2, locale, copy.documentUploadError) });
+    } finally {
+      setReuploading(false);
+    }
+  };
 
   const loadBrands = () => {
     setLoading(true);
@@ -119,6 +182,7 @@ export default function BrandPage() {
     setFormData(EMPTY_FORM);
     setSlugManuallyEdited(false);
     setMessage({ type: "", text: "" });
+    setAuthFile(null);
     setModalOpen(true);
   };
 
@@ -130,9 +194,13 @@ export default function BrandPage() {
       logo_image: brand.logo_image || "",
       banner_image: brand.banner_image || "",
       address: brand.address || "",
+      brand_type: brand.brand_type || "own",
+      trademark_number: brand.trademark_number || "",
+      trademark_jurisdiction: brand.trademark_jurisdiction || "",
     });
     setSlugManuallyEdited(true);
     setMessage({ type: "", text: "" });
+    setAuthFile(null);
     setModalOpen(true);
   };
 
@@ -140,6 +208,7 @@ export default function BrandPage() {
     setModalOpen(false);
     setEditingBrand(null);
     setFormData(EMPTY_FORM);
+    setAuthFile(null);
   };
 
   const resolveUrl = (url) => {
@@ -178,14 +247,43 @@ export default function BrandPage() {
           setSaving(false);
           return;
         }
+        const brandType = formData.brand_type || "own";
+        const needsAuth = !isSuperuser && (brandType === "own_registered" || brandType === "authorized_reseller");
+        if (needsAuth) {
+          if (brandType === "own_registered" && !formData.trademark_number.trim()) {
+            setMessage({ type: "error", text: `${copy.trademarkNumber}: ${copy.nameRequired}` });
+            setSaving(false);
+            return;
+          }
+          if (brandType === "own_registered" && !formData.trademark_jurisdiction.trim()) {
+            setMessage({ type: "error", text: `${copy.trademarkJurisdiction}: ${copy.nameRequired}` });
+            setSaving(false);
+            return;
+          }
+          if (!authFile) {
+            setMessage({ type: "error", text: copy.documentRequired });
+            setSaving(false);
+            return;
+          }
+        }
         const handle = (formData.handle || "").trim() || titleToHandle(name) || "brand-" + Date.now();
-        await client.createBrand({
+        const created = await client.createBrand({
           name,
           handle,
           logo_image: (formData.logo_image || "").trim() || null,
           banner_image: (formData.banner_image || "").trim() || null,
           address: (formData.address || "").trim() || null,
+          brand_type: brandType,
+          trademark_number: brandType === "own_registered" ? formData.trademark_number.trim() : undefined,
+          trademark_jurisdiction: brandType === "own_registered" ? formData.trademark_jurisdiction.trim() : undefined,
         });
+        if (authFile && created?.id) {
+          await client.uploadBrandAuthDocument(created.id, {
+            document_type: documentTypeForBrandType(brandType),
+            file_url: authFile.url,
+            file_name: authFile.name,
+          }).catch(() => {});
+        }
         setMessage({ type: "success", text: copy.created });
       }
       closeModal();
@@ -315,7 +413,15 @@ export default function BrandPage() {
         open={modalOpen}
         onClose={closeModal}
         title={editingBrand ? `${copy.editModal}: ${editingBrand.name}` : copy.addModal}
-        primaryAction={{ content: editingBrand ? copy.save : copy.create, onAction: handleSubmit, loading: saving }}
+        primaryAction={{
+          content: editingBrand
+            ? copy.save
+            : (!isSuperuser && (formData.brand_type === "own_registered" || formData.brand_type === "authorized_reseller"))
+              ? copy.submitForReview
+              : copy.create,
+          onAction: handleSubmit,
+          loading: saving,
+        }}
         secondaryActions={[
           ...(editingBrand && canEditBrand(editingBrand) ? [{ content: copy.delete, onAction: () => { closeModal(); handleDelete(editingBrand); }, destructive: true }] : []),
           { content: copy.cancel, onAction: closeModal },
@@ -326,6 +432,33 @@ export default function BrandPage() {
             {message.text && (
               <Banner tone={message.type === "success" ? "success" : "critical"}>
                 {message.text}
+              </Banner>
+            )}
+
+            {editingBrand && !isSuperuser && editingBrand.status === "pending" && (
+              <Banner tone="warning">{copy.pendingBannerText}</Banner>
+            )}
+
+            {editingBrand && !isSuperuser && editingBrand.status === "rejected" && (
+              <Banner tone="critical">
+                <BlockStack gap="200">
+                  <Text as="p">{copy.rejectedBannerText(editingBrand.rejection_reason)}</Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Button
+                      size="slim"
+                      onClick={() => document.getElementById("brand-reupload-input")?.click()}
+                      loading={authFileUploading}
+                    >
+                      {authFile ? authFile.name : copy.chooseFile}
+                    </Button>
+                    <input id="brand-reupload-input" type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={handleAuthFileSelect} />
+                    {authFile && (
+                      <Button size="slim" variant="primary" onClick={() => handleReuploadDocument(editingBrand)} loading={reuploading}>
+                        {copy.reuploadDocument}
+                      </Button>
+                    )}
+                  </InlineStack>
+                </BlockStack>
               </Banner>
             )}
 
@@ -355,6 +488,63 @@ export default function BrandPage() {
                 autoComplete="off"
                 helpText={copy.handleHelp}
               />
+            )}
+
+            {/* Brand type + authorization (docs/BRAND.md) — only shown when creating, superusers skip this entirely */}
+            {!editingBrand && !isSuperuser && (
+              <>
+                <Select
+                  label={copy.brandType}
+                  value={formData.brand_type}
+                  onChange={(v) => setFormData((p) => ({ ...p, brand_type: v }))}
+                  options={[
+                    { label: copy.brandTypeOwn, value: "own" },
+                    { label: copy.brandTypeRegistered, value: "own_registered" },
+                    { label: copy.brandTypeReseller, value: "authorized_reseller" },
+                  ]}
+                  helpText={
+                    formData.brand_type === "own_registered" ? copy.brandTypeRegisteredHelp
+                      : formData.brand_type === "authorized_reseller" ? copy.brandTypeResellerHelp
+                      : copy.brandTypeOwnHelp
+                  }
+                />
+
+                {formData.brand_type === "own_registered" && (
+                  <>
+                    <TextField
+                      label={copy.trademarkNumber}
+                      value={formData.trademark_number}
+                      onChange={(v) => setFormData((p) => ({ ...p, trademark_number: v }))}
+                      placeholder={copy.trademarkNumberPlaceholder}
+                      autoComplete="off"
+                    />
+                    <TextField
+                      label={copy.trademarkJurisdiction}
+                      value={formData.trademark_jurisdiction}
+                      onChange={(v) => setFormData((p) => ({ ...p, trademark_jurisdiction: v }))}
+                      placeholder={copy.trademarkJurisdictionPlaceholder}
+                      autoComplete="off"
+                    />
+                  </>
+                )}
+
+                {(formData.brand_type === "own_registered" || formData.brand_type === "authorized_reseller") && (
+                  <BlockStack gap="150">
+                    <Text as="p" variant="bodyMd" fontWeight="medium">{copy.authDocument}</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">{copy.authDocumentHelp}</Text>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Button
+                        size="slim"
+                        onClick={() => document.getElementById("brand-create-doc-input")?.click()}
+                        loading={authFileUploading}
+                      >
+                        {authFile ? authFile.name : copy.chooseFile}
+                      </Button>
+                      <input id="brand-create-doc-input" type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={handleAuthFileSelect} />
+                    </InlineStack>
+                  </BlockStack>
+                )}
+              </>
             )}
 
             <Divider />

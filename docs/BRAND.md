@@ -107,6 +107,7 @@
 
 > Backend tam kuruldu, non-breaking. Sellercentral UI + shop UI bekliyor. Commit/push YAPILMADI.
 > **2026-07-08 revizyonu**: brand_type modeli düzeltildi — tescilsiz kendi markası ≠ belge gerekmez, ≠ doğrulanmış; `own_registered` zorunlu alanlar + `verification_level` eklendi.
+> **2026-07-08 revizyonu 2 (aynı gün, ikinci Claude oturumu)**: doğrulama sırasında bir gerçek eksik bulundu ve düzeltildi — `brand_authorization_pending`/`brand_authorization_reviewed` bildirimleri DB'ye yazılıyordu ama `notifications.js`'e hiç bağlanmamıştı, yani superuser hiçbir yerde göremiyordu. Düzeltildi. Ardından Faz 3 (Sellercentral UI) uygulandı — bkz. aşağıdaki güncel bölüm.
 
 ## Faz 1 — Veri modeli ✅ YAPILDI (güncel)
 - ✅ `admin_hub_brands` kolonları: `status`, `brand_type`, `trademark_number`, `trademark_jurisdiction`, `approved_at`, `approved_by`, `rejection_reason` — server.js startup ALTER.
@@ -127,12 +128,13 @@
 - ✅ Bildirimler: `brand_authorization_pending` (superuser'a, türe göre farklı mesaj), `brand_authorization_reviewed` (satıcıya).
 - ⚠️ GEREKLİ: `own_registered` için belge yükleme (trademark_certificate) backend'de validate edilmiyor — "sertifika olmadan submit edilemez" kuralı UI'da uygulanmalı (UI kısıtı).
 
-## Faz 3 — Sellercentral UI ❌ YAPILMADI (gerekli)
-- ❌ `BrandPage.jsx`: "Kendi markam" vs "Tescilli marka" seçimi, registered'da fatura/belge upload alanı, pending sarı banner, rejected kırmızı banner+sebep+yeniden yükleme.
-- ❌ `ProductEditPage.jsx`: Brand dropdown yalnızca `status='active'` markaları göstermeli; pending gri/disabled+tooltip.
-- ❌ Yeni `BrandAuthorizationsPage.jsx` (superuser): bekleyen liste, belge önizleme, approve/reject. `seller_listing_pending` notification pattern'i kopyalanacak.
-- ❌ `medusa-admin-client.js`: yeni endpoint metodları (getPendingBrandAuthorizations, uploadBrandAuthDoc, approve/rejectBrandAuth).
-- 📝 NOT: Backend hazır; UI bunları çağırması yeterli. Endpoint sözleşmeleri yukarıda.
+## Faz 3 — Sellercentral UI ✅ YAPILDI (2026-07-08, ikinci oturum)
+- ✅ `medusa-admin-client.js`: `uploadBrandAuthDocument`, `getPendingBrandAuthorizations`, `approveBrandAuthorization`, `rejectBrandAuthorization` eklendi.
+- ✅ `BrandPage.jsx`: oluşturma modalinde "Kendi markam" / "Tescilli marka" / "Yetkili bayi" seçimi (Select), `own_registered` için tescil no.+bölge alanları, ikisi için de belge yükleme (basit `<input type="file">` + `client.uploadMedia`, MediaPickerModal'ın görsel-odaklı olması nedeniyle PDF için ayrı tutuldu). Kart üzerinde durum rozeti (pending/rejected/verified/reseller/unverified). Pending için sarı banner, rejected için kırmızı banner + sebep + "yeni belge yükle" akışı.
+- ✅ Backend'e küçük bir ek yapıldı: reddedilen bir markaya yeni belge yüklenince (`brandAuthDocsPOST`) durum otomatik `pending`'e dönüyor — böylece "yeniden yükleme" superuser kuyruğuna gerçekten geri giriyor.
+- ✅ Yeni `BrandAuthorizationsPage.jsx` (`apps/sellercentral/src/components/pages/admin/`) + route `apps/sellercentral/src/app/[locale]/content/brands/authorizations/page.jsx`: bekleyen liste (satıcı adı çözümlenmiş — backend'e `sellerNameById` JOIN eklendi), belge linkleri (yeni sekmede aç), onayla / reddet (red sebebi modalı). Sidebar menüsüne `superuserOnly: true` ile eklendi (`PolarisLayout.jsx`, Content > Brands altında).
+- ✅ `ProductEditPage.jsx`: Brand dropdown artık sadece `status='active'` markaları gösteriyor (mevcut seçili marka pending/rejected olsa bile listede kalır ama disabled + "(onay bekliyor)" etiketiyle, ürünün neden yayınlanamadığını açıklayan bir helpText ile).
+- 📝 Not: Marka türü (own/own_registered/authorized_reseller) sadece oluşturma anında seçilebiliyor — backend PATCH bunu değiştirmeye izin vermiyor (bilinçli, tasarım gereği).
 
 ## Faz 4 — Shop ✅ KISMEN YAPILDI
 - ✅ `GET /store/brands` artık yalnızca `status='active'` (veya NULL=legacy) markaları döndürüyor (`store-products.js`). Pending/rejected markalar shop `/brands` listesinde görünmez.
@@ -141,18 +143,30 @@
 ## Kabul kriterleri
 - [x] `own` (tescilsiz) → anında active, `verification_level='unverified'` ✅ (backend)
 - [x] `own_registered` → `trademark_number`+`trademark_jurisdiction` zorunlu, yoksa 400 ✅ (backend)
-- [~] `own_registered` → sertifika belgesi yüklemeden submit edilemez → ⚠️ UI katmanında uygulanmalı (backend belge ayrı endpoint)
-- [~] `authorized_reseller` → yetki belgesi zorunlu → ⚠️ aynı şekilde UI katmanında
+- [x] `own_registered` → sertifika belgesi yüklemeden submit edilemez ✅ (UI: `BrandPage.jsx` submit öncesi kontrol ediyor)
+- [x] `authorized_reseller` → yetki belgesi zorunlu ✅ (aynı UI kontrolü)
 - [x] Superuser approve → brand active + verification_level set ✅ (backend)
 - [x] Pending brand ile ürün publish → 400 ✅ (`admin-products.js` gate)
-- [x] Superuser notification `brand_authorization_pending` ✅
+- [x] Superuser notification `brand_authorization_pending` ✅ **görünür hale getirildi** (2026-07-08: notifications.js'e bağlandı)
 - [x] Mevcut markalar migration: status='active', brand_type='own', verification_level='unverified' ✅
 
 ## Değişen dosyalar
 - `apps/medusa-backend/server.js` (schema)
-- `apps/medusa-backend/src/routes/brands.js` (API)
+- `apps/medusa-backend/src/routes/brands.js` (API + seller adı JOIN + reject sonrası reupload→pending)
 - `apps/medusa-backend/src/routes/admin-products.js` (publish gate)
 - `apps/medusa-backend/src/routes/store-products.js` (shop /brands filter)
+- `apps/medusa-backend/src/routes/notifications.js` (bildirim bağlantısı — 2026-07-08)
+- `apps/sellercentral/src/lib/medusa-admin-client.js` (yeni endpoint metodları)
+- `apps/sellercentral/src/lib/brand-page-i18n.js` (yeni çeviri anahtarları)
+- `apps/sellercentral/src/components/pages/BrandPage.jsx` (Faz 3 UI)
+- `apps/sellercentral/src/components/pages/admin/BrandAuthorizationsPage.jsx` (yeni)
+- `apps/sellercentral/src/app/[locale]/content/brands/authorizations/page.jsx` (yeni route)
+- `apps/sellercentral/src/components/PolarisLayout.jsx` (sidebar linki)
+- `apps/sellercentral/src/components/pages/products/ProductEditPage.jsx` (brand dropdown filtresi)
 
 ## Sıradaki adım (öneri)
-Faz 3 sellercentral UI — backend sözleşmeleri hazır. Önce `medusa-admin-client.js` metodları, sonra `BrandPage.jsx` genişletme, sonra superuser `BrandAuthorizationsPage.jsx`.
+Faz 3 sellercentral UI — backend sözleşmeleri hazır. Önce `medusa-admin-client.js` metodları, sonra `BrandPage.jsx` genişletme, sonra superuser `BrandAuthorizationsPage.jsx`. **[2026-07-08: TAMAMLANDI]**
+
+## Kalan işler (opsiyonel, düşük öncelik)
+- Nav menüsündeki "Brand Authorizations" etiketi şu an sadece İngilizce fallback ile gösteriliyor (`PolarisLayout.jsx`), diğer diller için `messages/*.json` dosyalarına resmi çeviri anahtarı eklenmedi (iki ayrı `messages/` dizini olduğu görüldü, hangisinin aktif olduğu netleştirilip oradan eklenmeli).
+- Canlı ortamda tam akış (marka oluştur → belge yükle → superuser onayla/reddet → ürün publish gate) henüz manuel test edilmedi — kod incelemesiyle doğrulandı, uçtan uca fonksiyonel test önerilir.
