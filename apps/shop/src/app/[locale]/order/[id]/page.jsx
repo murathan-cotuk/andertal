@@ -657,7 +657,7 @@ export default function OrderDetailPage() {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {item.product_handle
-                      ? <Link href={`/produkt/${item.product_handle}`} style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none" }}>{name}</Link>
+                      ? <Link href={`/${item.product_handle}`} style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none" }}>{name}</Link>
                       : <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{name}</div>
                     }
                     {variant && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{variant.split(/\s*\/\s*/).join(" · ")}</div>}

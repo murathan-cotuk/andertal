@@ -1098,7 +1098,7 @@ export default function ProductTemplateMobile() {
     if (typeof document === "undefined" || !product) return;
     const pathSlug = storefrontProductHandle(product, locale);
     if (!pathSlug) return;
-    const href = `${window.location.origin}/produkt/${pathSlug}`;
+    const href = `${window.location.origin}/${pathSlug}`;
     let link = document.querySelector('link[rel="canonical"]');
     if (!link) {
       link = document.createElement("link");

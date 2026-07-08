@@ -445,7 +445,7 @@ export default function CartPage() {
                   <ItemDetails>
                     <ItemTitle>
                       <Link
-                        href={item.product_handle ? `/produkt/${item.product_handle}` : "/"}
+                        href={item.product_handle ? `/${item.product_handle}` : "/"}
                         style={{ color: "inherit", textDecoration: "none" }}
                       >
                         {(() => {

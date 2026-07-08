@@ -327,6 +327,37 @@ const validateBrandForPublish = async (client, meta, status) => {
   }
 }
 
+/**
+ * Non-blocking compliance advisory (docs/HUKUKI.md Faz 2, "needs_compliance_review"
+ * rollout — never blocks a save/publish). Fire-and-forget: resolves the product's
+ * first category to a compliance profile (assign-compliance-profiles.js output) and
+ * stamps metadata.compliance_review with what's missing, purely for superuser visibility.
+ * Any failure here is silently swallowed — this must never affect the caller's save.
+ */
+const stampComplianceReviewAsync = async (productId, metadata) => {
+  try {
+    const meta = metadata && typeof metadata === 'object' ? metadata : {}
+    const categoryIds = Array.isArray(meta.category_ids) ? meta.category_ids : []
+    const categoryId = categoryIds[0]
+    if (!productId || !categoryId) return
+    const { resolveCategoryComplianceProfileId } = require('../compliance/category-profile-lookup')
+    const { validateProductCompliance, DEFAULT_PROFILE_ID } = require('../compliance/resolve-compliance')
+    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+    const { Client } = require('pg')
+    const client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const profileId = await resolveCategoryComplianceProfileId(client, categoryId)
+    const result = validateProductCompliance(meta, profileId || DEFAULT_PROFILE_ID, 'DE', { forPublish: false })
+    await client.query(
+      `UPDATE admin_hub_products SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('compliance_review', $1::jsonb) WHERE id = $2`,
+      [JSON.stringify({ profile_id: result.resolved.profile_id, ok: result.ok, missing_fields: result.missing, checked_at: new Date().toISOString() }), productId]
+    )
+    await client.end()
+  } catch (_) {
+    // Fail silently and completely — this is advisory-only, never allowed to affect a save.
+  }
+}
+
 const createAdminHubProductDb = async (body) => {
   const client = getProductsDbClient()
   if (!client) return null
@@ -359,6 +390,7 @@ const createAdminHubProductDb = async (body) => {
     await client.end()
     const r = res.rows && res.rows[0]
     if (!r) return null
+    stampComplianceReviewAsync(r.id, r.metadata).catch(() => {})
     return {
       id: r.id, title: r.title, handle: r.handle, slug: r.handle, sku: r.sku,
       description: r.description, status: r.status, seller_id: r.seller_id, seller: r.seller_id,
@@ -457,6 +489,7 @@ const updateAdminHubProductDb = async (id, body) => {
       [title, handle, sku, description, status, price, inventory, metadata, variants, collection_id, uuid]
     )
     await client.end()
+    stampComplianceReviewAsync(uuid, metadataObj).catch(() => {})
     return await getAdminHubProductByIdOrHandleDb(uuid)
   } catch (e) {
     try { await client.end() } catch (_) {}

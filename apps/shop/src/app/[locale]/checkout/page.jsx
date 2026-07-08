@@ -2280,7 +2280,7 @@ export default function CheckoutPage() {
                       {t("sellerHeading")}: {displayName}
                     </SummarySellerLabel>
                     {group.items.map((item) => {
-                      const productHref = item.product_handle ? `/produkt/${item.product_handle}` : null;
+                      const productHref = item.product_handle ? `/${item.product_handle}` : null;
                       const lineTitle = getLocalizedCartLineTitle(item, locale);
                       const row = (
                         <>

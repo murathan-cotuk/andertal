@@ -508,23 +508,11 @@ const adminHubCategoryComplianceSchemaGET = async (req, res) => {
   if (!client) return categoriesPgUnavailable(res)
   try {
     const { resolveComplianceProfile, DEFAULT_PROFILE_ID } = require('../compliance/resolve-compliance')
+    const { resolveCategoryComplianceProfileId } = require('../compliance/category-profile-lookup')
     await client.connect()
-    const r = await client.query('SELECT id, slug, parent_id, metadata FROM admin_hub_categories WHERE id = $1', [id])
-    if (!r.rows[0]) { await client.end(); return res.status(404).json({ message: 'Category not found' }) }
-
-    // Walk up the parent chain until a metadata.compliance_profile_id is found
-    // (covers categories created/edited after assign-compliance-profiles.js last ran).
-    let cursor = r.rows[0]
-    let profileId = null
-    const seen = new Set()
-    while (cursor && !seen.has(cursor.id)) {
-      seen.add(cursor.id)
-      const meta = cursor.metadata && typeof cursor.metadata === 'object' ? cursor.metadata : {}
-      if (meta.compliance_profile_id) { profileId = meta.compliance_profile_id; break }
-      if (!cursor.parent_id) break
-      const pr = await client.query('SELECT id, slug, parent_id, metadata FROM admin_hub_categories WHERE id = $1', [cursor.parent_id])
-      cursor = pr.rows[0] || null
-    }
+    const exists = await client.query('SELECT id FROM admin_hub_categories WHERE id = $1', [id])
+    if (!exists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Category not found' }) }
+    const profileId = await resolveCategoryComplianceProfileId(client, id)
     await client.end()
 
     const resolved = resolveComplianceProfile(profileId || DEFAULT_PROFILE_ID, marketplace)

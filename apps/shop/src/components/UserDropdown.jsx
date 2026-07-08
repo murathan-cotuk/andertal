@@ -176,7 +176,7 @@ function MiniProductCard({ item, onNavigate }) {
   if (!item?.handle) return null;
   return (
     <Link
-      href={`/produkt/${item.handle}`}
+      href={`/${item.handle}`}
       onClick={onNavigate}
       className={cn(
         "group flex-shrink-0 w-[104px] sm:w-[118px] rounded-xl border border-gray-100 bg-white p-1.5",

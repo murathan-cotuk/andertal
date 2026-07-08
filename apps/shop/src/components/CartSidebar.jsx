@@ -586,7 +586,7 @@ export default function CartSidebar() {
                   <RecommendedStrip role="region" aria-label={tCart("recommendedTitle")}>
                     {recommended.map((p) => (
                       <RecommendedCard key={p.id}>
-                        <RecommendedItemLink href={`/produkt/${p.handle}`} onClick={closeCartSidebar}>
+                        <RecommendedItemLink href={`/${p.handle}`} onClick={closeCartSidebar}>
                           <RecommendedThumb>
                             {p.thumbnail ? (
                               <img src={p.thumbnail} alt={p.title} />
@@ -630,7 +630,7 @@ export default function CartSidebar() {
               <ItemBody>
                 <ItemTitle>
                   <Link
-                    href={item.product_handle ? `/produkt/${item.product_handle}` : "/"}
+                    href={item.product_handle ? `/${item.product_handle}` : "/"}
                     onClick={closeCartSidebar}
                     style={{ color: "inherit", textDecoration: "none" }}
                   >

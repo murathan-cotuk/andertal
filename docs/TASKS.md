@@ -1,19 +1,19 @@
 # Görev Listesi
 
 İlk not tarihi: 04.07
-Son gözden geçirme (kod bazlı durum kontrolü): 06.07.2026
+Son gözden geçirme (kod bazlı durum kontrolü): 08.07.2026
 
 ## Özet
 
 | Durum | Adet |
 |---|---|
-| ✅ Tamamlanmış | 11 |
-| ⚠️ Kısmen tamamlanmış | 7 |
+| ✅ Tamamlanmış | 12 |
+| ⚠️ Kısmen tamamlanmış | 6 |
 | 🐛 Bozuk / hatalı (kodda bulundu) | 0 |
 | ❓ Kodda bulgu yok / canlıda doğrulanmalı | 2 |
 | **Toplam** | **20** |
 
-Not: İlk gözden geçirme (06.07.2026) sadece koda bakılarak yapıldı. Aynı gün içinde, kullanıcı onayıyla, 4 doğrulanmış hata (Görev 5, 9, 10, 20) düzeltildi — bu değişiklikler henüz commit/push edilmedi, kullanıcı onayı bekleniyor.
+Not: İlk gözden geçirme 06.07.2026'da yapıldı. Görev 5/9/10/20'deki 4 hata düzeltmesi commit `ff47f96` ile, Görev 16 (shop URL) düzeltmesi ise ayrı bir commit ile push edilecek (bkz. ilgili görev notları için tarih damgaları).
 
 ---
 
@@ -179,10 +179,12 @@ Not: İlk gözden geçirme (06.07.2026) sadece koda bakılarak yapıldı. Aynı 
 
 > Shopta url neden /produkt/vampirevape... seklinde? andertal.com/de/de/ yazdiktan sonra hemen ürün bilgileri görünmeli.
 
-**Durum: ⚠️ Kısmen tamamlanmış**
-- Temel yetenek zaten var: ürün kartı linki ve catch-all route `/de/de/<handle>` şeklinde direkt çalışıyor (`ProductCard.jsx:562`, `[locale]/[handle]/page.jsx` fallback 4).
-- Ancak onlarca iç link hâlâ eski `/produkt/<handle>` önekini kullanıyor: sepet, hesap sayfası, kullanıcı menüsü, checkout, arama dropdown'u, sipariş sayfası, sitemap.xml — ve kritik olarak **ürün sayfasının kendi canonical tag'i bile hâlâ `/produkt/...`'a işaret ediyor** (`ProductTemplate.jsx:1083`, `ProductTemplateMobile.jsx:1101`). Eski `/produkt/[handle]` ve `/product/[slug]` route'ları da hâlâ paralel şekilde duruyor.
-- Statik sayfalar için `/pages/[slug]` route'u da hâlâ ayrı duruyor ve sitemap bunu böyle üretiyor.
+**Durum: ✅ Düzeltildi (08.07.2026, henüz commit/push edilmedi)**
+- Temel yetenek zaten vardı: ürün kartı linki ve catch-all route `/de/de/<handle>` şeklinde direkt çalışıyor (`ProductCard.jsx:562`, `[locale]/[handle]/page.jsx` fallback 4) — dokunulmadı.
+- **Düzeltildi**: Tüm iç linkler artık `/produkt/<handle>` yerine `/<handle>` üretiyor — sepet (`cart/page.jsx`, `CartSidebar.jsx`), hesap sayfası (`account/page.jsx`), kullanıcı menüsü (`UserDropdown.jsx`), checkout (`checkout/page.jsx`), arama dropdown'u (`DropdownSearch.jsx`, 8 yer), sipariş sayfası (`order/[id]/page.jsx`), sitemap.xml.
+- **Düzeltildi**: Ürün sayfasının canonical tag'i artık `/produkt/...` yerine temiz handle'a işaret ediyor (`ProductTemplate.jsx:1083`, `ProductTemplateMobile.jsx:1101`).
+- **Düzeltildi**: Eski `/produkt/[handle]` ve `/product/[slug]` route'ları artık aynı içeriği ikinci bir URL'de tekrar render etmiyor (duplicate content riski) — ikisi de `permanentRedirect()` ile temiz `/[locale]/[handle]` URL'ine 308 yönlendirme yapıyor, böylece eski linkler/yer imleri kırılmıyor.
+- Not: `/pages/[slug]` route'una dokunmadım — o route'un kendi `layout.jsx`'i var (muhtemelen sayfa-özel SEO metadata üretiyor) ve catch-all'daki CMS-sayfa render mantığının bununla birebir aynı davranışı sağladığını doğrulayamadım; buna dokunmak SEO metadata'sını kaza sonucu bozma riski taşıyordu, o yüzden bilinçli olarak atladım.
 
 ---
 

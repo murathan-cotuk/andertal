@@ -422,7 +422,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
       return (
         <HitLink
           key={product.id || product.handle || i}
-          href={pathHandle ? `/produkt/${pathHandle}` : "#"}
+          href={pathHandle ? `/${pathHandle}` : "#"}
           onClick={onPick}
         >
           {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
@@ -472,7 +472,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
                       const h = storefrontProductHandle(p, locale);
                       const th = p.thumbnail ? resolveImageUrl(p.thumbnail) : "";
                       return (
-                        <WeiterCard key={p.id} href={h ? `/produkt/${h}` : "#"} onClick={() => { setMobileOpen(false); setQ(""); }}>
+                        <WeiterCard key={p.id} href={h ? `/${h}` : "#"} onClick={() => { setMobileOpen(false); setQ(""); }}>
                           <WeiterImg>{th ? <img src={th} alt="" /> : null}</WeiterImg>
                           <WeiterTitle>{pt || p.title || ""}</WeiterTitle>
                         </WeiterCard>
@@ -506,7 +506,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
                     return (
                       <HitLink
                         key={product.id || product.handle || i}
-                        href={pathHandle ? `/produkt/${pathHandle}` : "#"}
+                        href={pathHandle ? `/${pathHandle}` : "#"}
                         onClick={() => { saveRecentSearch(q); setMobileOpen(false); setQ(""); }}
                       >
                         {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
@@ -571,7 +571,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
               return (
                 <HitLink
                   key={product.id || product.handle || `fb-${i}`}
-                  href={pathHandle ? `/produkt/${pathHandle}` : "#"}
+                  href={pathHandle ? `/${pathHandle}` : "#"}
                   onClick={() => setOpen(false)}
                 >
                   {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
@@ -700,7 +700,7 @@ function SearchInputWithDropdown({
       e.preventDefault();
       const hit = hits[focusedIndex];
       const urlPath = getByPath(hit, attributes.url || "url");
-      if (urlPath) window.location.href = typeof urlPath === "string" ? (urlPath.startsWith("/") ? urlPath : `/produkt/${urlPath}`) : "#";
+      if (urlPath) window.location.href = typeof urlPath === "string" ? (urlPath.startsWith("/") ? urlPath : `/${urlPath}`) : "#";
     }
   };
 
@@ -791,7 +791,7 @@ function SearchInputWithDropdown({
                       return (
                         <WeiterCard
                           key={p.id}
-                          href={h ? `/produkt/${h}` : "#"}
+                          href={h ? `/${h}` : "#"}
                           onClick={() => {
                             setMobileOpen(false);
                             refine("");
@@ -850,7 +850,7 @@ function SearchInputWithDropdown({
                 <div style={{ padding: "8px 0" }} role="listbox">
                   {hits.map((hit, i) => {
                     const url = getByPath(hit, urlKey);
-                    const link = url && (String(url).startsWith("/") ? url : `/produkt/${url}`);
+                    const link = url && (String(url).startsWith("/") ? url : `/${url}`);
                     return (
                       <HitLink
                         key={hit.objectID || i}
@@ -991,7 +991,7 @@ function SearchInputWithDropdown({
           {!loading && hits.length === 0 && <Empty>{ts("noResults", { query })}</Empty>}
           {hits.map((hit, i) => {
             const url = getByPath(hit, urlKey);
-            const link = url && (String(url).startsWith("/") ? url : `/produkt/${url}`);
+            const link = url && (String(url).startsWith("/") ? url : `/${url}`);
             return (
               <HitLink
                 key={hit.objectID || i}

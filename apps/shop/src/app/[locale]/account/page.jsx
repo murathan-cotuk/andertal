@@ -707,7 +707,7 @@ export default function AccountPage() {
                   </CarouselHeader>
                   <CarouselTrack>
                     {rebuyItems.map((item) => (
-                      <MiniCard key={item.handle} href={`/produkt/${item.handle}`}>
+                      <MiniCard key={item.handle} href={`/${item.handle}`}>
                         <MiniImg>
                           {item.thumbnail ? (
                             <img src={item.thumbnail} alt="" />
@@ -733,7 +733,7 @@ export default function AccountPage() {
                   </CarouselHeader>
                   <CarouselTrack>
                     {recentlyViewed.map((p) => (
-                      <MiniCard key={p.handle} href={`/produkt/${p.handle}`}>
+                      <MiniCard key={p.handle} href={`/${p.handle}`}>
                         <MiniImg>
                           {p.thumbnail ? (
                             <img src={p.thumbnail} alt="" />

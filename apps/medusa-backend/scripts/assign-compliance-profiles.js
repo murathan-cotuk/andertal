@@ -7,11 +7,14 @@
  * category -> profile mapping so that step can safely become profile-conditional later.
  *
  * Matching: each category's own name+slug is tested against a keyword table
- * (DE/EN/TR) mapped to a profile id from src/compliance/compliance-profiles.json.
+ * (EN-primary — the live category tree is Amazon's English taxonomy — with DE/TR
+ * synonyms mixed in) mapped to a profile id from src/compliance/compliance-profiles.json.
  * First matching profile wins (ordered narrow-to-broad, e.g. medical_device is
  * checked before the generic electronics/CE profiles). A category with no keyword
- * match inherits its nearest ancestor's resolved profile. A root category with no
- * match and no matched ancestor falls back to general_consumer_gpsr.
+ * match inherits its nearest ancestor's resolved profile. A ROOT category (no parent)
+ * with no keyword match falls back to a per-root default (ROOT_DEFAULT_PROFILE below,
+ * covering the 23 top-level Amazon categories actually present in this DB), and only
+ * general_consumer_gpsr if the root itself isn't in that table either.
  *
  * Usage:
  *   node apps/medusa-backend/scripts/assign-compliance-profiles.js [--dry-run] [--force] [--csv path/to/overrides.csv]
@@ -39,24 +42,54 @@ const PROFILES = require('../src/compliance/compliance-profiles.json').profiles 
 const FALLBACK_PROFILE = 'general_consumer_gpsr'
 
 // Ordered narrow -> broad: first match wins. Keywords are matched as substrings
-// (case-insensitive) against "<name> <slug>". DE/EN/TR mixed since this platform's
-// categories and staff are a mix of all three.
+// (case-insensitive) against "<name> <slug>". EN-primary (see note above), DE/TR
+// synonyms included for categories that were imported/renamed locally.
 const KEYWORD_RULES = [
-  { profile: 'medical_device', keywords: ['medizinprodukt', 'medical device', 'tibbi cihaz', 'tıbbi cihaz'] },
-  { profile: 'nicotine_tpd', keywords: ['e-zigarette', 'e-zigaretten', 'liquid', 'vape', 'nikotin', 'nicotine', 'e-sigara'] },
-  { profile: 'food_supplement', keywords: ['nahrungsergänzung', 'supplement', 'takviye edici', 'takviye gıda', 'protein pulver'] },
-  { profile: 'food', keywords: ['lebensmittel', 'food', 'gıda', 'getränk', 'beverage', 'içecek', 'snack', 'süßware', 'gewürz'] },
-  { profile: 'cosmetics', keywords: ['kosmetik', 'cosmetic', 'kozmetik', 'parfüm', 'parfum', 'makeup', 'make-up', 'pflege', 'skincare'] },
-  { profile: 'energy_labeled_eprel', keywords: ['kühlschrank', 'waschmaschine', 'geschirrspüler', 'fernseher', 'klimaanlage', 'refrigerator', 'washing machine', 'dishwasher', 'buzdolabı', 'çamaşır makinesi', 'klima'] },
-  { profile: 'battery_containing', keywords: ['batterie', 'akku', 'battery', 'pil', 'batarya', 'powerbank'] },
-  { profile: 'electronics_weee', keywords: ['elektronik', 'electronic', 'elektro', 'computer', 'bilgisayar', 'smartphone', 'handy', 'telefon', 'laptop', 'kamera', 'camera', 'haushaltsgerät', 'appliance'] },
-  { profile: 'toys', keywords: ['spielzeug', 'toy', 'oyuncak'] },
-  { profile: 'chemicals_reach', keywords: ['chemikalie', 'chemical', 'kimyasal', 'reiniger', 'detergent', 'lack', 'farbe', 'kleber', 'klebstoff', 'adhesive'] },
-  { profile: 'textiles', keywords: ['textil', 'textile', 'tekstil', 'bekleidung', 'clothing', 'giyim', 'schuh', 'shoe', 'ayakkabı', 'kleidung'] },
-  { profile: 'books_media', keywords: ['buch', 'book', 'kitap', 'medien', 'media', 'zeitschrift', 'magazine', 'dergi', 'hörbuch'] },
-  { profile: 'digital_goods', keywords: ['digital', 'download', 'lizenz', 'license', 'e-book', 'software'] },
-  { profile: 'ce_marked_general', keywords: ['maschine', 'machine', 'makine', 'werkzeug', 'power tool', 'elektrowerkzeug'] },
+  { profile: 'medical_device', keywords: ['medical device', 'medical equipment', 'medizinprodukt', 'tibbi cihaz', 'tıbbi cihaz', 'hearing aid', 'blood pressure monitor', 'thermometer', 'mobility aid', 'wheelchair'] },
+  { profile: 'nicotine_tpd', keywords: ['e-cigarette', 'e cigarette', 'vape', 'vaping', 'e-liquid', 'e-zigarette', 'nikotin', 'nicotine', 'e-sigara', 'tobacco'] },
+  { profile: 'food_supplement', keywords: ['supplement', 'vitamin', 'protein powder', 'nahrungsergänzung', 'takviye edici', 'takviye gıda'] },
+  { profile: 'food', keywords: ['food', 'grocery', 'gourmet', 'snack', 'beverage', 'drink', 'coffee', 'tea ', 'candy', 'chocolate', 'spice', 'condiment', 'baking', 'pantry', 'lebensmittel', 'gıda', 'içecek'] },
+  { profile: 'cosmetics', keywords: ['beauty', 'personal care', 'cosmetic', 'makeup', 'make-up', 'skin care', 'skincare', 'hair care', 'fragrance', 'perfume', 'kosmetik', 'kozmetik', 'parfüm'] },
+  { profile: 'energy_labeled_eprel', keywords: ['refrigerator', 'freezer', 'washing machine', 'washer', 'dryer', 'dishwasher', 'air conditioner', 'television', ' tv ', 'oven', 'range hood', 'kühlschrank', 'waschmaschine', 'geschirrspüler', 'klimaanlage'] },
+  { profile: 'battery_containing', keywords: ['battery', 'batteries', 'power bank', 'rechargeable', 'batterie', 'akku', 'pil', 'batarya'] },
+  { profile: 'electronics_weee', keywords: ['electronic', 'electronics', 'computer', 'laptop', 'tablet', 'monitor', 'printer', 'camera', 'phone', 'smartphone', 'headphone', 'speaker', 'appliance', 'kitchen appliance', 'small appliance', 'gaming console', 'router', 'charger', 'cable', 'elektronik', 'bilgisayar', 'telefon'] },
+  { profile: 'toys', keywords: ['toy', 'toys & games', 'toys and games', 'game', 'puzzle', 'doll', 'action figure', 'lego', 'building block', 'spielzeug', 'oyuncak'] },
+  { profile: 'chemicals_reach', keywords: ['chemical', 'cleaner', 'cleaning', 'detergent', 'paint', 'adhesive', 'glue', 'solvent', 'pesticide', 'fertilizer', 'kimyasal', 'reiniger', 'klebstoff'] },
+  { profile: 'textiles', keywords: ['clothing', 'apparel', 'shoes', 'jewelry', 'fashion', 'shirt', 'dress', 'jacket', 'pants', 'sock', 'underwear', 'textile', 'fabric', 'linen', 'bedding', 'towel', 'textil', 'bekleidung', 'giyim', 'ayakkabı'] },
+  { profile: 'books_media', keywords: ['book', 'books', 'ebook', 'magazine', 'novel', 'cd', 'vinyl', 'dvd', 'blu-ray', 'movie', 'music', 'audiobook', 'buch', 'kitap', 'dergi'] },
+  { profile: 'digital_goods', keywords: ['digital', 'download', 'video game', 'software', 'license key', 'gift card', 'in-game', 'lizenz'] },
+  { profile: 'ce_marked_general', keywords: ['power tool', 'hand tool', 'machine', 'machinery', 'drill', 'saw', 'generator', 'compressor', 'werkzeug', 'makine'] },
 ]
+
+// Fallback used only when a ROOT category (no parent) has no keyword match itself.
+// Covers all 23 top-level slugs present in this database (see docs/HUKUKI.md status
+// report for the exact list) so most of the tree resolves to something more specific
+// than the bare GPSR baseline even without a keyword hit deeper in the branch.
+const ROOT_DEFAULT_PROFILE = {
+  'appliances': 'electronics_weee',
+  'arts-crafts-sewing': 'general_consumer_gpsr',
+  'automotive': 'general_consumer_gpsr',
+  'baby-products': 'general_consumer_gpsr',
+  'beauty-personal-care': 'cosmetics',
+  'books': 'books_media',
+  'cds-vinyl': 'books_media',
+  'cell-phones-accessories': 'electronics_weee',
+  'clothing-shoes-jewelry': 'textiles',
+  'electronics': 'electronics_weee',
+  'grocery-gourmet-food': 'food',
+  'health-household': 'general_consumer_gpsr',
+  'home-kitchen': 'general_consumer_gpsr',
+  'industrial-scientific': 'general_consumer_gpsr',
+  'movies-tv': 'books_media',
+  'musical-instruments': 'general_consumer_gpsr',
+  'office-products': 'general_consumer_gpsr',
+  'patio-lawn-garden': 'general_consumer_gpsr',
+  'pet-supplies': 'general_consumer_gpsr',
+  'sports-outdoors': 'general_consumer_gpsr',
+  'tools-home-improvement': 'ce_marked_general',
+  'toys-games': 'toys',
+  'video-games': 'digital_goods',
+}
 
 function normalize(s) {
   return String(s || '').toLowerCase()
@@ -96,6 +129,11 @@ async function main() {
   const unknownProfiles = KEYWORD_RULES.filter((r) => !PROFILES[r.profile]).map((r) => r.profile)
   if (unknownProfiles.length) {
     console.error('Keyword table references unknown profile id(s):', unknownProfiles.join(', '))
+    process.exit(1)
+  }
+  const unknownRootProfiles = Object.entries(ROOT_DEFAULT_PROFILE).filter(([, p]) => !PROFILES[p])
+  if (unknownRootProfiles.length) {
+    console.error('ROOT_DEFAULT_PROFILE references unknown profile id(s):', unknownRootProfiles.map((x) => x.join('->')).join(', '))
     process.exit(1)
   }
   if (!PROFILES[FALLBACK_PROFILE]) {
@@ -151,7 +189,10 @@ async function main() {
       return result
     }
 
-    const result = { profileId: FALLBACK_PROFILE, source: 'fallback(root-no-match)' }
+    const rootDefault = ROOT_DEFAULT_PROFILE[normalize(row.slug)]
+    const result = rootDefault
+      ? { profileId: rootDefault, source: 'root-default' }
+      : { profileId: FALLBACK_PROFILE, source: 'fallback(root-no-match)' }
     resolvedCache.set(id, result)
     return result
   }

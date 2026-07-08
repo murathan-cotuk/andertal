@@ -53,7 +53,7 @@ export async function GET() {
 
   const productUrls = products
     .filter((p) => p?.handle)
-    .map((p) => url(`/produkt/${p.handle}`, (p.updated_at || today).split("T")[0], "weekly", "0.9"));
+    .map((p) => url(`/${p.handle}`, (p.updated_at || today).split("T")[0], "weekly", "0.9"));
 
   const collectionUrls = collections
     .filter((c) => c?.handle)
