@@ -1626,15 +1626,7 @@ export default function ProductTemplateMobile() {
         {/* 2. Title */}
         <Title style={{ fontSize: "1.05rem", lineHeight: 1.35, margin: "2px 0 6px" }}>{titleDisplay}</Title>
 
-        {/* 3. Badge + Category */}
-        <MobileBadgeCategoryRow>
-          <span>{isBestseller && <BestsellerBadge />}</span>
-          {categoryCurrentLabel ? (
-            <CategoryPill title={categoryCurrentLabel}>{categoryCurrentLabel}</CategoryPill>
-          ) : <span />}
-        </MobileBadgeCategoryRow>
-
-        {/* 4. Full-bleed swipeable gallery */}
+        {/* 3. Full-bleed swipeable gallery */}
         <MobileGalleryOuter>
           <MobileGalleryTrack ref={galleryTrackRef} onScroll={handleMobileGalleryScroll}>
             {(displayImages.length > 0 ? displayImages : [{ url: mainImage, alt: displayTitle }]).map((img, i) => (
@@ -1647,6 +1639,14 @@ export default function ProductTemplateMobile() {
               </MobileGallerySlide>
             ))}
           </MobileGalleryTrack>
+          {(isBestseller || hasSale) && !isComingSoon && (
+            <div style={{ position: "absolute", top: 8, left: 8, zIndex: 8, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, pointerEvents: "none" }}>
+              {isBestseller && <BestsellerBadge />}
+              {hasSale && (
+                <span style={{ display: "inline-block", padding: "3px 7px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, color: "#fff", background: "#e53e3e", whiteSpace: "nowrap", width: shopStyles?.bestseller_badge?.badge_width || 80, textAlign: "center", boxSizing: "border-box" }}>Sale</span>
+              )}
+            </div>
+          )}
           {/* Wishlist + Share — bottom-right */}
           {product?.id && (
             <GalleryActionRow
@@ -1778,6 +1778,14 @@ export default function ProductTemplateMobile() {
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
               <MainImage src={mainImage} alt={displayTitle} />
             </MainImageWrap>
+            {(isBestseller || hasSale) && !isComingSoon && (
+              <div style={{ position: "absolute", top: 8, left: 8, zIndex: 8, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, pointerEvents: "none" }}>
+                {isBestseller && <BestsellerBadge />}
+                {hasSale && (
+                  <span style={{ display: "inline-block", padding: "3px 7px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, color: "#fff", background: "#e53e3e", whiteSpace: "nowrap", width: shopStyles?.bestseller_badge?.badge_width || 80, textAlign: "center", boxSizing: "border-box" }}>Sale</span>
+                )}
+              </div>
+            )}
             {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             {product?.id && (
               <GalleryActionRow
@@ -1826,7 +1834,6 @@ export default function ProductTemplateMobile() {
         {/* Center: Title, brand, reviews, price, variants, bullets, meta */}
         <CenterCol>
           <DesktopOnly>
-            {isBestseller && <BestsellerBadge style={{ alignSelf: "flex-start", marginBottom: 2 }} />}
             <Title>{titleDisplay}</Title>
             <a
               href="#reviews"
