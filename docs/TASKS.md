@@ -1,7 +1,7 @@
 # Görev Listesi
 
 İlk not tarihi: 04.07
-Son gözden geçirme (kod bazlı durum kontrolü): 08.07.2026
+Son gözden geçirme (kod bazlı durum kontrolü): 09.07.2026
 
 ## Özet
 
