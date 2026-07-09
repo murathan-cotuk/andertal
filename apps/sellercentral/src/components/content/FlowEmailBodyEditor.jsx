@@ -216,6 +216,7 @@ const FlowEmailBodyEditor = forwardRef(function FlowEmailBodyEditor(
           <BlockStack gap="100">
             <Text as="span" variant="bodySm" fontWeight="semibold">{resolvedTemplateLabel}</Text>
             <InlineTemplateRow
+              templateSelectLabel={resolvedTemplateLabel}
               templateAppendLabel={resolvedAppendLabel}
               templateOptions={templateOptions}
               templateChoice={templateChoice}
@@ -307,6 +308,7 @@ const FlowEmailBodyEditor = forwardRef(function FlowEmailBodyEditor(
 export default FlowEmailBodyEditor;
 
 function InlineTemplateRow({
+  templateSelectLabel,
   templateAppendLabel,
   templateOptions,
   templateChoice,
@@ -318,7 +320,7 @@ function InlineTemplateRow({
     <InlineStack gap="300" blockAlign="end" wrap>
       <Box minWidth="200px" maxWidth="480px" width="100%">
         <Select
-          label={resolvedTemplateLabel}
+          label={templateSelectLabel || "Template"}
           labelHidden
           options={templateOptions}
           value={templateChoice}
