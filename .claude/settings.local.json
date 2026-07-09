@@ -167,7 +167,15 @@
       "PowerShell(Select-String -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\medusa-backend\\\\server.js\" -Pattern \"isUuid\" | Where-Object { $_.LineNumber -ge 1948 -and $_.LineNumber -le 2447 } | ForEach-Object { $_.LineNumber.ToString\\(\\).PadLeft\\(6\\) + \"  \" + $_.Line.Trim\\(\\).Substring\\(0, [Math]::Min\\(100, $_.Line.Trim\\(\\).Length\\)\\) })",
       "PowerShell(Select-String -Path \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\medusa-backend\\\\server.js\" -Pattern \"syncCategoryCmsToCollection\" | ForEach-Object { $_.LineNumber.ToString\\(\\).PadLeft\\(6\\) + \"  \" + $_.Line.Trim\\(\\).Substring\\(0, [Math]::Min\\(100, $_.Line.Trim\\(\\).Length\\)\\) })",
       "PowerShell(\\(Get-Content \"C:\\\\Users\\\\Lenovo\\\\Desktop\\\\Ortam\\\\Yazilim\\\\andertal\\\\apps\\\\medusa-backend\\\\server.js\"\\).Count)",
-      "Bash(awk -F: '$2>5019 && $2<9132')"
+      "Bash(awk -F: '$2>5019 && $2<9132')",
+      "Bash(cat apps/sellercentral/next.config.mjs)",
+      "Bash(cat apps/sellercentral/next.config.js)",
+      "Bash(cd C:\\\\\\\\Users\\\\\\\\murat\\\\\\\\Desktop\\\\\\\\MC\\\\\\\\MC\\\\\\\\EC\\\\\\\\EC\\\\\\\\ECProjeleri\\\\\\\\andertal)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\\\(auth\\)\\\\login\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\\\(auth\\)\\\\signup\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\dashboard\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\apps\\\\new\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\apps\\\\[id]\")"
     ]
   }
 }
