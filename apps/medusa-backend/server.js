@@ -1605,7 +1605,14 @@ async function start() {
 
     // ── App Platform migrations ──────────────────────────────────────────────
     {
-      const apClient = getDbClient()
+      const _apDbClient = () => {
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (!dbUrl || !dbUrl.startsWith('postgres')) return null
+        const { Client } = require('pg')
+        const isRender = dbUrl.includes('render.com')
+        return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+      }
+      const apClient = _apDbClient()
       try {
         await apClient.connect()
         await apClient.query(`
