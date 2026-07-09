@@ -701,9 +701,10 @@ function sanitizeHtml(html) {
 const META_ATTR_KEYS = ["material", "farbe", "colour", "color", "size", "gewicht", "cart", "curt", "stoff", "typ"];
 
 const META_HIDDEN_KEYS = [
-  "category_slug",
+  "category_slug", "category_name",
   "category_id", "admin_category_id", "collection_id", "collection_ids",
   "seller_id", "product_id", "media", "bullet_points", "uvp_cents", "rabattpreis_cents",
+  "thumbnail",
   "ean", "brand", "seller_name", "shop_name", "return_days", "return_cost", "return_kostenlos",
   "review_count", "review_avg", "sold_last_month", "metafields", "publish_date",
   "brand_id", "hersteller", "seo_keywords", "seo_meta_title", "seo_meta_description",
