@@ -23,7 +23,7 @@ module.exports = function createCouponsRouter({ normalizeCouponCode }) {
         let where = ''
         if (sellerId) { params.push(sellerId); where = `WHERE seller_id = $1` }
         const r = await client.query(
-          `SELECT id, seller_id, code, discount_type, discount_value, min_subtotal_cents, usage_limit, used_count, active, expires_at, created_at, updated_at
+          `SELECT id, seller_id, code, discount_type, discount_value, min_subtotal_cents, usage_limit, per_customer_limit, used_count, active, starts_at, expires_at, created_at, updated_at
            FROM admin_hub_coupons ${where}
            ORDER BY created_at DESC
            LIMIT 500`,
@@ -64,7 +64,9 @@ module.exports = function createCouponsRouter({ normalizeCouponCode }) {
         const discountValue = Math.max(0, parseInt(body.discount_value, 10) || 0)
         const minSubtotalCents = Math.max(0, parseInt(body.min_subtotal_cents, 10) || 0)
         const usageLimitRaw = body.usage_limit == null || body.usage_limit === '' ? null : Math.max(0, parseInt(body.usage_limit, 10) || 0)
+        const perCustomerLimitRaw = body.per_customer_limit == null || body.per_customer_limit === '' ? null : Math.max(1, parseInt(body.per_customer_limit, 10) || 1)
         const active = body.active !== false
+        const startsAt = body.starts_at ? new Date(body.starts_at) : null
         const expiresAt = body.expires_at ? new Date(body.expires_at) : null
         if (discountValue <= 0) {
           await client.end()
@@ -72,10 +74,10 @@ module.exports = function createCouponsRouter({ normalizeCouponCode }) {
         }
         const r = await client.query(
           `INSERT INTO admin_hub_coupons
-           (seller_id, code, discount_type, discount_value, min_subtotal_cents, usage_limit, active, expires_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           (seller_id, code, discount_type, discount_value, min_subtotal_cents, usage_limit, per_customer_limit, active, starts_at, expires_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
            RETURNING *`,
-          [sellerId, code, discountType, discountValue, minSubtotalCents, usageLimitRaw, active, expiresAt],
+          [sellerId, code, discountType, discountValue, minSubtotalCents, usageLimitRaw, perCustomerLimitRaw, active, startsAt, expiresAt],
         )
         await client.end()
         res.json({ coupon: r.rows?.[0] || null })
@@ -113,7 +115,9 @@ module.exports = function createCouponsRouter({ normalizeCouponCode }) {
         if (body.discount_value !== undefined) put('discount_value', Math.max(0, parseInt(body.discount_value, 10) || 0))
         if (body.min_subtotal_cents !== undefined) put('min_subtotal_cents', Math.max(0, parseInt(body.min_subtotal_cents, 10) || 0))
         if (body.usage_limit !== undefined) put('usage_limit', body.usage_limit == null || body.usage_limit === '' ? null : Math.max(0, parseInt(body.usage_limit, 10) || 0))
+        if (body.per_customer_limit !== undefined) put('per_customer_limit', body.per_customer_limit == null || body.per_customer_limit === '' ? null : Math.max(1, parseInt(body.per_customer_limit, 10) || 1))
         if (body.active !== undefined) put('active', body.active !== false)
+        if (body.starts_at !== undefined) put('starts_at', body.starts_at ? new Date(body.starts_at) : null)
         if (body.expires_at !== undefined) put('expires_at', body.expires_at ? new Date(body.expires_at) : null)
         if (!sets.length) {
           await client.end()

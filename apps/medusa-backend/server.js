@@ -668,6 +668,18 @@ async function start() {
           );
         `).catch(() => {})
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_coupons_seller_code ON admin_hub_coupons(seller_id, lower(code));').catch(() => {})
+        await client.query('ALTER TABLE admin_hub_coupons ADD COLUMN IF NOT EXISTS starts_at timestamp;').catch(() => {})
+        await client.query('ALTER TABLE admin_hub_coupons ADD COLUMN IF NOT EXISTS per_customer_limit integer;').catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_coupon_usage (
+            id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+            coupon_id uuid NOT NULL,
+            customer_id uuid NOT NULL,
+            order_id uuid,
+            used_at timestamp NOT NULL DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query('CREATE INDEX IF NOT EXISTS idx_coupon_usage_coupon_customer ON admin_hub_coupon_usage(coupon_id, customer_id);').catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_cart_items (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),

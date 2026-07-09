@@ -199,7 +199,8 @@ const Badges = styled.div`
   left: 8px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  align-items: flex-start;
+  gap: 4px;
   z-index: 8;
   pointer-events: none;
 `;
@@ -231,7 +232,9 @@ const Badge = styled.span`
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  border-radius: 3px;
   color: #fff;
+  white-space: nowrap;
   background: ${(p) =>
     p.$sale ? "#e53e3e" : p.$sold ? "#999" : p.$comingSoon ? "#c2410c" : "#111"};
 `;
@@ -705,6 +708,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                         const hasStock = normalizedVariants.some((v) => {
                           const ov = Array.isArray(v.option_values) ? v.option_values : [];
                           if (String(ov[gIdx] || "").toLowerCase() !== val.toLowerCase()) return false;
+                          if (v.manage_inventory !== true) return true;
                           const qty = v.inventory_quantity ?? v.inventory ?? 0;
                           return Number(qty) > 0;
                         });
@@ -745,7 +749,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             <Pills style={{ marginTop: 4 }}>
               {normalizedVariants.slice(0, expandedFlat ? undefined : 5).map((v, i) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
-                const outOfStock = Number(qty) <= 0;
+                const outOfStock = v.manage_inventory === true && Number(qty) <= 0;
                 const swatchUrl = v.swatch_image_url ? resolveImg(v.swatch_image_url) : null;
                 return (
                   <Pill

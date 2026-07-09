@@ -773,6 +773,8 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
 
     const FLOW_TRIGGER_KEYS = new Set([
       'new_subscriber',
+      'customer_signup',
+      'seller_signup',
       'abandoned_cart',
       'order_placed',
       'order_shipped',

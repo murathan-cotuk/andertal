@@ -39,6 +39,12 @@ function toDateInput(iso) {
 }
 
 function CouponRow({ c, onToggle, onRemove, onEdit, sellerLabel, ui, locale }) {
+  const startsLine = c.starts_at
+    ? `${lt(locale, "From", "Başlangıç", "From", "From", "From", "Ab")}: ${fmtDate(c.starts_at, locale)} | `
+    : "";
+  const perCustLine = c.per_customer_limit != null
+    ? ` | ${lt(locale, "Per customer", "Müşteri başına", "Per customer", "Per customer", "Per customer", "Pro Kunden")}: ${c.per_customer_limit}`
+    : "";
   return (
     <div style={{ borderTop: "1px solid #f1f2f4", padding: "12px 0" }}>
       <InlineStack align="space-between" blockAlign="center">
@@ -50,8 +56,8 @@ function CouponRow({ c, onToggle, onRemove, onEdit, sellerLabel, ui, locale }) {
           <Text tone="subdued" as="span">
             {c.discount_type === "fixed" ? `${(Number(c.discount_value || 0) / 100).toFixed(2)} €` : `${c.discount_value}%`} |
             {lt(locale, "Min", "Min", "Min", "Min", "Min", "Min")}: {(Number(c.min_subtotal_cents || 0) / 100).toFixed(2)} € |
-            {lt(locale, "Usage", "Kullanım", "Usage", "Usage", "Usage", "Nutzung")}: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""} |
-            {lt(locale, "Expires", "Bitiş", "Expires", "Expires", "Expires", "Ablauf")}: {fmtDate(c.expires_at, locale)}
+            {lt(locale, "Usage", "Kullanım", "Usage", "Usage", "Usage", "Nutzung")}: {Number(c.used_count || 0)}{c.usage_limit != null ? ` / ${c.usage_limit}` : ""}{perCustLine} |
+            {startsLine}{lt(locale, "Expires", "Bitiş", "Expires", "Expires", "Expires", "Ablauf")}: {fmtDate(c.expires_at, locale)}
           </Text>
           {sellerLabel ? (
             <Text tone="subdued" as="span" variant="bodySm">{lt(locale, "Seller", "Satıcı", "Seller", "Seller", "Seller", "Verkäufer")}: {sellerLabel}</Text>
@@ -67,6 +73,28 @@ function CouponRow({ c, onToggle, onRemove, onEdit, sellerLabel, ui, locale }) {
   );
 }
 
+const emptyForm = () => ({
+  code: "",
+  discount_type: "percent",
+  discount_value: "",
+  min_subtotal_cents: "",
+  usage_limit: "",
+  per_customer_limit: "",
+  starts_at: "",
+  expires_at: "",
+});
+
+const emptyEditForm = () => ({
+  code: "",
+  discount_type: "percent",
+  discount_value: "",
+  min_subtotal_euros: "",
+  usage_limit: "",
+  per_customer_limit: "",
+  starts_at: "",
+  expires_at: "",
+});
+
 export default function CouponsPage() {
   const locale = useLocale();
   const ui = getUI(locale);
@@ -80,22 +108,8 @@ export default function CouponsPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
-  const [editForm, setEditForm] = useState({
-    code: "",
-    discount_type: "percent",
-    discount_value: "",
-    min_subtotal_euros: "",
-    usage_limit: "",
-    expires_at: "",
-  });
-  const [form, setForm] = useState({
-    code: "",
-    discount_type: "percent",
-    discount_value: "",
-    min_subtotal_cents: "",
-    usage_limit: "",
-    expires_at: "",
-  });
+  const [editForm, setEditForm] = useState(emptyEditForm());
+  const [form, setForm] = useState(emptyForm());
 
   useEffect(() => {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
@@ -165,9 +179,11 @@ export default function CouponsPage() {
         discount_value: dVal,
         min_subtotal_cents: Math.round(Number(form.min_subtotal_cents || 0) * 100),
         usage_limit: form.usage_limit === "" ? null : Number(form.usage_limit),
+        per_customer_limit: form.per_customer_limit === "" ? null : Number(form.per_customer_limit),
+        starts_at: form.starts_at ? new Date(`${form.starts_at}T00:00:00.000`).toISOString() : null,
         expires_at: form.expires_at ? new Date(`${form.expires_at}T23:59:59.999`).toISOString() : null,
       });
-      setForm({ code: "", discount_type: "percent", discount_value: "", min_subtotal_cents: "", usage_limit: "", expires_at: "" });
+      setForm(emptyForm());
       setMsg({ tone: "success", text: lt(locale, "Coupon created.", "Kupon oluşturuldu.", "Coupon created.", "Coupon created.", "Coupon created.", "Coupon erstellt.") });
       await load();
     } catch (e) {
@@ -188,6 +204,8 @@ export default function CouponsPage() {
         : String(c.discount_value ?? ""),
       min_subtotal_euros: String((Number(c.min_subtotal_cents || 0) / 100).toFixed(2)),
       usage_limit: c.usage_limit != null ? String(c.usage_limit) : "",
+      per_customer_limit: c.per_customer_limit != null ? String(c.per_customer_limit) : "",
+      starts_at: toDateInput(c.starts_at),
       expires_at: toDateInput(c.expires_at),
     });
     setEditOpen(true);
@@ -196,14 +214,7 @@ export default function CouponsPage() {
   const closeEdit = () => {
     setEditOpen(false);
     setEditingId(null);
-    setEditForm({
-      code: "",
-      discount_type: "percent",
-      discount_value: "",
-      min_subtotal_euros: "",
-      usage_limit: "",
-      expires_at: "",
-    });
+    setEditForm(emptyEditForm());
   };
 
   const saveEdit = async () => {
@@ -230,6 +241,8 @@ export default function CouponsPage() {
         discount_value: discountValue,
         min_subtotal_cents: Math.round(Number(editForm.min_subtotal_euros || 0) * 100),
         usage_limit: editForm.usage_limit === "" ? null : Number(editForm.usage_limit),
+        per_customer_limit: editForm.per_customer_limit === "" ? null : Number(editForm.per_customer_limit),
+        starts_at: editForm.starts_at ? new Date(`${editForm.starts_at}T00:00:00.000`).toISOString() : null,
         expires_at: editForm.expires_at ? new Date(`${editForm.expires_at}T23:59:59.999`).toISOString() : null,
       });
       setMsg({ tone: "success", text: lt(locale, "Coupon updated.", "Kupon güncellendi.", "Coupon updated.", "Coupon updated.", "Coupon updated.", "Coupon aktualisiert.") });
@@ -276,6 +289,8 @@ export default function CouponsPage() {
   const valueEuroLabel = lt(locale, "Value (€)", "Değer (€)", "Value (€)", "Value (€)", "Value (€)", "Wert (€)");
   const minOrderLabel = lt(locale, "Minimum order value (€)", "Minimum sipariş tutarı (€)", "Minimum order value (€)", "Minimum order value (€)", "Minimum order value (€)", "Mindestbestellwert (€)");
   const usageLimitLabel = lt(locale, "Usage limit (optional)", "Kullanım limiti (isteğe bağlı)", "Usage limit (optional)", "Usage limit (optional)", "Usage limit (optional)", "Nutzungslimit (optional)");
+  const perCustomerLimitLabel = lt(locale, "Per-customer limit (optional)", "Müşteri başına limit (isteğe bağlı)", "Per-customer limit (optional)", "Per-customer limit (optional)", "Per-customer limit (optional)", "Limit pro Kunde (optional)");
+  const startDateLabel = lt(locale, "Start date (optional)", "Başlangıç tarihi (isteğe bağlı)", "Start date (optional)", "Start date (optional)", "Start date (optional)", "Startdatum (optional)");
   const expiryLabel = lt(locale, "Expiry date (optional)", "Bitiş tarihi (isteğe bağlı)", "Expiry date (optional)", "Expiry date (optional)", "Expiry date (optional)", "Ablaufdatum (optional)");
   const createTitle = lt(locale, "Create coupon", "Kupon oluştur", "Create coupon", "Create coupon", "Create coupon", "Coupon erstellen");
   const editModalTitle = lt(locale, "Edit coupon", "Kuponu düzenle", "Edit coupon", "Edit coupon", "Edit coupon", "Coupon bearbeiten");
@@ -339,6 +354,21 @@ export default function CouponsPage() {
                 autoComplete="off"
               />
               <TextField
+                label={perCustomerLimitLabel}
+                type="number"
+                min="1"
+                value={editForm.per_customer_limit}
+                onChange={(v) => setEditForm((p) => ({ ...p, per_customer_limit: v }))}
+                autoComplete="off"
+              />
+              <TextField
+                label={startDateLabel}
+                type="date"
+                value={editForm.starts_at}
+                onChange={(v) => setEditForm((p) => ({ ...p, starts_at: v }))}
+                autoComplete="off"
+              />
+              <TextField
                 label={expiryLabel}
                 type="date"
                 value={editForm.expires_at}
@@ -386,6 +416,21 @@ export default function CouponsPage() {
                 min="0"
                 value={form.usage_limit}
                 onChange={(v) => setForm((p) => ({ ...p, usage_limit: v }))}
+                autoComplete="off"
+              />
+              <TextField
+                label={perCustomerLimitLabel}
+                type="number"
+                min="1"
+                value={form.per_customer_limit}
+                onChange={(v) => setForm((p) => ({ ...p, per_customer_limit: v }))}
+                autoComplete="off"
+              />
+              <TextField
+                label={startDateLabel}
+                type="date"
+                value={form.starts_at}
+                onChange={(v) => setForm((p) => ({ ...p, starts_at: v }))}
                 autoComplete="off"
               />
               <TextField

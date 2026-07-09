@@ -161,6 +161,7 @@ const loadValidCouponForSeller = async (client, sellerId, code) => {
      WHERE COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = ANY($1)
        AND lower(code) = lower($2)
        AND active = true
+       AND (starts_at IS NULL OR starts_at <= now())
        AND (expires_at IS NULL OR expires_at > now())
      ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = $3 THEN 0 ELSE 1 END
      LIMIT 1`,
@@ -228,6 +229,7 @@ const resolveCartCouponDiscountSync = async (client, items, rawCouponCode) => {
      WHERE lower(code) = lower($1)
        AND COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = ANY($2::varchar[])
        AND active = true
+       AND (starts_at IS NULL OR starts_at <= now())
        AND (expires_at IS NULL OR expires_at > now())
      ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = 'default' THEN 1 ELSE 0 END, seller_id ASC`,
     [normalizedInput, sellerCandidates],
@@ -1347,6 +1349,9 @@ const storeCustomerRegisterPOST = async (req, res) => {
     }
     await client.end()
     res.status(201).json({ customer })
+    setImmediate(() => {
+      try { require('../flow-automation').runAutomationFlowsForCustomerEvent({ triggerKey: 'customer_signup', customerId: cid, email }).catch(() => {}) } catch (_) {}
+    })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     if (e.code === '23505') return res.status(409).json({ message: 'An account with this email already exists' })
@@ -3052,6 +3057,26 @@ const storeOrdersPOST = async (req, res) => {
     const sellerNetMerchandiseCents = Math.max(0, subtotalCents - platformFeeMerchandiseBasis)
     const paymentIntentForDb = isZeroPayOrder ? null : paymentIntentId
 
+    // Per-customer coupon limit check
+    if (cart.coupon_code && customerId) {
+      try {
+        const cpnRow = (await client.query(
+          `SELECT id, per_customer_limit FROM admin_hub_coupons WHERE lower(code) = lower($1) AND active = true LIMIT 1`,
+          [cart.coupon_code]
+        )).rows[0]
+        if (cpnRow?.per_customer_limit != null) {
+          const usageCnt = Number((await client.query(
+            `SELECT COUNT(*) AS cnt FROM admin_hub_coupon_usage WHERE coupon_id = $1 AND customer_id = $2`,
+            [cpnRow.id, customerId]
+          )).rows[0]?.cnt || 0)
+          if (usageCnt >= cpnRow.per_customer_limit) {
+            await client.end()
+            return res.status(400).json({ message: 'Dieser Coupon wurde bereits zu oft verwendet' })
+          }
+        }
+      } catch (_) {}
+    }
+
     const ins = await client.query(
       `INSERT INTO store_orders
         (cart_id, payment_intent_id, status, seller_id, email, first_name, last_name, phone,
@@ -3159,6 +3184,21 @@ const storeOrdersPOST = async (req, res) => {
         } catch (le) {
           console.warn('bonus ledger order_earn:', le?.message || le)
         }
+      }
+    }
+
+    // Increment coupon used_count + record per-customer usage
+    if (cart.coupon_code) {
+      await client.query(
+        `UPDATE admin_hub_coupons SET used_count = COALESCE(used_count, 0) + 1, updated_at = now() WHERE lower(code) = lower($1)`,
+        [cart.coupon_code]
+      ).catch(() => {})
+      if (customerId) {
+        await client.query(
+          `INSERT INTO admin_hub_coupon_usage (coupon_id, customer_id, order_id)
+           SELECT id, $1, $2 FROM admin_hub_coupons WHERE lower(code) = lower($3) LIMIT 1`,
+          [customerId, orderId, cart.coupon_code]
+        ).catch(() => {})
       }
     }
 
