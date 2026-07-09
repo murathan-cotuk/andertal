@@ -5,6 +5,11 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.js')
 const nextConfig = {
   reactStrictMode: true,
   compiler: { styledComponents: true },
+  turbopack: {
+    resolveAlias: {
+      'next-intl/config': './src/i18n/request.js',
+    },
+  },
   async headers() {
     return [{
       source: '/(.*)',
