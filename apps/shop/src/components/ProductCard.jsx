@@ -708,7 +708,6 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                         const hasStock = normalizedVariants.some((v) => {
                           const ov = Array.isArray(v.option_values) ? v.option_values : [];
                           if (String(ov[gIdx] || "").toLowerCase() !== val.toLowerCase()) return false;
-                          if (v.manage_inventory !== true) return true;
                           const qty = v.inventory_quantity ?? v.inventory ?? 0;
                           return Number(qty) > 0;
                         });
@@ -749,7 +748,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             <Pills style={{ marginTop: 4 }}>
               {normalizedVariants.slice(0, expandedFlat ? undefined : 5).map((v, i) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
-                const outOfStock = v.manage_inventory === true && Number(qty) <= 0;
+                const outOfStock = Number(qty) <= 0;
                 const swatchUrl = v.swatch_image_url ? resolveImg(v.swatch_image_url) : null;
                 return (
                   <Pill

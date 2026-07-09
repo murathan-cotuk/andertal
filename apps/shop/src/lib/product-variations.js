@@ -23,11 +23,7 @@ export function enrichVariationGroups(variationGroups, variants) {
 
     for (const v of list) {
       const ov = Array.isArray(v.option_values) ? v.option_values : [];
-      let raw = ov[gIdx];
-      if ((raw == null || String(raw).trim() === "") && gIdx === 0) {
-        const parts = (v.title || v.value || "").split(" / ").map((s) => s.trim()).filter(Boolean);
-        if (parts.length === variationGroups.length) raw = parts[gIdx];
-      }
+      const raw = ov[gIdx];
       if (raw == null || String(raw).trim() === "") continue;
       const key = String(raw).trim().toLowerCase();
       if (seen.has(key)) continue;

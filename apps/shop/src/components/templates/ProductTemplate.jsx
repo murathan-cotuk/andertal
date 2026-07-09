@@ -593,7 +593,6 @@ const SectionTitle = styled.h2`
 
 const DescriptionSection = styled.section`
   margin-bottom: 48px;
-  max-width: 780px;
   color: var(--body-color, #4b5563);
   line-height: var(--body-lh, 1.7);
   font-size: var(--body-fs, 1rem);
@@ -685,7 +684,6 @@ const DescriptionSection = styled.section`
 
 const ReviewsSection = styled.section`
   margin-bottom: 48px;
-  max-width: 780px;
 `;
 
 function sanitizeHtml(html) {
@@ -1869,8 +1867,10 @@ export default function ProductTemplate() {
           ) : null}
         </RightCol>
         </InnerGrid>
+        </PageRight>
+      </PageLayout>
 
-        {(effectiveDescription || product.subtitle) && (
+      {(effectiveDescription || product.subtitle) && (
           <DescriptionSection
             id="description"
             dangerouslySetInnerHTML={{
@@ -1982,9 +1982,7 @@ export default function ProductTemplate() {
             locale={locale === "en" ? "en-US" : "de-DE"}
             style={{ marginTop: 28 }}
           />
-        </ReviewsSection>
-        </PageRight>
-      </PageLayout>
+      </ReviewsSection>
 
       {/* Full width below */}
       {alsoBought.length > 0 && (
