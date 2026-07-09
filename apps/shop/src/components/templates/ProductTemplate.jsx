@@ -1591,7 +1591,7 @@ export default function ProductTemplate() {
               <div style={{ position: "absolute", top: 8, left: 8, zIndex: 8, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, pointerEvents: "none" }}>
                 {isBestseller && <BestsellerBadge />}
                 {hasSale && (
-                  <span style={{ display: "inline-block", padding: "3px 7px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, color: "#fff", background: "#e53e3e", whiteSpace: "nowrap", width: shopStyles?.bestseller_badge?.badge_width || 80, textAlign: "center", boxSizing: "border-box" }}>Sale</span>
+                  <span style={{ display: "inline-block", padding: "3px 7px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, color: "#fff", background: "#e53e3e", whiteSpace: "nowrap", width: Number(shopStyles?.bestseller_badge?.badge_width) || 80, textAlign: "center", boxSizing: "border-box" }}>Sale</span>
                 )}
               </div>
             )}
