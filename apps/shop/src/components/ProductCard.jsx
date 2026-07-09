@@ -432,7 +432,9 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   const normalizedVariants = variationGroupsRaw ? variants.map((v) => {
     const ov = Array.isArray(v.option_values) ? v.option_values : [];
     if (ov.length === variationGroupsRaw.length) return v;
-    const parts = (v.title || v.value || "").split(" / ").map((s) => s.trim()).filter(Boolean);
+    const titleStr = v.title || v.value || "";
+    if (!titleStr.includes(" / ")) return v;
+    const parts = titleStr.split(" / ").map((s) => s.trim()).filter(Boolean);
     if (parts.length === variationGroupsRaw.length) return { ...v, option_values: parts };
     return v;
   }) : variants;

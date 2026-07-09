@@ -746,9 +746,9 @@ function normalizeVariants(variants, variationGroups) {
     const ov = Array.isArray(v.option_values) ? v.option_values : [];
     if (ov.length === numGroups) return v;
     const titleStr = v.title || v.value || "";
+    if (!titleStr.includes(" / ")) return v;
     const parts = titleStr.split(" / ").map((s) => s.trim()).filter(Boolean);
     if (parts.length === numGroups) return { ...v, option_values: parts };
-    if (numGroups === 1 && (v.value || titleStr)) return { ...v, option_values: [v.value || titleStr] };
     return v;
   });
 }
