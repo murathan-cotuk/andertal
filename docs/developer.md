@@ -612,3 +612,10 @@ Push: `git push origin HEAD`
 2. Her katmanda test yaz.
 3. `billbee-marketplace-api.js` referans al ama refactor etme.
 4. Belirsizlik varsa dur, sor — varsayım yapıp kırma.
+
+
+1. Add DEVELOPER_JWT_SECRET to Render env
+2. Add developer.andertal.com to CORS_ORIGINS on Render
+3. Set APP_PLATFORM_AUTO_APPROVE=true on Render
+4. Create Vercel project for apps/developer pointing to developer.andertal.com
+5. Push (let me know when you want me to push)
