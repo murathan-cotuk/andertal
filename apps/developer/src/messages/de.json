@@ -1,0 +1,117 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "apps": "Meine Apps",
+    "docs": "Dokumentation",
+    "logout": "Abmelden"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "signup": "Konto erstellen",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "companyName": "Unternehmen / Entwicklername",
+    "country": "Land",
+    "vatNumber": "USt-IdNr. (optional)",
+    "agreeTerms": "Ich stimme den Entwicklerbedingungen und der Datenschutzrichtlinie zu",
+    "alreadyHaveAccount": "Bereits ein Konto?",
+    "noAccount": "Noch kein Konto?",
+    "loginError": "Ungültige E-Mail oder falsches Passwort.",
+    "signupError": "Konto konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "signupSuccess": "Konto erstellt! Bitte melden Sie sich an.",
+    "loading": "Lädt…"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Willkommen zurück",
+    "totalApps": "Apps gesamt",
+    "publishedApps": "Veröffentlichte Apps",
+    "totalInstalls": "Gesamtinstallationen",
+    "quickActions": "Schnellaktionen",
+    "createApp": "Neue App erstellen",
+    "viewDocs": "Dokumentation anzeigen",
+    "recentApps": "Neueste Apps",
+    "noApps": "Noch keine Apps. Erstellen Sie Ihre erste App.",
+    "status": {
+      "draft": "Entwurf",
+      "submitted": "In Prüfung",
+      "published": "Veröffentlicht",
+      "rejected": "Abgelehnt"
+    }
+  },
+  "apps": {
+    "title": "Meine Apps",
+    "createApp": "App erstellen",
+    "noApps": "Sie haben noch keine Apps erstellt.",
+    "appType": {
+      "integration_app": "Integrations-App",
+      "shop_app": "Shop-App"
+    },
+    "handle": "Handle",
+    "version": "Version",
+    "installs": "Installationen",
+    "status": "Status",
+    "actions": "Aktionen",
+    "manage": "Verwalten"
+  },
+  "newApp": {
+    "title": "Neue App erstellen",
+    "step1": "Grundinfo",
+    "step2": "Technische Details",
+    "step3": "OAuth-Einstellungen",
+    "name": "App-Name",
+    "handle": "Handle",
+    "handleHint": "Eindeutiger URL-sicherer Bezeichner (z.B. mein-versand-app). Kann nicht geändert werden.",
+    "type": "App-Typ",
+    "typeIntegration": "Integrations-App — Backend-Integrationen, ERP, Versand, usw.",
+    "typeShop": "Shop-App — fügt Storefront- oder Checkout-Funktionen hinzu (nur Tier 1)",
+    "description": "Beschreibung",
+    "category": "Kategorie",
+    "privacyUrl": "Datenschutz-URL",
+    "redirectUrls": "OAuth-Redirect-URLs",
+    "redirectUrlsHint": "Eine URL pro Zeile. In der Produktion muss HTTPS verwendet werden.",
+    "scopes": "Angeforderte Berechtigungen",
+    "create": "App erstellen",
+    "cancel": "Abbrechen",
+    "creating": "Wird erstellt…",
+    "error": "App konnte nicht erstellt werden.",
+    "categories": {
+      "shipping": "Versand & Logistik",
+      "accounting": "Buchhaltung & Finanzen",
+      "marketing": "Marketing & Analyse",
+      "inventory": "Bestandsverwaltung",
+      "customer_service": "Kundendienst",
+      "payments": "Zahlungen",
+      "storefront": "Storefront",
+      "other": "Sonstiges"
+    }
+  },
+  "appDetail": {
+    "back": "← Zurück zu Apps",
+    "credentials": "OAuth-Zugangsdaten",
+    "clientId": "Client-ID",
+    "clientSecret": "Client-Secret",
+    "rotateSecret": "Secret rotieren",
+    "rotateConfirm": "Das aktuelle Secret wird sofort ungültig. Alle installierten Instanzen müssen sich neu authentifizieren. Fortfahren?",
+    "manifest": "Manifest",
+    "saveManifest": "Manifest speichern",
+    "saving": "Speichert…",
+    "saved": "Gespeichert!",
+    "submitForReview": "Zur Prüfung einreichen",
+    "submitting": "Wird eingereicht…",
+    "submitConfirm": "Diese Version zur Prüfung einreichen? Das Manifest kann bis zum Abschluss der Prüfung nicht bearbeitet werden.",
+    "version": "Aktuelle Version",
+    "changelog": "Änderungsprotokoll",
+    "changelogHint": "Beschreiben Sie, was sich in dieser Version geändert hat.",
+    "installCount": "Aktive Installationen",
+    "type": "Typ",
+    "status": "Status",
+    "reviewNotes": "Prüfungsnotizen"
+  },
+  "errors": {
+    "required": "Dieses Feld ist erforderlich.",
+    "invalidUrl": "Muss eine gültige URL sein.",
+    "invalidHandle": "Handle muss 2–64 Kleinbuchstaben, Ziffern oder Bindestriche enthalten.",
+    "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+  }
+}

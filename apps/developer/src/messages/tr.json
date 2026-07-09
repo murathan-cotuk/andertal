@@ -1,0 +1,117 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "apps": "Uygulamalarım",
+    "docs": "Belgeler",
+    "logout": "Çıkış yap"
+  },
+  "auth": {
+    "login": "Giriş yap",
+    "signup": "Hesap oluştur",
+    "email": "E-posta",
+    "password": "Şifre",
+    "companyName": "Şirket / Geliştirici adı",
+    "country": "Ülke",
+    "vatNumber": "Vergi numarası (isteğe bağlı)",
+    "agreeTerms": "Geliştirici Şartları ve Gizlilik Politikasını kabul ediyorum",
+    "alreadyHaveAccount": "Zaten hesabınız var mı?",
+    "noAccount": "Hesabınız yok mu?",
+    "loginError": "Geçersiz e-posta veya şifre.",
+    "signupError": "Hesap oluşturulamadı. Lütfen tekrar deneyin.",
+    "signupSuccess": "Hesap oluşturuldu! Lütfen giriş yapın.",
+    "loading": "Yükleniyor…"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "welcome": "Tekrar hoş geldiniz",
+    "totalApps": "Toplam uygulama",
+    "publishedApps": "Yayımlanan uygulama",
+    "totalInstalls": "Toplam kurulum",
+    "quickActions": "Hızlı işlemler",
+    "createApp": "Yeni uygulama oluştur",
+    "viewDocs": "Belgeleri görüntüle",
+    "recentApps": "Son uygulamalar",
+    "noApps": "Henüz uygulama yok. İlk uygulamanızı oluşturun.",
+    "status": {
+      "draft": "Taslak",
+      "submitted": "İncelemede",
+      "published": "Yayımlandı",
+      "rejected": "Reddedildi"
+    }
+  },
+  "apps": {
+    "title": "Uygulamalarım",
+    "createApp": "Uygulama oluştur",
+    "noApps": "Henüz uygulama oluşturmadınız.",
+    "appType": {
+      "integration_app": "Entegrasyon Uygulaması",
+      "shop_app": "Mağaza Uygulaması"
+    },
+    "handle": "Handle",
+    "version": "Sürüm",
+    "installs": "Kurulum",
+    "status": "Durum",
+    "actions": "İşlemler",
+    "manage": "Yönet"
+  },
+  "newApp": {
+    "title": "Yeni uygulama oluştur",
+    "step1": "Temel bilgiler",
+    "step2": "Teknik detaylar",
+    "step3": "OAuth ayarları",
+    "name": "Uygulama adı",
+    "handle": "Handle",
+    "handleHint": "Benzersiz URL-güvenli tanımlayıcı (ör. benim-kargo-appim). Sonradan değiştirilemez.",
+    "type": "Uygulama türü",
+    "typeIntegration": "Entegrasyon Uygulaması — arka uç entegrasyonları, ERP, kargo vb.",
+    "typeShop": "Mağaza Uygulaması — vitrin veya ödeme işlevselliği ekler (yalnızca Tier 1)",
+    "description": "Açıklama",
+    "category": "Kategori",
+    "privacyUrl": "Gizlilik politikası URL'si",
+    "redirectUrls": "OAuth yönlendirme URL'leri",
+    "redirectUrlsHint": "Her satıra bir URL. Üretimde HTTPS zorunludur.",
+    "scopes": "İstenen izinler",
+    "create": "Uygulama oluştur",
+    "cancel": "İptal",
+    "creating": "Oluşturuluyor…",
+    "error": "Uygulama oluşturulamadı.",
+    "categories": {
+      "shipping": "Kargo ve Lojistik",
+      "accounting": "Muhasebe ve Finans",
+      "marketing": "Pazarlama ve Analiz",
+      "inventory": "Envanter Yönetimi",
+      "customer_service": "Müşteri Hizmetleri",
+      "payments": "Ödemeler",
+      "storefront": "Vitrin",
+      "other": "Diğer"
+    }
+  },
+  "appDetail": {
+    "back": "← Uygulamalara dön",
+    "credentials": "OAuth Kimlik Bilgileri",
+    "clientId": "Client ID",
+    "clientSecret": "Client Secret",
+    "rotateSecret": "Secret döndür",
+    "rotateConfirm": "Mevcut secret hemen geçersiz hale gelecek. Tüm kurulu örneklerin yeniden kimlik doğrulaması gerekecek. Devam edilsin mi?",
+    "manifest": "Manifest",
+    "saveManifest": "Manifestı kaydet",
+    "saving": "Kaydediliyor…",
+    "saved": "Kaydedildi!",
+    "submitForReview": "İncelemeye gönder",
+    "submitting": "Gönderiliyor…",
+    "submitConfirm": "Bu sürümü incelemeye göndermek istiyor musunuz? İnceleme tamamlanana kadar manifestı düzenleyemezsiniz.",
+    "version": "Mevcut sürüm",
+    "changelog": "Değişiklik günlüğü",
+    "changelogHint": "Bu sürümde nelerin değiştiğini açıklayın (App Store'da gösterilir).",
+    "installCount": "Aktif kurulum",
+    "type": "Tür",
+    "status": "Durum",
+    "reviewNotes": "İnceleme notları"
+  },
+  "errors": {
+    "required": "Bu alan zorunludur.",
+    "invalidUrl": "Geçerli bir URL olmalıdır.",
+    "invalidHandle": "Handle 2–64 küçük harf, rakam veya kısa çizgi içermelidir.",
+    "generic": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin."
+  }
+}

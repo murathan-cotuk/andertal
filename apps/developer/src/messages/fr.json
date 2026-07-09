@@ -1,0 +1,117 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "apps": "Mes applications",
+    "docs": "Documentation",
+    "logout": "Se déconnecter"
+  },
+  "auth": {
+    "login": "Se connecter",
+    "signup": "Créer un compte",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "companyName": "Société / Nom du développeur",
+    "country": "Pays",
+    "vatNumber": "Numéro de TVA (optionnel)",
+    "agreeTerms": "J'accepte les Conditions développeur et la Politique de confidentialité",
+    "alreadyHaveAccount": "Vous avez déjà un compte ?",
+    "noAccount": "Pas encore de compte ?",
+    "loginError": "E-mail ou mot de passe invalide.",
+    "signupError": "Impossible de créer le compte. Veuillez réessayer.",
+    "signupSuccess": "Compte créé ! Veuillez vous connecter.",
+    "loading": "Chargement…"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "welcome": "Bon retour",
+    "totalApps": "Applications totales",
+    "publishedApps": "Applications publiées",
+    "totalInstalls": "Installations totales",
+    "quickActions": "Actions rapides",
+    "createApp": "Créer une application",
+    "viewDocs": "Voir la documentation",
+    "recentApps": "Applications récentes",
+    "noApps": "Aucune application. Créez votre première application.",
+    "status": {
+      "draft": "Brouillon",
+      "submitted": "En révision",
+      "published": "Publié",
+      "rejected": "Rejeté"
+    }
+  },
+  "apps": {
+    "title": "Mes applications",
+    "createApp": "Créer une application",
+    "noApps": "Vous n'avez pas encore créé d'applications.",
+    "appType": {
+      "integration_app": "Application d'intégration",
+      "shop_app": "Application boutique"
+    },
+    "handle": "Handle",
+    "version": "Version",
+    "installs": "Installations",
+    "status": "Statut",
+    "actions": "Actions",
+    "manage": "Gérer"
+  },
+  "newApp": {
+    "title": "Créer une nouvelle application",
+    "step1": "Infos de base",
+    "step2": "Détails techniques",
+    "step3": "Paramètres OAuth",
+    "name": "Nom de l'application",
+    "handle": "Handle",
+    "handleHint": "Identifiant unique sécurisé pour URL (ex. mon-app-livraison). Ne peut pas être modifié.",
+    "type": "Type d'application",
+    "typeIntegration": "Application d'intégration — backends, ERP, livraison, etc.",
+    "typeShop": "Application boutique — ajoute des fonctionnalités vitrine ou paiement (Niveau 1 uniquement)",
+    "description": "Description",
+    "category": "Catégorie",
+    "privacyUrl": "URL de politique de confidentialité",
+    "redirectUrls": "URLs de redirection OAuth",
+    "redirectUrlsHint": "Une URL par ligne. HTTPS obligatoire en production.",
+    "scopes": "Portées demandées",
+    "create": "Créer l'application",
+    "cancel": "Annuler",
+    "creating": "Création…",
+    "error": "Impossible de créer l'application.",
+    "categories": {
+      "shipping": "Expédition et logistique",
+      "accounting": "Comptabilité et finance",
+      "marketing": "Marketing et analyse",
+      "inventory": "Gestion des stocks",
+      "customer_service": "Service client",
+      "payments": "Paiements",
+      "storefront": "Vitrine",
+      "other": "Autre"
+    }
+  },
+  "appDetail": {
+    "back": "← Retour aux applications",
+    "credentials": "Identifiants OAuth",
+    "clientId": "Client ID",
+    "clientSecret": "Client Secret",
+    "rotateSecret": "Régénérer le secret",
+    "rotateConfirm": "Le secret actuel sera immédiatement invalidé. Toutes les instances installées devront se réauthentifier. Continuer ?",
+    "manifest": "Manifest",
+    "saveManifest": "Enregistrer le manifest",
+    "saving": "Enregistrement…",
+    "saved": "Enregistré !",
+    "submitForReview": "Soumettre pour révision",
+    "submitting": "Soumission…",
+    "submitConfirm": "Soumettre cette version pour révision ? Vous ne pourrez pas modifier le manifest jusqu'à la fin de la révision.",
+    "version": "Version actuelle",
+    "changelog": "Journal des modifications",
+    "changelogHint": "Décrivez ce qui a changé dans cette version.",
+    "installCount": "Installations actives",
+    "type": "Type",
+    "status": "Statut",
+    "reviewNotes": "Notes de révision"
+  },
+  "errors": {
+    "required": "Ce champ est obligatoire.",
+    "invalidUrl": "Doit être une URL valide.",
+    "invalidHandle": "Le handle doit contenir 2 à 64 lettres minuscules, chiffres ou tirets.",
+    "generic": "Une erreur s'est produite. Veuillez réessayer."
+  }
+}

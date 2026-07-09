@@ -1,0 +1,117 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "apps": "Le mie app",
+    "docs": "Documentazione",
+    "logout": "Disconnettersi"
+  },
+  "auth": {
+    "login": "Accedi",
+    "signup": "Crea account",
+    "email": "Email",
+    "password": "Password",
+    "companyName": "Azienda / Nome sviluppatore",
+    "country": "Paese",
+    "vatNumber": "Partita IVA (opzionale)",
+    "agreeTerms": "Accetto i Termini sviluppatore e l'Informativa sulla privacy",
+    "alreadyHaveAccount": "Hai già un account?",
+    "noAccount": "Non hai un account?",
+    "loginError": "Email o password non validi.",
+    "signupError": "Impossibile creare l'account. Riprova.",
+    "signupSuccess": "Account creato! Accedi.",
+    "loading": "Caricamento…"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Bentornato",
+    "totalApps": "App totali",
+    "publishedApps": "App pubblicate",
+    "totalInstalls": "Installazioni totali",
+    "quickActions": "Azioni rapide",
+    "createApp": "Crea nuova app",
+    "viewDocs": "Vedi documentazione",
+    "recentApps": "App recenti",
+    "noApps": "Nessuna app. Crea la tua prima app.",
+    "status": {
+      "draft": "Bozza",
+      "submitted": "In revisione",
+      "published": "Pubblicata",
+      "rejected": "Rifiutata"
+    }
+  },
+  "apps": {
+    "title": "Le mie app",
+    "createApp": "Crea app",
+    "noApps": "Non hai ancora creato nessuna app.",
+    "appType": {
+      "integration_app": "App di integrazione",
+      "shop_app": "App negozio"
+    },
+    "handle": "Handle",
+    "version": "Versione",
+    "installs": "Installazioni",
+    "status": "Stato",
+    "actions": "Azioni",
+    "manage": "Gestisci"
+  },
+  "newApp": {
+    "title": "Crea nuova app",
+    "step1": "Informazioni base",
+    "step2": "Dettagli tecnici",
+    "step3": "Impostazioni OAuth",
+    "name": "Nome app",
+    "handle": "Handle",
+    "handleHint": "Identificatore univoco URL-safe (es. mia-app-spedizione). Non modificabile in seguito.",
+    "type": "Tipo di app",
+    "typeIntegration": "App di integrazione — integrazioni backend, ERP, spedizioni, ecc.",
+    "typeShop": "App negozio — aggiunge funzionalità vetrina o checkout (solo Tier 1)",
+    "description": "Descrizione",
+    "category": "Categoria",
+    "privacyUrl": "URL informativa sulla privacy",
+    "redirectUrls": "URL di redirect OAuth",
+    "redirectUrlsHint": "Un URL per riga. HTTPS obbligatorio in produzione.",
+    "scopes": "Autorizzazioni richieste",
+    "create": "Crea app",
+    "cancel": "Annulla",
+    "creating": "Creazione…",
+    "error": "Impossibile creare l'app.",
+    "categories": {
+      "shipping": "Spedizioni e logistica",
+      "accounting": "Contabilità e finanza",
+      "marketing": "Marketing e analisi",
+      "inventory": "Gestione magazzino",
+      "customer_service": "Servizio clienti",
+      "payments": "Pagamenti",
+      "storefront": "Vetrina",
+      "other": "Altro"
+    }
+  },
+  "appDetail": {
+    "back": "← Torna alle app",
+    "credentials": "Credenziali OAuth",
+    "clientId": "Client ID",
+    "clientSecret": "Client Secret",
+    "rotateSecret": "Rinnova secret",
+    "rotateConfirm": "Il secret attuale verrà invalidato immediatamente. Tutte le istanze installate dovranno ri-autenticarsi. Continuare?",
+    "manifest": "Manifest",
+    "saveManifest": "Salva manifest",
+    "saving": "Salvataggio…",
+    "saved": "Salvato!",
+    "submitForReview": "Invia per revisione",
+    "submitting": "Invio…",
+    "submitConfirm": "Inviare questa versione per revisione? Non potrai modificare il manifest fino al completamento della revisione.",
+    "version": "Versione attuale",
+    "changelog": "Registro modifiche",
+    "changelogHint": "Descrivi cosa è cambiato in questa versione.",
+    "installCount": "Installazioni attive",
+    "type": "Tipo",
+    "status": "Stato",
+    "reviewNotes": "Note revisione"
+  },
+  "errors": {
+    "required": "Questo campo è obbligatorio.",
+    "invalidUrl": "Deve essere un URL valido.",
+    "invalidHandle": "L'handle deve contenere 2–64 lettere minuscole, numeri o trattini.",
+    "generic": "Qualcosa è andato storto. Riprova."
+  }
+}

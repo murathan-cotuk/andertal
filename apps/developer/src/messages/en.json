@@ -1,0 +1,117 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "apps": "My Apps",
+    "docs": "Documentation",
+    "logout": "Log out"
+  },
+  "auth": {
+    "login": "Sign in",
+    "signup": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "companyName": "Company / Developer name",
+    "country": "Country",
+    "vatNumber": "VAT number (optional)",
+    "agreeTerms": "I agree to the Developer Terms and Privacy Policy",
+    "alreadyHaveAccount": "Already have an account?",
+    "noAccount": "Don't have an account?",
+    "loginError": "Invalid email or password.",
+    "signupError": "Could not create account. Please try again.",
+    "signupSuccess": "Account created! Please sign in.",
+    "loading": "Loading…"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back",
+    "totalApps": "Total apps",
+    "publishedApps": "Published apps",
+    "totalInstalls": "Total installs",
+    "quickActions": "Quick actions",
+    "createApp": "Create new app",
+    "viewDocs": "View documentation",
+    "recentApps": "Recent apps",
+    "noApps": "No apps yet. Create your first app to get started.",
+    "status": {
+      "draft": "Draft",
+      "submitted": "In review",
+      "published": "Published",
+      "rejected": "Rejected"
+    }
+  },
+  "apps": {
+    "title": "My Apps",
+    "createApp": "Create app",
+    "noApps": "You haven't created any apps yet.",
+    "appType": {
+      "integration_app": "Integration App",
+      "shop_app": "Shop App"
+    },
+    "handle": "Handle",
+    "version": "Version",
+    "installs": "Installs",
+    "status": "Status",
+    "actions": "Actions",
+    "manage": "Manage"
+  },
+  "newApp": {
+    "title": "Create new app",
+    "step1": "Basic info",
+    "step2": "Technical details",
+    "step3": "OAuth settings",
+    "name": "App name",
+    "handle": "Handle",
+    "handleHint": "Unique URL-safe identifier (e.g. my-shipping-app). Cannot be changed later.",
+    "type": "App type",
+    "typeIntegration": "Integration App — backend integrations, ERP, shipping, etc.",
+    "typeShop": "Shop App — adds storefront or checkout functionality (Tier 1 only)",
+    "description": "Description",
+    "category": "Category",
+    "privacyUrl": "Privacy policy URL",
+    "redirectUrls": "OAuth redirect URLs",
+    "redirectUrlsHint": "One URL per line. Must be HTTPS in production.",
+    "scopes": "Requested scopes",
+    "create": "Create app",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "error": "Could not create app.",
+    "categories": {
+      "shipping": "Shipping & Logistics",
+      "accounting": "Accounting & Finance",
+      "marketing": "Marketing & Analytics",
+      "inventory": "Inventory Management",
+      "customer_service": "Customer Service",
+      "payments": "Payments",
+      "storefront": "Storefront",
+      "other": "Other"
+    }
+  },
+  "appDetail": {
+    "back": "← Back to apps",
+    "credentials": "OAuth Credentials",
+    "clientId": "Client ID",
+    "clientSecret": "Client Secret",
+    "rotateSecret": "Rotate secret",
+    "rotateConfirm": "This will invalidate the current secret immediately. All installed instances will need to re-authenticate. Continue?",
+    "manifest": "Manifest",
+    "saveManifest": "Save manifest",
+    "saving": "Saving…",
+    "saved": "Saved!",
+    "submitForReview": "Submit for review",
+    "submitting": "Submitting…",
+    "submitConfirm": "Submit this version for review? You will not be able to edit the manifest until the review is complete.",
+    "version": "Current version",
+    "changelog": "Changelog",
+    "changelogHint": "Describe what changed in this version (shown in the App Store).",
+    "installCount": "Active installs",
+    "type": "Type",
+    "status": "Status",
+    "reviewNotes": "Review notes"
+  },
+  "errors": {
+    "required": "This field is required.",
+    "invalidUrl": "Must be a valid URL.",
+    "invalidHandle": "Handle must be 2–64 lowercase letters, numbers, or hyphens.",
+    "generic": "Something went wrong. Please try again."
+  }
+}

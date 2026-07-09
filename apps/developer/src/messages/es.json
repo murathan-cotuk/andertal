@@ -1,0 +1,117 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "apps": "Mis aplicaciones",
+    "docs": "Documentación",
+    "logout": "Cerrar sesión"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "signup": "Crear cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "companyName": "Empresa / Nombre de desarrollador",
+    "country": "País",
+    "vatNumber": "Número de IVA (opcional)",
+    "agreeTerms": "Acepto los Términos de desarrollador y la Política de privacidad",
+    "alreadyHaveAccount": "¿Ya tienes una cuenta?",
+    "noAccount": "¿No tienes cuenta?",
+    "loginError": "Correo o contraseña no válidos.",
+    "signupError": "No se pudo crear la cuenta. Por favor, inténtalo de nuevo.",
+    "signupSuccess": "¡Cuenta creada! Por favor, inicia sesión.",
+    "loading": "Cargando…"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "welcome": "Bienvenido de nuevo",
+    "totalApps": "Total de aplicaciones",
+    "publishedApps": "Aplicaciones publicadas",
+    "totalInstalls": "Total de instalaciones",
+    "quickActions": "Acciones rápidas",
+    "createApp": "Crear nueva aplicación",
+    "viewDocs": "Ver documentación",
+    "recentApps": "Aplicaciones recientes",
+    "noApps": "Sin aplicaciones. Crea tu primera aplicación.",
+    "status": {
+      "draft": "Borrador",
+      "submitted": "En revisión",
+      "published": "Publicada",
+      "rejected": "Rechazada"
+    }
+  },
+  "apps": {
+    "title": "Mis aplicaciones",
+    "createApp": "Crear aplicación",
+    "noApps": "Aún no has creado ninguna aplicación.",
+    "appType": {
+      "integration_app": "Aplicación de integración",
+      "shop_app": "Aplicación de tienda"
+    },
+    "handle": "Handle",
+    "version": "Versión",
+    "installs": "Instalaciones",
+    "status": "Estado",
+    "actions": "Acciones",
+    "manage": "Gestionar"
+  },
+  "newApp": {
+    "title": "Crear nueva aplicación",
+    "step1": "Información básica",
+    "step2": "Detalles técnicos",
+    "step3": "Configuración OAuth",
+    "name": "Nombre de la aplicación",
+    "handle": "Handle",
+    "handleHint": "Identificador único seguro para URL (ej. mi-app-envio). No se puede cambiar.",
+    "type": "Tipo de aplicación",
+    "typeIntegration": "Aplicación de integración — backends, ERP, envíos, etc.",
+    "typeShop": "Aplicación de tienda — añade funcionalidad de vitrina o pago (solo Nivel 1)",
+    "description": "Descripción",
+    "category": "Categoría",
+    "privacyUrl": "URL de política de privacidad",
+    "redirectUrls": "URLs de redirección OAuth",
+    "redirectUrlsHint": "Una URL por línea. HTTPS obligatorio en producción.",
+    "scopes": "Permisos solicitados",
+    "create": "Crear aplicación",
+    "cancel": "Cancelar",
+    "creating": "Creando…",
+    "error": "No se pudo crear la aplicación.",
+    "categories": {
+      "shipping": "Envío y logística",
+      "accounting": "Contabilidad y finanzas",
+      "marketing": "Marketing y análisis",
+      "inventory": "Gestión de inventario",
+      "customer_service": "Atención al cliente",
+      "payments": "Pagos",
+      "storefront": "Vitrina",
+      "other": "Otro"
+    }
+  },
+  "appDetail": {
+    "back": "← Volver a aplicaciones",
+    "credentials": "Credenciales OAuth",
+    "clientId": "Client ID",
+    "clientSecret": "Client Secret",
+    "rotateSecret": "Rotar secreto",
+    "rotateConfirm": "El secreto actual quedará invalidado inmediatamente. Todas las instancias instaladas deberán volver a autenticarse. ¿Continuar?",
+    "manifest": "Manifest",
+    "saveManifest": "Guardar manifest",
+    "saving": "Guardando…",
+    "saved": "¡Guardado!",
+    "submitForReview": "Enviar para revisión",
+    "submitting": "Enviando…",
+    "submitConfirm": "¿Enviar esta versión para revisión? No podrás editar el manifest hasta que se complete la revisión.",
+    "version": "Versión actual",
+    "changelog": "Registro de cambios",
+    "changelogHint": "Describe qué cambió en esta versión.",
+    "installCount": "Instalaciones activas",
+    "type": "Tipo",
+    "status": "Estado",
+    "reviewNotes": "Notas de revisión"
+  },
+  "errors": {
+    "required": "Este campo es obligatorio.",
+    "invalidUrl": "Debe ser una URL válida.",
+    "invalidHandle": "El handle debe tener 2–64 letras minúsculas, números o guiones.",
+    "generic": "Algo salió mal. Por favor, inténtalo de nuevo."
+  }
+}
