@@ -45,7 +45,10 @@
     "coupons": "Coupon",
     "landingPage": "Pagina di destinazione",
     "styles": "Stili",
-    "flows": "Flussi"
+    "flows": "Flussi",
+    "apps": "App",
+    "installed": "Installate",
+    "appStore": "App Store"
   },
   "auth": {
     "login": {

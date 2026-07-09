@@ -45,7 +45,10 @@
     "coupons": "Kuponlar",
     "landingPage": "Landing Page",
     "styles": "Stiller",
-    "flows": "Akışlar"
+    "flows": "Akışlar",
+    "apps": "Uygulamalar",
+    "installed": "Kurulu",
+    "appStore": "App Mağazası"
   },
   "auth": {
     "login": {

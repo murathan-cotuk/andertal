@@ -95,7 +95,6 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/:locale/apps/smtp", destination: "/:locale/settings/integrations", permanent: true },
-      { source: "/:locale/apps", destination: "/:locale/settings/integrations", permanent: true },
     ];
   },
 };

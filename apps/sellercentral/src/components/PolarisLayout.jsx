@@ -34,6 +34,7 @@ import {
   ImportIcon,
   StoreIcon,
   EditIcon,
+  AppsIcon,
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
 import { polarisI18nFor } from "@/lib/polaris-locale";
@@ -324,6 +325,15 @@ function getMenuItemsMain(t, isSuperuser = false) {
       ],
     },
     { url: "/import-export", label: tx("importExport", "Import/Export"), icon: ImportIcon },
+    {
+      url: "/apps",
+      label: tx("apps", "Apps"),
+      icon: AppsIcon,
+      subNavigationItems: [
+        { url: "/apps", label: tx("appStore", "App Store") },
+        { url: "/apps/installed", label: tx("installed", "Installed") },
+      ],
+    },
   );
   return items;
 }
@@ -338,7 +348,7 @@ function getMenuItemsSettings(t, isSuperuser = false) {
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
 const PARENT_NAV_URLS = new Set([
-  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu", "/discounts",
+  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu", "/discounts", "/apps",
 ]);
 const NAV_VIRTUAL_URL_FALLBACK = {
   "/customers-menu": "/customers",
