@@ -265,7 +265,7 @@ function getAllowedOrigins() {
     console.warn('[SECURITY] CORS_ORIGINS env var is not set in production! All cross-origin requests will be blocked. Set CORS_ORIGINS to allow your frontend domains.')
     return []
   }
-  return ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002']
+  return ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003']
 }
 
 async function start() {
@@ -1603,6 +1603,142 @@ async function start() {
       }
     }
 
+    // ── App Platform migrations ──────────────────────────────────────────────
+    {
+      const apClient = getDbClient()
+      try {
+        await apClient.connect()
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS developers (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            company_name TEXT,
+            country TEXT,
+            vat_number TEXT,
+            is_superuser_developer BOOLEAN NOT NULL DEFAULT FALSE,
+            stripe_account_id TEXT,
+            dpa_accepted_at TIMESTAMPTZ,
+            email_verified_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_developers_email ON developers(email)`).catch(() => {})
+
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS platform_apps (
+            id TEXT PRIMARY KEY,
+            developer_id TEXT NOT NULL REFERENCES developers(id) ON DELETE RESTRICT,
+            handle TEXT UNIQUE NOT NULL,
+            type TEXT NOT NULL DEFAULT 'integration_app',
+            client_id TEXT UNIQUE NOT NULL,
+            client_secret_hash TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft',
+            current_version_id TEXT,
+            install_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_platform_apps_handle ON platform_apps(handle)`).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_platform_apps_developer ON platform_apps(developer_id)`).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_platform_apps_status ON platform_apps(status)`).catch(() => {})
+
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS platform_app_versions (
+            id TEXT PRIMARY KEY,
+            app_id TEXT NOT NULL REFERENCES platform_apps(id) ON DELETE CASCADE,
+            version TEXT NOT NULL,
+            manifest JSONB NOT NULL,
+            changelog TEXT,
+            submitted_at TIMESTAMPTZ,
+            approved_at TIMESTAMPTZ,
+            approved_by TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (app_id, version)
+          )
+        `).catch(() => {})
+
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS platform_app_installations (
+            id TEXT PRIMARY KEY,
+            app_id TEXT NOT NULL REFERENCES platform_apps(id) ON DELETE CASCADE,
+            seller_id TEXT NOT NULL,
+            version_id TEXT REFERENCES platform_app_versions(id),
+            scopes TEXT[] NOT NULL DEFAULT '{}',
+            settings JSONB NOT NULL DEFAULT '{}',
+            installed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            uninstalled_at TIMESTAMPTZ,
+            UNIQUE (app_id, seller_id)
+          )
+        `).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_pai_seller ON platform_app_installations(seller_id)`).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_pai_app ON platform_app_installations(app_id)`).catch(() => {})
+
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS platform_oauth_codes (
+            id TEXT PRIMARY KEY,
+            code_hash TEXT UNIQUE NOT NULL,
+            app_id TEXT NOT NULL REFERENCES platform_apps(id) ON DELETE CASCADE,
+            seller_id TEXT NOT NULL,
+            scopes TEXT[] NOT NULL DEFAULT '{}',
+            redirect_uri TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_poc_code ON platform_oauth_codes(code_hash)`).catch(() => {})
+
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS platform_app_tokens (
+            id TEXT PRIMARY KEY,
+            installation_id TEXT NOT NULL REFERENCES platform_app_installations(id) ON DELETE CASCADE,
+            access_token_hash TEXT UNIQUE NOT NULL,
+            refresh_token_hash TEXT UNIQUE,
+            scopes TEXT[] NOT NULL DEFAULT '{}',
+            expires_at TIMESTAMPTZ NOT NULL,
+            revoked_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_pat_access ON platform_app_tokens(access_token_hash)`).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_pat_refresh ON platform_app_tokens(refresh_token_hash)`).catch(() => {})
+        await apClient.query(`CREATE INDEX IF NOT EXISTS idx_pat_install ON platform_app_tokens(installation_id)`).catch(() => {})
+
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS platform_app_webhook_subscriptions (
+            id TEXT PRIMARY KEY,
+            installation_id TEXT NOT NULL REFERENCES platform_app_installations(id) ON DELETE CASCADE,
+            event TEXT NOT NULL,
+            endpoint_url TEXT NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `).catch(() => {})
+
+        await apClient.query(`
+          CREATE TABLE IF NOT EXISTS platform_app_reviews (
+            id TEXT PRIMARY KEY,
+            app_id TEXT NOT NULL REFERENCES platform_apps(id) ON DELETE CASCADE,
+            version_id TEXT REFERENCES platform_app_versions(id),
+            reviewer_id TEXT,
+            status TEXT NOT NULL,
+            notes TEXT,
+            reviewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `).catch(() => {})
+
+        await apClient.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS developer_id TEXT REFERENCES developers(id)`).catch(() => {})
+        await apClient.end()
+        log.info('App Platform tables ready')
+      } catch (e) {
+        try { await apClient.end() } catch (_) {}
+        console.warn('App Platform migration skipped:', e?.message)
+      }
+    }
+
     // Proje loader'ları: adminHubService ve regionService container'a register edilir (.js = Render'da güvenilir)
     try {
       const adminHubServiceLoader = require(path.join(__dirname, 'loaders', 'admin-hub-service-loader.js'))
@@ -1646,6 +1782,8 @@ async function start() {
       /^\/auth\/register(\/|\?|$)/,
       // Billbee integration callbacks use Basic Auth, not seller JWT.
       /^\/v1\/integrations\/billbee\/webhook(\/|\?|$)/,
+      // App Store catalog is public (read-only listing)
+      /^\/v1\/app-store\/apps(\/[^/]+)?(\/|\?|$)/,
     ]
     httpApp.use('/admin-hub', (req, res, next) => {
       if (req.method === 'OPTIONS') return next() // CORS preflight
@@ -2331,6 +2469,32 @@ async function start() {
         })
       },
     })
+
+    // ── App Platform routes ─────────────────────────────────────────────────
+    try {
+      const cookieParser = require('cookie-parser')
+      httpApp.use(cookieParser())
+    } catch (_) {}
+
+    try {
+      const createDeveloperApiRouter = require('./src/routes/developer-api')
+      httpApp.use('/developer-api/v1', createDeveloperApiRouter())
+    } catch (e) { console.warn('developer-api mount failed:', e?.message) }
+
+    try {
+      const createAppOAuthRouter = require('./src/routes/app-oauth')
+      httpApp.use('/oauth', createAppOAuthRouter({ verifySellerToken }))
+    } catch (e) { console.warn('app-oauth mount failed:', e?.message) }
+
+    try {
+      const createPublicApiV1Router = require('./src/routes/public-api-v1')
+      httpApp.use('/api/public-api/v1', createPublicApiV1Router())
+    } catch (e) { console.warn('public-api-v1 mount failed:', e?.message) }
+
+    try {
+      const createAppStoreRouter = require('./src/routes/app-store')
+      httpApp.use('/admin-hub/v1/app-store', createAppStoreRouter())
+    } catch (e) { console.warn('app-store mount failed:', e?.message) }
 
     try {
       const { mountBillbeeMarketplaceApi } = require(path.join(__dirname, 'billbee-marketplace-api'))
