@@ -334,7 +334,10 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
         const optionLabels = variationGroups && variationGroups[i] ? variationGroups[i].labels || null : null
         return {
           id: v.id || `${p.id}-variant-${i}`,
-          title: v.title || v.label || `Variant ${i + 1}`,
+          title: v.title || v.label
+            || (vMeta.translations && vMeta.translations.de && vMeta.translations.de.title)
+            || (optionValues && optionValues.length > 0 ? optionValues.join(' / ') : v.value)
+            || `Option ${i + 1}`,
           sku: v.sku || null,
           ean: v.ean || null,
           price_cents: vPriceCents,
@@ -385,6 +388,7 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
     inventory_quantity: parseInt(p.inventory, 10) || (variants.reduce((s, v) => s + (v.inventory_quantity || 0), 0)),
     variants,
     variant_option_keys: variantOptionKeys,
+    variation_groups: variationGroups,
     metadata: { ...meta, ...(metaTranslations ? { translations: metaTranslations } : {}), thumbnail: thumb || meta.thumbnail || null, images: imagesResolved },
     created_at: p.created_at,
     updated_at: p.updated_at,
