@@ -67,7 +67,7 @@ export default function NewAppPage() {
       const payload = {
         handle: form.handle,
         manifest: {
-          schema_version: 1,
+          schema_version: '1',
           handle: form.handle,
           name: form.name,
           type: form.type,
