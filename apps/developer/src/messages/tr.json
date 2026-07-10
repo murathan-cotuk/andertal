@@ -7,9 +7,12 @@
   },
   "auth": {
     "login": "Giriş yap",
+    "loginSubtitle": "Geliştirici portalına hoş geldiniz",
     "signup": "Hesap oluştur",
+    "signupSubtitle": "Andertal uygulama platformuna katılın",
     "email": "E-posta",
     "password": "Şifre",
+    "passwordHint": "Min. 8 karakter",
     "companyName": "Şirket / Geliştirici adı",
     "country": "Ülke",
     "vatNumber": "Vergi numarası (isteğe bağlı)",
@@ -18,8 +21,12 @@
     "noAccount": "Hesabınız yok mu?",
     "loginError": "Geçersiz e-posta veya şifre.",
     "signupError": "Hesap oluşturulamadı. Lütfen tekrar deneyin.",
-    "signupSuccess": "Hesap oluşturuldu! Lütfen giriş yapın.",
-    "loading": "Yükleniyor…"
+    "signupSuccess": "Hesap oluşturuldu! Yönlendiriliyor…",
+    "loading": "Yükleniyor…",
+    "requiredFields": "E-posta ve şifre zorunludur.",
+    "requiredCompany": "Şirket adı zorunludur.",
+    "passwordTooShort": "Şifre en az 8 karakter olmalıdır.",
+    "mustAgree": "Kaydolmak için şartları kabul etmelisiniz."
   },
   "dashboard": {
     "title": "Panel",

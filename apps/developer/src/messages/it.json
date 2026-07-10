@@ -7,9 +7,12 @@
   },
   "auth": {
     "login": "Accedi",
+    "loginSubtitle": "Bentornato nel portale sviluppatori",
     "signup": "Crea account",
+    "signupSubtitle": "Unisciti alla piattaforma app di Andertal",
     "email": "Email",
     "password": "Password",
+    "passwordHint": "Min. 8 caratteri",
     "companyName": "Azienda / Nome sviluppatore",
     "country": "Paese",
     "vatNumber": "Partita IVA (opzionale)",
@@ -18,8 +21,12 @@
     "noAccount": "Non hai un account?",
     "loginError": "Email o password non validi.",
     "signupError": "Impossibile creare l'account. Riprova.",
-    "signupSuccess": "Account creato! Accedi.",
-    "loading": "Caricamento…"
+    "signupSuccess": "Account creato! Reindirizzamento…",
+    "loading": "Caricamento…",
+    "requiredFields": "Email e password sono obbligatorie.",
+    "requiredCompany": "Il nome dell'azienda è obbligatorio.",
+    "passwordTooShort": "La password deve contenere almeno 8 caratteri.",
+    "mustAgree": "Devi accettare i termini per registrarti."
   },
   "dashboard": {
     "title": "Dashboard",
