@@ -37,6 +37,13 @@ function requireDevAuth(req, res, next) {
 
 const AUTO_APPROVE = process.env.APP_PLATFORM_AUTO_APPROVE === 'true'
 
+function getSuperuserEmails() {
+  const env = process.env.SUPERUSER_EMAILS || ''
+  const fromEnv = env.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+  const defaults = ['murathan.cotuk@gmail.com']
+  return [...new Set([...fromEnv, ...defaults])]
+}
+
 module.exports = function createDeveloperApiRouter() {
   const router = Router()
 
@@ -55,9 +62,7 @@ module.exports = function createDeveloperApiRouter() {
       if (existing.rows.length) { await client.end(); return res.status(409).json({ message: 'Email already registered' }) }
       const id = generateId('developer')
       const pw_hash = hashPassword(password)
-      // Auto-grant superuser developer if email matches SUPERUSER_EMAILS
-      const superuserEmails = (process.env.SUPERUSER_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-      const is_superuser_developer = superuserEmails.includes(norm)
+      const is_superuser_developer = getSuperuserEmails().includes(norm)
       await client.query(
         `INSERT INTO developers (id, email, password_hash, company_name, country, vat_number, is_superuser_developer, dpa_accepted_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,now())`,
@@ -83,10 +88,16 @@ module.exports = function createDeveloperApiRouter() {
       const norm = String(email).toLowerCase().trim()
       const r = await client.query('SELECT id, email, password_hash, company_name, is_superuser_developer FROM developers WHERE email = $1', [norm])
       const dev = r.rows[0]
+      if (!dev || dev.password_hash !== hashPassword(password)) { await client.end(); return res.status(401).json({ message: 'Invalid email or password' }) }
+      // Auto-promote superuser emails even if account was created before env var was set
+      const shouldBeSuperuser = getSuperuserEmails().includes(norm)
+      if (shouldBeSuperuser && !dev.is_superuser_developer) {
+        await client.query('UPDATE developers SET is_superuser_developer = true WHERE id = $1', [dev.id])
+      }
       await client.end()
-      if (!dev || dev.password_hash !== hashPassword(password)) return res.status(401).json({ message: 'Invalid email or password' })
-      const token = signDeveloperToken({ id: dev.id, email: dev.email, is_superuser_developer: dev.is_superuser_developer })
-      res.json({ token, developer: { id: dev.id, email: dev.email, company_name: dev.company_name, is_superuser_developer: dev.is_superuser_developer } })
+      const is_superuser_developer = shouldBeSuperuser || dev.is_superuser_developer
+      const token = signDeveloperToken({ id: dev.id, email: dev.email, is_superuser_developer })
+      res.json({ token, developer: { id: dev.id, email: dev.email, company_name: dev.company_name, is_superuser_developer } })
     } catch (e) {
       try { await client.end() } catch (_) {}
       res.status(500).json({ message: e?.message || 'Login failed' })

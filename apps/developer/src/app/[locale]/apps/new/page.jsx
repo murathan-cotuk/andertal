@@ -1,29 +1,31 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import AuthGuard from '../../../../components/AuthGuard'
 import PortalNav from '../../../../components/PortalNav'
 import { api } from '../../../../lib/api'
 
+const TIER1_SCOPES = new Set(['write_storefront', 'write_checkout'])
+
 const ALL_SCOPES = [
-  { value: 'read_orders',           label: 'Read orders' },
-  { value: 'write_orders',          label: 'Update order status' },
-  { value: 'write_fulfillments',    label: 'Write tracking & shipping status' },
-  { value: 'read_products',         label: 'Read products' },
-  { value: 'write_products',        label: 'Create and update products' },
-  { value: 'read_inventory',        label: 'Read inventory levels' },
-  { value: 'write_inventory',       label: 'Update inventory' },
-  { value: 'write_shipping_methods',label: 'Create shipping groups and methods' },
-  { value: 'read_customers',        label: 'Read customer data' },
-  { value: 'read_analytics',        label: 'Read sales analytics and reports' },
-  { value: 'write_discounts',       label: 'Create coupons and discounts' },
-  { value: 'read_brands',           label: 'Read brand data' },
-  { value: 'write_brands',          label: 'Create and update brands' },
-  { value: 'read_categories',       label: 'Read product categories' },
-  { value: 'read_seller_settings',  label: 'Read seller profile and settings' },
-  { value: 'write_storefront',      label: 'Add blocks to shop UI (Tier 1)' },
-  { value: 'write_checkout',        label: 'Add checkout extensions (Tier 1)' },
+  { value: 'read_orders',            label: 'Read orders' },
+  { value: 'write_orders',           label: 'Update order status' },
+  { value: 'write_fulfillments',     label: 'Write tracking & shipping status' },
+  { value: 'read_products',          label: 'Read products' },
+  { value: 'write_products',         label: 'Create and update products' },
+  { value: 'read_inventory',         label: 'Read inventory levels' },
+  { value: 'write_inventory',        label: 'Update inventory' },
+  { value: 'write_shipping_methods', label: 'Create shipping groups and methods' },
+  { value: 'read_customers',         label: 'Read customer data' },
+  { value: 'read_analytics',         label: 'Read analytics and reports' },
+  { value: 'write_discounts',        label: 'Create coupons and discounts' },
+  { value: 'read_brands',            label: 'Read brand data' },
+  { value: 'write_brands',           label: 'Create and update brands' },
+  { value: 'read_categories',        label: 'Read product categories' },
+  { value: 'read_seller_settings',   label: 'Read seller profile and settings' },
+  { value: 'write_storefront',       label: 'Add blocks to shop UI', tier1: true },
+  { value: 'write_checkout',         label: 'Add checkout extensions', tier1: true },
 ]
 
 const CATEGORIES = [
@@ -53,13 +55,12 @@ const S = {
   typeCard: (active) => ({ border: `2px solid ${active ? '#0070f3' : '#e0e0e0'}`, borderRadius: 8, padding: '12px 14px', cursor: 'pointer', marginBottom: 10, background: active ? '#eff6ff' : '#fff' }),
   typeName: { fontSize: 14, fontWeight: 600, color: '#111' },
   typeDesc: { fontSize: 12, color: '#666', marginTop: 3 },
-  scopesGrid: { display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 },
-  scopeItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#333', cursor: 'pointer' },
+  scopesGrid: { display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 },
   footer: { display: 'flex', gap: 12, justifyContent: 'flex-end' },
   btn: { padding: '11px 22px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
   cancelBtn: { padding: '11px 22px', background: '#fff', color: '#333', border: '1.5px solid #e0e0e0', borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: 'pointer' },
   btnDisabled: { opacity: 0.6, cursor: 'not-allowed' },
-  err: { color: '#e53e3e', fontSize: 13, marginBottom: 12 },
+  err: { background: '#fee2e2', border: '1px solid #ef4444', borderRadius: 8, padding: '12px 14px', color: '#991b1b', fontSize: 14, marginBottom: 12 },
 }
 
 export default function NewAppPage() {
@@ -67,22 +68,41 @@ export default function NewAppPage() {
   const tApps = useTranslations('apps')
   const router = useRouter()
   const locale = useLocale()
+  const [isSuperuser, setIsSuperuser] = useState(false)
   const [form, setForm] = useState({
     handle: '', name: '', type: 'integration_app', description: '',
     category: 'other', privacy_policy_url: '', redirect_urls: '', scopes: [],
-    version: '1.0.0', support_url: '',
+    version: '1.0.0',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    api.me().then(d => setIsSuperuser(!!d?.developer?.is_superuser_developer)).catch(() => {})
+  }, [])
+
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
-  const toggleScope = (v) => setForm(f => ({
-    ...f, scopes: f.scopes.includes(v) ? f.scopes.filter(x => x !== v) : [...f.scopes, v]
-  }))
+
+  const toggleScope = (v, disabled) => {
+    if (disabled) return
+    setForm(f => ({
+      ...f, scopes: f.scopes.includes(v) ? f.scopes.filter(x => x !== v) : [...f.scopes, v]
+    }))
+  }
+
+  const availableScopes = ALL_SCOPES.filter(s => !s.tier1 || isSuperuser)
+  const allSelected = availableScopes.every(s => form.scopes.includes(s.value))
+
+  const toggleAll = () => {
+    const vals = availableScopes.map(s => s.value)
+    setForm(f => ({ ...f, scopes: allSelected ? [] : vals }))
+  }
 
   async function submit(e) {
     e.preventDefault()
     setError('')
+    if (!form.description.trim()) { setError('Description is required.'); return }
+    if (!form.privacy_policy_url.trim()) { setError('Privacy policy URL is required.'); return }
     setLoading(true)
     try {
       const redirect_urls = form.redirect_urls.split('\n').map(s => s.trim()).filter(Boolean)
@@ -96,16 +116,17 @@ export default function NewAppPage() {
           version: form.version,
           description: form.description,
           category: form.category,
-          support: { privacy_policy_url: form.privacy_policy_url, support_url: form.support_url || undefined },
+          support: { privacy_policy_url: form.privacy_policy_url },
           scopes: form.scopes,
-          oauth: { redirect_urls },
+          ...(redirect_urls.length ? { oauth: { redirect_urls } } : {}),
           pricing: { model: 'free' },
         }
       }
       const { app } = await api.createApp(payload)
       router.push(`/${locale}/apps/${app.id}`)
     } catch (err) {
-      setError(err?.body?.message || t('error'))
+      const msg = err?.body?.errors ? err.body.errors.join('\n') : (err?.body?.message || err?.message || t('error'))
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -128,7 +149,15 @@ export default function NewAppPage() {
               </div>
               <div style={S.field}>
                 <label style={S.label}>{t('handle')} *</label>
-                <input style={S.input} value={form.handle} onChange={set('handle')} required pattern="[a-z0-9][a-z0-9-]{0,62}[a-z0-9]" />
+                <input
+                  style={S.input}
+                  value={form.handle}
+                  onChange={e => setForm(f => ({ ...f, handle: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                  required
+                  minLength={3}
+                  maxLength={64}
+                  pattern="[a-z0-9][a-z0-9\-]{1,62}[a-z0-9]"
+                />
                 <div style={S.hint}>{t('handleHint')}</div>
               </div>
               <div style={S.field}>
@@ -137,10 +166,12 @@ export default function NewAppPage() {
                   <div style={S.typeName}>Integration App</div>
                   <div style={S.typeDesc}>{t('typeIntegration')}</div>
                 </div>
-                <div style={S.typeCard(form.type === 'shop_app')} onClick={() => setForm(f => ({ ...f, type: 'shop_app' }))}>
-                  <div style={S.typeName}>Shop App</div>
-                  <div style={S.typeDesc}>{t('typeShop')}</div>
-                </div>
+                {isSuperuser && (
+                  <div style={S.typeCard(form.type === 'shop_app')} onClick={() => setForm(f => ({ ...f, type: 'shop_app' }))}>
+                    <div style={S.typeName}>Shop App <span style={{ fontSize: 11, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: 4 }}>Tier 1</span></div>
+                    <div style={S.typeDesc}>{t('typeShop')}</div>
+                  </div>
+                )}
               </div>
               <div style={S.field}>
                 <label style={S.label}>{t('category')}</label>
@@ -149,12 +180,12 @@ export default function NewAppPage() {
                 </select>
               </div>
               <div style={S.field}>
-                <label style={S.label}>{t('description')}</label>
-                <textarea style={S.textarea} value={form.description} onChange={set('description')} />
+                <label style={S.label}>{t('description')} *</label>
+                <textarea style={S.textarea} value={form.description} onChange={set('description')} required />
               </div>
             </div>
 
-            {/* OAuth */}
+            {/* OAuth & support */}
             <div style={S.card}>
               <div style={S.sectionTitle}>{t('step3')}</div>
               <div style={S.field}>
@@ -163,23 +194,62 @@ export default function NewAppPage() {
                 <div style={S.hint}>{t('redirectUrlsHint')}</div>
               </div>
               <div style={S.field}>
-                <label style={S.label}>{t('privacyUrl')}</label>
-                <input style={S.input} type="url" value={form.privacy_policy_url} onChange={set('privacy_policy_url')} />
+                <label style={S.label}>{t('privacyUrl')} *</label>
+                <input style={S.input} type="url" value={form.privacy_policy_url} onChange={set('privacy_policy_url')} required placeholder="https://example.com/privacy" />
               </div>
               <div style={S.field}>
-                <label style={S.label}>{t('scopes')}</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <label style={{ ...S.label, marginBottom: 0 }}>{t('scopes')}</label>
+                  <button
+                    type="button"
+                    onClick={toggleAll}
+                    style={{ fontSize: 12, color: '#0070f3', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: '2px 6px' }}
+                  >
+                    {allSelected ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
                 <div style={S.scopesGrid}>
-                  {ALL_SCOPES.map(s => (
-                    <label key={s.value} style={S.scopeItem}>
-                      <input type="checkbox" checked={form.scopes.includes(s.value)} onChange={() => toggleScope(s.value)} />
-                      <span><strong style={{ fontSize: 12 }}>{s.value}</strong><br /><span style={{ color: '#888', fontSize: 11 }}>{s.label}</span></span>
-                    </label>
-                  ))}
+                  {ALL_SCOPES.map(s => {
+                    const isLocked = s.tier1 && !isSuperuser
+                    const checked = form.scopes.includes(s.value)
+                    return (
+                      <label
+                        key={s.value}
+                        onClick={() => toggleScope(s.value, isLocked)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13,
+                          color: isLocked ? '#bbb' : '#333',
+                          cursor: isLocked ? 'not-allowed' : 'pointer',
+                          background: checked ? '#f0f9ff' : 'transparent',
+                          border: `1px solid ${checked ? '#bae6fd' : '#f0f0f0'}`,
+                          borderRadius: 6, padding: '7px 10px',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={isLocked}
+                          onChange={() => toggleScope(s.value, isLocked)}
+                          style={{ marginTop: 2, flexShrink: 0 }}
+                        />
+                        <span>
+                          <strong style={{ fontSize: 12, display: 'block' }}>{s.value}</strong>
+                          <span style={{ color: isLocked ? '#bbb' : '#888', fontSize: 11 }}>
+                            {s.label}{s.tier1 ? ' — Tier 1' : ''}
+                          </span>
+                        </span>
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
             </div>
 
-            {error && <div style={S.err}>{error}</div>}
+            {error && (
+              <div style={S.err}>
+                {error.split('\n').map((line, i) => <div key={i}>{line}</div>)}
+              </div>
+            )}
             <div style={S.footer}>
               <button type="button" style={S.cancelBtn} onClick={() => router.push(`/${locale}/apps`)}>{t('cancel')}</button>
               <button type="submit" style={{ ...S.btn, ...(loading ? S.btnDisabled : {}) }} disabled={loading}>
