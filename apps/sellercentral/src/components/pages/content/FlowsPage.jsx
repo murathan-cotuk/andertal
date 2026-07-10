@@ -218,6 +218,7 @@ const T = {
     testEmailSendFailed: "Test email could not be sent. Check SMTP settings or try again.",
     smtpRequiredForTest: "Configure SMTP first (Settings → Integrations).",
     loadFlowErr: "Could not load flow.",
+    localeNeedsSubject: "subject is required when body is filled",
     saveFlowErr: "Could not save flow.",
     flowSavedOk: "Flow saved.",
     flowStatusLabel: "Flow status",
@@ -341,6 +342,7 @@ const T = {
     smtpRequiredForTest: "Zuerst SMTP einrichten (Einstellungen → Integrationen).",
     noStepsHint: "Schritte hinzufügen—z. B. 1 Stunde warten, dann E-Mail senden.",
     loadFlowErr: "Flow konnte nicht geladen werden.",
+    localeNeedsSubject: "Betreff muss ausgefüllt sein, wenn ein E-Mail-Text vorhanden ist",
     saveFlowErr: "Flow konnte nicht gespeichert werden.",
     flowSavedOk: "Flow gespeichert.",
     flowStatusLabel: "Flow-Status",
@@ -463,6 +465,7 @@ const T = {
     smtpRequiredForTest: "Önce SMTP yapılandırın (Ayarlar → Entegrasyonlar).",
     noStepsHint: "Adım ekleyin—ör. 1 saat bekleyin, sonra e-posta gönderin.",
     loadFlowErr: "Flow yüklenemedi.",
+    localeNeedsSubject: "Metin doluysa konu alanı zorunludur",
     saveFlowErr: "Flow kaydedilemedi.",
     flowSavedOk: "Flow kaydedildi.",
     flowStatusLabel: "Flow durumu",
@@ -585,6 +588,7 @@ const T = {
     smtpRequiredForTest: "Configurez d'abord SMTP (Paramètres → Intégrations).",
     noStepsHint: "Ajoutez des étapes — ex. attendre 1 heure puis envoyer un e-mail.",
     loadFlowErr: "Impossible de charger le flux.",
+    localeNeedsSubject: "L'objet est obligatoire si le corps est renseigné",
     saveFlowErr: "Impossible d'enregistrer le flux.",
     flowSavedOk: "Flux enregistré.",
     flowStatusLabel: "Statut du flux",
@@ -706,6 +710,7 @@ const T = {
     smtpRequiredForTest: "Configura prima SMTP (Impostazioni → Integrazioni).",
     noStepsHint: "Aggiungi passi — es. attendi 1 ora poi invia un'e-mail.",
     loadFlowErr: "Impossibile caricare il flusso.",
+    localeNeedsSubject: "Il soggetto è obbligatorio quando il corpo è compilato",
     saveFlowErr: "Impossibile salvare il flusso.",
     flowSavedOk: "Flusso salvato.",
     flowStatusLabel: "Stato flusso",
@@ -828,6 +833,7 @@ const T = {
     smtpRequiredForTest: "Configura SMTP primero (Ajustes → Integraciones).",
     noStepsHint: "Añade pasos — ej. esperar 1 hora y enviar un correo.",
     loadFlowErr: "No se pudo cargar el flujo.",
+    localeNeedsSubject: "El asunto es obligatorio cuando el cuerpo está relleno",
     saveFlowErr: "No se pudo guardar el flujo.",
     flowSavedOk: "Flujo guardado.",
     flowStatusLabel: "Estado del flujo",
@@ -1558,6 +1564,18 @@ export default function FlowsPage() {
           smtp_sender_id: sid || null,
         };
       });
+      for (let si = 0; si < stepsPayload.length; si++) {
+        const sp = stepsPayload[si];
+        if (sp.step_type !== "send_email" || !sp.email_i18n) continue;
+        for (const loc of FLOW_TEMPLATE_LANGS) {
+          const b = sp.email_i18n[loc];
+          if (!b) continue;
+          if (String(b.body || "").trim() && !String(b.subject || "").trim()) {
+            setEditErr(`Step ${si + 1}: ${loc.toUpperCase()} — ${t.localeNeedsSubject}`);
+            return;
+          }
+        }
+      }
       const res = await client.updateFlow(editingFlowId, {
         name,
         trigger: editTrigger,
