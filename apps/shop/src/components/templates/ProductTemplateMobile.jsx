@@ -38,7 +38,7 @@ const TrustpilotWordmark  = dynamic(
 );
 import ProductPurchaseActions from "@/components/ui/ProductPurchaseActions";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
-import BestsellerBadge from "@/components/BestsellerBadge";
+import ProductImageBadges from "@/components/ProductImageBadges";
 import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import { isEuOriginVerified } from "@andertal/shop-theme";
@@ -737,6 +737,12 @@ const META_HIDDEN_KEYS = [
 
 const DEFAULT_VARIANT_TITLES = new Set(["default title", "default", "standard"]);
 
+// Neutral local "no image" placeholder (light gray square + icon), used only when a
+// product has zero configured images anywhere (parent, variant, and thumbnail all
+// empty). Inline data URI so it never depends on an external service being up.
+const NO_IMAGE_PLACEHOLDER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'%3E%3Crect width='600' height='600' fill='%23f3f4f6'/%3E%3Cpath d='M240 220h120a20 20 0 0 1 20 20v120a20 20 0 0 1-20 20H240a20 20 0 0 1-20-20V240a20 20 0 0 1 20-20zm0 20v120h120V240H240zm20 90 25-30 20 24 35-42 30 48H262z' fill='%23d1d5db'/%3E%3C/svg%3E";
+
 /* Legacy: group flat variants by title for products without variation_groups */
 function groupVariantsByTitle(variants) {
   if (!Array.isArray(variants) || variants.length === 0) return [];
@@ -1262,7 +1268,9 @@ export default function ProductTemplateMobile() {
   const variantContent = variant ? variantLocaleContent(variant, locale) : {};
   const effectiveTitle = variantContent.title || displayTitle;
   const effectiveDescription = variantContent.description || displayDescription;
-  const mainImage = displayImages[selectedImage]?.url || variantImageUrl || (product.thumbnail ? resolveImageUrl(product.thumbnail) : null) || "https://via.placeholder.com/600";
+  // Local neutral "no image" placeholder — was previously an external via.placeholder.com
+  // URL, an unreliable third-party service prone to outages/broken-image icons.
+  const mainImage = displayImages[selectedImage]?.url || variantImageUrl || (product.thumbnail ? resolveImageUrl(product.thumbnail) : null) || NO_IMAGE_PLACEHOLDER;
   const variantCountryPrice = (() => {
     const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
     const prices = vm.prices && typeof vm.prices === "object" ? vm.prices : {};
@@ -1532,10 +1540,23 @@ export default function ProductTemplateMobile() {
                           aria-pressed={isSelected}
                         >
                           {swatchUrl ? (
-                            <img src={swatchUrl} alt={displayStr} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }} />
-                          ) : (
-                            <span style={{ display: "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }} />
-                          )}
+                            <img
+                              src={swatchUrl}
+                              alt={displayStr}
+                              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }}
+                              onError={(e) => {
+                                // Broken/stale swatch image URL: hide the <img> so the
+                                // colored-circle fallback (sibling span, rendered below)
+                                // shows instead of the browser's broken-image icon.
+                                e.currentTarget.style.display = "none";
+                                const fallback = e.currentTarget.nextSibling;
+                                if (fallback) fallback.style.display = "block";
+                              }}
+                            />
+                          ) : null}
+                          <span
+                            style={{ display: swatchUrl ? "none" : "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }}
+                          />
                         </VarSwatch>
                       );
                     }
@@ -1639,14 +1660,7 @@ export default function ProductTemplateMobile() {
               </MobileGallerySlide>
             ))}
           </MobileGalleryTrack>
-          {(isBestseller || hasSale) && !isComingSoon && (
-            <div style={{ position: "absolute", top: 8, left: 8, zIndex: 8, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, pointerEvents: "none" }}>
-              {isBestseller && <BestsellerBadge />}
-              {hasSale && (
-                <span style={{ display: "inline-block", padding: "3px 7px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, color: "#fff", background: "#e53e3e", whiteSpace: "nowrap", width: shopStyles?.bestseller_badge?.badge_width || 80, textAlign: "center", boxSizing: "border-box" }}>Sale</span>
-              )}
-            </div>
-          )}
+          <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} />
           {/* Wishlist + Share — bottom-right */}
           {product?.id && (
             <GalleryActionRow
@@ -1778,14 +1792,7 @@ export default function ProductTemplateMobile() {
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
               <MainImage src={mainImage} alt={displayTitle} />
             </MainImageWrap>
-            {(isBestseller || hasSale) && !isComingSoon && (
-              <div style={{ position: "absolute", top: 8, left: 8, zIndex: 8, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, pointerEvents: "none" }}>
-                {isBestseller && <BestsellerBadge />}
-                {hasSale && (
-                  <span style={{ display: "inline-block", padding: "3px 7px", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", borderRadius: 3, color: "#fff", background: "#e53e3e", whiteSpace: "nowrap", width: shopStyles?.bestseller_badge?.badge_width || 80, textAlign: "center", boxSizing: "border-box" }}>Sale</span>
-                )}
-              </div>
-            )}
+            <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} />
             {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             {product?.id && (
               <GalleryActionRow

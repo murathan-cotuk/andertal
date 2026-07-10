@@ -1400,18 +1400,45 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return (first || []).flatMap((v) => tail.map((r) => [v, ...r]));
   };
 
-  /** Single source of truth: always read from metadata.variation_groups */
+  /**
+   * Source of truth: metadata.variation_groups, RECONCILED with product.variants[].option_values.
+   * Excel imports (and other flows) can add variant rows with option values that were never
+   * folded back into metadata.variation_groups, so the two can silently drift apart — e.g. 9
+   * distinct colors present across variants but only 1 registered in variation_groups. Any value
+   * found in a variant's option_values that isn't already in the matching group is appended here
+   * (as a bare, unconfigured option — no swatch/labels, since none exist for it yet) so this list
+   * always matches what the Variation Matrix below actually shows. Saving the product persists
+   * this reconciled list back to metadata.variation_groups (see handleSubmit), self-healing the
+   * drift the next time anyone opens the product.
+   */
   const variantGroups = (() => {
     const mg = meta.variation_groups;
-    if (!Array.isArray(mg) || mg.length === 0) return [];
-    return mg.map((g) => ({
-      name: g.name || "",
-      options: (g.options || []).map((opt) => ({
-        value: typeof opt === "object" ? String(opt.value ?? "") : String(opt ?? ""),
-        swatch_image: typeof opt === "object" ? String(opt.swatch_image ?? opt.swatch_image_url ?? "") : "",
-        labels: typeof opt === "object" && opt.labels && typeof opt.labels === "object" ? { ...opt.labels } : {},
-      })),
-    }));
+    const base = Array.isArray(mg)
+      ? mg.map((g) => ({
+          name: g.name || "",
+          options: (g.options || []).map((opt) => ({
+            value: typeof opt === "object" ? String(opt.value ?? "") : String(opt ?? ""),
+            swatch_image: typeof opt === "object" ? String(opt.swatch_image ?? opt.swatch_image_url ?? "") : "",
+            labels: typeof opt === "object" && opt.labels && typeof opt.labels === "object" ? { ...opt.labels } : {},
+          })),
+        }))
+      : [];
+    if (base.length === 0) return base;
+    const variantsList = Array.isArray(product?.variants) ? product.variants : [];
+    return base.map((group, gIdx) => {
+      const seen = new Set(group.options.map((o) => o.value.trim().toLowerCase()).filter(Boolean));
+      const extra = [];
+      for (const v of variantsList) {
+        const ov = Array.isArray(v.option_values) ? v.option_values : [];
+        const raw = ov[gIdx];
+        if (raw == null || String(raw).trim() === "") continue;
+        const key = String(raw).trim().toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        extra.push({ value: String(raw).trim(), swatch_image: "", labels: {} });
+      }
+      return extra.length ? { ...group, options: [...group.options, ...extra] } : group;
+    });
   })();
 
   const getGroupDisplayName = (gi) => {

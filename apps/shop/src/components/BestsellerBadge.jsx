@@ -33,7 +33,10 @@ export default function BestsellerBadge({ children = "Bestseller", className, st
         src={imgUrl}
         alt="Bestseller"
         className={className}
-        style={{ width: badgeWidth, height: "auto", display: "inline-block", verticalAlign: "middle", flexShrink: 0, ...style }}
+        // maxHeight guards against a badly-proportioned uploaded image (e.g. tall/
+        // portrait) blowing up in height at the configured width and overlapping
+        // the Sale badge stacked below it, or other page content.
+        style={{ width: badgeWidth, height: "auto", maxHeight: 40, display: "inline-block", verticalAlign: "middle", flexShrink: 0, objectFit: "contain", ...style }}
       />
     );
   }

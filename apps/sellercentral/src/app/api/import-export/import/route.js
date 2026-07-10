@@ -783,7 +783,39 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
     if (next.length) m.media = next;
   }
 
-  if (parentPresent.hasOptionNames && pm.variation_groups?.length) m.variation_groups = pm.variation_groups;
+  // Union-merge (not overwrite): a later import batch touching only some rows of an
+  // existing product must not drop option values that earlier imports already
+  // registered, and must not need to re-list every historical value to keep them.
+  // Matches by group name (case-insensitive) and, within a group, by option value
+  // (case-insensitive) — existing swatch_image/labels are preserved, only genuinely
+  // new values are appended. Without this, variants[] and variation_groups can
+  // silently drift apart across repeated imports (seen in production: a product had
+  // 36 variants spanning 9 colors, but variation_groups only listed 1).
+  if (parentPresent.hasOptionNames && pm.variation_groups?.length) {
+    const existingGroups = Array.isArray(m.variation_groups) ? m.variation_groups : [];
+    const merged = existingGroups.map((g) => ({
+      name: g?.name || "",
+      options: Array.isArray(g?.options) ? g.options.map((o) => ({ ...o })) : [],
+    }));
+    for (const incoming of pm.variation_groups) {
+      const incomingName = String(incoming?.name || "").trim();
+      let target = merged.find((g) => g.name.trim().toLowerCase() === incomingName.toLowerCase());
+      if (!target) {
+        target = { name: incomingName, options: [] };
+        merged.push(target);
+      }
+      const seen = new Set(target.options.map((o) => String(o?.value ?? "").trim().toLowerCase()).filter(Boolean));
+      for (const opt of incoming.options || []) {
+        const val = String(opt?.value ?? "").trim();
+        if (!val) continue;
+        const key = val.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        target.options.push({ ...opt, value: val });
+      }
+    }
+    m.variation_groups = merged;
+  }
 
   if (parentPresent.seo_title && pm.seo_meta_title) m.seo_meta_title = pm.seo_meta_title;
   if (parentPresent.seo_description && pm.seo_meta_description) m.seo_meta_description = pm.seo_meta_description;
