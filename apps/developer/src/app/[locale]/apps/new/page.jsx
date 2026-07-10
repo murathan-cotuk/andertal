@@ -7,10 +7,23 @@ import PortalNav from '../../../../components/PortalNav'
 import { api } from '../../../../lib/api'
 
 const ALL_SCOPES = [
-  'read_orders', 'write_orders', 'read_products', 'write_products',
-  'write_inventory', 'write_fulfillments', 'read_customers', 'write_customers',
-  'read_analytics', 'read_shipping', 'write_shipping', 'read_discounts',
-  'write_discounts', 'write_storefront', 'write_checkout', 'read_seller', 'write_seller',
+  { value: 'read_orders',           label: 'Read orders' },
+  { value: 'write_orders',          label: 'Update order status' },
+  { value: 'write_fulfillments',    label: 'Write tracking & shipping status' },
+  { value: 'read_products',         label: 'Read products' },
+  { value: 'write_products',        label: 'Create and update products' },
+  { value: 'read_inventory',        label: 'Read inventory levels' },
+  { value: 'write_inventory',       label: 'Update inventory' },
+  { value: 'write_shipping_methods',label: 'Create shipping groups and methods' },
+  { value: 'read_customers',        label: 'Read customer data' },
+  { value: 'read_analytics',        label: 'Read sales analytics and reports' },
+  { value: 'write_discounts',       label: 'Create coupons and discounts' },
+  { value: 'read_brands',           label: 'Read brand data' },
+  { value: 'write_brands',          label: 'Create and update brands' },
+  { value: 'read_categories',       label: 'Read product categories' },
+  { value: 'read_seller_settings',  label: 'Read seller profile and settings' },
+  { value: 'write_storefront',      label: 'Add blocks to shop UI (Tier 1)' },
+  { value: 'write_checkout',        label: 'Add checkout extensions (Tier 1)' },
 ]
 
 const CATEGORIES = [
@@ -63,8 +76,8 @@ export default function NewAppPage() {
   const [error, setError] = useState('')
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
-  const toggleScope = (s) => setForm(f => ({
-    ...f, scopes: f.scopes.includes(s) ? f.scopes.filter(x => x !== s) : [...f.scopes, s]
+  const toggleScope = (v) => setForm(f => ({
+    ...f, scopes: f.scopes.includes(v) ? f.scopes.filter(x => x !== v) : [...f.scopes, v]
   }))
 
   async function submit(e) {
@@ -157,9 +170,9 @@ export default function NewAppPage() {
                 <label style={S.label}>{t('scopes')}</label>
                 <div style={S.scopesGrid}>
                   {ALL_SCOPES.map(s => (
-                    <label key={s} style={S.scopeItem}>
-                      <input type="checkbox" checked={form.scopes.includes(s)} onChange={() => toggleScope(s)} />
-                      <span>{s}</span>
+                    <label key={s.value} style={S.scopeItem}>
+                      <input type="checkbox" checked={form.scopes.includes(s.value)} onChange={() => toggleScope(s.value)} />
+                      <span><strong style={{ fontSize: 12 }}>{s.value}</strong><br /><span style={{ color: '#888', fontSize: 11 }}>{s.label}</span></span>
                     </label>
                   ))}
                 </div>
