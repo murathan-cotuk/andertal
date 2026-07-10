@@ -13,7 +13,16 @@ const ALL_SCOPES = [
   'write_discounts', 'write_storefront', 'write_checkout', 'read_seller', 'write_seller',
 ]
 
-const CATEGORIES = ['shipping', 'accounting', 'marketing', 'inventory', 'customer_service', 'payments', 'storefront', 'other']
+const CATEGORIES = [
+  { value: 'shipping-fulfillment', label: 'Shipping & Logistics' },
+  { value: 'accounting',           label: 'Accounting & Finance' },
+  { value: 'marketing',            label: 'Marketing' },
+  { value: 'analytics',            label: 'Analytics' },
+  { value: 'inventory',            label: 'Inventory Management' },
+  { value: 'reviews',              label: 'Reviews' },
+  { value: 'storefront',           label: 'Storefront' },
+  { value: 'other',                label: 'Other' },
+]
 
 const S = {
   page: { minHeight: '100vh', background: '#f7f8fa' },
@@ -48,7 +57,7 @@ export default function NewAppPage() {
   const [form, setForm] = useState({
     handle: '', name: '', type: 'integration_app', description: '',
     category: 'other', privacy_policy_url: '', redirect_urls: '', scopes: [],
-    version: '1.0.0',
+    version: '1.0.0', support_url: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -74,7 +83,7 @@ export default function NewAppPage() {
           version: form.version,
           description: form.description,
           category: form.category,
-          privacy_policy_url: form.privacy_policy_url,
+          support: { privacy_policy_url: form.privacy_policy_url, support_url: form.support_url || undefined },
           scopes: form.scopes,
           oauth: { redirect_urls },
           pricing: { model: 'free' },
@@ -123,7 +132,7 @@ export default function NewAppPage() {
               <div style={S.field}>
                 <label style={S.label}>{t('category')}</label>
                 <select style={S.select} value={form.category} onChange={set('category')}>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{t(`categories.${c}`)}</option>)}
+                  {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
               <div style={S.field}>
