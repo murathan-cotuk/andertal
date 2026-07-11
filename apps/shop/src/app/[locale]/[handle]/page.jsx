@@ -302,6 +302,60 @@ const Sidebar = styled.aside`
   }
 `;
 
+/* CMS landing page (e.g. "Bestseller") — desktop-only category jump sidebar,
+   reusing Sidebar's width/sticky-position convention but without the
+   mobile-drawer machinery (out of scope: this page has no product facets,
+   just a list of category links). */
+const CmsPageWithSidebar = styled.div`
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 24px 32px 0;
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  @media (max-width: 767px) {
+    padding: 16px 6px 0;
+  }
+`;
+
+const CmsPageSidebar = styled.aside`
+  display: none;
+  @media (min-width: 1024px) {
+    display: block;
+    width: 220px;
+    flex-shrink: 0;
+    position: sticky;
+    top: ${HEADER_H + 24}px;
+  }
+`;
+
+const CmsPageSidebarTitle = styled.h2`
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #111;
+`;
+
+const CmsPageSidebarLink = styled(Link)`
+  display: block;
+  padding: 7px 0;
+  font-size: 13.5px;
+  color: #555;
+  text-decoration: none;
+  border-bottom: 1px solid #f0f0ee;
+  transition: color 0.12s;
+  &:hover { color: #111; }
+`;
+
+const CmsPageContent = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
 const SidebarOverlay = styled.div`
   display: none;
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
@@ -647,6 +701,7 @@ export default function CollectionPage() {
 
   const [collection,  setCollection]  = useState(null);
   const [cmsPage,     setCmsPage]     = useState(null);
+  const [cmsPageCategoryLinks, setCmsPageCategoryLinks] = useState([]);
   const [products,    setProducts]    = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
@@ -830,6 +885,33 @@ export default function CollectionPage() {
     })();
   }, [collection?.recommended_product_ids]);
 
+  /* ── CMS landing page (e.g. "Bestseller"): desktop sidebar with one link per
+   * category carousel on the page, reusing the existing category-listing route
+   * (?sort=bestseller) rather than duplicating filter logic for a page that has
+   * no flat product list of its own. ── */
+  useEffect(() => {
+    if (!cmsPage?.id) { setCmsPageCategoryLinks([]); return; }
+    let cancelled = false;
+    getMedusaClient()
+      .request(`/store/landing-page/${encodeURIComponent(cmsPage.id)}`, { cache: "no-store" })
+      .then((data) => {
+        if (cancelled) return;
+        const containers = Array.isArray(data?.containers) ? data.containers : [];
+        const seen = new Set();
+        const links = [];
+        for (const c of containers) {
+          if (c?.type !== "bestseller_carousel" || c?.visible === false) continue;
+          const slug = String(c.category_slug || "").trim();
+          if (!slug || seen.has(slug)) continue;
+          seen.add(slug);
+          links.push({ slug, title: (c.title || "").trim() || slug });
+        }
+        setCmsPageCategoryLinks(links);
+      })
+      .catch(() => { if (!cancelled) setCmsPageCategoryLinks([]); });
+    return () => { cancelled = true; };
+  }, [cmsPage?.id]);
+
   /* ── Canonical ── */
   useEffect(() => {
     if (typeof document === "undefined" || !collection?.handle) return;
@@ -929,19 +1011,42 @@ export default function CollectionPage() {
   const richtextMaxW  = tmpl.richtext_max_width || "700px";
   const contentPadX   = tmpl.content_padding_x || "32px";
 
-  if (cmsPage) return (
-    <PageWrap>
-      <ShopHeader />
-      <Main style={{ paddingTop: HEADER_H }}>
+  if (cmsPage) {
+    const pageBody = (
+      <>
         <LandingContainers pageId={String(cmsPage.id)} />
         {cmsPage.body ? (
           <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}
             dangerouslySetInnerHTML={{ __html: sanitize(cmsPage.body) }} />
         ) : null}
-      </Main>
-      <Footer />
-    </PageWrap>
-  );
+      </>
+    );
+    return (
+      <PageWrap>
+        <ShopHeader />
+        <Main style={{ paddingTop: HEADER_H }}>
+          {cmsPageCategoryLinks.length > 0 ? (
+            <CmsPageWithSidebar>
+              <CmsPageSidebar>
+                <CmsPageSidebarTitle>
+                  {locale === "de" ? "Kategorien" : locale === "tr" ? "Kategoriler" : locale === "fr" ? "Catégories" : locale === "es" ? "Categorías" : locale === "it" ? "Categorie" : "Categories"}
+                </CmsPageSidebarTitle>
+                {cmsPageCategoryLinks.map((l) => (
+                  <CmsPageSidebarLink key={l.slug} href={`/${l.slug}?sort=bestseller`}>
+                    {l.title}
+                  </CmsPageSidebarLink>
+                ))}
+              </CmsPageSidebar>
+              <CmsPageContent>{pageBody}</CmsPageContent>
+            </CmsPageWithSidebar>
+          ) : (
+            pageBody
+          )}
+        </Main>
+        <Footer />
+      </PageWrap>
+    );
+  }
 
   if (isCategorySlug) return (
     <PageWrap>

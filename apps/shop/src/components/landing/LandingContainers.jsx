@@ -1158,6 +1158,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
           contained={false}
           title={lt(container, "title", locale) || undefined}
           itemWidth={180}
+          visibleCount={isNarrow ? undefined : 5}
           navOnSides
           gap={gap}
           showFade={false}
