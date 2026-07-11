@@ -58,10 +58,17 @@ export function isValidMarket(s) {
 export function isValidLocale(s) {
   return LOCALE_SET.has(String(s || "").toLowerCase());
 }
-/** Any 3-letter currency code is valid; EUR is the default for unknowns */
+const CURRENCY_SET = new Set(SHOP_CURRENCIES);
+
+/**
+ * Must match a known currency code (SHOP_CURRENCIES), not just "any 3 letters" —
+ * a blind /^[a-z]{3}$/ regex previously matched things like a "/agb" page slug
+ * in the legacy /{country}/{lang}/{currency}/... path shape, causing
+ * parseMarketPath() to misread it as a currency segment, drop the rest of the
+ * path, and redirect real pages (e.g. /de/de/agb) to the market root.
+ */
 export function isValidCurrency(s) {
-  const v = String(s || "").toLowerCase();
-  return /^[a-z]{3}$/.test(v);
+  return CURRENCY_SET.has(String(s || "").toLowerCase());
 }
 
 /**

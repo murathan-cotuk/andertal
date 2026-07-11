@@ -70,6 +70,7 @@ const BUTTON_COLOR_LABELS = {
 };
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import { NumericTextField, NumericInput } from "@/components/NumericTextField";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 import { getStylesPageCopy } from "@/lib/styles-page-i18n";
@@ -1163,21 +1164,14 @@ export default function StylesPage() {
                     {(dev.url || "").trim() && (
                       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
                         <div>
-                          <TextField
+                          <NumericTextField
                             label={locale === "de" ? "Größe (px)" : "Size (px)"}
-                            type="number"
-                            value={String(logoSlotSize(dev, section === "shop" ? 34 : 30))}
-                            onChange={(v) => {
-                              const n = Number(v);
-                              if (Number.isFinite(n) && n > 0) updateDev({ size: n, height: n });
-                            }}
-                            onBlur={() => {
-                              const cur = logoSlotSize(dev, section === "shop" ? 34 : 30);
-                              const clamped = clampLogoSize(cur, section === "shop" ? 34 : 30);
-                              if (clamped !== cur) updateDev({ size: clamped, height: clamped });
-                            }}
+                            value={logoSlotSize(dev, section === "shop" ? 34 : 30)}
+                            min={8}
+                            max={400}
+                            fallback={section === "shop" ? 34 : 30}
+                            onChange={(n) => updateDev({ size: n, height: n })}
                             helpText={locale === "de" ? "Anzeigegröße des Logos; Breite passt sich proportional an." : locale === "tr" ? "Logonun görüntü boyutu; genişlik orantılı olarak uyum sağlar." : locale === "fr" ? "Taille d'affichage du logo ; la largeur s'adapte proportionnellement." : locale === "es" ? "Tamaño de visualización del logo; el ancho se adapta proporcionalmente." : locale === "it" ? "Dimensione di visualizzazione del logo; la larghezza si adatta proporzionalmente." : "Display size of the logo; width adapts proportionally."}
-                            autoComplete="off"
                           />
                           <div style={{ marginTop: 8, marginBottom: 14 }}>
                             <button
@@ -1205,10 +1199,12 @@ export default function StylesPage() {
                             ].map(({ k, label: pl }) => (
                               <div key={k}>
                                 <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>{pl}</div>
-                                <input
-                                  type="number" min={0} max={80} step={1}
+                                <NumericInput
                                   value={dev[k] ?? 0}
-                                  onChange={(e) => updateDev({ [k]: Math.max(0, Math.min(80, Number(e.target.value) || 0)) })}
+                                  min={0}
+                                  max={80}
+                                  fallback={0}
+                                  onChange={(n) => updateDev({ [k]: n })}
                                   style={{ width: "100%", padding: "6px 8px", border: "1.5px solid #d1d5db", borderRadius: 6, fontSize: 13, textAlign: "center", boxSizing: "border-box" }}
                                 />
                               </div>
@@ -1295,53 +1291,56 @@ export default function StylesPage() {
                   />
                 </div>
                 <div style={{ width: 100 }}>
-                  <TextField
+                  <NumericTextField
                     label={locale === "tr" ? "Masaüstü (px)" : locale === "de" ? "Desktop (px)" : "Desktop (px)"}
-                    type="number"
-                    value={String(styles?.bestseller_badge?.badge_width || 80)}
-                    onChange={(v) =>
+                    value={styles?.bestseller_badge?.badge_width ?? 80}
+                    min={10}
+                    max={400}
+                    fallback={80}
+                    onChange={(n) =>
                       setStyles((prev) => ({
                         ...prev,
-                        bestseller_badge: { ...(prev.bestseller_badge || {}), badge_width: Math.max(10, Number(v) || 80) },
+                        bestseller_badge: { ...(prev.bestseller_badge || {}), badge_width: n },
                       }))
                     }
-                    autoComplete="off"
                   />
                 </div>
                 <div style={{ width: 100 }}>
-                  <TextField
+                  <NumericTextField
                     label={locale === "tr" ? "Tablet (px)" : "Tablet (px)"}
-                    type="number"
                     placeholder={String(styles?.bestseller_badge?.badge_width || 80)}
-                    value={styles?.bestseller_badge?.badge_width_tablet != null ? String(styles.bestseller_badge.badge_width_tablet) : ""}
-                    onChange={(v) =>
+                    value={styles?.bestseller_badge?.badge_width_tablet ?? null}
+                    min={10}
+                    max={400}
+                    allowEmpty
+                    onChange={(n) =>
                       setStyles((prev) => ({
                         ...prev,
                         bestseller_badge: {
                           ...(prev.bestseller_badge || {}),
-                          badge_width_tablet: v.trim() === "" ? null : Math.max(10, Number(v) || 80),
+                          badge_width_tablet: n,
                         },
                       }))
                     }
-                    autoComplete="off"
                   />
                 </div>
                 <div style={{ width: 100 }}>
-                  <TextField
+                  <NumericTextField
                     label={locale === "tr" ? "Mobil (px)" : locale === "de" ? "Mobil (px)" : "Mobile (px)"}
-                    type="number"
                     placeholder={String(styles?.bestseller_badge?.badge_width_tablet || styles?.bestseller_badge?.badge_width || 80)}
-                    value={styles?.bestseller_badge?.badge_width_mobile != null ? String(styles.bestseller_badge.badge_width_mobile) : ""}
-                    onChange={(v) =>
+                    value={styles?.bestseller_badge?.badge_width_mobile ?? null}
+                    min={10}
+                    max={400}
+                    allowEmpty
+                    onChange={(n) =>
                       setStyles((prev) => ({
                         ...prev,
                         bestseller_badge: {
                           ...(prev.bestseller_badge || {}),
-                          badge_width_mobile: v.trim() === "" ? null : Math.max(10, Number(v) || 80),
+                          badge_width_mobile: n,
                         },
                       }))
                     }
-                    autoComplete="off"
                   />
                 </div>
                 <Button size="slim" onClick={() => setBrandingPickerTarget("bestseller_badge_image")}>{locale === "de" ? "Aus Medien" : locale === "tr" ? "Medyadan seç" : locale === "fr" ? "Depuis les médias" : locale === "es" ? "Desde medios" : locale === "it" ? "Da media" : "From media"}</Button>
@@ -1408,53 +1407,57 @@ export default function StylesPage() {
                 />
               ) : null}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-                <TextField
+                <NumericTextField
                   label={locale === "de" ? "Breite (px)" : "Width (px)"}
-                  type="number"
-                  value={String(styles?.made_in_europe_badge?.width ?? 88)}
-                  onChange={(v) =>
+                  value={styles?.made_in_europe_badge?.width ?? 88}
+                  min={1}
+                  max={400}
+                  fallback={88}
+                  onChange={(n) =>
                     setStyles((prev) => ({
                       ...prev,
-                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), width: Number(v) || 88 },
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), width: n },
                     }))
                   }
-                  autoComplete="off"
                 />
-                <TextField
+                <NumericTextField
                   label={locale === "de" ? "Höhe (px)" : "Height (px)"}
-                  type="number"
-                  value={String(styles?.made_in_europe_badge?.height ?? 32)}
-                  onChange={(v) =>
+                  value={styles?.made_in_europe_badge?.height ?? 32}
+                  min={1}
+                  max={400}
+                  fallback={32}
+                  onChange={(n) =>
                     setStyles((prev) => ({
                       ...prev,
-                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), height: Number(v) || 32 },
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), height: n },
                     }))
                   }
-                  autoComplete="off"
                 />
-                <TextField
+                <NumericTextField
                   label={locale === "de" ? "Abstand links (px)" : locale === "tr" ? "Sol boşluk (px)" : locale === "fr" ? "Marge gauche (px)" : locale === "es" ? "Margen izquierdo (px)" : locale === "it" ? "Margine sinistro (px)" : "Left offset (px)"}
-                  type="number"
-                  value={String(styles?.made_in_europe_badge?.offset_left ?? 10)}
-                  onChange={(v) =>
+                  value={styles?.made_in_europe_badge?.offset_left ?? 10}
+                  min={0}
+                  max={400}
+                  fallback={0}
+                  onChange={(n) =>
                     setStyles((prev) => ({
                       ...prev,
-                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), offset_left: Number(v) || 0 },
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), offset_left: n },
                     }))
                   }
-                  autoComplete="off"
                 />
-                <TextField
+                <NumericTextField
                   label={locale === "de" ? "Abstand unten (px)" : locale === "tr" ? "Alt boşluk (px)" : locale === "fr" ? "Marge bas (px)" : locale === "es" ? "Margen inferior (px)" : locale === "it" ? "Margine inferiore (px)" : "Bottom offset (px)"}
-                  type="number"
-                  value={String(styles?.made_in_europe_badge?.offset_bottom ?? 10)}
-                  onChange={(v) =>
+                  value={styles?.made_in_europe_badge?.offset_bottom ?? 10}
+                  min={0}
+                  max={400}
+                  fallback={0}
+                  onChange={(n) =>
                     setStyles((prev) => ({
                       ...prev,
-                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), offset_bottom: Number(v) || 0 },
+                      made_in_europe_badge: { ...(prev.made_in_europe_badge || {}), offset_bottom: n },
                     }))
                   }
-                  autoComplete="off"
                 />
               </div>
             </BlockStack>
@@ -1632,19 +1635,15 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("topbar", "display_mode", v)}
                   disabled={!styles.topbar.enabled}
                 />
-                <TextField
+                <NumericTextField
                   label={c.carouselInterval}
-                  type="number"
+                  value={styles.topbar.carousel_interval_sec ?? 5}
                   min={2}
                   max={120}
-                  value={String(styles.topbar.carousel_interval_sec ?? 5)}
-                  onChange={(v) => {
-                    const n = Math.min(120, Math.max(2, parseInt(v, 10) || 5));
-                    updateSection("topbar", "carousel_interval_sec", n);
-                  }}
+                  fallback={5}
                   disabled={!styles.topbar.enabled || styles.topbar.display_mode !== "carousel"}
                   helpText={c.carouselIntervalHelp}
-                  autoComplete="off"
+                  onChange={(n) => updateSection("topbar", "carousel_interval_sec", n)}
                 />
               </div>
               <Banner tone="info">
@@ -1840,18 +1839,14 @@ export default function StylesPage() {
                     value={String(styles.header.bg_gradient_angle ?? 135)}
                     onChange={(v) => updateSection("header", "bg_gradient_angle", Number(v))}
                   />
-                  <TextField
+                  <NumericTextField
                     label={c.gradientIntensity}
-                    type="number"
+                    value={styles.header.bg_gradient_intensity ?? 75}
                     min={0}
                     max={100}
-                    value={String(styles.header.bg_gradient_intensity ?? 75)}
-                    onChange={(v) => {
-                      const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
-                      updateSection("header", "bg_gradient_intensity", n);
-                    }}
+                    fallback={0}
                     helpText={c.gradientIntensityHelp}
-                    autoComplete="off"
+                    onChange={(n) => updateSection("header", "bg_gradient_intensity", n)}
                   />
                 </>
               ) : null}
@@ -2016,17 +2011,13 @@ export default function StylesPage() {
                     value={String(headerScopeOverride.bg_gradient_angle ?? 135)}
                     onChange={(v) => updateHeaderScopeField("bg_gradient_angle", Number(v))}
                   />
-                  <TextField
+                  <NumericTextField
                     label={c.gradientIntensity}
-                    type="number"
+                    value={headerScopeOverride.bg_gradient_intensity ?? 75}
                     min={0}
                     max={100}
-                    value={String(headerScopeOverride.bg_gradient_intensity ?? 75)}
-                    onChange={(v) => {
-                      const n = Math.min(100, Math.max(0, parseInt(v, 10) || 0));
-                      updateHeaderScopeField("bg_gradient_intensity", n);
-                    }}
-                    autoComplete="off"
+                    fallback={0}
+                    onChange={(n) => updateHeaderScopeField("bg_gradient_intensity", n)}
                   />
                 </>
               ) : null}

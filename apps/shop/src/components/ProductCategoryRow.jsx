@@ -13,7 +13,8 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
-import BestsellerBadge, { useBestsellerBadgeWidth } from "@/components/BestsellerBadge";
+import BestsellerBadge from "@/components/BestsellerBadge";
+import { SaleBadgeImageCorner } from "@/components/SaleBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
 import { StarRating } from "@/components/ProductCard";
@@ -195,7 +196,6 @@ function atcLabel(tp, adding, oos, soon, unavail) {
 }
 
 export function ProductCategoryRow({ product, activeFilters = {} }) {
-  const bestsellerWidth = useBestsellerBadgeWidth();
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -377,6 +377,9 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
             <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
           </div>
         ) : null}
+        {hasSale && !isComingSoon && (
+          <SaleBadgeImageCorner inset={6}>{tp("sale")}</SaleBadgeImageCorner>
+        )}
       </ImgCol>
       <Content>
         {productUrl ? <Title href={productUrl}>{displayTitle}</Title> : <span style={{ fontSize: 16, fontWeight: 600 }}>{displayTitle}</span>}
@@ -388,18 +391,6 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
         <TagRow>
           {isBestseller && !isComingSoon && <BestsellerBadge />}
           {isComingSoon && <Tag>{tp("comingSoon")}</Tag>}
-          {hasSale && !isComingSoon && (
-            <Tag
-              $sale
-              style={
-                isBestseller && bestsellerWidth != null
-                  ? { width: bestsellerWidth, height: Math.max(24, Math.round(bestsellerWidth * 0.55)), padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }
-                  : undefined
-              }
-            >
-              {tp("sale")}
-            </Tag>
-          )}
           {isNew && !hasSale && !isComingSoon && <Tag>{tp("new")}</Tag>}
           {lowStockText && !isComingSoon && <Tag $mut>{lowStockText}</Tag>}
           {shippingUnavailable && !isComingSoon && <Tag $mut>{tp("notAvailable")}</Tag>}

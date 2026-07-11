@@ -1355,6 +1355,12 @@ export default function ShopHeader() {
     isNarrowViewport &&
     scrollPastThreshold &&
     String(mc.header_on_scroll || "") !== "inherit";
+  /**
+   * Sayfa en üstündeyken navbar + second nav tek yüzey (homepage landing ile aynı).
+   * Kaydırınca / buzlu scroll modunda second nav kendi rengine döner.
+   */
+  const unifiedHeaderAtTop =
+    showHeaderFilterBar && !mobileFrostedScrollActive && !scrollPastThreshold;
 
   /** Theme JSON link_style_* per breakpoint; Landing kann Desktop auf klassisch erzwingen */
   const secondNavUsePillClass = useMemo(() => {
@@ -1518,9 +1524,7 @@ export default function ShopHeader() {
       <HeaderWrap
         ref={headerRef}
         data-mobile-compact={narrowCompactProgress > 0.5 ? "true" : "false"}
-        data-landing-header-chrome={
-          isNarrowViewport && landingHeaderBg && !mobileFrostedScrollActive ? "true" : undefined
-        }
+        data-unified-header-chrome={unifiedHeaderAtTop ? "true" : undefined}
         style={{
           transform: `translateY(-${desktopHeaderHideProgress * 100}%)`,
           zIndex: localeDropdownOpen ? 2147483650 : undefined,
@@ -1535,12 +1539,18 @@ export default function ShopHeader() {
                 WebkitBackdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
                 "--narrow-header-safe-fill": mc.frosted_bg || computedHeaderSolidColor,
               }
-            : landingHeaderBg
+            : unifiedHeaderAtTop
               ? {
-                  ...(isNarrowViewport ? { background: landingHeaderBg } : {}),
-                  // Use the solid start-color for the ::before (status-bar strip) so the
-                  // gradient doesn't re-start inside the 44px safe-area slot — seamless bleed.
-                  "--narrow-header-safe-fill": extractSolidTintFromChromeCss(landingHeaderBg, computedHeaderSolidColor),
+                  ...(landingHeaderBg
+                    ? { background: landingHeaderBg }
+                    : !isNarrowViewport
+                      ? { background: "var(--header-chrome-bg)" }
+                      : {}),
+                  "--narrow-header-safe-fill": landingHeaderBg
+                    ? extractSolidTintFromChromeCss(landingHeaderBg, computedHeaderSolidColor)
+                    : headerScopeCssVars?.["--header-chrome-bg"] ||
+                      headerScopeCssVars?.["--header-bg"] ||
+                      computedHeaderSolidColor,
                 }
               : {
                   "--narrow-header-safe-fill":
@@ -1553,7 +1563,7 @@ export default function ShopHeader() {
         <ShopTopBar />
         <HeaderChrome
           className={`shop-header-chrome${
-            isNarrowViewport && landingHeaderBg && !mobileFrostedScrollActive ? " landing-clear" : ""
+            unifiedHeaderAtTop ? " landing-clear" : ""
           }${mobileFrostedScrollActive ? " mobile-frosted-scroll" : ""}`}
           $compactProgress={narrowCompactProgress}
           style={localeDropdownOpen ? { zIndex: 12010 } : undefined}
@@ -1776,8 +1786,11 @@ export default function ShopHeader() {
             id="subnav"
             className="second-nav"
             style={{
-              ...(snChromeCover ? { background: "var(--header-chrome-bg)" } : {}),
-              ...(isNarrowViewport && landingHeaderBg ? { borderTop: "none", borderBottom: "none" } : {}),
+              ...(unifiedHeaderAtTop
+                ? { background: "transparent", borderTop: "none", borderBottom: "none" }
+                : snChromeCover
+                  ? { background: "var(--header-chrome-bg)" }
+                  : {}),
             }}
           >
             <SecondMenuRowInner>

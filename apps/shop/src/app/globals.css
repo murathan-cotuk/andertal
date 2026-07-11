@@ -116,13 +116,19 @@ html {
   }
 }
 
-/* Landing carousel: HeaderWrap inline gradient — topbar şeffaf kalsın ki tek sürekli yüzey olsun */
-@media (max-width: 1023px) {
-  header[data-landing-header-chrome="true"] .topbar {
-    background: transparent !important;
-    box-shadow: none !important;
-    border-bottom: none !important;
-  }
+/*
+ * Unified header (homepage landing + tüm sayfalar en üstte):
+ * gradient yalnızca HeaderWrap'ta — topbar / main bar / second nav şeffaf, arada çizgi yok.
+ */
+header[data-unified-header-chrome="true"] .topbar {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-bottom: none !important;
+}
+
+header[data-unified-header-chrome="true"] .second-nav {
+  background: transparent !important;
+  border: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

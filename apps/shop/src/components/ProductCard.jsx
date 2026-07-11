@@ -15,7 +15,8 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
-import BestsellerBadge, { useBestsellerBadgeWidth } from "@/components/BestsellerBadge";
+import BestsellerBadge from "@/components/BestsellerBadge";
+import { SaleBadgeImageCorner } from "@/components/SaleBadge";
 import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import { isEuOriginVerified } from "@andertal/shop-theme";
@@ -220,7 +221,7 @@ const RankBadge = styled.span`
 
 const WishlistHeartWrap = styled.div`
   position: absolute;
-  top: 8px;
+  top: ${(p) => (p.$saleOffset ? "44px" : "8px")};
   right: 8px;
   z-index: 50;
   pointer-events: auto;
@@ -414,7 +415,6 @@ const MorePill = styled.button`
  * ─────────────────────────────────────────────────────────── */
 
 export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: isBestsellerProp, rank, hideBestsellerBadge = false }) {
-  const bestsellerWidth = useBestsellerBadgeWidth();
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -644,24 +644,16 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             </div>
           )}
           {isComingSoon && <Badge $comingSoon>{tp("comingSoon")}</Badge>}
-          {hasSale && !isComingSoon && (
-            <Badge
-              $sale
-              style={
-                isBestseller && !hideBestsellerBadge && bestsellerWidth != null
-                  ? { width: bestsellerWidth, height: Math.max(24, Math.round(bestsellerWidth * 0.55)), padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }
-                  : undefined
-              }
-            >
-              Sale
-            </Badge>
-          )}
           {isNew && !hasSale && !isComingSoon && <Badge>New</Badge>}
           {shippingUnavailable && !isComingSoon && <Badge $sold>{tp("notAvailable")}</Badge>}
           {outOfStock && !isComingSoon && <Badge $sold>{tp("outOfStock")}</Badge>}
         </Badges>
+        {hasSale && !isComingSoon && (
+          <SaleBadgeImageCorner inset={8}>{tp("sale")}</SaleBadgeImageCorner>
+        )}
         {product?.id && (
           <WishlistHeartWrap
+            $saleOffset={hasSale && !isComingSoon}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             role="presentation"
@@ -968,7 +960,6 @@ const ListBadge = styled.span`
 `;
 
 export function ProductListItem({ product, activeFilters = {}, isBestseller: isBestsellerProp }) {
-  const bestsellerWidth = useBestsellerBadgeWidth();
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -1056,6 +1047,9 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
       <Link href={productUrl} style={{ flexShrink: 0, textDecoration: "none" }}>
         <ListImgWrap>
           {imgSrc ? <img src={imgSrc} alt={displayTitle} loading="lazy" /> : null}
+          {hasSale && !isComingSoon && (
+            <SaleBadgeImageCorner inset={6}>{tp("sale")}</SaleBadgeImageCorner>
+          )}
         </ListImgWrap>
       </Link>
       <ListBody>
@@ -1066,18 +1060,6 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: 1 }}>
           {isBestseller && !isComingSoon && <BestsellerBadge />}
           {isComingSoon && <ListBadge $orange>{tp("comingSoon")}</ListBadge>}
-          {hasSale && !isComingSoon && (
-            <ListBadge
-              $sale
-              style={
-                isBestseller && bestsellerWidth != null
-                  ? { width: bestsellerWidth, height: Math.max(24, Math.round(bestsellerWidth * 0.55)), padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }
-                  : undefined
-              }
-            >
-              Sale
-            </ListBadge>
-          )}
           {outOfStock && !isComingSoon && <ListBadge $gray>{tp("outOfStock")}</ListBadge>}
         </div>
         <ListPriceRow>
