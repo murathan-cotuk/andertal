@@ -101,14 +101,15 @@ const TagRow = styled.div`
 
 const Tag = styled.span`
   display: inline-block;
-  padding: 2px 8px;
+  padding: 4px 9px;
   font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #fff;
-  background: ${(p) => (p.$sale ? "#e53e3e" : p.$mut ? "#6b7280" : "#111")};
-  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  background: ${(p) => (p.$sale ? "#e11d48" : p.$mut ? "#6b7280" : "#18181b")};
+  border-radius: 6px;
 `;
 
 const Prices = styled.div`

@@ -10,17 +10,16 @@ const Badge = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #2a1200 0%, #9a5b00 40%, #fbbf24 100%);
-  border: 1px solid rgba(255, 214, 107, 0.7);
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #18181b;
   color: #fff;
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  box-shadow: 0 6px 16px rgba(180, 83, 9, 0.38), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   white-space: nowrap;
 `;
 
@@ -64,7 +63,7 @@ export default function BestsellerBadge({ children = "Bestseller", className, st
 
   return (
     <Badge className={className} style={style}>
-      <span aria-hidden style={{ fontSize: 10, lineHeight: 1 }}>★</span>
+      <span aria-hidden style={{ fontSize: 9, lineHeight: 1, color: "#fbbf24" }}>★</span>
       {children}
     </Badge>
   );

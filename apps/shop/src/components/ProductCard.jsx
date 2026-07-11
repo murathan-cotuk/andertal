@@ -7,6 +7,7 @@ import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct, htmlToText } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
+import { colorSwatchFallback } from "@/lib/color-swatch";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { enrichVariationGroups } from "@/lib/product-variations";
@@ -227,16 +228,17 @@ const WishlistHeartWrap = styled.div`
 
 const Badge = styled.span`
   display: inline-block;
-  padding: 3px 7px;
+  padding: 5px 9px;
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  border-radius: 3px;
+  border-radius: 6px;
   color: #fff;
   white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   background: ${(p) =>
-    p.$sale ? "#e53e3e" : p.$sold ? "#999" : p.$comingSoon ? "#c2410c" : "#111"};
+    p.$sale ? "#e11d48" : p.$sold ? "#9ca3af" : p.$comingSoon ? "#c2410c" : "#18181b"};
 `;
 
 /* Info block below image — flex: 1 so all cards in a row share the same height */
@@ -710,6 +712,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                 const opts = isExpanded ? allOpts : allOpts.slice(0, MAX_OPTS);
                 const extra = isExpanded ? 0 : Math.max(0, allOpts.length - MAX_OPTS);
                 const pMeta = product.metadata || {};
+                const isSwatchGroup = allOpts.some((o) => typeof o === "object" && o.swatch_image);
                 return (
                   <VGroupRow key={gIdx}>
                     <VGroupLabel>{variationGroupDisplayName(group, gIdx, pMeta, locale) || group.name}</VGroupLabel>
@@ -730,7 +733,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                             key={oIdx}
                             $on={isOn}
                             $outOfStock={!hasStock}
-                            $swatch={!!swatchUrl}
+                            $swatch={isSwatchGroup}
                             type="button"
                             title={displayStr}
                             onClick={(e) => {
@@ -738,8 +741,30 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                               setSelectedOpts((prev) => ({ ...prev, [gIdx]: val }));
                             }}
                           >
-                            {swatchUrl ? (
-                              <img src={swatchUrl} alt={displayStr} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
+                            {isSwatchGroup ? (
+                              <>
+                                {swatchUrl && (
+                                  <img
+                                    src={swatchUrl}
+                                    alt={displayStr}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = "none";
+                                      const fallback = e.currentTarget.nextSibling;
+                                      if (fallback) fallback.style.display = "block";
+                                    }}
+                                  />
+                                )}
+                                <span
+                                  style={{
+                                    display: swatchUrl ? "none" : "block",
+                                    width: "100%",
+                                    height: "100%",
+                                    borderRadius: "50%",
+                                    background: colorSwatchFallback(val),
+                                  }}
+                                />
+                              </>
                             ) : displayStr}
                           </Pill>
                         );
@@ -932,12 +957,14 @@ const ListCartBtn = styled.button`
 
 const ListBadge = styled.span`
   display: inline-block;
-  padding: 2px 6px;
-  font-size: 10px;
+  padding: 4px 8px;
+  font-size: 9.5px;
   font-weight: 700;
-  border-radius: 4px;
+  letter-spacing: 0.03em;
+  border-radius: 6px;
   color: #fff;
-  background: ${(p) => p.$sale ? "#e53e3e" : p.$gray ? "#9ca3af" : p.$orange ? "#c2410c" : "#15803d"};
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  background: ${(p) => p.$sale ? "#e11d48" : p.$gray ? "#9ca3af" : p.$orange ? "#c2410c" : "#15803d"};
 `;
 
 export function ProductListItem({ product, activeFilters = {}, isBestseller: isBestsellerProp }) {

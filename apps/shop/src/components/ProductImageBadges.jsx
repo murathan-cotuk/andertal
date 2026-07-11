@@ -41,14 +41,15 @@ export default function ProductImageBadges({ isBestseller, hasSale, isComingSoon
             justifyContent: "center",
             ...(matchSize
               ? { width: bestsellerWidth, height: Math.max(24, Math.round(bestsellerWidth * 0.55)), padding: 0 }
-              : { padding: "3px 7px" }),
+              : { padding: "5px 9px" }),
             fontSize: 9,
             fontWeight: 700,
-            letterSpacing: "0.08em",
+            letterSpacing: "0.04em",
             textTransform: "uppercase",
-            borderRadius: 3,
+            borderRadius: 6,
             color: "#fff",
-            background: "#e53e3e",
+            background: "#e11d48",
+            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.18)",
             whiteSpace: "nowrap",
           }}
         >
