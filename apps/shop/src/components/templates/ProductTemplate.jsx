@@ -10,6 +10,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct, getLocalizedCategory } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
+import { colorSwatchFallback } from "@/lib/color-swatch";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
@@ -1511,7 +1512,7 @@ export default function ProductTemplate() {
                         />
                       ) : null}
                       <span
-                        style={{ display: swatchUrl ? "none" : "block", width: "100%", height: "100%", borderRadius: "50%", background: valueStr.toLowerCase() }}
+                        style={{ display: swatchUrl ? "none" : "block", width: "100%", height: "100%", borderRadius: "50%", background: colorSwatchFallback(valueStr) }}
                       />
                     </VarSwatch>
                   );

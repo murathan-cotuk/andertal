@@ -27,6 +27,7 @@ import {
 } from "@shopify/polaris";
 import { ProductIcon, MenuHorizontalIcon, ViewIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { resolveImageUrl } from "@/lib/image-url";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
 import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
@@ -1719,7 +1720,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   };
   const resolveMediaUrl = (url) => {
     if (!url) return "";
-    return url.startsWith("http") || url.startsWith("data:") ? url : `${baseUrl.replace(/\/$/, "")}${url.startsWith("/") ? "" : "/"}${url}`;
+    if (url.startsWith("data:")) return url;
+    // Delegate to the shared resolver: rewrites /uploads/ paths from any past
+    // backend hostname to the current one, instead of returning old-domain
+    // URLs verbatim (this used to just pass http(s) URLs through unchanged).
+    return resolveImageUrl(url) || url;
   };
 
   const productFiles = useMemo(() => {
@@ -2868,7 +2873,19 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       {matrixRows.map((v, vi) => {
                         const isOpen = expandedVariantIndex === vi;
                         const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
-                        const thumbUrl = variantImgs[0] ? resolveMediaUrl(variantImgs[0]) : null;
+                        // Images added via the full Variant Edit page (Open →) are saved to
+                        // image_url (de) / image_urls[locale], a separate field from this
+                        // matrix's own metadata.media gallery. Fall back to it here so those
+                        // images are visible instead of showing an empty "+" thumbnail.
+                        const localeVariantImg =
+                          String(locale).toLowerCase() === "de"
+                            ? v.image_url || ""
+                            : v.image_urls?.[locale] || v.image_url || "";
+                        const thumbUrl = variantImgs[0]
+                          ? resolveMediaUrl(variantImgs[0])
+                          : localeVariantImg
+                            ? resolveMediaUrl(localeVariantImg)
+                            : null;
                         const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
                         const mkDraftKey = (f) => `${vkey}_${f}`;
                         const priceFields = [
@@ -2940,6 +2957,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                 <div>
                                   <div className="vm-sub-label">Images</div>
                                   <div className="vm-img-strip">
+                                    {variantImgs.length === 0 && localeVariantImg && (
+                                      <div className="vm-img-item" title="Added via the full Variant Edit page (Open →) — manage it there">
+                                        <img src={resolveMediaUrl(localeVariantImg)} alt="" />
+                                      </div>
+                                    )}
                                     {variantImgs.map((imgUrl, imgIdx) => (
                                       <div key={imgIdx} className="vm-img-item">
                                         <img src={resolveMediaUrl(imgUrl)} alt="" />

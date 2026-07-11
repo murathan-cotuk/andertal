@@ -1276,6 +1276,9 @@ export default function StylesPage() {
               <Text as="p" variant="bodySm" tone="subdued">
                 {locale === "tr" ? "Özel bir görsel eklendiğinde, tüm etiket bu görselle değiştirilir — arka plan olmadan. PNG veya SVG (şeffaf arka plan önerilir)." : locale === "de" ? "Eigenes Bild für das Bestseller-Etikett — ersetzt das gesamte Etikett ohne Hintergrund. PNG oder SVG (transparenter Hintergrund empfohlen)." : locale === "fr" ? "Image personnalisée pour l'étiquette Bestseller — remplace l'étiquette entière sans fond. PNG ou SVG (fond transparent recommandé)." : locale === "es" ? "Imagen personalizada para la etiqueta Bestseller — reemplaza la etiqueta completa sin fondo. PNG o SVG (fondo transparente recomendado)." : locale === "it" ? "Immagine personalizzata per il badge Bestseller — sostituisce l'intero badge senza sfondo. PNG o SVG (sfondo trasparente consigliato)." : "Custom image for the bestseller badge — replaces the entire badge with no background. PNG or SVG (transparent background recommended)."}
               </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {locale === "tr" ? "Tablet/Mobil boş bırakılırsa bir üstteki (daha geniş) değer kullanılır." : locale === "de" ? "Wenn Tablet/Mobil leer bleibt, wird der nächstgrößere Wert verwendet." : locale === "fr" ? "Si Tablette/Mobile est vide, la valeur du point de rupture plus large est utilisée." : locale === "es" ? "Si Tablet/Móvil está vacío, se usa el valor del punto de ruptura más ancho." : locale === "it" ? "Se Tablet/Mobile è vuoto, viene usato il valore del breakpoint più largo." : "If Tablet/Mobile is left empty, the next wider breakpoint's value is used."}
+              </Text>
               <InlineStack gap="200" blockAlign="end" wrap>
                 <div style={{ flex: 1, minWidth: 280 }}>
                   <TextField
@@ -1293,13 +1296,49 @@ export default function StylesPage() {
                 </div>
                 <div style={{ width: 100 }}>
                   <TextField
-                    label={locale === "tr" ? "Genişlik (px)" : locale === "de" ? "Breite (px)" : "Width (px)"}
+                    label={locale === "tr" ? "Masaüstü (px)" : locale === "de" ? "Desktop (px)" : "Desktop (px)"}
                     type="number"
                     value={String(styles?.bestseller_badge?.badge_width || 80)}
                     onChange={(v) =>
                       setStyles((prev) => ({
                         ...prev,
                         bestseller_badge: { ...(prev.bestseller_badge || {}), badge_width: Math.max(10, Number(v) || 80) },
+                      }))
+                    }
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{ width: 100 }}>
+                  <TextField
+                    label={locale === "tr" ? "Tablet (px)" : "Tablet (px)"}
+                    type="number"
+                    placeholder={String(styles?.bestseller_badge?.badge_width || 80)}
+                    value={styles?.bestseller_badge?.badge_width_tablet != null ? String(styles.bestseller_badge.badge_width_tablet) : ""}
+                    onChange={(v) =>
+                      setStyles((prev) => ({
+                        ...prev,
+                        bestseller_badge: {
+                          ...(prev.bestseller_badge || {}),
+                          badge_width_tablet: v.trim() === "" ? null : Math.max(10, Number(v) || 80),
+                        },
+                      }))
+                    }
+                    autoComplete="off"
+                  />
+                </div>
+                <div style={{ width: 100 }}>
+                  <TextField
+                    label={locale === "tr" ? "Mobil (px)" : locale === "de" ? "Mobil (px)" : "Mobile (px)"}
+                    type="number"
+                    placeholder={String(styles?.bestseller_badge?.badge_width_tablet || styles?.bestseller_badge?.badge_width || 80)}
+                    value={styles?.bestseller_badge?.badge_width_mobile != null ? String(styles.bestseller_badge.badge_width_mobile) : ""}
+                    onChange={(v) =>
+                      setStyles((prev) => ({
+                        ...prev,
+                        bestseller_badge: {
+                          ...(prev.bestseller_badge || {}),
+                          badge_width_mobile: v.trim() === "" ? null : Math.max(10, Number(v) || 80),
+                        },
                       }))
                     }
                     autoComplete="off"

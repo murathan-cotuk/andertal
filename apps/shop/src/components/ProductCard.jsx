@@ -14,7 +14,7 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
-import BestsellerBadge from "@/components/BestsellerBadge";
+import BestsellerBadge, { useBestsellerBadgeWidth } from "@/components/BestsellerBadge";
 import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import { isEuOriginVerified } from "@andertal/shop-theme";
@@ -412,6 +412,7 @@ const MorePill = styled.button`
  * ─────────────────────────────────────────────────────────── */
 
 export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: isBestsellerProp, rank, hideBestsellerBadge = false }) {
+  const bestsellerWidth = useBestsellerBadgeWidth();
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -641,7 +642,18 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             </div>
           )}
           {isComingSoon && <Badge $comingSoon>{tp("comingSoon")}</Badge>}
-          {hasSale && !isComingSoon && <Badge $sale>Sale</Badge>}
+          {hasSale && !isComingSoon && (
+            <Badge
+              $sale
+              style={
+                isBestseller && !hideBestsellerBadge && bestsellerWidth != null
+                  ? { width: bestsellerWidth, height: Math.max(24, Math.round(bestsellerWidth * 0.55)), padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }
+                  : undefined
+              }
+            >
+              Sale
+            </Badge>
+          )}
           {isNew && !hasSale && !isComingSoon && <Badge>New</Badge>}
           {shippingUnavailable && !isComingSoon && <Badge $sold>{tp("notAvailable")}</Badge>}
           {outOfStock && !isComingSoon && <Badge $sold>{tp("outOfStock")}</Badge>}
@@ -929,6 +941,7 @@ const ListBadge = styled.span`
 `;
 
 export function ProductListItem({ product, activeFilters = {}, isBestseller: isBestsellerProp }) {
+  const bestsellerWidth = useBestsellerBadgeWidth();
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -1023,10 +1036,21 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
           <ListName>{displayTitle}</ListName>
         </Link>
         {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 1 }}>
-          {isBestseller && !isComingSoon && <ListBadge>★ Bestseller</ListBadge>}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: 1 }}>
+          {isBestseller && !isComingSoon && <BestsellerBadge />}
           {isComingSoon && <ListBadge $orange>{tp("comingSoon")}</ListBadge>}
-          {hasSale && !isComingSoon && <ListBadge $sale>Sale</ListBadge>}
+          {hasSale && !isComingSoon && (
+            <ListBadge
+              $sale
+              style={
+                isBestseller && bestsellerWidth != null
+                  ? { width: bestsellerWidth, height: Math.max(24, Math.round(bestsellerWidth * 0.55)), padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }
+                  : undefined
+              }
+            >
+              Sale
+            </ListBadge>
+          )}
           {outOfStock && !isComingSoon && <ListBadge $gray>{tp("outOfStock")}</ListBadge>}
         </div>
         <ListPriceRow>

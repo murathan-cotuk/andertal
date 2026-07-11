@@ -14,3 +14,24 @@ export function isBestsellerMetadata(metadata) {
     String(metadata.badge || "").toLowerCase().trim() === "bestseller"
   );
 }
+
+/**
+ * Configured bestseller badge width (px) for a viewport band, with a
+ * mobile → tablet → desktop fallback chain so leaving Tablet/Mobile empty
+ * in Sellercentral just inherits the next wider breakpoint's value.
+ */
+export function bestsellerBadgeWidthForBand(bestsellerBadge, band) {
+  const b = bestsellerBadge || {};
+  const desktop = Number(b.badge_width) || 80;
+  const tablet =
+    b.badge_width_tablet != null && b.badge_width_tablet !== ""
+      ? Number(b.badge_width_tablet) || desktop
+      : desktop;
+  const mobile =
+    b.badge_width_mobile != null && b.badge_width_mobile !== ""
+      ? Number(b.badge_width_mobile) || tablet
+      : tablet;
+  if (band === "mobile") return mobile;
+  if (band === "tablet") return tablet;
+  return desktop;
+}
