@@ -39,7 +39,7 @@ import {
 } from "@/context/MobileBottomNavScrollContext";
 import { getShippableCountries } from "@/lib/countries";
 import { menuItemHref } from "@/lib/shop-menu-href";
-import { buildHeaderSurfaceCssVarsFromRoute } from "@andertal/shop-theme";
+import { buildHeaderSurfaceCssVarsFromRoute, effectiveGradientEnabled } from "@andertal/shop-theme";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
@@ -1356,11 +1356,24 @@ export default function ShopHeader() {
     scrollPastThreshold &&
     String(mc.header_on_scroll || "") !== "inherit";
   /**
-   * Sayfa en üstündeyken navbar + second nav tek yüzey (homepage landing ile aynı).
-   * Kaydırınca / buzlu scroll modunda second nav kendi rengine döner.
+   * Sayfa en üstündeyken navbar + second nav tek yüzey (homepage landing veya header gradyanı).
+   * Düz/solid header'da second nav kendi arka planını korur.
    */
+  const headerGradientAnyViewport = useMemo(() => {
+    const h = shopStyles?.header;
+    if (!h) return false;
+    return (
+      effectiveGradientEnabled(h, "mobile") ||
+      effectiveGradientEnabled(h, "tablet") ||
+      effectiveGradientEnabled(h, "desktop")
+    );
+  }, [shopStyles?.header]);
+
   const unifiedHeaderAtTop =
-    showHeaderFilterBar && !mobileFrostedScrollActive && !scrollPastThreshold;
+    showHeaderFilterBar &&
+    !mobileFrostedScrollActive &&
+    !scrollPastThreshold &&
+    (landingHeaderBg || headerGradientAnyViewport);
 
   /** Theme JSON link_style_* per breakpoint; Landing kann Desktop auf klassisch erzwingen */
   const secondNavUsePillClass = useMemo(() => {

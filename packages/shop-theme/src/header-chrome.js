@@ -18,6 +18,14 @@ function normalizeHexInput(hex) {
   return "#ffffff";
 }
 
+/** Preserves transparent / rgb(a) — not forced through hex normalization. */
+function isNonHexCssColor(val) {
+  const s = String(val ?? "").trim().toLowerCase();
+  if (!s) return false;
+  if (s === "transparent") return true;
+  return s.startsWith("rgb(") || s.startsWith("rgba(");
+}
+
 function hexToRgb(hex) {
   const s = normalizeHexInput(hex).slice(1);
   const n = parseInt(s, 16);
@@ -106,19 +114,24 @@ export function resolveHeaderStringsForCss(header, primary) {
  */
 export function buildHeaderChromeBackground(header, primary) {
   const baseRaw = replacePrimaryInString(String(header?.bg_color ?? "#ffffff"), primary);
-  const base = normalizeHexInput(baseRaw);
+  const baseSpecial = isNonHexCssColor(baseRaw);
+  const base = baseSpecial ? baseRaw.trim() : normalizeHexInput(baseRaw);
   let layer;
   if (!isGradientEnabled(header)) {
     layer = base;
   } else {
     const endRaw = replacePrimaryInString(String(header?.bg_gradient_end ?? base), primary);
-    const end = normalizeHexInput(endRaw);
+    const endSpecial = isNonHexCssColor(endRaw);
+    const end = endSpecial ? endRaw.trim() : normalizeHexInput(endRaw);
     let angle = Number(header?.bg_gradient_angle);
     if (!Number.isFinite(angle)) angle = 135;
     let intenPct = Number(header?.bg_gradient_intensity);
     if (!Number.isFinite(intenPct)) intenPct = 75;
     const t = Math.min(1, Math.max(0, intenPct / 100));
-    const mixedEnd = mixHexColors(base, end, t);
+    const mixedEnd =
+      baseSpecial || endSpecial
+        ? end
+        : mixHexColors(base, end, t);
     layer = `linear-gradient(${angle}deg, ${base} 0%, ${mixedEnd} 100%)`;
   }
   const img = String(header?.bg_image_url ?? "").trim();

@@ -24,6 +24,10 @@ export {
 } from "./typography-fonts.js";
 export { buildSecondNavSurfacesByViewport } from "./second-nav-vars.js";
 export {
+  resolveEffectiveLayoutSurfaces,
+  applyUnifiedNavbarPreset,
+} from "./styles-admin-preview.js";
+export {
   applyLayoutPresets,
   TOPBAR_PRESET_LABELS,
   HEADER_PRESET_LABELS,

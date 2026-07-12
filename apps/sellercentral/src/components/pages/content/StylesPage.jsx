@@ -25,6 +25,8 @@ import {
   normalizeButtonType,
   DEFAULT_BUTTON_COLORS,
   effectiveGradientEnabled,
+  resolveEffectiveLayoutSurfaces,
+  applyUnifiedNavbarPreset,
 } from "@andertal/shop-theme";
 
 /** Button color field labels (keys as in DEFAULT_BUTTON_COLORS). */
@@ -96,6 +98,13 @@ function clampAlphaChannel(x) {
   const n = Number(x);
   if (Number.isNaN(n)) return 1;
   return Math.max(0, Math.min(1, n));
+}
+
+function fieldEffectiveHelp(c, rawValue, effective) {
+  if (String(rawValue ?? "").trim() !== "") return undefined;
+  const eff = String(effective ?? "").trim();
+  if (!eff) return undefined;
+  return `${c.effectiveInShop}: ${eff.length > 96 ? `${eff.slice(0, 93)}…` : eff}`;
 }
 
 /** Nur Hex oder rgb/rgba — komplexes CSS (Gradient) nicht als Farbe zu parsen */
@@ -988,6 +997,15 @@ export default function StylesPage() {
     );
   }, [headerScopeOverride]);
 
+  const effectiveLayout = useMemo(
+    () => resolveEffectiveLayoutSurfaces(styles),
+    [styles],
+  );
+
+  const applyUnifiedNavbar = useCallback(() => {
+    setStyles((prev) => applyUnifiedNavbarPreset(prev));
+  }, []);
+
   const updateHeaderScopeField = (key, val) => {
     setStyles((prev) => {
       const header = prev.header || {};
@@ -1099,6 +1117,11 @@ export default function StylesPage() {
             <Banner tone="success" onDismiss={() => setSavedMsg("")}>{savedMsg}</Banner>
           </Layout.Section>
         )}
+        <Layout.Section>
+          <Banner tone="info">
+            <p>{c.stylesLoadHint}</p>
+          </Banner>
+        </Layout.Section>
         {isSuperuser && (
           <AccordionCard title="Homepage SEO (Meta)" subtitle={locale === "de" ? "Browser-Titel und Meta-Beschreibung der Startseite" : locale === "tr" ? "Ana sayfanın tarayıcı başlığı ve meta açıklaması" : locale === "fr" ? "Titre du navigateur et méta-description de la page d'accueil" : locale === "es" ? "Título del navegador y meta-descripción de la página de inicio" : locale === "it" ? "Titolo del browser e meta-descrizione della home page" : "Browser title and meta description of the home page"}>
             <BlockStack gap="300">
@@ -1809,6 +1832,16 @@ export default function StylesPage() {
         {/* Header / Navbar */}
         <AccordionCard title="Layout: Header / Navbar">
           <BlockStack gap="400">
+            <Banner tone="warning">
+              <BlockStack gap="200">
+                <p>{c.unifiedNavbarPresetHelp}</p>
+                <div>
+                  <Button size="slim" onClick={applyUnifiedNavbar}>
+                    {c.applyUnifiedNavbarPreset}
+                  </Button>
+                </div>
+              </BlockStack>
+            </Banner>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
               <Select
                 label={c.stylePreset}
@@ -1820,6 +1853,7 @@ export default function StylesPage() {
                 label={c.headerBgColorGradientStart}
                 value={styles.header.bg_color}
                 onChange={(v) => updateSection("header", "bg_color", v)}
+                helpText={fieldEffectiveHelp(c, styles.header.bg_color, effectiveLayout.headerChrome.desktop)}
               />
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="300">
@@ -2097,7 +2131,10 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("secondNav", "bg_desktop", v)}
                   placeholder={c.emptyFallbackBg}
                   autoComplete="off"
-                  helpText={c.bgExample}
+                  helpText={
+                    fieldEffectiveHelp(c, styles.secondNav.bg_desktop, effectiveLayout.secondNav.desktop.bg) ||
+                    c.bgExample
+                  }
                 />
                 <TextField
                   label={c.desktopBorderCss}
@@ -2105,7 +2142,10 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("secondNav", "border_desktop", v)}
                   placeholder={c.emptyFallbackBorder}
                   autoComplete="off"
-                  helpText={c.borderExample}
+                  helpText={
+                    fieldEffectiveHelp(c, styles.secondNav.border_desktop, effectiveLayout.secondNav.desktop.border) ||
+                    c.borderExample
+                  }
                 />
                 <ColorField
                   label={c.desktopTextColor}
@@ -2125,6 +2165,7 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("secondNav", "bg_tablet", v)}
                   placeholder={c.emptyFallbackBg}
                   autoComplete="off"
+                  helpText={fieldEffectiveHelp(c, styles.secondNav.bg_tablet, effectiveLayout.secondNav.tablet.bg)}
                 />
                 <TextField
                   label={c.tabletBorderCss}
@@ -2132,6 +2173,7 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("secondNav", "border_tablet", v)}
                   placeholder={c.emptyFallbackBorder}
                   autoComplete="off"
+                  helpText={fieldEffectiveHelp(c, styles.secondNav.border_tablet, effectiveLayout.secondNav.tablet.border)}
                 />
                 <ColorField
                   label={c.tabletTextColor}
@@ -2151,6 +2193,7 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("secondNav", "bg_mobile", v)}
                   placeholder={c.emptyFallbackBg}
                   autoComplete="off"
+                  helpText={fieldEffectiveHelp(c, styles.secondNav.bg_mobile, effectiveLayout.secondNav.mobile.bg)}
                 />
                 <TextField
                   label={c.mobileBorderCss}
@@ -2158,6 +2201,7 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("secondNav", "border_mobile", v)}
                   placeholder={c.emptyFallbackBorder}
                   autoComplete="off"
+                  helpText={fieldEffectiveHelp(c, styles.secondNav.border_mobile, effectiveLayout.secondNav.mobile.border)}
                 />
                 <ColorField
                   label={c.mobileTextColor}

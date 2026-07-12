@@ -73,6 +73,39 @@ export function getStylesPageCopy(locale) {
       { value: "accent_line", label: t("Accent line bottom", "Alt vurgu çizgisi", "Ligne d'accent en bas", "Línea de acento inferior", "Linea accento in basso", "Akzent-Linie unten") },
     ],
 
+  effectiveInShop: t(
+    "Effective in shop",
+    "Mağazada uygulanan",
+    "Effectif dans la boutique",
+    "Efectivo en la tienda",
+    "Effettivo nel negozio",
+    "Im Shop wirksam"
+  ),
+  applyUnifiedNavbarPreset: t(
+    "Apply unified navbar preset",
+    "Birleşik navbar şablonunu uygula",
+    "Appliquer le preset navbar unifié",
+    "Aplicar preset navbar unificado",
+    "Applica preset navbar unificato",
+    "Einheitliches Navbar-Preset anwenden"
+  ),
+  unifiedNavbarPresetHelp: t(
+    "Transparent gradient header (navbar + second nav seamless at top), second nav #f9fafb when scrolling up, frosted white header on scroll down.",
+    "Şeffaf gradyan header (en üstte navbar + second nav tek parça), yukarı kaydırınca second nav #f9fafb, aşağı kaydırınca buzlu beyaz header.",
+    "En-tête dégradé transparent (navbar + second nav unifiés en haut), second nav #f9fafb au scroll vers le haut, header blanc givré en scroll bas.",
+    "Cabecera degradado transparente (navbar + second nav unidos arriba), second nav #f9fafb al subir, header blanco escarchado al bajar.",
+    "Header gradiente trasparente (navbar + second nav uniti in alto), second nav #f9fafb scroll su, header bianco satinato scroll giù.",
+    "Transparenter Verlauf-Header (Navbar + Second Nav oben nahtlos), Second Nav #f9fafb beim Hochscrollen, milchiger Header beim Runterscrollen."
+  ),
+  stylesLoadHint: t(
+    "Fields left empty inherit defaults or style presets. Use “Effective in shop” hints below each field. If your customization was lost after a backend outage, apply the unified navbar preset and save.",
+    "Boş alanlar varsayılanları veya stil şablonlarını kullanır. Her alanın altındaki “Mağazada uygulanan” ipuçlarına bakın. Backend kesintisinden sonra özelleştirmeler kaybolduysa birleşik navbar şablonunu uygulayıp kaydedin.",
+    "Les champs vides héritent des défauts ou presets. Voir « Effectif dans la boutique » sous chaque champ. Si une panne backend a effacé vos réglages, appliquez le preset navbar unifié puis enregistrez.",
+    "Los campos vacíos heredan valores por defecto o presets. Vea « Efectivo en la tienda » bajo cada campo. Si un fallo del backend borró su configuración, aplique el preset navbar unificado y guarde.",
+    "I campi vuoti ereditano default o preset. Vedi « Effettivo nel negozio » sotto ogni campo. Se un'interruzione backend ha cancellato le impostazioni, applica il preset navbar unificato e salva.",
+    "Leere Felder übernehmen Defaults oder Stil-Vorlagen. Hinweise « Im Shop wirksam » unter jedem Feld. Nach Backend-Ausfall: Einheitliches Navbar-Preset anwenden und speichern."
+  ),
+
     // ── Header ───────────────────────────────────────────────────────────────
     headerBgColorGradientStart: t(
       "Background color (base / gradient start)",
