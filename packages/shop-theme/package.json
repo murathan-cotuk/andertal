@@ -8,6 +8,6 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "test": "node --test src/eu-origin.test.js"
+    "test": "node --test src/eu-origin.test.js src/second-nav-link-style.test.js src/logo-branding.test.js"
   }
 }

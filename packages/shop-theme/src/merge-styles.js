@@ -108,14 +108,20 @@ export function mergeLoadedShopStyles(loaded = {}) {
       },
     },
     secondNav: (() => {
-      const merged = { ...DEFAULT_SHOP_STYLES.secondNav, ...(loaded.secondNav || {}) };
+      const loadedSn = loaded.secondNav && typeof loaded.secondNav === "object" ? loaded.secondNav : {};
+      const merged = { ...DEFAULT_SHOP_STYLES.secondNav, ...loadedSn };
       const r = String(merged.pill_border_radius ?? "").trim();
       /* Früherer Shop-Default 20% — auf langen Labels wie eine Pille */
       if (r === "20%") merged.pill_border_radius = DEFAULT_SHOP_STYLES.secondNav.pill_border_radius;
       const def = DEFAULT_SHOP_STYLES.secondNav;
-      merged.link_style_desktop = normalizeSecondNavLinkStyle(merged.link_style_desktop, def.link_style_desktop);
-      merged.link_style_tablet = normalizeSecondNavLinkStyle(merged.link_style_tablet, def.link_style_tablet);
-      merged.link_style_mobile = normalizeSecondNavLinkStyle(merged.link_style_mobile, def.link_style_mobile);
+      /* Only keep link_style_* when saved — otherwise layout presets (e.g. pill_bar) apply */
+      for (const key of ["link_style_desktop", "link_style_tablet", "link_style_mobile"]) {
+        if (Object.prototype.hasOwnProperty.call(loadedSn, key)) {
+          merged[key] = normalizeSecondNavLinkStyle(merged[key], def[key]);
+        } else {
+          delete merged[key];
+        }
+      }
       return merged;
     })(),
     footer: { ...DEFAULT_SHOP_STYLES.footer, ...(loaded.footer || {}) },

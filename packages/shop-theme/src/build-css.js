@@ -6,8 +6,67 @@ import {
   resolveHeaderStringsForCss,
 } from "./header-chrome.js";
 import { buildSecondNavSurfacesByViewport } from "./second-nav-vars.js";
+import { resolveSecondNavLinkStyles } from "./second-nav-link-style.js";
 
 const PRIMARY_TOKEN = "__PRIMARY__";
+
+/** Pill + classic link rules — viewport picked via data-sn-* on .second-nav (ShopHeader). */
+function buildSecondNavLinkAppearanceCss(linkStyles) {
+  const pillBlock = `
+  background: var(--second-nav-pill-bg) !important;
+  border: var(--second-nav-pill-border) !important;
+  backdrop-filter: var(--second-nav-pill-backdrop) !important;
+  -webkit-backdrop-filter: var(--second-nav-pill-backdrop) !important;
+  border-radius: var(--second-nav-pill-radius) !important;
+  padding: var(--second-nav-pill-padding) !important;
+  box-shadow: var(--second-nav-pill-shadow) !important;
+  text-decoration: none !important;`;
+
+  const pillHover = `
+  color: var(--second-nav-active) !important;
+  text-decoration: none !important;`;
+
+  const classicHover = `
+  color: var(--second-nav-active) !important;
+  text-decoration: underline !important;`;
+
+  const vpRules = (vp, mq) => {
+    const base = `.second-nav[data-sn-${vp}="pill"] a, nav.second-nav[data-sn-${vp}="pill"] a`;
+    const hoverPill = `.second-nav[data-sn-${vp}="pill"] a:hover, nav.second-nav[data-sn-${vp}="pill"] a:hover`;
+    const hoverClassic = `.second-nav[data-sn-${vp}="classic"] a:hover, nav.second-nav[data-sn-${vp}="classic"] a:hover`;
+    return `
+${mq} {
+  ${base} {${pillBlock}
+  }
+  ${hoverPill} {${pillHover}
+  }
+  ${hoverClassic} {${classicHover}
+  }
+}`;
+  };
+
+  const desktopMq = "@media (min-width: 1024px)";
+  const tabletMq = "@media (min-width: 768px) and (max-width: 1023px)";
+  const mobileMq = "@media (max-width: 767px)";
+
+  const legacyPill = `
+.second-nav a.shop-second-nav-link,
+nav.second-nav a.shop-second-nav-link {${pillBlock}
+}
+.second-nav a.shop-second-nav-link:hover,
+nav.second-nav a.shop-second-nav-link:hover {${pillHover}
+}`;
+
+  // Emit nothing extra when everything is default-only — attrs still set on DOM for clarity
+  void linkStyles;
+
+  return [
+    vpRules("desktop", desktopMq),
+    vpRules("tablet", tabletMq),
+    vpRules("mobile", mobileMq),
+    legacyPill,
+  ].join("\n");
+}
 
 function replacePrimary(val, primary) {
   if (typeof val !== "string") return val;
@@ -121,6 +180,7 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --header-bg:       ${header.bg_color};
   --header-chrome-bg: ${headerChromeByVp.desktop};
   --header-text:     ${header.text_color};
+  --header-icon-color: #ffffff;
   --header-h:        ${headerHVp.desktop};
   --header-h-compact: ${headerCompactVp.desktop};
   --header-shadow:   ${header.shadow};
@@ -353,6 +413,10 @@ h5 {
   box-shadow: none !important;
   border-bottom: none !important;
 }
+.shop-header-main .shop-header-action-icon,
+.shop-header-main .shop-header-action-icon svg {
+  color: var(--header-icon-color, #fff) !important;
+}
 .second-nav {
   background: var(--second-nav-bg) !important;
   color: var(--second-nav-text) !important;
@@ -362,26 +426,9 @@ h5 {
 }
 .second-nav a,
 nav.second-nav a { color: var(--second-nav-text) !important; }
-.second-nav a.shop-second-nav-link,
-nav.second-nav a.shop-second-nav-link {
-  background: var(--second-nav-pill-bg) !important;
-  border: var(--second-nav-pill-border) !important;
-  backdrop-filter: var(--second-nav-pill-backdrop) !important;
-  -webkit-backdrop-filter: var(--second-nav-pill-backdrop) !important;
-  border-radius: var(--second-nav-pill-radius) !important;
-  padding: var(--second-nav-pill-padding) !important;
-  box-shadow: var(--second-nav-pill-shadow) !important;
-  text-decoration: none !important;
-}
 .second-nav a.active,
-.second-nav a:hover,
-nav.second-nav a.active,
-nav.second-nav a:hover { color: var(--second-nav-active) !important; }
-.second-nav a.shop-second-nav-link:hover,
-nav.second-nav a.shop-second-nav-link:hover {
-  color: var(--second-nav-active) !important;
-  text-decoration: none !important;
-}
+nav.second-nav a.active { color: var(--second-nav-active) !important; }
+${buildSecondNavLinkAppearanceCss(resolveSecondNavLinkStyles(styles))}
 footer, .site-footer {
   background: var(--footer-bg) !important;
   color: var(--footer-text) !important;

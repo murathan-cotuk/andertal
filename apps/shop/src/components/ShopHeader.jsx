@@ -39,7 +39,7 @@ import {
 } from "@/context/MobileBottomNavScrollContext";
 import { getShippableCountries } from "@/lib/countries";
 import { menuItemHref } from "@/lib/shop-menu-href";
-import { buildHeaderSurfaceCssVarsFromRoute, effectiveGradientEnabled } from "@andertal/shop-theme";
+import { buildHeaderSurfaceCssVarsFromRoute, effectiveGradientEnabled, resolveSecondNavLinkStyles, resolveViewportTier, pickShopLogoSlot } from "@andertal/shop-theme";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
@@ -66,31 +66,6 @@ function writeCurrencyCookie(code) {
   const c = String(code || "").toLowerCase();
   if (!/^[a-z]{3}$/.test(c)) return;
   document.cookie = `andertal_currency=${encodeURIComponent(c)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
-}
-
-/**
- * Breakpoints aligned with StylesPage copy: mobile ≤767, tablet 768–1023, desktop ≥1024.
- * Drives second-nav link_style_* from shop theme JSON.
- */
-function useSecondNavLinkViewportBand() {
-  const [band, setBand] = useState("desktop");
-  useLayoutEffect(() => {
-    const mqMobile = window.matchMedia("(max-width: 767px)");
-    const mqTablet = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
-    const apply = () => {
-      if (mqMobile.matches) setBand("mobile");
-      else if (mqTablet.matches) setBand("tablet");
-      else setBand("desktop");
-    };
-    apply();
-    mqMobile.addEventListener("change", apply);
-    mqTablet.addEventListener("change", apply);
-    return () => {
-      mqMobile.removeEventListener("change", apply);
-      mqTablet.removeEventListener("change", apply);
-    };
-  }, []);
-  return band;
 }
 
 function categoryRefFromMenuItem(item) {
@@ -462,6 +437,7 @@ const MiddleBarRight = styled.div`
   gap: 4px;
   position: relative;
   z-index: 10;
+  color: #fff;
 `;
 
 const MiddleBarIconBtn = styled.button`
@@ -469,7 +445,7 @@ const MiddleBarIconBtn = styled.button`
   height: 46px;
   border: none;
   background: transparent;
-  color: var(--header-text, #fff);
+  color: #fff !important;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -478,8 +454,12 @@ const MiddleBarIconBtn = styled.button`
   transition: background 0.2s ease, color 0.2s ease;
 
   &:hover {
-    background: color-mix(in srgb, var(--header-text, #fff) 14%, transparent);
-    color: var(--header-text, #fff);
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff !important;
+  }
+
+  svg {
+    color: #fff;
   }
 `;
 
@@ -512,6 +492,10 @@ const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)``;
 
 /* User dropdown — hidden on mobile (bottom nav handles account) */
 const MiddleBarUserWrap = styled.div`
+  button {
+    color: #fff !important;
+  }
+
   @media (max-width: 767px) {
     display: none !important;
   }
@@ -871,15 +855,6 @@ const SecondLink = styled(Link)`
   line-height: 1.25;
   white-space: nowrap;
   flex-shrink: 0;
-
-  &.shop-second-nav-link:hover {
-    opacity: 0.92;
-  }
-
-  &:not(.shop-second-nav-link):hover {
-    color: var(--second-nav-active, ${tokens.primary.DEFAULT});
-    text-decoration: underline;
-  }
 `;
 
 const HeaderSpacer = styled.div`
@@ -976,7 +951,6 @@ export default function ShopHeader() {
   const ctxPrefix = useMarketPrefix();
   const pathname = usePathname() || "/";
   const shopStyles = useShopStyles();
-  const secondNavViewportBand = useSecondNavLinkViewportBand();
   const headerRestPath = useMemo(() => restPathFromPathname(pathname), [pathname]);
   const headerRouteScope = useMemo(() => detectShopHeaderRouteScope(headerRestPath), [headerRestPath]);
   const headerScopeCssVars = useMemo(
@@ -1075,11 +1049,10 @@ export default function ShopHeader() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const getKey = () => window.innerWidth >= 1024 ? "desktop" : window.innerWidth >= 600 ? "tablet" : "mobile";
-    setLogoDeviceKey(getKey());
-    const handler = () => setLogoDeviceKey(getKey());
-    window.addEventListener("resize", handler, { passive: true });
-    return () => window.removeEventListener("resize", handler);
+    const applyTier = () => setLogoDeviceKey(resolveViewportTier(window.innerWidth));
+    applyTier();
+    window.addEventListener("resize", applyTier, { passive: true });
+    return () => window.removeEventListener("resize", applyTier);
   }, []);
 
   useEffect(() => {
@@ -1375,23 +1348,14 @@ export default function ShopHeader() {
     !scrollPastThreshold &&
     (landingHeaderBg || headerGradientAnyViewport);
 
-  /** Theme JSON link_style_* per breakpoint; Landing kann Desktop auf klassisch erzwingen */
-  const secondNavUsePillClass = useMemo(() => {
-    const sn = shopStyles?.secondNav || {};
-    let mode =
-      secondNavViewportBand === "mobile"
-        ? sn.link_style_mobile
-        : secondNavViewportBand === "tablet"
-          ? sn.link_style_tablet
-          : sn.link_style_desktop;
-    if (mode !== "classic" && mode !== "pill") {
-      mode = secondNavViewportBand === "desktop" ? "classic" : "pill";
-    }
-    if (secondNavDesktopClassic && secondNavViewportBand === "desktop") {
-      mode = "classic";
-    }
-    return mode === "pill";
-  }, [shopStyles?.secondNav, secondNavViewportBand, secondNavDesktopClassic]);
+  const secondNavLinkDataAttrs = useMemo(() => {
+    const resolved = resolveSecondNavLinkStyles(shopStyles || {});
+    return {
+      "data-sn-desktop": secondNavDesktopClassic ? "classic" : resolved.desktop,
+      "data-sn-tablet": resolved.tablet,
+      "data-sn-mobile": resolved.mobile,
+    };
+  }, [shopStyles, secondNavDesktopClassic]);
   /** Geniş ekran: üst header sabit — ikinci nav SubNavWrap kendi hide progress'i ile kaybolur */
   const desktopHeaderHideProgress = 0;
 
@@ -1591,18 +1555,14 @@ export default function ShopHeader() {
               <MiddleBarLeft $compactProgress={narrowCompactProgress}>
                 <MiddleBarLogo href="/">
                   {(() => {
-                    const devCfg = shopBranding.logo_config?.shop?.[logoDeviceKey];
-                    const url = devCfg?.url || shopBranding.shop_logo_url || "";
-                    const height = Math.min(
-                      devCfg?.size ?? devCfg?.height ?? shopBranding.shop_logo_height ?? 34,
-                      200,
-                    );
-                    const compactH = Math.max(22, Math.round(height * (1 - 0.32 * narrowCompactProgress)));
+                    const devCfg = pickShopLogoSlot(shopBranding, logoDeviceKey);
+                    const url = devCfg?.url || "";
+                    const height = Math.min(devCfg?.size ?? devCfg?.height ?? 34, 200);
                     const pt = devCfg?.pt ?? 0;
                     const pr = devCfg?.pr ?? 0;
                     const pb = devCfg?.pb ?? 0;
                     const pl = devCfg?.pl ?? 0;
-                    const imgH = isNarrowViewport && narrowCompactProgress > 0.02 ? compactH : height;
+                    const imgH = isNarrowViewport && narrowCompactProgress > 0.02 ? Math.max(22, Math.round(height * (1 - 0.32 * narrowCompactProgress))) : height;
                     return url ? (
                       <img
                         src={url}
@@ -1719,7 +1679,7 @@ export default function ShopHeader() {
             <NarrowHeaderChrome $compactProgress={narrowCompactProgress} $keepOnCompact>
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
-                <MiddleBarLocaleBtn type="button" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={tLocale("label")} aria-label={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
+                <MiddleBarLocaleBtn type="button" className="shop-header-action-icon" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={tLocale("label")} aria-label={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
                   </svg>
@@ -1779,7 +1739,7 @@ export default function ShopHeader() {
                   onOpen={() => { setLocaleDropdownOpen(false); setMainMenuOpen(false); }}
                 />
               </MiddleBarUserWrap>
-              <MiddleBarCartBtn type="button" onClick={openCartSidebar} title={tCommon("cart")} aria-label={tCommon("cart")}>
+              <MiddleBarCartBtn type="button" className="shop-header-action-icon" onClick={openCartSidebar} title={tCommon("cart")} aria-label={tCommon("cart")}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <path fillRule="evenodd" clipRule="evenodd" d="M1 2.75C1 2.33579 1.33579 2 1.75 2H2.27029C3.34283 2 4.26626 2.75703 4.4766 3.80874L4.71485 5H20.2676C21.3791 5 22.209 6.02281 21.98 7.11052L20.5682 13.8165C20.3003 15.0891 19.1777 16 17.8772 16H7.63961C6.32874 16 5.20009 15.0747 4.94301 13.7893L3.00573 4.10291C2.93562 3.75234 2.6278 3.5 2.27029 3.5H1.75C1.33579 3.5 1 3.16421 1 2.75ZM6 19C6 17.8954 6.89543 17 8 17C9.10457 17 10 17.8954 10 19C10 20.1046 9.10457 21 8 21C6.89543 21 6 20.1046 6 19ZM15 19C15 17.8954 15.8954 17 17 17C18.1046 17 19 17.8954 19 19C19 20.1046 18.1046 21 17 21C15.8954 21 15 20.1046 15 19Z" />
                 </svg>
@@ -1798,6 +1758,7 @@ export default function ShopHeader() {
           <SubNavWrap
             id="subnav"
             className="second-nav"
+            {...secondNavLinkDataAttrs}
             style={{
               ...(unifiedHeaderAtTop
                 ? { background: "transparent", borderTop: "none", borderBottom: "none" }
@@ -1810,7 +1771,6 @@ export default function ShopHeader() {
               {secondMenuItems.map((item) => (
                 <SecondLink
                   key={item.id}
-                  className={secondNavUsePillClass ? "shop-second-nav-link" : undefined}
                   href={menuItemHref(item)}
                 >
                   {item.label}

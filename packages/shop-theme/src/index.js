@@ -24,6 +24,15 @@ export {
 } from "./typography-fonts.js";
 export { buildSecondNavSurfacesByViewport } from "./second-nav-vars.js";
 export {
+  resolveSecondNavLinkStyles,
+  resolveSecondNavLinkStyleForViewport,
+} from "./second-nav-link-style.js";
+export {
+  resolveViewportTier,
+  buildShopLogoSlotsFromSettings,
+  pickShopLogoSlot,
+} from "./logo-branding.js";
+export {
   resolveEffectiveLayoutSurfaces,
   applyUnifiedNavbarPreset,
 } from "./styles-admin-preview.js";
