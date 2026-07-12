@@ -745,6 +745,7 @@ export default function StylesPage() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
+  const [loadError, setLoadError] = useState(false);
 
   const mkDeviceLogo = (h = 34) => ({ url: "", size: h, height: h, pt: 0, pr: 0, pb: 0, pl: 0 });
   const defaultLogoConfig = () => ({
@@ -829,6 +830,7 @@ export default function StylesPage() {
 
   const loadStyles = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await client.getStyles();
       const loaded = data?.styles || {};
@@ -861,12 +863,17 @@ export default function StylesPage() {
       setBranding(loadedBranding);
       setBrandingSnapshot(JSON.stringify(loadedBranding));
     } catch (_) {
-      const merged = mergeLoadedShopStyles({});
-      setStyles(merged);
-      setSavedSnapshot(JSON.stringify(merged));
-      const emptyBranding = { shop_favicon_url: "", sellercentral_favicon_url: "", announcement_bar_items: [], logo_config: defaultLogoConfig() };
-      setBranding(emptyBranding);
-      setBrandingSnapshot(JSON.stringify(emptyBranding));
+      // Do NOT populate styles/branding with defaults here: the loading gate below
+      // keeps `!styles` true (showing a retry screen instead of the editable form)
+      // specifically so a failed load can never be silently saved over the seller's
+      // real configuration. This used to fall back to mergeLoadedShopStyles({}) and
+      // render the full editable form as if that were the seller's real config —
+      // a transient network/backend hiccup while this page loaded (e.g. a backend
+      // restart) would silently reset every field to factory defaults, and the next
+      // "Save" click would then overwrite the seller's actual saved styles in the
+      // database with those defaults. Real incident: a backend OOM restart wiped a
+      // seller's header/second-nav/footer customization this way.
+      setLoadError(true);
     }
     setLoading(false);
   }, [client]);
@@ -1040,11 +1047,28 @@ export default function StylesPage() {
                 style={{
                   minHeight: "55vh",
                   display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Text as="p" tone="subdued" alignment="center">{ui.loading}</Text>
+                {loadError && !loading ? (
+                  <>
+                    <Text as="p" tone="critical" alignment="center">
+                      {locale === "tr"
+                        ? "Ayarlar yüklenemedi (backend'e ulaşılamadı). Mevcut ayarlarınızın üzerine yazılmaması için form açılmadı."
+                        : locale === "de"
+                          ? "Einstellungen konnten nicht geladen werden (Backend nicht erreichbar). Das Formular wurde nicht geöffnet, damit Ihre bestehenden Einstellungen nicht überschrieben werden."
+                          : "Could not load settings (backend unreachable). The form was not opened, so your existing settings won't be overwritten."}
+                    </Text>
+                    <Button onClick={loadStyles}>
+                      {locale === "tr" ? "Tekrar Dene" : locale === "de" ? "Erneut versuchen" : "Retry"}
+                    </Button>
+                  </>
+                ) : (
+                  <Text as="p" tone="subdued" alignment="center">{ui.loading}</Text>
+                )}
               </Box>
             </Card>
           </Layout.Section>
