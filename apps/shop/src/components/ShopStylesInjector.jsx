@@ -89,13 +89,20 @@ export default function ShopStylesInjector() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [setStyles]);
 
-  // 1 saniyelik canlı güncelleme — sekme görünürken, içerik değişmemişse re-render yok
+  // Canlı güncelleme — sekme görünürken, içerik değişmemişse re-render yok.
+  // NOT: eskiden 1000ms'di. Her açık sekme saniyede bir /store/styles isteği
+  // atıyordu, her istek backend'de yeni bir ham pg.Client bağlantısı açıp
+  // kapatıyordu (bkz. apps/medusa-backend/src/routes/styles.js) — bu sürekli
+  // bağlantı/istek yükü, Render loglarında görülen "allocation failure" / GC
+  // çökmesine (Node.js OOM) katkıda bulunuyordu. 20s hâlâ "canlı" hissettirir
+  // (bir satıcı renk kaydettikten en geç 20sn sonra yansır) ama istek hacmini
+  // ~20 kat azaltır.
   useEffect(() => {
     const id = setInterval(() => {
       if (document.visibilityState === "visible") {
         loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink, lastRawRef);
       }
-    }, 1000);
+    }, 20000);
     return () => clearInterval(id);
   }, [setStyles]);
 
