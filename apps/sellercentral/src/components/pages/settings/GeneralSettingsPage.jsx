@@ -41,6 +41,8 @@ export default function GeneralSettingsPage() {
     companyName: "",
     taxId: "",
     vatId: "",
+    lucidNumber: "",
+    eprDocumentUrl: "",
     website: "",
     iban: "",
     businessStreet: "",
@@ -114,6 +116,8 @@ export default function GeneralSettingsPage() {
             companyName: sellerUser.company_name || "",
             taxId: sellerUser.tax_id || "",
             vatId: sellerUser.vat_id || "",
+            lucidNumber: sellerUser.lucid_number || "",
+            eprDocumentUrl: sellerUser.epr_document_url || "",
             website: sellerUser.website || "",
             iban: sellerUser.iban || "",
             businessStreet: businessAddress.street || "",
@@ -156,6 +160,8 @@ export default function GeneralSettingsPage() {
         company_name: formData.companyName.trim() || null,
         tax_id: formData.taxId.trim() || null,
         vat_id: formData.vatId.trim() || null,
+        lucid_number: formData.lucidNumber.trim() || null,
+        epr_document_url: formData.eprDocumentUrl.trim() || null,
         phone: formData.phone.trim() || null,
         website: formData.website.trim() || null,
         documents: Array.isArray(formData.documents) ? formData.documents : [],
@@ -376,10 +382,11 @@ export default function GeneralSettingsPage() {
               </Box>
               <Box minWidth="180px">
                 <TextField
-                  label="VAT ID"
+                  label="USt-IdNr. / VAT ID"
                   value={formData.vatId}
                   onChange={(v) => setFormData((p) => ({ ...p, vatId: v }))}
                   autoComplete="off"
+                  helpText="z.B. DE123456789"
                 />
               </Box>
               <Box minWidth="180px">
@@ -388,6 +395,29 @@ export default function GeneralSettingsPage() {
                   value={formData.iban}
                   onChange={(v) => setFormData((p) => ({ ...p, iban: v }))}
                   autoComplete="off"
+                />
+              </Box>
+            </InlineStack>
+            <Divider />
+            <Text as="h3" variant="headingSm">
+              {locale === "de" ? "Verpackungsgesetz (LUCID / EPR)" : locale === "tr" ? "Ambalaj Geri Dönüşüm (LUCID / EPR)" : "Packaging Recycling (LUCID / EPR)"}
+            </Text>
+            <Text as="p" tone="subdued" variant="bodySm">
+              {locale === "de"
+                ? "Pflichtangabe nach deutschem Verpackungsgesetz (VerpackG). Ohne gültige LUCID-Registrierung darf kein Produkt über einen deutschen Marktplatz angeboten werden."
+                : locale === "tr"
+                ? "Almanya Ambalaj Kanunu (VerpackG) gereği zorunludur. Geçerli LUCID kaydı olmadan Almanya'daki pazaryerlerinde ürün listeleyemezsiniz."
+                : "Required under the German Packaging Act (VerpackG). Without a valid LUCID registration you may not list products on German marketplaces."}
+            </Text>
+            <InlineStack gap="300" blockAlign="start">
+              <Box minWidth="220px">
+                <TextField
+                  label={locale === "de" ? "LUCID-Registrierungsnummer" : locale === "tr" ? "LUCID Kayıt Numarası" : "LUCID Registration Number"}
+                  value={formData.lucidNumber}
+                  onChange={(v) => setFormData((p) => ({ ...p, lucidNumber: v }))}
+                  placeholder="DE1234567890123"
+                  autoComplete="off"
+                  helpText={locale === "de" ? "Pflichtfeld — z.B. DE1234567890123 (Zentrale Stelle Verpackungsregister)" : locale === "tr" ? "Zorunlu — örn. DE1234567890123" : "Required — e.g. DE1234567890123"}
                 />
               </Box>
             </InlineStack>

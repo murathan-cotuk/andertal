@@ -159,7 +159,7 @@ module.exports = function createSellerAccountRouter({
                   approval_status, created_at, iban, payment_account_holder, payment_bic, payment_bank_name,
                   company_name, authorized_person_name, tax_id, vat_id,
                   business_address, phone, documents, rejection_reason, approved_at,
-                  commission_rate
+                  commission_rate, lucid_number, epr_document_url
            FROM seller_users WHERE id = $1`,
           [userId],
         )
@@ -192,6 +192,8 @@ module.exports = function createSellerAccountRouter({
             rejection_reason: row.rejection_reason,
             approved_at: row.approved_at,
             commission_rate: row.commission_rate != null ? parseFloat(row.commission_rate) : 0.12,
+            lucid_number: row.lucid_number,
+            epr_document_url: row.epr_document_url,
           },
           // legacy alias
           user: {

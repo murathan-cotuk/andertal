@@ -49,15 +49,20 @@ const tByLocale = (l) => {
       city: "Şehir",
       postalCode: "Posta kodu",
       country: "Ülke",
+      lucidNumber: "LUCID Kayıt Numarası",
+      lucidNumberHelp: "Almanya Ambalaj Kanunu (VerpackG) gereği zorunlu — örn. DE1234567890123 (Zentrale Stelle Verpackungsregister)",
+      needLucid: "Almanya'da satış yapmak için LUCID ambalaj kayıt numaranızı girmelisiniz.",
       docTypes: {
         trade_register: "Ticaret sicil belgesi",
         id_passport: "Kimlik / Pasaport",
         tax_document: "Vergi levhası (opsiyonel)",
+        epr_certificate: "EPR / LUCID Kayıt Belgesi",
       },
       docHints: {
         trade_register: "Ticaret sicil gazetesi veya ticaret odası faaliyet belgesi. Son 3 ay içinde alınmış olmalı. PDF tercih edilir.",
         id_passport: "Kimlik kartı veya pasaport ön yüz (kimlik için arka yüz de eklenebilir). PDF veya JPG formatında yükleyin.",
         tax_document: "Vergi levhası veya vergi beyan belgesi. PDF olarak yükleyin. Opsiyonel ama önerilir.",
+        epr_certificate: "LUCID kaydınızın belgesi veya ekstresi (Zentrale Stelle Verpackungsregister). PDF formatında yükleyin.",
       },
       uploadBtn: "Dosya seç",
       uploaded: "Yüklendi",
@@ -118,15 +123,20 @@ const tByLocale = (l) => {
       city: "Stadt",
       postalCode: "Postleitzahl",
       country: "Land",
+      lucidNumber: "LUCID-Registrierungsnummer",
+      lucidNumberHelp: "Pflichtfeld nach VerpackG — z.B. DE1234567890123 (Zentrale Stelle Verpackungsregister)",
+      needLucid: "Bitte gib deine LUCID-Registrierungsnummer ein. Sie ist nach dem Verpackungsgesetz für den Verkauf auf deutschen Marktplätzen Pflicht.",
       docTypes: {
         trade_register: "Handelsregisterauszug",
         id_passport: "Ausweis / Reisepass",
         tax_document: "Steuerdokument (optional)",
+        epr_certificate: "EPR / LUCID-Registrierungsnachweis",
       },
       docHints: {
         trade_register: "Offizieller Handelsregisterauszug (HRB/HRA), nicht älter als 3 Monate. PDF bevorzugt.",
         id_passport: "Vorder- und Rückseite des Personalausweises oder Reisepasses als PDF oder JPG.",
         tax_document: "Steuerbescheid oder Umsatzsteuervoranmeldung als PDF. Optional, aber empfohlen.",
+        epr_certificate: "Registrierungsnachweis oder -auszug der Zentralen Stelle Verpackungsregister (LUCID) als PDF.",
       },
       uploadBtn: "Datei auswählen",
       uploaded: "Hochgeladen",
@@ -187,15 +197,20 @@ const tByLocale = (l) => {
       city: "Ville",
       postalCode: "Code postal",
       country: "Pays",
+      lucidNumber: "Numéro d'enregistrement LUCID",
+      lucidNumberHelp: "Obligatoire selon la loi allemande sur les emballages (VerpackG) — ex. DE1234567890123",
+      needLucid: "Veuillez saisir votre numéro d'enregistrement LUCID pour vendre sur les marketplaces allemandes.",
       docTypes: {
         trade_register: "Extrait du registre du commerce",
         id_passport: "Carte d'identité / Passeport",
         tax_document: "Document fiscal (optionnel)",
+        epr_certificate: "Attestation EPR / LUCID",
       },
       docHints: {
         trade_register: "Extrait Kbis ou équivalent, datant de moins de 3 mois. PDF de préférence.",
         id_passport: "Recto-verso de la carte d'identité ou passeport en PDF ou JPG.",
         tax_document: "Avis d'imposition ou déclaration de TVA en PDF. Optionnel mais recommandé.",
+        epr_certificate: "Attestation ou extrait d'enregistrement LUCID (Zentrale Stelle Verpackungsregister) en PDF.",
       },
       uploadBtn: "Choisir un fichier",
       uploaded: "Téléchargé",
@@ -256,15 +271,20 @@ const tByLocale = (l) => {
       city: "Ciudad",
       postalCode: "Código postal",
       country: "País",
+      lucidNumber: "Número de registro LUCID",
+      lucidNumberHelp: "Obligatorio según la ley alemana de envases (VerpackG) — ej. DE1234567890123",
+      needLucid: "Introduce tu número de registro LUCID para vender en marketplaces alemanes.",
       docTypes: {
         trade_register: "Extracto del registro mercantil",
         id_passport: "DNI / Pasaporte",
         tax_document: "Documento fiscal (opcional)",
+        epr_certificate: "Certificado EPR / LUCID",
       },
       docHints: {
         trade_register: "Certificado de inscripción en el Registro Mercantil, no anterior a 3 meses. Se prefiere PDF.",
         id_passport: "Anverso y reverso del DNI o pasaporte en PDF o JPG.",
         tax_document: "Liquidación de IVA o resolución fiscal en PDF. Opcional pero recomendado.",
+        epr_certificate: "Certificado o extracto de registro LUCID (Zentrale Stelle Verpackungsregister) en PDF.",
       },
       uploadBtn: "Seleccionar archivo",
       uploaded: "Cargado",
@@ -325,15 +345,20 @@ const tByLocale = (l) => {
       city: "Città",
       postalCode: "CAP",
       country: "Paese",
+      lucidNumber: "Numero di registrazione LUCID",
+      lucidNumberHelp: "Obbligatorio ai sensi della legge tedesca sugli imballaggi (VerpackG) — es. DE1234567890123",
+      needLucid: "Inserisci il tuo numero di registrazione LUCID per vendere sui marketplace tedeschi.",
       docTypes: {
         trade_register: "Visura camerale",
         id_passport: "Carta d'identità / Passaporto",
         tax_document: "Documento fiscale (opzionale)",
+        epr_certificate: "Attestato EPR / LUCID",
       },
       docHints: {
         trade_register: "Visura camerale aggiornata, non anteriore a 3 mesi. Si preferisce PDF.",
         id_passport: "Fronte e retro della carta d'identità o passaporto in PDF o JPG.",
         tax_document: "Dichiarazione IVA o certificato fiscale in PDF. Opzionale ma consigliato.",
+        epr_certificate: "Attestato o estratto di registrazione LUCID (Zentrale Stelle Verpackungsregister) in PDF.",
       },
       uploadBtn: "Scegli file",
       uploaded: "Caricato",
@@ -393,15 +418,20 @@ const tByLocale = (l) => {
     city: "City",
     postalCode: "Postal code",
     country: "Country",
+    lucidNumber: "LUCID Registration Number",
+    lucidNumberHelp: "Required under German Packaging Act (VerpackG) — e.g. DE1234567890123 (Zentrale Stelle Verpackungsregister)",
+    needLucid: "Please enter your LUCID registration number. It is required to sell on German marketplaces.",
     docTypes: {
       trade_register: "Trade register extract",
       id_passport: "ID / Passport",
       tax_document: "Tax document (optional)",
+      epr_certificate: "EPR / LUCID Registration Certificate",
     },
     docHints: {
       trade_register: "Official trade register extract, not older than 3 months. PDF preferred.",
       id_passport: "Front and back of your ID card or passport as PDF or JPG.",
       tax_document: "Tax assessment or VAT return document as PDF. Optional but recommended.",
+      epr_certificate: "Registration certificate or extract from the Zentrale Stelle Verpackungsregister (LUCID) as PDF.",
     },
     uploadBtn: "Choose file",
     uploaded: "Uploaded",
@@ -446,8 +476,8 @@ const statusTone = (status) => {
   return "info";
 };
 
-const DOC_TYPES = ["trade_register", "id_passport", "tax_document"];
-const DOC_REQUIRED = { trade_register: true, id_passport: true, tax_document: false };
+const DOC_TYPES = ["trade_register", "id_passport", "tax_document", "epr_certificate"];
+const DOC_REQUIRED = { trade_register: true, id_passport: true, tax_document: false, epr_certificate: true };
 
 // ── EU-compliant Seller-Platform Contract ────────────────────────────────────
 // NOTE: This is boilerplate legal-style text, not legal advice. It must be
@@ -1087,13 +1117,14 @@ export default function VerificationSettingsPage() {
     authorizedPersonName: "",
     taxId: "",
     vatId: "",
+    lucidNumber: "",
     iban: "",
     phone: "",
     street: "",
     city: "",
     postalCode: "",
     country: "",
-    docs: { trade_register: null, id_passport: null, tax_document: null },
+    docs: { trade_register: null, id_passport: null, tax_document: null, epr_certificate: null },
   });
 
   const snapshotFrom = useCallback((nextForm, nextAgreement, nextDialCode) => {
@@ -1104,6 +1135,7 @@ export default function VerificationSettingsPage() {
       authorizedPersonName: nextForm.authorizedPersonName || "",
       taxId: nextForm.taxId || "",
       vatId: nextForm.vatId || "",
+      lucidNumber: nextForm.lucidNumber || "",
       iban: nextForm.iban || "",
       phone: nextForm.phone || "",
       street: nextForm.street || "",
@@ -1133,7 +1165,7 @@ export default function VerificationSettingsPage() {
         if (typeof window !== "undefined") localStorage.setItem("sellerApprovalStatus", s);
         const addr = seller?.business_address || {};
         const storedDocs = Array.isArray(seller?.documents) ? seller.documents : [];
-        const docs = { trade_register: null, id_passport: null, tax_document: null };
+        const docs = { trade_register: null, id_passport: null, tax_document: null, epr_certificate: null };
         storedDocs.forEach((d) => {
           if (d?.doc_type && docs.hasOwnProperty(d.doc_type)) docs[d.doc_type] = d;
         });
@@ -1144,6 +1176,7 @@ export default function VerificationSettingsPage() {
           authorizedPersonName: seller?.authorized_person_name || "",
           taxId: seller?.tax_id || "",
           vatId: seller?.vat_id || "",
+          lucidNumber: seller?.lucid_number || "",
           iban: seller?.iban || "",
           phone: number,
           street: addr?.street || "",
@@ -1253,6 +1286,7 @@ export default function VerificationSettingsPage() {
     setSuccess("");
     if (!agreementAccepted) { setError(t.needAgreement); return; }
     if (!form.docs.trade_register || !form.docs.id_passport) { setError(t.needDocs); return; }
+    if (!form.lucidNumber.trim()) { setError(t.needLucid); return; }
     setSaving(true);
     try {
       const documents = DOC_TYPES.map((dt) => form.docs[dt]).filter(Boolean);
@@ -1262,6 +1296,7 @@ export default function VerificationSettingsPage() {
         authorized_person_name: form.authorizedPersonName.trim() || null,
         tax_id: form.taxId.trim() || null,
         vat_id: form.vatId.trim() || null,
+        lucid_number: form.lucidNumber.trim() || null,
         phone: fullPhone || null,
         business_address: {
           street: form.street.trim() || null,
@@ -1330,6 +1365,7 @@ export default function VerificationSettingsPage() {
         authorizedPersonName: snap.authorizedPersonName || "",
         taxId: snap.taxId || "",
         vatId: snap.vatId || "",
+        lucidNumber: snap.lucidNumber || "",
         iban: snap.iban || "",
         phone: snap.phone || "",
         street: snap.street || "",
@@ -1531,6 +1567,14 @@ export default function VerificationSettingsPage() {
                   />
                 </div>
               </InlineStack>
+              <TextField
+                label={t.lucidNumber}
+                value={form.lucidNumber}
+                onChange={(v) => setForm((p) => ({ ...p, lucidNumber: v }))}
+                autoComplete="off"
+                helpText={t.lucidNumberHelp}
+                placeholder="DE1234567890123"
+              />
               <TextField label={t.iban} value={form.iban} onChange={(v) => setForm((p) => ({ ...p, iban: v }))} autoComplete="off" />
             </BlockStack>
           </Card>

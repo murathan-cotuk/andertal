@@ -16,6 +16,7 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
       iban, commission_rate, first_name, last_name,
       approval_status, company_name, authorized_person_name, tax_id, vat_id,
       business_address, warehouse_address, phone, website,
+      lucid_number, epr_document_url,
       documents, rejection_reason, approved_at, approved_by,
       agreement_accepted, agreement_accepted_at, agreement_version, agreement_ip,
       signature_at, signature_ip, signature_data
@@ -173,7 +174,8 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
       const { id } = req.params
       const body = req.body || {}
       const allowed = ['commission_rate', 'iban', 'store_name', 'company_name', 'tax_id', 'vat_id',
-        'business_address', 'warehouse_address', 'phone', 'website', 'documents', 'rejection_reason']
+        'business_address', 'warehouse_address', 'phone', 'website', 'documents', 'rejection_reason',
+        'lucid_number', 'epr_document_url']
       const updates = []; const params = []; let n = 1
       for (const key of allowed) {
         if (body[key] !== undefined) { updates.push(`${key} = $${n}`); params.push(body[key]); n++ }
@@ -259,7 +261,7 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
       const sellerId = req.sellerUser?.seller_id
       if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const body = req.body || {}
-      const allowed = ['company_name', 'authorized_person_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website', 'payment_account_holder', 'payment_bic', 'payment_bank_name']
+      const allowed = ['company_name', 'authorized_person_name', 'tax_id', 'vat_id', 'business_address', 'warehouse_address', 'phone', 'website', 'payment_account_holder', 'payment_bic', 'payment_bank_name', 'lucid_number', 'epr_document_url']
       const updates = []; const params = []; let n = 1
       const toJsonOrNull = (val) => {
         if (val === undefined) return undefined

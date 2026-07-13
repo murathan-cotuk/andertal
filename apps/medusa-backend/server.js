@@ -1171,6 +1171,9 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_card_brand varchar(30) DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_card_exp_month integer DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_card_exp_year integer DEFAULT NULL`).catch(() => {})
+        // Marktplatzhaftung (§ 22f UStG) compliance fields
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS lucid_number varchar(100) DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS epr_document_url text DEFAULT NULL`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS seller_sign_tokens (
             token varchar(64) PRIMARY KEY,

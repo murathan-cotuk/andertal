@@ -133,6 +133,7 @@ module.exports = function createVerificationRouter({ getSellerDbClient, getProdu
                   risk_score, verification_steps, verification_started_at,
                   company_name, authorized_person_name, tax_id, vat_id,
                   phone, business_address, documents,
+                  lucid_number, epr_document_url,
                   agreement_accepted, agreement_accepted_at, agreement_version
            FROM seller_users WHERE ${isSuperuser && req.query.seller_id ? 'seller_id' : 'id'} = $1`,
           [targetSellerId]
@@ -152,6 +153,8 @@ module.exports = function createVerificationRouter({ getSellerDbClient, getProdu
             authorized_person: !!row.authorized_person_name,
             tax_id: !!row.tax_id,
             vat_id: !!row.vat_id,
+            lucid_number: !!row.lucid_number,
+            epr_document: !!row.epr_document_url,
             phone: !!row.phone,
             address: !!(row.business_address?.street || row.business_address?.city),
             documents_count: Array.isArray(row.documents) ? row.documents.length : 0,
