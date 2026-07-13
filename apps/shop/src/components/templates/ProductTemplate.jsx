@@ -1608,9 +1608,9 @@ export default function ProductTemplate() {
           <div style={{ position: "relative", width: "100%" }}>
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
               <MainImage src={mainImage} alt={displayTitle} />
+              <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} />
+              {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             </MainImageWrap>
-            <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} />
-            {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             {product?.id && (
               <GalleryActionRow
                 onClick={(e) => e.stopPropagation()}

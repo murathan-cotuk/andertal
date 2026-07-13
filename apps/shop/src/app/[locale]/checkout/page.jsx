@@ -192,6 +192,7 @@ const SummaryItem = styled.div`
 `;
 
 const SummaryThumb = styled.div`
+  position: relative;
   width: 52px;
   height: 52px;
   flex-shrink: 0;
@@ -2290,11 +2291,15 @@ export default function CheckoutPage() {
                             ) : (
                               <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
                             )}
+                            {isBestsellerMetadata(item?.product_metadata || {}) && (
+                              <div style={{ position: "absolute", top: 0, left: 0, zIndex: 8, pointerEvents: "none", lineHeight: 0 }}>
+                                <BestsellerBadge />
+                              </div>
+                            )}
                           </SummaryThumb>
                           <SummaryItemDetails>
                             <SummaryItemTitle>
                               <span>{lineTitle}</span>
-                              {isBestsellerMetadata(item?.product_metadata || {}) && <BestsellerBadge />}
                             </SummaryItemTitle>
                             <SummaryItemQty>× {item.quantity}</SummaryItemQty>
                           </SummaryItemDetails>

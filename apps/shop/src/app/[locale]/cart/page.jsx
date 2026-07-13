@@ -79,6 +79,7 @@ const ItemRow = styled.div`
 `;
 
 const Thumb = styled.div`
+  position: relative;
   width: 88px;
   height: 88px;
   flex-shrink: 0;
@@ -441,6 +442,11 @@ export default function CartPage() {
                     ) : (
                       <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
                     )}
+                    {isBestsellerMetadata(item?.product_metadata || {}) && (
+                      <div style={{ position: "absolute", top: 0, left: 0, zIndex: 8, pointerEvents: "none", lineHeight: 0 }}>
+                        <BestsellerBadge />
+                      </div>
+                    )}
                   </Thumb>
                   <ItemDetails>
                     <ItemTitle>
@@ -454,7 +460,6 @@ export default function CartPage() {
                           return m ? m[1] : lineTitle;
                         })()}
                       </Link>
-                      {isBestsellerMetadata(item?.product_metadata || {}) && <BestsellerBadge />}
                     </ItemTitle>
                     {(() => {
                       const lineTitle = getLocalizedCartLineTitle(item, locale);

@@ -367,7 +367,7 @@ const CategoriesButton = styled.button`
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--header-text, #fff);
+  color: #fff !important;
   cursor: pointer;
 
   &:hover {

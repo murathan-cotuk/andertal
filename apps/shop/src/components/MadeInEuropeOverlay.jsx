@@ -20,9 +20,8 @@ const BadgeImg = styled.img`
 `;
 
 /**
- * PDP main image — bottom-left badge when product is EU-origin verified.
- * Rendered OUTSIDE the overflow:hidden image wrap so it can overflow freely.
- * Default position: bottom-left, with 5% of badge height protruding below the image.
+ * Bottom-left badge when product is EU-origin verified.
+ * Rendered inside the overflow:hidden image wrap — stays strictly within image bounds.
  * @param {{ badgeConfig?: object, className?: string }} props
  */
 export default function MadeInEuropeOverlay({ badgeConfig: badgeConfigProp, className }) {
@@ -31,14 +30,12 @@ export default function MadeInEuropeOverlay({ badgeConfig: badgeConfigProp, clas
   const src = resolveImageUrl(cfg.image_url);
   if (!src) return null;
 
-  // translateY(5%): shifts badge down by 5% of its own height → protrudes below image at offset=0
   return (
     <Overlay
       className={className}
       style={{
         left: `${cfg.offset_left}px`,
         bottom: `${cfg.offset_bottom}px`,
-        transform: "translateY(5%)",
       }}
       aria-hidden
     >

@@ -2056,6 +2056,25 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </Box>
               </InlineStack>
 
+              {!isNew && product?.id && (
+                <Box paddingBlockStart="100">
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      {locale === "tr" ? "Ürün ID:" : locale === "de" ? "Produkt-ID:" : "Product ID:"}
+                    </Text>
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      <span
+                        title={locale === "tr" ? "Kopyalamak için tıkla" : locale === "de" ? "Zum Kopieren klicken" : "Click to copy"}
+                        style={{ fontFamily: "monospace", cursor: "pointer", userSelect: "all" }}
+                        onClick={() => { try { navigator.clipboard.writeText(product.id); } catch (_) {} }}
+                      >
+                        {product.id}
+                      </span>
+                    </Text>
+                  </InlineStack>
+                </Box>
+              )}
+
               {eanLookupState === "found" && (
                 <Banner tone="warning">
                   {locale === "tr"

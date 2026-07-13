@@ -22,14 +22,14 @@ export function isBestsellerMetadata(metadata) {
  */
 export function bestsellerBadgeWidthForBand(bestsellerBadge, band) {
   const b = bestsellerBadge || {};
-  const desktop = Number(b.badge_width) || 80;
+  const desktop = (b.badge_width != null && b.badge_width !== "") ? (Number(b.badge_width) || 80) : 80;
   const tablet =
     b.badge_width_tablet != null && b.badge_width_tablet !== ""
-      ? Number(b.badge_width_tablet) || desktop
+      ? (Number(b.badge_width_tablet) || desktop)
       : desktop;
   const mobile =
     b.badge_width_mobile != null && b.badge_width_mobile !== ""
-      ? Number(b.badge_width_mobile) || tablet
+      ? (Number(b.badge_width_mobile) || tablet)
       : tablet;
   if (band === "mobile") return mobile;
   if (band === "tablet") return tablet;

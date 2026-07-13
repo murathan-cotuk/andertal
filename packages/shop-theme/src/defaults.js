@@ -248,5 +248,8 @@ export const DEFAULT_SHOP_STYLES = {
   bestseller_badge: {
     /** Optional image URL — shown in badge instead of ★ star when set */
     image_url: "",
+    badge_width: 80,
+    badge_width_tablet: null,
+    badge_width_mobile: null,
   },
 };

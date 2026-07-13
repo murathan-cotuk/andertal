@@ -114,6 +114,7 @@ const Item = styled.div`
 `;
 
 const ItemImage = styled.div`
+  position: relative;
   width: 72px;
   height: 72px;
   flex-shrink: 0;
@@ -626,6 +627,11 @@ export default function CartSidebar() {
                 ) : (
                   <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
                 )}
+                {isBestsellerMetadata(item?.product_metadata || {}) && (
+                  <div style={{ position: "absolute", top: 0, left: 0, zIndex: 8, pointerEvents: "none", lineHeight: 0 }}>
+                    <BestsellerBadge />
+                  </div>
+                )}
               </ItemImage>
               <ItemBody>
                 <ItemTitle>
@@ -636,9 +642,6 @@ export default function CartSidebar() {
                   >
                     {getLocalizedCartLineTitle(item, locale) || tCart("item")}
                   </Link>
-                  {isBestsellerMetadata(item?.product_metadata || {}) && (
-                    <BestsellerBadge style={{ marginLeft: 8, verticalAlign: "middle" }} />
-                  )}
                 </ItemTitle>
                 <ItemPrice>{formatPriceCents(item.unit_price_cents || 0)}</ItemPrice>
                 <QtyRow>

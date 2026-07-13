@@ -185,7 +185,8 @@
       "PowerShell(Select-String *)",
       "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\app\\\\globals.css\" -Pattern \"sn-desktop|sn-tablet|sn-mobile|pill|data-sn\" | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
       "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"shopStyles|useShopStyles|ShopStyles\" | Select-Object -First 15 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
-      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"SecondLink|SubNavWrap|SecondMenuRowInner\" | Select-Object -First 15 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })"
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"SecondLink|SubNavWrap|SecondMenuRowInner\" | Select-Object -First 15 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "Bash(findstr /s /r /i \"deme ba.arisiz\" apps\\\\shop\\\\src\\\\*.jsx apps\\\\shop\\\\src\\\\*.tsx apps\\\\shop\\\\src\\\\*.js)"
     ]
   }
 }
