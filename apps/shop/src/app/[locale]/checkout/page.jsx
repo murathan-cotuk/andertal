@@ -1020,9 +1020,17 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
     }
 
     if (stripeError) {
-      setError(stripeError.message || t("paymentError"));
-      setProcessing(false);
-      return;
+      // Common retry scenario: payment succeeded, but order creation failed (502/deploy/etc),
+      // user clicks Pay again → Stripe rejects a second confirm with this code.
+      const code = String(stripeError?.code || "").trim();
+      const piFromErr = stripeError?.payment_intent;
+      if (code === "payment_intent_unexpected_state" && piFromErr?.status === "succeeded") {
+        paymentIntent = piFromErr;
+      } else {
+        setError(stripeError.message || t("paymentError"));
+        setProcessing(false);
+        return;
+      }
     }
 
     if (paymentIntent?.status === "succeeded") {

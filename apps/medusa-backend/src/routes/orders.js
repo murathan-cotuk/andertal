@@ -652,6 +652,9 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
     }
 
   const router = Router()
+  // Storefront live presence ping (used by apps/shop ShopPresenceHeartbeat)
+  router.post('/store/presence/heartbeat', storePresenceHeartbeatPOST)
+
   router.get('/admin-hub/v1/orders', adminHubOrdersGET)
   router.post('/admin-hub/v1/orders', adminHubOrderPOST)
   router.get('/admin-hub/v1/orders/:id/pdf/invoice', adminHubOrderPdfInvoiceGET)

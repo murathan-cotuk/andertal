@@ -2834,6 +2834,20 @@ const storeOrdersPOST = async (req, res) => {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
 
+    // Idempotency: if an order already exists for this cart, return it instead of inserting again.
+    // This happens when payment succeeded but the client retried due to a transient 5xx / deploy.
+    try {
+      const ex = (await client.query(
+        'SELECT id FROM store_orders WHERE cart_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [cartId],
+      )).rows?.[0]
+      if (ex?.id) {
+        const order = await getOrderWithItems(client, ex.id)
+        await client.end()
+        return res.status(200).json({ order, reused: true })
+      }
+    } catch (_) {}
+
     let cart = await getCartWithItems(client, cartId)
     if (!cart) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
     cart = (await syncCartCouponDiscountFromLines(client, cartId, cart)) || cart
