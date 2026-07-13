@@ -5,6 +5,24 @@ const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderProvision
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 
+function getClientIpFromRequest(req) {
+  const xff = req.headers['x-forwarded-for']
+  if (typeof xff === 'string' && xff.trim()) {
+    return xff.split(',')[0].trim()
+  }
+  const xri = req.headers['x-real-ip']
+  if (typeof xri === 'string' && xri.trim()) return xri.trim()
+  return req.socket?.remoteAddress || req.connection?.remoteAddress || req.ip || ''
+}
+
+function detectDeviceType(userAgent) {
+  const ua = String(userAgent || '').toLowerCase()
+  if (!ua) return 'unknown'
+  if (/mobile|android|iphone|ipod|blackberry|windows phone/.test(ua)) return 'mobile'
+  if (/ipad|tablet/.test(ua)) return 'tablet'
+  return 'desktop'
+}
+
 // Dispatches order-related automation flow triggers via the queue, falling back to immediate execution.
     const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
       const tk = String(triggerKey || '').trim()
