@@ -118,6 +118,8 @@ async function findBestSellerCampaignDiscountRow(c, { productId, variantId, sell
 const productIdFromVariantId = (variantId) => {
   if (!variantId || typeof variantId !== 'string') return null
   if (variantId.endsWith('-variant')) return variantId.slice(0, -'-variant'.length)
+  const variantDashIdx = variantId.lastIndexOf('-variant-')
+  if (variantDashIdx > 0) return variantId.slice(0, variantDashIdx)
   const idx = variantId.indexOf('-v-')
   return idx > 0 ? variantId.slice(0, idx) : variantId
 }
@@ -690,7 +692,11 @@ const storeCartLineItemsPOST = async (req, res) => {
     const priceCents = product.price_cents != null ? Number(product.price_cents) : Math.round(Number(product.price || 0) * 100)
     const rawVariants = Array.isArray(product.variants) && product.variants.length > 0 ? product.variants : []
     let unitPriceCents = priceCents
-    const variantIndex = variantId.includes('-v-') ? parseInt(variantId.split('-v-')[1], 10) : null
+    const variantIndex = variantId.includes('-v-')
+      ? parseInt(variantId.split('-v-')[1], 10)
+      : variantId.includes('-variant-')
+        ? parseInt(variantId.split('-variant-').pop(), 10)
+        : null
     let variantLabel = ''
     if (rawVariants.length && variantIndex >= 0 && rawVariants[variantIndex]) {
       const v = rawVariants[variantIndex]
