@@ -2287,6 +2287,10 @@ async function start() {
     const createSellersRouter = require('./src/routes/sellers')
     httpApp.use('/', createSellersRouter({ getSellerDbClient, signSellerToken }))
 
+    // --- DAC7 / § 12 PStTG Reporting (superuser: preview + XML export): extracted to src/routes/dac7.js ---
+    const createDac7Router = require('./src/routes/dac7')
+    httpApp.use('/', createDac7Router({ getSellerDbClient }))
+
     // --- Verification Pipeline (start/status/review): extracted to src/routes/verification.js ---
     const createVerificationRouter = require('./src/routes/verification')
     httpApp.use('/', createVerificationRouter({ getSellerDbClient, getProductsDbClient }))

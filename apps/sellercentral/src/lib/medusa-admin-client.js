@@ -1537,6 +1537,21 @@ class MedusaAdminClient {
     return resp.blob()
   }
 
+  /** DAC7 — superuser: fetch reportable sellers for a given year */
+  async getDac7Report(year) {
+    return this.request(`/admin-hub/v1/dac7/report?year=${encodeURIComponent(year)}`)
+  }
+
+  /** DAC7 — superuser: download BZSt XML file */
+  async downloadDac7Xml(year) {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('sellerToken') || '') : ''
+    const url = `${base}/admin-hub/v1/dac7/export?year=${encodeURIComponent(year)}`
+    const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (!resp.ok) throw new Error(`DAC7 export failed: ${resp.status}`)
+    return resp.blob()
+  }
+
   /** Get verification status (seller: own, superuser: pass seller_id query param) */
   async getVerificationStatus(sellerId) {
     const qs = sellerId ? `?seller_id=${encodeURIComponent(sellerId)}` : ''
