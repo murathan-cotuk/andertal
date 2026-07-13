@@ -83,6 +83,10 @@ export function getContainerTypes(locale) {
       label: t(loc, "Testimonials", "Müşteri Yorumları", "Témoignages", "Testimonios", "Testimonianze", "Kundenstimmen"),
       description: t(loc, "Customer quotes as cards with avatar, name, role and star rating", "Avatar, isim, rol ve yıldız puanı destekli yorum kartları", "Citations clients en cartes avec avatar et étoiles", "Opiniones de clientes con avatar y estrellas", "Recensioni clienti con avatar e stelle", "Kundenzitate als Karten mit Avatar, Name, Rolle und Sternebewertung"),
     },
+    personalized_product_row: {
+      label: t(loc, "Personalized products", "Kişiselleştirilmiş ürünler", "Produits personnalisés", "Productos personalizados", "Prodotti personalizzati", "Personalisierte Produkte"),
+      description: t(loc, "4 product cards tailored to the customer: recently viewed, reorder, collaborative filter or trending picks", "Müşteriye özel 4 ürün kartı: son görüntülenen, yeniden sipariş, kolaboratif filtre veya trend ürünler", "4 fiches produit adaptées: vus récemment, recommande, filtre collaboratif ou tendances", "4 tarjetas de producto personalizadas: vistas, reordenar, filtro colaborativo o tendencias", "4 schede prodotto personalizzate: visti, riordina, filtro collaborativo o tendenze", "4 personalisierte Produktkarten: Zuletzt gesehen, Nachbestellen, Kollaborativer Filter oder Trends"),
+    },
   };
   return Object.entries(types).map(([type, { label, description }]) => ({ type, label, description }));
 }
@@ -627,6 +631,22 @@ export function getLandingEditorCopy(locale) {
       { label: x("2 columns", "2 sütun", "2 colonnes", "2 columnas", "2 colonne", "2 Spalten"), value: "2" },
       { label: x("3 columns", "3 sütun", "3 colonnes", "3 columnas", "3 colonne", "3 Spalten"), value: "3" },
       { label: x("4 columns", "4 sütun", "4 colonnes", "4 columnas", "4 colonne", "4 Spalten"), value: "4" },
+    ],
+    // Personalized product row
+    personalizedAlgorithm: x("Recommendation type", "Öneri türü", "Type de recommandation", "Tipo de recomendación", "Tipo di raccomandazione", "Empfehlungstyp"),
+    personalizedAlgorithmHelp: x("How products are selected for this customer", "Bu müşteri için ürünlerin nasıl seçileceği", "Comment les produits sont sélectionnés", "Cómo se seleccionan los productos", "Come vengono selezionati i prodotti", "Wie Produkte für diesen Kunden ausgewählt werden"),
+    visibleCount: x("Visible products (desktop)", "Görünür ürün (masaüstü)", "Produits visibles (bureau)", "Productos visibles (escritorio)", "Prodotti visibili (desktop)", "Sichtbare Produkte (Desktop)"),
+    algoRecentlyViewed: x("Recently viewed (continue where you left off)", "Son görüntülenen (kaldığın yerden devam et)", "Récemment vus (continuer là où tu t'es arrêté)", "Vistos recientemente (continuar donde lo dejaste)", "Visti di recente (continua da dove hai lasciato)", "Zuletzt angesehen (Weitermachen, wo du aufgehört hast)"),
+    algoReorder: x("Reorder — products ordered long ago", "Yeniden sipariş — uzun zaman önce sipariş edilen ürünler", "Récommander — produits commandés il y a longtemps", "Volver a pedir — productos pedidos hace tiempo", "Riordina — prodotti ordinati tempo fa", "Nachbestellen — vor langer Zeit bestellte Produkte"),
+    algoAlsoBought: x("Others also bought (collaborative filter)", "Diğerleri de satın aldı (kolaboratif filtre)", "D'autres ont aussi acheté (filtre collaboratif)", "Otros también compraron (filtro colaborativo)", "Altri hanno comprato (filtro collaborativo)", "Andere kauften auch (Kollaborativer Filter)"),
+    algoTrending: x("Trending for you (based on browsed categories)", "Sizin için trend (gezilen kategorilere göre)", "Tendances pour vous (selon catégories parcourues)", "Tendencias para ti (según categorías vistas)", "Tendenze per te (categorie esplorate)", "Trending für dich (basierend auf gesuchten Kategorien)"),
+    algoTopPicks: x("Top picks — overall bestsellers", "En iyi seçimler — genel çok satanlar", "Meilleurs choix — best-sellers globaux", "Mejores selecciones — más vendidos", "Scelte migliori — bestseller globali", "Top-Empfehlungen — allgemeine Bestseller"),
+    personalizedAlgorithmOptions: () => [
+      { label: x("Recently viewed (continue where you left off)", "Son görüntülenen (kaldığın yerden devam et)", "Récemment vus (continuer là où tu t'es arrêté)", "Vistos recientemente (continuar donde lo dejaste)", "Visti di recente (continua da dove hai lasciato)", "Zuletzt angesehen (Weitermachen, wo du aufgehört hast)"), value: "recently_viewed" },
+      { label: x("Reorder — products ordered long ago", "Yeniden sipariş — uzun zaman önce sipariş edilen ürünler", "Récommander — produits commandés il y a longtemps", "Volver a pedir — productos pedidos hace tiempo", "Riordina — prodotti ordinati tempo fa", "Nachbestellen — vor langer Zeit bestellte Produkte"), value: "reorder" },
+      { label: x("Others also bought (collaborative filter)", "Diğerleri de satın aldı (kolaboratif filtre)", "D'autres ont aussi acheté (filtre collaboratif)", "Otros también compraron (filtro colaborativo)", "Altri hanno comprato (filtro collaborativo)", "Andere kauften auch (Kollaborativer Filter)"), value: "also_bought" },
+      { label: x("Trending for you (based on browsed categories)", "Sizin için trend (gezilen kategorilere göre)", "Tendances pour vous (selon catégories parcourues)", "Tendencias para ti (según categorías vistas)", "Tendenze per te (categorie esplorate)", "Trending für dich (basierend auf gesuchten Kategorien)"), value: "trending_for_you" },
+      { label: x("Top picks — overall bestsellers", "En iyi seçimler — genel çok satanlar", "Meilleurs choix — best-sellers globaux", "Mejores selecciones — más vendidos", "Scelte migliori — bestseller globali", "Top-Empfehlungen — allgemeine Bestseller"), value: "top_picks" },
     ],
   };
 }

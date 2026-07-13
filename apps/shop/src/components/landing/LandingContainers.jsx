@@ -1180,6 +1180,162 @@ function BestsellerCarousel({ container, locale = "de" }) {
   );
 }
 
+// ── Personalized Product Row ──────────────────────────────────────────────────
+function PersonalizedProductRow({ container, locale = "de" }) {
+  const [products, setProducts] = useState(undefined);
+  const isNarrow = useIsNarrow(1023);
+  const baseGap = container.gap != null ? Number(container.gap) : 12;
+  const gap = Number.isNaN(baseGap) ? 12 : baseGap;
+  const visibleCount = Number(container.visible_count) || 4;
+  const algorithm = container.algorithm || "top_picks";
+
+  const DEFAULT_TITLES = {
+    recently_viewed:  { de: "Weitermachen, wo du aufgehört hast", en: "Continue where you left off" },
+    reorder:          { de: "Schon früher bestellt — wieder bestellen?", en: "Order again?" },
+    also_bought:      { de: "Andere kauften auch", en: "Others also bought" },
+    trending_for_you: { de: "Trending für dich", en: "Trending for you" },
+    top_picks:        { de: "Top-Empfehlungen", en: "Top picks for you" },
+  };
+
+  function getTitle() {
+    const custom = lt(container, "title", locale);
+    if (custom) return custom;
+    const algoTitles = DEFAULT_TITLES[algorithm] || DEFAULT_TITLES.top_picks;
+    return locale === "de" ? algoTitles.de : (algoTitles.en || algoTitles.de);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        if (algorithm === "recently_viewed") {
+          let viewed = [];
+          try { viewed = JSON.parse(localStorage.getItem("andertal_recently_viewed") || "[]"); } catch { viewed = []; }
+          if (!Array.isArray(viewed) || viewed.length === 0) { if (!cancelled) setProducts([]); return; }
+          const handles = viewed.map((v) => v?.handle).filter(Boolean).slice(0, 8);
+          const results = await Promise.all(
+            handles.map((h) =>
+              fetch(`/api/store-products/${encodeURIComponent(h)}`, { cache: "no-store" })
+                .then((r) => r.ok ? r.json() : null)
+                .then((d) => d?.product || null)
+                .catch(() => null)
+            )
+          );
+          if (!cancelled) setProducts(results.filter(Boolean));
+          return;
+        }
+
+        if (algorithm === "reorder") {
+          const token = typeof localStorage !== "undefined" ? localStorage.getItem("andertal_customer_token") : null;
+          if (!token) { if (!cancelled) setProducts([]); return; }
+          const res = await fetch(`/api/personalized-products?algorithm=reorder&limit=8`, {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          });
+          const data = res.ok ? await res.json() : { products: [] };
+          if (!cancelled) setProducts(Array.isArray(data?.products) ? data.products : []);
+          return;
+        }
+
+        if (algorithm === "also_bought" || algorithm === "trending_for_you") {
+          let viewed = [];
+          try { viewed = JSON.parse(localStorage.getItem("andertal_recently_viewed") || "[]"); } catch { viewed = []; }
+          const viewedHandles = (Array.isArray(viewed) ? viewed : []).map((v) => v?.handle).filter(Boolean);
+
+          // Fetch recently-viewed products to collect their category slugs
+          const productDetails = await Promise.all(
+            viewedHandles.slice(0, 5).map((h) =>
+              fetch(`/api/store-products/${encodeURIComponent(h)}`, { cache: "no-store" })
+                .then((r) => r.ok ? r.json() : null)
+                .then((d) => d?.product || null)
+                .catch(() => null)
+            )
+          );
+          const validProducts = productDetails.filter(Boolean);
+          const categorySlugs = [...new Set(
+            validProducts.flatMap((p) => [
+              ...(p.categories || []).map((cat) => cat.handle || cat.slug).filter(Boolean),
+              ...(p.collection ? [p.collection.handle].filter(Boolean) : []),
+            ])
+          )];
+
+          if (categorySlugs.length === 0) { if (!cancelled) setProducts([]); return; }
+          const qs = new URLSearchParams({
+            algorithm,
+            categories: categorySlugs.join(","),
+            exclude: viewedHandles.join(","),
+            limit: "8",
+          });
+          const res = await fetch(`/api/personalized-products?${qs}`, { cache: "no-store" });
+          const data = res.ok ? await res.json() : { products: [] };
+          if (!cancelled) setProducts(Array.isArray(data?.products) ? data.products : []);
+          return;
+        }
+
+        // top_picks (default)
+        const res = await fetch(`/api/personalized-products?algorithm=top_picks&limit=8`, { cache: "no-store" });
+        const data = res.ok ? await res.json() : { products: [] };
+        if (!cancelled) setProducts(Array.isArray(data?.products) ? data.products : []);
+      } catch {
+        if (!cancelled) setProducts([]);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [algorithm]);
+
+  if (products === undefined) {
+    return (
+      <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
+        <div style={{ display: "flex", gap, overflow: "hidden" }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                flex: "0 0 200px",
+                height: 260,
+                borderRadius: 8,
+                background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)",
+                backgroundSize: "800px 100%",
+                animation: "shimmer 1.5s infinite linear",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!products.length) return null;
+
+  const title = getTitle();
+
+  return (
+    <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
+      <div style={getContentInnerStyle(container, 1280)}>
+        <Carousel
+          contained={false}
+          title={title || undefined}
+          itemWidth={200}
+          visibleCount={isNarrow ? undefined : visibleCount}
+          navOnSides
+          gap={gap}
+          showFade={false}
+          ariaLabel={title || "Personalized products"}
+        >
+          {products.map((product, i) => (
+            <div key={product.id || i} style={{ minWidth: 0 }}>
+              <ProductCard product={product} plainImage />
+            </div>
+          ))}
+        </Carousel>
+      </div>
+    </div>
+  );
+}
+
 // ── Seller Carousel ────────────────────────────────────────────────────────────
 function SellerCarousel({ container, locale = "de" }) {
   const tp = useTranslations("product");
@@ -2523,7 +2679,8 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "blog_carousel":        inner = <BlogCarousel container={c} locale={locale} />; break;
     case "newsletter":           inner = <NewsletterSignup container={c} locale={locale} />; break;
     case "feature_grid":         inner = <FeatureGrid container={c} locale={locale} />; break;
-    case "testimonials":         inner = <Testimonials container={c} locale={locale} />; break;
+    case "testimonials":              inner = <Testimonials container={c} locale={locale} />; break;
+    case "personalized_product_row":  inner = <PersonalizedProductRow container={c} locale={locale} />; break;
     default: return null;
   }
   const m = c.margin || {};

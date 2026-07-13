@@ -2723,6 +2723,54 @@ function ContainerChromePanel({ container, onChange, deviceTab = 0 }) {
   );
 }
 
+function PersonalizedProductRowEditor({ container, onChange, editLang = "de" }) {
+  const c = useLandingCopy();
+  return (
+    <BlockStack gap="400">
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.personalizedAlgorithm}</Text>
+          <Text as="p" variant="bodySm" tone="subdued">{c.personalizedAlgorithmHelp}</Text>
+          <Select
+            label={c.personalizedAlgorithm}
+            options={c.personalizedAlgorithmOptions()}
+            value={container.algorithm || "top_picks"}
+            onChange={(v) => onChange({ ...container, algorithm: v })}
+          />
+          <TextField
+            label={`${c.heading} ${c.optional}`}
+            value={gi(container, "title", editLang)}
+            onChange={(v) => onChange(si(container, "title", editLang, v))}
+            autoComplete="off"
+            placeholder={c.headingPh}
+            helpText={c.sectionTitleOptional}
+          />
+          <div style={EDITOR_FIELD_GRID}>
+            <TextField
+              label={c.visibleCount}
+              type="number"
+              value={String(container.visible_count ?? 4)}
+              onChange={(v) => onChange({ ...container, visible_count: Math.min(8, Math.max(2, Number(v) || 4)) })}
+              autoComplete="off"
+            />
+            <TextField
+              label={c.gapPx}
+              type="number"
+              value={String(container.gap ?? 12)}
+              onChange={(v) => onChange({ ...container, gap: Number(v) || 12 })}
+              autoComplete="off"
+            />
+          </div>
+        </BlockStack>
+      </Card>
+      <Divider />
+      <ContainerLayoutEditor container={container} onChange={onChange} embedded />
+      <Divider />
+      <ContainerSpacingEditor container={container} onChange={onChange} embedded />
+    </BlockStack>
+  );
+}
+
 function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   let editor = null;
   switch (container.type) {
@@ -2743,8 +2791,9 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "blog_carousel":        editor = <BlogCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "newsletter":           editor = <NewsletterEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "feature_grid":         editor = <FeatureGridEditor container={container} onChange={onChange} editLang={editLang} />; break;
-    case "testimonials":         editor = <TestimonialsEditor container={container} onChange={onChange} editLang={editLang} />; break;
-    case "video_block":          editor = <VideoBlockEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
+    case "testimonials":              editor = <TestimonialsEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "video_block":               editor = <VideoBlockEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
+    case "personalized_product_row":  editor = <PersonalizedProductRowEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     default: return null;
   }
   return (
