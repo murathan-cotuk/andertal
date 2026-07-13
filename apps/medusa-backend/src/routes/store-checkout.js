@@ -2819,9 +2819,10 @@ const storeOrdersPOST = async (req, res) => {
   let jwtEmail = null
   if (bearerTok) {
     const jp = verifyCustomerToken(bearerTok)
-    if (jp?.id && jp?.email) {
-      jwtCustomerId = String(jp.id).trim()
-      jwtEmail = String(jp.email).trim()
+    const cid = customerIdForPg(jp)
+    if (cid) {
+      jwtCustomerId = cid
+      jwtEmail = jp?.email ? String(jp.email).trim() : null
     }
   }
 
@@ -2852,15 +2853,6 @@ const storeOrdersPOST = async (req, res) => {
         if (exPi?.id) return await returnExistingOrder(exPi.id)
       } catch (_) {}
     }
-
-    // Idempotency: order already created for this cart.
-    try {
-      const ex = (await client.query(
-        'SELECT id FROM store_orders WHERE cart_id = $1 ORDER BY created_at DESC LIMIT 1',
-        [cartId],
-      )).rows?.[0]
-      if (ex?.id) return await returnExistingOrder(ex.id)
-    } catch (_) {}
 
     let cart = await getCartWithItems(client, cartId)
     if (!cart) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
@@ -2906,8 +2898,7 @@ const storeOrdersPOST = async (req, res) => {
     let customerId = null
     let isGuest = true
     try {
-      if (jwtCustomerId && jwtEmail) {
-        email = jwtEmail
+      if (jwtCustomerId) {
         const accR = await client.query(
           'SELECT id, account_type, first_name, last_name, phone, email FROM store_customers WHERE id = $1::uuid',
           [jwtCustomerId],
@@ -2920,6 +2911,7 @@ const storeOrdersPOST = async (req, res) => {
           if (!last_name && acc.last_name) last_name = acc.last_name
           if (!phone && acc.phone) phone = acc.phone
           if (acc.email) email = String(acc.email).trim()
+          else if (jwtEmail) email = jwtEmail
         }
       } else if (email) {
         const custRes = await client.query('SELECT id, account_type FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))', [email])
@@ -2989,6 +2981,10 @@ const storeOrdersPOST = async (req, res) => {
       try {
         stripeInst = new (require('stripe'))(secretKey)
         const pi = await stripeInst.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] })
+        if (pi.status !== 'succeeded') {
+          await client.end()
+          return res.status(400).json({ message: `Zahlung noch nicht abgeschlossen (Status: ${pi.status})` })
+        }
         paidCentsFromStripe = Number(pi.amount)
 
         const recon = await reconcileCartCheckoutFromPaymentIntent(client, cartId, cart, pi)
@@ -3036,10 +3032,9 @@ const storeOrdersPOST = async (req, res) => {
         await client.end()
         return res.status(400).json({ message: e?.message || 'Zahlung konnte nicht verifiziert werden' })
       }
-    } else {
-      const fb = computeCartCheckoutMoney(cart, shippingFromBody)
-      orderPaidTotalCents = fb.payTotalCents
-      console.warn('storeOrdersPOST: Stripe secret missing — skipping PaymentIntent amount verification')
+    } else if (!isZeroPayOrder) {
+      await client.end()
+      return res.status(503).json({ message: 'Stripe Secret Key nicht konfiguriert — Sellercentral → Einstellungen → Checkout speichern.' })
     }
 
     const moneyInsert = computeCartCheckoutMoney(cart, shippingCentsOrder)
@@ -3091,6 +3086,8 @@ const storeOrdersPOST = async (req, res) => {
     const sellerNetMerchandiseCents = Math.max(0, subtotalCents - platformFeeMerchandiseBasis)
     const paymentIntentForDb = isZeroPayOrder ? null : paymentIntentId
 
+    const stripeApplicationFeeForDb = piAppFeeCents != null ? piAppFeeCents : platformFeeMerchandiseBasis
+
     // Per-customer coupon limit check
     if (cart.coupon_code && customerId) {
       try {
@@ -3130,7 +3127,7 @@ const storeOrdersPOST = async (req, res) => {
        address_line1, address_line2, city, postal_code, country,
        billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billingSame,
        paymentMethod, customerId, isGuest, newsletter_opted_in,
-       platformFeeMerchandiseBasis,
+       stripeApplicationFeeForDb,
        checkoutPaymentKind,
        sellerNetMerchandiseCents,
        subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,

@@ -81,6 +81,41 @@ async function resolveCheckoutPaymentIntent(stripe, elements, clientSecret, retu
   return { paymentIntent: result.paymentIntent, error: null };
 }
 
+function buildOrderPayload(cartId, paymentIntentId, shippingCents, contact, billing) {
+  return {
+    cart_id: cartId,
+    payment_intent_id: paymentIntentId,
+    shipping_cents: shippingCents ?? 0,
+    email: contact.email,
+    first_name: contact.first_name,
+    last_name: contact.last_name,
+    phone: contact.phone,
+    address_line1: contact.address_line1,
+    address_line2: contact.address_line2,
+    city: contact.city,
+    postal_code: contact.postal_code,
+    country: contact.country,
+    billing_same_as_shipping: billing.billing_same_as_shipping,
+    billing_address_line1: billing.billing_address_line1,
+    billing_address_line2: billing.billing_address_line2,
+    billing_city: billing.billing_city,
+    billing_postal_code: billing.billing_postal_code,
+    billing_country: billing.billing_country,
+  };
+}
+
+async function createStoreOrder(payload, custTok) {
+  const orderHeaders = { "Content-Type": "application/json" };
+  if (custTok) orderHeaders.Authorization = `Bearer ${custTok}`;
+  const res = await fetch("/api/store-orders", {
+    method: "POST",
+    headers: orderHeaders,
+    body: JSON.stringify(payload),
+  });
+  const data = await readResponseJson(res);
+  return { res, data, orderId: data?.order?.id };
+}
+
 const PageWrap = styled.div`
   min-height: 100vh;
   min-height: 100dvh;
@@ -755,7 +790,6 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
   const locale = params?.locale || "de";
   const { setCart } = useCart();
   const { user } = useCustomerAuthHook();
-  const returnRunRef = useRef(false);
   const [paymentElementReady, setPaymentElementReady] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [shipAddrId, setShipAddrId] = useState("");
@@ -794,6 +828,9 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
 
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
+  const [paymentAlreadySucceeded, setPaymentAlreadySucceeded] = useState(false);
+  const [succeededPiId, setSucceededPiId] = useState(null);
+  const [piStatusKnown, setPiStatusKnown] = useState(false);
   const payCentsDisplay = amountToPayCents != null ? amountToPayCents : subtotalCents;
 
   useEffect(() => {
@@ -851,129 +888,25 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
   }, [user?.id]);
 
   useEffect(() => {
-    if (!stripe || typeof window === "undefined") return;
-    const sp = new URLSearchParams(window.location.search);
-    const redirectStatus = sp.get("redirect_status");
-    if (!redirectStatus) return;
-
-    const checkoutPath = `/${locale}/checkout`;
-
-    if (redirectStatus === "failed") {
-      setError(t("paymentError"));
-      router.replace(checkoutPath);
-      return;
-    }
-
-    if (redirectStatus !== "succeeded") return;
-
-    const secret = sp.get("payment_intent_client_secret");
-    const piId = sp.get("payment_intent");
-    if (!secret || !piId) return;
-    if (sessionStorage.getItem(`andertal_pi_done_${piId}`) === "1") {
-      router.replace(checkoutPath);
-      return;
-    }
-    if (returnRunRef.current) return;
-    returnRunRef.current = true;
-
-    (async () => {
-      const { paymentIntent, error: retrieveErr } = await stripe.retrievePaymentIntent(secret);
-      if (retrieveErr || paymentIntent?.status !== "succeeded") {
-        returnRunRef.current = false;
-        setError(retrieveErr?.message || t("paymentError"));
-        router.replace(checkoutPath);
-        return;
+    if (!stripe || !clientSecret) return undefined;
+    let cancelled = false;
+    setPiStatusKnown(false);
+    stripe.retrievePaymentIntent(clientSecret).then(({ paymentIntent }) => {
+      if (cancelled) return;
+      if (paymentIntent?.status === "succeeded") {
+        setPaymentAlreadySucceeded(true);
+        setSucceededPiId(paymentIntent.id);
+        setError(null);
+      } else {
+        setPaymentAlreadySucceeded(false);
+        setSucceededPiId(null);
       }
-
-      let snapshot;
-      try {
-        const raw = sessionStorage.getItem(CHECKOUT_SNAPSHOT_KEY);
-        if (!raw) {
-          returnRunRef.current = false;
-          setError(t("paymentError"));
-          router.replace(checkoutPath);
-          return;
-        }
-        snapshot = JSON.parse(raw);
-      } catch {
-        returnRunRef.current = false;
-        setError(t("paymentError"));
-        router.replace(checkoutPath);
-        return;
-      }
-
-      if (snapshot.cartId !== cartId) {
-        returnRunRef.current = false;
-        router.replace(checkoutPath);
-        return;
-      }
-
-      try {
-        const custTok = typeof window !== "undefined" ? getToken("customer") : null;
-        const orderHeaders = { "Content-Type": "application/json" };
-        if (custTok) orderHeaders.Authorization = `Bearer ${custTok}`;
-        const res = await fetch("/api/store-orders", {
-          method: "POST",
-          headers: orderHeaders,
-          body: JSON.stringify({
-            cart_id: cartId,
-            payment_intent_id: paymentIntent.id,
-            shipping_cents: shippingCents ?? 0,
-            email: snapshot.email,
-            first_name: snapshot.first_name,
-            last_name: snapshot.last_name,
-            phone: snapshot.phone,
-            address_line1: snapshot.address_line1,
-            address_line2: snapshot.address_line2,
-            city: snapshot.city,
-            postal_code: snapshot.postal_code,
-            country: snapshot.country,
-            billing_same_as_shipping: snapshot.billing_same_as_shipping,
-            billing_address_line1: snapshot.billing_address_line1,
-            billing_address_line2: snapshot.billing_address_line2,
-            billing_city: snapshot.billing_city,
-            billing_postal_code: snapshot.billing_postal_code,
-            billing_country: snapshot.billing_country,
-          }),
-        });
-        const data = await readResponseJson(res);
-        const orderId = data?.order?.id;
-        if (orderId && res.ok) {
-          if (custTok && snapshot.save_new_address && !snapshot.ship_addr_id && snapshot.address_line1) {
-            try {
-              const client = getMedusaClient();
-              await client.createCustomerAddress(custTok, {
-                address_line1: snapshot.address_line1,
-                address_line2: snapshot.address_line2 || null,
-                zip_code: snapshot.postal_code || null,
-                city: snapshot.city || null,
-                country: snapshot.country || "DE",
-                is_default_shipping: snapshot.addr_count === 0,
-                is_default_billing: snapshot.addr_count === 0,
-              });
-            } catch (_) {}
-          }
-          sessionStorage.setItem(`andertal_pi_done_${piId}`, "1");
-          try {
-            sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
-          } catch (_) {}
-          try {
-            window.localStorage.removeItem("andertal_cart_id");
-          } catch (_) {}
-          setCart(null);
-          router.replace(`/${locale}/order/${orderId}?confirmed=1`);
-        } else {
-          returnRunRef.current = false;
-          setError(data?.message || t("paymentError"));
-          router.replace(checkoutPath);
-        }
-      } catch (err) {
-        returnRunRef.current = false;
-        setError(err?.message || t("paymentError"));
-        router.replace(checkoutPath);
-      }
-    })();
-  }, [stripe, cartId, locale, router, setCart, t]);
+      setPiStatusKnown(true);
+    }).catch(() => {
+      if (!cancelled) setPiStatusKnown(true);
+    });
+    return () => { cancelled = true; };
+  }, [stripe, clientSecret]);
 
   useEffect(() => {
     setPaymentElementReady(false);
@@ -984,7 +917,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe) return;
 
     // Mark all as touched for validation display
     [email, firstName, lastName, address, city, postalCode, country].forEach((f) => f.onBlur());
@@ -1001,7 +934,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
       phone: phone.value.trim() || undefined,
     }).catch(() => {});
 
-    if (!paymentElementReady) {
+    if (!paymentAlreadySucceeded && (!elements || !paymentElementReady)) {
       setError(t("paymentNotReady"));
       return;
     }
@@ -1009,31 +942,33 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
     setProcessing(true);
     setError(null);
 
-    const returnUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}${window.location.pathname}`
-        : "";
+    const contact = {
+      email: email.value.trim(),
+      first_name: firstName.value.trim(),
+      last_name: lastName.value.trim(),
+      phone: phone.value.trim(),
+      address_line1: address.value.trim(),
+      address_line2: address2.value.trim(),
+      city: city.value.trim(),
+      postal_code: postalCode.value.trim(),
+      country: country.value.trim(),
+    };
+    const billing = {
+      billing_same_as_shipping: billingSameAsShipping,
+      billing_address_line1: billingSameAsShipping ? undefined : billingAddress.value.trim(),
+      billing_address_line2: billingSameAsShipping ? undefined : billingAddress2.value.trim(),
+      billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
+      billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
+      billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
+    };
 
     try {
       sessionStorage.setItem(
         CHECKOUT_SNAPSHOT_KEY,
         JSON.stringify({
           cartId,
-          email: email.value.trim(),
-          first_name: firstName.value.trim(),
-          last_name: lastName.value.trim(),
-          phone: phone.value.trim(),
-          address_line1: address.value.trim(),
-          address_line2: address2.value.trim(),
-          city: city.value.trim(),
-          postal_code: postalCode.value.trim(),
-          country: country.value.trim(),
-          billing_same_as_shipping: billingSameAsShipping,
-          billing_address_line1: billingSameAsShipping ? undefined : billingAddress.value.trim(),
-          billing_address_line2: billingSameAsShipping ? undefined : billingAddress2.value.trim(),
-          billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
-          billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
-          billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
+          ...contact,
+          ...billing,
           save_new_address: saveNewAddress,
           ship_addr_id: shipAddrId || "",
           addr_count: savedAddresses.length,
@@ -1041,57 +976,52 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
       );
     } catch (_) {}
 
-    let paymentIntent;
-    let stripeError;
-    try {
-      const resolved = await resolveCheckoutPaymentIntent(stripe, elements, clientSecret, returnUrl);
-      paymentIntent = resolved.paymentIntent;
-      stripeError = resolved.error;
-    } catch (err) {
-      setError(err?.message || t("paymentError"));
-      setProcessing(false);
-      return;
+    let paymentIntentId = succeededPiId;
+
+    if (!paymentAlreadySucceeded) {
+      const returnUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${window.location.pathname}`
+          : "";
+
+      let paymentIntent;
+      let stripeError;
+      try {
+        const resolved = await resolveCheckoutPaymentIntent(stripe, elements, clientSecret, returnUrl);
+        paymentIntent = resolved.paymentIntent;
+        stripeError = resolved.error;
+      } catch (err) {
+        setError(err?.message || t("paymentError"));
+        setProcessing(false);
+        return;
+      }
+
+      if (stripeError) {
+        setError(stripeError.message || t("paymentError"));
+        setProcessing(false);
+        return;
+      }
+
+      if (paymentIntent?.status !== "succeeded") {
+        setError(t("paymentError"));
+        setProcessing(false);
+        return;
+      }
+
+      paymentIntentId = paymentIntent.id;
+      setPaymentAlreadySucceeded(true);
+      setSucceededPiId(paymentIntent.id);
     }
 
-    if (stripeError) {
-      setError(stripeError.message || t("paymentError"));
-      setProcessing(false);
-      return;
-    }
-
-    if (paymentIntent?.status === "succeeded") {
+    if (paymentIntentId) {
       try {
         const custTok = typeof window !== "undefined" ? getToken("customer") : null;
-        const orderHeaders = { "Content-Type": "application/json" };
-        if (custTok) orderHeaders.Authorization = `Bearer ${custTok}`;
-        const res = await fetch("/api/store-orders", {
-          method: "POST",
-          headers: orderHeaders,
-          body: JSON.stringify({
-            cart_id: cartId,
-            payment_intent_id: paymentIntent.id,
-            shipping_cents: shippingCents ?? 0,
-            email: email.value.trim(),
-            first_name: firstName.value.trim(),
-            last_name: lastName.value.trim(),
-            phone: phone.value.trim(),
-            address_line1: address.value.trim(),
-            address_line2: address2.value.trim(),
-            city: city.value.trim(),
-            postal_code: postalCode.value.trim(),
-            country: country.value.trim(),
-            billing_same_as_shipping: billingSameAsShipping,
-            billing_address_line1: billingSameAsShipping ? undefined : billingAddress.value.trim(),
-            billing_address_line2: billingSameAsShipping ? undefined : billingAddress2.value.trim(),
-            billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
-            billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
-            billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
-          }),
-        });
-        const data = await readResponseJson(res);
-        const orderId = data?.order?.id;
+        const { res, data, orderId } = await createStoreOrder(
+          buildOrderPayload(cartId, paymentIntentId, shippingCents, contact, billing),
+          custTok,
+        );
         if (!res.ok || !orderId) {
-          setError(data?.message || t("paymentError"));
+          setError(data?.message || t("orderCompletionFailed"));
         } else {
           if (custTok && saveNewAddress && !shipAddrId && address.value.trim()) {
             try {
@@ -1395,27 +1325,46 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
 
       <FormCard>
         <SectionTitle>{t("payment")}</SectionTitle>
-        <StripePaymentWrap>
-          <PaymentElement
-            options={{
-              layout: paymentMethodLayout === "list"
-                ? { type: "accordion", defaultCollapsed: false, radios: true, spacedAccordionItems: false }
-                : "tabs",
-            }}
-            onReady={() => setPaymentElementReady(true)}
-            onLoadError={() => {
-              setPaymentElementReady(false);
-              setError(t("paymentError"));
-            }}
-          />
-        </StripePaymentWrap>
+        {paymentAlreadySucceeded ? (
+          <div style={{ padding: "12px 14px", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 8, color: "#065f46", fontSize: "0.875rem", lineHeight: 1.5, marginBottom: 12 }}>
+            {t("paymentAlreadyPaid")}
+          </div>
+        ) : !piStatusKnown ? (
+          <div style={{ padding: "12px 0", color: "#6b7280", fontSize: "0.875rem" }}>{t("processing")}</div>
+        ) : (
+          <StripePaymentWrap>
+            <PaymentElement
+              options={{
+                layout: paymentMethodLayout === "list"
+                  ? { type: "accordion", defaultCollapsed: false, radios: true, spacedAccordionItems: false }
+                  : "tabs",
+              }}
+              onReady={() => setPaymentElementReady(true)}
+              onLoadError={() => {
+                setPaymentElementReady(false);
+                setError(t("paymentError"));
+              }}
+            />
+          </StripePaymentWrap>
+        )}
         {error && <ErrorBox>{error}</ErrorBox>}
         <CheckoutSubmitWrapFooter>
           <PayNowButton
             type="submit"
-            disabled={!stripe || !elements || !paymentElementReady || processing || paymentIntentRefreshing}
+            disabled={
+              !stripe ||
+              processing ||
+              paymentIntentRefreshing ||
+              (!paymentAlreadySucceeded && (!piStatusKnown || !elements || !paymentElementReady))
+            }
           >
-            {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
+            {processing
+              ? t("processing")
+              : paymentIntentRefreshing
+                ? t("processing")
+                : paymentAlreadySucceeded
+                  ? t("completeOrder")
+                  : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
           </PayNowButton>
         </CheckoutSubmitWrapFooter>
         <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 12, lineHeight: 1.5 }}>
@@ -1965,6 +1914,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
 export default function CheckoutPage() {
   const t = useTranslations("checkout");
   const locale = useLocale();
+  const router = useRouter();
   const { cart, subtotalCents, setCart, clearBonusPoints, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
   const cartBySeller = useMemo(() => groupCartItemsBySeller(items), [items]);
@@ -2056,6 +2006,9 @@ export default function CheckoutPage() {
   const [paymentMethodLayout, setPaymentMethodLayout] = useState("grid");
   const [customerSessionSecret, setCustomerSessionSecret] = useState(null);
   const [paymentConfigRetryKey, setPaymentConfigRetryKey] = useState(0);
+  const [returnRecovering, setReturnRecovering] = useState(false);
+  const [returnRecoveryError, setReturnRecoveryError] = useState(null);
+  const returnRecoveryStartedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -2239,10 +2192,15 @@ export default function CheckoutPage() {
     const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
 
     if (typeof window !== "undefined") {
-      const returnedSecret = new URLSearchParams(window.location.search).get(
-        "payment_intent_client_secret",
-      );
-      if (returnedSecret) {
+      const sp = new URLSearchParams(window.location.search);
+      const redirectStatus = sp.get("redirect_status");
+      // 3DS / redirect return: recovery effect creates the order — do not spawn a second PaymentIntent.
+      if (redirectStatus === "succeeded" || redirectStatus === "failed") return;
+      if (returnRecoveryStartedRef.current) return;
+
+      const returnedSecret = sp.get("payment_intent_client_secret");
+      // In-progress redirect only (e.g. requires_action) — reuse client secret from URL.
+      if (returnedSecret && redirectStatus !== "succeeded" && redirectStatus !== "failed") {
         if (!stripePromiseState) return;
         setZeroCheckoutMode(false);
         setClientSecret(returnedSecret);
@@ -2302,6 +2260,119 @@ export default function CheckoutPage() {
       .finally(() => setLoadingPI(false));
   }, [cart?.id, subtotalCents, bonusDiscountCents, cart?.coupon_discount_cents, shippingCents, isFreeShipping, shippingCountry, t, items.length, piRefreshKey, stripePromiseState]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !stripePromiseState || !cart?.id) return undefined;
+    const sp = new URLSearchParams(window.location.search);
+    const redirectStatus = sp.get("redirect_status");
+    const checkoutPath = `/${locale}/checkout`;
+
+    if (redirectStatus === "failed") {
+      setReturnRecoveryError(t("paymentError"));
+      router.replace(checkoutPath);
+      return undefined;
+    }
+    if (redirectStatus !== "succeeded") return undefined;
+
+    const secret = sp.get("payment_intent_client_secret");
+    const piId = sp.get("payment_intent");
+    if (!secret || !piId) return undefined;
+    if (sessionStorage.getItem(`andertal_pi_done_${piId}`) === "1") {
+      router.replace(checkoutPath);
+      return undefined;
+    }
+    if (returnRecoveryStartedRef.current) return undefined;
+    returnRecoveryStartedRef.current = true;
+    setReturnRecovering(true);
+    setReturnRecoveryError(null);
+
+    const effectiveShippingCents = isFreeShipping ? 0 : (shippingCents ?? 0);
+
+    (async () => {
+      try {
+        const stripe = await stripePromiseState;
+        const { paymentIntent, error: retrieveErr } = await stripe.retrievePaymentIntent(secret);
+        if (retrieveErr || paymentIntent?.status !== "succeeded") {
+          setReturnRecoveryError(retrieveErr?.message || t("paymentError"));
+          router.replace(checkoutPath);
+          return;
+        }
+
+        let snapshot;
+        try {
+          const raw = sessionStorage.getItem(CHECKOUT_SNAPSHOT_KEY);
+          if (!raw) throw new Error("missing snapshot");
+          snapshot = JSON.parse(raw);
+        } catch {
+          setReturnRecoveryError(t("paymentError"));
+          router.replace(checkoutPath);
+          return;
+        }
+
+        if (snapshot.cartId !== cart.id) {
+          router.replace(checkoutPath);
+          return;
+        }
+
+        const custTok = getToken("customer");
+        const { res, data, orderId } = await createStoreOrder(
+          buildOrderPayload(cart.id, paymentIntent.id, effectiveShippingCents, {
+            email: snapshot.email,
+            first_name: snapshot.first_name,
+            last_name: snapshot.last_name,
+            phone: snapshot.phone,
+            address_line1: snapshot.address_line1,
+            address_line2: snapshot.address_line2,
+            city: snapshot.city,
+            postal_code: snapshot.postal_code,
+            country: snapshot.country,
+          }, {
+            billing_same_as_shipping: snapshot.billing_same_as_shipping,
+            billing_address_line1: snapshot.billing_address_line1,
+            billing_address_line2: snapshot.billing_address_line2,
+            billing_city: snapshot.billing_city,
+            billing_postal_code: snapshot.billing_postal_code,
+            billing_country: snapshot.billing_country,
+          }),
+          custTok,
+        );
+
+        if (orderId && res.ok) {
+          if (custTok && snapshot.save_new_address && !snapshot.ship_addr_id && snapshot.address_line1) {
+            try {
+              const client = getMedusaClient();
+              await client.createCustomerAddress(custTok, {
+                address_line1: snapshot.address_line1,
+                address_line2: snapshot.address_line2 || null,
+                zip_code: snapshot.postal_code || null,
+                city: snapshot.city || null,
+                country: snapshot.country || "DE",
+                is_default_shipping: snapshot.addr_count === 0,
+                is_default_billing: snapshot.addr_count === 0,
+              });
+            } catch (_) {}
+          }
+          sessionStorage.setItem(`andertal_pi_done_${piId}`, "1");
+          try { sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY); } catch (_) {}
+          try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
+          setCart(null);
+          router.replace(`/${locale}/order/${orderId}?confirmed=1`);
+        } else {
+          returnRecoveryStartedRef.current = false;
+          setReturnRecoveryError(data?.message || t("orderCompletionFailed"));
+          router.replace(checkoutPath);
+        }
+      } catch (err) {
+        returnRecoveryStartedRef.current = false;
+        setReturnRecoveryError(err?.message || t("paymentError"));
+        router.replace(checkoutPath);
+      } finally {
+        setReturnRecovering(false);
+      }
+    })();
+
+    return undefined;
+  }, [stripePromiseState, cart?.id, locale, router, setCart, t, isFreeShipping, shippingCents]);
+
   return (
     <PageWrap>
       <ShopHeader />
@@ -2312,6 +2383,8 @@ export default function CheckoutPage() {
         <Title>{t("title")}</Title>
 
         {stripePkLoading && items.length > 0 ? (
+          <GlobalPageLoader label={t("processing")} />
+        ) : returnRecovering ? (
           <GlobalPageLoader label={t("processing")} />
         ) : items.length === 0 ? (
           <div style={{ color: "#6b7280", fontSize: "1rem" }}>
@@ -2548,6 +2621,9 @@ export default function CheckoutPage() {
             <div>
               {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
               {loadingPI && <GlobalPageLoader label={t("processing")} />}
+              {returnRecoveryError && (
+                <ErrorBox style={{ marginBottom: 24 }}>{returnRecoveryError}</ErrorBox>
+              )}
               {!loadingPI && !zeroCheckoutMode && !stripePromiseState ? (
                 <ErrorBox style={{ marginBottom: 24 }}>
                   <div>{t("configError")}</div>

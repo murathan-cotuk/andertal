@@ -97,6 +97,9 @@
   "checkout": {
     "title": "Checkout",
     "paymentError": "Payment failed. Please try again.",
+    "paymentAlreadyPaid": "Your payment was received. Click below to complete your order.",
+    "completeOrder": "Complete order",
+    "orderCompletionFailed": "Payment received but the order could not be created. Click «Complete order» again or contact support.",
     "paymentNotReady": "Payment form is still loading. Please wait a moment.",
     "invalidEmail": "Invalid email",
     "requiredField": "Required",

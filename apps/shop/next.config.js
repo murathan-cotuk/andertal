@@ -91,8 +91,11 @@ const nextConfig = {
       "default-src 'self'",
       // Next.js hydration, styled-components, Stripe SDK, Trustpilot widget
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://widget.trustpilot.com https://invitejs.trustpilot.com",
-      // Styled-components injects inline styles
-      "style-src 'self' 'unsafe-inline'",
+      // Styled-components injects inline styles; Font Awesome + Google Fonts from layout/theme
+      "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+      "style-src-elem 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+      // Stripe / Sentry may spawn blob workers
+      "worker-src 'self' blob:",
       // Product images from any HTTPS source; data URIs for QR codes / placeholders
       "img-src 'self' data: blob: https:",
       // Web fonts

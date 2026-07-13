@@ -97,6 +97,9 @@
   "checkout": {
     "title": "Kasse",
     "paymentError": "Zahlung fehlgeschlagen. Bitte erneut versuchen.",
+    "paymentAlreadyPaid": "Ihre Zahlung wurde empfangen. Klicken Sie unten, um die Bestellung abzuschließen.",
+    "completeOrder": "Bestellung abschließen",
+    "orderCompletionFailed": "Zahlung erhalten, Bestellung konnte nicht erstellt werden. Bitte erneut auf «Bestellung abschließen» klicken oder Support kontaktieren.",
     "paymentNotReady": "Zahlungsformular wird noch geladen. Bitte kurz warten.",
     "invalidEmail": "Ungültige E-Mail",
     "requiredField": "Pflichtfeld",
