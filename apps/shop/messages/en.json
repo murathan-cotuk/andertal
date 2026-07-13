@@ -117,6 +117,7 @@
     "placeOrder": "Place order",
     "backToCart": "Back to cart",
     "configError": "Unable to load checkout. Please try again.",
+    "retry": "Try again",
     "orderSummary": "Order summary",
     "subtotal": "Subtotal",
     "shipping": "Shipping",

@@ -2021,14 +2021,26 @@ export default function CheckoutPage() {
   const [paymentMethodTypes, setPaymentMethodTypes] = useState(["card"]);
   const [paymentMethodLayout, setPaymentMethodLayout] = useState("grid");
   const [customerSessionSecret, setCustomerSessionSecret] = useState(null);
+  const [paymentConfigRetryKey, setPaymentConfigRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-public-payment-config")
-      .then((r) => r.json())
-      .then((d) => {
+    setStripePkLoading(true);
+    // A transient failure here (e.g. the backend restarting) used to leave the
+    // customer permanently stuck: no button, just a static error, with no way
+    // to recover short of knowing to reload the page. Retry a few times with a
+    // short delay before giving up, and paymentConfigRetryKey lets the
+    // "configError" box below offer a real Retry button for anything left over.
+    const attempt = async (n) => {
+      try {
+        const r = await fetch("/api/store-public-payment-config");
+        const d = await r.json();
         if (cancelled) return;
         const pk = (d?.stripe_publishable_key || "").trim();
+        if (!pk && n < 3) {
+          setTimeout(() => attempt(n + 1), 1500);
+          return;
+        }
         const pmTypes = Array.isArray(d?.payment_method_types) && d.payment_method_types.length
           ? d.payment_method_types.map((x) => String(x || "").toLowerCase()).filter(Boolean)
           : ["card"];
@@ -2036,17 +2048,21 @@ export default function CheckoutPage() {
         setPaymentMethodLayout(d?.payment_method_layout === "list" ? "list" : "grid");
         if (pk) setStripePromiseState(loadStripe(pk));
         setStripePkLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPaymentMethodTypes(["card"]);
-          setStripePkLoading(false);
+      } catch {
+        if (cancelled) return;
+        if (n < 3) {
+          setTimeout(() => attempt(n + 1), 1500);
+          return;
         }
-      });
+        setPaymentMethodTypes(["card"]);
+        setStripePkLoading(false);
+      }
+    };
+    attempt(1);
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [paymentConfigRetryKey]);
 
   useEffect(() => {
     setCustomerToken(getToken("customer"));
@@ -2499,7 +2515,26 @@ export default function CheckoutPage() {
               {piError && <ErrorBox style={{ marginBottom: 24 }}>{piError}</ErrorBox>}
               {loadingPI && <GlobalPageLoader label={t("processing")} />}
               {!loadingPI && !zeroCheckoutMode && !stripePromiseState ? (
-                <ErrorBox style={{ marginBottom: 24 }}>{t("configError")}</ErrorBox>
+                <ErrorBox style={{ marginBottom: 24 }}>
+                  <div>{t("configError")}</div>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentConfigRetryKey((k) => k + 1)}
+                    style={{
+                      marginTop: 10,
+                      padding: "8px 16px",
+                      background: "#111827",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 8,
+                      fontSize: "0.8125rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {t("retry")}
+                  </button>
+                </ErrorBox>
               ) : null}
               {zeroCheckoutMode && (
                 <ZeroCheckoutForm

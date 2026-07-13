@@ -113,6 +113,7 @@
     "placeOrder": "Invia ordine",
     "backToCart": "Torna al carrello",
     "configError": "Impossibile caricare il checkout. Riprova.",
+    "retry": "Riprova",
     "orderSummary": "Riepilogo ordine",
     "subtotal": "Subtotale",
     "shipping": "Spedizione",

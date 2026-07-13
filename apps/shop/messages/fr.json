@@ -113,6 +113,7 @@
     "placeOrder": "Passer la commande",
     "backToCart": "Retour au panier",
     "configError": "Impossible de charger la caisse. Veuillez réessayer.",
+    "retry": "Réessayer",
     "orderSummary": "Récapitulatif",
     "subtotal": "Sous-total",
     "shipping": "Livraison",

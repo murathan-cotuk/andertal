@@ -117,6 +117,7 @@
     "placeOrder": "Bestellung aufgeben",
     "backToCart": "Zurück zum Warenkorb",
     "configError": "Kasse konnte nicht geladen werden. Bitte erneut versuchen.",
+    "retry": "Erneut versuchen",
     "orderSummary": "Bestellübersicht",
     "subtotal": "Zwischensumme",
     "shipping": "Versand",

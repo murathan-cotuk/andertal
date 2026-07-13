@@ -117,6 +117,7 @@
     "placeOrder": "Siparişi ver",
     "backToCart": "Sepete dön",
     "configError": "Ödeme yüklenemedi. Lütfen tekrar deneyin.",
+    "retry": "Tekrar dene",
     "orderSummary": "Sipariş özeti",
     "subtotal": "Ara toplam",
     "shipping": "Kargo",

@@ -113,6 +113,7 @@
     "placeOrder": "Realizar pedido",
     "backToCart": "Volver al carrito",
     "configError": "No se pudo cargar el pago. Inténtalo de nuevo.",
+    "retry": "Reintentar",
     "orderSummary": "Resumen del pedido",
     "subtotal": "Subtotal",
     "shipping": "Envío",
