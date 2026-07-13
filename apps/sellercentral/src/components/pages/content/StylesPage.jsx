@@ -844,6 +844,14 @@ export default function StylesPage() {
       const data = await client.getStyles();
       const loaded = data?.styles || {};
       const merged = mergeLoadedShopStyles(loaded);
+      // Ensure link_style_* always have explicit values in state so they are always
+      // included in the save payload — mergeLoadedShopStyles deletes them when absent
+      // from DB (intentional for layout presets in the shop), but StylesPage needs
+      // explicit values so that whatever is displayed is exactly what gets saved.
+      const sn = merged.secondNav;
+      if (!Object.prototype.hasOwnProperty.call(sn, 'link_style_desktop')) sn.link_style_desktop = 'classic';
+      if (!Object.prototype.hasOwnProperty.call(sn, 'link_style_tablet')) sn.link_style_tablet = 'pill';
+      if (!Object.prototype.hasOwnProperty.call(sn, 'link_style_mobile')) sn.link_style_mobile = 'pill';
       const settings = await client.getSellerSettings('default').catch(() => ({}));
       setStyles(merged);
       setSavedSnapshot(JSON.stringify(merged));

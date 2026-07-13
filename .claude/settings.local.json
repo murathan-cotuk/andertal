@@ -175,7 +175,17 @@
       "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\\\(auth\\)\\\\signup\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\dashboard\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\apps\\\\new\")",
-      "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\apps\\\\[id]\")"
+      "Bash(mkdir -p \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\developer\\\\src\\\\app\\\\[locale]\\\\apps\\\\[id]\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\*StylesPage*\")",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\components\\\\pages\\\\content\\\\StylesPage.jsx\" -Pattern \"link_style|secondNav|saveStyles|updateSection\" | Select-Object -First 60 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\components\\\\pages\\\\content\\\\StylesPage.jsx\" -Pattern \"link_style\" | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"link_style|resolveSecondNav|pill|secondNav\" | Select-Object -First 40 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"useLandingChrome|secondNavDesktopClassic\" | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"LandingChrome|landingChrome\" | Select-Object -First 5 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "PowerShell(Select-String *)",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\app\\\\globals.css\" -Pattern \"sn-desktop|sn-tablet|sn-mobile|pill|data-sn\" | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"shopStyles|useShopStyles|ShopStyles\" | Select-Object -First 15 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\ShopHeader.jsx\" -Pattern \"SecondLink|SubNavWrap|SecondMenuRowInner\" | Select-Object -First 15 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line\\)\" })"
     ]
   }
 }

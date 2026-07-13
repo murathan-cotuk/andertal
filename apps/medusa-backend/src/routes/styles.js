@@ -30,7 +30,10 @@ const stylesPUT = async (req, res) => {
   if (!client) return res.status(503).json({ message: 'Database not configured' })
   try {
     await client.connect()
-    const styles = req.body?.styles || { colors: {}, buttons: {} }
+    const styles = req.body?.styles
+    if (!styles || typeof styles !== 'object' || Array.isArray(styles)) {
+      return res.status(400).json({ message: 'Missing or invalid styles in request body' })
+    }
     await client.query(
       `INSERT INTO admin_hub_styles (key, value) VALUES ('styles', $1)
        ON CONFLICT (key) DO UPDATE SET value = $1`,
