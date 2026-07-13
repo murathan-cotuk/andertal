@@ -36,6 +36,51 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const CHECKOUT_SNAPSHOT_KEY = "andertal_checkout_snapshot";
 
+async function readResponseJson(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: (text || "").slice(0, 500) || `HTTP ${res.status}` };
+  }
+}
+
+/** If PI already succeeded (retry after backend 502), skip confirmPayment. */
+async function resolveCheckoutPaymentIntent(stripe, elements, clientSecret, returnUrl) {
+  if (clientSecret) {
+    const retrieved = await stripe.retrievePaymentIntent(clientSecret);
+    if (retrieved?.paymentIntent?.status === "succeeded") {
+      return { paymentIntent: retrieved.paymentIntent, error: null };
+    }
+  }
+
+  const { error: submitError } = await elements.submit();
+  if (submitError) return { paymentIntent: null, error: submitError };
+
+  const result = await stripe.confirmPayment({
+    elements,
+    confirmParams: { return_url: returnUrl },
+    redirect: "if_required",
+  });
+
+  if (result.error) {
+    const code = String(result.error.code || "").trim();
+    const piFromErr = result.error.payment_intent;
+    if (piFromErr && typeof piFromErr === "object" && piFromErr.status === "succeeded") {
+      return { paymentIntent: piFromErr, error: null };
+    }
+    if (code === "payment_intent_unexpected_state" && clientSecret) {
+      const again = await stripe.retrievePaymentIntent(clientSecret);
+      if (again?.paymentIntent?.status === "succeeded") {
+        return { paymentIntent: again.paymentIntent, error: null };
+      }
+    }
+    return { paymentIntent: result.paymentIntent, error: result.error };
+  }
+
+  return { paymentIntent: result.paymentIntent, error: null };
+}
+
 const PageWrap = styled.div`
   min-height: 100vh;
   min-height: 100dvh;
@@ -891,9 +936,9 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             billing_country: snapshot.billing_country,
           }),
         });
-        const data = await res.json();
+        const data = await readResponseJson(res);
         const orderId = data?.order?.id;
-        if (orderId) {
+        if (orderId && res.ok) {
           if (custTok && snapshot.save_new_address && !snapshot.ship_addr_id && snapshot.address_line1) {
             try {
               const client = getMedusaClient();
@@ -996,23 +1041,12 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
       );
     } catch (_) {}
 
-    const { error: submitError } = await elements.submit();
-    if (submitError) {
-      setError(submitError.message || t("paymentError"));
-      setProcessing(false);
-      return;
-    }
-
-    let stripeError;
     let paymentIntent;
+    let stripeError;
     try {
-      const result = await stripe.confirmPayment({
-        elements,
-        confirmParams: { return_url: returnUrl },
-        redirect: "if_required",
-      });
-      stripeError = result.error;
-      paymentIntent = result.paymentIntent;
+      const resolved = await resolveCheckoutPaymentIntent(stripe, elements, clientSecret, returnUrl);
+      paymentIntent = resolved.paymentIntent;
+      stripeError = resolved.error;
     } catch (err) {
       setError(err?.message || t("paymentError"));
       setProcessing(false);
@@ -1020,17 +1054,9 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
     }
 
     if (stripeError) {
-      // Common retry scenario: payment succeeded, but order creation failed (502/deploy/etc),
-      // user clicks Pay again → Stripe rejects a second confirm with this code.
-      const code = String(stripeError?.code || "").trim();
-      const piFromErr = stripeError?.payment_intent;
-      if (code === "payment_intent_unexpected_state" && piFromErr?.status === "succeeded") {
-        paymentIntent = piFromErr;
-      } else {
-        setError(stripeError.message || t("paymentError"));
-        setProcessing(false);
-        return;
-      }
+      setError(stripeError.message || t("paymentError"));
+      setProcessing(false);
+      return;
     }
 
     if (paymentIntent?.status === "succeeded") {
@@ -1062,7 +1088,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
           }),
         });
-        const data = await res.json();
+        const data = await readResponseJson(res);
         const orderId = data?.order?.id;
         if (!res.ok || !orderId) {
           setError(data?.message || t("paymentError"));
@@ -1597,7 +1623,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
         }),
       });
-      const data = await res.json();
+      const data = await readResponseJson(res);
       const orderId = data?.order?.id;
       if (!res.ok || !orderId) {
         setError(data?.message || t("paymentError"));

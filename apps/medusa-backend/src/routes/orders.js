@@ -514,18 +514,18 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       const pageTitle = String(body.title || body.page_title || '').trim().slice(0, 500)
       const referrer = String(body.referrer || '').trim().slice(0, 2000)
       const userAgent = String(req.headers['user-agent'] || body.user_agent || '').trim().slice(0, 500)
-      const ip = getClientIpFromRequest(req).slice(0, 45)
-      const countryCode = String(
-        req.headers['cf-ipcountry'] ||
-        req.headers['x-vercel-ip-country'] ||
-        body.country_code ||
-        '',
-      ).trim().toUpperCase().slice(0, 8) || null
-      const city = String(req.headers['cf-ipcity'] || req.headers['x-vercel-ip-city'] || body.city || '').trim().slice(0, 120) || null
-      const region = String(req.headers['cf-region'] || req.headers['x-vercel-ip-country-region'] || body.region || '').trim().slice(0, 120) || null
-      const deviceType = detectDeviceType(userAgent)
       let client
       try {
+        const ip = getClientIpFromRequest(req).slice(0, 45)
+        const countryCode = String(
+          req.headers['cf-ipcountry'] ||
+          req.headers['x-vercel-ip-country'] ||
+          body.country_code ||
+          '',
+        ).trim().toUpperCase().slice(0, 8) || null
+        const city = String(req.headers['cf-ipcity'] || req.headers['x-vercel-ip-city'] || body.city || '').trim().slice(0, 120) || null
+        const region = String(req.headers['cf-region'] || req.headers['x-vercel-ip-country-region'] || body.region || '').trim().slice(0, 120) || null
+        const deviceType = detectDeviceType(userAgent)
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()

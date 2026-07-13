@@ -2834,18 +2834,32 @@ const storeOrdersPOST = async (req, res) => {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
 
-    // Idempotency: if an order already exists for this cart, return it instead of inserting again.
-    // This happens when payment succeeded but the client retried due to a transient 5xx / deploy.
+    const paymentIntentIdEarly = (body.payment_intent_id || body.paymentIntentId || '').toString().trim()
+
+    const returnExistingOrder = async (orderId) => {
+      const order = await getOrderWithItems(client, orderId)
+      await client.end()
+      return res.status(200).json({ order, reused: true })
+    }
+
+    // Idempotency: payment already linked to an order (retry after 502 / deploy).
+    if (paymentIntentIdEarly.startsWith('pi_')) {
+      try {
+        const exPi = (await client.query(
+          'SELECT id FROM store_orders WHERE payment_intent_id = $1 LIMIT 1',
+          [paymentIntentIdEarly],
+        )).rows?.[0]
+        if (exPi?.id) return await returnExistingOrder(exPi.id)
+      } catch (_) {}
+    }
+
+    // Idempotency: order already created for this cart.
     try {
       const ex = (await client.query(
         'SELECT id FROM store_orders WHERE cart_id = $1 ORDER BY created_at DESC LIMIT 1',
         [cartId],
       )).rows?.[0]
-      if (ex?.id) {
-        const order = await getOrderWithItems(client, ex.id)
-        await client.end()
-        return res.status(200).json({ order, reused: true })
-      }
+      if (ex?.id) return await returnExistingOrder(ex.id)
     } catch (_) {}
 
     let cart = await getCartWithItems(client, cartId)

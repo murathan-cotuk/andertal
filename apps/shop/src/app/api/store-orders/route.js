@@ -31,7 +31,7 @@ export async function POST(request) {
     }
 
     if (res.ok) {
-      return NextResponse.json(data || {}, { status: 201 });
+      return NextResponse.json(data || {}, { status: res.status });
     }
 
     const message =

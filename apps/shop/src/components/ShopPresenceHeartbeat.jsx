@@ -22,9 +22,6 @@ function getOrCreateSessionId() {
   }
 }
 
-function backendBase() {
-  return (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
-}
 
 export default function ShopPresenceHeartbeat() {
   const pathname = usePathname() || "/";
@@ -39,8 +36,7 @@ export default function ShopPresenceHeartbeat() {
 
     const ping = () => {
       if (cancelled || typeof document === "undefined" || document.visibilityState === "hidden") return;
-      const base = backendBase();
-      fetch(`${base}/store/presence/heartbeat`, {
+      fetch("/api/store-presence-heartbeat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -69,8 +65,7 @@ export default function ShopPresenceHeartbeat() {
   useEffect(() => {
     const sid = getOrCreateSessionId();
     if (!sid) return;
-    const base = backendBase();
-    fetch(`${base}/store/presence/heartbeat`, {
+    fetch("/api/store-presence-heartbeat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
