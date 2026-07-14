@@ -770,7 +770,7 @@ function applyToField(field, value) {
   field.onChange({ target: { value: value ?? "" } });
 }
 
-function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false, paymentMethodTypes = ["card"], paymentMethodLayout = "grid" }) {
+function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amountToPayCents, shippingCents, onCountryChange, defaultCountry, shippableCountries, paymentIntentRefreshing = false, paymentMethodTypes = ["card"], paymentMethodLayout = "grid", onRetry }) {
   const shipList = useMemo(() => shippableCountries || [], [shippableCountries]);
   const pickShipCountry = (raw) => {
     const u = String(raw || "DE").toUpperCase();
@@ -1340,14 +1340,39 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
                   : "tabs",
               }}
               onReady={() => setPaymentElementReady(true)}
-              onLoadError={() => {
+              onLoadError={(ev) => {
+                console.error("[Stripe] PaymentElement load error:", ev?.error);
                 setPaymentElementReady(false);
                 setError(t("paymentError"));
               }}
             />
           </StripePaymentWrap>
         )}
-        {error && <ErrorBox>{error}</ErrorBox>}
+        {error && (
+          <ErrorBox>
+            <span>{error}</span>
+            {!paymentElementReady && !paymentAlreadySucceeded && onRetry && (
+              <button
+                type="button"
+                onClick={() => { setError(null); onRetry(); }}
+                style={{
+                  marginTop: 8,
+                  display: "block",
+                  background: "none",
+                  border: "1px solid #fecaca",
+                  borderRadius: 6,
+                  color: "#b91c1c",
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  padding: "6px 12px",
+                  cursor: "pointer",
+                }}
+              >
+                {t("retry")}
+              </button>
+            )}
+          </ErrorBox>
+        )}
         <CheckoutSubmitWrapFooter>
           <PayNowButton
             type="submit"
@@ -2690,6 +2715,7 @@ export default function CheckoutPage() {
                     paymentIntentRefreshing={loadingPI}
                     paymentMethodTypes={paymentMethodTypes}
                     paymentMethodLayout={paymentMethodLayout}
+                    onRetry={() => setPiRefreshKey((k) => k + 1)}
                   />
                 </Elements>
               )}

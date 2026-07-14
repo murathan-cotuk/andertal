@@ -104,7 +104,8 @@ const nextConfig = {
       // In development also allow http://localhost:* for the local backend
       `connect-src 'self' https: wss:${process.env.NODE_ENV !== 'production' ? ' http://localhost:9000 http://localhost:* ws://localhost:*' : ''}`,
       // Stripe payment iframes, Trustpilot rating widget
-      "frame-src https://js.stripe.com https://hooks.stripe.com https://widget.trustpilot.com",
+      // m.stripe.com is required for PaymentElement customer-session features (saved cards, Link)
+      "frame-src https://js.stripe.com https://hooks.stripe.com https://m.stripe.com https://widget.trustpilot.com",
       // No embedding of this page in foreign iframes
       "frame-ancestors 'self'",
       // Disable plugins (Flash, etc.)
