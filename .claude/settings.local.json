@@ -194,7 +194,8 @@
       "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\\\\server.js\" -Pattern \"ALTER TABLE|migrat|startup|seller_users\" | Select-Object -First 10 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line.Trim\\(\\)\\)\" })",
       "PowerShell(Select-String -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\medusa-backend\\\\server.js\" -Pattern \"sellers\\\\.js|seller-account|createSellersRouter|createSellerAccount\" | Select-Object -First 8 | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line.Trim\\(\\)\\)\" })",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\app\" -Recurse -Filter \"page.jsx\" | Select-Object FullName | Where-Object { $_.FullName -match \"settings\" } | Select-Object -First 10)",
-      "PowerShell(Get-Content -LiteralPath 'C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\messages\\\\tr.json' -Raw | Select-String -Pattern \"retry|tekrar|Tekrar\" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value })"
+      "PowerShell(Get-Content -LiteralPath 'C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\messages\\\\tr.json' -Raw | Select-String -Pattern \"retry|tekrar|Tekrar\" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value })",
+      "PowerShell(Get-ChildItem -LiteralPath 'C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\app\\\\api' -Recurse | Select-Object Name, FullName | Where-Object { $_.FullName -match \"order\" })"
     ]
   }
 }

@@ -507,7 +507,13 @@ export default function OrderDetailPage() {
         <ShopHeader />
         <main style={{ flex: 1, maxWidth: 640, margin: "0 auto", padding: "48px 20px", width: "100%" }}>
           <p style={{ color: "#ef4444", textAlign: "center" }}>{error || "Bestellung nicht gefunden."}</p>
-          <div style={{ textAlign: "center", marginTop: 20 }}>
+          <div style={{ textAlign: "center", marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <button
+              onClick={() => { setError(null); setLoading(true); loadOrder(); }}
+              style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}
+            >
+              Erneut versuchen
+            </button>
             <Link href="/orders" style={{ color: ORANGE, fontWeight: 600, textDecoration: "none" }}>← Zurück zu Bestellungen</Link>
           </div>
         </main>

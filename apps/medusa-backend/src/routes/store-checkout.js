@@ -6,6 +6,25 @@ const { getBestsellerProductIds } = require('./store-products')
 const { getAdminHubProductByIdOrHandleDb } = require('./admin-products')
 const { normalizeHubCountryCode } = require('./seller-settings')
 const { requireSellerAuth, requireSuperuser } = require('./seller-auth')
+const { runAutomationFlowsForOrder } = require('../flow-automation')
+const { enqueueFlowEvent } = require('../flow-queue')
+
+const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
+  const tk = String(triggerKey || '').trim()
+  const oid = String(orderId || '').trim()
+  if (!tk || !oid) return
+  try {
+    const queued = await enqueueFlowEvent('order-flow-event', { triggerKey: tk, orderId: oid })
+    if (queued) return
+  } catch (qe) {
+    console.warn('[flow-queue] enqueue order event failed, fallback immediate:', qe?.message || qe)
+  }
+  setImmediate(() => {
+    runAutomationFlowsForOrder({ triggerKey: tk, orderId: oid }).catch((fe) => {
+      console.warn(`runAutomationFlowsForOrder ${tk}:`, fe?.message || fe)
+    })
+  })
+}
 
 // ── DB ────────────────────────────────────────────────────────────────────────
 const { z } = require('zod')
@@ -3246,11 +3265,12 @@ const storeOrdersPOST = async (req, res) => {
     const order = await getOrderWithItems(client, orderId)
     await client.end()
     res.status(201).json({ order })
+    // Fire-and-forget AFTER response — must be outside try so a failure cannot trigger the 500 catch handler
     void dispatchOrderFlowEvent('order_placed', orderId)
   } catch (err) {
     if (client) try { await client.end() } catch (_) {}
     console.error('Store orders POST:', err)
-    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    if (!res.headersSent) res.status(500).json({ message: (err && err.message) || 'Internal server error' })
   }
 }
 
