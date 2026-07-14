@@ -940,6 +940,7 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 export default function ProductTemplate() {
+  const router = useRouter();
   const params = useParams();
   const locale = useLocale();
   const tp = useTranslations("product");
@@ -1373,7 +1374,6 @@ export default function ProductTemplate() {
     }
   };
 
-  const router = useRouter();
   const handleBuyNow = async () => {
     const variantId = variant?.id;
     if (!variantId || shippingUnavailable || isComingSoon || !inStock) return;
