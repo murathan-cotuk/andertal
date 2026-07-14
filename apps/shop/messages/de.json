@@ -417,6 +417,7 @@
     "emailPlaceholder": "deine@email.de"
   },
   "product": {
+    "buyNow": "Jetzt kaufen",
     "addToCart": "In den Warenkorb",
     "addedToCart": "Zum Warenkorb hinzugefügt",
     "addToCartFailed": "Hinzufügen fehlgeschlagen",

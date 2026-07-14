@@ -392,6 +392,7 @@
     "emailPlaceholder": "votre@email.fr"
   },
   "product": {
+    "buyNow": "Acheter maintenant",
     "addToCart": "Ajouter au panier",
     "addedToCart": "Ajouté au panier",
     "addToCartFailed": "Échec de l'ajout",

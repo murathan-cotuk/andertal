@@ -677,7 +677,11 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
         </Link>
 
         <ReviewRow>
-          {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
+          {reviewCount > 0 && (
+            <Link href={productUrl ? `${productUrl}#reviews` : "#"} style={{ textDecoration: "none", display: "inline-flex" }}>
+              <StarRating average={reviewAvg} count={reviewCount} />
+            </Link>
+          )}
         </ReviewRow>
 
         <Prices>

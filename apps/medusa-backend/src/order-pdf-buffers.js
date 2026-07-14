@@ -23,25 +23,21 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   const grandTotal = resolveOrderPaidTotalCents(row)
   const cc = row.coupon_code ? String(row.coupon_code).trim() : ''
 
-  const totalsLines = [
-    { label: s.subtotal, value: pdfCents(subtotal, locale) },
-    { label: s.shipping, value: shipping > 0 ? pdfCents(shipping, locale) : s.freeShipping },
-  ]
+  const sellerVatId = sellerInfo?.vat_id ? String(sellerInfo.vat_id).trim() : ''
+  const totalsLines = []
   if (bonusDisc > 0) totalsLines.push({ label: s.bonusPoints(Number(row.bonus_points_redeemed || 0)), value: `-${pdfCents(bonusDisc, locale)}` })
   if (couponDisc > 0) totalsLines.push({ label: cc ? `${s.coupon} (${cc})` : s.coupon, value: `-${pdfCents(couponDisc, locale)}` })
   const remainder = Math.max(0, discount - bonusDisc - couponDisc)
   if (remainder > 0) totalsLines.push({ label: s.discount, value: `-${pdfCents(remainder, locale)}` })
-  totalsLines.push({ label: s.grandTotal, value: pdfCents(grandTotal, locale), bold: true })
-
-  const sellerVatId = sellerInfo?.vat_id ? String(sellerInfo.vat_id).trim() : ''
   if (sellerVatId) {
     const vatCents = Math.round(grandTotal * 19 / 119)
     const netCents = grandTotal - vatCents
-    totalsLines.push({ label: s.vatIncluded, value: pdfCents(vatCents, locale), color: '#64748b' })
-    totalsLines.push({ label: s.netAmount, value: pdfCents(netCents, locale), color: '#64748b' })
+    totalsLines.push({ label: s.netTotal, value: pdfCents(netCents, locale) })
+    totalsLines.push({ label: s.vatLine(19), value: pdfCents(vatCents, locale) })
   } else {
-    totalsLines.push({ label: s.vatExempt, value: '', color: '#64748b' })
+    totalsLines.push({ label: s.vatExempt, value: '', color: '#64748b', small: true })
   }
+  totalsLines.push({ label: s.grandTotal, value: pdfCents(grandTotal, locale), bold: true })
 
   const displayNumber = String(invoiceNumber || '').startsWith('R-') ? String(invoiceNumber) : `R-${invoiceNumber}`
 
@@ -55,6 +51,7 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     locale,
     kind: 'invoice',
     totalsLines,
+    shippingCents: shipping,
     amountDueCents: grandTotal,
     footerText: s.invoiceFooter,
     invoiceNumber: displayNumber,
@@ -153,7 +150,7 @@ async function _querySellerInfo(pgClient, sellerId) {
   if (!sellerId || String(sellerId).trim() === 'default') return null
   try {
     const r = await pgClient.query(
-      `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
+      `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address, lucid_number
          FROM seller_users WHERE seller_id = $1 LIMIT 1`,
       [String(sellerId).trim()],
     )

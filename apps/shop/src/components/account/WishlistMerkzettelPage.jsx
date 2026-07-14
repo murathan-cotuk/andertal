@@ -22,15 +22,10 @@ const WishGrid = styled.div`
   display: grid;
   gap: 16px;
   width: 100%;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  @media (max-width: 1280px) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  @media (max-width: 900px) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  @media (max-width: 640px) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  @media (max-width: 767px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 `;
 

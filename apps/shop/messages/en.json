@@ -417,6 +417,7 @@
     "emailPlaceholder": "your@email.com"
   },
   "product": {
+    "buyNow": "Buy now",
     "addToCart": "Add to cart",
     "addedToCart": "Added to cart",
     "addToCartFailed": "Add to cart failed",

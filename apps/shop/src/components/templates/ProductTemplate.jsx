@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { Link } from "@/i18n/navigation";
+import { useRouter, Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import { Button } from "@andertal/ui";
 import { getMedusaClient } from "@/lib/medusa-client";
@@ -438,36 +438,9 @@ const RightCol = styled.div`
 
 
 const BuyboxCard = styled.aside`
-  position: static;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.98));
-  box-shadow:
-    0 8px 24px rgba(17, 24, 39, 0.10),
-    0 2px 8px rgba(17, 24, 39, 0.06);
-  overflow: hidden;
-  border: 1px solid rgba(17, 24, 39, 0.06);
-
-  @supports ((-webkit-backdrop-filter: blur(12px)) or (backdrop-filter: blur(12px))) {
-    background: rgba(255, 255, 255, 0.72);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-  }
-
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    padding: 1px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(255,106,0,0.45), rgba(255,106,0,0.05), rgba(17,24,39,0.08));
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-  }
-
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
 `;
 
 const BuyboxInner = styled.div`
@@ -1400,6 +1373,16 @@ export default function ProductTemplate() {
     }
   };
 
+  const router = useRouter();
+  const handleBuyNow = async () => {
+    const variantId = variant?.id;
+    if (!variantId || shippingUnavailable || isComingSoon || !inStock) return;
+    try {
+      await addToCart(variantId, quantity, selectedSellerId);
+    } catch (_) {}
+    router.push("/checkout");
+  };
+
   const resolvedCategorySlug = String(
     categoryCurrentNode?.slug || categoryCurrentNode?.handle || meta.category_slug || ""
   ).replace(/^\//, "");
@@ -1760,18 +1743,16 @@ export default function ProductTemplate() {
               />
 
               <ProductPurchaseActions
-                locale={locale}
                 quantity={quantity}
                 onQuantityChange={setQuantity}
                 maxQty={maxQty}
                 purchaseDisabled={!inStock || isComingSoon || shippingUnavailable}
                 onAddToCart={handleAddToCart}
+                onBuyNow={handleBuyNow}
                 cartNotice={cartNotice}
                 shippingUnavailable={shippingUnavailable}
                 isComingSoon={isComingSoon}
                 inStock={inStock}
-                publishDate={publishDate}
-                stackOnly
               />
 
               <InfoList>

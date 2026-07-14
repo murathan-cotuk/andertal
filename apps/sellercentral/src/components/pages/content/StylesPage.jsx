@@ -1669,6 +1669,15 @@ export default function StylesPage() {
                     familiesLoading={googleFontsLoading}
                     onLevelChange={updateTypoLevel}
                   />
+                  <Divider />
+                  <TypographyLevelRow
+                    heading={locale === "de" ? "Sidebar-Navigation (Filter-Seitenleiste)" : locale === "tr" ? "Sidebar Navigasyonu (Filtre kenar çubuğu)" : "Sidebar Navigation (filter sidebar)"}
+                    levelKey="sidebar_nav"
+                    typo={styles.typography}
+                    families={googleFontList || []}
+                    familiesLoading={googleFontsLoading}
+                    onLevelChange={updateTypoLevel}
+                  />
                 </BlockStack>
               )}
           </BlockStack>
@@ -1794,14 +1803,26 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("topbar", "variant", v)}
                 />
                 <ColorField
-                  label={c.bgColor}
+                  label={locale === "de" ? "Hintergrundfarbe (Statisch / Oben)" : locale === "tr" ? "Arka plan (Sabit / Üstte)" : "Background (Static / At Top)"}
                   value={styles.topbar.bg_color}
                   onChange={(v) => updateSection("topbar", "bg_color", v)}
+                />
+                <ColorField
+                  label={locale === "de" ? "Hintergrundfarbe (beim Scrollen)" : locale === "tr" ? "Arka plan (Kaydırırken)" : "Background (On Scroll)"}
+                  value={styles.topbar.bg_color_scroll ?? ""}
+                  onChange={(v) => updateSection("topbar", "bg_color_scroll", v)}
+                  helpText={locale === "de" ? "Leer = gleiche Farbe wie oben" : locale === "tr" ? "Boş = yukarıdaki renk" : "Empty = same as static color"}
                 />
                 <ColorField
                   label={c.textColor}
                   value={styles.topbar.text_color}
                   onChange={(v) => updateSection("topbar", "text_color", v)}
+                />
+                <ColorField
+                  label={locale === "de" ? "Textfarbe (beim Scrollen)" : locale === "tr" ? "Yazı rengi (Kaydırırken)" : "Text Color (On Scroll)"}
+                  value={styles.topbar.text_color_scroll ?? ""}
+                  onChange={(v) => updateSection("topbar", "text_color_scroll", v)}
+                  helpText={locale === "de" ? "Leer = gleiche Farbe wie oben" : locale === "tr" ? "Boş = yukarıdaki renk" : "Empty = same as static"}
                 />
                 <TextField
                   label={c.height}
@@ -1940,6 +1961,49 @@ export default function StylesPage() {
                 value={styles.header.text_color}
                 onChange={(v) => updateSection("header", "text_color", v)}
               />
+              <div style={{ gridColumn: "1 / -1" }}>
+                <BlockStack gap="300">
+                  <Text as="h4" variant="headingSm">{locale === "de" ? "Farben: Statisch (Oben) vs. Scrollen — pro Gerät" : locale === "tr" ? "Renkler: Sabit (Üstte) vs. Kaydırırken — cihaza göre" : "Colors: Static (At Top) vs. Scroll — Per Device"}</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {locale === "de" ? "Navbar-Hintergrund und Textfarbe je nach Scroll-Zustand und Gerät. Leer = globale Farbe oben verwendet." : locale === "tr" ? "Navbar arka planı ve yazı rengi, cihaz ve kaydırma durumuna göre. Boş = yukarıdaki global renk kullanılır." : "Navbar background and text color by scroll state and device. Empty = global color above is used."}
+                  </Text>
+                  {[
+                    { device: "desktop", label: locale === "de" ? "Desktop (≥1024px)" : "Desktop (≥1024px)" },
+                    { device: "tablet", label: locale === "de" ? "Tablet (768–1023px)" : "Tablet (768–1023px)" },
+                    { device: "mobile", label: locale === "de" ? "Mobil (≤767px)" : locale === "tr" ? "Mobil (≤767px)" : "Mobile (≤767px)" },
+                  ].map(({ device, label }) => (
+                    <div key={device} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
+                      <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued" style={{ marginBottom: 8 }}>{label}</Text>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginTop: 8 }}>
+                        <ColorField
+                          label={locale === "de" ? "Hintergrund – Statisch" : locale === "tr" ? "Arka plan – Sabit" : "Bg – Static (At Top)"}
+                          value={styles.header[`bg_color_top_${device}`] ?? ""}
+                          onChange={(v) => updateSection("header", `bg_color_top_${device}`, v)}
+                          helpText={locale === "de" ? "Leer = globale Farbe" : locale === "tr" ? "Boş = global renk" : "Empty = global color"}
+                        />
+                        <ColorField
+                          label={locale === "de" ? "Hintergrund – Scrollen" : locale === "tr" ? "Arka plan – Kaydırırken" : "Bg – On Scroll"}
+                          value={styles.header[`bg_color_scroll_${device}`] ?? ""}
+                          onChange={(v) => updateSection("header", `bg_color_scroll_${device}`, v)}
+                          helpText={locale === "de" ? "Leer = statische Farbe" : locale === "tr" ? "Boş = sabit renk" : "Empty = static color"}
+                        />
+                        <ColorField
+                          label={locale === "de" ? "Text – Statisch" : locale === "tr" ? "Yazı – Sabit" : "Text – Static"}
+                          value={styles.header[`text_color_top_${device}`] ?? ""}
+                          onChange={(v) => updateSection("header", `text_color_top_${device}`, v)}
+                          helpText={locale === "de" ? "Leer = globale Textfarbe" : locale === "tr" ? "Boş = global yazı rengi" : "Empty = global text color"}
+                        />
+                        <ColorField
+                          label={locale === "de" ? "Text – Scrollen" : locale === "tr" ? "Yazı – Kaydırırken" : "Text – On Scroll"}
+                          value={styles.header[`text_color_scroll_${device}`] ?? ""}
+                          onChange={(v) => updateSection("header", `text_color_scroll_${device}`, v)}
+                          helpText={locale === "de" ? "Leer = statische Textfarbe" : locale === "tr" ? "Boş = sabit yazı rengi" : "Empty = static text color"}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </BlockStack>
+              </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="200">
                   <Text as="span" variant="bodySm" fontWeight="medium">{c.normalHeight}</Text>
@@ -2132,98 +2196,44 @@ export default function StylesPage() {
                 <code style={{ fontSize: 12 }}>rgba(…)</code>,{" "}
                 <code style={{ fontSize: 12 }}>linear-gradient(…)</code>).
               </Text>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-                <TextField
-                  label={c.desktopBgCss}
-                  value={styles.secondNav.bg_desktop ?? ""}
-                  onChange={(v) => updateSection("secondNav", "bg_desktop", v)}
-                  placeholder={c.emptyFallbackBg}
-                  autoComplete="off"
-                  helpText={
-                    fieldEffectiveHelp(c, styles.secondNav.bg_desktop, effectiveLayout.secondNav.desktop.bg) ||
-                    c.bgExample
-                  }
-                />
-                <TextField
-                  label={c.desktopBorderCss}
-                  value={styles.secondNav.border_desktop ?? ""}
-                  onChange={(v) => updateSection("secondNav", "border_desktop", v)}
-                  placeholder={c.emptyFallbackBorder}
-                  autoComplete="off"
-                  helpText={
-                    fieldEffectiveHelp(c, styles.secondNav.border_desktop, effectiveLayout.secondNav.desktop.border) ||
-                    c.borderExample
-                  }
-                />
-                <ColorField
-                  label={c.desktopTextColor}
-                  value={styles.secondNav.text_color_desktop ?? ""}
-                  onChange={(v) => updateSection("secondNav", "text_color_desktop", v)}
-                  helpText={c.emptyGlobalTextBelow}
-                />
-                <ColorField
-                  label={c.desktopActiveColor}
-                  value={styles.secondNav.active_color_desktop ?? ""}
-                  onChange={(v) => updateSection("secondNav", "active_color_desktop", v)}
-                  helpText={c.emptyGlobalActive}
-                />
-                <TextField
-                  label={c.tabletBgCss}
-                  value={styles.secondNav.bg_tablet ?? ""}
-                  onChange={(v) => updateSection("secondNav", "bg_tablet", v)}
-                  placeholder={c.emptyFallbackBg}
-                  autoComplete="off"
-                  helpText={fieldEffectiveHelp(c, styles.secondNav.bg_tablet, effectiveLayout.secondNav.tablet.bg)}
-                />
-                <TextField
-                  label={c.tabletBorderCss}
-                  value={styles.secondNav.border_tablet ?? ""}
-                  onChange={(v) => updateSection("secondNav", "border_tablet", v)}
-                  placeholder={c.emptyFallbackBorder}
-                  autoComplete="off"
-                  helpText={fieldEffectiveHelp(c, styles.secondNav.border_tablet, effectiveLayout.secondNav.tablet.border)}
-                />
-                <ColorField
-                  label={c.tabletTextColor}
-                  value={styles.secondNav.text_color_tablet ?? ""}
-                  onChange={(v) => updateSection("secondNav", "text_color_tablet", v)}
-                  helpText={c.emptyGlobalText}
-                />
-                <ColorField
-                  label={c.tabletActiveColor}
-                  value={styles.secondNav.active_color_tablet ?? ""}
-                  onChange={(v) => updateSection("secondNav", "active_color_tablet", v)}
-                  helpText={c.emptyGlobalActive}
-                />
-                <TextField
-                  label={c.mobileBgCss}
-                  value={styles.secondNav.bg_mobile ?? ""}
-                  onChange={(v) => updateSection("secondNav", "bg_mobile", v)}
-                  placeholder={c.emptyFallbackBg}
-                  autoComplete="off"
-                  helpText={fieldEffectiveHelp(c, styles.secondNav.bg_mobile, effectiveLayout.secondNav.mobile.bg)}
-                />
-                <TextField
-                  label={c.mobileBorderCss}
-                  value={styles.secondNav.border_mobile ?? ""}
-                  onChange={(v) => updateSection("secondNav", "border_mobile", v)}
-                  placeholder={c.emptyFallbackBorder}
-                  autoComplete="off"
-                  helpText={fieldEffectiveHelp(c, styles.secondNav.border_mobile, effectiveLayout.secondNav.mobile.border)}
-                />
-                <ColorField
-                  label={c.mobileTextColor}
-                  value={styles.secondNav.text_color_mobile ?? ""}
-                  onChange={(v) => updateSection("secondNav", "text_color_mobile", v)}
-                  helpText={c.emptyGlobalText}
-                />
-                <ColorField
-                  label={c.mobileActiveColor}
-                  value={styles.secondNav.active_color_mobile ?? ""}
-                  onChange={(v) => updateSection("secondNav", "active_color_mobile", v)}
-                  helpText={c.emptyGlobalActive}
-                />
-              </div>
+              {[
+                { device: "desktop", bgKey: "bg_desktop", borderKey: "border_desktop", textKey: "text_color_desktop", activeKey: "active_color_desktop",
+                  bgScrollKey: "bg_scroll_desktop", textScrollKey: "text_color_scroll_desktop",
+                  label: locale === "de" ? "Desktop (≥1024px)" : "Desktop (≥1024px)",
+                  bgLabel: c.desktopBgCss, borderLabel: c.desktopBorderCss, textLabel: c.desktopTextColor, activeLabel: c.desktopActiveColor,
+                  bgHelp: fieldEffectiveHelp(c, styles.secondNav.bg_desktop, effectiveLayout.secondNav.desktop.bg) || c.bgExample,
+                  borderHelp: fieldEffectiveHelp(c, styles.secondNav.border_desktop, effectiveLayout.secondNav.desktop.border) || c.borderExample,
+                  textHelp: c.emptyGlobalTextBelow,
+                },
+                { device: "tablet", bgKey: "bg_tablet", borderKey: "border_tablet", textKey: "text_color_tablet", activeKey: "active_color_tablet",
+                  bgScrollKey: "bg_scroll_tablet", textScrollKey: "text_color_scroll_tablet",
+                  label: locale === "de" ? "Tablet (768–1023px)" : "Tablet (768–1023px)",
+                  bgLabel: c.tabletBgCss, borderLabel: c.tabletBorderCss, textLabel: c.tabletTextColor, activeLabel: c.tabletActiveColor,
+                  bgHelp: fieldEffectiveHelp(c, styles.secondNav.bg_tablet, effectiveLayout.secondNav.tablet.bg),
+                  borderHelp: fieldEffectiveHelp(c, styles.secondNav.border_tablet, effectiveLayout.secondNav.tablet.border),
+                  textHelp: c.emptyGlobalText,
+                },
+                { device: "mobile", bgKey: "bg_mobile", borderKey: "border_mobile", textKey: "text_color_mobile", activeKey: "active_color_mobile",
+                  bgScrollKey: "bg_scroll_mobile", textScrollKey: "text_color_scroll_mobile",
+                  label: locale === "de" ? "Mobil (≤767px)" : locale === "tr" ? "Mobil (≤767px)" : "Mobile (≤767px)",
+                  bgLabel: c.mobileBgCss, borderLabel: c.mobileBorderCss, textLabel: c.mobileTextColor, activeLabel: c.mobileActiveColor,
+                  bgHelp: fieldEffectiveHelp(c, styles.secondNav.bg_mobile, effectiveLayout.secondNav.mobile.bg),
+                  borderHelp: fieldEffectiveHelp(c, styles.secondNav.border_mobile, effectiveLayout.secondNav.mobile.border),
+                  textHelp: c.emptyGlobalText,
+                },
+              ].map(({ device, bgKey, borderKey, textKey, activeKey, bgScrollKey, textScrollKey, label, bgLabel, borderLabel, textLabel, activeLabel, bgHelp, borderHelp, textHelp }) => (
+                <div key={device} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 14, marginBottom: 8 }}>
+                  <Text as="p" variant="bodySm" fontWeight="semibold">{label}</Text>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12, marginTop: 12 }}>
+                    <TextField label={`${bgLabel} (${locale === "de" ? "Statisch" : locale === "tr" ? "Sabit" : "Static"})`} value={styles.secondNav[bgKey] ?? ""} onChange={(v) => updateSection("secondNav", bgKey, v)} placeholder={c.emptyFallbackBg} autoComplete="off" helpText={bgHelp} />
+                    <TextField label={`${bgLabel} (${locale === "de" ? "Scrollen" : locale === "tr" ? "Kaydırırken" : "On Scroll"})`} value={styles.secondNav[bgScrollKey] ?? ""} onChange={(v) => updateSection("secondNav", bgScrollKey, v)} placeholder={c.emptyFallbackBg} autoComplete="off" helpText={locale === "de" ? "Leer = statische Farbe" : locale === "tr" ? "Boş = sabit renk" : "Empty = static color"} />
+                    <TextField label={borderLabel} value={styles.secondNav[borderKey] ?? ""} onChange={(v) => updateSection("secondNav", borderKey, v)} placeholder={c.emptyFallbackBorder} autoComplete="off" helpText={borderHelp} />
+                    <ColorField label={`${textLabel} (${locale === "de" ? "Statisch" : locale === "tr" ? "Sabit" : "Static"})`} value={styles.secondNav[textKey] ?? ""} onChange={(v) => updateSection("secondNav", textKey, v)} helpText={textHelp} />
+                    <ColorField label={`${textLabel} (${locale === "de" ? "Scrollen" : locale === "tr" ? "Kaydırırken" : "On Scroll"})`} value={styles.secondNav[textScrollKey] ?? ""} onChange={(v) => updateSection("secondNav", textScrollKey, v)} helpText={locale === "de" ? "Leer = statische Textfarbe" : locale === "tr" ? "Boş = sabit yazı rengi" : "Empty = static text color"} />
+                    <ColorField label={activeLabel} value={styles.secondNav[activeKey] ?? ""} onChange={(v) => updateSection("secondNav", activeKey, v)} helpText={c.emptyGlobalActive} />
+                  </div>
+                </div>
+              ))}
               <Text as="p" variant="bodySm" tone="subdued">
                 {c.fallbackAllDevices}
               </Text>

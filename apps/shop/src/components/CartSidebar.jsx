@@ -13,9 +13,9 @@ import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-pri
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 
-/* Above ShopHeader (2147483600) but below MobileNav bar (2147483640) so bar stays visible */
-const CART_Z_OVERLAY = 2147483636;
-const CART_Z_DRAWER = 2147483637;
+/* Above MobileNav bar (2147483640) — nav bar hides behind cart when open */
+const CART_Z_OVERLAY = 2147483641;
+const CART_Z_DRAWER = 2147483642;
 
 const Overlay = styled.div`
   position: fixed;
@@ -51,7 +51,7 @@ const Drawer = styled.aside`
   }
 
   @media (max-width: 1023px) {
-    height: calc(100vh - 60px - env(safe-area-inset-bottom, 0px));
+    height: 100dvh;
   }
 `;
 
@@ -96,11 +96,7 @@ const Scroll = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
-
-  @media (max-width: 767px) {
-    overflow-y: hidden;
-    overscroll-behavior: contain;
-  }
+  overscroll-behavior: contain;
 `;
 
 const Item = styled.div`
@@ -309,11 +305,7 @@ const MobileTopCheckoutBtn = styled(PrimaryBtn)`
   margin-bottom: 0;
 `;
 
-const FooterPrimaryBtn = styled(PrimaryBtn)`
-  @media (max-width: 767px) {
-    display: none;
-  }
-`;
+const FooterPrimaryBtn = styled(PrimaryBtn)``;
 
 const TextLink = styled(Link)`
   display: block;
@@ -603,13 +595,6 @@ export default function CartSidebar() {
             </svg>
           </CloseBtn>
         </Header>
-        {items.length > 0 && (
-          <MobileTopCheckout>
-            <MobileTopCheckoutBtn href="/cart" onClick={closeCartSidebar}>
-              {tCart("checkout")}
-            </MobileTopCheckoutBtn>
-          </MobileTopCheckout>
-        )}
         <Scroll>
           {items.length === 0 && !loading && (
             <>
@@ -689,40 +674,6 @@ export default function CartSidebar() {
                 </BestsellerSection>
               )}
             </>
-          )}
-          {items.length > 0 && bestsellers.length > 0 && (
-            <BestsellerSection>
-              <BestsellerSectionTitle>{locale === "de" ? "Bestseller" : locale === "tr" ? "Çok Satanlar" : "Bestsellers"}</BestsellerSectionTitle>
-              <RecommendedStrip role="region" aria-label="Bestsellers">
-                {bestsellers.map((p) => (
-                  <RecommendedCard key={p.id}>
-                    <RecommendedItemLink href={`/${p.handle}`} onClick={closeCartSidebar}>
-                      <RecommendedThumb>
-                        {p.thumbnail ? (
-                          <img src={p.thumbnail} alt={p.title} />
-                        ) : (
-                          <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
-                        )}
-                      </RecommendedThumb>
-                      <RecommendedName>{p.title}</RecommendedName>
-                      <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
-                    </RecommendedItemLink>
-                    <QuickAddBtn
-                      type="button"
-                      disabled={loading}
-                      onClick={async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        let out = await addToCart(p.variantId, 1, p.sellerId || null);
-                        if (!out && p.sellerId) out = await addToCart(p.variantId, 1, null);
-                      }}
-                    >
-                      +
-                    </QuickAddBtn>
-                  </RecommendedCard>
-                ))}
-              </RecommendedStrip>
-            </BestsellerSection>
           )}
           {items.map((item) => (
             <Item key={item.id}>

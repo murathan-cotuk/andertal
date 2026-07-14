@@ -417,6 +417,7 @@
     "emailPlaceholder": "eposta@adresiniz.com"
   },
   "product": {
+    "buyNow": "Hemen satin al",
     "addToCart": "Sepete Ekle",
     "addedToCart": "Sepete eklendi",
     "addToCartFailed": "Sepete eklenemedi",

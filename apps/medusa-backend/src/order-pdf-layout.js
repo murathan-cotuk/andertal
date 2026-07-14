@@ -128,6 +128,27 @@ function resolveSellerDisplayLines(sellerInfo, locale, hasUnicode) {
   return lines.filter(Boolean).map((l) => txt(l, hasUnicode))
 }
 
+/** Returns [singleAddressLine, vatLine|null] for compact single-line seller display */
+function resolveSellerCompact(sellerInfo, locale, hasUnicode) {
+  if (!sellerInfo) return []
+  const s = getOrderPdfStrings(locale)
+  const name =
+    String(sellerInfo.store_name || '').trim() ||
+    String(sellerInfo.company_name || '').trim() ||
+    [sellerInfo.first_name, sellerInfo.last_name].filter(Boolean).join(' ').trim()
+  const addr = sellerInfo.business_address || {}
+  const street = String(addr.street || addr.address_line1 || '').trim()
+  const zip = String(addr.zip || addr.postal_code || '').trim()
+  const city = String(addr.city || '').trim()
+  const parts = [name]
+  if (street) parts.push(street)
+  if (zip || city) parts.push([zip, city].filter(Boolean).join(' '))
+  const line = parts.join(', ')
+  const out = [txt(line, hasUnicode)]
+  if (sellerInfo.vat_id) out.push(txt(`${s.vatIdPrefix}: ${String(sellerInfo.vat_id).trim()}`, hasUnicode))
+  return out.filter(Boolean)
+}
+
 // ─── Draw helpers ─────────────────────────────────────────────────────────────
 function drawHRule(doc, y) {
   const { left, right } = pageMetrics(doc)
@@ -167,6 +188,7 @@ function renderRetailOrderDocument(doc, {
   kind = 'invoice',
   lineItems = [],
   totalsLines = [],
+  shippingCents = null,
   amountDueCents = null,
   footerText = '',
   invoiceNumber = null,
@@ -220,7 +242,7 @@ function renderRetailOrderDocument(doc, {
   const metaRows = [
     { label: s.orderNoLabel, value: `#${orderNum}` },
     displayDocNum ? { label: kind === 'invoice' ? s.invoiceNoLabel : s.deliveryNoLabel, value: displayDocNum } : null,
-    { label: s.shippingDateLabel, value: pdfFmtDate(shippingDate || row.created_at, locale) },
+    { label: s.shippingDateLabel, value: pdfFmtDate(row.created_at, locale) },
   ].filter(Boolean)
 
   metaRows.forEach(({ label, value }) => {
@@ -234,13 +256,17 @@ function renderRetailOrderDocument(doc, {
   // Left column — seller then customer
   let leftY = headerTop
 
-  const sellerLines = resolveSellerDisplayLines(sellerInfo, locale, hasUnicode)
-  const senderLines = sellerLines.length ? sellerLines : [txt(shopName || 'Andertal', hasUnicode)]
-
-  drawLabel(doc, s.sellerLabel, left, leftY, leftColW, hasUnicode)
-  leftY = doc.y + 3
-  leftY = drawLines(doc, senderLines, left, leftY, leftColW, { hasUnicode, boldFirst: true, fontSize: 9 })
-  leftY += 10
+  const sellerCompact = resolveSellerCompact(sellerInfo, locale, hasUnicode)
+  const senderCompact = sellerCompact.length
+    ? sellerCompact
+    : [txt(shopName || 'Andertal', hasUnicode)]
+  const regFont = hasUnicode ? 'PdfRegular' : 'Helvetica'
+  senderCompact.forEach((line) => {
+    doc.fillColor(MUTED).font(regFont).fontSize(7.5)
+      .text(line, left, leftY, { width: leftColW })
+    leftY = doc.y + 1
+  })
+  leftY += 8
 
   const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ')
   const shipCountry = getCountryName(row.country || '', locale)
@@ -273,22 +299,27 @@ function renderRetailOrderDocument(doc, {
 
   // ── Products table ─────────────────────────────────────────────────────────
   const tableTop = tableRuleY + 6
-  let descW, qtyW, unitW, totalW, qtyX, unitX, totalX
+  const sellerHasVat = !!(sellerInfo && sellerInfo.vat_id && String(sellerInfo.vat_id).trim())
+  let descW, qtyW, mwstW, unitW, totalW, qtyX, mwstX, unitX, totalX
 
   if (kind === 'invoice') {
-    descW = Math.round(contentWidth * 0.46)
-    qtyW = 38
+    descW = Math.round(contentWidth * 0.42)
+    qtyW = 30
+    mwstW = 40
     unitW = Math.round(contentWidth * 0.17)
-    totalW = contentWidth - descW - qtyW - unitW
+    totalW = contentWidth - descW - qtyW - mwstW - unitW
     qtyX = left + descW
-    unitX = qtyX + qtyW
+    mwstX = qtyX + qtyW
+    unitX = mwstX + mwstW
     totalX = unitX + unitW
   } else {
     descW = Math.round(contentWidth * 0.76)
     qtyW = contentWidth - descW
+    mwstW = 0
     totalW = 0
     unitW = 0
     qtyX = left + descW
+    mwstX = qtyX
     unitX = qtyX
     totalX = qtyX
   }
@@ -299,6 +330,7 @@ function renderRetailOrderDocument(doc, {
   doc.text(txt(s.itemLabel, hasUnicode), left + 8, tableTop + 5, { width: descW - 12 })
   doc.text(txt(s.qtyLabel, hasUnicode), qtyX, tableTop + 5, { width: qtyW, align: 'right' })
   if (kind === 'invoice') {
+    doc.text(txt(s.mwstLabel, hasUnicode), mwstX, tableTop + 5, { width: mwstW, align: 'right' })
     doc.text(txt(s.unitPriceLabel, hasUnicode), unitX, tableTop + 5, { width: unitW, align: 'right' })
     doc.text(txt(s.totalLabel, hasUnicode), totalX, tableTop + 5, { width: totalW - 8, align: 'right' })
   }
@@ -329,6 +361,7 @@ function renderRetailOrderDocument(doc, {
       .text(String(qty), qtyX, rowY + 5, { width: qtyW, align: 'right' })
 
     if (kind === 'invoice') {
+      doc.text(sellerHasVat ? '19%' : '—', mwstX, rowY + 5, { width: mwstW, align: 'right' })
       doc.text(pdfCents(unit, locale), unitX, rowY + 5, { width: unitW, align: 'right' })
       doc.text(pdfCents(lineTotal, locale), totalX, rowY + 5, { width: totalW - 8, align: 'right' })
     }
@@ -337,6 +370,24 @@ function renderRetailOrderDocument(doc, {
       .lineWidth(0.3).strokeColor(BORDER).stroke()
     doc.y = rowY + rowH
   })
+
+  // ── Shipping row (invoice only) ────────────────────────────────────────────
+  if (kind === 'invoice' && shippingCents != null) {
+    const shRowIdx = drawRows.length
+    const shRowY = doc.y
+    const shRowH = 22
+    if (shRowIdx % 2 === 1) doc.rect(left, shRowY, contentWidth, shRowH).fill(ROW_ALT)
+    const shTitle = txt(s.shipping, hasUnicode)
+    doc.font(REG).fontSize(9.5).fillColor('#111827')
+      .text(shTitle, left + 8, shRowY + 5, { width: descW - 12 })
+      .text('1', qtyX, shRowY + 5, { width: qtyW, align: 'right' })
+      .text(sellerHasVat ? '19%' : '—', mwstX, shRowY + 5, { width: mwstW, align: 'right' })
+      .text(pdfCents(shippingCents, locale), unitX, shRowY + 5, { width: unitW, align: 'right' })
+      .text(pdfCents(shippingCents, locale), totalX, shRowY + 5, { width: totalW - 8, align: 'right' })
+    doc.moveTo(left, shRowY + shRowH).lineTo(right, shRowY + shRowH)
+      .lineWidth(0.3).strokeColor(BORDER).stroke()
+    doc.y = shRowY + shRowH
+  }
 
   // ── Totals (invoice only) ──────────────────────────────────────────────────
   if (kind === 'invoice' && totalsLines.length) {
@@ -350,12 +401,14 @@ function renderRetailOrderDocument(doc, {
     drawHRule(doc, doc.y)
     doc.y += 10
 
-    totalsLines.forEach(({ label, value, bold, color }) => {
+    totalsLines.forEach(({ label, value, bold, color, small }) => {
       const y = doc.y
-      doc.font(bold ? BOLD : REG).fontSize(bold ? 10.5 : 9.5).fillColor(color || '#111827')
-      doc.text(txt(label, hasUnicode), totalsX, y, { width: totalsW * 0.56 })
-      doc.text(txt(value, hasUnicode), totalsX + totalsW * 0.56, y, { width: totalsW * 0.44, align: 'right' })
-      doc.y = y + (bold ? 17 : 14)
+      const fs = bold ? 10.5 : small ? 8 : 9.5
+      const hasVal = value != null && value !== ''
+      doc.font(bold ? BOLD : REG).fontSize(fs).fillColor(color || '#111827')
+      doc.text(txt(label, hasUnicode), totalsX, y, { width: hasVal ? totalsW * 0.66 : totalsW })
+      if (hasVal) doc.text(txt(value, hasUnicode), totalsX + totalsW * 0.66, y, { width: totalsW * 0.34, align: 'right' })
+      doc.y = y + (bold ? 17 : small ? 12 : 14)
     })
 
     if (amountDueCents != null) {
@@ -372,10 +425,28 @@ function renderRetailOrderDocument(doc, {
     }
   }
 
+  // ── Compliance info (payment method, LUCID) ────────────────────────────────
+  if (kind === 'invoice') {
+    const paymentMethod = String(row.payment_method || '').trim()
+    const lucidNumber = String(sellerInfo?.lucid_number || '').trim()
+    if (paymentMethod || lucidNumber) {
+      doc.y += 10
+      doc.fillColor(MUTED).font(REG).fontSize(8)
+      if (paymentMethod) {
+        doc.text(txt(`${s.paymentMethodLabel}: ${paymentMethod}`, hasUnicode), left, doc.y, { width: contentWidth })
+        doc.y += 2
+      }
+      if (lucidNumber) {
+        doc.text(txt(`${s.lucidLabel}: ${lucidNumber}`, hasUnicode), left, doc.y, { width: contentWidth })
+        doc.y += 2
+      }
+    }
+  }
+
   // ── Footer ─────────────────────────────────────────────────────────────────
   const footerY = Math.max(doc.y + 16, doc.page.height - doc.page.margins.bottom - 52)
 
-  if (sellerLines.length) {
+  if (kind === 'invoice' && sellerInfo) {
     doc.fillColor(MUTED).font(REG).fontSize(7.5)
       .text(txt(s.sellerDisclaimer, hasUnicode), left, footerY - 24, { width: contentWidth })
   }

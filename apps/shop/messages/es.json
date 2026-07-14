@@ -392,6 +392,7 @@
     "emailPlaceholder": "tu@email.es"
   },
   "product": {
+    "buyNow": "Comprar ahora",
     "addToCart": "Añadir al carrito",
     "addedToCart": "Añadido al carrito",
     "addToCartFailed": "Error al añadir",

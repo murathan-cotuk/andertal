@@ -392,6 +392,7 @@
     "emailPlaceholder": "tua@email.it"
   },
   "product": {
+    "buyNow": "Acquista ora",
     "addToCart": "Aggiungi al carrello",
     "addedToCart": "Aggiunto al carrello",
     "addToCartFailed": "Errore nell'aggiunta",

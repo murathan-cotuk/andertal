@@ -205,7 +205,8 @@ const FieldGrid = styled.div`
   min-width: 0;
 
   @media (max-width: 640px) {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: ${(p) => p.$keepCols ? (p.$cols || "1fr") : "1fr"} !important;
+    gap: ${(p) => p.$keepCols ? "10px" : "16px"};
   }
 `;
 
@@ -1077,7 +1078,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
           />
           <CheckoutFormField label={t("phone")} field={phone} type="tel" autoComplete="tel" />
         </FieldGrid>
-        <FieldGrid $cols="1fr 1fr">
+        <FieldGrid $cols="1fr 1fr" $keepCols>
           <CheckoutFormField
             label={t("firstName")}
             field={{
@@ -1152,7 +1153,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
           <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="street-address" />
           <CheckoutFormField label={t("address2")} field={address2} fullWidth autoComplete="address-line2" />
         </FieldGrid>
-        <FieldGrid $cols="1fr 1fr">
+        <FieldGrid $cols="1fr 1fr" $keepCols>
           <CheckoutFormField label={t("postalCode")} field={postalCode} autoComplete="postal-code" />
           <CheckoutFormField label={t("city")} field={city} autoComplete="address-level2" />
         </FieldGrid>
@@ -1262,7 +1263,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing street-address" />
             <CheckoutFormField label={t("address2")} field={billingAddress2} fullWidth autoComplete="billing address-line2" />
           </FieldGrid>
-          <FieldGrid $cols="1fr 1fr">
+          <FieldGrid $cols="1fr 1fr" $keepCols>
             <CheckoutFormField label={t("postalCode")} field={billingPostalCode} autoComplete="billing postal-code" />
             <CheckoutFormField label={t("city")} field={billingCity} autoComplete="billing address-level2" />
           </FieldGrid>
@@ -1657,7 +1658,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           />
           <CheckoutFormField label={t("phone")} field={phone} type="tel" autoComplete="tel" />
         </FieldGrid>
-        <FieldGrid $cols="1fr 1fr">
+        <FieldGrid $cols="1fr 1fr" $keepCols>
           <CheckoutFormField
             label={t("firstName")}
             field={{
@@ -1732,7 +1733,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="street-address" />
           <CheckoutFormField label={t("address2")} field={address2} fullWidth autoComplete="address-line2" />
         </FieldGrid>
-        <FieldGrid $cols="1fr 1fr">
+        <FieldGrid $cols="1fr 1fr" $keepCols>
           <CheckoutFormField label={t("postalCode")} field={postalCode} autoComplete="postal-code" />
           <CheckoutFormField label={t("city")} field={city} autoComplete="address-level2" />
         </FieldGrid>
@@ -1842,7 +1843,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
             <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing street-address" />
             <CheckoutFormField label={t("address2")} field={billingAddress2} fullWidth autoComplete="billing address-line2" />
           </FieldGrid>
-          <FieldGrid $cols="1fr 1fr">
+          <FieldGrid $cols="1fr 1fr" $keepCols>
             <CheckoutFormField label={t("postalCode")} field={billingPostalCode} autoComplete="billing postal-code" />
             <CheckoutFormField label={t("city")} field={billingCity} autoComplete="billing address-level2" />
           </FieldGrid>
@@ -2404,11 +2405,6 @@ export default function CheckoutPage() {
     <PageWrap>
       <ShopHeader />
       <Main>
-        <BackLink href="/cart">
-          <i className="fas fa-arrow-left" style={{ fontSize: 13 }} /> {t("backToCart")}
-        </BackLink>
-        <Title>{t("title")}</Title>
-
         {stripePkLoading && items.length > 0 ? (
           <GlobalPageLoader label={t("processing")} />
         ) : returnRecovering ? (
@@ -2466,10 +2462,6 @@ export default function CheckoutPage() {
                         <SummaryItem key={item.id}>{row}</SummaryItem>
                       );
                     })}
-                    <SummarySellerSubtotalRow>
-                      <span>{t("sellerSubtotal", { name: displayName })}</span>
-                      <span>{formatPriceCents(group.subtotalCents)} €</span>
-                    </SummarySellerSubtotalRow>
                   </SummarySellerSection>
                 );
               })}
@@ -2488,8 +2480,7 @@ export default function CheckoutPage() {
                         )}
                       </p>
                     )}
-                    <p style={{ fontSize: "0.7rem", color: "#9ca3af", margin: "0 0 8px", lineHeight: 1.4 }}>{t("bonusHint")}</p>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -2498,12 +2489,12 @@ export default function CheckoutPage() {
                         onChange={(e) => setBonusDraft(e.target.value)}
                         placeholder={t("bonusPlaceholder")}
                         style={{
-                          flex: "1 1 120px",
-                          minWidth: 100,
-                          padding: "8px 10px",
+                          flex: "1 1 100px",
+                          minWidth: 80,
+                          padding: "5px 8px",
                           border: "1px solid #d1d5db",
-                          borderRadius: 8,
-                          fontSize: "0.875rem",
+                          borderRadius: 6,
+                          fontSize: "0.8125rem",
                         }}
                       />
                       <button
@@ -2511,12 +2502,12 @@ export default function CheckoutPage() {
                         onClick={applyBonusRedemption}
                         disabled={bonusApplying}
                         style={{
-                          padding: "8px 14px",
+                          padding: "5px 10px",
                           background: tokens.primary.DEFAULT,
                           color: "#fff",
                           border: "none",
-                          borderRadius: 8,
-                          fontSize: "0.8125rem",
+                          borderRadius: 6,
+                          fontSize: "0.75rem",
                           fontWeight: 600,
                           cursor: bonusApplying ? "wait" : "pointer",
                           opacity: bonusApplying ? 0.7 : 1,
@@ -2533,7 +2524,7 @@ export default function CheckoutPage() {
               </div>
               <div style={{ marginBottom: 16 }}>
                 <Label as="div" style={{ marginBottom: 8, display: "block" }}>{t("couponCode")}</Label>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   <input
                     type="text"
                     aria-label="Coupon-Code"
@@ -2541,12 +2532,12 @@ export default function CheckoutPage() {
                     onChange={(e) => setCouponDraft(e.target.value)}
                     placeholder="z. B. SAVE10"
                     style={{
-                      flex: "1 1 140px",
-                      minWidth: 120,
-                      padding: "8px 10px",
+                      flex: "1 1 120px",
+                      minWidth: 100,
+                      padding: "5px 8px",
                       border: "1px solid #d1d5db",
-                      borderRadius: 8,
-                      fontSize: "0.875rem",
+                      borderRadius: 6,
+                      fontSize: "0.8125rem",
                     }}
                   />
                   <button
@@ -2554,12 +2545,12 @@ export default function CheckoutPage() {
                     onClick={applyCouponCode}
                     disabled={couponApplying}
                     style={{
-                      padding: "8px 14px",
+                      padding: "5px 10px",
                       background: tokens.primary.DEFAULT,
                       color: "#fff",
                       border: "none",
-                      borderRadius: 8,
-                      fontSize: "0.8125rem",
+                      borderRadius: 6,
+                      fontSize: "0.75rem",
                       fontWeight: 600,
                       cursor: couponApplying ? "wait" : "pointer",
                       opacity: couponApplying ? 0.7 : 1,
@@ -2573,12 +2564,12 @@ export default function CheckoutPage() {
                       onClick={removeCouponCode}
                       disabled={couponApplying}
                       style={{
-                        padding: "8px 14px",
+                        padding: "5px 10px",
                         background: "#fff",
                         color: "#374151",
                         border: "1px solid #d1d5db",
-                        borderRadius: 8,
-                        fontSize: "0.8125rem",
+                        borderRadius: 6,
+                        fontSize: "0.75rem",
                         fontWeight: 600,
                         cursor: couponApplying ? "wait" : "pointer",
                         opacity: couponApplying ? 0.7 : 1,
