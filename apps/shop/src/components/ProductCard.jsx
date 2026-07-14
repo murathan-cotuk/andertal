@@ -185,8 +185,8 @@ const CartNotice = styled.div`
 `;
 
 const ReviewRow = styled.div`
-  margin-top: 1px;
-  height: 20px;
+  margin-top: 0;
+  height: 18px;
   font-size: 13px;
   @media (max-width: 767px) {
     height: 14px;
@@ -221,7 +221,7 @@ const RankBadge = styled.span`
 
 const WishlistHeartWrap = styled.div`
   position: absolute;
-  top: ${(p) => (p.$saleOffset ? "44px" : "8px")};
+  top: 8px;
   right: 8px;
   z-index: 50;
   pointer-events: auto;
@@ -263,12 +263,10 @@ const Name = styled.h3`
   font-weight: 500;
   color: #111;
   line-height: 1.4;
-  margin: 0 0 2px;
+  margin: 0;
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  min-height: calc(13px * 1.4 * 2);
+  text-overflow: ellipsis;
 `;
 
 const Prices = styled.div`
@@ -280,12 +278,11 @@ const Prices = styled.div`
 `;
 
 const CurrentPrice = styled.span`
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: ${(p) => (p.$sale ? "#e53e3e" : "#111")};
   @media (min-width: 768px) {
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 18px;
   }
 `;
 
@@ -648,18 +645,17 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           {shippingUnavailable && !isComingSoon && <Badge $sold>{tp("notAvailable")}</Badge>}
           {outOfStock && !isComingSoon && <Badge $sold>{tp("outOfStock")}</Badge>}
         </Badges>
-        {hasSale && !isComingSoon && (
-          <SaleBadgeImageCorner inset={8}>{tp("sale")}</SaleBadgeImageCorner>
-        )}
         {product?.id && (
           <WishlistHeartWrap
-            $saleOffset={hasSale && !isComingSoon}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
             role="presentation"
           >
             <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
           </WishlistHeartWrap>
+        )}
+        {hasSale && !isComingSoon && (
+          <SaleBadgeImageCorner style={{ top: 44, right: 8 }}>{tp("sale")}</SaleBadgeImageCorner>
         )}
         {isEuOrigin && <MadeInEuropeOverlay />}
       </ImgBlock>

@@ -375,7 +375,7 @@ const RecommendedCard = styled.div`
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  padding: 7px;
   border: 1px solid #eceff3;
   border-radius: 12px;
   background: #fff;
@@ -385,10 +385,10 @@ const RecommendedCard = styled.div`
 const RecommendedThumb = styled.div`
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   background: #f3f4f6;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   img {
     width: 100%;
     height: 100%;
@@ -406,7 +406,7 @@ const RecommendedItemLink = styled(Link)`
 `;
 
 const RecommendedName = styled.div`
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.3;
   color: #111827;
@@ -414,13 +414,13 @@ const RecommendedName = styled.div`
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 `;
 
 const RecommendedPrice = styled.div`
-  font-size: 11px;
+  font-size: 10px;
   color: #6b7280;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 `;
 
 const QuickAddBtn = styled.button`
@@ -445,6 +445,17 @@ const QuickAddBtn = styled.button`
     opacity: 0.5;
     cursor: not-allowed;
   }
+`;
+
+const BestsellerSection = styled.div`
+  margin-top: 20px;
+`;
+
+const BestsellerSectionTitle = styled.h3`
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f2937;
 `;
 
 const ENV_THRESHOLD_CENTS = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
@@ -507,6 +518,32 @@ export default function CartSidebar() {
       : tCart("shipping");
   const [recommended, setRecommended] = useState([]);
   const [recommendedLoading, setRecommendedLoading] = useState(false);
+  const [bestsellers, setBestsellers] = useState([]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    let cancelled = false;
+    fetch("/api/store-products?limit=200")
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const list = Array.isArray(d?.products) ? d.products : [];
+        const mapped = list
+          .map((p) => {
+            const meta = p.metadata || {};
+            const salesScore = Number(meta.sold_last_month || meta.sold || meta.sales_count || 0);
+            const isBs = salesScore > 0 || meta.is_bestseller === true || meta.is_bestseller === "true" || String(meta.badge || "").toLowerCase() === "bestseller";
+            const price = Number(p?.variants?.[0]?.calculated_price?.calculated_amount ?? p?.variants?.[0]?.prices?.[0]?.amount ?? p.price_cents ?? 0);
+            return { id: p.id, handle: String(p.handle || p.id || "").replace(/^\//, ""), title: p.title || "", thumbnail: p.thumbnail || "", price, salesScore, isBs, variantId: p?.variants?.[0]?.id || "", sellerId: p?.seller_id || p?.metadata?.seller_id || null };
+          })
+          .filter((p) => p.handle && (p.isBs || p.salesScore > 0))
+          .sort((a, b) => b.salesScore - a.salesScore)
+          .slice(0, 8);
+        if (!cancelled) setBestsellers(mapped);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     if (!sidebarOpen || items.length > 0) return;
@@ -617,7 +654,75 @@ export default function CartSidebar() {
                   </RecommendedStrip>
                 )}
               </RecommendedWrap>
+              {bestsellers.length > 0 && (
+                <BestsellerSection>
+                  <BestsellerSectionTitle>{locale === "de" ? "Bestseller" : locale === "tr" ? "Çok Satanlar" : "Bestsellers"}</BestsellerSectionTitle>
+                  <RecommendedStrip role="region" aria-label="Bestsellers">
+                    {bestsellers.map((p) => (
+                      <RecommendedCard key={p.id}>
+                        <RecommendedItemLink href={`/${p.handle}`} onClick={closeCartSidebar}>
+                          <RecommendedThumb>
+                            {p.thumbnail ? (
+                              <img src={p.thumbnail} alt={p.title} />
+                            ) : (
+                              <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                            )}
+                          </RecommendedThumb>
+                          <RecommendedName>{p.title}</RecommendedName>
+                          <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
+                        </RecommendedItemLink>
+                        <QuickAddBtn
+                          type="button"
+                          disabled={loading}
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            let out = await addToCart(p.variantId, 1, p.sellerId || null);
+                            if (!out && p.sellerId) out = await addToCart(p.variantId, 1, null);
+                          }}
+                        >
+                          +
+                        </QuickAddBtn>
+                      </RecommendedCard>
+                    ))}
+                  </RecommendedStrip>
+                </BestsellerSection>
+              )}
             </>
+          )}
+          {items.length > 0 && bestsellers.length > 0 && (
+            <BestsellerSection>
+              <BestsellerSectionTitle>{locale === "de" ? "Bestseller" : locale === "tr" ? "Çok Satanlar" : "Bestsellers"}</BestsellerSectionTitle>
+              <RecommendedStrip role="region" aria-label="Bestsellers">
+                {bestsellers.map((p) => (
+                  <RecommendedCard key={p.id}>
+                    <RecommendedItemLink href={`/${p.handle}`} onClick={closeCartSidebar}>
+                      <RecommendedThumb>
+                        {p.thumbnail ? (
+                          <img src={p.thumbnail} alt={p.title} />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                        )}
+                      </RecommendedThumb>
+                      <RecommendedName>{p.title}</RecommendedName>
+                      <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
+                    </RecommendedItemLink>
+                    <QuickAddBtn
+                      type="button"
+                      disabled={loading}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        let out = await addToCart(p.variantId, 1, p.sellerId || null);
+                        if (!out && p.sellerId) out = await addToCart(p.variantId, 1, null);
+                      }}
+                    >
+                      +
+                    </QuickAddBtn>
+                  </RecommendedCard>
+                ))}
+              </RecommendedStrip>
+            </BestsellerSection>
           )}
           {items.map((item) => (
             <Item key={item.id}>

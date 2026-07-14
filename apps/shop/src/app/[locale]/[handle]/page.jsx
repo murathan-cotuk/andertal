@@ -122,6 +122,10 @@ const ColHeader = styled.div`
   width: 100%;
   box-sizing: border-box;
 
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
+
   h1 {
     margin: 0;
   }
@@ -183,6 +187,10 @@ const SortBarInner = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
 
   @media (max-width: 600px) { padding: 0 16px; }
 `;
@@ -266,6 +274,10 @@ const ContentWrap = styled.div`
   gap: 32px;
   align-items: flex-start;
 
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
+
   @media (max-width: 767px) {
     padding: 8px 6px 60px;
     padding-left: 4px !important;
@@ -315,6 +327,11 @@ const CmsPageWithSidebar = styled.div`
   display: flex;
   gap: 32px;
   align-items: flex-start;
+
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
+
   @media (max-width: 767px) {
     padding: 16px 6px 0;
   }
@@ -1187,6 +1204,12 @@ export default function CollectionPage() {
               >
                 % {locale === "de" ? "Sale" : locale === "tr" ? "İndirim" : "Sale"}
               </FilterBtn>
+              {/* Breadcrumb — desktop only */}
+              <Breadcrumb aria-label="Breadcrumb" style={{ margin: 0 }}>
+                <Link href={`/${locale}`}>Home</Link>
+                <span style={{ color: "#ccc", margin: "0 2px" }}>&gt;</span>
+                <b>{title}</b>
+              </Breadcrumb>
             </SortBarLeft>
             <SortWrap>
               <SortLabel>Sort:</SortLabel>
@@ -1202,14 +1225,6 @@ export default function CollectionPage() {
             </SortWrap>
           </SortBarInner>
         </SortBar>
-
-        <BreadcrumbRow style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
-          <Breadcrumb aria-label="Breadcrumb">
-            <Link href={`/${locale}`}>Home</Link>
-            <span style={{ color: "#ccc" }}>/</span>
-            <b>{title}</b>
-          </Breadcrumb>
-        </BreadcrumbRow>
 
         {/* ── Sidebar + content ── */}
         <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
@@ -1258,7 +1273,7 @@ export default function CollectionPage() {
                         const on = (filters[key] || []).includes(val);
                         return (
                           <CheckRow key={val} $on={on}>
-                            <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
+                            <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={14} />
                             {val}
                           </CheckRow>
                         );

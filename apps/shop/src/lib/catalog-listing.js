@@ -93,7 +93,8 @@ export const FACET_SKIP = new Set([
   "shipping_info", "versand",
   "eu_origin_provider", "eu_origin_registry_id", "eu_origin_document_url",
   "eu_origin_status", "eu_origin_verified_at", "eu_origin_country",
-  "wee_number", "wee", "eprel_number", "eprel", "description",
+  "wee_number", "wee", "weee", "weee_number", "eprel_number", "eprel", "eprel_id", "eprel_registration_number", "description",
+  "is_bestseller", "category_slug", "category", "prices",
 ]);
 
 export function normalizeFacetKey(key) {

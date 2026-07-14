@@ -485,7 +485,8 @@ const storeProductsFromAdminHubGET = async (req, res) => {
     const limitForSearch = searchQ ? 8 : (parseInt(query.limit, 10) || 100)
     const categorySlugFilter = (query.category || query.category_slug || '').toString().trim()
     let allowedCategoryIds = null
-    if (categorySlugFilter) {
+    // "all" is a reserved slug meaning no category filter — return every product
+    if (categorySlugFilter && categorySlugFilter.toLowerCase() !== 'all') {
       const subtreeIdsForSlug = (tree) => collectCategorySubtreeIdsBySlug(tree, categorySlugFilter)
       const ah = resolveAdminHub()
       if (ah) {

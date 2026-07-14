@@ -244,7 +244,7 @@ export default function BestsellersPage() {
 
         {!loading && !error && visibleRows.map(({ collection, products: list }) => (
           <div key={collection.id || collection.handle} style={{ padding: "8px 24px 28px" }}>
-            <div style={{ width: "100%", maxWidth: 1280, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
+            <div style={{ width: "100%", maxWidth: 1700, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
               <Carousel
                 contained={false}
                 navOnSides
@@ -262,7 +262,7 @@ export default function BestsellersPage() {
                 )}
               >
                 {list.map((p) => (
-                  <ProductCard key={p.id} product={p} plainImage hideBestsellerBadge />
+                  <ProductCard key={p.id} product={p} plainImage isBestseller />
                 ))}
               </Carousel>
             </div>

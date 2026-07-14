@@ -92,6 +92,10 @@ const ColHeader = styled.div`
   width: 100%;
   box-sizing: border-box;
 
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
+
   @media (max-width: 767px) {
     padding: 16px 12px 0;
   }
@@ -161,6 +165,10 @@ const SortBarInner = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
 
   @media (max-width: 600px) { padding: 0 16px; }
 `;
@@ -241,6 +249,10 @@ const ContentWrap = styled.div`
   display: flex;
   gap: 32px;
   align-items: flex-start;
+
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
 
   @media (max-width: 767px) {
     padding: 6px 6px 80px;
@@ -1216,6 +1228,21 @@ export default function CategoryTemplate() {
                 Navigation {activeCount > 0 ? `(${activeCount})` : ""}
               </FilterBtn>
             )}
+            {/* Breadcrumb — desktop only */}
+            <Breadcrumb aria-label="Breadcrumb" style={{ margin: 0 }}>
+              <Link href={`/${locale}`}>Home</Link>
+              {ancestors.map((anc) => {
+                const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
+                return (
+                  <React.Fragment key={anc.id || ancSlug}>
+                    <span style={{ color: "#ccc", margin: "0 2px" }}>&gt;</span>
+                    <Link href={`/${ancSlug}`}>{anc.name || ancSlug}</Link>
+                  </React.Fragment>
+                );
+              })}
+              <span style={{ color: "#ccc", margin: "0 2px" }}>&gt;</span>
+              <b>{displayTitle}</b>
+            </Breadcrumb>
           </SortBarLeft>
           <SortWrap>
             <SortLabel>Sort:</SortLabel>
@@ -1227,23 +1254,6 @@ export default function CategoryTemplate() {
           </SortWrap>
         </SortBarInner>
       </SortBar>
-
-      <BreadcrumbRow style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
-        <Breadcrumb aria-label="Breadcrumb">
-          <Link href={`/${locale}`}>Home</Link>
-          {ancestors.map((anc) => {
-            const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
-            return (
-              <React.Fragment key={anc.id || ancSlug}>
-                <span style={{ color: "#ccc" }}>/</span>
-                <Link href={`/${ancSlug}`}>{anc.name || ancSlug}</Link>
-              </React.Fragment>
-            );
-          })}
-          <span style={{ color: "#ccc" }}>/</span>
-          <b>{displayTitle}</b>
-        </Breadcrumb>
-      </BreadcrumbRow>
 
       <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
         {showCatalogSidebar && showSidebar && (
@@ -1353,7 +1363,7 @@ export default function CategoryTemplate() {
                           const on = (filters[key] || []).includes(val);
                           return (
                             <CheckRow key={val} $on={on}>
-                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
+                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={14} />
                               {val}
                             </CheckRow>
                           );

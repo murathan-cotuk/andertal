@@ -7,8 +7,12 @@ function stripHandleSuffix(handle) {
   const lastDash = handle.lastIndexOf("-");
   if (lastDash < 1) return null;
   const suffix = handle.slice(lastDash + 1);
-  if (/^[a-z0-9]{8}$/.test(suffix)) return handle.slice(0, lastDash);
-  return null;
+  if (!/^[a-z0-9]{8}$/.test(suffix)) return null;
+  // New format: {handle}-a-{8chars} — strip "-a-{8chars}" to get base handle
+  const withoutSuffix = handle.slice(0, lastDash);
+  if (withoutSuffix.endsWith("-a")) return withoutSuffix.slice(0, -2);
+  // Legacy format: {handle}-{8chars}
+  return withoutSuffix;
 }
 
 async function fetchFromBackend(base, handle) {

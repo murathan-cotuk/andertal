@@ -17,7 +17,7 @@ export default function Breadcrumbs({ items: customItems }) {
         {items.map((item, i) => (
           <li key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {i > 0 && (
-              <span style={{ color: "#9ca3af", fontSize: 12, userSelect: "none" }}>›</span>
+              <span style={{ color: "#9ca3af", fontSize: 12, userSelect: "none" }}>&gt;</span>
             )}
             {item.href ? (
               <Link

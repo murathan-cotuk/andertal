@@ -17,6 +17,13 @@ import {
   DEFAULT_SELLER_PERMS,
 } from "@/lib/users-i18n";
 
+const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "").replace(/\/$/, "");
+const resolveDocUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http") || url.startsWith("data:") || url.startsWith("//")) return url;
+  return `${BACKEND_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 const approvalStatusTone = (s) => {
   const v = String(s || "registered").toLowerCase();
   if (v === "approved" || v === "active") return "success";
@@ -383,7 +390,7 @@ function KybReviewModal({ user, onClose, onApproved, copy, ui, locale }) {
                       {doc.name && <Text variant="bodySm" tone="subdued">{doc.name}</Text>}
                     </div>
                     {doc.url && (
-                      <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ color: "#0070f3", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                      <a href={resolveDocUrl(doc.url)} target="_blank" rel="noopener noreferrer" style={{ color: "#0070f3", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                         {copy.open}
                       </a>
                     )}
