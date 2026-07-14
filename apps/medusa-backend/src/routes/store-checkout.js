@@ -136,11 +136,26 @@ async function findBestSellerCampaignDiscountRow(c, { productId, variantId, sell
 // --- Store Carts (session cart: create, get, add/update/remove line-items) ---
 const productIdFromVariantId = (variantId) => {
   if (!variantId || typeof variantId !== 'string') return null
-  if (variantId.endsWith('-variant')) return variantId.slice(0, -'-variant'.length)
-  const variantDashIdx = variantId.lastIndexOf('-variant-')
-  if (variantDashIdx > 0) return variantId.slice(0, variantDashIdx)
-  const idx = variantId.indexOf('-v-')
-  return idx > 0 ? variantId.slice(0, idx) : variantId
+  let base
+  if (variantId.endsWith('-variant')) {
+    base = variantId.slice(0, -'-variant'.length)
+  } else {
+    const variantDashIdx = variantId.lastIndexOf('-variant-')
+    if (variantDashIdx > 0) {
+      base = variantId.slice(0, variantDashIdx)
+    } else {
+      const idx = variantId.indexOf('-v-')
+      base = idx > 0 ? variantId.slice(0, idx) : variantId
+    }
+  }
+  // Buybox/"other sellers" listings use a composite id — {productId}-listing-{sellerId}
+  // (see store-products.js: `String(l.product_id) + '-listing-' + l.seller_id`) — so its
+  // variant ids look like {productId}-listing-{sellerId}-variant-{N}. Strip the
+  // "-listing-{sellerId}" part too, or getAdminHubProductByIdOrHandleDb() gets handed
+  // that whole composite string, fails to match it as a UUID or a handle, and the
+  // add-to-cart call 404s with "Product not found".
+  const listingIdx = base.indexOf('-listing-')
+  return listingIdx > 0 ? base.slice(0, listingIdx) : base
 }
 
 const BONUS_POINTS_PER_EURO_DISCOUNT = 25
