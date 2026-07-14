@@ -1016,7 +1016,11 @@ const storePaymentIntentPOST = async (req, res) => {
         pay_total_cents: String(payCents),
       },
     }
-    if (stripeCustomerId) piBody.customer = stripeCustomerId
+    if (stripeCustomerId) {
+      piBody.customer = stripeCustomerId
+      // Required by Stripe when Customer Session has payment_method_save=enabled
+      piBody.setup_future_usage = 'off_session'
+    }
 
     // Destination Charge: route payment directly to seller's connected account.
     // Platform keeps application_fee_amount (commission). Only applied when seller

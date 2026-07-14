@@ -1341,9 +1341,11 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
               }}
               onReady={() => setPaymentElementReady(true)}
               onLoadError={(ev) => {
-                console.error("[Stripe] PaymentElement load error:", ev?.error);
+                const stripeErr = ev?.error;
+                console.error("[Stripe] PaymentElement load error:", stripeErr);
                 setPaymentElementReady(false);
-                setError(t("paymentError"));
+                const detail = stripeErr?.message || stripeErr?.type || stripeErr?.code || "";
+                setError(detail ? `${t("paymentError")} [${detail}]` : t("paymentError"));
               }}
             />
           </StripePaymentWrap>

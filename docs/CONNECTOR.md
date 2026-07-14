@@ -215,3 +215,8 @@ Connector SDK + JTL SCX + Billbee wrapper + queue + ERP sayfası
 Sen
 JTL token iste, env koy, Partner URL tanımla, Wawi ile test et
 Agent moduna geç, talimatı yapıştır. Token gelene kadar kod yazılır; token gelince test edersin.
+
+Sana cursor böyle bir yol haritasi önerdi erp entegrasyonlariyla alakali. sen muhakkak daha iyisini bilirsin. bi incele bak, detayli düsün. en mükemmel nasil olacaksa kuralim bu sistemi
+
+JTL Client ID: 8e3bbc28-8814-469d-b376-2a62afd392c7
+Geheimer Schlüssel für den Client: kgipO1zJyR-e-koOFTfjLm4SZK
