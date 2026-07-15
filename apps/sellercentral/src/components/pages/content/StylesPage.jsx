@@ -2338,6 +2338,13 @@ export default function StylesPage() {
                 />
                 <div style={{ gridColumn: "1 / -1" }}>
                   <BlockStack gap="300">
+                    <Select
+                      label={c.secondNavAtTopDesktop}
+                      helpText={c.secondNavAtTopDesktopHelp}
+                      options={c.secondNavAtTopDesktopOptions}
+                      value={styles.secondNav.own_color_at_top_desktop === true ? "separate" : "merge"}
+                      onChange={(v) => updateSection("secondNav", "own_color_at_top_desktop", v === "separate")}
+                    />
                     <Checkbox
                       label={c.hideSecondNavOnScroll}
                       helpText={c.hideSecondNavOnScrollHelp}

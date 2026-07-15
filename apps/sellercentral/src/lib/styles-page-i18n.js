@@ -292,6 +292,19 @@ export function getStylesPageCopy(locale) {
       { value: "classic", label: t("Classic (text links, hover underline)", "Klasik (metin bağlantılar, hover alt çizgi)", "Classique (liens texte, soulignement au survol)", "Clásico (enlaces texto, subrayado al pasar)", "Classico (link testo, sottolineatura hover)", "Klassisch (Textlinks, Hover-Unterstrich)") },
       { value: "pill", label: t("Tile / frosted glass (pills)", "Karo / buzlu cam (pills)", "Tuile / verre dépoli (pills)", "Mosaico / cristal esmerilado (pills)", "Tile / vetro smerigliato (pills)", "Kachel / Frostglas (Pills)") },
     ],
+    secondNavAtTopDesktop: t("Second nav at page top (desktop ≥1024px)", "Sayfa en üstünde second nav (desktop ≥1024px)", "Second nav en haut de page (desktop ≥1024px)", "Second nav arriba del todo (desktop ≥1024px)", "Second nav in cima pagina (desktop ≥1024px)", "Second Nav oben auf der Seite (Desktop ≥1024px)"),
+    secondNavAtTopDesktopHelp: t(
+      "When the header uses a gradient or landing-page tint, the second nav can merge into one surface at the top. Choose \"Always own background\" to keep the second-nav row color visible on desktop.",
+      "Header gradyan veya landing rengi kullanıyorsa second nav en üstte tek yüzey gibi birleşebilir. Desktop'ta second nav satır renginin her zaman görünmesi için \"Her zaman kendi arka planı\"nı seçin.",
+      "Avec un dégradé d'en-tête ou une teinte landing, la second nav peut fusionner en haut. Choisissez « Toujours son propre fond » pour garder la couleur de la ligne second nav sur desktop.",
+      "Con degradado en cabecera o tinte landing, la second nav puede fusionarse arriba. Elija « Siempre fondo propio » para mantener el color de la fila second nav en desktop.",
+      "Con gradiente header o tinta landing, la second nav può unirsi in alto. Scegli « Sempre sfondo proprio » per mantenere il colore della riga second nav su desktop.",
+      "Bei Header-Verlauf oder Landing-Farbton kann sich die Second Nav oben verbinden. Wählen Sie „Immer eigener Hintergrund“, damit die Second-Nav-Zeile auf Desktop immer sichtbar bleibt."
+    ),
+    secondNavAtTopDesktopOptions: [
+      { value: "merge", label: t("Merge with navbar (default)", "Navbar ile birleşik (varsayılan)", "Fusionner avec la navbar (défaut)", "Fusionar con navbar (predeterminado)", "Unisci alla navbar (predefinito)", "Mit Navbar verbinden (Standard)") },
+      { value: "separate", label: t("Always own background color", "Her zaman kendi arka plan rengi", "Toujours son propre fond", "Siempre fondo propio", "Sempre sfondo proprio", "Immer eigener Hintergrund") },
+    ],
     hideSecondNavOnScroll: t("Hide second nav on scroll", "Kaydırınca second nav gizle", "Masquer second nav au scroll", "Ocultar second nav al desplazar", "Nascondi second nav allo scroll", "Second Nav beim Scrollen ausblenden"),
     hideSecondNavOnScrollHelp: t(
       "Off: second nav stays visible while scrolling.",

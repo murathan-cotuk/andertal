@@ -89,6 +89,8 @@ export const DEFAULT_SHOP_STYLES = {
     height_mobile: "",
     hide_on_scroll: true,
     chrome_covers_on_scroll: false,
+    /** Desktop ≥1024px: when true, second nav keeps its own bg at page top (no merge with header gradient) */
+    own_color_at_top_desktop: false,
     font_size: "14px",
     font_weight: "500",
     /** Link-Darstellung je Viewport: classic = Text + Hover-Unterstrich, pill = Frostglas-Kachel */

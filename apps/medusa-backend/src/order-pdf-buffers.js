@@ -4,11 +4,17 @@
 
 const { resolveOrderPaidTotalCents, orderBonusDiscountCents, orderCouponDiscountCents } = require('./order-money')
 const { getOrderPdfStrings, getOrderPdfFilename } = require('./order-pdf-i18n')
+const { resolveLocaleFromCountry } = require('./locale-from-country')
 const {
   pdfCents,
   renderRetailOrderDocument,
   renderCommissionInvoiceDocument,
 } = require('./order-pdf-layout')
+
+/** Legal documents (Rechnung/Lieferschein) follow the recipient's billing/shipping country, not the storefront UI language. */
+function resolveDocumentLocaleFromOrderRow(row) {
+  return resolveLocaleFromCountry((row && (row.billing_country || row.country)) || '', 'de')
+}
 
 function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, shopName, sellerInfo, shopLogoBuffer, locale = 'de' }) {
   const s = getOrderPdfStrings(locale)
@@ -160,11 +166,12 @@ async function _querySellerInfo(pgClient, sellerId) {
   }
 }
 
-async function buildInvoicePdfBuffer(pgClient, orderId, locale = 'de') {
+async function buildInvoicePdfBuffer(pgClient, orderId, locale) {
   const id = String(orderId || '').trim()
   const oRes = await pgClient.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
   const row = oRes.rows && oRes.rows[0]
   if (!row) return null
+  const resolvedLocale = locale || resolveDocumentLocaleFromOrderRow(row)
   const iRes = await pgClient.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
   const itemRows = iRes.rows || []
   const sellerInfo = await _querySellerInfo(pgClient, row.seller_id)
@@ -182,17 +189,18 @@ async function buildInvoicePdfBuffer(pgClient, orderId, locale = 'de') {
       shopName,
       sellerInfo,
       shopLogoBuffer,
-      locale,
+      locale: resolvedLocale,
     }),
   )
-  return { filename: getOrderPdfFilename('invoice', on, locale), content: buf }
+  return { filename: getOrderPdfFilename('invoice', on, resolvedLocale), content: buf }
 }
 
-async function buildLieferscheinPdfBuffer(pgClient, orderId, locale = 'de') {
+async function buildLieferscheinPdfBuffer(pgClient, orderId, locale) {
   const id = String(orderId || '').trim()
   const oRes = await pgClient.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
   const row = oRes.rows && oRes.rows[0]
   if (!row) return null
+  const resolvedLocale = locale || resolveDocumentLocaleFromOrderRow(row)
   const iRes = await pgClient.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
   const itemRows = iRes.rows || []
   const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
@@ -201,9 +209,9 @@ async function buildLieferscheinPdfBuffer(pgClient, orderId, locale = 'de') {
     .then((r) => r.rows?.[0]?.shop_logo_url || '').catch(() => '')
   const shopLogoBuffer = logoUrl ? await _fetchImageBuffer(logoUrl) : null
   const buf = await pdfDocToBuffer((doc) =>
-    renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName, shopLogoBuffer, locale }),
+    renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName, shopLogoBuffer, locale: resolvedLocale }),
   )
-  return { filename: getOrderPdfFilename('lieferschein', on, locale), content: buf }
+  return { filename: getOrderPdfFilename('lieferschein', on, resolvedLocale), content: buf }
 }
 
 async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {

@@ -10,42 +10,7 @@ const { resolveSmtpSenderIdentity } = require('./smtp-sender-resolve')
 const { resolveOrderPaidTotalCents } = require('./order-money')
 const { resolveFlowMailProvider, sendFlowOutboundEmail } = require('./email-providers')
 const { consumeFlowEmailSlot } = require('./flow-email-rate-limit')
-
-const FLOW_EMAIL_LOCALES = ['en', 'de', 'tr', 'fr', 'it', 'es']
-
-/** Map ISO shipping country → preferred email locale (matches shop conventions). */
-const COUNTRY_TO_EMAIL_LOCALE = {
-  DE: 'de',
-  AT: 'de',
-  CH: 'de',
-  LU: 'de',
-  LI: 'de',
-  BE: 'de',
-  TR: 'tr',
-  FR: 'fr',
-  MC: 'fr',
-  ES: 'es',
-  MX: 'es',
-  IT: 'it',
-  SM: 'it',
-  VA: 'it',
-  GB: 'en',
-  US: 'en',
-  IE: 'en',
-  AU: 'en',
-  NZ: 'en',
-  CA: 'en',
-}
-
-function resolveEmailLocaleFromCountry(countryRaw) {
-  const c = String(countryRaw || '')
-    .trim()
-    .toUpperCase()
-  if (c && FLOW_EMAIL_LOCALES.includes(COUNTRY_TO_EMAIL_LOCALE[c])) {
-    return COUNTRY_TO_EMAIL_LOCALE[c]
-  }
-  return 'en'
-}
+const { SUPPORTED_LOCALES: FLOW_EMAIL_LOCALES, resolveLocaleFromCountry: resolveEmailLocaleFromCountry } = require('./locale-from-country')
 
 /** Mirrors apps/shop/src/lib/shop-market.js — URL language segment from market country. */
 function storefrontLangFromMarketCountry(market) {
@@ -850,7 +815,10 @@ async function runAutomationFlowsForOrder(opts) {
       customerProfile = cr.rows[0] || null
     }
     const placeholderVars = buildPlaceholderVars(ctx, triggerKey, customerProfile)
-    const customerLocale = resolveEmailLocaleFromCountry(ctx.order.country)
+    const orderLocaleRaw = String(ctx.order.locale || '').trim().toLowerCase()
+    const customerLocale = FLOW_EMAIL_LOCALES.includes(orderLocaleRaw)
+      ? orderLocaleRaw
+      : resolveEmailLocaleFromCountry(ctx.order.country)
     const rateScopeKey = String(ctx.order.seller_id || 'default').trim() || 'default'
 
     const flowsR = await client.query(

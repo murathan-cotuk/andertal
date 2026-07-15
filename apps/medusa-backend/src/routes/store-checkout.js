@@ -8,6 +8,8 @@ const { normalizeHubCountryCode } = require('./seller-settings')
 const { requireSellerAuth, requireSuperuser } = require('./seller-auth')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
+const { renderInvoicePdfDocument } = require('../order-pdf-buffers')
+const { resolveLocaleFromCountry } = require('../locale-from-country')
 
 const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
   const tk = String(triggerKey || '').trim()
@@ -1157,7 +1159,7 @@ const storePaymentIntentPOST = async (req, res) => {
 // --- Store Orders (Stripe payment success sonrası) ---
 const getOrderWithItems = async (client, orderId) => {
   const oRes = await client.query(
-    `SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping, payment_method, customer_id, is_guest, newsletter_opted_in, subtotal_cents, total_cents, COALESCE(shipping_cents,0) AS shipping_cents, COALESCE(discount_cents,0) AS discount_cents, COALESCE(coupon_discount_cents,0) AS coupon_discount_cents, coupon_code, COALESCE(bonus_points_redeemed,0) AS bonus_points_redeemed, currency, created_at, updated_at,
+    `SELECT id, order_number, cart_id, payment_intent_id, status, order_status, payment_status, delivery_status, email, first_name, last_name, phone, address_line1, address_line2, city, postal_code, country, billing_address_line1, billing_address_line2, billing_city, billing_postal_code, billing_country, billing_same_as_shipping, payment_method, customer_id, is_guest, newsletter_opted_in, subtotal_cents, total_cents, COALESCE(shipping_cents,0) AS shipping_cents, COALESCE(discount_cents,0) AS discount_cents, COALESCE(coupon_discount_cents,0) AS coupon_discount_cents, coupon_code, COALESCE(bonus_points_redeemed,0) AS bonus_points_redeemed, currency, locale, created_at, updated_at,
       COALESCE(checkout_payment_kind, 'stripe') AS checkout_payment_kind,
       COALESCE(seller_net_after_commission_cents, 0) AS seller_net_after_commission_cents,
       COALESCE(stripe_application_fee_cents, 0) AS stripe_application_fee_cents
@@ -1953,6 +1955,7 @@ const storeOrderInvoicePdfGET = async (req, res) => {
       invoiceNumber: on,
       shopName,
       sellerInfo,
+      locale: resolveLocaleFromCountry(row.billing_country || row.country, 'de'),
     })
     doc.end()
   } catch (e) {
@@ -2914,6 +2917,8 @@ const storeOrdersPOST = async (req, res) => {
     const billing_postal_code = billingSame ? (body.postal_code || '').toString().trim() || null : (body.billing_postal_code || '').toString().trim() || null
     const billing_country = billingSame ? (body.country || '').toString().trim() || null : (body.billing_country || '').toString().trim() || null
     const newsletter_opted_in = body.newsletter_opted_in === true
+    const localeRaw = (body.locale || '').toString().trim().toLowerCase()
+    const locale = ['en', 'de', 'tr', 'fr', 'it', 'es'].includes(localeRaw) ? localeRaw : null
 
     // Determine seller_id from the first cart item's product
     let sellerId = 'default'
@@ -3155,11 +3160,11 @@ const storeOrdersPOST = async (req, res) => {
          order_status, payment_status, stripe_transfer_status,
          stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
          checkout_payment_kind, seller_net_after_commission_cents,
-         subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency)
+         subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency, locale)
        VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',
          '${stripeTransferInit}',$33,$23,'pending',
          $24,$25,
-         $26,$27,$28,$29,$30,$31,$32,'eur')
+         $26,$27,$28,$29,$30,$31,$32,'eur',$34)
        RETURNING id, order_number`,
       [cartId, paymentIntentForDb, sellerId, email, first_name, last_name, phone,
        address_line1, address_line2, city, postal_code, country,
@@ -3169,7 +3174,7 @@ const storeOrdersPOST = async (req, res) => {
        checkoutPaymentKind,
        sellerNetMerchandiseCents,
        subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,
-       piStripeAccountId || null]
+       piStripeAccountId || null, locale]
     )
 
     const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null

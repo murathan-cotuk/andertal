@@ -1342,11 +1342,14 @@ export default function ShopHeader() {
     );
   }, [shopStyles?.header]);
 
+  const desktopSecondNavOwnColorAtTop = shopStyles?.secondNav?.own_color_at_top_desktop === true;
+
   const unifiedHeaderAtTop =
     showHeaderFilterBar &&
     !mobileFrostedScrollActive &&
     !scrollPastThreshold &&
-    (landingHeaderBg || headerGradientAnyViewport);
+    (landingHeaderBg || headerGradientAnyViewport) &&
+    !(desktopSecondNavOwnColorAtTop && !isNarrowViewport);
 
   const secondNavLinkDataAttrs = useMemo(() => {
     const resolved = resolveSecondNavLinkStyles(shopStyles || {});
@@ -1765,6 +1768,7 @@ export default function ShopHeader() {
                 : snChromeCover
                   ? { background: "var(--header-chrome-bg)" }
                   : {}),
+              ...(scrollPastThreshold ? { "--second-nav-text": "var(--second-nav-text-scrolled)" } : {}),
             }}
           >
             <SecondMenuRowInner>

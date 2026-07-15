@@ -188,6 +188,7 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --second-nav-bg:   ${secondNavVp.desktop.bg};
   --second-nav-border: ${secondNavVp.desktop.border};
   --second-nav-text: ${secondNavVp.desktop.text};
+  --second-nav-text-scrolled: ${secondNavVp.desktop.textScrolled};
   --second-nav-active: ${secondNavVp.desktop.active};
   --second-nav-h:    ${secondNavHVp.desktop};
   --second-nav-fs:   ${secondNav.font_size};
@@ -279,6 +280,7 @@ ${buttonColorCssVars ? `\n${buttonColorCssVars}` : ""}
     --second-nav-bg: ${secondNavVp.tablet.bg};
     --second-nav-border: ${secondNavVp.tablet.border};
     --second-nav-text: ${secondNavVp.tablet.text};
+    --second-nav-text-scrolled: ${secondNavVp.tablet.textScrolled};
     --second-nav-active: ${secondNavVp.tablet.active};
     --second-nav-h: ${secondNavHVp.tablet};
   }
@@ -291,6 +293,7 @@ ${buttonColorCssVars ? `\n${buttonColorCssVars}` : ""}
     --second-nav-bg: ${secondNavVp.mobile.bg};
     --second-nav-border: ${secondNavVp.mobile.border};
     --second-nav-text: ${secondNavVp.mobile.text};
+    --second-nav-text-scrolled: ${secondNavVp.mobile.textScrolled};
     --second-nav-active: ${secondNavVp.mobile.active};
     --second-nav-h: ${secondNavHVp.mobile};
   }

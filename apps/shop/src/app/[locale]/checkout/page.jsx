@@ -81,11 +81,12 @@ async function resolveCheckoutPaymentIntent(stripe, elements, clientSecret, retu
   return { paymentIntent: result.paymentIntent, error: null };
 }
 
-function buildOrderPayload(cartId, paymentIntentId, shippingCents, contact, billing) {
+function buildOrderPayload(cartId, paymentIntentId, shippingCents, contact, billing, locale) {
   return {
     cart_id: cartId,
     payment_intent_id: paymentIntentId,
     shipping_cents: shippingCents ?? 0,
+    locale: locale || undefined,
     email: contact.email,
     first_name: contact.first_name,
     last_name: contact.last_name,
@@ -970,6 +971,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
           cartId,
           ...contact,
           ...billing,
+          locale,
           save_new_address: saveNewAddress,
           ship_addr_id: shipAddrId || "",
           addr_count: savedAddresses.length,
@@ -1018,7 +1020,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
       try {
         const custTok = typeof window !== "undefined" ? getToken("customer") : null;
         const { res, data, orderId } = await createStoreOrder(
-          buildOrderPayload(cartId, paymentIntentId, shippingCents, contact, billing),
+          buildOrderPayload(cartId, paymentIntentId, shippingCents, contact, billing, locale),
           custTok,
         );
         if (!res.ok || !orderId) {
@@ -1567,6 +1569,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
           billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
           billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
+          locale,
           save_new_address: saveNewAddress,
           ship_addr_id: shipAddrId || "",
           addr_count: savedAddresses.length,
@@ -1598,6 +1601,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           billing_city: billingSameAsShipping ? undefined : billingCity.value.trim(),
           billing_postal_code: billingSameAsShipping ? undefined : billingPostalCode.value.trim(),
           billing_country: billingSameAsShipping ? undefined : billingCountry.value.trim(),
+          locale,
         }),
       });
       const data = await readResponseJson(res);
@@ -2360,7 +2364,7 @@ export default function CheckoutPage() {
             billing_city: snapshot.billing_city,
             billing_postal_code: snapshot.billing_postal_code,
             billing_country: snapshot.billing_country,
-          }),
+          }, snapshot.locale || locale),
           custTok,
         );
 

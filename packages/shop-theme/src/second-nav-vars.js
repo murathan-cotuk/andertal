@@ -14,10 +14,12 @@ function trimOpt(v) {
  * @param {SecondNavViewport} vp
  */
 export function secondNavSurfaceForViewport(sn, vp) {
+  const text = pickSecondNavText(sn, vp);
   return {
     bg: pickSecondNavBg(sn, vp),
     border: pickSecondNavBorder(sn, vp),
-    text: pickSecondNavText(sn, vp),
+    text,
+    textScrolled: pickSecondNavTextScrolled(sn, vp, text),
     active: pickSecondNavActive(sn, vp),
   };
 }
@@ -60,6 +62,17 @@ function pickSecondNavText(sn, vp) {
     if (t !== "") return t;
   }
   return trimOpt(sn.text_color) || "#374151";
+}
+
+/** @param {string} staticText — already-resolved "Sabit" color, used as the fallback when no scroll color is configured */
+function pickSecondNavTextScrolled(sn, vp, staticText) {
+  const k = `text_color_scroll_${vp}`;
+  if (own(sn, k)) {
+    const t = trimOpt(sn[k]);
+    if (t !== "") return t;
+  }
+  const leg = trimOpt(sn.text_color_scroll);
+  return leg !== "" ? leg : staticText;
 }
 
 function pickSecondNavActive(sn, vp) {
