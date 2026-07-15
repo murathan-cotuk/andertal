@@ -213,7 +213,11 @@
       "PowerShell(Get-Content -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\shop\\\\src\\\\components\\\\templates\\\\ProductTemplate.jsx\" | ForEach-Object { $i = 1 } { \"$i`t$_\"; $i++ } | Select-String \"useRouter|router\" | Select-Object -First 5)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\components\\\\pages\" -Name | Where-Object { $_ -match \"otif\" })",
       "PowerShell(Get-Content \"C:\\\\Users\\\\murat\\\\Desktop\\\\MC\\\\MC\\\\EC\\\\EC\\\\ECProjeleri\\\\andertal\\\\apps\\\\sellercentral\\\\src\\\\components\\\\DashboardLayout.jsx\" | ForEach-Object { $i = 1 } { \"$i`t$_\"; $i++ } | Select-String \"notif|bell|unread|Notif|Bell|badge\" | Select-Object -First 20)",
-      "Bash(npx --no-install babel apps/shop/src/app/\\\\[locale\\\\]/checkout/page.jsx --presets @babel/preset-react)"
+      "Bash(npx --no-install babel apps/shop/src/app/\\\\[locale\\\\]/checkout/page.jsx --presets @babel/preset-react)",
+      "Bash(env)",
+      "Bash(curl -s \"https://api.andertal.com/store/collections\")",
+      "Bash(curl -s \"https://api.andertal.com/store/products?collection_handle=koleksiyon-All&limit=20\")",
+      "Bash(curl -s \"https://api.andertal.com/store/products?collection_id=85b8461d-e50e-43af-9777-8e82d828b66c&limit=20\")"
     ]
   }
 }
