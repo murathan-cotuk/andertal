@@ -990,9 +990,13 @@ export default function ProductTemplate() {
     return () => { cancelled = true; };
   }, []);
 
-  // After product loads, fetch the seller's actual store name using their seller_id
+  // After product loads, fetch the seller's actual store name using their seller_id.
+  // Prefer the canonical top-level product.seller_id (always set by the backend) over
+  // metadata.seller_id, which is only populated for some listings — falling back to it
+  // alone silently left this stuck on the platform default store name for products where
+  // metadata.seller_id was never written.
   useEffect(() => {
-    const sellerId = product?.metadata?.seller_id;
+    const sellerId = product?.seller_id || product?.metadata?.seller_id;
     if (!sellerId) return;
     let cancelled = false;
     fetch(`/api/store-seller-settings?seller_id=${encodeURIComponent(sellerId)}`, { cache: "no-store" })
@@ -1002,7 +1006,7 @@ export default function ProductTemplate() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [product?.metadata?.seller_id]);
+  }, [product?.seller_id, product?.metadata?.seller_id]);
 
   useEffect(() => {
     const fetchProduct = async () => {

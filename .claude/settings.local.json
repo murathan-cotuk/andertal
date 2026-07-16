@@ -217,7 +217,16 @@
       "Bash(env)",
       "Bash(curl -s \"https://api.andertal.com/store/collections\")",
       "Bash(curl -s \"https://api.andertal.com/store/products?collection_handle=koleksiyon-All&limit=20\")",
-      "Bash(curl -s \"https://api.andertal.com/store/products?collection_id=85b8461d-e50e-43af-9777-8e82d828b66c&limit=20\")"
+      "Bash(curl -s \"https://api.andertal.com/store/products?collection_id=85b8461d-e50e-43af-9777-8e82d828b66c&limit=20\")",
+      "Bash(rm -f scripts_tmp_patch3.js /tmp/patch_order_page.js /tmp/patch_order_page2.js)",
+      "Bash(npx --prefix apps/shop next --version)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(curl -s \"https://www.andertal.com/api/store-products?query=4012345678900\" -H \"Accept: application/json\")",
+      "Bash(curl -s \"https://www.andertal.com/api/store-products?query=Heisenberg\" -H \"Accept: application/json\")",
+      "Bash(curl -s \"https://www.andertal.com/api/store-products/17923a99-6532-4d1f-bc16-894197adebff\" -H \"Accept: application/json\")",
+      "Bash(curl -s \"https://www.andertal.com/api/store-products/ab0d88d8-9ca6-42c2-94a2-3859eb2efdd2\" -H \"Accept: application/json\")",
+      "Bash(curl -s \"https://www.andertal.com/api/store-seller-settings?seller_id=seller_c0bd09dee2866d5f\" -H \"Accept: application/json\")",
+      "Bash(curl -s \"https://www.andertal.com/api/store-seller-settings\" -H \"Accept: application/json\")"
     ]
   }
 }

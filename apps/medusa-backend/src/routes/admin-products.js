@@ -468,7 +468,15 @@ const updateAdminHubProductDb = async (id, body) => {
     }
     const bodyKeys = Object.keys(body || {})
     const onlyVariantPatch = bodyKeys.length > 0 && bodyKeys.every((k) => k === 'variants')
-    if (!onlyVariantPatch) {
+    const metadataKeysInBody = body.metadata && typeof body.metadata === 'object' ? Object.keys(body.metadata) : []
+    // Adding/removing a product from a collection only ever touches metadata.collection_ids
+    // (+ the collection_id mirror column) — it must not be blocked by GPSR/brand gates that
+    // are meant to guard real product edits/publishes.
+    const onlyCollectionPatch = bodyKeys.length > 0 &&
+      bodyKeys.every((k) => k === 'metadata' || k === 'collection_id') &&
+      metadataKeysInBody.every((k) => k === 'collection_ids')
+    const skipComplianceGates = onlyVariantPatch || onlyCollectionPatch
+    if (!skipComplianceGates) {
       const gpsrValidation = validateRequiredGpsrMetadata(metadataObj || {})
       if (!gpsrValidation.ok) { await client.end(); return { __error: gpsrValidation.message || 'GPSR validation failed' } }
     }
@@ -477,7 +485,7 @@ const updateAdminHubProductDb = async (id, body) => {
       : (Array.isArray(existing.variants) ? existing.variants : [])
     const eanValidation = await validateProductEansDb(client, metadataObj && metadataObj.ean, collectVariantEans(nextVariantsArr), uuid)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
-    if (!onlyVariantPatch) {
+    if (!skipComplianceGates) {
       const brandGate = await validateBrandForPublish(client, metadataObj || {}, status)
       if (!brandGate.ok) { await client.end(); return { __error: brandGate.message || 'Brand authorization pending' } }
     }

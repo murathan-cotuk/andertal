@@ -327,6 +327,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+  // Save/approve/reject errors render in a banner at the top of the page — without this the user
+  // can be scrolled deep into a long product form and never see why the action failed.
+  useEffect(() => {
+    if (message.type !== "error" || !message.text) return;
+    const scrollEl = typeof document !== "undefined" ? document.querySelector(".andertal-scroll-wrapper") : null;
+    if (scrollEl) scrollEl.scrollTo({ top: 0, behavior: "smooth" });
+    else if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [message]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -2055,25 +2063,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   />
                 </Box>
               </InlineStack>
-
-              {!isNew && product?.id && (
-                <Box paddingBlockStart="100">
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <Text as="span" variant="bodySm" tone="subdued">
-                      {locale === "tr" ? "Ürün ID:" : locale === "de" ? "Produkt-ID:" : "Product ID:"}
-                    </Text>
-                    <Text as="span" variant="bodySm" tone="subdued">
-                      <span
-                        title={locale === "tr" ? "Kopyalamak için tıkla" : locale === "de" ? "Zum Kopieren klicken" : "Click to copy"}
-                        style={{ fontFamily: "monospace", cursor: "pointer", userSelect: "all" }}
-                        onClick={() => { try { navigator.clipboard.writeText(product.id); } catch (_) {} }}
-                      >
-                        {product.id}
-                      </span>
-                    </Text>
-                  </InlineStack>
-                </Box>
-              )}
 
               {eanLookupState === "found" && (
                 <Banner tone="warning">

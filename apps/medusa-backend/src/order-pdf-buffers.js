@@ -153,14 +153,36 @@ async function _fetchImageBuffer(url) {
 }
 
 async function _querySellerInfo(pgClient, sellerId) {
-  if (!sellerId || String(sellerId).trim() === 'default') return null
+  const sid = String(sellerId || '').trim()
   try {
-    const r = await pgClient.query(
-      `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address, lucid_number
-         FROM seller_users WHERE seller_id = $1 LIMIT 1`,
-      [String(sellerId).trim()],
+    if (sid && sid !== 'default') {
+      const r = await pgClient.query(
+        `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address, lucid_number
+           FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+        [sid],
+      )
+      if (r.rows?.[0]) return r.rows[0]
+    }
+    // Platform-run orders (no marketplace seller, i.e. seller_id is absent/'default') still need a
+    // sender block + real VAT status on the invoice — fall back to the platform's own legal/company
+    // settings instead of leaving the invoice sender blank and defaulting to the Kleinunternehmer notice.
+    const lr = await pgClient.query(
+      `SELECT legal_company_name, legal_street, legal_city, legal_vat_id
+         FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
     )
-    return r.rows?.[0] || null
+    const l = lr.rows?.[0]
+    if (!l) return null
+    const companyName = String(l.legal_company_name || '').trim()
+    const street = String(l.legal_street || '').trim()
+    const cityLine = String(l.legal_city || '').trim()
+    const vatId = String(l.legal_vat_id || '').trim()
+    if (!companyName && !street && !cityLine && !vatId) return null
+    return {
+      store_name: companyName,
+      company_name: companyName,
+      vat_id: vatId,
+      business_address: { street, city: cityLine },
+    }
   } catch (_) {
     return null
   }
@@ -171,7 +193,8 @@ async function buildInvoicePdfBuffer(pgClient, orderId, locale) {
   const oRes = await pgClient.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
   const row = oRes.rows && oRes.rows[0]
   if (!row) return null
-  const resolvedLocale = locale || resolveDocumentLocaleFromOrderRow(row)
+  // Invoices are always issued in German regardless of the shipping/billing country.
+  const resolvedLocale = locale || 'de'
   const iRes = await pgClient.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
   const itemRows = iRes.rows || []
   const sellerInfo = await _querySellerInfo(pgClient, row.seller_id)
@@ -282,4 +305,5 @@ module.exports = {
   renderLieferscheinPdfDocument,
   renderProvisionsfakturPdfDocument,
   getOrderPdfFilename,
+  querySellerInfoForInvoice: _querySellerInfo,
 }

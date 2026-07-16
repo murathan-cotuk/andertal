@@ -134,6 +134,16 @@ export default function CategoryDrilldownSelect({
     };
   }, [open]);
 
+  // The dropdown is `position: fixed` so it can escape the white card, but it's still a DOM
+  // descendant of the scrollable page wrapper — that wrapper's `overflow` still clips it visually.
+  // Toggling this body class flips the wrapper to `overflow: visible` while the dropdown is open.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (open) document.body.classList.add("andertal-dropdown-open");
+    else document.body.classList.remove("andertal-dropdown-open");
+    return () => document.body.classList.remove("andertal-dropdown-open");
+  }, [open]);
+
   useEffect(() => {
     const onDown = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);

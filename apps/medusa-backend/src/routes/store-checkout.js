@@ -8,7 +8,7 @@ const { normalizeHubCountryCode } = require('./seller-settings')
 const { requireSellerAuth, requireSuperuser } = require('./seller-auth')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
-const { renderInvoicePdfDocument } = require('../order-pdf-buffers')
+const { renderInvoicePdfDocument, querySellerInfoForInvoice } = require('../order-pdf-buffers')
 const { resolveLocaleFromCountry } = require('../locale-from-country')
 
 const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
@@ -516,6 +516,8 @@ const getCartWithItems = async (client, cartId) => {
   if (!cartRow) return null
   const itemsRes = await client.query(
     `SELECT ci.id, ci.variant_id, ci.product_id, ci.quantity, ci.unit_price_cents, ci.title, ci.thumbnail, ci.product_handle,
+     COALESCE(p1.id, p2.id) AS current_product_id,
+     COALESCE(p1.handle, p2.handle) AS current_product_handle,
      COALESCE(p1.metadata->>'shipping_group_id', p2.metadata->>'shipping_group_id') AS shipping_group_id,
      COALESCE(p1.title, p2.title) AS product_title,
      COALESCE(p1.metadata, p2.metadata) AS product_metadata,
@@ -545,12 +547,12 @@ const getCartWithItems = async (client, cartId) => {
     return {
       id: r.id,
       variant_id: r.variant_id,
-      product_id: r.product_id,
+      product_id: r.current_product_id || r.product_id,
       quantity: r.quantity,
       unit_price_cents: r.unit_price_cents,
       title: r.title,
       thumbnail: r.thumbnail,
-      product_handle: r.product_handle,
+      product_handle: r.current_product_handle || r.product_handle,
       shipping_group_id: r.shipping_group_id || null,
       product_title: r.product_title || null,
       product_metadata: metadataOut,
@@ -1070,23 +1072,33 @@ const storePaymentIntentPOST = async (req, res) => {
     }
 
     const cancelPiId = (body.cancel_payment_intent_id || '').toString().trim()
+    let paymentIntent = null
     if (cancelPiId && cancelPiId.startsWith('pi_')) {
       try {
         const prev = await stripe.paymentIntents.retrieve(cancelPiId)
         const prevCart = String(prev.metadata?.cart_id || '').trim()
-        if (
-          prevCart === cartId &&
-          prev.status !== 'succeeded' &&
-          prev.status !== 'canceled'
-        ) {
+        // Reusing the same PaymentIntent (updating amount in place) keeps the client_secret
+        // unchanged, so the Stripe Elements form on the frontend does NOT get remounted —
+        // recreating a new PaymentIntent here forces a remount that wipes every field the
+        // customer already typed (address, name, etc.). Stripe explicitly supports updating
+        // amount on an unconfirmed PaymentIntent for exactly this reason.
+        const updatableStatuses = new Set(['requires_payment_method', 'requires_confirmation', 'requires_action'])
+        if (prevCart === cartId && updatableStatuses.has(prev.status)) {
+          try {
+            const updateBody = { amount: payCents, metadata: piBody.metadata }
+            if (piBody.application_fee_amount != null) updateBody.application_fee_amount = piBody.application_fee_amount
+            paymentIntent = await stripe.paymentIntents.update(cancelPiId, updateBody)
+          } catch (_) {
+            paymentIntent = null
+          }
+        } else if (prevCart === cartId && prev.status !== 'succeeded' && prev.status !== 'canceled') {
           await stripe.paymentIntents.cancel(cancelPiId).catch(() => {})
         }
       } catch (_) {}
     }
 
-    let paymentIntent
     try {
-      paymentIntent = await stripe.paymentIntents.create(piBody)
+      if (!paymentIntent) paymentIntent = await stripe.paymentIntents.create(piBody)
     } catch (stripeErr) {
       const code = stripeErr && stripeErr.code
       const param = stripeErr && stripeErr.param
@@ -1171,7 +1183,9 @@ const getOrderWithItems = async (client, orderId) => {
 
   const itemsRes = await client.query(
     `SELECT oi.id, oi.variant_id, oi.product_id, oi.quantity, oi.unit_price_cents, oi.title, oi.thumbnail, oi.product_handle,
+     COALESCE(p1.id, p2.id) AS current_product_id,
      COALESCE(p1.title, p2.title) AS product_title,
+     COALESCE(p1.handle, p2.handle) AS current_product_handle,
      COALESCE(p1.metadata, p2.metadata) AS product_metadata
      FROM store_order_items oi
      LEFT JOIN admin_hub_products p1 ON p1.id::text = oi.product_id
@@ -1185,12 +1199,12 @@ const getOrderWithItems = async (client, orderId) => {
     return {
       id: r.id,
       variant_id: r.variant_id,
-      product_id: r.product_id,
+      product_id: r.current_product_id || r.product_id,
       quantity: r.quantity,
       unit_price_cents: r.unit_price_cents,
       title: r.title,
       thumbnail: r.thumbnail,
-      product_handle: r.product_handle,
+      product_handle: r.current_product_handle || r.product_handle,
       product_title: r.product_title || null,
       product_metadata: pm && typeof pm === 'object' ? pm : null,
     }
@@ -1932,14 +1946,7 @@ const storeOrderInvoicePdfGET = async (req, res) => {
     const itemRows = iRes.rows || []
     let sellerInfo = null
     try {
-      if (row.seller_id && row.seller_id !== 'default') {
-        const sr = await client.query(
-          `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
-             FROM seller_users WHERE seller_id = $1 LIMIT 1`,
-          [row.seller_id],
-        )
-        sellerInfo = sr.rows?.[0] || null
-      }
+      sellerInfo = await querySellerInfoForInvoice(client, row.seller_id)
     } catch (_) {}
     await client.end(); client = null
     const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
@@ -1955,7 +1962,8 @@ const storeOrderInvoicePdfGET = async (req, res) => {
       invoiceNumber: on,
       shopName,
       sellerInfo,
-      locale: resolveLocaleFromCountry(row.billing_country || row.country, 'de'),
+      // Invoices are always issued in German regardless of the shipping/billing country.
+      locale: 'de',
     })
     doc.end()
   } catch (e) {
@@ -2502,11 +2510,26 @@ const storeOrdersMeGET = async (req, res) => {
     if (orderIds.length > 0) {
       try {
         const itemsR = await client.query(
-          `SELECT id, order_id, title, quantity, unit_price_cents, product_id, product_handle, thumbnail
-           FROM store_order_items WHERE order_id = ANY($1::uuid[])`,
+          `SELECT oi.id, oi.order_id, oi.title, oi.quantity, oi.unit_price_cents, oi.product_id, oi.product_handle, oi.thumbnail,
+           COALESCE(p1.id, p2.id) AS current_product_id,
+           COALESCE(p1.handle, p2.handle) AS current_product_handle,
+           COALESCE(p1.metadata, p2.metadata) AS product_metadata
+           FROM store_order_items oi
+           LEFT JOIN admin_hub_products p1 ON p1.id::text = oi.product_id
+           LEFT JOIN admin_hub_products p2 ON p1.id IS NULL AND p2.handle = oi.product_handle
+           WHERE oi.order_id = ANY($1::uuid[])`,
           [orderIds]
         )
-        for (const it of (itemsR.rows || [])) {
+        for (const r of (itemsR.rows || [])) {
+          let pm = r.product_metadata
+          if (pm != null && typeof pm === 'string') { try { pm = JSON.parse(pm) } catch (_) { pm = null } }
+          const it = {
+            id: r.id, order_id: r.order_id, title: r.title, quantity: r.quantity, unit_price_cents: r.unit_price_cents,
+            product_id: r.current_product_id || r.product_id,
+            product_handle: r.current_product_handle || r.product_handle,
+            thumbnail: r.thumbnail,
+            product_metadata: pm && typeof pm === 'object' ? pm : null,
+          }
           if (!itemsMap[it.order_id]) itemsMap[it.order_id] = []
           itemsMap[it.order_id].push(it)
         }

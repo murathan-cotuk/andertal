@@ -1,7 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { resolveOrderPaidTotalCents } = require('../order-money')
-const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename } = require('../order-pdf-buffers')
+const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename, querySellerInfoForInvoice } = require('../order-pdf-buffers')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 
@@ -187,14 +187,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         let sellerInfoHub = null
         let shopLogoUrl = ''
         try {
-          if (row.seller_id && row.seller_id !== 'default') {
-            const sr = await client.query(
-              `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
-                 FROM seller_users WHERE seller_id = $1 LIMIT 1`,
-              [row.seller_id],
-            )
-            sellerInfoHub = sr.rows?.[0] || null
-          }
+          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
           const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
           shopLogoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}
@@ -330,14 +323,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
 
         let sellerInfo = null
         try {
-          if (order.seller_id && order.seller_id !== 'default') {
-            const sr = await client.query(
-              `SELECT store_name, company_name, first_name, last_name, vat_id, email, business_address
-                 FROM seller_users WHERE seller_id = $1 LIMIT 1`,
-              [order.seller_id],
-            )
-            sellerInfo = sr.rows?.[0] || null
-          }
+          sellerInfo = await querySellerInfoForInvoice(client, order.seller_id)
         } catch (_) {}
 
         await client.end(); client = null

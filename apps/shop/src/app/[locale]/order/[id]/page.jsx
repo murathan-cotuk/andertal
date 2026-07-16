@@ -11,31 +11,30 @@ import { getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
+import { storefrontProductHandle } from "@/lib/product-url-handle";
 
 const ORANGE = "#ff971c";
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 /* ── helpers ── */
-function fmtDate(d) {
+const INTL_LOCALE = { de: "de-DE", en: "en-GB", tr: "tr-TR", fr: "fr-FR", es: "es-ES", it: "it-IT" };
+function fmtDate(d, locale = "de") {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  return new Date(d).toLocaleDateString(INTL_LOCALE[locale] || "de-DE", { day: "2-digit", month: "long", year: "numeric" });
 }
-function fmtTime(d) {
+function fmtTime(d, locale = "de") {
   if (!d) return "";
-  return new Date(d).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleTimeString(INTL_LOCALE[locale] || "de-DE", { hour: "2-digit", minute: "2-digit" });
 }
-function fmtEur(cents) {
-  return (Number(cents || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+function fmtEur(cents, locale = "de") {
+  return (Number(cents || 0) / 100).toLocaleString(INTL_LOCALE[locale] || "de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
-const STATUS_LABEL = {
-  offen: "Offen", in_bearbeitung: "In Bearbeitung", versendet: "Versendet",
-  zugestellt: "Zugestellt", abgeschlossen: "Abgeschlossen", storniert: "Storniert",
-  bezahlt: "Bezahlt", refunded: "Erstattet", retoure: "Retoure",
-  retoure_anfrage: "Rückgabe läuft", pending: "Offen", shipped: "Versendet",
-  delivered: "Zugestellt", completed: "Abgeschlossen", cancelled: "Storniert",
-  processing: "In Bearbeitung",
-};
+function statusLabel(t, status) {
+  const k = String(status || "").toLowerCase();
+  if (!k) return "-";
+  try { return t(`status.${k}`); } catch (_) { return status; }
+}
 const STATUS_BG = {
   offen: "#fef3c7", in_bearbeitung: "#dbeafe", versendet: "#ede9fe",
   zugestellt: "#d1fae5", abgeschlossen: "#d1fae5", storniert: "#fee2e2",
@@ -54,7 +53,6 @@ const STATUS_COLOR = {
 };
 
 const STEP_ORDER = ["bezahlt", "in_bearbeitung", "versendet", "zugestellt"];
-const STEP_LABELS = { bezahlt: "Bezahlt", in_bearbeitung: "In Bearbeitung", versendet: "Versendet", zugestellt: "Zugestellt" };
 
 function displayStatus(order) {
   if (order.order_status === "refunded") return "refunded";
@@ -70,7 +68,7 @@ function displayStatus(order) {
   return order.order_status || order.delivery_status || "offen";
 }
 
-function StatusPill({ status, large }) {
+function StatusPill({ status, large, t }) {
   const k = (status || "").toLowerCase();
   return (
     <span style={{
@@ -81,12 +79,12 @@ function StatusPill({ status, large }) {
       borderRadius: 20, padding: large ? "5px 14px" : "3px 10px",
       letterSpacing: 0.2,
     }}>
-      {STATUS_LABEL[k] || status || "—"}
+      {statusLabel(t, k) || status || "-"}
     </span>
   );
 }
 
-function StatusTimeline({ status }) {
+function StatusTimeline({ status, t }) {
   const idx = STEP_ORDER.indexOf(status);
   if (idx < 0 || ["storniert", "cancelled", "refunded"].includes(status)) return null;
   return (
@@ -109,7 +107,7 @@ function StatusTimeline({ status }) {
                 {done && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
               </div>
               <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: done ? ORANGE : "#9ca3af", whiteSpace: "nowrap" }}>
-                {STEP_LABELS[step]}
+                {statusLabel(t, step)}
               </span>
             </div>
             {i < STEP_ORDER.length - 1 && (
@@ -195,13 +193,14 @@ function ActionBtn({ children, onClick, color = "#374151", bg = "#f9fafb", disab
 
 /* ── Return request modal ── */
 function ReturnModal({ order, onClose, onDone }) {
+  const t = useTranslations("order");
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   const submit = async () => {
-    if (!reason) { setErr("Bitte wähle einen Grund."); return; }
+    if (!reason) { setErr(t("reasonRequired")); return; }
     setBusy(true); setErr("");
     try {
       const token = getToken("customer");
@@ -212,7 +211,7 @@ function ReturnModal({ order, onClose, onDone }) {
       });
       onDone?.();
       onClose();
-    } catch (e) { setErr(e?.message || "Fehler beim Absenden"); }
+    } catch (e) { setErr(e?.message || t("submitError")); }
     setBusy(false);
   };
 
@@ -220,32 +219,32 @@ function ReturnModal({ order, onClose, onDone }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 440, boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
         <div style={{ padding: "18px 22px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>Retoure anfragen</h3>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{t("requestReturn")}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
         <div style={{ padding: "18px 22px" }}>
-          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>Rückgabegrund *</label>
+          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("returnReasonLabel")}</label>
           <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
-            <option value="">Bitte wählen…</option>
-            <option value="defekt">Artikel defekt / beschädigt</option>
-            <option value="falsch">Falscher Artikel erhalten</option>
-            <option value="nicht_gefallen">Artikel gefällt nicht</option>
-            <option value="zu_gross">Zu groß</option>
-            <option value="zu_klein">Zu klein</option>
-            <option value="nicht_erwartet">Entspricht nicht der Beschreibung</option>
-            <option value="sonstiges">Sonstiges</option>
+            <option value="">{t("choosePlaceholder")}</option>
+            <option value="defekt">{t("reasonDefect")}</option>
+            <option value="falsch">{t("reasonWrongItem")}</option>
+            <option value="nicht_gefallen">{t("reasonDislike")}</option>
+            <option value="zu_gross">{t("reasonTooBig")}</option>
+            <option value="zu_klein">{t("reasonTooSmall")}</option>
+            <option value="nicht_erwartet">{t("reasonNotAsDescribed")}</option>
+            <option value="sonstiges">{t("reasonOther")}</option>
           </select>
-          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>Anmerkungen (optional)</label>
+          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("notesLabel")}</label>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
             style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
-            placeholder="Weitere Details…"
+            placeholder={t("notesPlaceholder")}
           />
           {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 8 }}>{err}</p>}
         </div>
         <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button onClick={onClose} style={{ padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff" }}>Abbrechen</button>
+          <button onClick={onClose} style={{ padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff" }}>{t("cancelButton")}</button>
           <button onClick={submit} disabled={busy} style={{ padding: "8px 18px", background: "#b91c1c", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: busy ? "not-allowed" : "pointer", fontWeight: 700 }}>
-            {busy ? "…" : "Retoure anfragen"}
+            {busy ? "…" : t("requestReturn")}
           </button>
         </div>
       </div>
@@ -255,6 +254,8 @@ function ReturnModal({ order, onClose, onDone }) {
 
 /* ── Message modal ── */
 function MessageModal({ order, onClose }) {
+  const t = useTranslations("order");
+  const locale = useLocale();
   const [body, setBody] = useState("");
   const [history, setHistory] = useState([]);
   const [sending, setSending] = useState(false);
@@ -276,13 +277,13 @@ function MessageModal({ order, onClose }) {
       await getMedusaClient().request("/store/messages", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: order.id, body: body.trim(), subject: `Bestellung #${order.order_number || ""}` }),
+        body: JSON.stringify({ order_id: order.id, body: body.trim(), subject: t("orderTitle", { number: order.order_number || "" }) }),
       });
       setSent(true); setBody("");
       const d = await getMedusaClient().request(`/store/messages?order_id=${order.id}`, { headers: { Authorization: `Bearer ${token}` } });
       if (!d?.__error) setHistory(d?.messages || []);
       setTimeout(() => setSent(false), 3000);
-    } catch (e) { setErr(e?.message || "Fehler"); }
+    } catch (e) { setErr(e?.message || t("genericError")); }
     setSending(false);
   };
 
@@ -290,34 +291,34 @@ function MessageModal({ order, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, maxHeight: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
         <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Nachricht — #{order.order_number || "—"}</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{t("messageModalTitle", { number: order.order_number || "-" })}</div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-          {history.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "24px 0" }}>Noch keine Nachrichten zu dieser Bestellung</div>}
+          {history.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "24px 0" }}>{t("noMessagesYet")}</div>}
           {history.map(m => {
             const isSeller = m.sender_type === "seller";
             return (
               <div key={m.id} style={{ display: "flex", justifyContent: isSeller ? "flex-start" : "flex-end" }}>
                 <div style={{ maxWidth: "75%", background: isSeller ? "#f3f4f6" : ORANGE, color: isSeller ? "#111827" : "#fff", borderRadius: isSeller ? "12px 12px 12px 2px" : "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13 }}>
                   {m.body}
-                  <div style={{ fontSize: 10, marginTop: 3, opacity: 0.6 }}>{new Date(m.created_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+                  <div style={{ fontSize: 10, marginTop: 3, opacity: 0.6 }}>{new Date(m.created_at).toLocaleString(INTL_LOCALE[locale] || "de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
               </div>
             );
           })}
         </div>
         <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6" }}>
-          {sent && <div style={{ color: "#15803d", fontSize: 12, marginBottom: 6 }}>Nachricht gesendet ✓</div>}
+          {sent && <div style={{ color: "#15803d", fontSize: 12, marginBottom: 6 }}>{t("messageSent")}</div>}
           {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
           <div style={{ display: "flex", gap: 8 }}>
             <textarea value={body} onChange={e => setBody(e.target.value)} rows={2}
               style={{ flex: 1, padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "none" }}
-              placeholder="Deine Nachricht…"
+              placeholder={t("messagePlaceholder")}
             />
             <button onClick={send} disabled={sending || !body.trim()}
               style={{ padding: "0 18px", background: ORANGE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: sending || !body.trim() ? "not-allowed" : "pointer", opacity: sending || !body.trim() ? 0.6 : 1 }}>
-              {sending ? "…" : "Senden"}
+              {sending ? "…" : t("sendButton")}
             </button>
           </div>
         </div>
@@ -457,6 +458,8 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const orderId = params?.id || "";
   const isConfirmed = searchParams?.get("confirmed") === "1";
+  const t = useTranslations("order");
+  const locale = useLocale();
 
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -480,9 +483,9 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/store-orders/${orderId}`);
       const data = await res.json();
       if (data?.order) setOrder(data.order);
-      else setError("Bestellung nicht gefunden.");
+      else setError(t("notFound"));
     } catch (e) {
-      setError(e?.message || "Fehler beim Laden");
+      setError(e?.message || t("loadError"));
     }
     setLoading(false);
   }, [orderId]);
@@ -506,15 +509,15 @@ export default function OrderDetailPage() {
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
         <ShopHeader />
         <main style={{ flex: 1, maxWidth: 640, margin: "0 auto", padding: "48px 20px", width: "100%" }}>
-          <p style={{ color: "#ef4444", textAlign: "center" }}>{error || "Bestellung nicht gefunden."}</p>
+          <p style={{ color: "#ef4444", textAlign: "center" }}>{error || t("notFound")}</p>
           <div style={{ textAlign: "center", marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
             <button
               onClick={() => { setError(null); setLoading(true); loadOrder(); }}
               style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}
             >
-              Erneut versuchen
+              {t("retryButton")}
             </button>
-            <Link href="/orders" style={{ color: ORANGE, fontWeight: 600, textDecoration: "none" }}>← Zurück zu Bestellungen</Link>
+            <Link href="/orders" style={{ color: ORANGE, fontWeight: 600, textDecoration: "none" }}>&larr; {t("backToOrders")}</Link>
           </div>
         </main>
         <Footer />
@@ -545,15 +548,15 @@ export default function OrderDetailPage() {
   const canCancel = !!order.cancellation_allowed && !cancelBusy;
 
   const handleCancel = async () => {
-    if (!window.confirm(`Bestellung #${order.order_number || order.id?.slice(0, 8)} wirklich stornieren?`)) return;
+    if (!window.confirm(t("cancelConfirm", { number: order.order_number || order.id?.slice(0, 8) }))) return;
     setCancelBusy(true);
     try {
       const token = getToken("customer");
       await getMedusaClient().cancelStoreOrder(token, order.id);
-      setActionMsg({ type: "success", text: "Bestellung wurde storniert." });
+      setActionMsg({ type: "success", text: t("cancelSuccess") });
       await loadOrder();
     } catch (e) {
-      setActionMsg({ type: "error", text: e?.message || "Stornierung fehlgeschlagen." });
+      setActionMsg({ type: "error", text: e?.message || t("cancelFailed") });
     }
     setCancelBusy(false);
   };
@@ -571,7 +574,7 @@ export default function OrderDetailPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
       <ShopHeader />
 
-      {retourModal && <ReturnModal order={order} onClose={() => setRetourModal(false)} onDone={() => { setActionMsg({ type: "success", text: "Retouranfrage wurde eingereicht. Wir melden uns bald!" }); loadOrder(); }} />}
+      {retourModal && <ReturnModal order={order} onClose={() => setRetourModal(false)} onDone={() => { setActionMsg({ type: "success", text: t("returnSubmitted") }); loadOrder(); }} />}
       {messageModal && <MessageModal order={order} onClose={() => setMessageModal(false)} />}
 
       <main style={{ flex: 1, maxWidth: 760, margin: "0 auto", width: "100%", padding: "28px 16px 60px" }}>
@@ -580,7 +583,7 @@ export default function OrderDetailPage() {
         <div style={{ marginBottom: 20 }}>
           <button onClick={() => router.push("/orders")} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#6b7280", padding: 0 }}>
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-            Alle Bestellungen
+            {t("allOrders")}
           </button>
         </div>
 
@@ -596,17 +599,17 @@ export default function OrderDetailPage() {
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
             <div>
               <div style={{ fontSize: 22, fontWeight: 800, color: "#111827", letterSpacing: -0.5, lineHeight: 1.1 }}>
-                Bestellung #{order.order_number || order.id?.slice(0, 8).toUpperCase()}
+                {t("orderTitle", { number: order.order_number || order.id?.slice(0, 8).toUpperCase() })}
               </div>
               <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
-                {fmtDate(order.created_at)} · {fmtTime(order.created_at)} Uhr
+                {t("dateTimeJoin", { date: fmtDate(order.created_at, locale), time: fmtTime(order.created_at, locale) })}
                 {order.email && <span> · {order.email}</span>}
               </div>
             </div>
-            <StatusPill status={status} large />
+            <StatusPill status={status} large t={t} />
           </div>
 
-          <StatusTimeline status={status} />
+          <StatusTimeline status={status} t={t} />
 
           {/* Tracking */}
           {order.tracking_number && (
@@ -614,7 +617,7 @@ export default function OrderDetailPage() {
               <span style={{ fontSize: 18 }}>📦</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 1 }}>
-                  Sendungsverfolgung{order.carrier_name ? ` · ${order.carrier_name}` : ""}
+                  {t("trackingLabel")}{order.carrier_name ? ` · ${order.carrier_name}` : ""}
                 </div>
                 {trackingUrl ? (
                   <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", fontFamily: "monospace", textDecoration: "underline" }}>
@@ -626,7 +629,7 @@ export default function OrderDetailPage() {
               </div>
               {trackingUrl && (
                 <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", textDecoration: "none", background: "#eff6ff", borderRadius: 6, padding: "5px 10px", flexShrink: 0 }}>
-                  Verfolgen →
+                  {t("trackButton")} →
                 </a>
               )}
             </div>
@@ -636,15 +639,15 @@ export default function OrderDetailPage() {
           {activeReturn && (
             <div style={{ marginTop: 12, borderRadius: 8, padding: "10px 14px", background: activeReturn.status === "genehmigt" ? "#f0fdf4" : "#fffbeb", border: `1px solid ${activeReturn.status === "genehmigt" ? "#bbf7d0" : "#fde68a"}`, fontSize: 13, color: activeReturn.status === "genehmigt" ? "#15803d" : "#92400e" }}>
               {activeReturn.status === "genehmigt"
-                ? `✓ Retoure genehmigt (R-${activeReturn.return_number || "—"})${activeReturn.label_sent_at ? ` · Etikett per E-Mail gesendet am ${fmtDate(activeReturn.label_sent_at)}` : ""}`
-                : `Retoure #${activeReturn.return_number || "—"} · Wird geprüft`}
+                ? `${t("returnApproved", { number: activeReturn.return_number || "-" })}${activeReturn.label_sent_at ? ` · ${t("labelSentOn", { date: fmtDate(activeReturn.label_sent_at, locale) })}` : ""}`
+                : t("returnPending", { number: activeReturn.return_number || "-" })}
             </div>
           )}
         </Card>
 
         {/* Items */}
         <Card>
-          <CardTitle>Artikel ({items.length})</CardTitle>
+          <CardTitle>{t("itemsHeading", { count: items.length })}</CardTitle>
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
             {items.map((item, i) => {
               const raw = item.title || "";
@@ -662,17 +665,22 @@ export default function OrderDetailPage() {
                     }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {item.product_handle
-                      ? <Link href={`/${item.product_handle}`} style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none" }}>{name}</Link>
-                      : <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{name}</div>
-                    }
+                    {(() => {
+                      const url = storefrontProductHandle(
+                        { id: item.product_id, handle: item.product_handle, metadata: item.product_metadata },
+                        locale,
+                      );
+                      return url
+                        ? <Link href={`/${url}`} style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none" }}>{name}</Link>
+                        : <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{name}</div>;
+                    })()}
                     {variant && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{variant.split(/\s*\/\s*/).join(" · ")}</div>}
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                      {qty > 1 ? `${qty} × ${fmtEur(unitPrice)}` : fmtEur(unitPrice)}
+                      {qty > 1 ? `${qty} × ${fmtEur(unitPrice, locale)}` : fmtEur(unitPrice, locale)}
                     </div>
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", flexShrink: 0 }}>
-                    {fmtEur(unitPrice * qty)}
+                    {fmtEur(unitPrice * qty, locale)}
                   </div>
                 </div>
               );
@@ -682,18 +690,18 @@ export default function OrderDetailPage() {
           {/* Price breakdown */}
           <div style={{ borderTop: "1px solid #f3f4f6", marginTop: 16, paddingTop: 14 }}>
             {[
-              { label: "Zwischensumme", value: fmtEur(subtotal), muted: true },
-              shipping !== 0 && { label: "Versand", value: shipping > 0 ? fmtEur(shipping) : "Kostenlos", muted: true },
-              discount > 0 && { label: "Rabatt", value: `−${fmtEur(discount)}`, muted: true, green: true },
-              { label: "Netto", value: fmtEur(netTotal), muted: true },
-              { label: "MwSt. (19%)", value: fmtEur(vatAmount), muted: true },
+              { label: t("subtotal"), value: fmtEur(subtotal, locale), muted: true },
+              shipping !== 0 && { label: t("shippingLabel"), value: shipping > 0 ? fmtEur(shipping, locale) : t("freeShipping"), muted: true },
+              discount > 0 && { label: t("discountLabel"), value: `−${fmtEur(discount, locale)}`, muted: true, green: true },
+              { label: t("netLabel"), value: fmtEur(netTotal, locale), muted: true },
+              { label: t("vatLabel"), value: fmtEur(vatAmount, locale), muted: true },
             ].filter(Boolean).map(row => (
               <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: row.green ? "#16a34a" : "#6b7280", marginBottom: 5 }}>
                 <span>{row.label}</span><span>{row.value}</span>
               </div>
             ))}
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "#111827", borderTop: "2px solid #e5e7eb", marginTop: 8, paddingTop: 10 }}>
-              <span>Gesamt</span><span>{fmtEur(total)}</span>
+              <span>{t("total")}</span><span>{fmtEur(total, locale)}</span>
             </div>
           </div>
         </Card>
@@ -702,71 +710,71 @@ export default function OrderDetailPage() {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
           {addrLines.length > 0 && (
             <Card style={{ marginBottom: 0 }}>
-              <CardTitle>Lieferadresse</CardTitle>
+              <CardTitle>{t("shippingAddressHeading")}</CardTitle>
               {addrLines.map((l, i) => (
                 <div key={i} style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{l}</div>
               ))}
               {order.delivery_date && (
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>Zugestellt: {fmtDate(order.delivery_date)}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>{t("deliveredOn", { date: fmtDate(order.delivery_date, locale) })}</div>
               )}
             </Card>
           )}
           <Card style={{ marginBottom: 0 }}>
-            <CardTitle>Bestellinfo</CardTitle>
+            <CardTitle>{t("orderInfoHeading")}</CardTitle>
             {order.payment_method && (
               <div style={{ fontSize: 13, color: "#374151", marginBottom: 6 }}>
-                <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>Zahlung</span>
+                <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("paymentMethodLabel")}</span>
                 {order.payment_method}
               </div>
             )}
             {order.payment_status && (
               <div style={{ fontSize: 13, color: "#374151", marginBottom: 6 }}>
-                <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>Zahlungsstatus</span>
+                <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("paymentStatus")}</span>
                 {order.payment_status}
               </div>
             )}
             <div style={{ fontSize: 13, color: "#374151" }}>
-              <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>Bestellt am</span>
-              {fmtDate(order.created_at)}
+              <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("orderedOn")}</span>
+              {fmtDate(order.created_at, locale)}
             </div>
           </Card>
         </div>
 
         {/* Actions */}
         <Card>
-          <CardTitle>Aktionen</CardTitle>
+          <CardTitle>{t("actionsHeading")}</CardTitle>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             <ActionBtn bg="#f0f9ff" color="#0369a1" onClick={() => openPdf(`/api/store-invoice/${order.id}`)}>
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-              Rechnung herunterladen
+              {t("downloadInvoice")}
             </ActionBtn>
             <ActionBtn bg="#fff7ed" color="#c2410c" onClick={() => setMessageModal(true)}>
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-              Nachricht senden
+              {t("sendMessageAction")}
             </ActionBtn>
             {canReturn && (
               <ActionBtn bg="#fef2f2" color="#b91c1c" onClick={() => setRetourModal(true)}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-                Retoure anfragen
+                {t("requestReturn")}
               </ActionBtn>
             )}
             {approvedReturn && (
               <ActionBtn bg="#fffbeb" color="#92400e" onClick={() => openPdf(`/api/store-return-retourenschein/${order.id}`)}>
-                Retourenschein
+                {t("returnSlip")}
               </ActionBtn>
             )}
             {approvedReturn && (
               <ActionBtn bg="#fffbeb" color="#92400e" onClick={() => openPdf(`/api/store-return-etikett/${order.id}`)}>
-                Rücksende-Etikett
+                {t("returnLabelAction")}
               </ActionBtn>
             )}
             {canCancel && (
               <ActionBtn color="#991b1b" bg="#fef2f2" onClick={handleCancel} loading={cancelBusy}>
-                Bestellung stornieren
+                {t("cancelOrderAction")}
               </ActionBtn>
             )}
             <Link href="/orders" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#6b7280", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 9, padding: "8px 16px", textDecoration: "none" }}>
-              ← Alle Bestellungen
+              &larr; {t("allOrders")}
             </Link>
           </div>
         </Card>

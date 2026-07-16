@@ -18,6 +18,7 @@ import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { storefrontProductHandle } from "@/lib/product-url-handle";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -451,7 +452,13 @@ export default function CartPage() {
                   <ItemDetails>
                     <ItemTitle>
                       <Link
-                        href={item.product_handle ? `/${item.product_handle}` : "/"}
+                        href={(() => {
+                          const url = storefrontProductHandle(
+                            { id: item.product_id, handle: item.product_handle, metadata: item.product_metadata },
+                            locale,
+                          );
+                          return url ? `/${url}` : "/";
+                        })()}
                         style={{ color: "inherit", textDecoration: "none" }}
                       >
                         {(() => {

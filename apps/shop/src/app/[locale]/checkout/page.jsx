@@ -23,6 +23,7 @@ import PayNowButton from "@/components/ui/PayNowButton";
 import { getToken, useCustomerAuth as useCustomerAuthHook } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { getShippableCountries } from "@/lib/countries";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
@@ -2031,6 +2032,8 @@ export default function CheckoutPage() {
   const [customerToken, setCustomerToken] = useState(null);
   /** Cancel previous unpaid PI when bonus/Versand triggers a new PaymentIntent (fewer orphaned „incomplete“ in Stripe). */
   const lastPaymentIntentIdRef = useRef(null);
+  /** Tracks which cart the current clientSecret belongs to, so we only hard-reset it on a genuine cart switch. */
+  const clientSecretCartIdRef = useRef(null);
 
   const [stripePromiseState, setStripePromiseState] = useState(null);
   const [stripePkLoading, setStripePkLoading] = useState(true);
@@ -2133,9 +2136,10 @@ export default function CheckoutPage() {
       const newPts = out.bonus_points_reserved ?? out.cart?.bonus_points_reserved ?? pts;
       setCart((prev) => (prev ? { ...prev, bonus_points_reserved: newPts } : prev));
       setBonusDraft(String(newPts));
-      // Force a fresh PaymentIntent whenever bonus changes.
-      setClientSecret(null);
-      setPayCents(null);
+      // Recalculate the PaymentIntent amount for the new bonus total. The effect below updates
+      // the existing PaymentIntent in place (same client_secret) instead of recreating it, so
+      // don't null clientSecret here — that would unmount the Stripe Elements form early and
+      // wipe whatever the customer already typed into it.
       setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
       // Fetch updated balance in background
@@ -2156,8 +2160,6 @@ export default function CheckoutPage() {
       const tok = getToken("customer");
       await clearBonusPoints(tok);
       setBonusDraft("");
-      setClientSecret(null);
-      setPayCents(null);
       setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (_) {}
@@ -2182,8 +2184,6 @@ export default function CheckoutPage() {
       const newDiscount = out?.coupon_discount_cents ?? out?.cart?.coupon_discount_cents ?? 0;
       setCart((prev) => (prev ? { ...prev, coupon_code: newCode || null, coupon_discount_cents: Number(newDiscount || 0) } : prev));
       setCouponDraft(String(newCode || ""));
-      setClientSecret(null);
-      setPayCents(null);
       setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (e) {
@@ -2206,8 +2206,6 @@ export default function CheckoutPage() {
       }
       setCart((prev) => (prev ? { ...prev, coupon_code: null, coupon_discount_cents: 0 } : prev));
       setCouponDraft("");
-      setClientSecret(null);
-      setPayCents(null);
       setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (e) {
@@ -2236,6 +2234,7 @@ export default function CheckoutPage() {
         if (!stripePromiseState) return;
         setZeroCheckoutMode(false);
         setClientSecret(returnedSecret);
+        clientSecretCartIdRef.current = cart.id;
         setPiError(null);
         setLoadingPI(false);
         const couponDisc = Number(cart?.coupon_discount_cents || 0);
@@ -2246,8 +2245,14 @@ export default function CheckoutPage() {
 
     setLoadingPI(true);
     setPiError(null);
-    setClientSecret(null);
-    setPayCents(null);
+    // Only hard-reset clientSecret on a genuine cart switch. On a same-cart recalculation
+    // (bonus/coupon/shipping change) the backend updates the existing PaymentIntent in place
+    // and returns the same client_secret, so the mounted Stripe Elements form (and everything
+    // the customer already typed into it) must stay mounted for the duration of this fetch.
+    if (clientSecretCartIdRef.current !== cart.id) {
+      setClientSecret(null);
+      setPayCents(null);
+    }
     const custTok = getToken("customer");
     const paymentIntentHeaders = { "Content-Type": "application/json" };
     if (custTok) paymentIntentHeaders.Authorization = `Bearer ${custTok}`;
@@ -2268,6 +2273,7 @@ export default function CheckoutPage() {
           setClientSecret(null);
           setCustomerSessionSecret(null);
           lastPaymentIntentIdRef.current = null;
+          clientSecretCartIdRef.current = null;
           setPiError(null);
           setPayCents(0);
           return;
@@ -2277,6 +2283,7 @@ export default function CheckoutPage() {
           setClientSecret(data.client_secret);
           setCustomerSessionSecret(data.customer_session_secret || null);
           if (data.payment_intent_id) lastPaymentIntentIdRef.current = data.payment_intent_id;
+          clientSecretCartIdRef.current = cart.id;
           setPayCents(typeof data.amount_cents === "number" ? data.amount_cents : subtotalCents - bonusDiscountCents - Number(cart?.coupon_discount_cents || 0) + effectiveShippingCents);
         } else {
           setZeroCheckoutMode(false);
@@ -2431,7 +2438,11 @@ export default function CheckoutPage() {
                       {t("sellerHeading")}: {displayName}
                     </SummarySellerLabel>
                     {group.items.map((item) => {
-                      const productHref = item.product_handle ? `/${item.product_handle}` : null;
+                      const productUrl = storefrontProductHandle(
+                        { id: item.product_id, handle: item.product_handle, metadata: item.product_metadata },
+                        locale,
+                      );
+                      const productHref = productUrl ? `/${productUrl}` : null;
                       const lineTitle = getLocalizedCartLineTitle(item, locale);
                       const row = (
                         <>

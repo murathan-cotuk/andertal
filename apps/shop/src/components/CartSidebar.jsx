@@ -12,6 +12,7 @@ import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { storefrontProductHandle } from "@/lib/product-url-handle";
 
 /* Above MobileNav bar (2147483640) — nav bar hides behind cart when open */
 const CART_Z_OVERLAY = 2147483641;
@@ -692,7 +693,13 @@ export default function CartSidebar() {
               <ItemBody>
                 <ItemTitle>
                   <Link
-                    href={item.product_handle ? `/${item.product_handle}` : "/"}
+                    href={(() => {
+                      const url = storefrontProductHandle(
+                        { id: item.product_id, handle: item.product_handle, metadata: item.product_metadata },
+                        locale,
+                      );
+                      return url ? `/${url}` : "/";
+                    })()}
                     onClick={closeCartSidebar}
                     style={{ color: "inherit", textDecoration: "none" }}
                   >

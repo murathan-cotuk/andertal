@@ -10,6 +10,7 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { storefrontProductHandle } from "@/lib/product-url-handle";
 
 const ORANGE = "#ff971c";
 const DARK = "#1A1A1A";
@@ -507,10 +508,14 @@ export default function AccountPage() {
     const items = [];
     for (const order of orders) {
       for (const item of order.items || []) {
-        if (!item.product_handle || seen.has(item.product_handle)) continue;
-        seen.add(item.product_handle);
+        const url = storefrontProductHandle(
+          { id: item.product_id, handle: item.product_handle, metadata: item.product_metadata },
+          locale,
+        );
+        if (!url || seen.has(url)) continue;
+        seen.add(url);
         items.push({
-          handle: item.product_handle,
+          handle: url,
           title: item.title || "",
           thumbnail: item.thumbnail || null,
           price_cents: item.unit_price_cents,

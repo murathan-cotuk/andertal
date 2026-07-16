@@ -187,6 +187,15 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
     };
   }, [addProductPopoverOpen]);
 
+  // Popover is `position: fixed` to escape the white card, but the scrollable page wrapper's
+  // `overflow` still clips it — flip the wrapper to visible while the popover is open.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (addProductPopoverOpen) document.body.classList.add("andertal-dropdown-open");
+    else document.body.classList.remove("andertal-dropdown-open");
+    return () => document.body.classList.remove("andertal-dropdown-open");
+  }, [addProductPopoverOpen]);
+
   const addProductToCollection = async (productId) => {
     if (!collection?.id || !productId) return;
     setAddingProductId(productId);

@@ -732,7 +732,7 @@ export default function PolarisLayout({ children }) {
   const userMenuActions = [
     {
       items: [
-        { content: tCommon("settings"), onAction: () => router.push("/settings") },
+        { content: tCommon("settings"), url: "/settings" },
         { content: tCommon("logout"), onAction: () => handleLogout() },
       ],
     },
