@@ -104,6 +104,18 @@ export default function VersandPage() {
     ? items.every((it) => getScanned(currentOrder.id).has(it.title || it.id))
     : false;
 
+  // Order status moves offen → in_bearbeitung the moment a seller starts picking
+  // an order (first item scanned/marked here), not at order placement. Fire
+  // once per order per page visit — the backend PATCH is idempotent (only
+  // dispatches the "order_processing" flow email on an actual offen→in_bearbeitung
+  // transition), this ref just avoids redundant requests on every scan.
+  const processingNotifiedRef = useRef(new Set());
+  const notifyOrderProcessingStarted = (orderId) => {
+    if (!orderId || processingNotifiedRef.current.has(orderId)) return;
+    processingNotifiedRef.current.add(orderId);
+    getMedusaAdminClient().updateOrder(orderId, { order_status: "in_bearbeitung" }).catch(() => {});
+  };
+
   const handleBarcodeSubmit = (e) => {
     e.preventDefault();
     if (!currentOrder || !barcodeInput.trim()) return;
@@ -122,6 +134,7 @@ export default function VersandPage() {
       return;
     }
 
+    if (getScanned(currentOrder.id).size === 0) notifyOrderProcessingStarted(currentOrder.id);
     setScannedItems((prev) => {
       const scanned = new Set(prev[currentOrder.id] || []);
       scanned.add(match.title || match.id);
@@ -133,6 +146,8 @@ export default function VersandPage() {
 
   const markItemManually = (itemKey) => {
     if (!currentOrder) return;
+    const alreadyScanned = getScanned(currentOrder.id).has(itemKey);
+    if (!alreadyScanned && getScanned(currentOrder.id).size === 0) notifyOrderProcessingStarted(currentOrder.id);
     setScannedItems((prev) => {
       const scanned = new Set(prev[currentOrder.id] || []);
       scanned.has(itemKey) ? scanned.delete(itemKey) : scanned.add(itemKey);

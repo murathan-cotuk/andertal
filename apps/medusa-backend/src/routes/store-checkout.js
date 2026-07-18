@@ -3184,7 +3184,7 @@ const storeOrdersPOST = async (req, res) => {
          stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
          checkout_payment_kind, seller_net_after_commission_cents,
          subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency, locale)
-       VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'in_bearbeitung','bezahlt',
+       VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'offen','bezahlt',
          '${stripeTransferInit}',$33,$23,'pending',
          $24,$25,
          $26,$27,$28,$29,$30,$31,$32,'eur',$34)

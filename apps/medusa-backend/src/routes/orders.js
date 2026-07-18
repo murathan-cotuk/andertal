@@ -387,9 +387,10 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        // Fetch previous state to detect tracking_number changes
-        const prevRes = await client.query('SELECT tracking_number, carrier_name, delivery_status FROM store_orders WHERE id = $1::uuid', [id])
+        // Fetch previous state to detect tracking_number / order_status changes
+        const prevRes = await client.query('SELECT tracking_number, carrier_name, delivery_status, order_status FROM store_orders WHERE id = $1::uuid', [id])
         const prevRow = prevRes.rows[0] || {}
+        const orderStatusChangedToProcessing = order_status === 'in_bearbeitung' && prevRow.order_status !== 'in_bearbeitung'
         await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
         // Auto-set delivery_date when marking as delivered (triggers 14-day Stripe payout window)
         if (delivery_status === 'zugestellt' && delivery_date === undefined) {
@@ -462,6 +463,9 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         }
         if (deliveryStatusChangedToZugestellt) {
           void dispatchOrderFlowEvent('order_delivered', id)
+        }
+        if (orderStatusChangedToProcessing) {
+          void dispatchOrderFlowEvent('order_processing', id)
         }
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}

@@ -135,6 +135,7 @@ const T = {
       seller_signup: "New seller registration",
       abandoned_cart: "Abandoned cart",
       order_placed: "Order placed",
+      order_processing: "Order processing started",
       order_shipped: "Order shipped (tracking)",
       order_delivered: "Order delivered",
       review_request: "Review request",
@@ -258,6 +259,7 @@ const T = {
       seller_signup: "Neue Verkäuferregistrierung",
       abandoned_cart: "Verlassener Warenkorb",
       order_placed: "Bestellung aufgegeben",
+      order_processing: "Bestellung wird bearbeitet",
       order_shipped: "Bestellung versendet (Tracking)",
       order_delivered: "Bestellung geliefert",
       review_request: "Bewertungsanfrage",
@@ -381,6 +383,7 @@ const T = {
       seller_signup: "Yeni satıcı kaydı",
       abandoned_cart: "Terk edilen sepet",
       order_placed: "Sipariş oluşturuldu",
+      order_processing: "Sipariş işleme alındı",
       order_shipped: "Sipariş kargoya verildi (takip)",
       order_delivered: "Sipariş teslim edildi",
       review_request: "Yorum isteği",
@@ -504,6 +507,7 @@ const T = {
       seller_signup: "Nouvelle inscription vendeur",
       abandoned_cart: "Panier abandonné",
       order_placed: "Commande passée",
+      order_processing: "Commande en cours de préparation",
       order_shipped: "Commande expédiée (suivi)",
       order_delivered: "Commande livrée",
       review_request: "Demande d'avis",
@@ -627,6 +631,7 @@ const T = {
       seller_signup: "Nuova registrazione venditore",
       abandoned_cart: "Carrello abbandonato",
       order_placed: "Ordine effettuato",
+      order_processing: "Ordine in lavorazione",
       order_shipped: "Ordine spedito (tracking)",
       order_delivered: "Ordine consegnato",
       review_request: "Richiesta recensione",
@@ -749,6 +754,7 @@ const T = {
       seller_signup: "Nuevo registro de vendedor",
       abandoned_cart: "Carrito abandonado",
       order_placed: "Pedido realizado",
+      order_processing: "Pedido en preparación",
       order_shipped: "Pedido enviado (seguimiento)",
       order_delivered: "Pedido entregado",
       review_request: "Solicitud de reseña",
@@ -949,7 +955,7 @@ export default function FlowsPage() {
     () => Object.entries(t.triggers).map(([value, label]) => ({ label, value })),
     [t],
   );
-  const sellerTriggerValues = useMemo(() => new Set(["order_placed", "order_shipped", "order_delivered"]), []);
+  const sellerTriggerValues = useMemo(() => new Set(["order_placed", "order_processing", "order_shipped", "order_delivered"]), []);
 
   const [newAudience, setNewAudience] = useState("customer");
   const [editAudience, setEditAudience] = useState("customer");
