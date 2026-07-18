@@ -2361,6 +2361,67 @@ async function start() {
     await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS seller_metadata jsonb DEFAULT NULL`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_product ON admin_hub_seller_listings(product_id)`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_seller  ON admin_hub_seller_listings(seller_id)`).catch(() => {})
+
+    // ── ERP Connector Platform (Faz 1: JTL SCX + Billbee) ──────────────────────
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_erp_connections (
+      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      seller_id   varchar(255) NOT NULL,
+      erp_type    varchar(50) NOT NULL,
+      status      varchar(50) NOT NULL DEFAULT 'disconnected',
+      config      jsonb DEFAULT '{}'::jsonb,
+      linked_at   timestamptz,
+      created_at  timestamptz NOT NULL DEFAULT now(),
+      updated_at  timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(seller_id, erp_type)
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_erp_connections_seller ON admin_hub_erp_connections(seller_id)`).catch(() => {})
+
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_erp_sync_state (
+      id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      seller_id       varchar(255) NOT NULL,
+      erp_type        varchar(50) NOT NULL,
+      last_full_sync  timestamptz,
+      last_delta_sync timestamptz,
+      cursor          text,
+      updated_at      timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(seller_id, erp_type)
+    )`).catch(() => {})
+
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_erp_external_map (
+      id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      seller_id    varchar(255) NOT NULL,
+      erp_type     varchar(50) NOT NULL,
+      external_id  text NOT NULL,
+      entity_type  varchar(50) NOT NULL,
+      andertal_id  text NOT NULL,
+      created_at   timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(seller_id, erp_type, external_id, entity_type)
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_erp_external_map_andertal ON admin_hub_erp_external_map(andertal_id)`).catch(() => {})
+
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_jtl_sellers (
+      id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      seller_id      varchar(255) NOT NULL,
+      jtl_seller_id  text NOT NULL,
+      company_name   text,
+      is_active      boolean NOT NULL DEFAULT true,
+      linked_at      timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(seller_id),
+      UNIQUE(jtl_seller_id)
+    )`).catch(() => {})
+
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_erp_sync_log (
+      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      job_id      text,
+      seller_id   varchar(255),
+      erp_type    varchar(50) NOT NULL,
+      status      varchar(50) NOT NULL,
+      counts      jsonb DEFAULT '{}'::jsonb,
+      errors      jsonb DEFAULT '[]'::jsonb,
+      created_at  timestamptz NOT NULL DEFAULT now()
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_erp_sync_log_seller ON admin_hub_erp_sync_log(seller_id, erp_type)`).catch(() => {})
+
     await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_product_change_requests (
       id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       product_id    uuid NOT NULL REFERENCES admin_hub_products(id) ON DELETE CASCADE,

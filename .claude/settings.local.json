@@ -226,7 +226,14 @@
       "Bash(curl -s \"https://www.andertal.com/api/store-products/17923a99-6532-4d1f-bc16-894197adebff\" -H \"Accept: application/json\")",
       "Bash(curl -s \"https://www.andertal.com/api/store-products/ab0d88d8-9ca6-42c2-94a2-3859eb2efdd2\" -H \"Accept: application/json\")",
       "Bash(curl -s \"https://www.andertal.com/api/store-seller-settings?seller_id=seller_c0bd09dee2866d5f\" -H \"Accept: application/json\")",
-      "Bash(curl -s \"https://www.andertal.com/api/store-seller-settings\" -H \"Accept: application/json\")"
+      "Bash(curl -s \"https://www.andertal.com/api/store-seller-settings\" -H \"Accept: application/json\")",
+      "WebSearch",
+      "WebFetch(domain:developer.jtl-software.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:scx-sandbox.ui.jtl-software.com)",
+      "Bash(curl -s \"https://api.github.com/repos/jtl-scx/channel-api-client/git/trees/main?recursive=1\")",
+      "Bash(curl -s \"https://api.github.com/repos/jtl-scx/channel-api-client\")",
+      "Bash(curl -s \"https://api.github.com/repos/jtl-scx/channel-api-client/git/trees/master?recursive=1\")"
     ]
   }
 }

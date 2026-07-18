@@ -728,11 +728,12 @@ export default function IntegrationsSettingsPage() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
   useEffect(() => {
-    setIsSuperuser(typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true");
-  }, []);
+    const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
+    setIsSuperuser(su);
+    if (su) load();
+    else setLoading(false);
+  }, [load]);
 
   const openCreate = () => { setEditingId(null); setFormName(""); setCreatedCreds(null); setModalOpen(true); };
   const openEdit = (i) => { setEditingId(i.id); setFormName(i.name || ""); setCreatedCreds(null); setModalOpen(true); };
@@ -795,7 +796,10 @@ export default function IntegrationsSettingsPage() {
   const inactive = integrations.filter((i) => !i.is_active);
 
   return (
-    <Page title={copy.pageTitle} primaryAction={{ content: copy.createIntegration, onAction: openCreate }}>
+    <Page
+      title={copy.pageTitle}
+      primaryAction={isSuperuser ? { content: copy.createIntegration, onAction: openCreate } : undefined}
+    >
       <BlockStack gap="400">
         {msg && <Banner tone={msg.tone} onDismiss={() => setMsg(null)}>{msg.text}</Banner>}
 
@@ -853,54 +857,56 @@ export default function IntegrationsSettingsPage() {
           <BillbeeSettingsPage embedded />
         </IntegrationsAccordion>
 
-        <IntegrationsAccordion
-          sectionId="api"
-          open={openSection === "api"}
-          onToggle={() => toggleSection("api")}
-          logo={<LogoApi />}
-          title={copy.apiTitle}
-          subtitle={copy.apiSub}
-          headerExtra={
-            !loading && integrations.length > 0 ? (
-              <Badge tone="info">{integrations.length}</Badge>
-            ) : null
-          }
-        >
-          {loading ? (
-            <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>
-          ) : integrations.length === 0 ? (
-            <EmptyState heading={copy.noIntegrations}>
-              <p>{copy.noIntegrationsBody}</p>
-              <Button variant="primary" onClick={openCreate}>{copy.createIntegration}</Button>
-            </EmptyState>
-          ) : (
-            <BlockStack gap="400">
-              {active.length > 0 && (
-                <BlockStack gap="300">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <Text as="h3" variant="headingSm">{copy.active(active.length)}</Text>
-                    <Button size="slim" onClick={load} loading={loading}>{ui.refresh}</Button>
-                  </InlineStack>
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {active.map((i) => (
-                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
-                    ))}
-                  </div>
-                </BlockStack>
-              )}
-              {inactive.length > 0 && (
-                <BlockStack gap="300">
-                  <Text as="h3" variant="headingSm">{copy.inactive(inactive.length)}</Text>
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {inactive.map((i) => (
-                      <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
-                    ))}
-                  </div>
-                </BlockStack>
-              )}
-            </BlockStack>
-          )}
-        </IntegrationsAccordion>
+        {isSuperuser && (
+          <IntegrationsAccordion
+            sectionId="api"
+            open={openSection === "api"}
+            onToggle={() => toggleSection("api")}
+            logo={<LogoApi />}
+            title={copy.apiTitle}
+            subtitle={copy.apiSub}
+            headerExtra={
+              !loading && integrations.length > 0 ? (
+                <Badge tone="info">{integrations.length}</Badge>
+              ) : null
+            }
+          >
+            {loading ? (
+              <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>
+            ) : integrations.length === 0 ? (
+              <EmptyState heading={copy.noIntegrations}>
+                <p>{copy.noIntegrationsBody}</p>
+                <Button variant="primary" onClick={openCreate}>{copy.createIntegration}</Button>
+              </EmptyState>
+            ) : (
+              <BlockStack gap="400">
+                {active.length > 0 && (
+                  <BlockStack gap="300">
+                    <InlineStack align="space-between" blockAlign="center">
+                      <Text as="h3" variant="headingSm">{copy.active(active.length)}</Text>
+                      <Button size="slim" onClick={load} loading={loading}>{ui.refresh}</Button>
+                    </InlineStack>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {active.map((i) => (
+                        <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
+                      ))}
+                    </div>
+                  </BlockStack>
+                )}
+                {inactive.length > 0 && (
+                  <BlockStack gap="300">
+                    <Text as="h3" variant="headingSm">{copy.inactive(inactive.length)}</Text>
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {inactive.map((i) => (
+                        <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
+                      ))}
+                    </div>
+                  </BlockStack>
+                )}
+              </BlockStack>
+            )}
+          </IntegrationsAccordion>
+        )}
       </BlockStack>
 
       <Modal
