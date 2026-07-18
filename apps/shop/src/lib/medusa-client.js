@@ -262,6 +262,7 @@ class MedusaClient {
   async getMenus(options = {}) {
     const params = new URLSearchParams()
     if (options.location) params.set('location', options.location)
+    if (options.locale) params.set('locale', options.locale)
     const qs = params.toString()
     const res = await this.request(`/store/menus${qs ? `?${qs}` : ''}`)
     if (res?.__error) return { menus: [], count: 0 }

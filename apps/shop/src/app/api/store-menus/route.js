@@ -3,18 +3,21 @@ import { NextResponse } from "next/server";
 const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
-const menusCache = { data: null, expiresAt: 0 };
+const menusCache = new Map(); // locale -> { data, expiresAt }
 const MENUS_TTL = 60 * 1000; // 60 seconds
 
-export async function GET() {
+export async function GET(request) {
+  const locale = new URL(request.url).searchParams.get("locale") || "";
   try {
     const skipCache = process.env.NODE_ENV === "development";
     const now = Date.now();
-    if (!skipCache && menusCache.data && menusCache.expiresAt > now) {
-      return NextResponse.json(menusCache.data);
+    const cached = menusCache.get(locale);
+    if (!skipCache && cached && cached.expiresAt > now) {
+      return NextResponse.json(cached.data);
     }
     const base = getBackendUrl();
-    const res = await fetch(`${base}/store/menus`, {
+    const qs = locale ? `?locale=${encodeURIComponent(locale)}` : "";
+    const res = await fetch(`${base}/store/menus${qs}`, {
       headers: { "Content-Type": "application/json" },
       ...(skipCache ? { cache: "no-store" } : { next: { revalidate: 60 } }),
     });
@@ -28,8 +31,7 @@ export async function GET() {
     }
     const data = await res.json();
     if (!skipCache) {
-      menusCache.data = data;
-      menusCache.expiresAt = now + MENUS_TTL;
+      menusCache.set(locale, { data, expiresAt: now + MENUS_TTL });
     }
     return NextResponse.json(data);
   } catch (e) {

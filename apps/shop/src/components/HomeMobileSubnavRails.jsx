@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { menuItemHref } from "@/lib/shop-menu-href";
@@ -59,6 +59,7 @@ const rowStyle = {
  */
 export function HomeMobileSubnavRails({ children }) {
   const tCommon = useTranslations("common");
+  const locale = useLocale();
   const pathname = usePathname() || "/";
   const [items, setItems] = useState([]);
   const [wideEnough, setWideEnough] = useState(false);
@@ -98,12 +99,12 @@ export function HomeMobileSubnavRails({ children }) {
     };
     Promise.all([
       fetch("/api/store-menu-locations").then((r) => r.json()).catch(() => ({ locations: [] })),
-      fetch("/api/store-menus").then((r) => r.json()).catch(() => ({ menus: [] })),
+      fetch(`/api/store-menus?locale=${encodeURIComponent(locale)}`).then((r) => r.json()).catch(() => ({ menus: [] })),
     ]).then(([loc, menu]) => apply(loc, menu));
     return () => {
       cancelled = true;
     };
-  }, [isHome]);
+  }, [isHome, locale]);
 
   const { left, right } = useMemo(() => {
     if (!items.length) return { left: [], right: [] };

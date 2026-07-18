@@ -105,6 +105,9 @@ const T = {
     title: "Flows",
     subtitle: "Automated email campaigns triggered by customer events",
     createBtn: "Create flow",
+    duplicateBtn: "Duplicate",
+    duplicateSuffix: "(Copy)",
+    duplicateErr: "Could not duplicate flow.",
     smtpWarningTitle: "Email server not configured",
     smtpWarningBody: "To send flow emails, you need to configure SMTP / Gmail settings first.",
     smtpWarningBodySeller: "Outgoing email must be configured by a platform superuser. Contact your administrator if flows cannot send mail.",
@@ -229,6 +232,9 @@ const T = {
     title: "Flows",
     subtitle: "Automatische E-Mail-Kampagnen ausgelöst durch Kundenereignisse",
     createBtn: "Flow erstellen",
+    duplicateBtn: "Duplizieren",
+    duplicateSuffix: "(Kopie)",
+    duplicateErr: "Flow konnte nicht dupliziert werden.",
     smtpWarningTitle: "E-Mail-Server nicht konfiguriert",
     smtpWarningBody: "Um Flow-E-Mails zu senden, müssen zuerst die SMTP / Gmail-Einstellungen konfiguriert werden.",
     smtpWarningBodySeller: "Der ausgehende E-Mail-Versand muss von einem Plattform-Superuser eingerichtet werden. Bitte den Administrator kontaktieren.",
@@ -353,6 +359,9 @@ const T = {
     title: "Flows",
     subtitle: "Tetikleyici olaylara göre otomatik e-posta kampanyaları",
     createBtn: "Flow oluştur",
+    duplicateBtn: "Kopyala",
+    duplicateSuffix: "(Kopya)",
+    duplicateErr: "Flow kopyalanamadı.",
     smtpWarningTitle: "E-posta sunucusu yapılandırılmamış",
     smtpWarningBody: "Flow e-postalarının gönderilebilmesi için önce SMTP / Gmail ayarlarını yapmanız gerekiyor.",
     smtpWarningBodySeller: "Giden e-postayı yalnızca platform süper kullanıcısı yapılandırabilir. E-posta gönderilemiyorsa yöneticinize başvurun.",
@@ -477,6 +486,9 @@ const T = {
     title: "Flux",
     subtitle: "Campagnes e-mail automatiques déclenchées par des événements clients",
     createBtn: "Créer un flux",
+    duplicateBtn: "Dupliquer",
+    duplicateSuffix: "(Copie)",
+    duplicateErr: "Impossible de dupliquer le flux.",
     smtpWarningTitle: "Serveur e-mail non configuré",
     smtpWarningBody: "Pour envoyer des e-mails de flux, vous devez d'abord configurer les paramètres SMTP / Gmail.",
     smtpWarningBodySeller: "L'e-mail sortant doit être configuré par un super-utilisateur de la plateforme. Contactez votre administrateur.",
@@ -601,6 +613,9 @@ const T = {
     title: "Flussi",
     subtitle: "Campagne e-mail automatiche attivate da eventi dei clienti",
     createBtn: "Crea flusso",
+    duplicateBtn: "Duplica",
+    duplicateSuffix: "(Copia)",
+    duplicateErr: "Impossibile duplicare il flusso.",
     smtpWarningTitle: "Server e-mail non configurato",
     smtpWarningBody: "Per inviare e-mail di flusso, è necessario prima configurare le impostazioni SMTP / Gmail.",
     smtpWarningBodySeller: "L'e-mail in uscita deve essere configurata da un superuser della piattaforma. Contatta l'amministratore.",
@@ -724,6 +739,9 @@ const T = {
     title: "Flujos",
     subtitle: "Campañas de correo automáticas activadas por eventos de clientes",
     createBtn: "Crear flujo",
+    duplicateBtn: "Duplicar",
+    duplicateSuffix: "(Copia)",
+    duplicateErr: "No se pudo duplicar el flujo.",
     smtpWarningTitle: "Servidor de correo no configurado",
     smtpWarningBody: "Para enviar correos de flujo, primero debes configurar los ajustes SMTP / Gmail.",
     smtpWarningBodySeller: "El correo saliente debe configurarlo un superusuario de la plataforma. Contacta al administrador.",
@@ -955,7 +973,7 @@ export default function FlowsPage() {
     () => Object.entries(t.triggers).map(([value, label]) => ({ label, value })),
     [t],
   );
-  const sellerTriggerValues = useMemo(() => new Set(["order_placed", "order_processing", "order_shipped", "order_delivered"]), []);
+  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "order_placed", "order_processing", "order_shipped", "order_delivered"]), []);
 
   const [newAudience, setNewAudience] = useState("customer");
   const [editAudience, setEditAudience] = useState("customer");
@@ -1621,6 +1639,29 @@ export default function FlowsPage() {
     }
   };
 
+  const duplicateFlow = async (flow) => {
+    setTogglingId(flow.id);
+    try {
+      const full = await client.getFlow(flow.id);
+      const steps = Array.isArray(full?.steps) ? full.steps : [];
+      const res = await client.createFlow({
+        name: `${flow.name} ${t.duplicateSuffix}`.trim(),
+        trigger: flow.trigger,
+        status: "draft",
+        audience: flow.audience,
+      });
+      const newFlow = res?.flow;
+      if (newFlow && steps.length) {
+        await client.updateFlow(newFlow.id, { steps });
+      }
+      await load();
+    } catch (e) {
+      setError(e?.message || t.duplicateErr);
+    } finally {
+      setTogglingId("");
+    }
+  };
+
   const toggleStatus = async (flow) => {
     setTogglingId(flow.id);
     const nextStatus = flow.status === "active" ? "paused" : "active";
@@ -1741,6 +1782,9 @@ export default function FlowsPage() {
                       <InlineStack gap="200" wrap={false}>
                         <Button size="slim" disabled={isToggling} onClick={() => openEditModal(flow)}>
                           {t.editBtn}
+                        </Button>
+                        <Button size="slim" disabled={isToggling} onClick={() => duplicateFlow(flow)}>
+                          {t.duplicateBtn}
                         </Button>
                         <Button
                           size="slim"

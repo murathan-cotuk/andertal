@@ -244,7 +244,7 @@ export default function Navbar() {
       try {
         setLoading(true);
         const client = getMedusaClient();
-        const menuData = await client.getMenus();
+        const menuData = await client.getMenus({ locale });
         const menus = menuData.menus || [];
         // Only use a menu explicitly assigned to location "main"
         const mainMenu = menus.find((m) => m.location === "main") || null;
@@ -268,7 +268,7 @@ export default function Navbar() {
       }
     };
     fetchMenusAndCategories();
-  }, []);
+  }, [locale]);
 
 
   return (

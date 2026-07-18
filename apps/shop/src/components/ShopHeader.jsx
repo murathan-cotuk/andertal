@@ -1144,7 +1144,7 @@ export default function ShopHeader() {
     };
     Promise.all([
       fetch("/api/store-menu-locations").then((r) => r.json()).catch(() => ({ locations: [] })),
-      fetch("/api/store-menus").then((r) => r.json()).catch(() => ({ menus: [] })),
+      fetch(`/api/store-menus?locale=${encodeURIComponent(locale)}`).then((r) => r.json()).catch(() => ({ menus: [] })),
     ]).then(([locData, menuData]) => {
       const hasMenus = Array.isArray(menuData?.menus) && menuData.menus.length > 0;
       if (hasMenus) {
@@ -1154,10 +1154,10 @@ export default function ShopHeader() {
       const client = getMedusaClient();
       Promise.all([
         client.getMenuLocations().catch(() => ({ locations: [] })),
-        client.getMenus().catch(() => ({ menus: [] })),
+        client.getMenus({ locale }).catch(() => ({ menus: [] })),
       ]).then(([locData2, menuData2]) => applyMenus(locData2, menuData2));
     });
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     let cancelled = false;

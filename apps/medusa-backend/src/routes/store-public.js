@@ -12,6 +12,7 @@ const { getProductsDbClient, listAdminHubProductsDb } = require('./admin-product
 const { getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct } = require('./seller-settings')
 const { resolveUploadUrl, storeProductCategoryIds } = require('./store-products')
 const { resolveMenuService } = require('./menus')
+const { applyMenuLocale, normalizeMenuLocale } = require('../menu-auto-translate')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -230,7 +231,7 @@ const getStoreMenusFromDb = async () => {
     const isRender = dbUrl.includes('render.com')
     const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const menusRes = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus ORDER BY name')
+    const menusRes = await client.query('SELECT id, name, slug, location, categories_with_products, name_i18n FROM admin_hub_menus ORDER BY name')
     const menus = (menusRes.rows || []).map((r) => ({
       id: r.id,
       name: r.name,
@@ -238,6 +239,7 @@ const getStoreMenusFromDb = async () => {
       // null/'' → '' (unassigned). Only explicitly set 'main' is treated as main.
       location: (r.location === null || r.location === undefined || String(r.location).trim() === '') ? '' : String(r.location).trim().toLowerCase(),
       categories_with_products: Boolean(r.categories_with_products),
+      name_i18n: r.name_i18n && typeof r.name_i18n === 'object' ? r.name_i18n : null,
     }))
     const menusWithItems = []
     const collectionKeys = new Set() // handle or id from link_value
@@ -245,7 +247,7 @@ const getStoreMenusFromDb = async () => {
     const categoryKeys = new Set() // slug or id for link_type=category
     for (const menu of menus) {
       const itemsRes = await client.query(
-        'SELECT id, menu_id, label, slug, link_type, link_value, parent_id, sort_order FROM admin_hub_menu_items WHERE menu_id = $1 ORDER BY sort_order ASC, label ASC',
+        'SELECT id, menu_id, label, slug, link_type, link_value, parent_id, sort_order, label_i18n FROM admin_hub_menu_items WHERE menu_id = $1 ORDER BY sort_order ASC, label ASC',
         [menu.id]
       )
       const rows = itemsRes.rows || []
@@ -284,6 +286,7 @@ const getStoreMenusFromDb = async () => {
         link_value: r.link_value,
         parent_id: r.parent_id,
         sort_order: r.sort_order != null ? r.sort_order : 0,
+        label_i18n: r.label_i18n && typeof r.label_i18n === 'object' ? r.label_i18n : null,
       }))
       menusWithItems.push({ ...menu, items, _rows: rows })
     }
@@ -436,6 +439,14 @@ const storeMenusGET = async (req, res) => {
       )
     } else {
       if (location) menusWithItems = menusWithItems.filter((m) => m.location === location)
+    }
+    const locale = normalizeMenuLocale(req.query.locale || req.headers['x-shop-locale'] || '')
+    if (locale) {
+      try {
+        await applyMenuLocale(menusWithItems, locale)
+      } catch (e) {
+        console.warn('Store menus locale translate:', e && e.message)
+      }
     }
     res.json({ menus: menusWithItems, count: menusWithItems.length })
   } catch (err) {

@@ -980,7 +980,6 @@ async function runAutomationFlowsForCustomerEvent(opts) {
     let total = 0
     for (const fr of flowRows) {
       const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
-      if (audience !== 'customer') continue
       const sr = await client.query(
         `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
          FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,

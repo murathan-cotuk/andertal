@@ -511,6 +511,16 @@ async function start() {
         } catch (e) {
           if (e.code !== '42701') throw e
         }
+        try {
+          await client.query('ALTER TABLE admin_hub_menus ADD COLUMN IF NOT EXISTS name_i18n jsonb;')
+        } catch (e) {
+          if (e.code !== '42701') throw e
+        }
+        try {
+          await client.query('ALTER TABLE admin_hub_menu_items ADD COLUMN IF NOT EXISTS label_i18n jsonb;')
+        } catch (e) {
+          if (e.code !== '42701') throw e
+        }
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menus_location ON admin_hub_menus(location);')
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_menu_id ON admin_hub_menu_items(menu_id);')
         await client.query('CREATE INDEX IF NOT EXISTS idx_admin_hub_menu_items_parent_id ON admin_hub_menu_items(parent_id);')

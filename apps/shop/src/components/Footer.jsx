@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect } from "react";
+import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
@@ -252,6 +253,7 @@ const Copyright = styled.p`
 const FOOTER_LOCATIONS = ["footer1", "footer2", "footer3", "footer4"];
 
 export default function Footer() {
+  const locale = useLocale();
   const prefix = useMarketPrefix();
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const envThresholdCents =
@@ -264,7 +266,7 @@ export default function Footer() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/store-menus").then((r) => r.json()),
+      fetch(`/api/store-menus?locale=${encodeURIComponent(locale)}`).then((r) => r.json()),
       fetch("/api/store-seller-settings").then((r) => r.json()),
     ])
       .then(([menuData, sellerData]) => {
@@ -289,7 +291,7 @@ export default function Footer() {
         setFooterColumns([]);
         setRawThresholds(null);
       });
-  }, []);
+  }, [locale]);
 
   const thresholdCents = resolveFreeShippingThresholdCents(rawThresholds, marketCountry, envThresholdCents);
   const shippingPromoText = null; /* temporarily hidden — re-enable when ready */

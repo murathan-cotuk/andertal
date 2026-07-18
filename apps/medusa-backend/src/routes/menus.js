@@ -41,13 +41,14 @@ const normalizeLocation = (loc) =>
 const menusListGET = async (req, res) => {
   try {
     const menusFromDb = await runWithMenuDb(async (client) => {
-      const r = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus ORDER BY name')
+      const r = await client.query('SELECT id, name, slug, location, categories_with_products, name_i18n FROM admin_hub_menus ORDER BY name')
       return (r.rows || []).map((row) => ({
         id: row.id,
         name: row.name,
         slug: row.slug,
         location: normalizeLocation(row.location),
         categories_with_products: Boolean(row.categories_with_products),
+        name_i18n: row.name_i18n && typeof row.name_i18n === 'object' ? row.name_i18n : null,
       }))
     })
     if (menusFromDb && Array.isArray(menusFromDb)) return res.status(200).json({ menus: menusFromDb, count: menusFromDb.length })
@@ -66,16 +67,26 @@ const menusListGET = async (req, res) => {
   return res.status(200).json({ menus: [], count: 0 })
 }
 
+const menuI18nJsonbOrNull = (v) => {
+  if (v === undefined || v === null) return null
+  if (typeof v !== 'object' || Array.isArray(v)) return null
+  try {
+    return JSON.stringify(v)
+  } catch {
+    return null
+  }
+}
+
 const menusCreatePOST = async (req, res) => {
   const b = req.body || {}
   if (!b.name || !b.slug) return res.status(400).json({ message: 'name and slug required' })
   let menu = await runWithMenuDb(async (client) => {
     const r = await client.query(
-      'INSERT INTO admin_hub_menus (name, slug, location, categories_with_products) VALUES ($1, $2, $3, $4) RETURNING id, name, slug, location, categories_with_products',
-      [b.name, b.slug, b.location || 'main', Boolean(b.categories_with_products)]
+      'INSERT INTO admin_hub_menus (name, slug, location, categories_with_products, name_i18n) VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING id, name, slug, location, categories_with_products, name_i18n',
+      [b.name, b.slug, b.location || 'main', Boolean(b.categories_with_products), menuI18nJsonbOrNull(b.name_i18n)]
     )
     return r.rows && r.rows[0]
-      ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main', categories_with_products: Boolean(r.rows[0].categories_with_products) }
+      ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: r.rows[0].location || 'main', categories_with_products: Boolean(r.rows[0].categories_with_products), name_i18n: r.rows[0].name_i18n || null }
       : null
   })
   if (menu) return res.status(201).json({ menu })
@@ -95,9 +106,9 @@ const menusCreatePOST = async (req, res) => {
 
 const menuByIdGET = async (req, res) => {
   let menu = await runWithMenuDb(async (client) => {
-    const r = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus WHERE id = $1', [req.params.id])
+    const r = await client.query('SELECT id, name, slug, location, categories_with_products, name_i18n FROM admin_hub_menus WHERE id = $1', [req.params.id])
     const row = r.rows && r.rows[0]
-    return row ? { id: row.id, name: row.name, slug: row.slug, location: normalizeLocation(row.location), categories_with_products: Boolean(row.categories_with_products) } : null
+    return row ? { id: row.id, name: row.name, slug: row.slug, location: normalizeLocation(row.location), categories_with_products: Boolean(row.categories_with_products), name_i18n: row.name_i18n || null } : null
   })
   if (menu) return res.json({ menu })
   const svc = resolveMenuService()
@@ -123,16 +134,17 @@ const menuByIdPUT = async (req, res) => {
     if (body.slug !== undefined) { updates.push(`slug = $${n++}`); vals.push(body.slug) }
     if (body.location !== undefined) { updates.push(`location = $${n++}`); vals.push((body.location === null || body.location === '') ? '' : body.location) }
     if (body.categories_with_products !== undefined) { updates.push(`categories_with_products = $${n++}`); vals.push(Boolean(body.categories_with_products)) }
+    if (body.name_i18n !== undefined) { updates.push(`name_i18n = $${n++}::jsonb`); vals.push(menuI18nJsonbOrNull(body.name_i18n)) }
     if (updates.length === 0) {
-      const r = await client.query('SELECT id, name, slug, location, categories_with_products FROM admin_hub_menus WHERE id = $1', [req.params.id])
+      const r = await client.query('SELECT id, name, slug, location, categories_with_products, name_i18n FROM admin_hub_menus WHERE id = $1', [req.params.id])
       return r.rows && r.rows[0]
-        ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalizeLocation(r.rows[0].location), categories_with_products: Boolean(r.rows[0].categories_with_products) }
+        ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalizeLocation(r.rows[0].location), categories_with_products: Boolean(r.rows[0].categories_with_products), name_i18n: r.rows[0].name_i18n || null }
         : null
     }
     vals.push(req.params.id)
-    const r = await client.query(`UPDATE admin_hub_menus SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, name, slug, location, categories_with_products`, vals)
+    const r = await client.query(`UPDATE admin_hub_menus SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, name, slug, location, categories_with_products, name_i18n`, vals)
     return r.rows && r.rows[0]
-      ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalizeLocation(r.rows[0].location), categories_with_products: Boolean(r.rows[0].categories_with_products) }
+      ? { id: r.rows[0].id, name: r.rows[0].name, slug: r.rows[0].slug, location: normalizeLocation(r.rows[0].location), categories_with_products: Boolean(r.rows[0].categories_with_products), name_i18n: r.rows[0].name_i18n || null }
       : null
   })
   if (!menu) return res.status(404).json({ message: 'Menu not found' })
@@ -169,12 +181,13 @@ const mapMenuItemRow = (row) => ({
   link_value: row.link_value,
   parent_id: row.parent_id,
   sort_order: row.sort_order != null ? row.sort_order : 0,
+  label_i18n: row.label_i18n && typeof row.label_i18n === 'object' ? row.label_i18n : null,
 })
 
 const menuItemsGET = async (req, res) => {
   const itemsFromDb = await runWithMenuDb(async (client) => {
     const r = await client.query(
-      'SELECT id, menu_id, label, slug, link_type, link_value, parent_id, sort_order FROM admin_hub_menu_items WHERE menu_id = $1 ORDER BY sort_order ASC, label ASC',
+      'SELECT id, menu_id, label, slug, link_type, link_value, parent_id, sort_order, label_i18n FROM admin_hub_menu_items WHERE menu_id = $1 ORDER BY sort_order ASC, label ASC',
       [req.params.menuId]
     )
     return (r.rows || []).map(mapMenuItemRow)
@@ -199,8 +212,8 @@ const menuItemsPOST = async (req, res) => {
   const menuId = req.params.menuId
   let item = await runWithMenuDb(async (client) => {
     const r = await client.query(
-      'INSERT INTO admin_hub_menu_items (menu_id, label, slug, link_type, link_value, parent_id, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, menu_id, label, slug, link_type, link_value, parent_id, sort_order',
-      [menuId, b.label, b.slug || null, b.link_type || 'url', b.link_value || null, b.parent_id || null, b.sort_order != null ? b.sort_order : 0]
+      'INSERT INTO admin_hub_menu_items (menu_id, label, slug, link_type, link_value, parent_id, sort_order, label_i18n) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb) RETURNING id, menu_id, label, slug, link_type, link_value, parent_id, sort_order, label_i18n',
+      [menuId, b.label, b.slug || null, b.link_type || 'url', b.link_value || null, b.parent_id || null, b.sort_order != null ? b.sort_order : 0, menuI18nJsonbOrNull(b.label_i18n)]
     )
     return r.rows && r.rows[0] ? mapMenuItemRow(r.rows[0]) : null
   })
@@ -240,12 +253,13 @@ const menuItemByIdPUT = async (req, res) => {
     if (body.link_value !== undefined) { updates.push(`link_value = $${n++}`); vals.push(body.link_value) }
     if (body.parent_id !== undefined) { updates.push(`parent_id = $${n++}`); vals.push(body.parent_id) }
     if (body.sort_order !== undefined) { updates.push(`sort_order = $${n++}`); vals.push(body.sort_order) }
+    if (body.label_i18n !== undefined) { updates.push(`label_i18n = $${n++}::jsonb`); vals.push(menuI18nJsonbOrNull(body.label_i18n)) }
     if (updates.length === 0) {
-      const r = await client.query('SELECT id, menu_id, label, slug, link_type, link_value, parent_id, sort_order FROM admin_hub_menu_items WHERE id = $1', [req.params.itemId])
+      const r = await client.query('SELECT id, menu_id, label, slug, link_type, link_value, parent_id, sort_order, label_i18n FROM admin_hub_menu_items WHERE id = $1', [req.params.itemId])
       return r.rows && r.rows[0] ? mapMenuItemRow(r.rows[0]) : null
     }
     vals.push(req.params.itemId)
-    const r = await client.query(`UPDATE admin_hub_menu_items SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, menu_id, label, slug, link_type, link_value, parent_id, sort_order`, vals)
+    const r = await client.query(`UPDATE admin_hub_menu_items SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, menu_id, label, slug, link_type, link_value, parent_id, sort_order, label_i18n`, vals)
     return r.rows && r.rows[0] ? mapMenuItemRow(r.rows[0]) : null
   })
   if (!item) return res.status(404).json({ message: 'Menu item not found' })
