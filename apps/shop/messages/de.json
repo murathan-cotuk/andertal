@@ -132,7 +132,7 @@
     "billingAddress": "Rechnungsadresse",
     "bonusTitle": "Bonuspunkte",
     "bonusBalance": "Ihr Kontostand: {points} Punkte",
-    "bonusHint": "25 Punkte = 1 € Rabatt. Frei einlösbar (z. B. 34 Punkte = 1,36 €). Nach Registrierung erhalten Sie 100 Willkommenspunkte.",
+    "bonusHint": "50 Punkte = 1 € Rabatt. Frei einlösbar (z. B. 68 Punkte = 1,36 €). Nach Registrierung erhalten Sie 100 Willkommenspunkte.",
     "bonusPlaceholder": "Punkte (z. B. 34, 50, 75)",
     "bonusApply": "Anwenden",
     "bonusDiscount": "Bonus-Rabatt",

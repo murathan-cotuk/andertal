@@ -160,7 +160,7 @@ const productIdFromVariantId = (variantId) => {
   return listingIdx > 0 ? base.slice(0, listingIdx) : base
 }
 
-const BONUS_POINTS_PER_EURO_DISCOUNT = 25
+const BONUS_POINTS_PER_EURO_DISCOUNT = 50
 const BONUS_SIGNUP_POINTS = 100
 const STRIPE_MIN_CHARGE_CENTS_EUR = 50
 const COUPON_CODE_MAX_LEN = 100

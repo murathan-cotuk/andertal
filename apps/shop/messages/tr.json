@@ -132,7 +132,7 @@
     "billingAddress": "Fatura adresi",
     "bonusTitle": "Bonus puanlar",
     "bonusBalance": "Bakiyeniz: {points} puan",
-    "bonusHint": "25 puan = 1 € indirim. İstenilen miktarda kullanılabilir (örn. 34 puan = 1,36 €). Kayıtta 100 hoş geldin puanı.",
+    "bonusHint": "50 puan = 1 € indirim. İstenilen miktarda kullanılabilir (örn. 68 puan = 1,36 €). Kayıtta 100 hoş geldin puanı.",
     "bonusPlaceholder": "Puan (örn. 34, 50, 75)",
     "bonusApply": "Uygula",
     "bonusDiscount": "Bonus indirimi",

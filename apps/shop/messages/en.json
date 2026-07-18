@@ -132,7 +132,7 @@
     "billingAddress": "Billing address",
     "bonusTitle": "Bonus points",
     "bonusBalance": "Your balance: {points} points",
-    "bonusHint": "25 points = €1 off. Redeem any amount (e.g. 34 points = €1.36). You receive 100 welcome points when you register.",
+    "bonusHint": "50 points = €1 off. Redeem any amount (e.g. 68 points = €1.36). You receive 100 welcome points when you register.",
     "bonusPlaceholder": "Points (e.g. 34, 50, 75)",
     "bonusApply": "Apply",
     "bonusDiscount": "Bonus discount",

@@ -125,7 +125,7 @@
     "billingAddress": "Dirección de facturación",
     "bonusTitle": "Puntos bonus",
     "bonusBalance": "Tu saldo: {points} puntos",
-    "bonusHint": "25 puntos = 1 € de descuento. Puedes canjear cualquier cantidad (p. ej. 34 puntos = 1,36 €). Recibes 100 puntos de bienvenida al registrarte.",
+    "bonusHint": "50 puntos = 1 € de descuento. Puedes canjear cualquier cantidad (p. ej. 68 puntos = 1,36 €). Recibes 100 puntos de bienvenida al registrarte.",
     "bonusPlaceholder": "Puntos (ej. 34, 50, 75)",
     "bonusApply": "Aplicar",
     "bonusDiscount": "Descuento bonus",

@@ -331,8 +331,14 @@ function MessageModal({ order, onClose }) {
 function OrderConfirmationView({ order }) {
   const t = useTranslations("order");
   const locale = useLocale();
+  const router = useRouter();
   const items = Array.isArray(order?.items) ? order.items : [];
   const settlement = order?.settlement_breakdown || null;
+
+  useEffect(() => {
+    const id = setTimeout(() => router.push("/orders"), 4000);
+    return () => clearTimeout(id);
+  }, [router]);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>

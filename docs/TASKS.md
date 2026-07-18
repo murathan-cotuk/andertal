@@ -25,5 +25,25 @@
 - ⚠️ Not: Kod değişikliği henüz commit/push edilmedi.
 
 4) siparis verildikten sonra siparis aldindi diye bi onay sayfasi gözüksün. 4 saniye sonrasinda siparislerim sayfasina yönlendirsin.
+
+**Durum: ✅ Düzeltildi (18.07.2026, Claude — henüz commit/push edilmedi).**
+- Onay sayfası zaten mevcuttu (`order/[id]/page.jsx` içindeki `OrderConfirmationView`, checkout sonrası `?confirmed=1` ile açılıyor) ama otomatik yönlendirme yoktu — kullanıcı "Siparişlerim" butonuna manuel basmak zorundaydı.
+- Eklenen: `OrderConfirmationView` içine `useEffect` ile 4 saniyelik `setTimeout(() => router.push("/orders"), 4000)` eklendi, component unmount olursa (kullanıcı manuel tıklarsa/sayfadan çıkarsa) `clearTimeout` ile temizleniyor.
+- Manuel "Siparişlerim" ve "Alışverişe devam et" linkleri olduğu gibi kaldı, sadece otomatik yönlendirme eklendi.
+- ⚠️ Not: Kod değişikliği henüz commit/push edilmedi.
+
 5) Biliyorsun ki müsteriye bonus puan veriyoruz ve müsteri bu puanlari sonraki alisverislerinde bozabiliyor. su an 25 bonus puana 1 euro indirim kazaniyor. ancak bunu 50 bonus puanda 1 euro olacak sekilde ayarlayalim lütfen sellercentral ve shopun her yerinde. 
+
+**Durum: ✅ Düzeltildi (18.07.2026, Claude — henüz commit/push edilmedi).**
+- Tek gerçek kaynak (backend): `store-checkout.js`'teki `BONUS_POINTS_PER_EURO_DISCOUNT` sabiti `25` → `50` yapıldı. Bu sabit hem indirim hesaplamasında (`discountCentsFromBonusPoints`) hem de tersi yönde (maksimum kullanılabilir puan hesabı) kullanılıyor — tek yerden değişince backend'in tamamı otomatik güncellendi.
+- Puan **kazanma** oranına (harcanan her 1 € = 1 puan) dokunmadım — talepte sadece **kullanma/indirim** oranı geçiyordu, kazanma oranı ayrı ve ilgisiz bir sabit (`bonusPointsEarnedFromOrderPaidCents`).
+- Frontend'de bulduğum, aynı oranı tekrar hesaplayan/gösteren tüm yerler güncellendi:
+  - `apps/shop/src/context/CartContext.jsx`: sepet indirim önizlemesi `/ 25` → `/ 50`.
+  - `apps/shop/src/lib/medusa-client.js`: kod yorumu güncellendi.
+  - `apps/shop/src/app/[locale]/bonus/page.jsx`: "25 Punkte = 1 € Rabatt" metni ve örneği (34→68 puan) güncellendi.
+  - `apps/shop/messages/{de,en,es,fr,it,tr}.json`: `bonusHint` metninin 6 dilinin tamamında "25" → "50" ve örnek "34" → "68" (68/50=1,36 €, önceki örnekle aynı indirim tutarını koruyor).
+- Sellercentral tarafında bu oranı gösteren/hesaplayan hiçbir kod bulunamadı (aratıldı) — sadece backend'in ortak sabitine bağlı olduğu için orada ek değişiklik gerekmedi.
+- 6 dildeki JSON dosyalarının hepsi `JSON.parse` ile, değişen JS/JSX dosyaları `@babel/parser`/`node -c` ile doğrulandı — hepsi geçerli.
+- ⚠️ Not: Kod değişiklikleri henüz commit/push edilmedi.
+
 6) eger müsteri bir entegrasyon sistemi yahut bir erp vb. bir sistem kullanarak siparislerini islediyse sistemde gözüken ve müsteriye gönerilen fatura müsterinin kendi sisteminde belirleyip andertale api yolu ile gönderdigi fatura olmali. bu sadece fatura icin gecerli degil. lieferschein, retourelabel vs dosyalar ve bilgiler de bu sekilde müsteri tarafindan gelmeli. müsteriler hangi dosyalari kullanmak istediklerini kendileri sececekler. dilerlerse elbette bizim dosya taslaklarimizi da kullanabilirler. saticilarin bu tercihi nasil yapabileceklerine dair en ufak fikrim yok. amazon nasil yapiyorsa onun gibi sisteme entegre et bu modeli.
