@@ -14,9 +14,16 @@
 - `VersandPage.jsx` (Sellercentral "Versand" tarama ekranı): bir siparişte **ilk ürün** taranınca/işaretlenince artık arka planda `order_status: 'in_bearbeitung'` PATCH isteği gönderiliyor — "taramaya başlama" anı tam olarak burası.
 - Yeni e-posta akışı oluşturuldu (veritabanı, `admin_hub_flows`/`admin_hub_flow_steps`): "Order Processing", `trigger_key: order_processing`, `audience: customer`, mevcut "Sipariş Alındı" şablonunun (görsel düzeltmesi dahil) 6 dilde uyarlanmış bir kopyası — başlık ve giriş metni "siparişiniz paketleniyor" temalı, yasal "sipariş alındı" onay cümlesi "işleme başladık" cümlesiyle değiştirildi.
 - Sellercentral Akışlar (Flows) sayfasına 6 dilde `order_processing` tetikleyici etiketi eklendi, seçenek listesinde görünür ve düzenlenebilir.
-- ⚠️ Not: Kod değişiklikleri henüz commit/push edilmedi, canlıda aktif değil.
+- ✅ Commit `937a203`, push edildi (17.07.2026).
 
 3) müsteilere gönderilecek email templatelerde PDF-Anhänge (dieser E-Mail-Schritt) diye bir alan var. buradan bu email ile gönderilmesini istedigimiz dosyalar secilebiliyor. diger flow templatelerde bu kisim yok. her template de pdf anhang ekleme bölümü koy. yeni olusturacagina da mevcutlara da.
+
+**Durum: ✅ Düzeltildi (17.07.2026, Claude — henüz commit/push edilmedi).**
+- Kök neden: PDF eki bölümü kodda `editAudience === "customer"` şartına bağlıydı — sadece müşteri odaklı akışlarda gösteriliyordu, satıcı odaklı akışlarda (`FlowsPage.jsx`) hiç görünmüyordu.
+- Backend'i (`flow-automation.js`) kontrol ettim: PDF ekleme mantığının hedef kitleye (audience) bakan bir kısıtlaması yok, sadece geçerli bir sipariş ID'si arıyor — yani satıcı e-postalarına da teknik olarak zaten eklenebiliyordu, sadece arayüzde seçenek yoktu.
+- Düzeltme: `FlowsPage.jsx`'teki `editAudience === "customer"` koşulu kaldırıldı — PDF eki bölümü artık **her akış türünde, her adımda** (yeni eklenen adımlar dahil, aynı arayüz bileşeni kullanıldığı için) görünüyor.
+- ⚠️ Not: Kod değişikliği henüz commit/push edilmedi.
+
 4) siparis verildikten sonra siparis aldindi diye bi onay sayfasi gözüksün. 4 saniye sonrasinda siparislerim sayfasina yönlendirsin.
 5) Biliyorsun ki müsteriye bonus puan veriyoruz ve müsteri bu puanlari sonraki alisverislerinde bozabiliyor. su an 25 bonus puana 1 euro indirim kazaniyor. ancak bunu 50 bonus puanda 1 euro olacak sekilde ayarlayalim lütfen sellercentral ve shopun her yerinde. 
 6) eger müsteri bir entegrasyon sistemi yahut bir erp vb. bir sistem kullanarak siparislerini islediyse sistemde gözüken ve müsteriye gönerilen fatura müsterinin kendi sisteminde belirleyip andertale api yolu ile gönderdigi fatura olmali. bu sadece fatura icin gecerli degil. lieferschein, retourelabel vs dosyalar ve bilgiler de bu sekilde müsteri tarafindan gelmeli. müsteriler hangi dosyalari kullanmak istediklerini kendileri sececekler. dilerlerse elbette bizim dosya taslaklarimizi da kullanabilirler. saticilarin bu tercihi nasil yapabileceklerine dair en ufak fikrim yok. amazon nasil yapiyorsa onun gibi sisteme entegre et bu modeli.

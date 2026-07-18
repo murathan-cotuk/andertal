@@ -1947,7 +1947,12 @@ export default function FlowsPage() {
                           </InlineStack>
                           <Text as="p" variant="bodySm" tone="subdued">{t.emailHtmlHelp}</Text>
                           <Text as="p" variant="bodySm" tone="subdued">{t.placeholdersHelp}</Text>
-                          {editAudience === "customer" && (
+                          {(
+                            // Was gated to editAudience === "customer" — but the backend attachment
+                            // builder (flow-automation.js: buildFlowEmailPdfAttachments) only needs a
+                            // valid order id, it has no audience check, so seller-audience order flows
+                            // (e.g. the seller's "new order" notification) can attach the same PDFs too.
+                            // Every template — new or existing, any audience — should offer this.
                             <BlockStack gap="150">
                               <Text as="span" variant="bodySm" fontWeight="semibold">{t.emailAttachmentsLabel}</Text>
                               <Checkbox
