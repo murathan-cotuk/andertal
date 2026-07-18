@@ -777,6 +777,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       'seller_signup',
       'abandoned_cart',
       'order_placed',
+      'order_processing',
       'order_shipped',
       'order_delivered',
       'review_request',
