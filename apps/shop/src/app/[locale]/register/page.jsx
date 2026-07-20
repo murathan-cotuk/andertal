@@ -99,6 +99,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordConfirmTouched, setPasswordConfirmTouched] = useState(false);
   const [error, setError] = useState("");
+  const [emailExists, setEmailExists] = useState(false);
+  const emailCheckSeq = useRef(0);
   const [countrySearch, setCountrySearch] = useState("");
   const [billingCountrySearch, setBillingCountrySearch] = useState("");
   const [isCountryOpen, setIsCountryOpen] = useState(false);
@@ -232,6 +234,20 @@ export default function RegisterPage() {
     return () => mq.removeEventListener?.("change", apply);
   }, []);
 
+  useEffect(() => {
+    const email = formData.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailExists(false); return; }
+    const seq = ++emailCheckSeq.current;
+    const id = setTimeout(() => {
+      const backendUrl = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+      fetch(`${backendUrl}/store/customers/email-exists?email=${encodeURIComponent(email)}`)
+        .then((r) => r.json())
+        .then((d) => { if (seq === emailCheckSeq.current) setEmailExists(!!d?.exists); })
+        .catch(() => {});
+    }, 500);
+    return () => clearTimeout(id);
+  }, [formData.email]);
+
   const set = (key) => (e) => setFormData(f => ({ ...f, [key]: e.target.value }));
   const parseCountryCode = (value, list) => {
     const raw = String(value || "").trim();
@@ -282,6 +298,7 @@ export default function RegisterPage() {
 
     try {
       const extra = {
+        locale,
         account_type: accountType,
         phone: formData.phone,
         gender: formData.gender,
@@ -487,7 +504,20 @@ export default function RegisterPage() {
             {/* Email */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label htmlFor="email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail *</label>
-              <input type="email" id="email" value={formData.email} onChange={set("email")} placeholder={t("emailPlaceholder")} required autoComplete="email" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+              <input
+                type="email" id="email" value={formData.email} onChange={set("email")}
+                placeholder={t("emailPlaceholder")} required autoComplete="email"
+                style={{ ...inp, border: emailExists ? "2px solid #dc2626" : inp.border }}
+                onFocus={focusStyle} onBlur={blurStyle}
+              />
+              {emailExists && (
+                <span style={{ color: "#dc2626", fontSize: 12, fontWeight: 600 }}>
+                  {t("emailAlreadyRegistered")}{" "}
+                  <Link href="/login" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>
+                    {t("signInNow")}
+                  </Link>
+                </span>
+              )}
             </div>
 
             {/* Phone */}

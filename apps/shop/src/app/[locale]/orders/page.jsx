@@ -10,6 +10,8 @@ import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
+import { storefrontProductHandle } from "@/lib/product-url-handle";
+import { useLocale } from "next-intl";
 
 /* ─────────────── Design tokens ─────────────── */
 const T = {
@@ -326,12 +328,20 @@ function TrackingChip({ carrier, number }) {
 }
 
 /* Items row */
-function ItemRow({ item, isLast }) {
+function ItemRow({ item, isLast, locale }) {
   const raw = item.title || "";
   const m = raw.match(/^(.*)\s+\((.+)\)$/);
   const name = m ? m[1] : raw;
   const variant = m ? m[2] : null;
   const lineTotal = (item.unit_price_cents || 0) * (item.quantity || 1);
+  const productUrl = storefrontProductHandle(
+    { id: item.product_id, handle: item.product_handle, metadata: item.product_metadata },
+    locale,
+  );
+
+  const thumbEl = item.thumbnail
+    ? <img src={resolveImageUrl ? resolveImageUrl(item.thumbnail) : item.thumbnail} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+    : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />;
 
   return (
     <div style={{
@@ -340,21 +350,31 @@ function ItemRow({ item, isLast }) {
       borderBottom: isLast ? "none" : `1px solid ${T.border}`,
     }}>
       {/* Thumbnail */}
-      <div style={{
-        width: 48, height: 48, borderRadius: 8, overflow: "hidden",
-        border: `1px solid ${T.border}`, flexShrink: 0, background: "#f9fafb",
-      }}>
-        {item.thumbnail
-          ? <img src={resolveImageUrl ? resolveImageUrl(item.thumbnail) : item.thumbnail} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-          : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
-        }
-      </div>
+      {productUrl ? (
+        <Link href={`/${productUrl}`} onClick={e => e.stopPropagation()} style={{ width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, flexShrink: 0, background: "#f9fafb", display: "block" }}>
+          {thumbEl}
+        </Link>
+      ) : (
+        <div style={{ width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, flexShrink: 0, background: "#f9fafb" }}>
+          {thumbEl}
+        </div>
+      )}
 
       {/* Name + variant */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {name}
-        </div>
+        {productUrl ? (
+          <Link
+            href={`/${productUrl}`}
+            onClick={e => e.stopPropagation()}
+            style={{ fontSize: 13, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block", textDecoration: "none" }}
+          >
+            {name}
+          </Link>
+        ) : (
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {name}
+          </div>
+        )}
         {variant && (
           <div style={{ fontSize: 11.5, color: T.gray2, marginTop: 2 }}>
             {variant.split(/\s*\/\s*/).join(" · ")}
@@ -411,6 +431,7 @@ const RETOURE_REASONS = [
 
 /* ─────────────── OrderCard ─────────────── */
 function OrderCard({ order, expanded, onToggle, onRefresh }) {
+  const locale = useLocale();
   const items = order.items || [];
   const returns = order.returns || [];
   const status = displayStatus(order);
@@ -450,9 +471,11 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
     <Card>
       {/* ── Collapsed header ── */}
       <CardHeader $open={expanded} onClick={onToggle}>
-        {/* Col 1: order # + date */}
+        {/* Col 1: order # (links directly into the order — doesn't just toggle the accordion) + date */}
         <OrderNum>
-          <OrderNumText>#{orderNum}</OrderNumText>
+          <Link href={`/order/${order.id}`} onClick={e => e.stopPropagation()} style={{ textDecoration: "none" }}>
+            <OrderNumText>#{orderNum}</OrderNumText>
+          </Link>
           <OrderDate>{fmtDate(order.created_at)}</OrderDate>
         </OrderNum>
 
@@ -502,7 +525,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
             <Section>
               <SectionLabel>Artikel ({items.length})</SectionLabel>
               {items.map((item, i) => (
-                <ItemRow key={item.id || i} item={item} isLast={i === items.length - 1} />
+                <ItemRow key={item.id || i} item={item} isLast={i === items.length - 1} locale={locale} />
               ))}
             </Section>
           )}

@@ -964,7 +964,11 @@ async function runAutomationFlowsForCustomerEvent(opts) {
     }
 
     const vars = await placeholderVarsCustomerOnly(client, cust)
-    const locale = resolveEmailLocaleFromCountry(cust.country || '')
+    // Prefer the UI language the customer was actually using (passed by the caller, e.g.
+    // register/newsletter forms) over guessing from their shipping country — a German
+    // speaker with a non-DE delivery country would otherwise get an English signup email.
+    const requestedLocale = String(opts.locale || '').trim().toLowerCase()
+    const locale = FLOW_EMAIL_LOCALES.includes(requestedLocale) ? requestedLocale : resolveEmailLocaleFromCountry(cust.country || '')
     const toEmail = String(cust.email || fallbackEmail || '').trim()
     if (!toEmail) return
 

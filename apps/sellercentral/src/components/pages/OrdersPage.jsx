@@ -9,7 +9,6 @@ import { Card } from "@andertal/ui";
 import { Button, InlineStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
-import ShipOrdersModal from "@/components/orders/ShipOrdersModal";
 import ShipLabelModal from "@/components/orders/ShipLabelModal";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete } from "@/lib/confirm-delete";
@@ -499,7 +498,7 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
   );
 }
 
-function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser }) {
+function ActionMenu({ order, onUpdate, onDelete, onVersenden, onBuyLabel, isSuperuser }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, bottom: "auto", right: 0, openUp: false });
   const router = useRouter();
@@ -545,6 +544,7 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser }) {
             return [
               { label: _ui.viewDetails, action: () => { router.push(`/${locale}/orders/${order.id}`); setOpen(false); } },
               { label: _ui.ship, action: () => { onVersenden?.(); setOpen(false); } },
+              ...(order.delivery_status !== "zugestellt" ? [{ label: _ui.buyLabel, action: () => { onBuyLabel?.(); setOpen(false); } }] : []),
               { label: _ui.cancelOrder, action: () => { onUpdate(order.id, { order_status: "storniert" }); setOpen(false); }, danger: true },
               ...(isSuperuser ? [{ label: _ui.deleteOrder, action: async () => { if (await confirmDelete(_ui.deleteOrder + "?")) { onDelete(order.id); } setOpen(false); }, danger: true }] : []),
             ];
@@ -761,8 +761,7 @@ export default function OrdersPage() {
   const [loadingItems, setLoadingItems] = useState({});
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [selected, setSelected] = useState(new Set());
-  const [versendModal, setVersendModal] = useState(null); // null | array of order objects
-  const [labelModal, setLabelModal] = useState(null); // null | order object
+  const [labelModal, setLabelModal] = useState(null); // null | order object — replacement label for an already-shipped order (via "..." menu)
   const [labelFulfillResult, setLabelFulfillResult] = useState(null); // { label_url, tracking_number }
   const [allReviews, setAllReviews] = useState([]); // all product reviews
   const [reviewPopupOrderId, setReviewPopupOrderId] = useState(null);
@@ -777,6 +776,27 @@ export default function OrdersPage() {
   const [showColMenu, setShowColMenu] = useState(false);
   const colMenuRef = useRef(null);
   const resizingRef = useRef(null);
+  const colPrefsLoadedRef = useRef(false);
+
+  // Column widths/visibility are per-browser preferences (Excel-like customization) —
+  // persist them so a seller's layout survives a reload instead of resetting every visit.
+  useEffect(() => {
+    try {
+      const savedWidths = JSON.parse(localStorage.getItem("sellercentral_orders_colWidths") || "null");
+      if (Array.isArray(savedWidths) && savedWidths.length === COL_DEFS.length) setColWidths(savedWidths);
+      const savedHidden = JSON.parse(localStorage.getItem("sellercentral_orders_hiddenCols") || "null");
+      if (Array.isArray(savedHidden)) setHiddenCols(new Set(savedHidden));
+    } catch (_) { /* ignore malformed prefs */ }
+    colPrefsLoadedRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!colPrefsLoadedRef.current) return;
+    localStorage.setItem("sellercentral_orders_colWidths", JSON.stringify(colWidths));
+  }, [colWidths]);
+  useEffect(() => {
+    if (!colPrefsLoadedRef.current) return;
+    localStorage.setItem("sellercentral_orders_hiddenCols", JSON.stringify([...hiddenCols]));
+  }, [hiddenCols]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isSuperuser) return;
@@ -921,6 +941,14 @@ export default function OrdersPage() {
     } catch { }
   };
 
+  // "Versenden" always starts the scan-then-ship flow (Packaging center) — items must be
+  // scanned/confirmed one by one before a carrier/label can be chosen. Etikett kaufen
+  // (Sendcloud) lives inside that flow now instead of being a separate, scan-skipping button.
+  const startPacking = (ordersToShip) => {
+    sessionStorage.setItem("versand_orders", JSON.stringify(ordersToShip));
+    router.push(`/${locale}/versand`);
+  };
+
   const handleColSort = (sortKey) => {
     if (!sortKey) return;
     const isCurrentCol = sort.startsWith(sortKey + "_");
@@ -993,16 +1021,16 @@ export default function OrdersPage() {
           onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#f9fafb"; }}
           onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
-          <td style={{ padding: "10px 6px 10px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
+          <td style={{ padding: "7px 6px 7px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
             <CustomCheckbox checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} size={18} />
           </td>
-          <td style={{ padding: "10px 8px 10px 8px", width: 32 }}>
+          <td style={{ padding: "7px 8px 7px 8px", width: 32 }}>
             <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
               {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
             </button>
           </td>
           {!hc.has("order_number") && (
-            <td style={{ padding: "10px 12px", fontWeight: 600, fontSize: 13 }}>
+            <td style={{ padding: "7px 10px", fontWeight: 600, fontSize: 13 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <button
                   onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
@@ -1014,12 +1042,12 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("customer") && (
-            <td style={{ padding: "10px 10px", minWidth: 180 }}>
+            <td style={{ padding: "7px 10px", minWidth: 180 }}>
               <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
             </td>
           )}
           {!hc.has("address") && (
-            <td style={{ padding: "10px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45 }}>
+            <td style={{ padding: "7px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45 }}>
               {order.address_line1 ? (
                 <>
                   <div>{order.address_line1}</div>
@@ -1030,7 +1058,7 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("amount") && (
-            <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600 }}>
+            <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600 }}>
               {(() => {
                 const vat = getVatInfo(order.country);
                 const brutto = order.total_cents || 0;
@@ -1050,7 +1078,7 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("order_status") && (
-            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center" }}>
               {returnsMap[order.id] ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
@@ -1062,27 +1090,27 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("payment_status") && (
-            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center" }}>
               <StatusBadge value={order.payment_status} />
             </td>
           )}
           {!hc.has("delivery_status") && (
-            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center" }}>
               <StatusBadge value={order.delivery_status} />
             </td>
           )}
           {!hc.has("date") && (
-            <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+            <td style={{ padding: "7px 10px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
               {fmtDate(order.created_at)}
             </td>
           )}
           {!hc.has("country") && (
-            <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 500 }}>
+            <td style={{ padding: "7px 10px", textAlign: "center", fontWeight: 500 }}>
               {order.country || "—"}
             </td>
           )}
           {!hc.has("review") && (
-            <td style={{ padding: "10px 12px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center" }}>
               {(() => {
                 const orderReviews = allReviews.filter((r) => r.order_id === order.id);
                 if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 14 }}>★★★★★</span>;
@@ -1112,19 +1140,12 @@ export default function OrdersPage() {
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
               {order.delivery_status !== "versendet" && order.delivery_status !== "zugestellt" && (
                 <div onClick={(e) => e.stopPropagation()}>
-                  <Button size="slim" variant="primary" onClick={() => setVersendModal([order])}>
+                  <Button size="slim" variant="primary" onClick={() => startPacking([order])}>
                     {ui.ship}
                   </Button>
                 </div>
               )}
-              {order.delivery_status !== "zugestellt" && (
-                <div onClick={(e) => e.stopPropagation()}>
-                  <Button size="slim" onClick={() => setLabelModal(order)}>
-                    {ui.buyLabel}
-                  </Button>
-                </div>
-              )}
-              <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => setVersendModal([order])} isSuperuser={isSuperuser} />
+              <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => startPacking([order])} onBuyLabel={() => setLabelModal(order)} isSuperuser={isSuperuser} />
             </div>
           </td>
         </tr>
@@ -1139,13 +1160,6 @@ export default function OrdersPage() {
           onClose={() => setShowNewOrder(false)}
           onCreated={() => fetchOrders()}
           locale={locale}
-        />
-      )}
-      {versendModal && (
-        <ShipOrdersModal
-          orders={versendModal}
-          onClose={() => setVersendModal(null)}
-          onDone={() => { fetchOrders(); setSelected(new Set()); }}
         />
       )}
       {labelModal && (
@@ -1229,16 +1243,8 @@ export default function OrdersPage() {
         <BulkBar>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#1e3a8a" }}>{selected.size} {ui.selected}</span>
           <InlineStack gap="200" wrap blockAlign="center">
-            <Button variant="primary" onClick={() => setVersendModal(selectedOrders)}>
+            <Button variant="primary" onClick={() => startPacking(selectedOrders)}>
               {ui.bulkShip}
-            </Button>
-            <Button
-              onClick={() => {
-                sessionStorage.setItem("versand_orders", JSON.stringify(selectedOrders));
-                router.push(`/${locale}/versand`);
-              }}
-            >
-              {ui.bulkPackaging}
             </Button>
             <Button variant="plain" onClick={() => setSelected(new Set())}>
               {ui.clearSelection}

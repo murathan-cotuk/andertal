@@ -37,6 +37,7 @@ const storeNewsletterSubscribePOST = (dispatchCustomerFlowEvent) => async (req, 
     res.json({ ok: true })
     void dispatchCustomerFlowEvent('new_subscriber', {
       email: String(email).trim().toLowerCase(),
+      locale: localeValue || undefined,
     })
   } catch (e) {
     try { await c.end() } catch (_) {}

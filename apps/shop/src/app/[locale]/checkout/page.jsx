@@ -1153,7 +1153,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
           </FieldWrap>
         )}
         <FieldGrid>
-          <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="street-address" />
+          <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="address-line1" />
           <CheckoutFormField label={t("address2")} field={address2} fullWidth autoComplete="address-line2" />
         </FieldGrid>
         <FieldGrid $cols="1fr 1fr" $keepCols>
@@ -1263,7 +1263,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             </FieldWrap>
           )}
           <FieldGrid>
-            <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing street-address" />
+            <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing address-line1" />
             <CheckoutFormField label={t("address2")} field={billingAddress2} fullWidth autoComplete="billing address-line2" />
           </FieldGrid>
           <FieldGrid $cols="1fr 1fr" $keepCols>
@@ -1735,7 +1735,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           </FieldWrap>
         )}
         <FieldGrid>
-          <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="street-address" />
+          <CheckoutFormField label={t("address")} field={address} fullWidth autoComplete="address-line1" />
           <CheckoutFormField label={t("address2")} field={address2} fullWidth autoComplete="address-line2" />
         </FieldGrid>
         <FieldGrid $cols="1fr 1fr" $keepCols>
@@ -1845,7 +1845,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
             </FieldWrap>
           )}
           <FieldGrid>
-            <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing street-address" />
+            <CheckoutFormField label={t("address")} field={billingAddress} fullWidth autoComplete="billing address-line1" />
             <CheckoutFormField label={t("address2")} field={billingAddress2} fullWidth autoComplete="billing address-line2" />
           </FieldGrid>
           <FieldGrid $cols="1fr 1fr" $keepCols>

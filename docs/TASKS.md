@@ -47,3 +47,51 @@
 - ✅ Commit `0e947b7`, push edildi (18.07.2026).
 
 6) eger müsteri bir entegrasyon sistemi yahut bir erp vb. bir sistem kullanarak siparislerini islediyse sistemde gözüken ve müsteriye gönerilen fatura müsterinin kendi sisteminde belirleyip andertale api yolu ile gönderdigi fatura olmali. bu sadece fatura icin gecerli degil. lieferschein, retourelabel vs dosyalar ve bilgiler de bu sekilde müsteri tarafindan gelmeli. müsteriler hangi dosyalari kullanmak istediklerini kendileri sececekler. dilerlerse elbette bizim dosya taslaklarimizi da kullanabilirler. saticilarin bu tercihi nasil yapabileceklerine dair en ufak fikrim yok. amazon nasil yapiyorsa onun gibi sisteme entegre et bu modeli.
+
+7) register olurken email yazildiginda böyle kayitli bir hesa var desin direkt mail girme kutusu altinda. register a basmayi beklemesin. — **Durum: ✅ Yapıldı.**
+8) yeni siparis geldi baska bir seller ürününden. ancak superuser a bildirim gelmedi. — **Durum: ✅ Yapıldı.** (Not: backend'deki sayaç zaten superuser için tüm satıcıların siparişlerini kapsıyordu — eksik olan aktif bir uyarıydı; artık yeni sipariş gelince ekranda toast bildirimi çıkıyor.)
+9) sellercentralde siparisler icine giriyorum. gelen siparis icin versandetikett kaufen diyorum. "Aus technischen Gründen konnte die Aktion nicht abgeschlossen werden. Unser Team wurde informiert und kümmert sich darum." hatasi veriyor. entegrasyon sorunu mu var? ne ise bul hallet.
+
+**Durum: ✅ Düzeltildi (20.07.2026, Claude — henüz commit/push edilmedi).**
+- `seller_error_logs` tablosundaki gerçek Sendcloud hata kayıtlarını inceledim: `SENDCLOUD_API_ERROR — Sendcloud API 404: {"detail":"Not Found"}`.
+- Canlı Sendcloud API kimlik bilgileriyle (platform entegrasyonu, doğru ve aktif) doğrudan test ettim: `/api/v2/shipping_products` uç noktası bu Sendcloud hesabında **404** dönüyor (bu hesabın sözleşmesinde etkin değil), ama `/api/v2/shipping_methods` (klasik uç nokta) **200 OK** dönüyor ve paket oluşturma kodu zaten bu klasik uç noktanın `id` formatını (`shipment: { id: ... }`) kullanıyordu — yani kod baştan beri yanlış/kullanılamayan uç noktayı çağırıyordu.
+- Kök neden: entegrasyon **yanlış konfigüre edilmiş değildi** (API anahtarları geçerliydi), kod **yanlış Sendcloud API uç noktasını** çağırıyordu.
+- Düzeltme: `apps/medusa-backend/src/routes/shipment-tracking.js`'teki `adminHubLabelRatesPOST` fonksiyonu `/api/v2/shipping_methods?to_country=...` kullanacak şekilde yeniden yazıldı (düz liste + ülkeye göre fiyat/süre eşleştirme + ağırlık aralığı filtresi client-side). Paket oluşturma (fulfill) adımına dokunulmadı — zaten doğru `id` formatını bekliyordu.
+- Canlı hesaba karşı uçtan uca test ettim (gerçek hata loglarındaki parametrelerle: DE, 1000g, 35×25×10cm): düzeltmeden önce 404/0 sonuç, düzeltmeden sonra **28 geçerli fiyat seçeneği** dönüyor.
+10) siparislerin yaninda versenden ve etikett kaufen diye ayri iki buton olmasin. etikett kaufen butonu, versendene basildiginda acilan pencerenin icinde olsun. versenden dedikten sonra direkt gönder diyebiliyoruz ancak ilk önce siparis edilen ürünler tek tek scanlenmeli. o sekilde bir sayfa acilsin. atiyorum 6 farkli ürün siparis edildi farkli adetlerde 2,5,1 gibi. önce bir ürün acilsin yaninda tutar yazsin. scanleyince ilerlesin sürec ya da pakete kondugunu manuel sekilde onaylayalim buton ile. versenden yapildiktan sonra 
+
+**Durum: ✅ Düzeltildi (20.07.2026, Claude — henüz commit/push edilmedi).**
+- Kod tabanında aslında **üç ayrı** sevkiyat yolu vardı: (1) satır başındaki hızlı "Versenden" butonu → tarama adımı olmayan eski `ShipOrdersModal`, (2) satır başındaki ayrı "Etikett kaufen" butonu → Sendcloud satın alma penceresi, (3) toplu seçimde zaten var olan "Paketleme merkezi" butonu → `/versand` sayfası (ürünleri tek tek tarama akışı, tam olarak istenen deneyim, sadece siparişlerin yanındaki tekli butona bağlı değildi).
+- Düzeltme: satır başındaki ve toplu işlemdeki "Versenden" artık **her zaman** `/versand` sayfasındaki tarama akışını açıyor (`OrdersPage.jsx`'te yeni `startPacking()` yardımcı fonksiyonu). Ayrı "Etikett kaufen" satır butonu kaldırıldı.
+- `/versand` sayfasının (`VersandPage.jsx`) "ship" adımına (tüm ürünler tarandıktan SONRA görünen ekran), her sipariş satırının yanına **"Etikett kaufen"** butonu eklendi — tıklanınca aynı Sendcloud satın alma penceresi (`ShipLabelModal`) o siparişe özel açılıyor. Yani artık etikett kaufen, versendenin (tarama akışının) içinde.
+- Zaten sevk edilmiş bir siparişe **yedek** etiket almak isteyen satıcılar için "..." menüsüne de bir "Etikett kaufen" seçeneği eklendi (bunu tamamen kaldırmak, hasarlı kargo için yedek etiket alma gibi meşru bir senaryoyu kırardı).
+- Artık hiçbir yerden çağrılmayan eski `ShipOrdersModal.jsx` (241 satır) **tamamen silindi**.
+11) Checkoutta Adres otomatik doldurma yaptiginda tüm adres straße ye yaziliyor. her yere ayri ayri doldurmali otomatik.
+
+**Durum: ✅ Düzeltildi (20.07.2026, Claude — henüz commit/push edilmedi).**
+- Kök neden: "Straße" input'unda `autoComplete="street-address"` kullanılıyordu — bu HTML standart token'ı tarayıcıya "adresin TAMAMINI buraya yaz" der (çok satırlı, tek alan). Doğrusu `address-line1`. "Adres 2" alanı zaten doğru `address-line2` kullandığı için tarayıcı satır1/satır2 ayrımını yapamıyor, her şeyi ilk alana (Straße) döküyordu.
+- Düzeltme: `apps/shop/src/app/[locale]/checkout/page.jsx`'te teslimat VE fatura adresi alanlarının tamamında (mobil+masaüstü form, 4 yer) `street-address` → `address-line1` yapıldı.
+- (Not: `apps/shop/src/app/[locale]/register/page.jsx`'te de aynı `street-address` deseni var — görev sadece "checkoutta" dediği için orada dokunmadım, isterseniz onu da aynı şekilde düzeltebilirim.)
+12) Register sayfasında almanca seçiliyken register oldum ama email ingilizce geldi. Newsletter de registry emaili de. 
+
+**Durum: ✅ Düzeltildi (20.07.2026, Claude — henüz commit/push edilmedi).**
+- Kök neden: `flow-automation.js`'teki `runAutomationFlowsForCustomerEvent` (register onay e-postası VE newsletter hoş geldin e-postası ikisi de bunu kullanıyor) e-posta dilini **her zaman müşterinin teslimat ülkesinden** tahmin ediyordu (`resolveEmailLocaleFromCountry`), site üzerinde seçili arayüz dilini hiç dikkate almıyordu — fonksiyon bir `locale` parametresi bile kabul etmiyordu.
+- Düzeltme: `runAutomationFlowsForCustomerEvent` artık çağıranın gönderdiği `locale`'ı (geçerliyse) ülke tahmininden **önce** kullanıyor.
+- `newsletter.js`: `/store/newsletter-subscribe` zaten aldığı `preferred_locale`'ı artık flow tetikleyicisine de gönderiyor (önceden veritabanına kaydediyordu ama e-posta gönderimine iletmiyordu).
+- `store-checkout.js`: register şemasına (`CustomerRegisterSchema`) opsiyonel `locale` alanı eklendi, `customer_signup` flow tetikleyicisine iletiliyor.
+- `apps/shop/.../register/page.jsx`: register isteğine artık sayfanın aktif dili (`locale`) ekleniyor.
+13) Mobilde meine bestellungen sayfasına gidip siparişi aşağı açabiliyorum. Ancak orada ürüne tıkladığımda ürün sayfasına gitmiyor. Ayrıca sipariş içine giremiyorum.
+
+**Durum: ✅ Düzeltildi (20.07.2026, Claude — henüz commit/push edilmedi).**
+- `apps/shop/src/app/[locale]/orders/page.jsx` (mobil+masaüstü ortak "Meine Bestellungen" listesi): iki ayrı kök neden buldum:
+  1. `ItemRow` (genişletilmiş panelde her ürün satırı) tamamen tıklanamaz bir `<div>`'di — hiçbir onClick/Link yoktu. Artık ürün görseli ve adı, `order/[id]/page.jsx`'te zaten kullanılan aynı `storefrontProductHandle()` mantığıyla ürün sayfasına yönlendiren gerçek link.
+  2. Sipariş detayına giden tek yol, genişletilmiş panelin en altında, 4-5 başka butonun arasına gizlenmiş küçük bir "Details" linkiydi — mobilde bulunması zordu. Artık kapalı satırdaki **sipariş numarasının kendisi** de doğrudan `/order/{id}` sayfasına götüren bir link (akordeon açma davranışını bozmadan, `stopPropagation` ile).
+- Doğrulama: `@babel/parser` ile syntax kontrol edildi; backend'in `/store/orders/me` uç noktasının `product_id`/`product_handle`/`product_metadata` alanlarını zaten döndürdüğü koddan doğrulandı.
+14) sellercentralde orders sayfasinda icerikler ekrana sigmiyor. daha kompakt yap. sütun genislikleri tutup sürükleyip özellestirilebilsin excel gibi. sütünlar gizlenebilsin sag üstten columbns tarzi bir dropdown ile.
+15) flowlardaki bestellung versendet flowunun tetikleyicisi ne bilmiyorum. ancak siparisin lieferstatusu versendet oldugu zaman bu flow tetiklenmeli.
+16) Bestellung geliefert flowu siparis icindeki Sendungsverfolgung kismi altinadki kargo takip güncellemelerinde "Zugestellt" gözüktügünde tetiklensin.
+17) customers/newsletter sayfasinda newsletter a abone olanlari göremiyorum.
+18) customers/reviews sayfasinda sellerlara göre kategorize edelim. ancak en üstte superuser bilgileri olsun tabii.
+19) sellers/errors sayfasindaki sorunlari tek tek incele ve cöz. 
+20) content/brands/authorizations sayfasi bos duruyor. ayrica brand sayfasi icinden yapabilelim bunu. autorization islemleri ile brandler ayni ekranda olmali. ekranin üstünde dogrulama islemi kayit islemi olsun altta da liste olsun. 1 sayfada 100 marka olsun. 1 satirda yan yana 4 tane 25 satir seklinde. brand autorizations kaldiriyorsun yani. brand icine kuruyorsun.
+21) shopa girdim sepete ürün ekledim. satin almadan ciktim. abandoned checkouts sayfasina baktim. evet orada gözüküyor. ancak Kunde kisminda ve E-Mail kisminda hicbir sey yazmiyor. her abandoned checkouts satirinin en saginda durum belli olsun. bu sepetteki ürünler silindi mi, satin mi alindi, hala sepette duruyor mu o yazsin. hala sepette duruyorsa zaten flow calisacak. satin alindiysa satin alinanlar sekmesine gidecek. silindiyse sepetteki ürünler silinenler sekmesine gidecek. hala sepettekiler sepettekiler sekmesine gidicek. all sekmesinde hesi gözükecek. email ve müsteri adi cok önemli dedigim gibi. cünkü email gidecek. flow hazirlandi.

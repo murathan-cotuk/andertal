@@ -8,6 +8,8 @@ import { fmtMoney } from "@/lib/locale-text";
 import { getShipStrings, fmtShipDate } from "@/lib/ship-i18n";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { buildShipLabelsHtml, buildShipLieferscheinHtml, openShipCombinedPrintWindow } from "@/lib/ship-print-html";
+import ShipLabelModal from "@/components/orders/ShipLabelModal";
+import { getUI } from "@/lib/ui-strings";
 
 const OTHER_CARRIER = "__other__";
 const FALLBACK_CARRIERS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express"];
@@ -16,6 +18,8 @@ export default function VersandPage() {
   const router = useRouter();
   const locale = useLocale();
   const s = useMemo(() => getShipStrings(locale), [locale]);
+  const ui = useMemo(() => getUI(locale), [locale]);
+  const [labelModalOrder, setLabelModalOrder] = useState(null); // null | order object
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -271,7 +275,7 @@ export default function VersandPage() {
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{s.trackingNumber}</div>
           {orders.map((o) => (
-            <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 10, marginBottom: 10, alignItems: "center" }}>
+            <div key={o.id} style={{ display: "grid", gridTemplateColumns: "1fr 200px auto", gap: 10, marginBottom: 10, alignItems: "center" }}>
               <div style={{ fontSize: 13, fontWeight: 500 }}>
                 #{o.order_number || "—"} — {[o.first_name, o.last_name].filter(Boolean).join(" ") || (isSuperuser ? o.email : null) || "—"}
               </div>
@@ -281,9 +285,15 @@ export default function VersandPage() {
                 placeholder={s.trackingEnter}
                 style={{ padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
               />
+              <Button size="slim" onClick={() => setLabelModalOrder(o)}>
+                {ui.buyLabel}
+              </Button>
             </div>
           ))}
         </div>
+        {labelModalOrder && (
+          <ShipLabelModal order={labelModalOrder} locale={locale} onClose={() => setLabelModalOrder(null)} />
+        )}
 
         <BlockStack gap="300">
           <InlineStack gap="200" wrap>

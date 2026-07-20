@@ -442,6 +442,7 @@
     "passwordTooShort": "Le mot de passe doit comporter au moins 6 caractères.",
     "legalConsentRequired": "Veuillez accepter les mentions légales.",
     "registerFailed": "Inscription échouée. Veuillez réessayer.",
+    "emailAlreadyRegistered": "Un compte existe déjà avec cet e-mail.",
     "registering": "Inscription en cours…",
     "alreadyHaveAccount": "Vous avez déjà un compte ?",
     "signInNow": "Se connecter maintenant",

@@ -509,8 +509,12 @@ module.exports = function createShipmentTrackingRouter({
         const length = Math.round(Number(length_cm) || 30)
         const width = Math.round(Number(width_cm) || 20)
         const height = Math.round(Number(height_cm) || 15)
-        const qs = `?from_country=DE&to_country=${toCountry}&weight=${weightG}&length=${length}&width=${width}&height=${height}`
-        const resp = await sendcloudRequest('/api/v2/shipping_products' + qs, sc)
+        // NOTE: '/api/v2/shipping_products' 404s on this Sendcloud account (not enabled for
+        // this contract) — '/api/v2/shipping_methods' is the classic endpoint that this
+        // account actually has access to (verified against the live account). It returns a
+        // flat method list with a per-country price/lead-time instead of nested products.
+        const qs = `?to_country=${toCountry}`
+        const resp = await sendcloudRequest('/api/v2/shipping_methods' + qs, sc)
         if (resp.status >= 400) {
           return respondSellerSystemError(req, res, {
             errorCode: 'SENDCLOUD_API_ERROR',
@@ -520,41 +524,46 @@ module.exports = function createShipmentTrackingRouter({
             context: JSON.stringify({ order_id: id, endpoint: 'label/rates', qs }),
           })
         }
-        const products = resp.data?.shipping_products || []
+        const methods = resp.data?.shipping_methods || []
         const markup = 1 + (Number(sc.markup_pct) || 5) / 100
+        const weightKg = weightG / 1000
         const rates = []
-        for (const prod of products) {
-          for (const method of (prod.methods || [])) {
-            const price = method.price?.total_price ?? null
-            if (price == null) continue
-            const leadHours = method.lead_time_hours != null ? Number(method.lead_time_hours) : null
-            let deliveryDays = null
-            if (leadHours != null) {
-              if (leadHours <= 24) deliveryDays = 'Lieferung am nächsten Werktag'
-              else if (leadHours <= 48) deliveryDays = 'Lieferung in 1–2 Werktagen'
-              else if (leadHours <= 72) deliveryDays = 'Lieferung in 2–3 Werktagen'
-              else deliveryDays = `Lieferung in ca. ${Math.ceil(leadHours / 24)} Werktagen`
-            }
-            rates.push({
-              service_id: method.id,
-              name: `${prod.name}${method.name && method.name !== prod.name ? ' — ' + method.name : ''}`,
-              carrier: prod.carrier?.code || (prod.name || '').toLowerCase(),
-              price_eur: Math.round(Number(price) * markup * 100) / 100,
-              price_base: Math.round(Number(price) * 100) / 100,
-              min_weight: method.min_weight,
-              max_weight: method.max_weight,
-              delivery_days: deliveryDays,
-              tracking: method.tracking != null ? Boolean(method.tracking) : true,
-            })
+        for (const method of methods) {
+          const minW = method.min_weight != null ? Number(method.min_weight) : null
+          const maxW = method.max_weight != null ? Number(method.max_weight) : null
+          if (minW != null && weightKg < minW) continue
+          if (maxW != null && weightKg > maxW) continue
+          const countryEntry = (method.countries || []).find((c) => (c.iso_2 || '').toUpperCase() === toCountry)
+          if (!countryEntry) continue
+          const price = countryEntry.price
+          if (price == null) continue
+          const leadHours = countryEntry.lead_time_hours != null ? Number(countryEntry.lead_time_hours) : null
+          let deliveryDays = null
+          if (leadHours != null) {
+            if (leadHours <= 24) deliveryDays = 'Lieferung am nächsten Werktag'
+            else if (leadHours <= 48) deliveryDays = 'Lieferung in 1–2 Werktagen'
+            else if (leadHours <= 72) deliveryDays = 'Lieferung in 2–3 Werktagen'
+            else deliveryDays = `Lieferung in ca. ${Math.ceil(leadHours / 24)} Werktagen`
           }
+          rates.push({
+            service_id: method.id,
+            name: method.name,
+            carrier: method.carrier || (method.name || '').toLowerCase(),
+            price_eur: Math.round(Number(price) * markup * 100) / 100,
+            price_base: Math.round(Number(price) * 100) / 100,
+            min_weight: method.min_weight,
+            max_weight: method.max_weight,
+            delivery_days: deliveryDays,
+            tracking: true,
+          })
         }
         rates.sort((a, b) => a.price_eur - b.price_eur)
         if (rates.length === 0) {
           return respondSellerSystemError(req, res, {
             errorCode: 'SENDCLOUD_NO_RATES',
-            errorMessage: `Keine Versandoptionen für ${toCountry}, ${weightG}g, ${length}×${width}×${height} cm. Sendcloud-Produkte: ${products.length}`,
+            errorMessage: `Keine Versandoptionen für ${toCountry}, ${weightG}g, ${length}×${width}×${height} cm. Sendcloud-Methoden: ${methods.length}`,
             sellerId: callerSellerId,
-            context: JSON.stringify({ order_id: id, endpoint: 'label/rates', to_country: toCountry, weight_g: weightG, products_count: products.length }),
+            context: JSON.stringify({ order_id: id, endpoint: 'label/rates', to_country: toCountry, weight_g: weightG, methods_count: methods.length }),
           })
         }
         res.json({ rates, to_country: toCountry, markup_pct: sc.markup_pct })

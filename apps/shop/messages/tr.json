@@ -459,6 +459,7 @@
     "passwordTooShort": "Şifre en az 6 karakter olmalıdır.",
     "legalConsentRequired": "Lütfen yasal bildirimleri kabul edin.",
     "registerFailed": "Kayıt başarısız. Lütfen tekrar deneyin.",
+    "emailAlreadyRegistered": "Bu e-posta ile zaten bir hesap var.",
     "registering": "Kaydediliyor…",
     "alreadyHaveAccount": "Zaten hesabınız var mı?",
     "signInNow": "Şimdi giriş yap",

@@ -1328,6 +1328,7 @@ const CustomerRegisterSchema = z.object({
   first_name: z.string().max(60).optional(),
   last_name:  z.string().max(60).optional(),
   phone:      z.string().max(30).optional(),
+  locale:     z.string().max(5).optional(),
 })
 const storeCustomerRegisterPOST = async (req, res) => {
   const parsed = validate(CustomerRegisterSchema, req.body || {}, res)
@@ -1410,12 +1411,37 @@ const storeCustomerRegisterPOST = async (req, res) => {
     await client.end()
     res.status(201).json({ customer })
     setImmediate(() => {
-      try { require('../flow-automation').runAutomationFlowsForCustomerEvent({ triggerKey: 'customer_signup', customerId: cid, email }).catch(() => {}) } catch (_) {}
+      try { require('../flow-automation').runAutomationFlowsForCustomerEvent({ triggerKey: 'customer_signup', customerId: cid, email, locale: body.locale }).catch(() => {}) } catch (_) {}
     })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     if (e.code === '23505') return res.status(409).json({ message: 'An account with this email already exists' })
     res.status(500).json({ message: e?.message || 'Registration failed' })
+  }
+}
+
+// GET /store/customers/email-exists?email=... — used by the register form to warn inline,
+// before submit, that an account already exists (register itself already reveals this via
+// a 409 on submit — this just surfaces it earlier).
+const storeCustomerEmailExistsGET = async (req, res) => {
+  const email = String(req.query?.email || '').trim().toLowerCase()
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.json({ exists: false })
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl) return res.json({ exists: false })
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(
+      'SELECT 1 FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) AND password_hash IS NOT NULL LIMIT 1',
+      [email],
+    )
+    await client.end()
+    res.json({ exists: r.rows.length > 0 })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.json({ exists: false })
   }
 }
 
@@ -3394,6 +3420,7 @@ module.exports = function createStoreCheckoutRouter() {
 
   // Customers
   router.post('/store/customers', storeCustomerRegisterPOST)
+  router.get('/store/customers/email-exists', storeCustomerEmailExistsGET)
   router.post('/store/auth/token', storeAuthTokenPOST)
   router.get('/store/customers/me', storeCustomersMeGET)
   router.patch('/store/customers/me', storeCustomerMePATCH)

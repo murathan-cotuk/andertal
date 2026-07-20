@@ -459,6 +459,7 @@
     "passwordTooShort": "Password must be at least 6 characters.",
     "legalConsentRequired": "Please accept the legal notices.",
     "registerFailed": "Registration failed. Please try again.",
+    "emailAlreadyRegistered": "An account with this email already exists.",
     "registering": "Registering…",
     "alreadyHaveAccount": "Already have an account?",
     "signInNow": "Sign in now",

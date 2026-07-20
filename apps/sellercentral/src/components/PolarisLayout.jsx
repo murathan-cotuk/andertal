@@ -16,6 +16,7 @@ import {
   ActionList,
   UnstyledLink,
   Icon,
+  Toast,
 } from "@shopify/polaris";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import { useSellerImpersonation } from "@/context/SellerImpersonationContext";
@@ -472,6 +473,8 @@ export default function PolarisLayout({ children }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifData, setNotifData] = useState(null);
   const [msgUnread, setMsgUnread] = useState(0);
+  const [orderToast, setOrderToast] = useState(null);
+  const prevOrdersCountRef = useRef(null);
   const notifRef = useRef(null);
   // Track which parent nav item has its sub-menu expanded
   const [expandedNavKey, setExpandedNavKey] = useState(null);
@@ -595,11 +598,19 @@ export default function PolarisLayout({ children }) {
       if (d && !d.__error) {
         setNotifData(d);
         setMsgUnread(d.messages || 0);
+        const prevCount = prevOrdersCountRef.current;
+        const nextCount = typeof d.orders === "number" ? d.orders : 0;
+        // Only toast once we have a baseline from a previous poll — otherwise every
+        // page load with pre-existing unread orders would pop a toast.
+        if (prevCount !== null && nextCount > prevCount) {
+          setOrderToast(notifCopy.newOrdersToast(nextCount - prevCount));
+        }
+        prevOrdersCountRef.current = nextCount;
       }
     } catch {
       // Backend unreachable — silently ignore
     }
-  }, []);
+  }, [notifCopy]);
 
   // Poll notifications + message unread count every 60s
   useEffect(() => {
@@ -1237,6 +1248,7 @@ export default function PolarisLayout({ children }) {
         topBar={topBarMarkup}
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
+        toastMarkup={orderToast ? <Toast content={orderToast} onDismiss={() => setOrderToast(null)} duration={6000} /> : null}
       >
         {isSuperuser ? <style>{SUPERUSER_NAV_ACCENT_CSS}</style> : null}
         {approvalBanner && (

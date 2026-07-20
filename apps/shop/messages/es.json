@@ -442,6 +442,7 @@
     "passwordTooShort": "La contraseña debe tener al menos 6 caracteres.",
     "legalConsentRequired": "Acepta los avisos legales.",
     "registerFailed": "El registro ha fallado. Inténtalo de nuevo.",
+    "emailAlreadyRegistered": "Ya existe una cuenta con este correo electrónico.",
     "registering": "Registrando…",
     "alreadyHaveAccount": "¿Ya tienes una cuenta?",
     "signInNow": "Inicia sesión ahora",
