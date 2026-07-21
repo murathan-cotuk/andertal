@@ -325,6 +325,20 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
         },
       },
       {
+        key: 'UNSUBSCRIBE_URL',
+        sample: 'https://shop.example.com/de/newsletter/unsubscribe?token=…',
+        category: 'shop',
+        triggers: ['*'],
+        desc: {
+          en: 'One-click newsletter unsubscribe link (tokenized; marks subscriber unsubscribed)',
+          de: 'Ein-Klick Newsletter-Abmeldung (Token; setzt Status auf abgemeldet)',
+          tr: 'Tek tıkla bülten abonelik iptali (token; status=unsubscribed)',
+          fr: 'Lien de désabonnement newsletter (token)',
+          it: 'Link disiscrizione newsletter (token)',
+          es: 'Enlace de baja del boletín (token)',
+        },
+      },
+      {
         key: 'LOGIN_URL',
         sample: 'https://shop.example.com/de/de/login',
         category: 'shop',
@@ -782,6 +796,8 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       'order_delivered',
       'review_request',
       'win_back',
+      'favorite_low_stock',
+      'favorite_price_drop',
     ])
     const mapFlowRow = (row) =>
       row

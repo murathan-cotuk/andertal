@@ -547,7 +547,13 @@
     "continueShopping": "Continuer vos achats"
   },
   "newsletter": {
-    "error": "Échec de l'inscription. Veuillez réessayer."
+    "error": "Échec de l'inscription. Veuillez réessayer.",
+    "unsubscribeTitle": "Se désabonner de la newsletter",
+    "unsubscribeSuccess": "Vous avez été désabonné(e) de la newsletter avec succès.",
+    "unsubscribeAlready": "Cet abonnement a déjà été annulé.",
+    "unsubscribeError": "Le lien est invalide ou expiré. Veuillez vous désabonner depuis votre compte.",
+    "unsubscribeLoading": "Traitement en cours…",
+    "backToShop": "Retour à la boutique"
   },
   "wishlist": {
     "title": "Liste de souhaits",

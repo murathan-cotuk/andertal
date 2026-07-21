@@ -547,7 +547,13 @@
     "continueShopping": "Seguir comprando"
   },
   "newsletter": {
-    "error": "Error al suscribirse. Inténtalo de nuevo."
+    "error": "Error al suscribirse. Inténtalo de nuevo.",
+    "unsubscribeTitle": "Cancelar suscripción al boletín",
+    "unsubscribeSuccess": "Te has dado de baja del boletín correctamente.",
+    "unsubscribeAlready": "Esta suscripción ya ha sido cancelada.",
+    "unsubscribeError": "El enlace no es válido o ha caducado. Cancela la suscripción desde tu cuenta.",
+    "unsubscribeLoading": "Procesando…",
+    "backToShop": "Volver a la tienda"
   },
   "wishlist": {
     "title": "Lista de deseos",

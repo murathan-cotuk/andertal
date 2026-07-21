@@ -34,7 +34,7 @@ try {
 
 const path = require('path')
 const fs = require('fs')
-const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent } = require('./src/flow-automation')
+const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent, runWinBackScan, runProductWishlistWatchers } = require('./src/flow-automation')
 const {
   applyEuOriginMetadataPolicy,
   registerEuOriginRoutes,
@@ -1087,6 +1087,65 @@ async function start() {
         await client.query(
           `CREATE INDEX IF NOT EXISTS idx_flow_snapshots_flow_ver ON admin_hub_flow_snapshots(flow_id, version_num DESC)`,
         ).catch(() => {})
+
+        // Seed new flow templates once (draft — a superuser reviews/translates/activates them
+        // under Content → Flows before they start sending): reorder reminder ('win_back'),
+        // favorited-product low-stock and price-drop nudges.
+        try {
+          const seedFlows = [
+            {
+              trigger_key: 'win_back',
+              name: 'Reorder Reminder',
+              i18n: {
+                en: { subject: "Time to restock? We miss you!", body: "<p>Hi {FIRST_NAME},</p><p>It's been a while since your last order at {SHOP_NAME} — we hope everything arrived well!</p><p>If you're ready to restock or discover something new, we'd love to have you back.</p><p><a href=\"{SHOP_HOME_URL}\">Browse the shop</a></p>" },
+                de: { subject: "Zeit zum Nachbestellen? Wir vermissen Sie!", body: "<p>Hallo {FIRST_NAME},</p><p>es ist eine Weile her seit Ihrer letzten Bestellung bei {SHOP_NAME} — wir hoffen, alles ist gut angekommen!</p><p>Wenn Sie nachbestellen oder etwas Neues entdecken möchten, freuen wir uns auf Sie.</p><p><a href=\"{SHOP_HOME_URL}\">Zum Shop</a></p>" },
+                tr: { subject: "Yeniden sipariş zamanı mı? Sizi özledik!", body: "<p>Merhaba {FIRST_NAME},</p><p>{SHOP_NAME}'daki son siparişinizin üzerinden bir süre geçti — umarız her şey sorunsuz ulaşmıştır!</p><p>Yeniden sipariş vermek veya yeni ürünler keşfetmek isterseniz sizi tekrar aramızda görmekten mutluluk duyarız.</p><p><a href=\"{SHOP_HOME_URL}\">Mağazaya göz atın</a></p>" },
+                fr: { subject: "Envie de recommander ? Vous nous manquez !", body: "<p>Bonjour {FIRST_NAME},</p><p>Cela fait un moment depuis votre dernière commande chez {SHOP_NAME} — nous espérons que tout est bien arrivé !</p><p>Si vous souhaitez recommander ou découvrir de nouveautés, nous serions ravis de vous revoir.</p><p><a href=\"{SHOP_HOME_URL}\">Parcourir la boutique</a></p>" },
+                it: { subject: "Tempo di riordinare? Ci manchi!", body: "<p>Ciao {FIRST_NAME},</p><p>è passato un po' dal tuo ultimo ordine su {SHOP_NAME} — speriamo sia arrivato tutto bene!</p><p>Se vuoi riordinare o scoprire qualcosa di nuovo, saremmo felici di riaverti tra noi.</p><p><a href=\"{SHOP_HOME_URL}\">Vai al negozio</a></p>" },
+                es: { subject: "¿Hora de volver a pedir? ¡Te echamos de menos!", body: "<p>Hola {FIRST_NAME},</p><p>ha pasado un tiempo desde tu último pedido en {SHOP_NAME} — ¡esperamos que todo llegara bien!</p><p>Si quieres volver a pedir o descubrir algo nuevo, nos encantaría verte de nuevo.</p><p><a href=\"{SHOP_HOME_URL}\">Ver la tienda</a></p>" },
+              },
+            },
+            {
+              trigger_key: 'favorite_low_stock',
+              name: 'Favorite Product Low Stock',
+              i18n: {
+                en: { subject: "Hurry — {PRODUCT_NAME} is almost sold out", body: "<p>Hi {FIRST_NAME},</p><p>A product on your wishlist is running low.</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong> — only {PRODUCT_STOCK} left in stock.</p><p><a href=\"{PRODUCT_URL}\">Get it before it's gone</a></p>" },
+                de: { subject: "Schnell sein — {PRODUCT_NAME} ist fast ausverkauft", body: "<p>Hallo {FIRST_NAME},</p><p>ein Produkt auf Ihrer Merkliste wird knapp.</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong> — nur noch {PRODUCT_STOCK} Stück auf Lager.</p><p><a href=\"{PRODUCT_URL}\">Jetzt sichern</a></p>" },
+                tr: { subject: "Acele edin — {PRODUCT_NAME} tükenmek üzere", body: "<p>Merhaba {FIRST_NAME},</p><p>favorilerinizdeki bir ürünün stoğu azalıyor.</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong> — stokta sadece {PRODUCT_STOCK} adet kaldı.</p><p><a href=\"{PRODUCT_URL}\">Tükenmeden edinin</a></p>" },
+                fr: { subject: "Dépêchez-vous — {PRODUCT_NAME} est presque épuisé", body: "<p>Bonjour {FIRST_NAME},</p><p>un produit de votre liste de souhaits se fait rare.</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong> — seulement {PRODUCT_STOCK} en stock.</p><p><a href=\"{PRODUCT_URL}\">À saisir avant rupture</a></p>" },
+                it: { subject: "Sbrigati — {PRODUCT_NAME} è quasi esaurito", body: "<p>Ciao {FIRST_NAME},</p><p>un prodotto nella tua wishlist sta finendo.</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong> — solo {PRODUCT_STOCK} rimasti in stock.</p><p><a href=\"{PRODUCT_URL}\">Prendilo prima che finisca</a></p>" },
+                es: { subject: "Date prisa — {PRODUCT_NAME} está casi agotado", body: "<p>Hola {FIRST_NAME},</p><p>un producto de tu lista de deseos se está agotando.</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong> — solo quedan {PRODUCT_STOCK} unidades.</p><p><a href=\"{PRODUCT_URL}\">Consíguelo antes de que se agote</a></p>" },
+              },
+            },
+            {
+              trigger_key: 'favorite_price_drop',
+              name: 'Favorite Product Price Drop',
+              i18n: {
+                en: { subject: "Price drop: {PRODUCT_NAME} is now cheaper!", body: "<p>Hi {FIRST_NAME},</p><p>A product on your wishlist just got cheaper!</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong><br/><span style=\"text-decoration:line-through;color:#9ca3af;\">{PRODUCT_OLD_PRICE}</span> &rarr; <strong>{PRODUCT_PRICE}</strong></p><p><a href=\"{PRODUCT_URL}\">Shop now</a></p>" },
+                de: { subject: "Preissenkung: {PRODUCT_NAME} ist jetzt günstiger!", body: "<p>Hallo {FIRST_NAME},</p><p>ein Produkt auf Ihrer Merkliste ist gerade günstiger geworden!</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong><br/><span style=\"text-decoration:line-through;color:#9ca3af;\">{PRODUCT_OLD_PRICE}</span> &rarr; <strong>{PRODUCT_PRICE}</strong></p><p><a href=\"{PRODUCT_URL}\">Jetzt ansehen</a></p>" },
+                tr: { subject: "Fiyat düştü: {PRODUCT_NAME} artık daha uygun!", body: "<p>Merhaba {FIRST_NAME},</p><p>favorilerinizdeki bir ürünün fiyatı az önce düştü!</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong><br/><span style=\"text-decoration:line-through;color:#9ca3af;\">{PRODUCT_OLD_PRICE}</span> &rarr; <strong>{PRODUCT_PRICE}</strong></p><p><a href=\"{PRODUCT_URL}\">Şimdi incele</a></p>" },
+                fr: { subject: "Baisse de prix : {PRODUCT_NAME} est maintenant moins cher !", body: "<p>Bonjour {FIRST_NAME},</p><p>un produit de votre liste de souhaits vient de baisser de prix !</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong><br/><span style=\"text-decoration:line-through;color:#9ca3af;\">{PRODUCT_OLD_PRICE}</span> &rarr; <strong>{PRODUCT_PRICE}</strong></p><p><a href=\"{PRODUCT_URL}\">Voir maintenant</a></p>" },
+                it: { subject: "Calo di prezzo: {PRODUCT_NAME} ora costa meno!", body: "<p>Ciao {FIRST_NAME},</p><p>un prodotto nella tua wishlist è appena diventato più economico!</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong><br/><span style=\"text-decoration:line-through;color:#9ca3af;\">{PRODUCT_OLD_PRICE}</span> &rarr; <strong>{PRODUCT_PRICE}</strong></p><p><a href=\"{PRODUCT_URL}\">Scopri ora</a></p>" },
+                es: { subject: "Bajada de precio: ¡{PRODUCT_NAME} ahora es más barato!", body: "<p>Hola {FIRST_NAME},</p><p>¡un producto de tu lista de deseos acaba de bajar de precio!</p>{PRODUCT_IMAGE_HTML}<p><strong>{PRODUCT_NAME}</strong><br/><span style=\"text-decoration:line-through;color:#9ca3af;\">{PRODUCT_OLD_PRICE}</span> &rarr; <strong>{PRODUCT_PRICE}</strong></p><p><a href=\"{PRODUCT_URL}\">Ver ahora</a></p>" },
+              },
+            },
+          ]
+          for (const f of seedFlows) {
+            const exists = await client.query(`SELECT id FROM admin_hub_flows WHERE trigger_key = $1 LIMIT 1`, [f.trigger_key])
+            if (exists.rows.length) continue
+            const ins = await client.query(
+              `INSERT INTO admin_hub_flows (name, trigger_key, status, audience) VALUES ($1, $2, 'draft', 'customer') RETURNING id`,
+              [f.name, f.trigger_key],
+            )
+            const flowId = ins.rows[0].id
+            const enTpl = f.i18n.en
+            await client.query(
+              `INSERT INTO admin_hub_flow_steps (flow_id, step_order, step_type, email_subject, email_body, email_i18n)
+               VALUES ($1::uuid, 1, 'send_email', $2, $3, $4::jsonb)`,
+              [flowId, enTpl.subject, enTpl.body, JSON.stringify(f.i18n)],
+            )
+          }
+        } catch (_) {}
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS iban text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS payment_account_holder text;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS payment_bic text;`).catch(() => {})
@@ -2474,6 +2533,15 @@ async function start() {
     await dbQ(`ALTER TABLE store_newsletter_subscribers ADD COLUMN IF NOT EXISTS preferred_locale varchar(8)`).catch(() => {})
     await dbQ(`ALTER TABLE store_newsletter_subscribers ADD COLUMN IF NOT EXISTS notes text`).catch(() => {})
     await dbQ(`ALTER TABLE store_newsletter_subscribers ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now()`).catch(() => {})
+    await dbQ(`CREATE TABLE IF NOT EXISTS store_newsletter_unsubscribe_tokens (
+      token      text PRIMARY KEY,
+      email      text NOT NULL,
+      locale     varchar(8) NOT NULL DEFAULT 'de',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      used       boolean NOT NULL DEFAULT false
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_unsub_tokens_email ON store_newsletter_unsubscribe_tokens(email)`).catch(() => {})
+
     await dbQ(`CREATE TABLE IF NOT EXISTS store_newsletter_email_logs (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       subscriber_id uuid REFERENCES store_newsletter_subscribers(id) ON DELETE SET NULL,
@@ -2544,6 +2612,19 @@ async function start() {
       computeRankingFeatures().catch(() => {})
       setInterval(() => computeRankingFeatures().catch(() => {}), 2 * 60 * 60 * 1000)
     }, 30 * 1000) // 30s delay after startup
+
+    // Win-back / reorder reminder (trigger 'win_back'): daily scan for lapsed customers.
+    setTimeout(() => {
+      runWinBackScan().catch(() => {})
+      setInterval(() => runWinBackScan().catch(() => {}), 24 * 60 * 60 * 1000)
+    }, 60 * 1000) // 60s delay after startup
+
+    // Wishlist watchers (triggers 'favorite_low_stock' / 'favorite_price_drop'): checked every
+    // 15 minutes so a price drop or low-stock crossing reaches favoriting customers promptly.
+    setTimeout(() => {
+      runProductWishlistWatchers().catch(() => {})
+      setInterval(() => runProductWishlistWatchers().catch(() => {}), 15 * 60 * 1000)
+    }, 45 * 1000) // 45s delay after startup
 
     startFlowQueueWorker({
       onOrderEvent: async (jobData) => {

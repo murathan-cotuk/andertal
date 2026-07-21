@@ -564,7 +564,13 @@
     "continueShopping": "Alışverişe devam et"
   },
   "newsletter": {
-    "error": "Abonelik başarısız. Lütfen tekrar deneyin."
+    "error": "Abonelik başarısız. Lütfen tekrar deneyin.",
+    "unsubscribeTitle": "Bülten aboneliğini iptal et",
+    "unsubscribeSuccess": "Bülten aboneliğiniz başarıyla iptal edildi.",
+    "unsubscribeAlready": "Bu abonelik zaten iptal edilmiş.",
+    "unsubscribeError": "Bağlantı geçersiz veya süresi dolmuş. Lütfen hesabınızdan aboneliği iptal edin.",
+    "unsubscribeLoading": "İşleniyor…",
+    "backToShop": "Mağazaya dön"
   },
   "wishlist": {
     "title": "İstek listesi",

@@ -5,195 +5,45 @@ import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getAutomationsCopy } from "@/lib/marketing-i18n";
 
-/* ─── Toggle switch ──────────────────────────────────────────── */
-function Toggle({ on, onChange, disabled }) {
+/* ─── Active flows table (read-only — flows are authored under Content → Flows) ── */
+function ActiveFlowsPanel({ copy, flows, loading }) {
+  const activeFlows = flows.filter((f) => f.status === "active");
   return (
-    <button
-      onClick={() => !disabled && onChange(!on)}
-      style={{
-        width: 46, height: 26, borderRadius: 13, padding: 0,
-        background: on ? "#10b981" : "#d1d5db",
-        border: "none", cursor: disabled ? "not-allowed" : "pointer",
-        position: "relative", transition: "background 0.2s", flexShrink: 0,
-        opacity: disabled ? 0.5 : 1,
-      }}
-      aria-checked={on}
-      role="switch"
-    >
-      <span style={{
-        position: "absolute", top: 3, left: on ? 23 : 3,
-        width: 20, height: 20, borderRadius: "50%", background: "#fff",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s",
-      }} />
-    </button>
-  );
-}
-
-/* ─── Config field renderer ──────────────────────────────────── */
-function ConfigField({ field, value, values, onChange }) {
-  const visible = !field.depends_on || values[field.depends_on];
-  if (!visible) return null;
-  const inputStyle = {
-    width: "100%", padding: "9px 12px", borderRadius: 8,
-    border: "1px solid #e2e8f0", fontSize: 13, color: "#0f172a",
-    background: "#fff", boxSizing: "border-box", outline: "none",
-    fontFamily: "inherit",
-  };
-  if (field.type === "toggle") return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>{field.label}</span>
-      <Toggle on={!!value} onChange={v => onChange(field.key, v)} />
-    </div>
-  );
-  if (field.type === "textarea") return (
-    <div>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.04em" }}>{field.label}</label>
-      <textarea
-        style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
-        value={value ?? ""}
-        onChange={e => onChange(field.key, e.target.value)}
-        placeholder={field.default || ""}
-      />
-    </div>
-  );
-  return (
-    <div>
-      <label style={{ fontSize: 12, fontWeight: 600, color: "#64748b", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.04em" }}>{field.label}</label>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <input
-          style={{ ...inputStyle, flex: 1 }}
-          type={field.type === "number" ? "number" : field.type === "email" ? "email" : "text"}
-          min={field.min} max={field.max}
-          value={value ?? (field.default ?? "")}
-          onChange={e => onChange(field.key, field.type === "number" ? Number(e.target.value) : e.target.value)}
-          placeholder={String(field.default ?? "")}
-        />
-        {field.suffix && <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{field.suffix}</span>}
+    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(15,23,42,0.05)", padding: "20px 22px", marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{copy.activeFlowsTitle}</h2>
+        <a
+          href="/content/flows"
+          style={{ fontSize: 12, fontWeight: 600, color: "#3b82f6", textDecoration: "none" }}
+        >
+          {copy.manageInFlows} →
+        </a>
       </div>
-    </div>
-  );
-}
-
-/* ─── Single automation card ─────────────────────────────────── */
-function AutomationCard({ def, copy, rule, stats, onSave, onToggle, saving }) {
-  const isActive = rule?.is_active ?? false;
-  const isComingSoon = def.status === "coming_soon";
-  const [open, setOpen] = useState(false);
-  const [localConfig, setLocalConfig] = useState(() => {
-    const base = {};
-    def.fields.forEach(f => { base[f.key] = f.default; });
-    return { ...base, ...(rule?.config || {}) };
-  });
-  const [dirty, setDirty] = useState(false);
-
-  const setField = (key, val) => {
-    setLocalConfig(c => ({ ...c, [key]: val }));
-    setDirty(true);
-  };
-
-  const handleSave = async () => {
-    await onSave(def.id, { is_active: isActive, config: localConfig });
-    setDirty(false);
-  };
-
-  const statCount = stats?.count ?? rule?.triggered_count ?? 0;
-
-  return (
-    <div style={{
-      background: "#fff", borderRadius: 14,
-      border: `1px solid ${open ? def.accentColor + "40" : "#e2e8f0"}`,
-      boxShadow: open ? `0 4px 24px ${def.accentColor}18` : "0 1px 4px rgba(15,23,42,0.05)",
-      transition: "all 0.2s", overflow: "hidden",
-    }}>
-      <div style={{ padding: "18px 20px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: 12,
-          background: def.accentBg, display: "flex", alignItems: "center",
-          justifyContent: "center", fontSize: 22, flexShrink: 0,
-        }}>
-          {def.emoji}
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{def.title}</span>
-            {isComingSoon && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#f1f5f9", color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                {copy.comingSoon}
-              </span>
-            )}
-            {!isComingSoon && isActive && (
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", letterSpacing: "0.05em" }}>
-                {copy.active}
-              </span>
-            )}
-          </div>
-          <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>{def.desc}</p>
-          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: 5,
-              fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
-              background: def.accentBg, color: def.accentColor,
-            }}>
-              ⚡ {def.trigger}
-            </span>
-            {statCount > 0 && (
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>
-                {statCount} {def.stat_label}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, flexShrink: 0 }}>
-          <Toggle on={isActive} onChange={v => !isComingSoon && onToggle(def.id, v)} disabled={isComingSoon} />
-          {!isComingSoon && def.fields.length > 0 && (
-            <button
-              onClick={() => setOpen(o => !o)}
-              style={{
-                fontSize: 11, fontWeight: 600, color: open ? def.accentColor : "#64748b",
-                background: "none", border: "none", cursor: "pointer", padding: 0,
-                textDecoration: open ? "none" : "underline",
-              }}
-            >
-              {open ? copy.close : copy.configure}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {open && def.fields.length > 0 && (
-        <div style={{ borderTop: `1px solid ${def.accentColor}30`, padding: "20px 20px", background: "#fafafa" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16, marginBottom: 16 }}>
-            {def.fields.map(field => (
-              <ConfigField
-                key={field.key}
-                field={field}
-                value={localConfig[field.key]}
-                values={localConfig}
-                onChange={setField}
-              />
+      {loading ? (
+        <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>{copy.loading}</div>
+      ) : activeFlows.length === 0 ? (
+        <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>{copy.noActiveFlows}</div>
+      ) : (
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
+              <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colName}</th>
+              <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colTrigger}</th>
+              <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colAudience}</th>
+              <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colSent}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeFlows.map((f) => (
+              <tr key={f.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <td style={{ padding: "10px 6px", color: "#0f172a", fontWeight: 600 }}>{f.name}</td>
+                <td style={{ padding: "10px 6px", color: "#475569", fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{f.trigger}</td>
+                <td style={{ padding: "10px 6px", color: "#64748b" }}>{f.audience === "seller" ? copy.audienceSeller : copy.audienceCustomer}</td>
+                <td style={{ padding: "10px 6px", color: "#64748b" }}>{f.sent_count ?? 0}</td>
+              </tr>
             ))}
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button onClick={() => { setOpen(false); setDirty(false); }} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 500 }}>
-              {copy.cancel}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !dirty}
-              style={{
-                padding: "8px 20px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600,
-                background: dirty ? def.accentColor : "#e5e7eb",
-                color: dirty ? "#fff" : "#9ca3af",
-                cursor: dirty && !saving ? "pointer" : "not-allowed",
-                transition: "all 0.15s",
-              }}
-            >
-              {saving ? copy.saving : copy.save}
-            </button>
-          </div>
-        </div>
+          </tbody>
+        </table>
       )}
     </div>
   );
@@ -478,57 +328,28 @@ function statusColor(st) {
 export default function MarketingAutomationsPage() {
   const locale = useLocale();
   const copy = useMemo(() => getAutomationsCopy(locale), [locale]);
-  const { categories, automationDefs } = copy;
 
-  const [rules, setRules] = useState({});
-  const [stats, setStats] = useState({});
+  const [flows, setFlows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(null);
   const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const data = await getMedusaAdminClient().request("/admin-hub/v1/automations");
-      const rulesMap = {};
-      for (const r of (data?.rules || [])) rulesMap[r.type] = r;
-      setRules(rulesMap);
-      const statsMap = {};
-      for (const s of (data?.stats || [])) statsMap[s.type] = s;
-      setStats(statsMap);
+      const data = await getMedusaAdminClient().getFlows();
+      setFlows(Array.isArray(data?.flows) ? data.flows : []);
     } catch (e) {
       setError(e?.message || copy.loadError);
+      setFlows([]);
     }
     setLoading(false);
   }, [copy.loadError]);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleSave = async (type, { is_active, config }) => {
-    setSaving(type);
-    setError(""); setSuccessMsg("");
-    try {
-      await getMedusaAdminClient().request(`/admin-hub/v1/automations/${type}`, {
-        method: "PUT",
-        body: JSON.stringify({ is_active, config }),
-      });
-      setRules(r => ({ ...r, [type]: { ...(r[type] || { type }), is_active, config } }));
-      setSuccessMsg(copy.savedSuccess);
-      setTimeout(() => setSuccessMsg(""), 2500);
-    } catch (e) {
-      setError(e?.message || copy.saveError);
-    }
-    setSaving(null);
-  };
-
-  const handleToggle = async (type, val) => {
-    const existing = rules[type];
-    await handleSave(type, { is_active: val, config: existing?.config || {} });
-  };
-
-  const activeCount = Object.values(rules).filter(r => r.is_active).length;
-  const totalTriggered = Object.values(stats).reduce((s, v) => s + (v?.count || 0), 0);
+  const activeCount = flows.filter((f) => f.status === "active").length;
+  const totalSent = flows.reduce((s, f) => s + (f.sent_count || 0), 0);
   const dateLoc = copy.dateLocale;
 
   return (
@@ -551,18 +372,12 @@ export default function MarketingAutomationsPage() {
                 {copy.pageSubtitle}
               </p>
             </div>
-            {successMsg && (
-              <div style={{ padding: "8px 16px", borderRadius: 8, background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", color: "#6ee7b7", fontSize: 13, fontWeight: 600 }}>
-                {successMsg}
-              </div>
-            )}
           </div>
 
           <div style={{ display: "flex", gap: 24, marginTop: 24, flexWrap: "wrap" }}>
             {[
               { label: copy.statActiveFlows, value: loading ? "—" : activeCount, color: "#6ee7b7" },
-              { label: copy.statTriggered, value: loading ? "—" : totalTriggered.toLocaleString(dateLoc), color: "#93c5fd" },
-              { label: copy.statAvailable, value: automationDefs.filter(d => d.status === "live").length, color: "#c4b5fd" },
+              { label: copy.statTriggered, value: loading ? "—" : totalSent.toLocaleString(dateLoc), color: "#93c5fd" },
             ].map(s => (
               <div key={s.label}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: "-0.5px" }}>{s.value}</div>
@@ -580,43 +395,7 @@ export default function MarketingAutomationsPage() {
           </div>
         )}
 
-        {loading ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[1,2,3,4].map(i => (
-              <div key={i} style={{ height: 96, borderRadius: 14, background: "#e2e8f0", animation: "pulse 1.5s ease-in-out infinite" }} />
-            ))}
-          </div>
-        ) : (
-          categories.map(cat => {
-            const defs = automationDefs.filter(d => d.category === cat.id);
-            return (
-              <div key={cat.id} style={{ marginBottom: 36 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                  <div style={{ width: 3, height: 20, borderRadius: 2, background: cat.color }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    {cat.icon} {cat.label}
-                  </span>
-                  <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {defs.map(def => (
-                    <AutomationCard
-                      key={def.id}
-                      def={def}
-                      copy={copy}
-                      rule={rules[def.id]}
-                      stats={stats[def.id]}
-                      onSave={handleSave}
-                      onToggle={handleToggle}
-                      saving={saving === def.id}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })
-        )}
+        <ActiveFlowsPanel copy={copy} flows={flows} loading={loading} />
 
         <FlowExecutionLogPanel copy={copy} />
 
@@ -625,13 +404,6 @@ export default function MarketingAutomationsPage() {
           {" "}{copy.howItWorksBody}
         </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
     </div>
   );
 }

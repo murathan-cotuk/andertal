@@ -547,7 +547,13 @@
     "continueShopping": "Continua gli acquisti"
   },
   "newsletter": {
-    "error": "Iscrizione fallita. Riprova."
+    "error": "Iscrizione fallita. Riprova.",
+    "unsubscribeTitle": "Annulla iscrizione alla newsletter",
+    "unsubscribeSuccess": "Sei stato/a disiscritto/a dalla newsletter con successo.",
+    "unsubscribeAlready": "Questa iscrizione è già stata annullata.",
+    "unsubscribeError": "Il link non è valido o è scaduto. Annulla l'iscrizione dal tuo account.",
+    "unsubscribeLoading": "Elaborazione in corso…",
+    "backToShop": "Torna al negozio"
   },
   "wishlist": {
     "title": "Lista desideri",

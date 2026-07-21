@@ -143,6 +143,7 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/sellers-menu",
   "/sellers",
   "/customers/newsletter",
+  "/marketing/automations",
   "/content/menus",
   "/content/categories",
   "/content/landing-page",
@@ -285,6 +286,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/marketing/campaigns", label: tx("campaigns", "Campaigns") },
         { url: "/marketing/attribution", label: tx("attribution", "Attribution") },
+        { url: "/marketing/automations", label: tx("automations", "Automations"), superuserOnly: true },
       ],
     },
     {

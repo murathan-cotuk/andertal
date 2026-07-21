@@ -192,7 +192,7 @@ async function getSmtpTransport(client) {
   })
 }
 
-function buildFlowStepIdempotencyKey({ triggerKey, flowId, stepOrder, audience, recipientEmail, orderId, customerId }) {
+function buildFlowStepIdempotencyKey({ triggerKey, flowId, stepOrder, audience, recipientEmail, orderId, customerId, dedupeKey }) {
   const raw = [
     String(triggerKey || '').trim().toLowerCase(),
     String(flowId || '').trim().toLowerCase(),
@@ -201,6 +201,10 @@ function buildFlowStepIdempotencyKey({ triggerKey, flowId, stepOrder, audience, 
     String(recipientEmail || '').trim().toLowerCase(),
     String(orderId || '').trim().toLowerCase(),
     String(customerId || '').trim().toLowerCase(),
+    // Extra dedup dimension for customer-only events tied to a specific product (favorite_low_stock,
+    // favorite_price_drop) — without this, every product would collapse onto the same idempotency key
+    // (orderId is always '' for these) and only the first-ever product alert for a customer would send.
+    String(dedupeKey || '').trim().toLowerCase(),
   ].join('|')
   return crypto.createHash('sha256').update(raw).digest('hex')
 }
@@ -499,7 +503,7 @@ async function placeholderVarsCustomerOnly(client, cust) {
   const siteUrl = resolvePublicShopBaseUrl() || dbStorefrontUrl
   const { market, lang, prefix } = storefrontPathPrefixFromShippingCountry(cust.country)
   const absPath = (p) => absoluteStorefrontUrl(siteUrl, p)
-  return {
+  const vars = {
     CUSTOMER_NAME: fullName,
     CUSTOMER: fullName,
     FIRST_NAME: fn || fullName,
@@ -550,8 +554,18 @@ async function placeholderVarsCustomerOnly(client, cust) {
     REGISTER_URL: absPath(`${prefix}/register`),
     ORDER_UUID: '',
     ORDER_ITEMS_HTML: '',
+    UNSUBSCRIBE_URL: '',
     ...salutationVarsFromGender(cust.gender),
   }
+  // Generate a real unsubscribe token when we have a DB client
+  try {
+    const { generateUnsubscribeUrl } = require('./routes/newsletter')
+    const email = String(cust.email || '').trim().toLowerCase()
+    if (email && client) {
+      vars.UNSUBSCRIBE_URL = await generateUnsubscribeUrl(client, email, lang, siteUrl)
+    }
+  } catch (_) {}
+  return vars
 }
 
 /**
@@ -575,7 +589,17 @@ async function buildFlowEmailPlaceholderVarsForCustomer(client, customerId) {
 
   if (ordR.rows[0]) {
     const ctx = await loadOrderContext(client, ordR.rows[0].id)
-    if (ctx) return buildPlaceholderVars(ctx, '*', cust)
+    if (ctx) {
+      const vars = buildPlaceholderVars(ctx, '*', cust)
+      try {
+        const { generateUnsubscribeUrl } = require('./routes/newsletter')
+        const email = String(cust.email || '').trim().toLowerCase()
+        const locale = String(vars.STOREFRONT_LOCALE || 'de').trim()
+        const base = String(vars.SITE_URL || '').trim()
+        if (email) vars.UNSUBSCRIBE_URL = await generateUnsubscribeUrl(client, email, locale, base)
+      } catch (_) {}
+      return vars
+    }
   }
 
   return placeholderVarsCustomerOnly(client, cust)
@@ -597,6 +621,7 @@ async function sendImmediateStepsForFlow({
   placeholderVars,
   orderId,
   customerId,
+  dedupeKey,
 }) {
   const { buildFlowEmailPdfAttachments } = require('./order-pdf-buffers')
   let idx = 0
@@ -627,6 +652,7 @@ async function sendImmediateStepsForFlow({
       recipientEmail: toEmail,
       orderId,
       customerId,
+      dedupeKey,
     })
     const reserved = await reserveFlowExecutionLog(client, {
       triggerKey,
@@ -637,7 +663,7 @@ async function sendImmediateStepsForFlow({
       orderId,
       customerId,
       idempotencyKey,
-      metadata: { templateLocale, step_type: s.step_type, channel: 'email' },
+      metadata: { templateLocale, step_type: s.step_type, channel: 'email', dedupe_key: dedupeKey || undefined },
     })
     if (reserved && reserved.attempts > 1 && reserved.status === 'sent') {
       logger.info(
@@ -819,6 +845,19 @@ async function runAutomationFlowsForOrder(opts) {
     const customerLocale = FLOW_EMAIL_LOCALES.includes(orderLocaleRaw)
       ? orderLocaleRaw
       : resolveEmailLocaleFromCountry(ctx.order.country)
+    // Inject unsubscribe URL token for this recipient
+    try {
+      const { generateUnsubscribeUrl } = require('./routes/newsletter')
+      const recipientEmail = String(ctx.order.email || '').trim().toLowerCase()
+      if (recipientEmail) {
+        placeholderVars.UNSUBSCRIBE_URL = await generateUnsubscribeUrl(
+          client,
+          recipientEmail,
+          customerLocale,
+          String(placeholderVars.SITE_URL || '').trim(),
+        )
+      }
+    } catch (_) {}
     const rateScopeKey = String(ctx.order.seller_id || 'default').trim() || 'default'
 
     const flowsR = await client.query(
@@ -964,11 +1003,43 @@ async function runAutomationFlowsForCustomerEvent(opts) {
     }
 
     const vars = await placeholderVarsCustomerOnly(client, cust)
+    // Overlay product context for wishlist-triggered events (favorite_low_stock, favorite_price_drop) —
+    // placeholderVarsCustomerOnly() has no order to pull PRODUCT_* fields from, so the caller passes
+    // the specific product the customer favorited.
+    if (opts.product) {
+      const p = opts.product
+      const { prefix } = storefrontPathPrefixFromShippingCountry(cust.country || '')
+      const productUrl = p.handle ? absoluteStorefrontUrl(vars.SITE_URL, `${prefix}/produkt/${encodeURIComponent(p.handle)}`) : vars.PRODUCT_URL
+      vars.PRODUCT = p.title || vars.PRODUCT
+      vars.PRODUCT_NAME = p.title || vars.PRODUCT_NAME
+      vars.PRODUCT_IMAGE = p.image || vars.PRODUCT_IMAGE
+      vars.PRODUCT_IMAGE_HTML = p.image
+        ? `<img src="${p.image}" alt="${String(p.title || '').replace(/"/g, '&quot;')}" style="max-width:200px;width:100%;height:auto;display:block;border-radius:6px;" />`
+        : vars.PRODUCT_IMAGE_HTML
+      vars.PRODUCT_URL = productUrl
+      vars.PRODUCT_PRICE = p.price_cents != null ? formatEuro(p.price_cents) : ''
+      vars.PRODUCT_OLD_PRICE = p.old_price_cents != null ? formatEuro(p.old_price_cents) : ''
+      vars.PRODUCT_STOCK = p.stock != null ? String(p.stock) : ''
+    }
     // Prefer the UI language the customer was actually using (passed by the caller, e.g.
     // register/newsletter forms) over guessing from their shipping country — a German
     // speaker with a non-DE delivery country would otherwise get an English signup email.
     const requestedLocale = String(opts.locale || '').trim().toLowerCase()
     const locale = FLOW_EMAIL_LOCALES.includes(requestedLocale) ? requestedLocale : resolveEmailLocaleFromCountry(cust.country || '')
+    // Rebuild unsubscribe URL with the actual email locale (preferred_locale from signup), not country guess
+    try {
+      const { generateUnsubscribeUrl } = require('./routes/newsletter')
+      const to = String(cust.email || fallbackEmail || '').trim().toLowerCase()
+      if (to) {
+        vars.UNSUBSCRIBE_URL = await generateUnsubscribeUrl(
+          client,
+          to,
+          locale,
+          String(vars.SITE_URL || '').trim(),
+        )
+        vars.STOREFRONT_LOCALE = locale
+      }
+    } catch (_) {}
     const toEmail = String(cust.email || fallbackEmail || '').trim()
     if (!toEmail) return
 
@@ -1002,6 +1073,7 @@ async function runAutomationFlowsForCustomerEvent(opts) {
         placeholderVars: vars,
         orderId: '',
         customerId: cust.id ? String(cust.id) : '',
+        dedupeKey: opts.dedupeKey || '',
       })
       total += n
     }
@@ -1019,6 +1091,143 @@ async function runAutomationFlowsForCustomerEvent(opts) {
   }
 }
 
+/**
+ * Win-back / reorder reminder (trigger_key 'win_back'): finds customers whose most recent order
+ * was placed at least REORDER_REMINDER_DAYS ago with no order since, and nudges them to come
+ * back. Runs periodically (see server.js) — sending is one-shot per customer (idempotency key
+ * has no time dimension), so this is a gentle single reminder rather than a recurring nag.
+ */
+const REORDER_REMINDER_DAYS = 30
+async function runWinBackScan() {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(
+      `SELECT o.customer_id, MAX(o.created_at) AS last_order_at
+       FROM store_orders o
+       WHERE o.customer_id IS NOT NULL AND o.order_status != 'storniert'
+       GROUP BY o.customer_id
+       HAVING MAX(o.created_at) <= now() - ($1::int * interval '1 day')
+       LIMIT 200`,
+      [REORDER_REMINDER_DAYS],
+    )
+    await client.end()
+    for (const row of (r.rows || [])) {
+      await runAutomationFlowsForCustomerEvent({ triggerKey: 'win_back', customerId: row.customer_id }).catch((e) =>
+        logger.warn('[flow-automation] win_back failed', e?.message || e),
+      )
+    }
+  } catch (e) {
+    logger.error('[flow-automation] win_back scan failed', e?.message || e)
+    if (client) {
+      try {
+        await client.end()
+      } catch (_) {}
+    }
+  }
+}
+
+/**
+ * Wishlist watchers (trigger_keys 'favorite_low_stock' / 'favorite_price_drop'): compares each
+ * favorited product's current price/inventory against the last-seen snapshot and notifies every
+ * customer who favorited it. Runs periodically instead of hooking every product-write path
+ * (manual edit, CSV import, per-seller listings, campaigns can all change price/inventory).
+ */
+const LOW_STOCK_THRESHOLD = 10
+async function runProductWishlistWatchers() {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    await client
+      .query(
+        `CREATE TABLE IF NOT EXISTS store_product_watch_state (
+           product_id uuid PRIMARY KEY,
+           last_price_cents integer,
+           last_inventory integer,
+           updated_at timestamptz NOT NULL DEFAULT now()
+         )`,
+      )
+      .catch(() => {})
+
+    const r = await client.query(`
+      SELECT p.id, p.title, p.handle, p.price_cents, p.inventory, p.metadata,
+             w.last_price_cents, w.last_inventory
+      FROM admin_hub_products p
+      JOIN (SELECT DISTINCT product_id FROM store_customer_wishlist) fw ON fw.product_id = p.id
+      LEFT JOIN store_product_watch_state w ON w.product_id = p.id
+      WHERE p.status = 'published'
+    `)
+
+    for (const row of r.rows || []) {
+      const productId = String(row.id)
+      const price = row.price_cents != null ? Number(row.price_cents) : null
+      const inv = row.inventory != null ? Number(row.inventory) : null
+      const hadSnapshot = row.last_price_cents != null || row.last_inventory != null
+
+      if (hadSnapshot) {
+        const crossedLowStock =
+          inv != null && inv < LOW_STOCK_THRESHOLD && (row.last_inventory == null || row.last_inventory >= LOW_STOCK_THRESHOLD)
+        const priceDropped = price != null && row.last_price_cents != null && price < row.last_price_cents
+
+        if (crossedLowStock || priceDropped) {
+          let meta = row.metadata
+          if (meta != null && typeof meta === 'string') {
+            try {
+              meta = JSON.parse(meta)
+            } catch (_) {
+              meta = null
+            }
+          }
+          const media = meta && meta.media
+          const image = Array.isArray(media) && media[0] ? (typeof media[0] === 'string' ? media[0] : media[0].url) : typeof media === 'string' ? media : null
+          const product = { title: row.title, handle: row.handle, image, price_cents: price, stock: inv }
+
+          const wl = await client.query(`SELECT customer_id FROM store_customer_wishlist WHERE product_id = $1::uuid`, [productId])
+          for (const wrow of wl.rows || []) {
+            if (crossedLowStock) {
+              await runAutomationFlowsForCustomerEvent({
+                triggerKey: 'favorite_low_stock',
+                customerId: wrow.customer_id,
+                product,
+                dedupeKey: productId,
+              }).catch((e) => logger.warn('[flow-automation] favorite_low_stock failed', e?.message || e))
+            }
+            if (priceDropped) {
+              await runAutomationFlowsForCustomerEvent({
+                triggerKey: 'favorite_price_drop',
+                customerId: wrow.customer_id,
+                product: { ...product, old_price_cents: row.last_price_cents },
+                dedupeKey: `${productId}:${price}`,
+              }).catch((e) => logger.warn('[flow-automation] favorite_price_drop failed', e?.message || e))
+            }
+          }
+        }
+      }
+
+      await client.query(
+        `INSERT INTO store_product_watch_state (product_id, last_price_cents, last_inventory, updated_at)
+         VALUES ($1::uuid, $2, $3, now())
+         ON CONFLICT (product_id) DO UPDATE SET last_price_cents = $2, last_inventory = $3, updated_at = now()`,
+        [productId, price, inv],
+      )
+    }
+    await client.end()
+  } catch (e) {
+    logger.error('[flow-automation] wishlist watchers failed', e?.message || e)
+    if (client) {
+      try {
+        await client.end()
+      } catch (_) {}
+    }
+  }
+}
+
 module.exports = {
   runAutomationFlowsForOrder,
   runAutomationFlowsForCustomerEvent,
@@ -1026,4 +1235,6 @@ module.exports = {
   FLOW_EMAIL_LOCALES,
   buildFlowEmailPlaceholderVarsForCustomer,
   resolveSmtpSenderIdentity,
+  runWinBackScan,
+  runProductWishlistWatchers,
 }

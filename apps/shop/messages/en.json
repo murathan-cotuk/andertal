@@ -564,7 +564,13 @@
     "continueShopping": "Continue shopping"
   },
   "newsletter": {
-    "error": "Subscription failed. Please try again."
+    "error": "Subscription failed. Please try again.",
+    "unsubscribeTitle": "Unsubscribe from newsletter",
+    "unsubscribeSuccess": "You have been successfully unsubscribed from the newsletter.",
+    "unsubscribeAlready": "This subscription has already been cancelled.",
+    "unsubscribeError": "The link is invalid or has expired. Please unsubscribe from your account.",
+    "unsubscribeLoading": "Processing…",
+    "backToShop": "Back to shop"
   },
   "wishlist": {
     "title": "Wishlist",

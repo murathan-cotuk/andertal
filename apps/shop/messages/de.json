@@ -564,7 +564,13 @@
     "continueShopping": "Weiter einkaufen"
   },
   "newsletter": {
-    "error": "Fehler beim Anmelden. Bitte erneut versuchen."
+    "error": "Fehler beim Anmelden. Bitte erneut versuchen.",
+    "unsubscribeTitle": "Newsletter abbestellen",
+    "unsubscribeSuccess": "Ihr Newsletter-Abonnement wurde erfolgreich beendet.",
+    "unsubscribeAlready": "Dieses Abonnement wurde bereits gekündigt.",
+    "unsubscribeError": "Der Link ist ungültig oder abgelaufen. Bitte melden Sie sich in Ihrem Konto ab.",
+    "unsubscribeLoading": "Wird verarbeitet…",
+    "backToShop": "Zurück zum Shop"
   },
   "wishlist": {
     "title": "Merkzettel",
