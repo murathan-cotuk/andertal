@@ -48,6 +48,9 @@ function CustomerReviewsPage() {
   const [sort, setSort] = useState({ col: "created_at", dir: "desc" });
   const [isSuperuser, setIsSuperuser] = useState(false);
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
+  const [mySellerId, setMySellerId] = useState("");
+  useEffect(() => { setMySellerId(localStorage.getItem("sellerId") || ""); }, []);
+  const [sellerSectionOpen, setSellerSectionOpen] = useState({});
 
   useEffect(() => {
     getMedusaAdminClient()
@@ -93,6 +96,33 @@ function CustomerReviewsPage() {
     return list;
   }, [reviews, search, filterRating, sort, isSuperuser]);
 
+  // Superuser view: platform's own reviews (unassigned / own account) always on top,
+  // followed by each other seller's reviews grouped into collapsible sections.
+  const isOwnSellerReview = (r, sid) => {
+    const s = String(r?.seller_id ?? "default").trim();
+    if (!s || s === "default") return true;
+    return s === String(sid || "").trim();
+  };
+  const { ownReviews, sellerReviewGroups } = useMemo(() => {
+    if (!isSuperuser) return { ownReviews: filtered, sellerReviewGroups: [] };
+    const own = [];
+    const g = new Map();
+    for (const r of filtered) {
+      if (isOwnSellerReview(r, mySellerId)) own.push(r);
+      else {
+        const sid = String(r.seller_id || "unknown");
+        if (!g.has(sid)) g.set(sid, []);
+        g.get(sid).push(r);
+      }
+    }
+    const keys = [...g.keys()].sort((a, b) => {
+      const la = g.get(a)[0]?.seller_store_name || a;
+      const lb = g.get(b)[0]?.seller_store_name || b;
+      return String(la).localeCompare(String(lb), undefined, { sensitivity: "base" });
+    });
+    return { ownReviews: own, sellerReviewGroups: keys.map((k) => ({ sellerId: k, items: g.get(k) })) };
+  }, [filtered, isSuperuser, mySellerId]);
+
   const avgRating = stats?.avg != null ? Number(stats.avg).toFixed(1) : (reviews.length ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length).toFixed(1) : "—");
 
   const ratingDist = [5, 4, 3, 2, 1].map((n) => {
@@ -118,6 +148,60 @@ function CustomerReviewsPage() {
     { label: lt("Comment", "Yorum", "Commentaire", "Comentario", "Commento", "Kommentar"), col: "comment" },
     { label: lt("Date", "Tarih", "Date", "Fecha", "Data", "Datum"), col: "created_at" },
   ];
+
+  const renderReviewRow = (r, key) => (
+    <tr
+      key={key}
+      style={{ borderBottom: "1px solid #f3f4f6" }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#fafafa")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "")}
+    >
+      <td style={{ padding: "10px 12px", minWidth: 180 }}>
+        {r.customer_id ? (
+          <button
+            onClick={() => router.push(`/${routeLocale}/customers/${r.customer_id}`)}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+          >
+            {r.customer_number && (
+              <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>#{r.customer_number}</div>
+            )}
+            <div style={{ fontWeight: 600, color: "#111827", textDecoration: "underline", fontSize: 13 }}>
+              {r.customer_name || (isSuperuser ? r.customer_email : null) || "—"}
+            </div>
+          </button>
+        ) : (
+          <div>
+            <div style={{ fontWeight: 600, color: "#111827" }}>{r.customer_name || (isSuperuser ? r.customer_email : null) || "—"}</div>
+          </div>
+        )}
+      </td>
+
+      <td style={{ padding: "10px 12px", minWidth: 160 }}>
+        {r.product_sku && (
+          <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, monospace", marginBottom: 2 }}>{r.product_sku}</div>
+        )}
+        <div style={{ color: "#374151" }}>{r.product_title || r.product_id || "—"}</div>
+      </td>
+
+      {isSuperuser && (
+        <td style={{ padding: "10px 12px", minWidth: 120 }}>
+          <span style={{ fontSize: 12, color: "#6b7280" }}>{r.seller_store_name || r.seller_id || "—"}</span>
+        </td>
+      )}
+
+      <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+        <Stars rating={r.rating} />
+      </td>
+
+      <td style={{ padding: "10px 12px", color: "#6b7280", maxWidth: 400 }}>
+        {r.comment || <span style={{ color: "#d1d5db" }}>—</span>}
+      </td>
+
+      <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, whiteSpace: "nowrap" }}>
+        {fmtDate(r.created_at)}
+      </td>
+    </tr>
+  );
 
   return (
     <div style={{ padding: 24, background: "#fff", minHeight: "100%" }}>
@@ -233,59 +317,50 @@ function CustomerReviewsPage() {
                 </td>
               </tr>
             )}
-            {filtered.map((r, i) => (
-              <tr
-                key={i}
-                style={{ borderBottom: "1px solid #f3f4f6" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#fafafa")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "")}
-              >
-                <td style={{ padding: "10px 12px", minWidth: 180 }}>
-                  {r.customer_id ? (
-                    <button
-                      onClick={() => router.push(`/${routeLocale}/customers/${r.customer_id}`)}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
-                    >
-                      {r.customer_number && (
-                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>#{r.customer_number}</div>
-                      )}
-                      <div style={{ fontWeight: 600, color: "#111827", textDecoration: "underline", fontSize: 13 }}>
-                        {r.customer_name || (isSuperuser ? r.customer_email : null) || "—"}
-                      </div>
-                    </button>
-                  ) : (
-                    <div>
-                      <div style={{ fontWeight: 600, color: "#111827" }}>{r.customer_name || (isSuperuser ? r.customer_email : null) || "—"}</div>
-                    </div>
-                  )}
-                </td>
-
-                <td style={{ padding: "10px 12px", minWidth: 160 }}>
-                  {r.product_sku && (
-                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, monospace", marginBottom: 2 }}>{r.product_sku}</div>
-                  )}
-                  <div style={{ color: "#374151" }}>{r.product_title || r.product_id || "—"}</div>
-                </td>
-
-                {isSuperuser && (
-                  <td style={{ padding: "10px 12px", minWidth: 120 }}>
-                    <span style={{ fontSize: 12, color: "#6b7280" }}>{r.seller_store_name || r.seller_id || "—"}</span>
-                  </td>
-                )}
-
-                <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                  <Stars rating={r.rating} />
-                </td>
-
-                <td style={{ padding: "10px 12px", color: "#6b7280", maxWidth: 400 }}>
-                  {r.comment || <span style={{ color: "#d1d5db" }}>—</span>}
-                </td>
-
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, whiteSpace: "nowrap" }}>
-                  {fmtDate(r.created_at)}
+            {isSuperuser && (
+              <tr>
+                <td colSpan={columns.length} style={{ padding: "10px 20px", background: "#eff6ff", borderBottom: "1px solid #bfdbfe", fontWeight: 700, fontSize: 12, color: "#1e40af", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {lt("Your superuser area — own account reviews and unassigned", "Süper kullanıcı alanınız — kendi hesap değerlendirmeleri ve atanmamış", "Votre espace superutilisateur — avis du compte propre et non attribués", "Su área de superusuario — reseñas de la cuenta propia y sin asignar", "La tua area superuser — recensioni dell'account proprio e non assegnate", "Ihr Superuser-Bereich — eigene Konto-Bewertungen und ohne Verkäufer-Zuordnung")} ({ownReviews.length})
                 </td>
               </tr>
-            ))}
+            )}
+            {(isSuperuser ? ownReviews : filtered).map((r, i) => renderReviewRow(r, i))}
+            {isSuperuser && (
+              <>
+                <tr>
+                  <td colSpan={columns.length} style={{ padding: "10px 20px", background: "#f3f4f6", borderBottom: "1px solid #e5e7eb", borderTop: "1px solid #e5e7eb", fontWeight: 700, fontSize: 12, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {lt("Seller reviews", "Satıcı değerlendirmeleri", "Avis des vendeurs", "Reseñas de vendedores", "Recensioni dei venditori", "Verkäufer-Bewertungen")}
+                  </td>
+                </tr>
+                {sellerReviewGroups.length === 0 ? (
+                  <tr>
+                    <td colSpan={columns.length} style={{ padding: "16px 20px", color: "#9ca3af", fontSize: 13 }}>
+                      {lt("No seller reviews", "Satıcı değerlendirmesi yok", "Aucun avis de vendeur", "Sin reseñas de vendedores", "Nessuna recensione dei venditori", "Keine Verkäufer-Bewertungen")}
+                    </td>
+                  </tr>
+                ) : (
+                  sellerReviewGroups.flatMap(({ sellerId, items }) => {
+                    const label = items[0]?.seller_store_name || sellerId;
+                    const open = sellerSectionOpen[sellerId] !== false;
+                    const headerRow = (
+                      <tr key={`h-${sellerId}`}>
+                        <td colSpan={columns.length} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
+                            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", background: "none", border: "none", cursor: "pointer", font: "inherit", textAlign: "left" }}
+                          >
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
+                            <span style={{ fontSize: 13, color: "#6b7280" }}>{open ? "▾" : "▸"} {reviewCountLabel(items.length)}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                    return open ? [headerRow, ...items.map((r, i) => renderReviewRow(r, `${sellerId}-${i}`))] : [headerRow];
+                  })
+                )}
+              </>
+            )}
           </tbody>
         </table>
       </div>

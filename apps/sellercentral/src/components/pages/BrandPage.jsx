@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import {
@@ -21,7 +21,7 @@ import { titleToHandle } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
-import { getBrandPageCopy } from "@/lib/brand-page-i18n";
+import { getBrandPageCopy, getBrandAuthorizationsPageCopy } from "@/lib/brand-page-i18n";
 import { userError } from "@/lib/api-error-messages";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
 
@@ -34,6 +34,8 @@ const EMPTY_FORM = {
   brand_type: "own", trademark_number: "", trademark_jurisdiction: "",
 };
 
+const BRANDS_PAGE_SIZE = 100; // 4 per row x 25 rows
+
 // Brand status/verification badge (docs/BRAND.md)
 function BrandStatusBadge({ brand, copy }) {
   if (brand.status === "pending") return <Badge tone="attention">{copy.statusPending}</Badge>;
@@ -44,8 +46,8 @@ function BrandStatusBadge({ brand, copy }) {
   return null;
 }
 
-// ── Brand card (display only) ──────────────────────────────────────────────
-function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, copy }) {
+// ── Brand card (grid tile) ─────────────────────────────────────────────────
+function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, isMine, copy }) {
   const resolveUrl = (url) => {
     if (!url) return "";
     if (url.startsWith("http") || url.startsWith("data:")) return url;
@@ -55,36 +57,97 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, copy }) {
   const bannerSrc = brand.banner_image ? resolveUrl(brand.banner_image) : null;
 
   return (
-    <Card padding="400">
-      {bannerSrc && (
-        <div style={{ marginBottom: 12, borderRadius: 6, overflow: "hidden", height: 60 }}>
-          <img src={bannerSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        </div>
-      )}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, width: "100%" }}>
-        <div style={{ width: 48, height: 48, borderRadius: "50%", overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", border: "1px solid #e5e7eb", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {logoSrc ? (
-            <img src={logoSrc} alt={brand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <Text as="span" variant="bodyMd" tone="subdued">—</Text>
-          )}
-        </div>
-        <BlockStack gap="050">
-          <InlineStack gap="150" blockAlign="center">
-            <Text as="p" variant="bodyMd" fontWeight="semibold">{brand.name}</Text>
-            <BrandStatusBadge brand={brand} copy={copy} />
-          </InlineStack>
-          {brand.handle && <Text as="p" variant="bodySm" tone="subdued">{brand.handle}</Text>}
-          {brand.address && <Text as="p" variant="bodySm" tone="subdued">{brand.address}</Text>}
-        </BlockStack>
-        {canEdit && (
-          <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-            <Button size="slim" variant="secondary" onClick={() => onEdit(brand)}>
-              {isSuperuser ? copy.edit : copy.logoBanner}
-            </Button>
+    <Card padding="300">
+      <BlockStack gap="200">
+        {bannerSrc && (
+          <div style={{ borderRadius: 6, overflow: "hidden", height: 56 }}>
+            <img src={bannerSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           </div>
         )}
-      </div>
+        <InlineStack gap="200" blockAlign="center" wrap={false}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", border: "1px solid #e5e7eb", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {logoSrc ? (
+              <img src={logoSrc} alt={brand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <Text as="span" variant="bodyMd" tone="subdued">—</Text>
+            )}
+          </div>
+          <BlockStack gap="050">
+            <Text as="p" variant="bodyMd" fontWeight="semibold" truncate>{brand.name}</Text>
+            {brand.handle && <Text as="p" variant="bodySm" tone="subdued" truncate>{brand.handle}</Text>}
+          </BlockStack>
+        </InlineStack>
+
+        <InlineStack gap="150" wrap>
+          <BrandStatusBadge brand={brand} copy={copy} />
+          {isMine && <Badge tone="info">{copy.myBrands}</Badge>}
+        </InlineStack>
+
+        {canEdit && (
+          <Button size="slim" variant="secondary" fullWidth onClick={() => onEdit(brand)}>
+            {isSuperuser ? copy.edit : copy.logoBanner}
+          </Button>
+        )}
+      </BlockStack>
+    </Card>
+  );
+}
+
+// ── Pending authorization card (full-width review row) ─────────────────────
+function PendingBrandCard({ brand, authCopy, baseUrl, onApprove, onReject, busy }) {
+  const resolveUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http") || url.startsWith("data:")) return url;
+    return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+  const isReseller = brand.brand_type === "authorized_reseller";
+
+  return (
+    <Card padding="400">
+      <BlockStack gap="300">
+        <InlineStack align="space-between" blockAlign="center">
+          <BlockStack gap="050">
+            <InlineStack gap="150" blockAlign="center">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">{brand.name}</Text>
+              <Badge tone="attention">{isReseller ? authCopy.typeReseller : authCopy.typeRegistered}</Badge>
+            </InlineStack>
+            <Text as="p" variant="bodySm" tone="subdued">{authCopy.seller}: {brand.seller_name || brand.seller_id}</Text>
+            {brand.created_at && (
+              <Text as="p" variant="bodySm" tone="subdued">{authCopy.submittedOn}: {new Date(brand.created_at).toLocaleString()}</Text>
+            )}
+          </BlockStack>
+          <InlineStack gap="200">
+            <Button size="slim" tone="critical" onClick={() => onReject(brand)} disabled={busy}>{authCopy.reject}</Button>
+            <Button size="slim" variant="primary" onClick={() => onApprove(brand)} loading={busy}>{authCopy.approve}</Button>
+          </InlineStack>
+        </InlineStack>
+
+        {!isReseller && (brand.trademark_number || brand.trademark_jurisdiction) && (
+          <Text as="p" variant="bodySm">
+            {authCopy.trademark}: {brand.trademark_number || "—"} ({brand.trademark_jurisdiction || "—"})
+          </Text>
+        )}
+
+        <Divider />
+
+        <BlockStack gap="150">
+          <Text as="p" variant="bodySm" fontWeight="medium">{authCopy.documents}</Text>
+          {(!brand.documents || brand.documents.length === 0) ? (
+            <Text as="p" variant="bodySm" tone="subdued">{authCopy.noDocuments}</Text>
+          ) : (
+            <BlockStack gap="100">
+              {brand.documents.map((doc) => (
+                <InlineStack key={doc.id} gap="200" blockAlign="center">
+                  <Text as="span" variant="bodySm">{doc.document_type}{doc.file_name ? ` — ${doc.file_name}` : ""}</Text>
+                  <Button size="slim" variant="plain" url={resolveUrl(doc.file_url)} target="_blank">
+                    {authCopy.viewDocument}
+                  </Button>
+                </InlineStack>
+              ))}
+            </BlockStack>
+          )}
+        </BlockStack>
+      </BlockStack>
     </Card>
   );
 }
@@ -119,7 +182,66 @@ export default function BrandPage() {
   const [authFile, setAuthFile] = useState(null); // { url, name } once uploaded
   const [authFileUploading, setAuthFileUploading] = useState(false);
   const [reuploading, setReuploading] = useState(false);
+  const [page, setPage] = useState(1);
   const copy = getBrandPageCopy(locale, isSuperuser);
+  const authCopy = getBrandAuthorizationsPageCopy(locale);
+
+  // ── Pending authorizations (superuser review queue — merged in from the old
+  // standalone /content/brands/authorizations page) ───────────────────────
+  const [pendingBrands, setPendingBrands] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
+  const [authBusyId, setAuthBusyId] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null); // brand or null
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
+
+  const loadPending = () => {
+    if (!isSuperuser) { setPendingLoading(false); return; }
+    setPendingLoading(true);
+    client.getPendingBrandAuthorizations()
+      .then((r) => setPendingBrands(r.brands || []))
+      .catch(() => setPendingBrands([]))
+      .finally(() => setPendingLoading(false));
+  };
+
+  useEffect(() => { loadPending(); }, [isSuperuser]);
+
+  const handleApprove = async (brand) => {
+    setAuthBusyId(brand.id);
+    setMessage({ type: "", text: "" });
+    try {
+      await client.approveBrandAuthorization(brand.id);
+      setMessage({ type: "success", text: authCopy.approved });
+      loadPending();
+      loadBrands();
+    } catch (e) {
+      setMessage({ type: "error", text: userError(e, locale, authCopy.actionError) });
+    } finally {
+      setAuthBusyId(null);
+    }
+  };
+
+  const openReject = (brand) => {
+    setRejectTarget(brand);
+    setRejectReason("");
+  };
+
+  const confirmReject = async () => {
+    if (!rejectTarget) return;
+    setRejecting(true);
+    setMessage({ type: "", text: "" });
+    try {
+      await client.rejectBrandAuthorization(rejectTarget.id, rejectReason.trim());
+      setMessage({ type: "success", text: authCopy.rejected });
+      setRejectTarget(null);
+      loadPending();
+      loadBrands();
+    } catch (e) {
+      setMessage({ type: "error", text: userError(e, locale, authCopy.actionError) });
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   const handleAuthFileSelect = async (e) => {
     const file = e.target.files?.[0];
@@ -173,9 +295,13 @@ export default function BrandPage() {
 
   useEffect(() => { loadBrands(); }, []);
 
-  // Split brands: mine vs others
+  // Split brands: mine vs others, then flatten into one paginated grid (mine first)
   const myBrands = brands.filter((b) => b.seller_id && b.seller_id === callerId);
   const otherBrands = brands.filter((b) => !b.seller_id || b.seller_id !== callerId);
+  const allBrandsOrdered = [...myBrands, ...otherBrands];
+  const totalPages = Math.max(1, Math.ceil(allBrandsOrdered.length / BRANDS_PAGE_SIZE));
+  const pageSafe = Math.min(Math.max(1, page), totalPages);
+  const pagedBrands = allBrandsOrdered.slice((pageSafe - 1) * BRANDS_PAGE_SIZE, pageSafe * BRANDS_PAGE_SIZE);
 
   const openCreate = () => {
     setEditingBrand(null);
@@ -324,88 +450,86 @@ export default function BrandPage() {
           </Banner>
         )}
 
-        {loading ? (
+        {/* ── PENDING AUTHORIZATIONS (superuser only, always on top) ───────── */}
+        {isSuperuser && (
           <Card>
-            <Box padding="800">
-              <Text as="p" tone="subdued">{copy.loading}</Text>
-            </Box>
-          </Card>
-        ) : (
-          <>
-            {/* ── MY BRANDS ─────────────────────────────────────────────── */}
-            <Card>
-              <BlockStack gap="400">
-                <InlineStack gap="200" blockAlign="center">
-                  <Text as="h2" variant="headingMd">{copy.myBrands}</Text>
-                  {myBrands.length > 0 && <Badge>{myBrands.length}</Badge>}
-                </InlineStack>
-
-                {myBrands.length === 0 ? (
-                  <Box padding="600" background="bg-surface-secondary" borderRadius="200">
-                    <BlockStack gap="100">
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">{copy.noBrandsYet}</Text>
-                      <Text as="p" tone="subdued">{copy.noBrandsHelp}</Text>
-                    </BlockStack>
-                  </Box>
-                ) : (
-                  <BlockStack gap="300">
-                    {myBrands.map((brand) => (
-                      <BrandCard
-                        key={brand.id}
-                        brand={brand}
-                        baseUrl={baseUrl}
-                        onEdit={openEdit}
-                        canEdit
-                        isSuperuser={isSuperuser}
-                        copy={copy}
-                      />
-                    ))}
-                  </BlockStack>
-                )}
+            <BlockStack gap="400">
+              <BlockStack gap="050">
+                <Text as="h2" variant="headingMd">{authCopy.title}</Text>
+                <Text as="p" variant="bodySm" tone="subdued">{authCopy.subtitle}</Text>
               </BlockStack>
-            </Card>
 
-            {/* ── ALL OTHER BRANDS ──────────────────────────────────────── */}
-            {(otherBrands.length > 0 || isSuperuser) && (
-              <Card>
-                <BlockStack gap="400">
-                  <InlineStack gap="200" blockAlign="center">
-                    <Text as="h2" variant="headingMd">
-                      {copy.allBrands}
-                    </Text>
-                    {otherBrands.length > 0 && <Badge tone="info">{otherBrands.length}</Badge>}
-                  </InlineStack>
-
-                  {!isSuperuser && (
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {copy.othersReadonly}
-                    </Text>
-                  )}
-
-                  {otherBrands.length === 0 ? (
-                    <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                      <Text as="p" tone="subdued">{copy.noOtherBrands}</Text>
-                    </Box>
-                  ) : (
-                    <BlockStack gap="300">
-                      {otherBrands.map((brand) => (
-                        <BrandCard
-                          key={brand.id}
-                          brand={brand}
-                          baseUrl={baseUrl}
-                          onEdit={openEdit}
-                          canEdit={isSuperuser}
-                          isSuperuser={isSuperuser}
-                          copy={copy}
-                        />
-                      ))}
-                    </BlockStack>
-                  )}
+              {pendingLoading ? (
+                <Text as="p" tone="subdued">{authCopy.loading}</Text>
+              ) : pendingBrands.length === 0 ? (
+                <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                  <Text as="p" tone="subdued">{authCopy.empty}</Text>
+                </Box>
+              ) : (
+                <BlockStack gap="300">
+                  {pendingBrands.map((brand) => (
+                    <PendingBrandCard
+                      key={brand.id}
+                      brand={brand}
+                      authCopy={authCopy}
+                      baseUrl={baseUrl}
+                      onApprove={handleApprove}
+                      onReject={openReject}
+                      busy={authBusyId === brand.id}
+                    />
+                  ))}
                 </BlockStack>
-              </Card>
-            )}
-          </>
+              )}
+            </BlockStack>
+          </Card>
         )}
+
+        {/* ── ALL BRANDS (paginated grid: 4 per row, 100 per page) ─────────── */}
+        <Card>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="center">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">{copy.title}</Text>
+                {allBrandsOrdered.length > 0 && <Badge tone="info">{allBrandsOrdered.length}</Badge>}
+              </InlineStack>
+              {totalPages > 1 && (
+                <InlineStack gap="200" blockAlign="center">
+                  <Button size="slim" disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)}>‹</Button>
+                  <Text as="span" variant="bodySm" tone="subdued">{pageSafe} / {totalPages}</Text>
+                  <Button size="slim" disabled={pageSafe >= totalPages} onClick={() => setPage(pageSafe + 1)}>›</Button>
+                </InlineStack>
+              )}
+            </InlineStack>
+
+            {loading ? (
+              <Box padding="800">
+                <Text as="p" tone="subdued">{copy.loading}</Text>
+              </Box>
+            ) : allBrandsOrdered.length === 0 ? (
+              <Box padding="600" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">{copy.noBrandsYet}</Text>
+                  <Text as="p" tone="subdued">{copy.noBrandsHelp}</Text>
+                </BlockStack>
+              </Box>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
+                {pagedBrands.map((brand) => (
+                  <BrandCard
+                    key={brand.id}
+                    brand={brand}
+                    baseUrl={baseUrl}
+                    onEdit={openEdit}
+                    canEdit={canEditBrand(brand)}
+                    isSuperuser={isSuperuser}
+                    isMine={!!brand.seller_id && brand.seller_id === callerId}
+                    copy={copy}
+                  />
+                ))}
+              </div>
+            )}
+          </BlockStack>
+        </Card>
       </BlockStack>
 
       {/* ── Create / Edit modal ─────────────────────────────────────────── */}
@@ -596,6 +720,25 @@ export default function BrandPage() {
               />
             )}
           </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      {/* ── Reject pending authorization modal ───────────────────────────── */}
+      <Modal
+        open={!!rejectTarget}
+        onClose={() => setRejectTarget(null)}
+        title={rejectTarget ? `${authCopy.confirmReject}: ${rejectTarget.name}` : authCopy.confirmReject}
+        primaryAction={{ content: authCopy.reject, onAction: confirmReject, loading: rejecting, destructive: true }}
+        secondaryActions={[{ content: authCopy.cancel, onAction: () => setRejectTarget(null) }]}
+      >
+        <Modal.Section>
+          <TextField
+            label={authCopy.rejectReasonLabel}
+            value={rejectReason}
+            onChange={setRejectReason}
+            multiline={3}
+            autoComplete="off"
+          />
         </Modal.Section>
       </Modal>
 

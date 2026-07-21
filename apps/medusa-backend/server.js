@@ -706,6 +706,10 @@ async function start() {
           );
         `)
         await client.query('CREATE INDEX IF NOT EXISTS idx_store_cart_items_cart_id ON store_cart_items(cart_id);')
+        // Soft-delete flag: removing an item from a cart now keeps the row (removed_at set)
+        // instead of hard-deleting it, so abandoned-checkout reporting can tell "items removed
+        // from cart" apart from "cart still has these items" instead of losing that history.
+        await client.query('ALTER TABLE store_cart_items ADD COLUMN IF NOT EXISTS removed_at timestamptz').catch(() => {})
 
         // Orders (Stripe checkout sonrası)
         await client.query(`

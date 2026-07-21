@@ -26,5 +26,13 @@ export function getAbandonedCheckoutsCopy(locale) {
     noCheckouts: t("No abandoned checkouts", "Yarim kalan siparis yok", "Aucun checkout abandonne", "No hay checkouts abandonados", "Nessun checkout abbandonato", "Keine abgebrochenen Checkouts"),
     itemCount: (count) => t(`${count} items`, `${count} urun`, `${count} articles`, `${count} articulos`, `${count} articoli`, `${count} Artikel`),
     email: t("Email", "E-posta", "E-mail", "Correo", "E-mail", "E-Mail"),
+    status: t("Status", "Durum", "Statut", "Estado", "Stato", "Status"),
+    statusInCart: t("Still in cart", "Hala sepette", "Toujours dans le panier", "Todavia en el carrito", "Ancora nel carrello", "Noch im Warenkorb"),
+    statusPurchased: t("Purchased", "Satin alindi", "Achete", "Comprado", "Acquistato", "Gekauft"),
+    statusDeleted: t("Removed from cart", "Sepetten silindi", "Retire du panier", "Eliminado del carrito", "Rimosso dal carrello", "Aus Warenkorb entfernt"),
+    tabAll: t("All", "Tumu", "Tous", "Todos", "Tutti", "Alle"),
+    tabInCart: t("In cart", "Sepettekiler", "Dans le panier", "En el carrito", "Nel carrello", "Im Warenkorb"),
+    tabPurchased: t("Purchased", "Satin alinanlar", "Achetes", "Comprados", "Acquistati", "Gekauft"),
+    tabDeleted: t("Deleted", "Silinenler", "Supprimes", "Eliminados", "Eliminati", "Geloscht"),
   };
 }

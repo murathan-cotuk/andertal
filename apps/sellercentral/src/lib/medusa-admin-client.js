@@ -1101,7 +1101,10 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/notifications/delete', { method: 'POST', body: JSON.stringify(payload) })
   }
   async getNewsletterSubscribers(params = {}) {
-    const qs = new URLSearchParams(params).toString()
+    // URLSearchParams stringifies `undefined` values as the literal text "undefined",
+    // which the backend then treats as a real search term (matches nothing) — strip them first.
+    const clean = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+    const qs = new URLSearchParams(clean).toString()
     return this.request(`/admin-hub/v1/newsletter-subscribers${qs ? `?${qs}` : ''}`)
   }
   async getNewsletterSubscriber(id) {

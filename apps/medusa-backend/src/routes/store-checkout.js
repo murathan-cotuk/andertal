@@ -527,7 +527,7 @@ const getCartWithItems = async (client, cartId) => {
      LEFT JOIN admin_hub_products p1 ON p1.id::text = ci.product_id
      LEFT JOIN admin_hub_products p2 ON p1.id IS NULL AND p2.handle = ci.product_handle
      LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = COALESCE(NULLIF(TRIM(ci.seller_id), ''), p1.seller_id, p2.seller_id)
-     WHERE ci.cart_id = $1 ORDER BY ci.created_at`,
+     WHERE ci.cart_id = $1 AND ci.removed_at IS NULL ORDER BY ci.created_at`,
     [cartId]
   )
   const bestsellerIds = await getBestsellerProductIds().catch(() => new Set())
@@ -774,7 +774,7 @@ const storeCartLineItemsPOST = async (req, res) => {
     const handle = product.handle || product.id
     const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
     if (!cartExists.rows || !cartExists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
-    const existing = await client.query('SELECT id, quantity FROM store_cart_items WHERE cart_id = $1 AND variant_id = $2', [cartId, variantId])
+    const existing = await client.query('SELECT id, quantity FROM store_cart_items WHERE cart_id = $1 AND variant_id = $2 AND removed_at IS NULL', [cartId, variantId])
     if (existing.rows && existing.rows[0]) {
       const newQty = (existing.rows[0].quantity || 0) + quantity
       await client.query('UPDATE store_cart_items SET quantity = $1, seller_id = COALESCE($2, seller_id), updated_at = now() WHERE id = $3', [newQty, chosenSellerId, existing.rows[0].id])
@@ -785,6 +785,23 @@ const storeCartLineItemsPOST = async (req, res) => {
       )
     }
     await clearCartBonusReserve(client, cartId)
+    // Backfill customer identity onto the cart as soon as we know it (logged-in add-to-cart),
+    // instead of only capturing it once the shopper reaches the checkout form — a cart that's
+    // abandoned before checkout would otherwise show up with a blank Kunde/E-Mail forever.
+    const authHeader = req.headers.authorization || ''
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+    const customerPayload = bearerToken ? verifyCustomerToken(bearerToken) : null
+    if (customerPayload?.id) {
+      await client.query(
+        `UPDATE store_carts SET
+           email = COALESCE(NULLIF(email, ''), (SELECT email FROM store_customers WHERE id = $1::uuid)),
+           first_name = COALESCE(NULLIF(first_name, ''), (SELECT first_name FROM store_customers WHERE id = $1::uuid)),
+           last_name = COALESCE(NULLIF(last_name, ''), (SELECT last_name FROM store_customers WHERE id = $1::uuid)),
+           updated_at = now()
+         WHERE id = $2`,
+        [customerPayload.id, cartId]
+      ).catch(() => {})
+    }
     const cart = await syncCartCouponDiscountFromLines(client, cartId)
     await client.end()
     res.json({ cart })
@@ -807,9 +824,11 @@ const storeCartLineItemPATCH = async (req, res) => {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
     if (quantity === 0) {
-      await client.query('DELETE FROM store_cart_items WHERE cart_id = $1 AND id = $2', [cartId, lineId])
+      // Soft-delete (removed_at) instead of a hard DELETE, so abandoned-checkout reporting can
+      // still tell "customer removed this item" apart from "item is still in the cart".
+      await client.query('UPDATE store_cart_items SET removed_at = now(), updated_at = now() WHERE cart_id = $1 AND id = $2 AND removed_at IS NULL', [cartId, lineId])
     } else {
-      const up = await client.query('UPDATE store_cart_items SET quantity = $1, updated_at = now() WHERE cart_id = $2 AND id = $3 RETURNING id', [quantity, cartId, lineId])
+      const up = await client.query('UPDATE store_cart_items SET quantity = $1, updated_at = now() WHERE cart_id = $2 AND id = $3 AND removed_at IS NULL RETURNING id', [quantity, cartId, lineId])
       if (!up.rows || !up.rows[0]) { await client.end(); return res.status(404).json({ message: 'Line item not found' }) }
     }
     await clearCartBonusReserve(client, cartId)
@@ -833,7 +852,7 @@ const storeCartLineItemDELETE = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const del = await client.query('DELETE FROM store_cart_items WHERE cart_id = $1 AND id = $2 RETURNING id', [cartId, lineId])
+    const del = await client.query('UPDATE store_cart_items SET removed_at = now(), updated_at = now() WHERE cart_id = $1 AND id = $2 AND removed_at IS NULL RETURNING id', [cartId, lineId])
     if (!del.rows || !del.rows[0]) { await client.end(); return res.status(404).json({ message: 'Line item not found' }) }
     await clearCartBonusReserve(client, cartId)
     const cart = await syncCartCouponDiscountFromLines(client, cartId)
@@ -860,7 +879,7 @@ const storeCartClearDELETE = async (req, res) => {
     // Ensure cart exists
     const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
     if (!cartExists.rows || !cartExists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
-    await client.query('DELETE FROM store_cart_items WHERE cart_id = $1', [cartId])
+    await client.query('UPDATE store_cart_items SET removed_at = now(), updated_at = now() WHERE cart_id = $1 AND removed_at IS NULL', [cartId])
     await clearCartBonusReserve(client, cartId)
     const cart = await syncCartCouponDiscountFromLines(client, cartId)
     await client.end()

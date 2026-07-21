@@ -305,7 +305,6 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/content/menus", label: tx("menus", "Menus"), superuserOnly: true },
         { url: "/content/categories", label: tx("categories", "Categories"), superuserOnly: true },
         { url: "/content/brands", label: tx("brands", "Brands") },
-        { url: "/content/brands/authorizations", label: tx("brandAuthorizations", "Brand Authorizations"), superuserOnly: true },
         { url: "/content/metaobjects", label: tx("metaobjects", "Metaobjects") },
         { url: "/content/landing-page", label: tx("landingPage", "Landing Page"), superuserOnly: true },
         { url: "/content/styles", label: tx("styles", "Styles"), superuserOnly: true },

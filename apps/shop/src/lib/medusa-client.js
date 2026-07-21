@@ -162,11 +162,16 @@ class MedusaClient {
     return res
   }
 
-  async addToCart(cartId, variantId, quantity = 1, sellerId = null) {
+  async addToCart(cartId, variantId, quantity = 1, sellerId = null, authToken = null) {
     const body = { variant_id: variantId, quantity }
     if (sellerId) body.seller_id = sellerId
+    const headers = {}
+    // Lets the backend backfill Kunde/E-Mail onto the cart for logged-in shoppers as soon as
+    // they add an item, instead of only once they reach the checkout form (see abandoned checkouts).
+    if (authToken) headers.Authorization = `Bearer ${authToken}`
     const res = await this.requestShopApi(`/api/store-carts/${encodeURIComponent(cartId)}/line-items`, {
       method: 'POST',
+      headers,
       body: JSON.stringify(body),
     })
     if (res?.__error) return { cart: null, __error: true, status: res.status }

@@ -1,5 +1,26 @@
 'use strict'
 const { Router } = require('express')
+const { runAutomationFlowsForOrder } = require('../flow-automation')
+const { enqueueFlowEvent } = require('../flow-queue')
+
+// Dispatches order-related automation flow triggers via the queue, falling back to immediate execution.
+// (Mirrors the helper in orders.js — kept separate since these two route files aren't shared modules.)
+const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
+  const tk = String(triggerKey || '').trim()
+  const oid = String(orderId || '').trim()
+  if (!tk || !oid) return
+  try {
+    const queued = await enqueueFlowEvent('order-flow-event', { triggerKey: tk, orderId: oid })
+    if (queued) return
+  } catch (qe) {
+    console.warn('[flow-queue] enqueue order event failed, fallback immediate:', qe?.message || qe)
+  }
+  setImmediate(() => {
+    runAutomationFlowsForOrder({ triggerKey: tk, orderId: oid }).catch((fe) => {
+      console.warn(`runAutomationFlowsForOrder ${tk}:`, fe?.message || fe)
+    })
+  })
+}
 
 module.exports = function createShipmentTrackingRouter({
   logSellerError,
@@ -86,14 +107,18 @@ module.exports = function createShipmentTrackingRouter({
           [id, status, description || null, location || null, event_time ? new Date(event_time).toISOString() : new Date().toISOString()]
         )
         const event = evRes.rows[0]
+        let firedTrigger = null
         if (status === 'zugestellt') {
-          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          const upd = await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
           await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
+          if (upd.rowCount > 0) firedTrigger = 'order_delivered'
         } else if (status === 'versendet') {
-          await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
+          const upd = await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
+          if (upd.rowCount > 0) firedTrigger = 'order_shipped'
         }
         await client.end()
         res.json({ event })
+        if (firedTrigger) void dispatchOrderFlowEvent(firedTrigger, id)
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -407,15 +432,19 @@ module.exports = function createShipmentTrackingRouter({
         }
         const mostRecentEvent = newEvents[newEvents.length - 1]
         const mostRecentStatus = mostRecentEvent?.status
+        let firedTrigger = null
         if (mostRecentStatus === 'zugestellt') {
-          await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          const upd = await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
           await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
+          if (upd.rowCount > 0) firedTrigger = 'order_delivered'
         } else if (mostRecentStatus === 'versendet' || mostRecentStatus === 'in_transit') {
-          await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
+          const upd = await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
+          if (upd.rowCount > 0) firedTrigger = 'order_shipped'
         }
         const allEvents = await client.query('SELECT * FROM store_shipment_events WHERE order_id=$1::uuid ORDER BY event_time ASC, created_at ASC', [id])
         await client.end()
         res.json({ events: allEvents.rows || [], inserted, trackingUrl: buildTrackingUrl(order.carrier_name, trackingNumber, carrierRow.tracking_url_template) })
+        if (firedTrigger) void dispatchOrderFlowEvent(firedTrigger, id)
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -716,12 +745,13 @@ module.exports = function createShipmentTrackingRouter({
         const trackingNumber = parcel.tracking_number || ''
         const labelUrl = parcel.label?.label_printer || parcel.label?.normal_printer || ''
         const carrierName = meta.carrier || meta.service_name || 'Sendcloud'
-        await client.query(
-          `UPDATE store_orders SET tracking_number=$1, carrier_name=$2, sendcloud_label_url=$3, delivery_status='versendet', shipped_at=COALESCE(shipped_at,now()), updated_at=now() WHERE id=$4::uuid`,
+        const updRes = await client.query(
+          `UPDATE store_orders SET tracking_number=$1, carrier_name=$2, sendcloud_label_url=$3, delivery_status='versendet', shipped_at=COALESCE(shipped_at,now()), updated_at=now() WHERE id=$4::uuid AND delivery_status NOT IN ('versendet','zugestellt')`,
           [trackingNumber, carrierName, labelUrl, orderId]
         )
         await client.end()
         res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName })
+        if (updRes.rowCount > 0) void dispatchOrderFlowEvent('order_shipped', orderId)
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         return respondSellerSystemError(req, res, {

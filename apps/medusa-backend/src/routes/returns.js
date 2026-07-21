@@ -9,22 +9,33 @@ const adminHubAbandonedCartsGET = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    // Carts that have items but no corresponding order
+    // Every cart that ever had an item added — including ones that later converted to an order
+    // (status: purchased) or had all their items removed (status: deleted) — so the sellercentral
+    // page can show all three states instead of only "still sitting in the cart".
     const r = await client.query(`
       SELECT c.id, c.created_at, c.updated_at,
         c.email, c.first_name, c.last_name, c.phone,
-        json_agg(json_build_object('id',ci.id,'title',ci.title,'quantity',ci.quantity,'unit_price_cents',ci.unit_price_cents,'thumbnail',ci.thumbnail,'product_handle',ci.product_handle)) as items,
-        COUNT(ci.id)::int as item_count,
-        SUM(ci.unit_price_cents * ci.quantity) as cart_total
+        COALESCE(
+          json_agg(json_build_object('id',ci.id,'title',ci.title,'quantity',ci.quantity,'unit_price_cents',ci.unit_price_cents,'thumbnail',ci.thumbnail,'product_handle',ci.product_handle))
+            FILTER (WHERE ci.id IS NOT NULL AND ci.removed_at IS NULL),
+          '[]'
+        ) as items,
+        COUNT(ci.id) FILTER (WHERE ci.removed_at IS NULL)::int as item_count,
+        COALESCE(SUM(ci.unit_price_cents * ci.quantity) FILTER (WHERE ci.removed_at IS NULL), 0) as cart_total,
+        o.id as order_id
       FROM store_carts c
       JOIN store_cart_items ci ON ci.cart_id = c.id
-      WHERE NOT EXISTS (SELECT 1 FROM store_orders o WHERE o.cart_id = c.id)
-      GROUP BY c.id, c.created_at, c.updated_at, c.email, c.first_name, c.last_name, c.phone
+      LEFT JOIN store_orders o ON o.cart_id = c.id
+      GROUP BY c.id, c.created_at, c.updated_at, c.email, c.first_name, c.last_name, c.phone, o.id
       ORDER BY c.updated_at DESC
-      LIMIT 100
+      LIMIT 500
     `)
+    const carts = (r.rows || []).map((row) => ({
+      ...row,
+      status: row.order_id ? 'purchased' : (Number(row.item_count) > 0 ? 'in_cart' : 'deleted'),
+    }))
     await client.end()
-    res.json({ carts: r.rows || [] })
+    res.json({ carts })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     res.json({ carts: [] })

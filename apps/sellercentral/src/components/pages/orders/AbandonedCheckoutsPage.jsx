@@ -19,12 +19,28 @@ function fmtCents(c, locale) {
   return (Number(c || 0) / 100).toLocaleString(loc, { minimumFractionDigits: 2 }) + " €";
 }
 
+const STATUS_STYLE = {
+  in_cart: { bg: "#eff6ff", color: "#1d4ed8" },
+  purchased: { bg: "#f0fdf4", color: "#15803d" },
+  deleted: { bg: "#fef2f2", color: "#b91c1c" },
+};
+
+function StatusBadge({ status, copy }) {
+  const label = status === "purchased" ? copy.statusPurchased : status === "deleted" ? copy.statusDeleted : copy.statusInCart;
+  const s = STATUS_STYLE[status] || STATUS_STYLE.in_cart;
+  return (
+    <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
+      {label}
+    </span>
+  );
+}
+
 function ExpandedCart({ cart, locale }) {
   const c = getAbandonedCheckoutsCopy(locale);
   const items = cart.items || [];
   return (
     <tr>
-      <td colSpan={7} style={{ padding: 0, background: "#f9fafb" }}>
+      <td colSpan={8} style={{ padding: 0, background: "#f9fafb" }}>
         <div style={{ padding: "12px 24px 16px", borderBottom: "1px solid #e5e7eb" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
@@ -68,6 +84,7 @@ export default function AbandonedCheckoutsPage() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
   const [isSuperuser, setIsSuperuser] = useState(false);
+  const [tab, setTab] = useState("all");
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
   useEffect(() => {
@@ -82,7 +99,21 @@ export default function AbandonedCheckoutsPage() {
     })();
   }, []);
 
-  const COLS = ["", c.customer, c.email, c.items, c.value, c.created, c.lastActive];
+  const COLS = ["", c.customer, c.email, c.items, c.value, c.created, c.lastActive, c.status];
+
+  const counts = {
+    all: carts.length,
+    in_cart: carts.filter((cart) => cart.status === "in_cart").length,
+    purchased: carts.filter((cart) => cart.status === "purchased").length,
+    deleted: carts.filter((cart) => cart.status === "deleted").length,
+  };
+  const TABS = [
+    { key: "all", label: c.tabAll },
+    { key: "in_cart", label: c.tabInCart },
+    { key: "purchased", label: c.tabPurchased },
+    { key: "deleted", label: c.tabDeleted },
+  ];
+  const filteredCarts = tab === "all" ? carts : carts.filter((cart) => cart.status === tab);
 
   return (
     <div style={{ padding: 24 }}>
@@ -91,7 +122,28 @@ export default function AbandonedCheckoutsPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{c.pageTitle}</h1>
           <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{c.pageSubtitle}</p>
         </div>
-        <span style={{ fontSize: 13, color: "#6b7280" }}>{carts.length} {c.carts}</span>
+        <span style={{ fontSize: 13, color: "#6b7280" }}>{filteredCarts.length} {c.carts}</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 8,
+              border: tab === t.key ? "1px solid #2563eb" : "1px solid #e5e7eb",
+              background: tab === t.key ? "#eff6ff" : "#fff",
+              color: tab === t.key ? "#1d4ed8" : "#374151",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            {t.label} ({counts[t.key]})
+          </button>
+        ))}
       </div>
 
       <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "auto" }}>
@@ -107,17 +159,17 @@ export default function AbandonedCheckoutsPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
+              <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
             )}
-            {!loading && carts.length === 0 && (
+            {!loading && filteredCarts.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
+                <td colSpan={8} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🛒</div>
                   <div>{c.noCheckouts}</div>
                 </td>
               </tr>
             )}
-            {carts.map((cart) => (
+            {filteredCarts.map((cart) => (
               <React.Fragment key={cart.id}>
                 <tr
                   style={{ borderBottom: "1px solid #f3f4f6" }}
@@ -144,6 +196,9 @@ export default function AbandonedCheckoutsPage() {
                   </td>
                   <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280" }}>{fmtDate(cart.created_at, locale)}</td>
                   <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280" }}>{fmtDate(cart.updated_at, locale)}</td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <StatusBadge status={cart.status} copy={c} />
+                  </td>
                 </tr>
                 {expanded[cart.id] && <ExpandedCart cart={cart} locale={locale} />}
               </React.Fragment>

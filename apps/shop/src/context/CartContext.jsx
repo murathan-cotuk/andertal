@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useLocale } from "next-intl";
+import { getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 
 const CART_ID_KEY = "andertal_cart_id";
@@ -92,14 +93,15 @@ export function CartProvider({ children }) {
         c = await createCart();
         if (!c) return null;
       }
-      let res = await client.addToCart(c.id, variantId, quantity, sellerId);
+      const authToken = getToken("customer");
+      let res = await client.addToCart(c.id, variantId, quantity, sellerId, authToken);
       // If cart not found (stale localStorage ID), create a new cart and retry once
       if (res?.__error && res?.status === 404) {
         try { window.localStorage.removeItem(CART_ID_KEY); } catch (_) {}
         setCart(null);
         c = await createCart();
         if (!c) return null;
-        res = await client.addToCart(c.id, variantId, quantity, sellerId);
+        res = await client.addToCart(c.id, variantId, quantity, sellerId, authToken);
       }
       // If add explicitly failed, do not open sidebar
       if (res?.__error) return null;

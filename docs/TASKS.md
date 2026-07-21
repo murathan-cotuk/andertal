@@ -88,10 +88,38 @@
   2. Sipariş detayına giden tek yol, genişletilmiş panelin en altında, 4-5 başka butonun arasına gizlenmiş küçük bir "Details" linkiydi — mobilde bulunması zordu. Artık kapalı satırdaki **sipariş numarasının kendisi** de doğrudan `/order/{id}` sayfasına götüren bir link (akordeon açma davranışını bozmadan, `stopPropagation` ile).
 - Doğrulama: `@babel/parser` ile syntax kontrol edildi; backend'in `/store/orders/me` uç noktasının `product_id`/`product_handle`/`product_metadata` alanlarını zaten döndürdüğü koddan doğrulandı.
 14) sellercentralde orders sayfasinda icerikler ekrana sigmiyor. daha kompakt yap. sütun genislikleri tutup sürükleyip özellestirilebilsin excel gibi. sütünlar gizlenebilsin sag üstten columbns tarzi bir dropdown ile.
+
+**Durum: ✅ Yapıldı.** (Zaten mevcuttu.)
 15) flowlardaki bestellung versendet flowunun tetikleyicisi ne bilmiyorum. ancak siparisin lieferstatusu versendet oldugu zaman bu flow tetiklenmeli.
+
+**Durum: ✅ Düzeltildi (21.07.2026, Claude — henüz commit/push edilmedi).**
+- Tetikleyici (`order_shipped`) zaten doğru tanımlıydı ama sadece `orders.js`'teki manuel PATCH endpoint'inden (sellercentral'da elle "versendet" seçince) ateşleniyordu.
+- Kök neden: `shipment-tracking.js`'teki **gerçek** sevkiyat yolları — manuel shipment-event ekleme, otomatik kargo takip senkronizasyonu (DHL/DPD/GLS/UPS) ve Sendcloud etiket satın alma sonrası (`adminHubLabelFulfillPOST`, en sık kullanılan yol) — `delivery_status`'u doğrudan SQL ile `'versendet'` yapıyordu ama hiçbiri flow tetiklemiyordu.
+- Düzeltme: Bu üç yere de `orders.js`'teki ile aynı `dispatchOrderFlowEvent` mekanizması eklendi; `delivery_status` fiilen `versendet`e değiştiğinde (UPDATE `rowCount` ile tespit) `order_shipped` tetikleniyor.
+
 16) Bestellung geliefert flowu siparis icindeki Sendungsverfolgung kismi altinadki kargo takip güncellemelerinde "Zugestellt" gözüktügünde tetiklensin.
+
+**Durum: ✅ Düzeltildi (21.07.2026, Claude — henüz commit/push edilmedi).** Aynı kök neden ve aynı düzeltme (bkz. #15) — `order_delivered` tetikleyicisi de artık manuel shipment-event ekleme VE otomatik DHL/DPD/GLS/UPS takip senkronizasyonu "Zugestellt" gösterdiğinde ateşleniyor (önceden sadece sellercentral'da elle "zugestellt" seçilince çalışıyordu).
 17) customers/newsletter sayfasinda newsletter a abone olanlari göremiyorum.
+
+**Durum: ✅ Düzeltildi (21.07.2026, Claude — henüz commit/push edilmedi).**
+- Kök neden: `medusa-admin-client.js`'teki `getNewsletterSubscribers()`, arama kutusu boşken/status "Alle" iken `{ q: undefined, status: undefined }` gönderiyordu. JavaScript'in `URLSearchParams` fonksiyonu `undefined` değerleri **literal `"undefined"` metnine** çeviriyor (`?q=undefined&status=undefined`), backend de bunu gerçek bir arama terimi sanıp `email LIKE '%undefined%'` filtresi uyguluyordu — hiçbir gerçek abone eşleşmediği için sayfa her zaman boş görünüyordu (aboneler veritabanında vardı, sadece hep filtrelenip gizleniyorlardı).
+- Düzeltme: `getNewsletterSubscribers()` artık `undefined`/`null`/boş değerleri query string'e eklemeden önce filtreliyor.
 18) customers/reviews sayfasinda sellerlara göre kategorize edelim. ancak en üstte superuser bilgileri olsun tabii.
+
+**Durum: ✅ Düzeltildi (21.07.2026, Claude — henüz commit/push edilmedi).** `customers/reviews/page.jsx`: (sadece superuser görünümünde) tablo artık `OrdersPage`'deki ile aynı gruplama deseniyle bölümlere ayrılıyor — en üstte "Süper kullanıcı alanı" (platformun kendi/atanmamış ürün değerlendirmeleri), altında her satıcı için ayrı, açılır/kapanır bir bölüm (mağaza adına göre alfabetik sıralı). Arama/yıldız filtreleri gruplamadan önce uygulanıyor. Normal (superuser olmayan) satıcı görünümü değişmedi — zaten sadece kendi değerlendirmelerini görüyorlar.
 19) sellers/errors sayfasindaki sorunlari tek tek incele ve cöz. 
 20) content/brands/authorizations sayfasi bos duruyor. ayrica brand sayfasi icinden yapabilelim bunu. autorization islemleri ile brandler ayni ekranda olmali. ekranin üstünde dogrulama islemi kayit islemi olsun altta da liste olsun. 1 sayfada 100 marka olsun. 1 satirda yan yana 4 tane 25 satir seklinde. brand autorizations kaldiriyorsun yani. brand icine kuruyorsun.
+
+**Durum: ✅ Düzeltildi (21.07.2026, Claude — henüz commit/push edilmedi).**
+- Ayrı `/content/brands/authorizations` sayfası ve komponenti (`BrandAuthorizationsPage.jsx`) tamamen kaldırıldı, nav linki silindi.
+- Onay/red mantığı `BrandPage.jsx`'e taşındı: sayfanın en üstünde (sadece superuser'a görünür) bekleyen marka başvuruları bölümü — belgeler, onayla/reddet butonları, red sebebi modalı, hepsi aynı ekranda.
+- Altında tüm markaların listesi artık dikey/tam-genişlik kartlar yerine **4 sütunlu grid** (CSS grid, `repeat(4, 1fr)`) ve **100 marka/sayfa** sayfalama (‹ › ile) olarak yeniden tasarlandı. Kendi markalar önce, sonra diğerleri (kendi markalarda küçük bir rozet ile işaretli).
+- Kart tasarımı grid'e uyacak şekilde daha kompakt (dikey) hale getirildi.
 21) shopa girdim sepete ürün ekledim. satin almadan ciktim. abandoned checkouts sayfasina baktim. evet orada gözüküyor. ancak Kunde kisminda ve E-Mail kisminda hicbir sey yazmiyor. her abandoned checkouts satirinin en saginda durum belli olsun. bu sepetteki ürünler silindi mi, satin mi alindi, hala sepette duruyor mu o yazsin. hala sepette duruyorsa zaten flow calisacak. satin alindiysa satin alinanlar sekmesine gidecek. silindiyse sepetteki ürünler silinenler sekmesine gidecek. hala sepettekiler sepettekiler sekmesine gidicek. all sekmesinde hesi gözükecek. email ve müsteri adi cok önemli dedigim gibi. cünkü email gidecek. flow hazirlandi.
+
+**Durum: ✅ Düzeltildi (21.07.2026, Claude — henüz commit/push edilmedi).**
+- Kök neden (Kunde/E-Mail boş): `store_carts.email/first_name/last_name` sadece checkout sayfasındaki iletişim alanlarına dokunulduğunda (`onBlur`) veya girişli müşteri checkout'a ulaştığında dolduruluyordu. Sizin senaryonuzda ("sepete ekledim, checkout'a hiç girmeden çıktım") bu satır hiç çalışmıyor, dolayısıyla kimlik bilgisi hiç kaydedilmiyordu.
+  - Düzeltme: sepete ürün eklerken (`POST /store/carts/:id/line-items`) istek, giriş yapmış müşterinin bearer token'ını da taşıyorsa (artık `CartContext.jsx`/`medusa-client.js` `addToCart` bunu gönderiyor), backend giriş yapmış müşterinin email/ad/soyad bilgisini **daha ilk üründe** sepete yazıyor — checkout'a hiç girilmese bile. (Not: hiç giriş yapmamış misafir kullanıcılar için e-posta hâlâ ancak checkout formuna yazıldığında bilinebilir — bu teknik bir sınır, veri hiç toplanmadıysa gösterilemez.)
+- Durum sütunu + sekmeler: `store_cart_items`'a `removed_at` (soft-delete) sütunu eklendi — ürün sepetten çıkarılınca artık satır silinmiyor, `removed_at` damgalanıyor (sepet toplamı/checkout/tekrar-ekleme mantığının hepsi bu alanı filtreliyor). `/admin-hub/v1/abandoned-carts` artık sadece "hâlâ sepette" değil, siparişe dönüşmüş (**purchased**) ve tüm ürünleri çıkarılmış (**deleted**) sepetleri de dönüyor, her satıra bir `status` alanı ekliyor.
+- `AbandonedCheckoutsPage.jsx`: her satırın en sağına durum rozeti (Sepette / Satın Alındı / Sepetten Silindi) eklendi; sayfanın üstüne **All / Sepettekiler / Satın Alınanlar / Silinenler** sekmeleri eklendi (her birinde sayaç).
