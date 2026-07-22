@@ -1087,6 +1087,13 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/returns/${id}/send-label`, { method: 'POST' })
   }
 
+  async getDocumentSources() {
+    return this.request('/admin-hub/v1/document-sources')
+  }
+  async updateDocumentSources(sources) {
+    return this.request('/admin-hub/v1/document-sources', { method: 'PATCH', body: JSON.stringify(sources) })
+  }
+
   async getNotificationsUnread() {
     return this.request('/admin-hub/v1/notifications/unread')
   }

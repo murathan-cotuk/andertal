@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useContext, useRef } from "react";
+import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { CartContext } from "@/context/CartContext";
@@ -613,8 +614,8 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           <Link href={productUrl} aria-label={displayTitle} style={{ position: "absolute", inset: 0, zIndex: 0 }}>
             {imgSrc ? (
               <>
-                <img className="img-primary" src={imgSrc} alt={displayTitle} loading="lazy" />
-                {imgSrc2 && !plainImage ? <img className="img-secondary" src={imgSrc2} alt="" aria-hidden /> : null}
+                <Image className="img-primary" src={imgSrc} alt={displayTitle} fill sizes="(max-width: 767px) 50vw, 300px" />
+                {imgSrc2 && !plainImage ? <Image className="img-secondary" src={imgSrc2} alt="" aria-hidden fill sizes="(max-width: 767px) 50vw, 300px" /> : null}
               </>
             ) : (
               <ImgPlaceholder>No image</ImgPlaceholder>
@@ -624,8 +625,8 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           <>
             {imgSrc ? (
               <>
-                <img className="img-primary" src={imgSrc} alt={displayTitle} loading="lazy" />
-                {imgSrc2 && !plainImage ? <img className="img-secondary" src={imgSrc2} alt="" aria-hidden /> : null}
+                <Image className="img-primary" src={imgSrc} alt={displayTitle} fill sizes="(max-width: 767px) 50vw, 300px" />
+                {imgSrc2 && !plainImage ? <Image className="img-secondary" src={imgSrc2} alt="" aria-hidden fill sizes="(max-width: 767px) 50vw, 300px" /> : null}
               </>
             ) : (
               <ImgPlaceholder>No image</ImgPlaceholder>

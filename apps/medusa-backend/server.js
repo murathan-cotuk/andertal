@@ -2359,6 +2359,10 @@ async function start() {
     const createShipmentTrackingRouter = require('./src/routes/shipment-tracking')
     httpApp.use('/', createShipmentTrackingRouter({ logSellerError, loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform }))
 
+    // Görev 6: müşterinin kendi ERP/sisteminden fatura/lieferschein/retourelabel push edebilmesi
+    const createOrderDocumentsRouter = require('./src/routes/order-documents')
+    httpApp.use('/', createOrderDocumentsRouter())
+
     // --- Seller Locations CRUD: extracted to src/routes/seller-locations.js ---
     const createSellerLocationsRouter = require('./src/routes/seller-locations')
     httpApp.use('/', createSellerLocationsRouter())
@@ -2522,6 +2526,25 @@ async function start() {
       created_at  timestamptz NOT NULL DEFAULT now()
     )`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_erp_sync_log_seller ON admin_hub_erp_sync_log(seller_id, erp_type)`).catch(() => {})
+
+    // ── Customer-supplied documents (Görev 6: satıcı her belge türü için kaynak seçebilir) ──
+    // document_sources: { invoice: 'platform'|'customer_api', lieferschein: ..., retourelabel: ... }
+    // Eksik/boş anahtar = 'platform' (varsayılan, geriye dönük uyumlu).
+    await dbQ(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS document_sources jsonb DEFAULT '{}'::jsonb`).catch(() => {})
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_order_documents (
+      id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id       uuid NOT NULL,
+      seller_id      varchar(255) NOT NULL,
+      document_type  varchar(30) NOT NULL,
+      file_url       text NOT NULL,
+      filename       text,
+      uploaded_via   varchar(50) NOT NULL DEFAULT 'customer_api',
+      integration_id uuid,
+      created_at     timestamptz NOT NULL DEFAULT now(),
+      updated_at     timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(order_id, document_type)
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_order_documents_seller ON admin_hub_order_documents(seller_id)`).catch(() => {})
 
     await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_product_change_requests (
       id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),

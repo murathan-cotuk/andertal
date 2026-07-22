@@ -2,6 +2,7 @@
 import Script from "next/script";
 import TrustpilotInviteBootstrap from "@/components/TrustpilotInviteBootstrap";
 import UnhandledRejectionGuard from "@/components/UnhandledRejectionGuard";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 /* Safari / iOS status area + first paint: keep in sync with --header-bg fallback in ShopHeader (MIDDLE_BAR_BG) */
 const DEFAULT_STATUS_THEME = "#1b8880";
@@ -79,10 +80,6 @@ export default function RootLayout({ children }) {
           Dil için yerleşik locale rotaları ve dil seçici kullanılıyor (next-intl).
         */}
         <meta name="google" content="notranslate" />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
@@ -96,6 +93,7 @@ export default function RootLayout({ children }) {
         </Script>
         <UnhandledRejectionGuard />
         <TrustpilotInviteBootstrap />
+        <GoogleAnalytics />
         {children}
       </body>
     </html>

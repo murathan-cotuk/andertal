@@ -13,6 +13,7 @@ import BillbeeSettingsPage from "@/components/pages/settings/BillbeeSettingsPage
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useUI } from "@/lib/ui-strings";
 import { getIntegrationsCopy, getSmtpProviders } from "@/lib/integrations-i18n";
+import { lt } from "@/lib/locale-text";
 
 const client = getMedusaAdminClient();
 
@@ -646,6 +647,173 @@ function LogoApi() {
   );
 }
 
+function LogoDocuments() {
+  return (
+    <AccordionLogoWrap bg="#eff6ff">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="#1d4ed8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 2v6h6" stroke="#1d4ed8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </AccordionLogoWrap>
+  );
+}
+
+const DOCUMENT_TYPE_KEYS = ["invoice", "lieferschein", "retourelabel"];
+const DOC_API_INTEGRATION_NAME = "Beleg-API (ERP)";
+
+function documentSourcesCopy(locale) {
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
+  return {
+    title: t("Document sources", "Belge kaynakları", "Sources des documents", "Fuentes de documentos", "Fonti dei documenti", "Beleg-Quellen"),
+    sub: t(
+      "Choose whether invoices, delivery notes and return labels come from Andertal or your own ERP.",
+      "Fatura, irsaliye ve iade etiketinin Andertal'dan mı yoksa kendi ERP sisteminizden mi geleceğini seçin.",
+      "Choisissez si les factures, bons de livraison et étiquettes de retour proviennent d'Andertal ou de votre propre ERP.",
+      "Elige si las facturas, albaranes y etiquetas de devolución provienen de Andertal o de tu propio ERP.",
+      "Scegli se fatture, bolle di consegna ed etichette di reso provengono da Andertal o dal tuo ERP.",
+      "Wähle, ob Rechnungen, Lieferscheine und Retourenetiketten von Andertal oder deinem eigenen ERP-System kommen.",
+    ),
+    intro: t(
+      "By default Andertal generates these documents for you automatically. If your own system (ERP, accounting software, warehouse system) already produces them, switch a document type to \"My own system\" — Andertal will then serve whatever your system pushes to us via API instead of generating its own.",
+      "Varsayılan olarak bu belgeleri Andertal sizin için otomatik oluşturur. Kendi sisteminiz (ERP, muhasebe yazılımı, depo sistemi) bunları zaten üretiyorsa, ilgili belge türünü \"Kendi sistemim\"e çevirin — Andertal artık kendi belgesini oluşturmak yerine sisteminizin API ile gönderdiğini sunar.",
+      "Par défaut, Andertal génère ces documents automatiquement pour vous. Si votre propre système (ERP, comptabilité, entrepôt) les produit déjà, basculez ce type de document sur « Mon propre système » — Andertal fournira alors ce que votre système nous envoie via l'API au lieu de générer le sien.",
+      "Por defecto, Andertal genera estos documentos automáticamente. Si tu propio sistema (ERP, contabilidad, almacén) ya los produce, cambia ese tipo de documento a «Mi propio sistema» — Andertal entregará entonces lo que tu sistema nos envíe vía API en lugar de generar el suyo.",
+      "Per impostazione predefinita, Andertal genera questi documenti automaticamente. Se il tuo sistema (ERP, contabilità, magazzino) li produce già, imposta quel tipo di documento su \"Il mio sistema\" — Andertal fornirà quanto il tuo sistema invia tramite API invece di generarne uno proprio.",
+      "Standardmäßig erstellt Andertal diese Dokumente automatisch für dich. Falls dein eigenes System (ERP, Buchhaltung, Lager) sie bereits erzeugt, stelle diesen Beleg-Typ auf „Mein eigenes System“ um — Andertal liefert dann aus, was dein System uns per API sendet, statt selbst eins zu erstellen.",
+    ),
+    invoice: t("Invoice", "Fatura", "Facture", "Factura", "Fattura", "Rechnung"),
+    lieferschein: t("Delivery note", "İrsaliye", "Bon de livraison", "Albarán", "Bolla di consegna", "Lieferschein"),
+    retourelabel: t("Return label", "İade etiketi", "Étiquette de retour", "Etiqueta de devolución", "Etichetta di reso", "Retourenetikett"),
+    platform: t("Andertal generates it", "Andertal oluştursun", "Andertal génère", "Andertal genera", "Andertal genera", "Andertal erstellt"),
+    customerApi: t("My own system (API)", "Kendi sistemim (API)", "Mon propre système (API)", "Mi propio sistema (API)", "Il mio sistema (API)", "Mein eigenes System (API)"),
+    save: t("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern"),
+    saved: t("Saved.", "Kaydedildi.", "Enregistré.", "Guardado.", "Salvato.", "Gespeichert."),
+    apiSectionTitle: t("API access for your system", "Sisteminiz için API erişimi", "Accès API pour votre système", "Acceso API para tu sistema", "Accesso API per il tuo sistema", "API-Zugang für dein System"),
+    apiSectionBody: t(
+      "Have your ERP/accounting system send a POST request per document, authenticated with the credentials below (HTTP Basic Auth). We only accept PDF files, up to 15 MB.",
+      "ERP/muhasebe sisteminiz her belge için aşağıdaki bilgilerle (HTTP Basic Auth) kimlik doğrulaması yaparak bir POST isteği göndersin. Sadece PDF dosyaları kabul edilir, en fazla 15 MB.",
+      "Faites en sorte que votre ERP/comptabilité envoie une requête POST par document, authentifiée avec les identifiants ci-dessous (HTTP Basic Auth). Seuls les PDF sont acceptés, jusqu'à 15 Mo.",
+      "Haz que tu ERP/contabilidad envíe una solicitud POST por documento, autenticada con las credenciales de abajo (HTTP Basic Auth). Solo se aceptan PDF, hasta 15 MB.",
+      "Fai inviare al tuo ERP/contabilità una richiesta POST per ogni documento, autenticata con le credenziali sottostanti (HTTP Basic Auth). Sono accettati solo PDF, fino a 15 MB.",
+      "Lass dein ERP-/Buchhaltungssystem pro Beleg einen POST-Request senden, authentifiziert mit den Zugangsdaten unten (HTTP Basic Auth). Es werden nur PDF-Dateien akzeptiert, bis 15 MB.",
+    ),
+    createKey: t("Generate API key", "API anahtarı oluştur", "Générer une clé API", "Generar clave API", "Genera chiave API", "API-Schlüssel erstellen"),
+    endpoint: t("Endpoint", "Uç nokta", "Point de terminaison", "Endpoint", "Endpoint", "Endpoint"),
+    accessId: t("Username (api_key)", "Kullanıcı adı (api_key)", "Nom d'utilisateur (api_key)", "Usuario (api_key)", "Nome utente (api_key)", "Benutzername (api_key)"),
+    securityKey: t("Password (api_secret)", "Şifre (api_secret)", "Mot de passe (api_secret)", "Contraseña (api_secret)", "Password (api_secret)", "Passwort (api_secret)"),
+    oneTimeWarning: t(
+      "The password is only shown once — copy it now.",
+      "Şifre yalnızca bir kez gösterilir — şimdi kopyalayın.",
+      "Le mot de passe n'est affiché qu'une seule fois — copiez-le maintenant.",
+      "La contraseña solo se muestra una vez — cópiala ahora.",
+      "La password viene mostrata una sola volta — copiala ora.",
+      "Das Passwort wird nur einmal angezeigt — jetzt kopieren.",
+    ),
+    saveError: t("Could not save", "Kaydedilemedi", "Échec de l'enregistrement", "No se pudo guardar", "Salvataggio non riuscito", "Speichern fehlgeschlagen"),
+    keyError: t("Could not create API key", "API anahtarı oluşturulamadı", "Échec de création de la clé API", "No se pudo crear la clave API", "Creazione chiave API non riuscita", "API-Schlüssel konnte nicht erstellt werden"),
+  };
+}
+
+function DocumentSourcesSection({ ui }) {
+  const locale = useLocale();
+  const t = useMemo(() => documentSourcesCopy(locale), [locale]);
+  const [sources, setSources] = useState({ invoice: "platform", lieferschein: "platform", retourelabel: "platform" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [docIntegration, setDocIntegration] = useState(null);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState(null);
+
+  useEffect(() => {
+    Promise.all([client.getDocumentSources(), client.getIntegrations()])
+      .then(([ds, integ]) => {
+        setSources((s) => ({ ...s, ...(ds?.document_sources || {}) }));
+        const found = (integ?.integrations || []).find((i) => i.name === DOC_API_INTEGRATION_NAME);
+        if (found) setDocIntegration(found);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const setType = (key, value) => setSources((s) => ({ ...s, [key]: value }));
+  const anyCustomerApi = DOCUMENT_TYPE_KEYS.some((k) => sources[k] === "customer_api");
+
+  const save = async () => {
+    setSaving(true); setMsg(null);
+    try {
+      await client.updateDocumentSources(sources);
+      setMsg({ tone: "success", text: t.saved });
+      setTimeout(() => setMsg(null), 3000);
+    } catch (e) { setMsg({ tone: "critical", text: e?.message || t.saveError }); }
+    setSaving(false);
+  };
+
+  const createDocKey = async () => {
+    setCreatingKey(true);
+    try {
+      const data = await client.saveIntegration({ name: DOC_API_INTEGRATION_NAME, category: "documents", is_active: true });
+      const integ = data?.integration;
+      if (integ) {
+        setDocIntegration(integ);
+        setCreatedCreds({ zugang: integ.api_key, secret: integ.api_secret });
+      }
+    } catch (e) { setMsg({ tone: "critical", text: e?.message || t.keyError }); }
+    setCreatingKey(false);
+  };
+
+  const endpointUrl = `${(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "https://api.andertal.com").replace(/\/$/, "")}/api/v1/orders/:order_id/documents`;
+  const copyText = (text) => { if (text) navigator.clipboard.writeText(String(text)); };
+
+  if (loading) return <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>;
+
+  return (
+    <BlockStack gap="400">
+      {msg && <Banner tone={msg.tone} onDismiss={() => setMsg(null)}>{msg.text}</Banner>}
+      <Text as="p" variant="bodySm" tone="subdued">{t.intro}</Text>
+      <BlockStack gap="300">
+        {DOCUMENT_TYPE_KEYS.map((key) => (
+          <InlineStack key={key} gap="200" blockAlign="center" wrap>
+            <Box minWidth="160px"><Text as="span" fontWeight="semibold">{t[key]}</Text></Box>
+            <Button size="slim" variant={sources[key] !== "customer_api" ? "primary" : "secondary"} onClick={() => setType(key, "platform")}>
+              {t.platform}
+            </Button>
+            <Button size="slim" variant={sources[key] === "customer_api" ? "primary" : "secondary"} onClick={() => setType(key, "customer_api")}>
+              {t.customerApi}
+            </Button>
+          </InlineStack>
+        ))}
+      </BlockStack>
+      <Box><Button variant="primary" onClick={save} loading={saving}>{t.save}</Button></Box>
+
+      {anyCustomerApi && (
+        <>
+          <Divider />
+          <BlockStack gap="300">
+            <Text as="h3" variant="headingSm">{t.apiSectionTitle}</Text>
+            <Text as="p" variant="bodySm" tone="subdued">{t.apiSectionBody}</Text>
+            <TextField label={t.endpoint} value={`POST ${endpointUrl}`} readOnly autoComplete="off" />
+            {docIntegration ? (
+              <TextField label={t.accessId} value={docIntegration.api_key || ""} readOnly autoComplete="off" />
+            ) : (
+              <Button onClick={createDocKey} loading={creatingKey}>{t.createKey}</Button>
+            )}
+            {createdCreds && (
+              <BlockStack gap="200">
+                <Banner tone="warning">{t.oneTimeWarning}</Banner>
+                <TextField label={t.accessId} value={createdCreds.zugang} readOnly autoComplete="off" />
+                <Button size="slim" onClick={() => copyText(createdCreds.zugang)}>{ui.copy || "Copy"}</Button>
+                <TextField label={t.securityKey} value={createdCreds.secret} readOnly autoComplete="off" />
+                <Button size="slim" onClick={() => copyText(createdCreds.secret)}>{ui.copy || "Copy"}</Button>
+              </BlockStack>
+            )}
+          </BlockStack>
+        </>
+      )}
+    </BlockStack>
+  );
+}
+
 function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecret, copy, ui }) {
   const initials = (integration.name || "?").split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
   return (
@@ -855,6 +1023,17 @@ export default function IntegrationsSettingsPage() {
           subtitle={copy.billbeeSub}
         >
           <BillbeeSettingsPage embedded />
+        </IntegrationsAccordion>
+
+        <IntegrationsAccordion
+          sectionId="documents"
+          open={openSection === "documents"}
+          onToggle={() => toggleSection("documents")}
+          logo={<LogoDocuments />}
+          title={documentSourcesCopy(locale).title}
+          subtitle={documentSourcesCopy(locale).sub}
+        >
+          <DocumentSourcesSection ui={ui} />
         </IntegrationsAccordion>
 
         {isSuperuser && (

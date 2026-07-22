@@ -54,9 +54,13 @@ const nextConfig = {
         protocol: 'http',
         hostname: 'localhost',
       },
+      // Product images can come from our own backend OR any seller-supplied external URL
+      // (CSV bulk import accepts arbitrary image_url_1/2/3 values) — CSP (img-src) already
+      // allows any https source for the same reason, so this mirrors an existing trust
+      // boundary rather than widening it.
       {
         protocol: 'https',
-        hostname: 'cdnjs.cloudflare.com',
+        hostname: '**',
       },
     ],
   },
@@ -89,11 +93,11 @@ const nextConfig = {
     // meaningful protection against clickjacking, base-tag injection, and data exfil.
     const csp = [
       "default-src 'self'",
-      // Next.js hydration, styled-components, Stripe SDK, Trustpilot widget
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://widget.trustpilot.com https://invitejs.trustpilot.com",
-      // Styled-components injects inline styles; Font Awesome + Google Fonts from layout/theme
-      "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
-      "style-src-elem 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
+      // Next.js hydration, styled-components, Stripe SDK, Trustpilot widget, GA4 (Görev 28 — no-op until NEXT_PUBLIC_GA_MEASUREMENT_ID is set)
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://widget.trustpilot.com https://invitejs.trustpilot.com https://www.googletagmanager.com",
+      // Styled-components injects inline styles; Google Fonts from layout/theme
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
       // Stripe / Sentry may spawn blob workers
       "worker-src 'self' blob:",
       // Product images from any HTTPS source; data URIs for QR codes / placeholders

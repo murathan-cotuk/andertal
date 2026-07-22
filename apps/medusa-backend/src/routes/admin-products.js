@@ -75,13 +75,11 @@ const requireSellerAuth = (req, res, next) => {
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
-const getProductsDbClient = () => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  const isRender = dbUrl.includes('render.com')
-  return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
-}
+// Görev 25: pooled connection (see src/db-pool.js) — this factory backs both the public
+// shop product listing (via store-products.js) and Sellercentral's product management,
+// the two highest-traffic product read paths, so pooling it here has broad impact without
+// touching every one of the backend's ~190 other per-request pg.Client call sites.
+const getProductsDbClient = () => require('../db-pool').getPooledClient()
 
 const dbQ = async (sql, params = []) => {
   const client = getProductsDbClient()

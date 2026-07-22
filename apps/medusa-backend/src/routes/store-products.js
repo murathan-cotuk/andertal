@@ -5,12 +5,10 @@ const { getAdminHubProductByIdOrHandleDb, listAdminHubProductsDb, getProductsDbC
 const { getSellerStoreName, getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct, storePublishedStatusSql } = require('./seller-settings')
 
 // ── DB ────────────────────────────────────────────────────────────────────────
-const getDbClient = () => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
-}
+// Görev 25: shared pool (src/db-pool.js) instead of a fresh Client per call — this
+// file backs the public shop's product listing/search/detail pages, its single
+// highest-traffic read path.
+const getDbClient = () => require('../db-pool').getPooledClient()
 
 // Brands use same DATABASE_URL as other tables
 const getBrandsDbClient = () => getDbClient()
@@ -253,8 +251,7 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
     const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
     if (dbUrl && dbUrl.startsWith('postgres')) {
       try {
-        const { Client } = require('pg')
-        const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        const lc = require('../db-pool').getPooledClient()
         await lc.connect()
         const lr = await lc.query(
           `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
@@ -698,8 +695,7 @@ const storeProductsFromAdminHubGET = async (req, res) => {
       if (dbUrl && dbUrl.startsWith('postgres')) {
         let cClient
         try {
-          const { Client } = require('pg')
-          cClient = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+          cClient = require('../db-pool').getPooledClient()
           await cClient.connect()
           const cr = await cClient.query('SELECT id, metadata FROM admin_hub_collections WHERE id = ANY($1::uuid[])', [collIds])
           await cClient.end()

@@ -1987,6 +1987,10 @@ const storeOrderInvoicePdfGET = async (req, res) => {
     )
     const row = oRes.rows && oRes.rows[0]
     if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+    // Seller may have opted invoices for this order into "customer_api" sourcing (Görev 6) —
+    // serve the document their own ERP pushed to us instead of generating our own.
+    const customerDocUrl = await require('./order-documents').resolveCustomerSuppliedDocumentUrl(client, orderId, row.seller_id, 'invoice')
+    if (customerDocUrl) { await client.end(); return res.redirect(302, customerDocUrl) }
     const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [orderId])
     const itemRows = iRes.rows || []
     let sellerInfo = null
@@ -2056,6 +2060,8 @@ const storeOrderReturnRetourenscheinGET = async (req, res) => {
     )
     if (!oRes.rows?.[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
     const row = oRes.rows[0]
+    const customerDocUrl = await require('./order-documents').resolveCustomerSuppliedDocumentUrl(client, orderId, row.seller_id, 'retourelabel')
+    if (customerDocUrl) { await client.end(); return res.redirect(302, customerDocUrl) }
     const rRes = await client.query(
       `SELECT * FROM store_returns WHERE order_id = $1::uuid AND status = 'genehmigt' ORDER BY created_at DESC LIMIT 1`,
       [orderId],
@@ -2127,6 +2133,8 @@ const storeOrderReturnEtikettGET = async (req, res) => {
     )
     if (!oRes.rows?.[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
     const row = oRes.rows[0]
+    const customerDocUrl = await require('./order-documents').resolveCustomerSuppliedDocumentUrl(client, orderId, row.seller_id, 'retourelabel')
+    if (customerDocUrl) { await client.end(); return res.redirect(302, customerDocUrl) }
     const rRes = await client.query(
       `SELECT * FROM store_returns WHERE order_id = $1::uuid AND status = 'genehmigt' ORDER BY created_at DESC LIMIT 1`,
       [orderId],
