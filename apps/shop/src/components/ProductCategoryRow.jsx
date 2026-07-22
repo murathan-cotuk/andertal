@@ -373,7 +373,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
           <img src={imgSrc} alt={displayTitle} loading="lazy" />
         ) : null}
         {product?.id ? (
-          <div style={{ position: "absolute", top: 4, right: 4, zIndex: 2 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ position: "absolute", bottom: 4, right: 4, zIndex: 2 }} onClick={(e) => e.stopPropagation()}>
             <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
           </div>
         ) : null}

@@ -43,6 +43,18 @@ export async function generateMetadata() {
     },
     /* iOS Safari: tints the status bar / top chrome; client updates this when --header-bg is loaded from store theme */
     themeColor: DEFAULT_STATUS_THEME,
+    /*
+     * "Add to Home Screen" (iOS): without statusBarStyle="black-translucent" the OS paints its
+     * own opaque status bar over the safe-area, so ShopHeader's ::before safe-area-fill (which
+     * mirrors the live header color/gradient there) never becomes visible — the fixed fallback
+     * teal (MIDDLE_BAR_BG) is what actually shows through instead. black-translucent makes that
+     * area transparent so the page's own CSS underneath is what the user sees.
+     */
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "black-translucent",
+      title: brand,
+    },
   };
 }
 

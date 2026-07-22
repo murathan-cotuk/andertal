@@ -222,7 +222,7 @@ const RankBadge = styled.span`
 
 const WishlistHeartWrap = styled.div`
   position: absolute;
-  top: 8px;
+  bottom: 8px;
   right: 8px;
   z-index: 50;
   pointer-events: auto;
@@ -657,7 +657,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           </WishlistHeartWrap>
         )}
         {hasSale && !isComingSoon && (
-          <SaleBadgeImageCorner style={{ top: 44, right: 8 }}>{tp("sale")}</SaleBadgeImageCorner>
+          <SaleBadgeImageCorner>{tp("sale")}</SaleBadgeImageCorner>
         )}
         {isEuOrigin && <MadeInEuropeOverlay />}
       </ImgBlock>

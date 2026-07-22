@@ -15,6 +15,13 @@ export function useVisualViewportBottomInset() {
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.visualViewport) return;
+    /* Standalone (Add to Home Screen / installed PWA): there is no browser toolbar to dodge,
+       but iOS still fires visualViewport resize/scroll with tiny transient offsetTop/height
+       jitter during scroll momentum — tracking it here made the fixed bottom nav visibly
+       shift while scrolling. Skip the dynamic tracking entirely in that mode; inset stays 0. */
+    const isStandalone =
+      window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator?.standalone === true;
+    if (isStandalone) { setInset(0); return; }
     const vv = window.visualViewport;
 
     /* Use rAF so both window.resize and vv.resize have fired before we read

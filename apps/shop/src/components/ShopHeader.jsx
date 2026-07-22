@@ -194,7 +194,10 @@ const MiddleBarInner = styled.div`
   display: flex;
   align-items: center;
 
+  /* Desktop's 24px side padding ate ~13% of a phone's width before any content even started
+     (logo/search bar visibly cramped away from the edges) — mobile gets a much tighter inset. */
   @media (max-width: ${HEADER_NARROW_MQ}px) {
+    padding: 0 10px;
     min-height: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
       return `calc(${1 - t} * var(--header-h, 72px) + ${t} * var(--header-h-compact, var(--header-h, 72px)))`;
@@ -1566,6 +1569,10 @@ export default function ShopHeader() {
                     const pb = devCfg?.pb ?? 0;
                     const pl = devCfg?.pl ?? 0;
                     const imgH = isNarrowViewport && narrowCompactProgress > 0.02 ? Math.max(22, Math.round(height * (1 - 0.32 * narrowCompactProgress))) : height;
+                    /* Width cap must scale with the configured height, not a flat px constant —
+                       a flat cap silently squashed a deliberately large (e.g. wide/square) logo
+                       back down regardless of the seller's size setting in Sellercentral. */
+                    const maxW = Math.round(imgH * 2.2);
                     return url ? (
                       <img
                         src={url}
@@ -1574,7 +1581,7 @@ export default function ShopHeader() {
                           height: imgH,
                           maxHeight: isNarrowViewport ? Math.max(22, height) : 200,
                           width: "auto",
-                          maxWidth: isNarrowViewport && narrowCompactProgress > 0.02 ? 120 : 220,
+                          maxWidth: isNarrowViewport ? Math.max(120, maxW) : Math.max(220, maxW),
                           objectFit: "contain",
                           display: "block",
                           paddingTop: pt,

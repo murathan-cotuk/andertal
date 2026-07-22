@@ -1136,7 +1136,7 @@ export default function OrdersPage() {
               })()}
             </td>
           )}
-          <td style={{ padding: "10px 8px", textAlign: "right" }}>
+          <td style={{ padding: "7px 8px", textAlign: "right" }}>
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
               {order.delivery_status !== "versendet" && order.delivery_status !== "zugestellt" && (
                 <div onClick={(e) => e.stopPropagation()}>
@@ -1341,7 +1341,7 @@ export default function OrdersPage() {
                     key={col.key}
                     onClick={isSortable ? () => handleColSort(col.sortKey) : undefined}
                     style={{
-                      padding: "10px 10px",
+                      padding: "7px 10px",
                       textAlign: col.align,
                       fontWeight: 600,
                       fontSize: 11,

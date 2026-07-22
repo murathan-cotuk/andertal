@@ -7,6 +7,7 @@ import { useRouter, Link } from "@/i18n/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
+import TruckLoader from "@/components/ui/TruckLoader";
 import { getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
@@ -499,6 +500,9 @@ export default function OrderDetailPage() {
   useEffect(() => { loadOrder(); }, [loadOrder]);
 
   if (loading) {
+    // Fresh from checkout (?confirmed=1): keep showing the same truck-loader the user just
+    // saw during payment processing instead of switching to a generic spinner mid-flow.
+    if (isConfirmed) return <TruckLoader />;
     return (
       <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
         <ShopHeader />
