@@ -434,6 +434,141 @@ const storeProductCategoryIds = (p) => {
   return out
 }
 
+// ── Product Badges (superuser-managed text badges: Sale, Bestseller, etc.) ────
+const categoryBestsellerCache = new Map() // categoryId -> { expiresAt, ids }
+const CATEGORY_BESTSELLER_LIMIT = 5
+
+const getTopSellingProductIdsByCategory = async (categoryId) => {
+  const catId = (categoryId || '').toString().trim().toLowerCase()
+  if (!catId) return new Set()
+  const now = Date.now()
+  const cached = categoryBestsellerCache.get(catId)
+  if (cached && cached.expiresAt > now) return cached.ids
+  await getBestsellerProductIds() // ensures bestsellerCache.scoresById is populated/fresh
+  const scoresById = bestsellerCache.scoresById || new Map()
+  let ids = new Set()
+  const client = getProductsDbClient()
+  if (client) {
+    try {
+      await client.connect()
+      const res = await client.query('SELECT id, metadata FROM admin_hub_products WHERE metadata IS NOT NULL')
+      const scored = []
+      for (const row of res.rows) {
+        const catIds = storeProductCategoryIds({ metadata: row.metadata })
+        if (!catIds.includes(catId)) continue
+        const pid = String(row.id).trim()
+        const score = scoresById.get(pid) || 0
+        if (score > 0) scored.push([pid, score])
+      }
+      scored.sort((a, b) => b[1] - a[1])
+      ids = new Set(scored.slice(0, CATEGORY_BESTSELLER_LIMIT).map(([id]) => id))
+      await client.end()
+    } catch (_) { try { await client.end() } catch (__) {} }
+  }
+  categoryBestsellerCache.set(catId, { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids })
+  return ids
+}
+
+let productBadgesCache = { expiresAt: 0, badges: [] }
+const PRODUCT_BADGES_CACHE_TTL_MS = 60 * 1000
+
+const getActiveProductBadges = async () => {
+  const now = Date.now()
+  if (productBadgesCache.expiresAt > now) return productBadgesCache.badges
+  let badges = []
+  const client = getDbClient()
+  if (client) {
+    try {
+      await client.connect()
+      const r = await client.query('SELECT * FROM admin_hub_product_badges WHERE active = true')
+      badges = r.rows || []
+      await client.end()
+    } catch (_) { try { await client.end() } catch (__) {} }
+  }
+  productBadgesCache = { expiresAt: now + PRODUCT_BADGES_CACHE_TTL_MS, badges }
+  return badges
+}
+
+const getGroupProductIdSets = async (groupIds) => {
+  const map = new Map()
+  const ids = [...new Set((groupIds || []).filter(Boolean).map(String))]
+  if (ids.length === 0) return map
+  const client = getDbClient()
+  if (!client) return map
+  try {
+    await client.connect()
+    const r = await client.query('SELECT id, product_ids FROM seller_product_groups WHERE id = ANY($1::uuid[])', [ids])
+    for (const row of r.rows || []) {
+      const pids = Array.isArray(row.product_ids) ? row.product_ids.map((x) => String(x)) : []
+      map.set(String(row.id), new Set(pids))
+    }
+    await client.end()
+  } catch (_) { try { await client.end() } catch (__) {} }
+  return map
+}
+
+const hasSaleFromMapped = (mapped) => {
+  const meta = mapped?.metadata || {}
+  const priceCents = Number(mapped?.price_cents || 0)
+  const deSale = meta.prices?.DE?.sale_cents != null ? Number(meta.prices.DE.sale_cents) : null
+  const legacySale = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null
+  const saleCents = deSale ?? legacySale
+  return saleCents != null && saleCents > 0 && saleCents < priceCents
+}
+
+const isNewFromMapped = (mapped) => {
+  const meta = mapped?.metadata || {}
+  return meta.is_new === true || meta.is_new === 'true' || meta.badge === 'new'
+}
+
+const buildProductBadgeContext = async () => {
+  const badges = await getActiveProductBadges()
+  const groupIds = badges.filter((b) => b.target_type === 'group' && b.group_id).map((b) => b.group_id)
+  const groupProductIdsByGroup = await getGroupProductIdSets(groupIds)
+  const bestsellerIds = await getBestsellerProductIds()
+  const categoryIds = [...new Set(
+    badges.filter((b) => b.target_type === 'api' && b.api_rule === 'bestseller_category' && b.api_category_id).map((b) => b.api_category_id)
+  )]
+  const categoryTopIdsByCategory = new Map()
+  await Promise.all(categoryIds.map(async (cid) => {
+    categoryTopIdsByCategory.set(String(cid).toLowerCase(), await getTopSellingProductIdsByCategory(cid))
+  }))
+  return { badges, groupProductIdsByGroup, bestsellerIds, categoryTopIdsByCategory }
+}
+
+const badgeToPayload = (b) => ({
+  id: b.id,
+  label: b.label,
+  position: b.position,
+  bg_color: b.bg_color,
+  text_color: b.text_color,
+  font_size: b.font_size,
+  border_width: b.border_width,
+  border_color: b.border_color,
+  border_radius: b.border_radius,
+  offset_x: b.offset_x,
+  offset_y: b.offset_y,
+})
+
+const resolveCustomBadgesForProduct = (productId, mapped, ctx) => {
+  const pid = String(productId)
+  const matched = []
+  for (const b of ctx.badges) {
+    let hit = false
+    if (b.target_type === 'product') hit = String(b.product_id) === pid
+    else if (b.target_type === 'group') hit = !!ctx.groupProductIdsByGroup.get(String(b.group_id))?.has(pid)
+    else if (b.target_type === 'api') {
+      if (b.api_rule === 'bestseller') hit = ctx.bestsellerIds.has(pid)
+      else if (b.api_rule === 'bestseller_category') hit = !!ctx.categoryTopIdsByCategory.get(String(b.api_category_id || '').toLowerCase())?.has(pid)
+      else if (b.api_rule === 'sale') hit = hasSaleFromMapped(mapped)
+      else if (b.api_rule === 'new') hit = isNewFromMapped(mapped)
+    }
+    if (hit) matched.push(badgeToPayload(b))
+  }
+  if (matched.length > 0) mapped.metadata = { ...(mapped.metadata || {}), custom_badges: matched }
+  return mapped
+}
+
 const enrichMappedStoreProduct = async (productRow, mapped) => {
   const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
   if (!existingSeller && productRow.seller_id) {
@@ -457,6 +592,8 @@ const enrichMappedStoreProduct = async (productRow, mapped) => {
   const realSalesScore = bestsellerCache.scoresById?.get(String(productRow.id).trim())
   if (realSalesScore > 0) mapped.metadata = { ...(mapped.metadata || {}), sales_count: realSalesScore }
   if (bsIds.has(String(productRow.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+  const badgeCtx = await buildProductBadgeContext()
+  resolveCustomBadgesForProduct(productRow.id, mapped, badgeCtx)
   const sid = String(productRow.seller_id || '').trim()
   if (sid) {
     let client
@@ -592,6 +729,7 @@ const storeProductsFromAdminHubGET = async (req, res) => {
       mapped.metadata = meta
     }
     const bestsellerIds = await getBestsellerProductIds()
+    const badgeCtx = await buildProductBadgeContext()
     let products = list.map((p) => {
       const mapped = mapAdminHubToStoreProduct(p, query.country || 'DE')
       mergeCategoryIdsFromCollections(p, mapped)
@@ -606,6 +744,7 @@ const storeProductsFromAdminHubGET = async (req, res) => {
         mapped.metadata = { ...(mapped.metadata || {}), brand_name: b.name, brand_logo: b.logo_image || null, brand_handle: b.handle || null }
       }
       if (bestsellerIds.has(String(p.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+      resolveCustomBadgesForProduct(p.id, mapped, badgeCtx)
       return mapped
     })
     if (categorySlugFilter) {
@@ -726,6 +865,7 @@ module.exports = function createStoreProductsRouter() {
       const storeNamesBySeller = {}
       await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
       const bestsellerIds = await getBestsellerProductIds()
+      const badgeCtx = await buildProductBadgeContext()
       const products = list.map((p) => {
         const mapped = mapAdminHubToStoreProduct(p, (req.query && req.query.country) || 'DE')
         const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
@@ -735,6 +875,7 @@ module.exports = function createStoreProductsRouter() {
         }
         mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
         if (bestsellerIds.has(String(p.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+        resolveCustomBadgesForProduct(p.id, mapped, badgeCtx)
         return mapped
       })
       res.json({ brand, products, count: products.length })

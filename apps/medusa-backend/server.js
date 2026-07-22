@@ -1612,6 +1612,30 @@ async function start() {
           );
         `).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_spg_seller ON seller_product_groups(seller_id)`).catch(() => {})
+        // Product badges (superuser-managed text badges shown on product images: Sale, Bestseller, etc.)
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_product_badges (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            label text NOT NULL,
+            position text NOT NULL DEFAULT 'top-left',
+            bg_color text DEFAULT '#e53935',
+            text_color text DEFAULT '#ffffff',
+            font_size int DEFAULT 12,
+            border_width int DEFAULT 0,
+            border_color text DEFAULT '#000000',
+            border_radius int DEFAULT 4,
+            offset_x int DEFAULT 8,
+            offset_y int DEFAULT 8,
+            target_type text NOT NULL DEFAULT 'product',
+            product_id text,
+            group_id uuid,
+            api_rule text,
+            api_category_id text,
+            active boolean DEFAULT true,
+            created_at timestamptz DEFAULT now(),
+            updated_at timestamptz DEFAULT now()
+          );
+        `).catch(() => {})
         // Seller campaigns (Aktionen/Kampagnen)
         await client.query(`
           CREATE TABLE IF NOT EXISTS seller_campaigns (
@@ -2344,6 +2368,10 @@ async function start() {
     // --- Seller Product Groups: extracted to src/routes/product-groups.js ---
     const createProductGroupsRouter = require('./src/routes/product-groups')
     httpApp.use('/', createProductGroupsRouter())
+
+    // --- Product Badges (superuser-only, styling section under content/styles): extracted to src/routes/product-badges.js ---
+    const createProductBadgesRouter = require('./src/routes/product-badges')
+    httpApp.use('/', createProductBadgesRouter({ requireSuperuser }))
 
     // --- Seller Campaigns + Google Ads publishing + Automation Rules + Platform Marketing Accounts + store discount lookup: extracted to src/routes/campaigns.js ---
     const createCampaignsRouter = require('./src/routes/campaigns')

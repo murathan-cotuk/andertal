@@ -1593,6 +1593,30 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/product-groups/${id}`, { method: 'DELETE' })
   }
 
+  // ── Product Badges ───────────────────────────────────────────────────────────
+
+  async getProductBadges() {
+    return this.request('/admin-hub/v1/product-badges')
+  }
+
+  async createProductBadge(data) {
+    return this.request('/admin-hub/v1/product-badges', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateProductBadge(id, data) {
+    return this.request(`/admin-hub/v1/product-badges/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteProductBadge(id) {
+    return this.request(`/admin-hub/v1/product-badges/${id}`, { method: 'DELETE' })
+  }
+
   // ── Campaigns ───────────────────────────────────────────────────────────────
 
   async getCampaigns() {

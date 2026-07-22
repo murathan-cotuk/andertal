@@ -17,6 +17,7 @@ import {
   Select,
   Popover,
   Checkbox,
+  Modal,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import {
@@ -736,6 +737,331 @@ function ButtonTypeSection({ typeKey, typeData, onChange }) {
         </InlineStack>
       </BlockStack>
     </Card>
+  );
+}
+
+// ── Product Badges ────────────────────────────────────────────────────────────
+const POSITION_OPTIONS = ["top-left", "top-right", "bottom-left", "bottom-right"];
+
+function posLabel(locale, key) {
+  return {
+    "top-left": locale === "de" ? "Oben links" : locale === "tr" ? "Sol üst" : locale === "fr" ? "Haut gauche" : locale === "es" ? "Superior izquierda" : locale === "it" ? "In alto a sinistra" : "Top left",
+    "top-right": locale === "de" ? "Oben rechts" : locale === "tr" ? "Sağ üst" : locale === "fr" ? "Haut droite" : locale === "es" ? "Superior derecha" : locale === "it" ? "In alto a destra" : "Top right",
+    "bottom-left": locale === "de" ? "Unten links" : locale === "tr" ? "Sol alt" : locale === "fr" ? "Bas gauche" : locale === "es" ? "Inferior izquierda" : locale === "it" ? "In basso a sinistra" : "Bottom left",
+    "bottom-right": locale === "de" ? "Unten rechts" : locale === "tr" ? "Sağ alt" : locale === "fr" ? "Bas droite" : locale === "es" ? "Inferior derecha" : locale === "it" ? "In basso a destra" : "Bottom right",
+  }[key];
+}
+
+function targetTypeLabel(locale, key) {
+  return {
+    product: locale === "de" ? "Produkt" : locale === "tr" ? "Ürün" : locale === "fr" ? "Produit" : locale === "es" ? "Producto" : locale === "it" ? "Prodotto" : "Product",
+    group: locale === "de" ? "Produktgruppe" : locale === "tr" ? "Ürün grubu" : locale === "fr" ? "Groupe de produits" : locale === "es" ? "Grupo de productos" : locale === "it" ? "Gruppo di prodotti" : "Product group",
+    api: locale === "de" ? "API-Regel" : locale === "tr" ? "API kuralı" : locale === "fr" ? "Règle API" : locale === "es" ? "Regla API" : locale === "it" ? "Regola API" : "API rule",
+  }[key];
+}
+
+function apiRuleLabel(locale, key) {
+  return {
+    bestseller: locale === "de" ? "Bestseller (global)" : locale === "tr" ? "Bestseller (genel)" : locale === "fr" ? "Bestseller (global)" : locale === "es" ? "Más vendido (global)" : locale === "it" ? "Bestseller (globale)" : "Bestseller (global)",
+    bestseller_category: locale === "de" ? "Bestseller in Kategorie" : locale === "tr" ? "Bu kategoride en çok satan" : locale === "fr" ? "Meilleure vente de la catégorie" : locale === "es" ? "Más vendido en la categoría" : locale === "it" ? "Più venduto nella categoria" : "Bestseller in category",
+    sale: locale === "de" ? "Im Angebot (Sale)" : locale === "tr" ? "İndirimli (Sale)" : locale === "fr" ? "En promotion" : locale === "es" ? "En oferta" : locale === "it" ? "In offerta" : "On sale",
+    new: locale === "de" ? "Neu" : locale === "tr" ? "Yeni ürün" : locale === "fr" ? "Nouveau" : locale === "es" ? "Nuevo" : locale === "it" ? "Nuovo" : "New",
+  }[key];
+}
+
+function badgePositionStyle(b) {
+  const style = { position: "absolute" };
+  const ox = Number(b.offset_x) || 0;
+  const oy = Number(b.offset_y) || 0;
+  if (b.position === "top-left") { style.top = oy; style.left = ox; }
+  else if (b.position === "top-right") { style.top = oy; style.right = ox; }
+  else if (b.position === "bottom-left") { style.bottom = oy; style.left = ox; }
+  else { style.bottom = oy; style.right = ox; }
+  return style;
+}
+
+function badgeVisualStyle(b) {
+  return {
+    background: b.bg_color || "#e53935",
+    color: b.text_color || "#ffffff",
+    fontSize: Number(b.font_size) || 12,
+    borderWidth: Number(b.border_width) || 0,
+    borderStyle: "solid",
+    borderColor: b.border_color || "#000000",
+    borderRadius: Number(b.border_radius) || 0,
+    padding: "3px 8px",
+    fontWeight: 700,
+    lineHeight: 1.2,
+    whiteSpace: "nowrap",
+  };
+}
+
+function emptyBadgeForm() {
+  return {
+    label: "",
+    position: "top-left",
+    bg_color: "#e53935",
+    text_color: "#ffffff",
+    font_size: 12,
+    border_width: 0,
+    border_color: "#000000",
+    border_radius: 4,
+    offset_x: 8,
+    offset_y: 8,
+    target_type: "product",
+    product_id: "",
+    group_id: "",
+    api_rule: "bestseller",
+    api_category_id: "",
+    active: true,
+  };
+}
+
+function ProductBadgesCard({ locale, client }) {
+  const [badges, setBadges] = useState([]);
+  const [loadingBadges, setLoadingBadges] = useState(true);
+  const [groups, setGroups] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyBadgeForm());
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+
+  const loadBadges = useCallback(async () => {
+    setLoadingBadges(true);
+    try {
+      const data = await client.getProductBadges();
+      setBadges(Array.isArray(data?.badges) ? data.badges : []);
+    } catch (_) {
+      setBadges([]);
+    } finally {
+      setLoadingBadges(false);
+    }
+  }, [client]);
+
+  useEffect(() => { loadBadges(); }, [loadBadges]);
+
+  useEffect(() => {
+    client.getProductGroups().then((d) => setGroups(Array.isArray(d?.groups) ? d.groups : [])).catch(() => setGroups([]));
+    client.getAdminHubCategories({ all: true }).then((d) => setCategories(Array.isArray(d?.categories) ? d.categories : [])).catch(() => setCategories([]));
+    client.getAdminHubProducts({ limit: 500 }).then((d) => setProducts(Array.isArray(d?.products) ? d.products : [])).catch(() => setProducts([]));
+  }, [client]);
+
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    const list = q ? products.filter((p) => (p.title || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q)) : products;
+    return list.slice(0, 50);
+  }, [products, productSearch]);
+
+  const productLabelById = useCallback((id) => products.find((p) => String(p.id) === String(id))?.title || id, [products]);
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyBadgeForm());
+    setErrMsg("");
+    setModalOpen(true);
+  };
+
+  const openEdit = (b) => {
+    setEditingId(b.id);
+    setForm({ ...emptyBadgeForm(), ...b, product_id: b.product_id || "", group_id: b.group_id || "", api_category_id: b.api_category_id || "" });
+    setErrMsg("");
+    setModalOpen(true);
+  };
+
+  const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleSubmit = async () => {
+    if (!form.label.trim()) {
+      setErrMsg(locale === "de" ? "Badge-Text ist erforderlich." : locale === "tr" ? "Badge metni gerekli." : locale === "fr" ? "Le texte du badge est requis." : locale === "es" ? "El texto de la insignia es obligatorio." : locale === "it" ? "Il testo del badge è obbligatorio." : "Badge text is required.");
+      return;
+    }
+    setSaving(true);
+    setErrMsg("");
+    try {
+      if (editingId) await client.updateProductBadge(editingId, form);
+      else await client.createProductBadge(form);
+      setModalOpen(false);
+      await loadBadges();
+    } catch (e) {
+      setErrMsg(e?.message || "Error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    await client.deleteProductBadge(id);
+    await loadBadges();
+  };
+
+  const handleToggleActive = async (b) => {
+    await client.updateProductBadge(b.id, { ...b, active: !b.active });
+    await loadBadges();
+  };
+
+  const targetSummary = (b) => {
+    if (b.target_type === "group") {
+      const g = groups.find((x) => String(x.id) === String(b.group_id));
+      return `${targetTypeLabel(locale, "group")}: ${g?.name || b.group_id || "—"}`;
+    }
+    if (b.target_type === "api") {
+      if (b.api_rule === "bestseller_category") {
+        const cat = categories.find((x) => String(x.id) === String(b.api_category_id));
+        return `${apiRuleLabel(locale, "bestseller_category")}: ${cat?.name || b.api_category_id || "—"}`;
+      }
+      return apiRuleLabel(locale, b.api_rule || "bestseller");
+    }
+    return `${targetTypeLabel(locale, "product")}: ${productLabelById(b.product_id)}`;
+  };
+
+  const positionSelectOptions = POSITION_OPTIONS.map((p) => ({ label: posLabel(locale, p), value: p }));
+  const targetTypeSelectOptions = ["product", "group", "api"].map((t) => ({ label: targetTypeLabel(locale, t), value: t }));
+  const apiRuleSelectOptions = ["bestseller", "bestseller_category", "sale", "new"].map((r) => ({ label: apiRuleLabel(locale, r), value: r }));
+  const groupSelectOptions = [{ label: "—", value: "" }, ...groups.map((g) => ({ label: g.name, value: g.id }))];
+  const categorySelectOptions = [{ label: "—", value: "" }, ...categories.map((cat) => ({ label: cat.name, value: cat.id }))];
+
+  const t = {
+    addBadge: locale === "de" ? "+ Badge hinzufügen" : locale === "tr" ? "+ Badge ekle" : locale === "fr" ? "+ Ajouter un badge" : locale === "es" ? "+ Añadir insignia" : locale === "it" ? "+ Aggiungi badge" : "+ Add badge",
+    noBadges: locale === "de" ? "Noch keine Badges erstellt." : locale === "tr" ? "Henüz badge oluşturulmadı." : locale === "fr" ? "Aucun badge créé pour l'instant." : locale === "es" ? "Aún no se han creado insignias." : locale === "it" ? "Nessun badge creato finora." : "No badges created yet.",
+    edit: locale === "de" ? "Bearbeiten" : locale === "tr" ? "Düzenle" : locale === "fr" ? "Modifier" : locale === "es" ? "Editar" : locale === "it" ? "Modifica" : "Edit",
+    delete: locale === "de" ? "Löschen" : locale === "tr" ? "Sil" : locale === "fr" ? "Supprimer" : locale === "es" ? "Eliminar" : locale === "it" ? "Elimina" : "Delete",
+    active: locale === "de" ? "Aktiv" : locale === "tr" ? "Aktif" : locale === "fr" ? "Actif" : locale === "es" ? "Activo" : locale === "it" ? "Attivo" : "Active",
+    inactive: locale === "de" ? "Inaktiv" : locale === "tr" ? "Pasif" : locale === "fr" ? "Inactif" : locale === "es" ? "Inactivo" : locale === "it" ? "Inattivo" : "Inactive",
+    modalTitle: editingId
+      ? (locale === "de" ? "Badge bearbeiten" : locale === "tr" ? "Badge düzenle" : locale === "fr" ? "Modifier le badge" : locale === "es" ? "Editar insignia" : locale === "it" ? "Modifica badge" : "Edit badge")
+      : (locale === "de" ? "Neues Badge" : locale === "tr" ? "Yeni badge" : locale === "fr" ? "Nouveau badge" : locale === "es" ? "Nueva insignia" : locale === "it" ? "Nuovo badge" : "New badge"),
+    save: locale === "de" ? "Speichern" : locale === "tr" ? "Kaydet" : locale === "fr" ? "Enregistrer" : locale === "es" ? "Guardar" : locale === "it" ? "Salva" : "Save",
+    cancel: locale === "de" ? "Abbrechen" : locale === "tr" ? "İptal" : locale === "fr" ? "Annuler" : locale === "es" ? "Cancelar" : locale === "it" ? "Annulla" : "Cancel",
+    badgeText: locale === "de" ? "Badge-Text" : locale === "tr" ? "Badge metni" : locale === "fr" ? "Texte du badge" : locale === "es" ? "Texto de la insignia" : locale === "it" ? "Testo del badge" : "Badge text",
+    position: locale === "de" ? "Position" : locale === "tr" ? "Konum" : locale === "fr" ? "Position" : locale === "es" ? "Posición" : locale === "it" ? "Posizione" : "Position",
+    style: locale === "de" ? "Stil" : locale === "tr" ? "Stil" : locale === "fr" ? "Style" : locale === "es" ? "Estilo" : locale === "it" ? "Stile" : "Style",
+    bgColor: locale === "de" ? "Hintergrundfarbe" : locale === "tr" ? "Arka plan rengi" : locale === "fr" ? "Couleur de fond" : locale === "es" ? "Color de fondo" : locale === "it" ? "Colore di sfondo" : "Background color",
+    textColor: locale === "de" ? "Textfarbe" : locale === "tr" ? "Yazı rengi" : locale === "fr" ? "Couleur du texte" : locale === "es" ? "Color del texto" : locale === "it" ? "Colore del testo" : "Text color",
+    borderWidth: locale === "de" ? "Rahmenbreite (px)" : locale === "tr" ? "Kenarlık kalınlığı (px)" : locale === "fr" ? "Épaisseur de bordure (px)" : locale === "es" ? "Grosor del borde (px)" : locale === "it" ? "Spessore bordo (px)" : "Border width (px)",
+    borderColor: locale === "de" ? "Rahmenfarbe" : locale === "tr" ? "Kenarlık rengi" : locale === "fr" ? "Couleur de bordure" : locale === "es" ? "Color del borde" : locale === "it" ? "Colore del bordo" : "Border color",
+    borderRadius: locale === "de" ? "Eckenradius (px)" : locale === "tr" ? "Köşe yuvarlaklığı (px)" : locale === "fr" ? "Rayon des coins (px)" : locale === "es" ? "Radio de esquina (px)" : locale === "it" ? "Raggio angoli (px)" : "Corner radius (px)",
+    fontSize: locale === "de" ? "Schriftgröße (px)" : locale === "tr" ? "Yazı boyutu (px)" : locale === "fr" ? "Taille de police (px)" : locale === "es" ? "Tamaño de fuente (px)" : locale === "it" ? "Dimensione carattere (px)" : "Font size (px)",
+    offsetX: locale === "de" ? "Abstand X (px, 0 = randbündig)" : locale === "tr" ? "Köşeye mesafe X (px, 0 = tam köşede)" : locale === "fr" ? "Décalage X (px, 0 = au ras du coin)" : locale === "es" ? "Desplazamiento X (px, 0 = al borde)" : locale === "it" ? "Offset X (px, 0 = a filo angolo)" : "Offset X (px, 0 = flush corner)",
+    offsetY: locale === "de" ? "Abstand Y (px, 0 = randbündig)" : locale === "tr" ? "Köşeye mesafe Y (px, 0 = tam köşede)" : locale === "fr" ? "Décalage Y (px, 0 = au ras du coin)" : locale === "es" ? "Desplazamiento Y (px, 0 = al borde)" : locale === "it" ? "Offset Y (px, 0 = a filo angolo)" : "Offset Y (px, 0 = flush corner)",
+    preview: locale === "de" ? "Vorschau" : locale === "tr" ? "Önizleme" : locale === "fr" ? "Aperçu" : locale === "es" ? "Vista previa" : locale === "it" ? "Anteprima" : "Preview",
+    target: locale === "de" ? "Ziel" : locale === "tr" ? "Hedef" : locale === "fr" ? "Cible" : locale === "es" ? "Objetivo" : locale === "it" ? "Target" : "Target",
+    apiRule: locale === "de" ? "API-Regel" : locale === "tr" ? "API kuralı" : locale === "fr" ? "Règle API" : locale === "es" ? "Regla API" : locale === "it" ? "Regola API" : "API rule",
+    category: locale === "de" ? "Kategorie" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Category",
+    searchProducts: locale === "de" ? "Produkte suchen …" : locale === "tr" ? "Ürün ara…" : locale === "fr" ? "Rechercher des produits…" : locale === "es" ? "Buscar productos…" : locale === "it" ? "Cerca prodotti…" : "Search products…",
+    group: locale === "de" ? "Produktgruppe" : locale === "tr" ? "Ürün grubu" : locale === "fr" ? "Groupe de produits" : locale === "es" ? "Grupo de productos" : locale === "it" ? "Gruppo di prodotti" : "Product group",
+  };
+
+  return (
+    <BlockStack gap="400">
+      <Text as="p" tone="subdued">
+        {locale === "de" ? "Beliebig viele Text-Badges (z. B. „Sale“, „Bestseller“) auf Produktbildern — Position, Stil und Ziel (Produkt / Produktgruppe / API-Regel) frei wählbar." : locale === "tr" ? "Ürün görsellerinde istediğiniz kadar metin badge'i (ör. \"Sale\", \"Bestseller\") — konum, stil ve hedef (ürün / ürün grubu / API kuralı) serbestçe seçilebilir." : locale === "fr" ? "Un nombre illimité de badges texte (ex. « Sale », « Bestseller ») sur les images produits — position, style et cible (produit / groupe / règle API) entièrement paramétrables." : locale === "es" ? "Tantas insignias de texto como quieras (p. ej. «Sale», «Bestseller») sobre las imágenes de producto — posición, estilo y objetivo (producto / grupo / regla API) totalmente configurables." : locale === "it" ? "Tutti i badge di testo che vuoi (es. \"Sale\", \"Bestseller\") sulle immagini prodotto — posizione, stile e target (prodotto / gruppo / regola API) completamente configurabili." : "As many text badges as you like (e.g. \"Sale\", \"Bestseller\") on product images — position, style and target (product / group / API rule) are all configurable."}
+      </Text>
+
+      <InlineStack>
+        <Button size="slim" variant="primary" onClick={openCreate}>{t.addBadge}</Button>
+      </InlineStack>
+
+      {!loadingBadges && badges.length === 0 && (
+        <Text as="p" tone="subdued">{t.noBadges}</Text>
+      )}
+
+      {badges.length > 0 && (
+        <div style={{ border: "1px solid #e4e5e7", borderRadius: 8 }}>
+          {badges.map((b) => (
+            <div key={b.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid #f4f5f7" }}>
+              <InlineStack gap="300" blockAlign="center">
+                <span style={{ ...badgeVisualStyle(b), position: "relative" }}>{b.label}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{posLabel(locale, b.position)}</div>
+                  <div style={{ fontSize: 12, color: "#6d7175" }}>{targetSummary(b)}</div>
+                </div>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center">
+                <Badge tone={b.active ? "success" : undefined}>{b.active ? t.active : t.inactive}</Badge>
+                <Button size="slim" onClick={() => handleToggleActive(b)}>{b.active ? t.inactive : t.active}</Button>
+                <Button size="slim" onClick={() => openEdit(b)}>{t.edit}</Button>
+                <Button size="slim" tone="critical" variant="plain" onClick={() => handleDelete(b.id)}>{t.delete}</Button>
+              </InlineStack>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modalOpen && (
+        <Modal open onClose={() => setModalOpen(false)} title={t.modalTitle} primaryAction={{ content: t.save, onAction: handleSubmit, loading: saving }} secondaryActions={[{ content: t.cancel, onAction: () => setModalOpen(false) }]}>
+          <Modal.Section>
+            <BlockStack gap="400">
+              {errMsg && <Banner tone="critical">{errMsg}</Banner>}
+              <InlineStack gap="400" wrap={false}>
+                <div style={{ flex: 1 }}>
+                  <TextField label={t.badgeText} value={form.label} onChange={(v) => setField("label", v)} autoComplete="off" placeholder="Sale" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <Select label={t.position} options={positionSelectOptions} value={form.position} onChange={(v) => setField("position", v)} />
+                </div>
+              </InlineStack>
+
+              <Text as="h3" variant="headingSm">{t.preview}</Text>
+              <div style={{ position: "relative", width: 160, height: 160, background: "#e9eaeb", borderRadius: 8, border: "1px solid #d3d5d8" }}>
+                <div style={{ ...badgePositionStyle(form), ...badgeVisualStyle(form) }}>{form.label || "Badge"}</div>
+              </div>
+
+              <Text as="h3" variant="headingSm">{t.style}</Text>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                <ColorField label={t.bgColor} value={form.bg_color} onChange={(v) => setField("bg_color", v)} />
+                <ColorField label={t.textColor} value={form.text_color} onChange={(v) => setField("text_color", v)} />
+                <ColorField label={t.borderColor} value={form.border_color} onChange={(v) => setField("border_color", v)} />
+                <NumericTextField label={t.borderWidth} value={form.border_width} min={0} max={10} fallback={0} onChange={(n) => setField("border_width", n)} />
+                <NumericTextField label={t.borderRadius} value={form.border_radius} min={0} max={100} fallback={4} onChange={(n) => setField("border_radius", n)} />
+                <NumericTextField label={t.fontSize} value={form.font_size} min={8} max={48} fallback={12} onChange={(n) => setField("font_size", n)} />
+                <NumericTextField label={t.offsetX} value={form.offset_x} min={0} max={200} fallback={8} onChange={(n) => setField("offset_x", n)} />
+                <NumericTextField label={t.offsetY} value={form.offset_y} min={0} max={200} fallback={8} onChange={(n) => setField("offset_y", n)} />
+              </div>
+
+              <Divider />
+              <Text as="h3" variant="headingSm">{t.target}</Text>
+              <Select label={t.target} labelHidden options={targetTypeSelectOptions} value={form.target_type} onChange={(v) => setField("target_type", v)} />
+
+              {form.target_type === "product" && (
+                <BlockStack gap="200">
+                  <TextField label="" labelHidden placeholder={t.searchProducts} value={productSearch} onChange={setProductSearch} autoComplete="off" clearButton onClearButtonClick={() => setProductSearch("")} />
+                  <div style={{ maxHeight: 240, overflowY: "auto", border: "1px solid #e4e5e7", borderRadius: 8 }}>
+                    {filteredProducts.map((p) => {
+                      const checked = String(form.product_id) === String(p.id);
+                      return (
+                        <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", background: checked ? "#f0f9ff" : "transparent", borderBottom: "1px solid #f4f5f7" }}>
+                          <Checkbox checked={checked} onChange={() => setField("product_id", checked ? "" : p.id)} />
+                          <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400 }}>{p.title || p.id}</div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </BlockStack>
+              )}
+
+              {form.target_type === "group" && (
+                <Select label={t.group} labelHidden options={groupSelectOptions} value={form.group_id} onChange={(v) => setField("group_id", v)} />
+              )}
+
+              {form.target_type === "api" && (
+                <BlockStack gap="200">
+                  <Select label={t.apiRule} options={apiRuleSelectOptions} value={form.api_rule} onChange={(v) => setField("api_rule", v)} />
+                  {form.api_rule === "bestseller_category" && (
+                    <Select label={t.category} options={categorySelectOptions} value={form.api_category_id} onChange={(v) => setField("api_category_id", v)} />
+                  )}
+                </BlockStack>
+              )}
+
+              <Checkbox label={t.active} checked={form.active} onChange={(v) => setField("active", v)} />
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
+      )}
+    </BlockStack>
   );
 }
 
@@ -1516,6 +1842,15 @@ export default function StylesPage() {
                 />
               </div>
             </BlockStack>
+          </AccordionCard>
+        )}
+
+        {isSuperuser && (
+          <AccordionCard
+            title="Product Badges"
+            subtitle={locale === "de" ? "Text-Badges auf Produktbildern — Position, Stil und Ziel frei konfigurierbar" : locale === "tr" ? "Ürün görsellerinde metin badge'leri — konum, stil ve hedef serbestçe yapılandırılabilir" : locale === "fr" ? "Badges texte sur les images produits — position, style et cible entièrement configurables" : locale === "es" ? "Insignias de texto en las imágenes de producto — posición, estilo y objetivo totalmente configurables" : locale === "it" ? "Badge di testo sulle immagini prodotto — posizione, stile e target completamente configurabili" : "Text badges on product images — position, style and target fully configurable"}
+          >
+            <ProductBadgesCard locale={locale} client={client} />
           </AccordionCard>
         )}
 
