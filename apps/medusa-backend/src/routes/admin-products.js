@@ -1280,6 +1280,30 @@ module.exports = function createAdminProductsRouter() {
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
     if (!rows.length) return res.status(400).json({ message: 'rows array required' })
     if (rows.length > 500) return res.status(400).json({ message: 'Max 500 rows per request' })
+    // Görev 30: the "category"/"brand" CSV columns used to be written into unused
+    // metadata.category_name/brand_name strings — adminHubProductsPOST only ever reads
+    // metadata.category_id/brand_id, so imported products silently ended up with no
+    // category or brand at all. Resolve names to real ids up front (one query each,
+    // not per row) the same way the sellercentral Excel importer does.
+    const categoryIdByLowerName = new Map()
+    const brandIdByLowerName = new Map()
+    try {
+      const lookupClient = getProductsDbClient()
+      if (lookupClient) {
+        await lookupClient.connect()
+        const catRes = await lookupClient.query(`SELECT id, name FROM admin_hub_categories WHERE active = true`)
+        for (const r of catRes.rows || []) {
+          const k = String(r.name || '').trim().toLowerCase()
+          if (k) categoryIdByLowerName.set(k, r.id)
+        }
+        const brandRes = await lookupClient.query(`SELECT id, name FROM admin_hub_brands WHERE status = 'active'`)
+        for (const r of brandRes.rows || []) {
+          const k = String(r.name || '').trim().toLowerCase()
+          if (k) brandIdByLowerName.set(k, r.id)
+        }
+        await lookupClient.end()
+      }
+    } catch (_) { /* lookups are best-effort — import still proceeds without category/brand linking */ }
     const results = []
     for (const row of rows) {
       try {
@@ -1295,18 +1319,23 @@ module.exports = function createAdminProductsRouter() {
         const weight = parseFloat(String(row.weight || row.Weight || row['Gewicht'] || '0').replace(',', '.')) || null
         const ean = String(row.ean || row.EAN || '').trim() || null
         const imageUrls = [row['image_url_1'] || row['Image URL 1'] || row['image1'] || '', row['image_url_2'] || row['Image URL 2'] || row['image2'] || '', row['image_url_3'] || row['Image URL 3'] || row['image3'] || ''].map((u) => String(u || '').trim()).filter(Boolean)
+        const categoryId = categoryName ? categoryIdByLowerName.get(categoryName.toLowerCase()) || null : null
+        const brandId = brandName ? brandIdByLowerName.get(brandName.toLowerCase()) || null : null
+        const unmatchedNames = []
+        if (categoryName && !categoryId) unmatchedNames.push(`category "${categoryName}" not found`)
+        if (brandName && !brandId) unmatchedNames.push(`brand "${brandName}" not found`)
         const productPayload = {
           title, sku, description,
           status: ['published', 'draft', 'archived'].includes(status) ? status : 'draft',
           price, inventory, seller_id: callerSellerId,
-          metadata: { ...(ean ? { ean } : {}), ...(brandName ? { brand_name: brandName } : {}), ...(categoryName ? { category_name: categoryName } : {}), ...(weight ? { weight } : {}), ...(imageUrls.length ? { media: imageUrls.map((url) => ({ url, type: 'image' })) } : {}), seller_id: callerSellerId },
+          metadata: { ...(ean ? { ean } : {}), ...(brandId ? { brand_id: brandId } : {}), ...(categoryId ? { category_id: categoryId, category_ids: [categoryId] } : {}), ...(weight ? { weight } : {}), ...(imageUrls.length ? { media: imageUrls.map((url) => ({ url, type: 'image' })) } : {}), seller_id: callerSellerId },
         }
         const backendBase = `http://localhost:${process.env.PORT || 9000}`
         const authHeader = req.headers.authorization || ''
         const createRes = await fetch(`${backendBase}/admin-hub/products`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: authHeader }, body: JSON.stringify(productPayload) })
         const createData = await createRes.json().catch(() => ({}))
         if (!createRes.ok) { results.push({ title, status: 'error', reason: createData?.message || `HTTP ${createRes.status}` }) }
-        else { results.push({ title, status: 'created', id: createData?.product?.id || createData?.id || null }) }
+        else { results.push({ title, status: 'created', id: createData?.product?.id || createData?.id || null, reason: unmatchedNames.length ? unmatchedNames.join('; ') : undefined }) }
       } catch (e) { results.push({ title: String(row.title || row.Title || ''), status: 'error', reason: e?.message || 'Unknown error' }) }
     }
     const created = results.filter((r) => r.status === 'created').length

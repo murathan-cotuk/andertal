@@ -1189,11 +1189,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setProduct(savedProduct);
       setBaselineSnapshot(productSnapshot(savedProduct));
       unsaved?.setDirty(false);
-      setMessage({ type: "success", text: updatedRaw?.listing_saved
+      // Görev 29: shop's public product cache is 60s (max-age), so a save here doesn't
+      // reflect on the live storefront instantly — say so, instead of leaving the seller
+      // to wonder why nothing changed when they immediately check the shop.
+      const cacheDelayNote = locale === "en" ? " Changes may take up to a minute to appear in the shop."
+        : locale === "tr" ? " Değişiklikler mağazada görünmesi bir dakikaya kadar sürebilir."
+        : locale === "fr" ? " Les changements peuvent prendre jusqu'à une minute pour apparaître dans la boutique."
+        : locale === "es" ? " Los cambios pueden tardar hasta un minuto en aparecer en la tienda."
+        : locale === "it" ? " Le modifiche possono richiedere fino a un minuto per apparire nel negozio."
+        : " Änderungen können bis zu einer Minute brauchen, bis sie im Shop sichtbar sind.";
+      setMessage({ type: "success", text: (updatedRaw?.listing_saved
         ? (updatedRaw?.suggestion_submitted
             ? (locale === "en" ? "Price and inventory saved. Your shared-field change suggestion was submitted for superuser review." : locale === "tr" ? "Fiyat ve stok bilgileriniz kaydedildi. Ortak alan değişiklik öneriniz superuser onayına gönderildi." : locale === "fr" ? "Prix et stock enregistrés. Votre suggestion de modification a été soumise pour examen par un superuser." : locale === "es" ? "Precio e inventario guardados. Tu sugerencia de cambio fue enviada para revisión del superusuario." : locale === "it" ? "Prezzo e inventario salvati. Il tuo suggerimento di modifica è stato inviato per la revisione del superuser." : "Preis und Bestand gespeichert. Dein Änderungsvorschlag wurde zur Prüfung durch einen Superuser eingereicht.")
             : (locale === "en" ? "Price, inventory and own data saved." : locale === "tr" ? "Fiyat, stok ve özel veriler kaydedildi." : locale === "fr" ? "Prix, stock et données propres enregistrés." : locale === "es" ? "Precio, inventario y datos propios guardados." : locale === "it" ? "Prezzo, inventario e dati propri salvati." : "Preis, Bestand und eigene Daten gespeichert."))
-        : ui.saved });
+        : ui.saved) + cacheDelayNote });
       await refetchPendingChangeRequests(savedProduct.id);
       onReload?.();
       return true;

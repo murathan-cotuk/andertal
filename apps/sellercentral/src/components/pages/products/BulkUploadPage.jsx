@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import NextLink from "next/link";
 import { useLocale } from "next-intl";
 import styled from "styled-components";
 import { Card, Button } from "@andertal/ui";
@@ -36,24 +37,43 @@ const CSV_TEMPLATE_ROW = [
   "https://example.com/bild1.jpg", "", "",
 ];
 
+/**
+ * Görev 30: the previous implementation split on "\n" *before* looking at quotes, so a
+ * quoted field containing a real line break (e.g. a multi-line product description) got
+ * torn into multiple broken rows. This parses the whole text as one character stream —
+ * a newline only ends a row when it's outside an open quote, and "" inside a quoted
+ * field is the standard CSV escape for a literal quote.
+ */
 function parseCSV(text) {
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(Boolean);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, "").trim());
-  return lines.slice(1).map(line => {
-    const vals = [];
-    let inQuote = false, cur = "";
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') { inQuote = !inQuote; continue; }
-      if (ch === "," && !inQuote) { vals.push(cur); cur = ""; continue; }
-      cur += ch;
+  const s = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const rows = [];
+  let row = [];
+  let cur = "";
+  let inQuote = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQuote) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { cur += '"'; i++; } else { inQuote = false; }
+      } else {
+        cur += ch;
+      }
+      continue;
     }
-    vals.push(cur);
+    if (ch === '"') { inQuote = true; continue; }
+    if (ch === ",") { row.push(cur); cur = ""; continue; }
+    if (ch === "\n") { row.push(cur); cur = ""; rows.push(row); row = []; continue; }
+    cur += ch;
+  }
+  if (cur !== "" || row.length > 0) { row.push(cur); rows.push(row); }
+  const nonEmptyRows = rows.filter(r => r.some(v => String(v || "").trim() !== ""));
+  if (nonEmptyRows.length < 2) return [];
+  const headers = nonEmptyRows[0].map(h => h.trim());
+  return nonEmptyRows.slice(1).map(vals => {
     const obj = {};
     headers.forEach((h, i) => { obj[h] = (vals[i] || "").trim(); });
     return obj;
-  }).filter(r => Object.values(r).some(v => v));
+  });
 }
 
 function csvTemplateRow(locale) {
@@ -152,6 +172,13 @@ export default function BulkUploadPage() {
   return (
     <Container>
       <Title>{locale === "en" ? "Upload products via CSV" : locale === "tr" ? "CSV ile ürün yükle" : locale === "fr" ? "Importer des produits via CSV" : locale === "es" ? "Subir productos por CSV" : locale === "it" ? "Carica prodotti via CSV" : "Produkte per CSV hochladen"}</Title>
+      <p style={{ margin: "-24px 0 24px", fontSize: 14, color: "#6b7280" }}>
+        {locale === "en" ? "Have a real Excel (.xlsx) file? Use " : locale === "tr" ? "Gerçek bir Excel (.xlsx) dosyanız mı var? " : locale === "fr" ? "Vous avez un vrai fichier Excel (.xlsx) ? Utilisez " : locale === "es" ? "¿Tienes un archivo Excel (.xlsx) real? Usa " : locale === "it" ? "Hai un vero file Excel (.xlsx)? Usa " : "Hast du eine echte Excel-Datei (.xlsx)? Nutze "}
+        <NextLink href="/import-export" style={{ color: "#0ea5e9", fontWeight: 600 }}>
+          {locale === "en" ? "Import & Export" : locale === "tr" ? "İçe/Dışa Aktar" : locale === "fr" ? "Import & Export" : locale === "es" ? "Importar y Exportar" : locale === "it" ? "Importa ed Esporta" : "Import & Export"}
+        </NextLink>
+        {locale === "en" ? " instead — it also matches categories/brands and updates existing products by SKU." : locale === "tr" ? " sayfasını kullanın — o araç ayrıca kategori/marka eşleştirmesi de yapar ve SKU'ya göre mevcut ürünleri günceller." : locale === "fr" ? " à la place — il associe aussi catégories/marques et met à jour les produits existants par SKU." : locale === "es" ? " en su lugar — también asocia categorías/marcas y actualiza productos existentes por SKU." : locale === "it" ? " invece — associa anche categorie/marchi e aggiorna i prodotti esistenti tramite SKU." : " stattdessen — es ordnet auch Kategorien/Marken zu und aktualisiert bestehende Produkte per SKU."}
+      </p>
 
       <Section>
         {/* Template download */}
