@@ -734,6 +734,20 @@ const META_HIDDEN_KEYS = [
   "weight", "width", "height", "depth", "length",
   "eu_origin_provider", "eu_origin_registry_id", "eu_origin_document_url",
   "eu_origin_status", "eu_origin_verified_at", "eu_origin_country",
+  // Shown in dedicated buybox row / "Produktsicherheitsinformationen" section instead — avoid duplicate row in the generic properties table.
+  "weee_number", "eprel_number",
+  "energy_label_image", "energy_label_qr", "ce_declaration_url", "battery_chemistry", "battery_capacity_wh",
+  "inci_list", "responsible_person_eu", "ingredients", "allergens", "best_before", "nutrition_values",
+  "daily_dose", "warning_text", "age_warning", "fiber_composition", "care_symbols", "safety_data_sheet_url",
+  "tpd_compliance_ref", "age_verification", "ce_class", "udi", "authorized_representative", "isbn",
+];
+
+/** Extra GPSR category-specific fields (docs/HUKUKI.md Faz 4) — rendered in the "Produktsicherheitsinformationen" section when present. */
+const EXTRA_COMPLIANCE_KEYS = [
+  "battery_chemistry", "battery_capacity_wh", "inci_list", "responsible_person_eu", "ingredients", "allergens",
+  "best_before", "nutrition_values", "daily_dose", "warning_text", "age_warning", "fiber_composition",
+  "care_symbols", "tpd_compliance_ref", "age_verification", "ce_class", "udi", "authorized_representative", "isbn",
+  "energy_label_qr", "ce_declaration_url", "safety_data_sheet_url", "energy_label_image",
 ];
 
 const DEFAULT_VARIANT_TITLES = new Set(["default title", "default", "standard"]);
@@ -2078,14 +2092,35 @@ export default function ProductTemplateMobile() {
         />
       )}
 
-      {(meta.hersteller || meta.hersteller_information || meta.verantwortliche_person_information) && (
-        <DescriptionSection id="produktsicherheit" as="section" style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>Produktsicherheitsinformationen</h3>
-          {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>Hersteller:</strong> {String(meta.hersteller)}</p>}
-          {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Hersteller-Informationen:</strong><br />{String(meta.hersteller_information)}</p>}
-          {meta.verantwortliche_person_information && <p style={{ marginBottom: 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Verantwortliche Person (EU):</strong><br />{String(meta.verantwortliche_person_information)}</p>}
-        </DescriptionSection>
-      )}
+      {(() => {
+        const extraCompliance = EXTRA_COMPLIANCE_KEYS.filter((k) => meta[k] != null && String(meta[k]).trim() !== "");
+        if (!meta.hersteller && !meta.hersteller_information && !meta.verantwortliche_person_information && extraCompliance.length === 0) return null;
+        return (
+          <DescriptionSection id="produktsicherheit" as="section" style={{ marginTop: 24 }}>
+            <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
+              {{ de: "Produktsicherheitsinformationen", en: "Product safety information", tr: "Ürün güvenlik bilgileri", fr: "Informations de sécurité produit", it: "Informazioni di sicurezza prodotto", es: "Información de seguridad del producto" }[locale] ?? "Produktsicherheitsinformationen"}
+            </h3>
+            {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>Hersteller:</strong> {String(meta.hersteller)}</p>}
+            {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Hersteller-Informationen:</strong><br />{String(meta.hersteller_information)}</p>}
+            {meta.verantwortliche_person_information && <p style={{ marginBottom: extraCompliance.length > 0 ? 8 : 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Verantwortliche Person (EU):</strong><br />{String(meta.verantwortliche_person_information)}</p>}
+            {extraCompliance.map((key, i) => {
+              const value = String(meta[key]);
+              const label = localizeMetaKey(key, locale);
+              const isUrl = /^https?:\/\//i.test(value);
+              return (
+                <p key={key} style={{ marginBottom: i === extraCompliance.length - 1 ? 0 : 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}>
+                  <strong>{label}:</strong>{" "}
+                  {isUrl ? (
+                    <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb" }}>
+                      {{ de: "Dokument ansehen", en: "View document", tr: "Belgeyi görüntüle", fr: "Voir le document", it: "Vedi documento", es: "Ver documento" }[locale] ?? "Dokument ansehen"}
+                    </a>
+                  ) : value}
+                </p>
+              );
+            })}
+          </DescriptionSection>
+        );
+      })()}
 
       {Array.isArray(meta.product_files) && meta.product_files.length > 0 && (
         <DescriptionSection as="section" style={{ marginTop: 24 }}>

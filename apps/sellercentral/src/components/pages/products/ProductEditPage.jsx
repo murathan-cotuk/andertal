@@ -34,6 +34,7 @@ import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import ComplianceFieldsSection from "@/components/products/ComplianceFieldsSection";
 import { routing } from "@/i18n/routing";
 import { encodeVariantPathKey } from "@/lib/variant-path-key";
 import { ChangeRequestFieldBadge } from "@/components/ChangeRequestFieldBadge";
@@ -3342,6 +3343,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)}
                 placeholder="Verantwortliche Person Information"
                 multiline={2}
+              />
+
+              <ComplianceFieldsSection
+                client={client}
+                categoryId={getMeta(product, "category_id")}
+                marketplace="DE"
+                locale={locale}
+                product={product}
+                getMeta={getMeta}
+                updateMeta={updateMeta}
               />
 
               <ProductSectionRule />

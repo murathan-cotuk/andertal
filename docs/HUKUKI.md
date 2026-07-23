@@ -230,16 +230,22 @@ TALİMAT A — Kategori + ülke bazlı compliance sistemi
 - ❌ Excel import validation.
 - 📝 NOT: Superuser'ın bu `compliance_review` verisini görebileceği bir liste/panel henüz yok (veri DB'de birikiyor ama henüz bir UI'da gösterilmiyor) — bu, gerçek SERT gate'e geçmeden önce mantıklı bir sonraki adım.
 
-## Faz 3 — Sellercentral UI ❌ YAPILMADI
-- ❌ `ProductEditPage.jsx` sabit WEEE/EPREL/GPSR blokları duruyor; dinamik `ComplianceFieldsSection` yapılmadı.
-- ❌ `ComplianceProfilesPage` (superuser, opsiyonel).
+## Faz 3 — Sellercentral UI ✅ DİNAMİK ALANLAR EKLENDİ (2026-07-23, dördüncü oturum)
+- ✅ **YENİ**: `apps/sellercentral/src/components/products/ComplianceFieldsSection.jsx` — ürünün kategorisi için `GET /admin-hub/categories/:id/compliance-schema?marketplace=DE` çağırır, dönen `required_fields`/`optional_fields`'ten zaten statik gösterilen 5 alanı (`hersteller`, `hersteller_information`, `verantwortliche_person_information`, `weee_number`, `eprel_number`) çıkarıp kalanları `field_definitions`teki `type`e göre (text/select/number/file) diner render eder. `getMeta`/`updateMeta` ile aynı `product.metadata` alanına okur/yazar. `superuser_only` profillerde uyarı banner'ı gösterir.
+- ✅ `ProductEditPage.jsx`'e entegre edildi — "Produktsicherheitsinformationen (GPSR)" bloğunun hemen altına, `Made in Europe` bölümünden önce.
+- ⚠️ BİLİNÇLİ OLARAK DEĞİŞTİRİLMEDİ: sabit WEEE/EPREL/GPSR blokları kaldırılmadı (hâlâ duruyor, kanıtlanmış çalışıyor) — sadece kategoriye özel EK alanlar dinamik olarak eklendi. Sert (bloklayan) save/publish engeli eklenmedi — bu bileşen sadece gösterim/veri toplama amaçlı, mevcut hard-block (satır ~1099-1113, sadece temel 3 GPSR alanı) DEĞİŞMEDİ.
+- ❌ `ComplianceProfilesPage` (superuser, opsiyonel Faz 3b) — hâlâ yapılmadı.
 - ❌ `compliance_review` verisini gösteren bir superuser paneli/bildirim yok (bkz. Faz 2 notu).
 
-## Faz 4 — Shop gösterimi ❌ YAPILMADI
-- ❌ `prop-labels.js` / `ProductTemplate.jsx` — mevcut "sadece dolu alanları göster" mantığı zaten var; EPREL QR tıklanabilir link vb. eklenmedi.
+## Faz 4 — Shop gösterimi ✅ KATEGORİYE ÖZEL ALANLAR GÖSTERİLİYOR (2026-07-23, dördüncü oturum)
+- ✅ `apps/shop/src/lib/prop-labels.js` — `compliance-profiles.json`'daki 23 kategori-özel alan için (battery_chemistry, ingredients, allergens, ce_declaration_url, fiber_composition, isbn, vb.) 6 dilde (de/en/tr/fr/it/es) etiket eklendi; önceden bunlar jenerik İngilizce Title-Case fallback ile gösteriliyordu.
+- ✅ `ProductTemplate.jsx` + `ProductTemplateMobile.jsx` — "Produktsicherheitsinformationen" bölümü, dolu olan kategori-özel alanları da (Hersteller bilgisinin altında) gösterecek şekilde genişletildi; `http(s)://` ile başlayan değerler (örn. `ce_declaration_url`, `safety_data_sheet_url`) düz metin yerine tıklanabilir "Dokument ansehen" linki olarak render ediliyor.
+- ✅ **BUG DÜZELTİLDİ**: `weee_number`/`eprel_number` önceden `META_HIDDEN_KEYS`'te değildi, bu yüzden hem özel buybox satırında HEM DE jenerik "Eigenschaften" özellik tablosunda iki kez gösteriliyorlardı. Artık 23 yeni alanla birlikte `META_HIDDEN_KEYS`'e eklendi (mükerrer satır önlendi), her ikisi de yalnızca "Produktsicherheitsinformationen" bölümünde gösteriliyor.
+- ⚠️ BİLİNÇLİ OLARAK YAPILMADI: EPREL numarası tıklanabilir bir eprel.ec.europa.eu QR/derin linkine dönüştürülmedi — resmi EPREL sorgu URL formatı doğrulanamadığı için (kategoriye göre değişen path yapısı), yanlış/kırık link riski almamak adına düz metin olarak bırakıldı. İleride EPREL API/URL formatı netleştirilirse eklenebilir.
 
 ## Kabul kriterleri
-- [x] Kitap kategorisinde WEEE/EPREL GÖRÜNMEZ → ✅ Gerçek "books" kategorisiyle canlı DB'ye karşı doğrulandı (motor + atanmış profil + endpoint hepsi çalışıyor); UI'da GÖSTERİLMESİ hâlâ Faz 3'e bağlı.
+- [x] Kitap kategorisinde WEEE/EPREL GÖRÜNMEZ → ✅ Gerçek "books" kategorisiyle canlı DB'ye karşı doğrulandı (motor + atanmış profil + endpoint hepsi çalışıyor); Faz 3 dinamik bileşen de aynı endpoint'i kullandığı için kitap kategorisinde ek alan render etmiyor.
+- [x] Kategoriye özel alanlar (elektronik→WEEE, kozmetik→INCI, vb.) Sellercentral'da dinamik gösteriliyor → ✅ `ComplianceFieldsSection.jsx` (2026-07-23).
 - [~] Elektronikte WEEE zorunlu, eksikse active olamaz → Motor + atama + non-blocking tespit çalışıyor (`compliance_review.missing_fields` doğru hesaplanıyor); SERT engelleme (gerçek "active olamaz") bilinçli olarak hâlâ açılmadı.
 - [ ] DE'de Almanca etiket uyarısı → ⚠️ Overlay'de `label_language:"de"` var; UI göstermiyor.
 - [ ] 2. satıcı dolu GPSR tekrar istenmez → ❌ Yapılmadı.
@@ -265,6 +271,7 @@ TALİMAT A — Kategori + ülke bazlı compliance sistemi
 2. ~~`GET /admin-hub/categories/:id/compliance-schema` route wrapper~~ **[TAMAMLANDI]**
 3. ~~Faz 2 validation'ı draft'ta kal, needs_compliance_review flag ile açmak~~ **[TAMAMLANDI — bloklamayan `compliance_review` işaretleyicisi canlı, gerçek üründe test edildi]**
 4. Superuser'ın `compliance_review.ok=false` olan ürünleri görebileceği bir liste/bildirim (Faz 3'ün küçük bir parçası) — henüz yok, mantıklı bir sonraki adım.
-5. Faz 3 UI (dinamik `ComplianceFieldsSection`, sabit WEEE/EPREL bloklarının kaldırılması) — büyük kapsamlı, henüz başlanmadı.
-6. Ancak kategori ataması biraz daha CSV override ile iyileştirildikten ve superuser bir süre `compliance_review` verisini gözlemleyip güvendikten SONRA, SERT (bloklayan) gate'e geçiş düşünülebilir — şu an bilinçli olarak yapılmadı.
+5. ~~Faz 3 UI (dinamik `ComplianceFieldsSection`)~~ **[TAMAMLANDI — 2026-07-23, kategoriye özel ek alanlar Sellercentral'da dinamik render ediliyor, sabit bloklar kasıtlı olarak korundu]**
+6. ~~Faz 4 shop gösterimi (kategoriye özel alanlar + i18n etiketler)~~ **[TAMAMLANDI — 2026-07-23, `ProductTemplate.jsx`/`ProductTemplateMobile.jsx`/`prop-labels.js`]**
+7. Ancak kategori ataması biraz daha CSV override ile iyileştirildikten ve superuser bir süre `compliance_review` verisini gözlemleyip güvendikten SONRA, SERT (bloklayan) gate'e geçiş düşünülebilir — şu an bilinçli olarak yapılmadı.
 > ⚠️ Bu bir hukuki tavsiye değildir; canlıya almadan önce avukat/compliance danışmanı doğrulaması şart (JSON `_meta.legal_disclaimer`).

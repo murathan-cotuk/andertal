@@ -84,3 +84,25 @@
   - **SKU/EAN tekilliği** konusunda ilk bulgum yanlıştı, düzelttim: tüm ürün oluşturma yolları (tekil ekleme, her iki toplu araç) aynı paylaşılan uç noktadan geçiyor, o da aynı EAN geldiğinde çoğaltma yerine mevcut ürüne yeni bir satıcı teklifi (buybox) olarak bağlıyor — bu zaten doğru/kasıtlı bir pazar yeri davranışı, düzeltme gerekmedi.
   - Bu ikinci sayfaya artık, gerçek Excel dosyası olan satıcıları daha iyi/olgun `/import-export` aracına yönlendiren bir bağlantı eklendi.
   - Sıralı/yavaş işleme (500 satıra kadar tek tek istek) düzeltilmedi — CSV aracı zaten ikincil/az kullanılan bir yol olduğu için önceliklendirilmedi.
+
+---
+
+23.07 — Canlıya alma öncesi kontrol listesi, tur 2 (Claude). "Site komple bitti mi?" sorusuna yanıt olarak.
+
+31) **[🔴 KESİN ENGEL] Stripe test modunda.** Canlı veritabanını kontrol ettim: `store_platform_checkout` tablosundaki anahtarlar `sk_test_`/`pk_test_` — yani şu anki haliyle **tek bir gerçek satış bile yapılamaz**, her "ödeme" sahte/test işlemi. Kullanıcı bunu en son, kendisi yapacak (bilgi amaçlı).
+
+32) **[🔴 Ciddi, yasal risk] AB GPSR (Genel Ürün Güvenliği) uyumluluğu yarım kalmış.** — **Durum: ✅ Yapıldı (Faz 3 + Faz 4).**
+- Sellercentral: yeni `ComplianceFieldsSection.jsx` bileşeni ürünün kategorisine göre `GET /admin-hub/categories/:id/compliance-schema` çağırıp eksik olan kategoriye-özel alanları (WEEE/EPREL dışında battery_chemistry, ingredients, allergens, fiber_composition, ce_declaration_url vb. 23 alan) `ProductEditPage.jsx`'te dinamik gösteriyor. Sabit WEEE/EPREL/temel-GPSR blokları bilinçli olarak korundu (kanıtlanmış çalışıyorlardı), sadece eksik ek alanlar üstüne eklendi. Sert (bloklayan) save engeli eklenmedi — mevcut hard-block (sadece temel 3 GPSR alanı) değişmedi.
+- Shop: `prop-labels.js`'e bu 23 alan için 6 dilde etiket eklendi, `ProductTemplate.jsx`/`ProductTemplateMobile.jsx`'teki "Produktsicherheitsinformationen" bölümü doldurulan kategoriye-özel alanları da gösterecek şekilde genişletildi (URL değerleri tıklanabilir link olarak). Yan bulgu: `weee_number`/`eprel_number` daha önce hem özel satırda hem jenerik özellik tablosunda **iki kez** gösteriliyordu — bu da düzeltildi.
+- Aralık 2024'te yürürlüğe giren GPSR aktif olarak denetleniyor — bu düzeltmeyle artık kategoriye özel güvenlik bilgileri hem toplanabiliyor hem müşteriye gösteriliyor, düzenleyici risk büyük ölçüde azaldı.
+- Yapılmayan (bilinçli, düşük öncelik): superuser'ın `compliance_review.ok=false` ürünleri görebileceği panel; sert publish engeli; EPREL numarasının tıklanabilir eprel.ec.europa.eu linkine çevrilmesi (resmi URL formatı doğrulanamadığı için kırık link riski alınmadı).
+
+33) **[🟡 Ciddi, ölçeklenme riski] E-posta gönderimi kişisel/kurumsal Gmail SMTP üzerinden gidiyor.** Platform tüm işlemsel e-postaları (sipariş onayı, kargo, şifre sıfırlama, tüm flow e-postaları) `smtp.gmail.com` + `info@andertal.com` üzerinden gönderiyor. Gmail/Google Workspace SMTP relay'in günlük gönderim limiti var (tipik olarak birkaç yüz-birkaç bin/gün) — gerçek müşteri hacminde bu limitlere takılıp e-postalar gecikebilir/reddedilebilir. Kod tabanında zaten profesyonel bir alternatif (Resend API) desteklenmiş durumda (`flow-automation.js`, `resolveFlowMailProvider()`) ama `RESEND_API_KEY` ortam değişkeni ayarlanmamış, yani şu an devre dışı — aktifleştirmek sadece bir hesap açıp API anahtarını ayarlamayı gerektiriyor, ek kod yazmaya gerek yok.
+
+34) **[🟡 Ciddi] E-posta kimlik doğrulama DNS kayıtları eksik.** `andertal.com` için canlı DNS sorgusu yaptım: **SPF kaydı yok**, **DMARC kaydı yok** (`_dmarc.andertal.com` hiç mevcut değil). Bu, gönderilen e-postaların (özellikle Gmail SMTP ile birlikte) büyük olasılıkla Gmail/Outlook gibi alıcı sunucular tarafından spam'e atılmasına veya reddedilmesine yol açar — sipariş onayı gibi kritik e-postalar müşteriye hiç ulaşmayabilir. Bu, DNS sağlayıcısı (domain kayıt paneli) üzerinden yapılması gereken bir ayar, kod değişikliği değil.
+
+35) **[✅ Bulundu ve düzeltildi] Canlıda herkese açık bir debug sayfası vardı.** `apps/shop/src/app/[locale]/debug/collections/page.jsx` — geliştiricinin kendi notunda bile "production'da kaldır" yazan, backend koleksiyon/menü verisini yetkilendirmesiz gösteren bir sayfa — canlı sitede gerçekten erişilebilir olduğunu doğruladım (`https://www.andertal.com/de/de/debug/collections` → HTTP 200). Dosya tamamen silindi.
+
+36) **[⚪ Kod dışı, doğrulanamadı] Yedekleme/felaket kurtarma, sunucu/hosting sağlayıcısı (Render, Vercel) seviyesinde bir konu — koddan görülemez, doğrudan hosting panelinden kontrol edilmeli.**
+
+**Genel durum:** İkinci tur denetimde bulunan 31-36 arası maddelerden 32 (GPSR Faz 3/4) ve 35 (public debug sayfası) artık ✅ tamamlandı. Geriye kalanlar kullanıcının kendi aksiyonunu gerektiriyor, kodla çözülemez: 31 (Stripe canlı moda geçiş — kullanıcı en son kendisi yapacak), 33 (Resend hesabı açıp `RESEND_API_KEY` ayarlamak), 34 (SPF/DMARC DNS kayıtlarını domain panelinden eklemek), 36 (hosting sağlayıcısının yedekleme panelinden kontrol).
