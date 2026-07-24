@@ -989,6 +989,9 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_updated_at timestamp;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS billbee_connection_name text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS storefront_url text;`).catch(() => {})
+        // Seller's last-used Sellercentral UI language — captured opportunistically when they reply to a
+        // message or open a support ticket, so message-notification emails can be sent in that language.
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS locale varchar(8) DEFAULT 'de';`).catch(() => {})
         // ── Platform legal / company info ────────────────────────────────────
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_company_name varchar(255)`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_representative varchar(255)`).catch(() => {})
@@ -1073,6 +1076,14 @@ async function start() {
         ).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_flows ADD COLUMN IF NOT EXISTS audience varchar(20) NOT NULL DEFAULT 'customer'`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_admin_hub_flow_steps_flow ON admin_hub_flow_steps(flow_id, step_order)`).catch(() => {})
+        // Seed the customer/seller messaging-notification flows (Content → Flows) once — never
+        // overwrites a trigger_key the superuser already has a flow for.
+        try {
+          const { seedMessageFlows } = require('./src/seed-message-flows')
+          await seedMessageFlows(client)
+        } catch (e) {
+          console.warn('[seed-message-flows]', e?.message || e)
+        }
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_flow_snapshots (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

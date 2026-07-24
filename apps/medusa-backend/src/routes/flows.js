@@ -758,6 +758,90 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
           es: 'Puntos bonus',
         },
       },
+      {
+        key: 'MESSAGE_BODY',
+        sample: 'Hello, when will my order ship?',
+        category: 'messaging',
+        triggers: ['customer_message_sent', 'seller_new_customer_message', 'customer_message_replied', 'seller_support_ticket_sent', 'seller_support_ticket_replied'],
+        desc: {
+          en: 'The message text (HTML, line breaks preserved)',
+          de: 'Nachrichtentext (HTML, Zeilenumbrüche erhalten)',
+          tr: 'Mesaj metni (HTML, satır sonları korunur)',
+          fr: 'Texte du message (HTML, sauts de ligne conservés)',
+          it: 'Testo del messaggio (HTML, a capo mantenuti)',
+          es: 'Texto del mensaje (HTML, saltos de línea conservados)',
+        },
+      },
+      {
+        key: 'MESSAGE_SUBJECT',
+        sample: 'Question about my order',
+        category: 'messaging',
+        triggers: ['customer_message_sent', 'seller_new_customer_message', 'customer_message_replied', 'seller_support_ticket_sent', 'seller_support_ticket_replied'],
+        desc: {
+          en: 'The message subject, if one was given',
+          de: 'Nachrichtenbetreff, falls angegeben',
+          tr: 'Mesaj konusu (varsa)',
+          fr: 'Objet du message, si renseigné',
+          it: 'Oggetto del messaggio, se indicato',
+          es: 'Asunto del mensaje, si se indicó',
+        },
+      },
+      {
+        key: 'SELLER_NAME',
+        sample: 'Andertal Shop',
+        category: 'messaging',
+        triggers: ['customer_message_sent', 'seller_new_customer_message', 'customer_message_replied'],
+        desc: {
+          en: "The seller's store name",
+          de: 'Shop-Name des Sellers',
+          tr: 'Satıcının mağaza adı',
+          fr: 'Nom de la boutique du vendeur',
+          it: 'Nome del negozio del seller',
+          es: 'Nombre de la tienda del vendedor',
+        },
+      },
+      {
+        key: 'CUSTOMER_EMAIL',
+        sample: 'jane@example.com',
+        category: 'messaging',
+        triggers: ['customer_message_sent', 'seller_new_customer_message'],
+        desc: {
+          en: "The customer's email address",
+          de: 'E-Mail-Adresse des Kunden',
+          tr: 'Müşterinin e-posta adresi',
+          fr: "Adresse e-mail du client",
+          it: "Indirizzo email del cliente",
+          es: 'Correo electrónico del cliente',
+        },
+      },
+      {
+        key: 'SHOP_MESSAGES_URL',
+        sample: 'https://www.andertal.com/nachrichten',
+        category: 'messaging',
+        triggers: ['customer_message_sent', 'customer_message_replied'],
+        desc: {
+          en: 'Link to the customer\'s messages page in the shop',
+          de: 'Link zur Nachrichtenseite des Kunden im Shop',
+          tr: 'Müşterinin mağazadaki mesajlar sayfasına link',
+          fr: 'Lien vers la page messages du client dans la boutique',
+          it: 'Link alla pagina messaggi del cliente nel negozio',
+          es: 'Enlace a la página de mensajes del cliente en la tienda',
+        },
+      },
+      {
+        key: 'SELLERCENTRAL_INBOX_URL',
+        sample: 'https://sellercentral.andertal.com/de/inbox',
+        category: 'messaging',
+        triggers: ['seller_new_customer_message', 'seller_support_ticket_sent', 'seller_support_ticket_replied'],
+        desc: {
+          en: "Link to the seller's Sellercentral inbox",
+          de: 'Link zum Sellercentral-Posteingang',
+          tr: 'Sellercentral gelen kutusuna link',
+          fr: 'Lien vers la boîte de réception Sellercentral',
+          it: 'Link alla posta in arrivo di Sellercentral',
+          es: 'Enlace a la bandeja de entrada de Sellercentral',
+        },
+      },
     ]
     const FLOW_EMAIL_SAMPLE_PLACEHOLDERS = (() => {
       const o = {}
@@ -812,6 +896,11 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       'win_back',
       'favorite_low_stock',
       'favorite_price_drop',
+      'customer_message_sent',
+      'seller_new_customer_message',
+      'customer_message_replied',
+      'seller_support_ticket_sent',
+      'seller_support_ticket_replied',
     ])
     const mapFlowRow = (row) =>
       row

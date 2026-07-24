@@ -215,6 +215,10 @@ function SmtpSendersSection({ onToast, copy, ui }) {
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editRow, setEditRow] = useState(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -293,6 +297,30 @@ function SmtpSendersSection({ onToast, copy, ui }) {
     setAdding(false);
   };
 
+  const openEdit = (row) => {
+    setEditRow(row);
+    setEditEmail(row.from_email || "");
+    setEditName(row.from_name || "");
+  };
+
+  const saveEdit = async () => {
+    const fe = editEmail.trim();
+    if (!fe) {
+      onToast?.({ tone: "critical", text: copy.emailRequired });
+      return;
+    }
+    setEditing(true);
+    try {
+      await client.updateSmtpSender(editRow.id, { from_email: fe, from_name: editName.trim() || undefined });
+      onToast?.({ tone: "success", text: copy.senderUpdated });
+      setEditRow(null);
+      await load();
+    } catch (e) {
+      onToast?.({ tone: "critical", text: e?.message || copy.updateFailed });
+    }
+    setEditing(false);
+  };
+
   if (loading) return <Box padding="400"><Text tone="subdued">{copy.sendersLoading}</Text></Box>;
 
   return (
@@ -335,6 +363,7 @@ function SmtpSendersSection({ onToast, copy, ui }) {
             {!row.is_default && (
               <Button size="slim" onClick={() => setMain(row.id)}>{copy.setMain}</Button>
             )}
+            <Button size="slim" onClick={() => openEdit(row)}>{ui.edit}</Button>
             <Button size="slim" onClick={() => openTest(row.id)}>Test</Button>
             <Button size="slim" tone="critical" variant="plain" onClick={() => removeSender(row)}>{ui.delete}</Button>
           </div>
@@ -371,6 +400,21 @@ function SmtpSendersSection({ onToast, copy, ui }) {
           <BlockStack gap="300">
             <TextField label={copy.senderEmail} type="email" value={newEmail} onChange={setNewEmail} autoComplete="off" />
             <TextField label={copy.senderNameOptional} value={newName} onChange={setNewName} autoComplete="off" />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={!!editRow}
+        onClose={() => setEditRow(null)}
+        title={copy.editSender}
+        primaryAction={{ content: ui.save, onAction: saveEdit, loading: editing }}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setEditRow(null) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <TextField label={copy.senderEmail} type="email" value={editEmail} onChange={setEditEmail} autoComplete="off" />
+            <TextField label={copy.senderNameOptional} value={editName} onChange={setEditName} autoComplete="off" />
           </BlockStack>
         </Modal.Section>
       </Modal>

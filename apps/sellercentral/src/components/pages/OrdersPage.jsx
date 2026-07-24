@@ -736,8 +736,8 @@ const COL_DEFS_BASE = [
   { key: "delivery_status", labelKey: "colDeliveryStatus",hideable: true, sortKey: null,           defaultWidth: 130, align: "center" },
   { key: "date",            labelKey: "colDate",         hideable: true,  sortKey: "created_at",   defaultWidth: 145, align: "left"   },
   { key: "country",         labelKey: "colCountry",      hideable: true,  sortKey: "country",      defaultWidth: 70,  align: "center" },
-  { key: "review",          labelKey: "colReview",       hideable: true,  sortKey: null,           defaultWidth: 100, align: "center" },
-  { key: "actions",         labelKey: "",                hideable: false, sortKey: null,           defaultWidth: 210, align: "right"  },
+  { key: "review",          labelKey: "colReview",       hideable: true,  sortKey: null,           defaultWidth: 70,  align: "center" },
+  { key: "actions",         labelKey: "",                hideable: false, sortKey: null,           defaultWidth: 70,  align: "right"  },
 ];
 // Kept for backward compat in column-width tracking
 const COL_DEFS = COL_DEFS_BASE;
@@ -1021,16 +1021,16 @@ export default function OrdersPage() {
           onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#f9fafb"; }}
           onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
-          <td style={{ padding: "7px 6px 7px 12px", width: 32 }} onClick={e => e.stopPropagation()}>
+          <td style={{ padding: "7px 6px 7px 12px", width: 32, borderRight: "1px solid #e5e7eb" }} onClick={e => e.stopPropagation()}>
             <CustomCheckbox checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} size={18} />
           </td>
-          <td style={{ padding: "7px 8px 7px 8px", width: 32 }}>
+          <td style={{ padding: "7px 8px 7px 8px", width: 32, borderRight: "1px solid #e5e7eb" }}>
             <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
               {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
             </button>
           </td>
           {!hc.has("order_number") && (
-            <td style={{ padding: "7px 10px", fontWeight: 600, fontSize: 13 }}>
+            <td style={{ padding: "7px 10px", fontWeight: 600, fontSize: 13, borderRight: "1px solid #e5e7eb" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <button
                   onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
@@ -1042,12 +1042,12 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("customer") && (
-            <td style={{ padding: "7px 10px", minWidth: 180 }}>
+            <td style={{ padding: "7px 10px", minWidth: 180, borderRight: "1px solid #e5e7eb" }}>
               <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
             </td>
           )}
           {!hc.has("address") && (
-            <td style={{ padding: "7px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45 }}>
+            <td style={{ padding: "7px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45, borderRight: "1px solid #e5e7eb" }}>
               {order.address_line1 ? (
                 <>
                   <div>{order.address_line1}</div>
@@ -1058,7 +1058,7 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("amount") && (
-            <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600 }}>
+            <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600, borderRight: "1px solid #e5e7eb" }}>
               {(() => {
                 const vat = getVatInfo(order.country);
                 const brutto = order.total_cents || 0;
@@ -1078,7 +1078,7 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("order_status") && (
-            <td style={{ padding: "7px 10px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
               {returnsMap[order.id] ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
@@ -1090,27 +1090,27 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("payment_status") && (
-            <td style={{ padding: "7px 10px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
               <StatusBadge value={order.payment_status} />
             </td>
           )}
           {!hc.has("delivery_status") && (
-            <td style={{ padding: "7px 10px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
               <StatusBadge value={order.delivery_status} />
             </td>
           )}
           {!hc.has("date") && (
-            <td style={{ padding: "7px 10px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+            <td style={{ padding: "7px 10px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap", borderRight: "1px solid #e5e7eb" }}>
               {fmtDate(order.created_at)}
             </td>
           )}
           {!hc.has("country") && (
-            <td style={{ padding: "7px 10px", textAlign: "center", fontWeight: 500 }}>
+            <td style={{ padding: "7px 10px", textAlign: "center", fontWeight: 500, borderRight: "1px solid #e5e7eb" }}>
               {order.country || "—"}
             </td>
           )}
           {!hc.has("review") && (
-            <td style={{ padding: "7px 10px", textAlign: "center" }}>
+            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
               {(() => {
                 const orderReviews = allReviews.filter((r) => r.order_id === order.id);
                 if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 14 }}>★★★★★</span>;
@@ -1136,15 +1136,8 @@ export default function OrdersPage() {
               })()}
             </td>
           )}
-          <td style={{ padding: "7px 8px", textAlign: "right" }}>
+          <td style={{ padding: "7px 8px", textAlign: "right", borderRight: "1px solid #e5e7eb" }}>
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
-              {order.delivery_status !== "versendet" && order.delivery_status !== "zugestellt" && (
-                <div onClick={(e) => e.stopPropagation()}>
-                  <Button size="slim" variant="primary" onClick={() => startPacking([order])}>
-                    {ui.ship}
-                  </Button>
-                </div>
-              )}
               <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => startPacking([order])} onBuyLabel={() => setLabelModal(order)} isSuperuser={isSuperuser} />
             </div>
           </td>
@@ -1357,6 +1350,7 @@ export default function OrdersPage() {
                       background: "#f9fafb",
                       overflow: "hidden",
                       boxSizing: "border-box",
+                      borderRight: "1px solid #d1d5db",
                     }}
                   >
                     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>

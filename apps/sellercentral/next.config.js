@@ -60,8 +60,9 @@ const nextConfig = {
     // Strict CSP for the admin/seller panel — no third-party embeds needed.
     const csp = [
       "default-src 'self'",
-      // Next.js hydration + Polaris + styled-components require unsafe-inline/eval
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      // Next.js hydration + Polaris + styled-components require unsafe-inline/eval.
+      // Stripe.js (seller card-on-file for platform fees / shipping label charges) is loaded from js.stripe.com.
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com",
       // User-uploaded images can come from the backend or any HTTPS CDN
       "img-src 'self' data: blob: https:",
@@ -69,8 +70,9 @@ const nextConfig = {
       // XHR/fetch to backend API; wss for any future WebSocket features.
       // Dev-only backend origins come from SC_ALLOWED_DEV_BACKEND_HOSTS env.
       `connect-src 'self' https: wss:${devBackendHosts.length ? " " + devBackendHosts.join(" ") : ""}`,
-      // Admin panel must never be embeddable in any frame
-      "frame-src 'none'",
+      // Admin panel must never be embeddable in any frame (frame-ancestors) — but this page embeds
+      // Stripe's own Card Element / 3D Secure iframes, so those two origins must be allowed here.
+      "frame-src https://js.stripe.com https://hooks.stripe.com",
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",

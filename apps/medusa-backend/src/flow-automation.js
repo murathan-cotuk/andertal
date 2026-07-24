@@ -276,12 +276,15 @@ async function loadOrderContext(client, orderId) {
       dbStorefrontUrl = String(sh.rows[0].storefront_url || '').trim().replace(/\/$/, '')
     }
   }
+  const platformRow = await client.query(
+    `SELECT storefront_url, platform_name, store_name FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
+  )
   if (!dbStorefrontUrl) {
-    const defRow = await client.query(
-      `SELECT storefront_url FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
-    )
-    dbStorefrontUrl = String(defRow.rows[0]?.storefront_url || '').trim().replace(/\/$/, '')
+    dbStorefrontUrl = String(platformRow.rows[0]?.storefront_url || '').trim().replace(/\/$/, '')
   }
+  // Marketplace emails must show the platform's own brand as the sender name (not the
+  // fulfilling seller's store name) — we are the intermediary sending the notification.
+  const platformName = String(platformRow.rows[0]?.platform_name || platformRow.rows[0]?.store_name || 'Andertal').trim() || 'Andertal'
   const siteUrl = resolvePublicShopBaseUrl() || dbStorefrontUrl
   if (!siteUrl) {
     logger.warn(
@@ -326,6 +329,7 @@ async function loadOrderContext(client, orderId) {
     order,
     items,
     storeName,
+    platformName,
     supportEmail,
     siteUrl,
     lineSummary,
@@ -401,6 +405,7 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     order,
     items,
     storeName,
+    platformName,
     supportEmail,
     siteUrl,
     lineSummary,
@@ -454,6 +459,7 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     LINE_ITEMS_SUMMARY: lineSummary,
     STORE_NAME: storeName,
     SHOP_NAME: storeName,
+    PLATFORM_NAME: platformName,
     SITE_URL: siteUrl || 'https://',
     SUPPORT_EMAIL: supportEmail || String(order.email || '').trim(),
     TRACKING_NUMBER: String(order.tracking_number || '').trim(),
@@ -707,7 +713,10 @@ async function sendImmediateStepsForFlow({
         logger.error('[flow-automation] pdf attachments', e?.message || e)
       }
     }
-    const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, s.smtp_sender_id, 'default', placeholderVars.STORE_NAME)
+    // Marketplace emails must be sent as the platform ("Andertal"), not the fulfilling seller's own
+    // store name — PLATFORM_NAME is set for order-based triggers; customer-only triggers already
+    // resolve STORE_NAME from the platform's own settings row, so it's a safe fallback there.
+    const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, s.smtp_sender_id, 'default', placeholderVars.PLATFORM_NAME || placeholderVars.STORE_NAME)
     if (!fromEmail) {
       await finalizeFlowExecutionLog(client, idempotencyKey, {
         status: 'skipped',
@@ -1093,6 +1102,92 @@ async function runAutomationFlowsForCustomerEvent(opts) {
 }
 
 /**
+ * Generic dispatch for messaging-related triggers (customer_message_sent, seller_new_customer_message,
+ * customer_message_replied, seller_support_ticket_sent, seller_support_ticket_replied). Unlike
+ * runAutomationFlowsForOrder/runAutomationFlowsForCustomerEvent, the recipient is already known by the
+ * caller (messages.js resolves it from the specific message/order/seller context) — this function only
+ * needs to load the active flow(s) for the trigger and render/send the configured template(s) to that
+ * recipient, in the caller-supplied locale.
+ */
+async function runAutomationFlowsForMessageEvent(opts) {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) {
+    logger.warn('[flow-automation] skip message event: DATABASE_URL missing')
+    return 0
+  }
+  const triggerKey = String(opts.triggerKey || '').trim()
+  const toEmail = String(opts.toEmail || '').trim()
+  if (!triggerKey || !toEmail) return 0
+
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+
+    const useResend = resolveFlowMailProvider() === 'resend'
+    let transport = null
+    if (!useResend) {
+      transport = await getSmtpTransport(client)
+      if (!transport) {
+        logger.warn('[flow-automation] skip message event: SMTP not configured')
+        return 0
+      }
+    } else if (!String(process.env.RESEND_API_KEY || '').trim()) {
+      logger.warn('[flow-automation] skip message event: RESEND_API_KEY missing')
+      return 0
+    }
+
+    const requestedLocale = String(opts.locale || '').trim().toLowerCase()
+    const locale = FLOW_EMAIL_LOCALES.includes(requestedLocale) ? requestedLocale : 'de'
+
+    const flowsR = await client.query(
+      `SELECT id, audience FROM admin_hub_flows WHERE status = 'active' AND trigger_key = $1 ORDER BY updated_at ASC`,
+      [triggerKey],
+    )
+    const flowRows = flowsR.rows || []
+    if (!flowRows.length) {
+      logger.warn(`[flow-automation] no active flow for message trigger "${triggerKey}" — enable it in Content → Flows`)
+      return 0
+    }
+
+    let total = 0
+    for (const fr of flowRows) {
+      const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
+      const sr = await client.query(
+        `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
+         FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
+        [fr.id],
+      )
+      const n = await sendImmediateStepsForFlow({
+        client,
+        transport,
+        rateScopeKey: opts.rateScopeKey || 'messages',
+        flowId: fr.id,
+        audience,
+        triggerKey,
+        steps: sr.rows || [],
+        toEmail,
+        templateLocale: locale,
+        placeholderVars: opts.vars || {},
+        orderId: opts.orderId || '',
+        customerId: opts.customerId || '',
+        dedupeKey: opts.dedupeKey || '',
+      })
+      total += n
+    }
+    if (total > 0) logger.info(`[flow-automation] ${triggerKey} -> ${toEmail}: sent ${total} email(s)`)
+    return total
+  } catch (e) {
+    logger.error('[flow-automation] message event failed', triggerKey, toEmail, e?.message || e)
+    return 0
+  } finally {
+    if (client) {
+      try { await client.end() } catch (_) {}
+    }
+  }
+}
+
+/**
  * Win-back / reorder reminder (trigger_key 'win_back'): finds customers whose most recent order
  * was placed at least REORDER_REMINDER_DAYS ago with no order since, and nudges them to come
  * back. Runs periodically (see server.js) — sending is one-shot per customer (idempotency key
@@ -1232,6 +1327,7 @@ async function runProductWishlistWatchers() {
 module.exports = {
   runAutomationFlowsForOrder,
   runAutomationFlowsForCustomerEvent,
+  runAutomationFlowsForMessageEvent,
   resolveEmailLocaleFromCountry,
   FLOW_EMAIL_LOCALES,
   buildFlowEmailPlaceholderVarsForCustomer,

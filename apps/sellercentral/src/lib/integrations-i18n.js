@@ -96,6 +96,9 @@ export function getIntegrationsCopy(locale) {
     addFailed: t("Could not add.", "Eklenemedi.", "Ajout impossible.", "No se pudo añadir.", "Impossibile aggiungere.", "Hinzufügen fehlgeschlagen."),
     senderEmail: t("Sender email", "Gönderen e-posta", "E-mail expéditeur", "Correo remitente", "Email mittente", "Absender-E-Mail"),
     senderNameOptional: t("Sender name (optional)", "Gönderen adı (isteğe bağlı)", "Nom expéditeur (optionnel)", "Nombre remitente (opcional)", "Nome mittente (opzionale)", "Absendername (optional)"),
+    editSender: t("Edit sender", "Göndereni düzenle", "Modifier l'expéditeur", "Editar remitente", "Modifica mittente", "Absender bearbeiten"),
+    senderUpdated: t("Sender updated.", "Gönderen güncellendi.", "Expéditeur mis à jour.", "Remitente actualizado.", "Mittente aggiornato.", "Absender aktualisiert."),
+    updateFailed: t("Could not update.", "Güncellenemedi.", "Mise à jour impossible.", "No se pudo actualizar.", "Impossibile aggiornare.", "Aktualisierung fehlgeschlagen."),
     // Trustpilot
     trustpilotLoading: t("Loading Trustpilot…", "Trustpilot yükleniyor…", "Chargement Trustpilot…", "Cargando Trustpilot…", "Caricamento Trustpilot…", "Trustpilot laden…"),
     trustpilotIntro: t("Connects the public TrustBox widget on shop product pages to your Trustpilot Business account. The Business Unit ID is the same as in the TrustBox embed code (public).", "Mağaza ürün sayfasındaki TrustBox widget'ını Trustpilot Business hesabınıza bağlar. Business Unit ID, TrustBox embed kodundakiyle aynıdır (herkese açık).", "Connecte le widget TrustBox public aux pages produit à votre compte Trustpilot Business.", "Conecta el widget TrustBox público en páginas de producto con su cuenta Trustpilot Business.", "Collega il widget TrustBox pubblico alle pagine prodotto del negozio al vostro account Trustpilot Business.", "Verbindet das öffentliche TrustBox-Widget auf der Shop-Produktseite mit eurem Trustpilot Business-Konto."),

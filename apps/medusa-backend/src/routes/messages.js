@@ -1,5 +1,35 @@
 'use strict'
 const { Router } = require('express')
+const { runAutomationFlowsForMessageEvent, FLOW_EMAIL_LOCALES } = require('../flow-automation')
+const { resolveSmtpSenderIdentity } = require('../smtp-sender-resolve')
+
+const resolveShopBaseUrl = () => {
+  const candidates = [
+    process.env.STOREFRONT_PUBLIC_URL,
+    process.env.SHOP_PUBLIC_URL,
+    process.env.PUBLIC_SHOP_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_SHOP_URL,
+    process.env.SITE_URL,
+  ]
+  for (const raw of candidates) {
+    const s = String(raw || '').trim().replace(/\/$/, '')
+    if (/^https?:\/\//i.test(s)) return s
+  }
+  return ''
+}
+const resolveSellercentralBaseUrl = () =>
+  (process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || process.env.SELLERCENTRAL_URL || 'https://sellercentral.andertal.com').replace(/\/$/, '')
+
+const messageBodyToHtml = (body) =>
+  String(body || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+
+/** Best-effort recipient name lookup — falls back to the email's local-part so templates never show "undefined". */
+const displayNameOrEmail = (firstName, lastName, email) => {
+  const n = [firstName, lastName].filter(Boolean).join(' ').trim()
+  if (n) return n
+  return String(email || '').split('@')[0] || ''
+}
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -134,13 +164,25 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const { order_id, body, subject, channel, sender_seller_id } = req.body || {}
+        const { order_id, body, subject, channel, sender_seller_id, locale } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
-        const { fromEmail: sellerEmail } = await resolveSmtpSenderIdentity(client, null)
+
+        // Opportunistically remember the acting seller's current Sellercentral UI language, so
+        // automated notification emails to them can be sent in that language later.
+        const requestedLocale = String(locale || '').trim().toLowerCase()
+        const callerLocale = FLOW_EMAIL_LOCALES.includes(requestedLocale) ? requestedLocale : ''
+        const actingSellerId = String(sender_seller_id || req.sellerUser?.seller_id || '').trim()
+        if (callerLocale && actingSellerId) {
+          await client.query(
+            `INSERT INTO admin_hub_seller_settings (seller_id, locale) VALUES ($1, $2)
+             ON CONFLICT (seller_id) DO UPDATE SET locale = $2`,
+            [actingSellerId, callerLocale],
+          ).catch(() => {})
+        }
 
         if (channel === 'support') {
           // Support channel: seller <-> support team (superusers)
-          // sender_seller_id: if set, sender is a seller; if null, sender is support team
+          // sender_seller_id: if set, sender is a seller (opening/continuing a ticket); if null, sender is support team replying.
           const isSupportSide = !sender_seller_id
           const senderType = isSupportSide ? 'seller' : 'customer' // 'customer' = seller side, 'seller' = support side
           const msgSellerId = sender_seller_id || req.body.target_seller_id || null
@@ -148,57 +190,93 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
             `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_support, is_read_by_customer)
              VALUES ($1, $2, $3, $4, $5, $6, 'support', $7, $8, $9, false) RETURNING *`,
             [
-              null, senderType, sellerEmail, null, subject || null, body, msgSellerId,
+              null, senderType, req.sellerUser?.email || null, null, subject || null, body, msgSellerId,
               isSupportSide ? true : false, // is_read_by_seller: support side msgs are auto-read by support
               isSupportSide ? false : true,  // is_read_by_support: seller side msgs need to be read by support
             ]
           )
+
+          if (msgSellerId) {
+            const sur = await client.query(
+              `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
+              [msgSellerId],
+            )
+            const sellerEmail = String(sur.rows[0]?.email || '').trim()
+            const sh = await client.query(`SELECT store_name, locale FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`, [msgSellerId])
+            const sellerName = String(sh.rows[0]?.store_name || '').trim()
+            const sLoc = String(sh.rows[0]?.locale || '').trim().toLowerCase()
+            const sellerLocale = callerLocale || (FLOW_EMAIL_LOCALES.includes(sLoc) ? sLoc : 'de')
+            if (sellerEmail) {
+              const vars = {
+                SELLER_NAME: sellerName,
+                MESSAGE_BODY: messageBodyToHtml(body),
+                MESSAGE_SUBJECT: String(subject || '').trim(),
+                SELLERCENTRAL_INBOX_URL: `${resolveSellercentralBaseUrl()}/${sellerLocale}/inbox`,
+              }
+              const triggerKey = isSupportSide ? 'seller_support_ticket_replied' : 'seller_support_ticket_sent'
+              runAutomationFlowsForMessageEvent({
+                triggerKey,
+                toEmail: sellerEmail,
+                locale: sellerLocale,
+                vars,
+                dedupeKey: r.rows[0]?.id || '',
+              }).catch((e) => console.error(`[flow-automation] ${triggerKey}`, e?.message || e))
+            }
+          }
+
           await client.end()
           return res.status(201).json({ message: r.rows[0] })
         }
 
-        // Customer channel (default)
-        // Get order's customer email
+        // Customer channel (default) — seller/superuser replying to a customer.
         let recipientEmail = null
+        let orderSellerId = null
+        let orderNumber = null
+        let orderLocale = ''
+        let orderCountry = ''
         if (order_id) {
-          const oR = await client.query(`SELECT email FROM store_orders WHERE id = $1::uuid`, [order_id])
+          const oR = await client.query(`SELECT email, seller_id, order_number, locale, country FROM store_orders WHERE id = $1::uuid`, [order_id])
           recipientEmail = oR.rows[0]?.email || null
+          orderSellerId = oR.rows[0]?.seller_id || null
+          orderNumber = oR.rows[0]?.order_number != null ? Number(oR.rows[0].order_number) : null
+          orderLocale = String(oR.rows[0]?.locale || '').trim().toLowerCase()
+          orderCountry = String(oR.rows[0]?.country || '').trim()
         }
         const r = await client.query(
-          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, is_read_by_seller, is_read_by_customer)
-           VALUES ($1, 'seller', $2, $3, $4, $5, 'customer', true, false) RETURNING *`,
-          [order_id || null, sellerEmail, recipientEmail, subject || null, body]
+          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_customer)
+           VALUES ($1, 'seller', $2, $3, $4, $5, 'customer', $6, true, false) RETURNING *`,
+          [order_id || null, req.sellerUser?.email || null, recipientEmail, subject || null, body, orderSellerId]
         )
         const msg = r.rows[0]
-        // Send email via SMTP
+
         if (recipientEmail) {
-          const transport = await getSmtpTransport(client)
-          if (transport) {
-            const _snR = await client.query(`SELECT from_name FROM store_smtp_settings WHERE seller_id = 'default' LIMIT 1`)
-            const fromName = _snR.rows[0]?.from_name || 'Shop'
-            const rawBody = String(body || '')
-            const looksHtml = /<[a-z][\s\S]*>/i.test(rawBody)
-            const plainFromHtml = (html) =>
-              String(html || '')
-                .replace(/<br\s*\/?>/gi, '\n')
-                .replace(/<\/p>/gi, '\n\n')
-                .replace(/<[^>]+>/g, '')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim()
-            const mailOpts = looksHtml
-              ? {
-                  text: plainFromHtml(rawBody) || rawBody.replace(/<[^>]+>/g, ''),
-                  html: rawBody,
-                }
-              : { text: rawBody, html: `<p>${rawBody.replace(/\n/g, '<br>')}</p>` }
-            transport.sendMail({
-              from: `"${fromName}" <${sellerEmail}>`,
-              to: recipientEmail,
-              subject: subject || 'Nachricht vom Shop',
-              ...mailOpts,
-            }).catch((e) => console.error('[SMTP sendMail]', e.message))
+          const custR = await client.query(`SELECT first_name, last_name, locale FROM store_customers WHERE LOWER(email) = LOWER($1) LIMIT 1`, [recipientEmail])
+          const customerName = displayNameOrEmail(custR.rows[0]?.first_name, custR.rows[0]?.last_name, recipientEmail)
+          const custLocaleRaw = String(custR.rows[0]?.locale || orderLocale || '').trim().toLowerCase()
+          const { resolveEmailLocaleFromCountry } = require('../flow-automation')
+          const customerLocale = FLOW_EMAIL_LOCALES.includes(custLocaleRaw) ? custLocaleRaw : resolveEmailLocaleFromCountry(orderCountry)
+          let sellerName = ''
+          if (orderSellerId) {
+            const sh = await client.query(`SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`, [orderSellerId])
+            sellerName = String(sh.rows[0]?.store_name || '').trim()
           }
+          runAutomationFlowsForMessageEvent({
+            triggerKey: 'customer_message_replied',
+            toEmail: recipientEmail,
+            locale: customerLocale,
+            vars: {
+              CUSTOMER_NAME: customerName,
+              SELLER_NAME: sellerName,
+              MESSAGE_BODY: messageBodyToHtml(body),
+              MESSAGE_SUBJECT: String(subject || '').trim(),
+              ORDER_NUMBER: orderNumber != null ? String(orderNumber) : '',
+              SHOP_MESSAGES_URL: `${resolveShopBaseUrl()}/nachrichten`,
+            },
+            orderId: order_id || '',
+            dedupeKey: msg?.id || '',
+          }).catch((e) => console.error('[flow-automation] customer_message_replied', e?.message || e))
         }
+
         await client.end()
         res.status(201).json({ message: msg })
       } catch (e) {
@@ -500,28 +578,81 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const { order_id, body, subject } = req.body || {}
+        const { order_id, body, subject, locale } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
-        const { fromEmail: sellerEmail } = await resolveSmtpSenderIdentity(client, null)
-        const r = await client.query(
-          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, is_read_by_seller, is_read_by_customer)
-           VALUES ($1, 'customer', $2, $3, $4, $5, false, true) RETURNING *`,
-          [order_id || null, payload.email, sellerEmail, subject || null, body]
-        )
-        // Forward to seller via SMTP
-        if (sellerEmail) {
-          const transport = await getSmtpTransport(client)
-          if (transport) {
-            transport.sendMail({
-              from: `"Kunde" <${payload.email}>`,
-              to: sellerEmail,
-              replyTo: payload.email,
-              subject: subject || `Neue Nachricht von Kunde${order_id ? ' (Bestellung)' : ''}`,
-              text: body,
-              html: `<p><strong>Von:</strong> ${payload.email}</p><p>${body.replace(/\n/g, '<br>')}</p>`,
-            }).catch((e) => console.error('[SMTP sendMail]', e.message))
-          }
+
+        // Resolve the order's seller (if any) so the notification actually reaches that seller's own
+        // account email — previously this looked up the platform's default SMTP "From" address instead
+        // of a real seller contact, so customer messages never reached the intended seller.
+        let orderSellerId = null
+        let orderNumber = null
+        if (order_id) {
+          const oR = await client.query(`SELECT seller_id, order_number FROM store_orders WHERE id = $1::uuid`, [order_id])
+          orderSellerId = oR.rows[0]?.seller_id || null
+          orderNumber = oR.rows[0]?.order_number != null ? Number(oR.rows[0].order_number) : null
         }
+        let sellerEmail = ''
+        let sellerLocale = 'de'
+        let sellerName = ''
+        if (orderSellerId) {
+          const sur = await client.query(
+            `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
+            [orderSellerId],
+          )
+          sellerEmail = String(sur.rows[0]?.email || '').trim()
+          const sh = await client.query(
+            `SELECT store_name, locale FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+            [orderSellerId],
+          )
+          sellerName = String(sh.rows[0]?.store_name || '').trim()
+          const sLoc = String(sh.rows[0]?.locale || '').trim().toLowerCase()
+          sellerLocale = FLOW_EMAIL_LOCALES.includes(sLoc) ? sLoc : 'de'
+        }
+
+        const r = await client.query(
+          `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_customer)
+           VALUES ($1, 'customer', $2, $3, $4, $5, 'customer', $6, false, true) RETURNING *`,
+          [order_id || null, payload.email, sellerEmail || null, subject || null, body, orderSellerId]
+        )
+
+        const custR = await client.query(`SELECT first_name, last_name FROM store_customers WHERE LOWER(email) = LOWER($1) LIMIT 1`, [payload.email])
+        const customerName = displayNameOrEmail(custR.rows[0]?.first_name, custR.rows[0]?.last_name, payload.email)
+        const requestedLocale = String(locale || '').trim().toLowerCase()
+        const customerLocale = FLOW_EMAIL_LOCALES.includes(requestedLocale) ? requestedLocale : 'de'
+        const sharedVars = {
+          CUSTOMER_NAME: customerName,
+          CUSTOMER_EMAIL: payload.email,
+          SELLER_NAME: sellerName,
+          MESSAGE_BODY: messageBodyToHtml(body),
+          MESSAGE_SUBJECT: String(subject || '').trim(),
+          ORDER_NUMBER: orderNumber != null ? String(orderNumber) : '',
+          SHOP_MESSAGES_URL: `${resolveShopBaseUrl()}/nachrichten`,
+          SELLERCENTRAL_INBOX_URL: `${resolveSellercentralBaseUrl()}/${sellerLocale}/inbox`,
+        }
+
+        // Copy of the customer's own message, sent to them — also serves as our own record in
+        // whichever mailbox the "customer_message_sent" flow's sender address belongs to.
+        runAutomationFlowsForMessageEvent({
+          triggerKey: 'customer_message_sent',
+          toEmail: payload.email,
+          locale: customerLocale,
+          vars: sharedVars,
+          orderId: order_id || '',
+          dedupeKey: r.rows[0]?.id || '',
+        }).catch((e) => console.error('[flow-automation] customer_message_sent', e?.message || e))
+
+        // Notify the seller by email in addition to the in-app Sellercentral inbox notification.
+        if (sellerEmail) {
+          runAutomationFlowsForMessageEvent({
+            triggerKey: 'seller_new_customer_message',
+            toEmail: sellerEmail,
+            locale: sellerLocale,
+            vars: sharedVars,
+            orderId: order_id || '',
+            dedupeKey: r.rows[0]?.id || '',
+          }).catch((e) => console.error('[flow-automation] seller_new_customer_message', e?.message || e))
+        }
+
         await client.end()
         res.status(201).json({ message: r.rows[0] })
       } catch (e) {

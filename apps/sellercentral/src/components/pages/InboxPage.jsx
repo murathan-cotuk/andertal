@@ -340,6 +340,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
         order_id: selected.order_id || undefined,
         body: bodyOut,
         subject: selected.order_number ? `Re: ${locale === "en" ? "Order" : locale === "tr" ? "Sipariş" : locale === "fr" ? "Commande" : locale === "es" ? "Pedido" : locale === "it" ? "Ordine" : "Bestellung"} #${selected.order_number}` : ui.message,
+        locale,
       });
       setReply("");
       const data = await client.getMessages(debouncedQ ? { q: debouncedQ } : {});
@@ -932,12 +933,14 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
           target_seller_id: selectedSellerThread.seller_id,
           sender_seller_id: null,
           subject: subjectForApi || undefined,
+          locale,
         });
       } else {
         await client.sendSupportMessage({
           body: bodyOut,
           sender_seller_id: mySellerID,
           subject: subjectForApi || undefined,
+          locale,
         });
       }
       setReply("");

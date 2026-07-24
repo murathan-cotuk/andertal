@@ -278,7 +278,7 @@ function MessageModal({ order, onClose }) {
       await getMedusaClient().request("/store/messages", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: order.id, body: body.trim(), subject: t("orderTitle", { number: order.order_number || "" }) }),
+        body: JSON.stringify({ order_id: order.id, body: body.trim(), subject: t("orderTitle", { number: order.order_number || "" }), locale }),
       });
       setSent(true); setBody("");
       const d = await getMedusaClient().request(`/store/messages?order_id=${order.id}`, { headers: { Authorization: `Bearer ${token}` } });

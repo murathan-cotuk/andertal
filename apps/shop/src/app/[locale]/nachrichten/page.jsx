@@ -236,6 +236,7 @@ export default function NachrichtenPage() {
           subject: selected.order_number
             ? tm("reOrderSubject", { number: selected.order_number })
             : tm("defaultSubject"),
+          locale,
         }),
       });
       setReply("");
@@ -267,6 +268,7 @@ export default function NachrichtenPage() {
           order_id: composeOrderId || undefined,
           body: composeBody.trim(),
           subject,
+          locale,
         }),
       });
       setComposeBody("");
