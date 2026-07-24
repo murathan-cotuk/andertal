@@ -199,6 +199,20 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
         },
       },
       {
+        key: 'SHIP_DATE',
+        sample: '24.07.2026',
+        category: 'shipping',
+        triggers: ['order_shipped', 'order_delivered'],
+        desc: {
+          en: 'Date the order was marked as shipped',
+          de: 'Versanddatum',
+          tr: 'Kargoya verilme tarihi',
+          fr: 'Date d\'expédition',
+          it: 'Data di spedizione',
+          es: 'Fecha de envío',
+        },
+      },
+      {
         key: 'TRACKING_NUMBER',
         sample: '1Z999AA10123456784',
         category: 'shipping',

@@ -163,7 +163,14 @@ export default function PlatformSettingsPage() {
                   type="email"
                   placeholder="support@andertal.de"
                   autoComplete="off"
-                  helpText={t("Contact email for buyers and automated emails", "Alıcılar ve otomatik e-postalar için iletişim e-postası", "E-mail de contact pour les acheteurs et les e-mails automatiques", "Correo de contacto para compradores y correos automáticos", "Email di contatto per clienti ed email automatiche", "Kontakt-E-Mail für Käufer und automatische E-Mails")}
+                  helpText={t(
+                    "Shown as the contact address inside email text ({SUPPORT_EMAIL}) — does NOT change the sender address. To change the actual From address, go to Settings → Integrations → SMTP.",
+                    "E-posta metni içinde iletişim adresi olarak gösterilir ({SUPPORT_EMAIL}) — gönderen adresini DEĞİŞTİRMEZ. Gönderen adresini değiştirmek için Ayarlar → Entegrasyonlar → SMTP'ye gidin.",
+                    "Affiché comme adresse de contact dans le texte de l'e-mail ({SUPPORT_EMAIL}) — ne change PAS l'adresse d'expéditeur. Pour cela, allez dans Paramètres → Intégrations → SMTP.",
+                    "Se muestra como dirección de contacto en el texto del correo ({SUPPORT_EMAIL}) — NO cambia la dirección del remitente. Para eso, ve a Ajustes → Integraciones → SMTP.",
+                    "Mostrata come indirizzo di contatto nel testo dell'email ({SUPPORT_EMAIL}) — NON cambia l'indirizzo del mittente. Per farlo, vai su Impostazioni → Integrazioni → SMTP.",
+                    "Wird als Kontaktadresse im E-Mail-Text angezeigt ({SUPPORT_EMAIL}) — ändert NICHT die Absenderadresse. Dafür: Einstellungen → Integrationen → SMTP.",
+                  )}
                 />
                 <TextField
                   label={t("Shop URL", "Mağaza URL", "URL de la boutique", "URL de la tienda", "URL negozio", "Shop-URL")}

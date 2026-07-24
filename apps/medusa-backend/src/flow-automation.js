@@ -103,9 +103,8 @@ function applyFlowEmailPlaceholders(template, vars) {
   return String(template || '').replace(/\{([A-Za-z0-9_]+)\}/g, (_, rawKey) => {
     const keyUp = String(rawKey).toUpperCase()
     const v = vars[keyUp] ?? vars[String(rawKey)] ?? vars[rawKey]
-    const str = v == null ? '' : String(v).trim()
-    if (str !== '') return str
-    return `{${rawKey}}`
+    // Unknown/empty merge fields (e.g. no tracking number yet) render blank rather than leaving the raw {TOKEN} in the sent email.
+    return v == null ? '' : String(v).trim()
   })
 }
 
@@ -415,6 +414,7 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
   const ln = String(order.last_name || '').trim()
   const fullName = [fn, ln].filter(Boolean).join(' ') || String(order.email || '').trim()
   const ordDate = order.created_at ? new Date(order.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
+  const shipDate = order.shipped_at ? new Date(order.shipped_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
   const baseSite = String(siteUrl || '').replace(/\/$/, '')
   const { market, lang, prefix } = prefixParts || storefrontPathPrefixFromShippingCountry(order.country)
   const firstHandle = items[0]?.product_handle ? String(items[0].product_handle).trim() : ''
@@ -458,6 +458,7 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     SUPPORT_EMAIL: supportEmail || String(order.email || '').trim(),
     TRACKING_NUMBER: String(order.tracking_number || '').trim(),
     CARRIER_NAME: String(order.carrier_name || '').trim(),
+    SHIP_DATE: shipDate,
     TRACKING_URL: trackingUrl,
     /** Deutsch alternative token often used in templates */
     SENDUNGSVERFOLGUNG_URL: trackingUrl || orderDetailUrl,
@@ -706,7 +707,7 @@ async function sendImmediateStepsForFlow({
         logger.error('[flow-automation] pdf attachments', e?.message || e)
       }
     }
-    const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, s.smtp_sender_id)
+    const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, s.smtp_sender_id, 'default', placeholderVars.STORE_NAME)
     if (!fromEmail) {
       await finalizeFlowExecutionLog(client, idempotencyKey, {
         status: 'skipped',
