@@ -4,10 +4,10 @@
  * instead of the generic literal "Shop" — so a sender profile missing a display name still shows the real store name.
  */
 
-async function resolveSmtpSenderIdentity(client, profileIdNullable, sellerId = 'default', fallbackName = 'Shop') {
+async function resolveSmtpSenderIdentity(client, profileIdNullable, sellerId = 'default', fallbackName = 'Andertal') {
   const sid = String(sellerId || 'default').trim() || 'default'
   const pid = profileIdNullable != null && profileIdNullable !== '' ? String(profileIdNullable).trim() : ''
-  const fb = String(fallbackName || '').trim() || 'Shop'
+  const fb = String(fallbackName || '').trim() || 'Andertal'
 
   if (pid) {
     const r = await client.query(

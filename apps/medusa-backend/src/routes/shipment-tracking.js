@@ -558,6 +558,10 @@ module.exports = function createShipmentTrackingRouter({
         const weightKg = weightG / 1000
         const rates = []
         for (const method of methods) {
+          // Platform ships via DHL only for now — other carriers stay hidden until
+          // seller-owned carrier integrations are wired up.
+          const carrierKey = String(method.carrier || method.name || '').toLowerCase()
+          if (!carrierKey.includes('dhl')) continue
           const minW = method.min_weight != null ? Number(method.min_weight) : null
           const maxW = method.max_weight != null ? Number(method.max_weight) : null
           if (minW != null && weightKg < minW) continue

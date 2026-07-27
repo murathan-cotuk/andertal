@@ -283,8 +283,11 @@ async function loadOrderContext(client, orderId) {
     dbStorefrontUrl = String(platformRow.rows[0]?.storefront_url || '').trim().replace(/\/$/, '')
   }
   // Marketplace emails must show the platform's own brand as the sender name (not the
-  // fulfilling seller's store name) — we are the intermediary sending the notification.
-  const platformName = String(platformRow.rows[0]?.platform_name || platformRow.rows[0]?.store_name || 'Andertal').trim() || 'Andertal'
+  // fulfilling seller's store name, and not the platform seller-settings row's own
+  // "store_name" field either — that field is used for other seller-facing purposes
+  // and isn't guaranteed to hold the customer-facing brand). Falls straight to the
+  // literal brand name so a stray/legacy store_name value can never leak into emails.
+  const platformName = String(platformRow.rows[0]?.platform_name || 'Andertal').trim() || 'Andertal'
   const siteUrl = resolvePublicShopBaseUrl() || dbStorefrontUrl
   if (!siteUrl) {
     logger.warn(
@@ -503,8 +506,10 @@ async function placeholderVarsCustomerOnly(client, cust) {
   const fn = String(cust.first_name || '').trim()
   const ln = String(cust.last_name || '').trim()
   const fullName = [fn, ln].filter(Boolean).join(' ') || String(cust.email || '').trim()
-  const sh = await client.query(`SELECT store_name, support_email, storefront_url FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
-  const storeName = String(sh.rows[0]?.store_name || 'Shop').trim() || 'Shop'
+  const sh = await client.query(`SELECT store_name, platform_name, support_email, storefront_url FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`)
+  // Prefer the platform brand name (same field order-based flows use) over the legacy
+  // store_name column, and never fall back to the English literal "Shop".
+  const storeName = String(sh.rows[0]?.platform_name || sh.rows[0]?.store_name || 'Andertal').trim() || 'Andertal'
   const supportEmail = String(sh.rows[0]?.support_email || '').trim()
   const dbStorefrontUrl = String(sh.rows[0]?.storefront_url || '').trim().replace(/\/$/, '')
   const siteUrl = resolvePublicShopBaseUrl() || dbStorefrontUrl
@@ -629,6 +634,7 @@ async function sendImmediateStepsForFlow({
   orderId,
   customerId,
   dedupeKey,
+  skipLeadingWait,
 }) {
   const { buildFlowEmailPdfAttachments } = require('./order-pdf-buffers')
   let idx = 0
@@ -637,12 +643,15 @@ async function sendImmediateStepsForFlow({
     const s = steps[idx]
     if (s.step_type === 'wait_hours') {
       const wh = Number(s.wait_hours || 0)
-      if (wh > 0) {
+      if (wh > 0 && !skipLeadingWait) {
         logger.warn(
           `[flow-automation] order ${orderId} flow ${flowId}: wait_hours=${wh} stops immediate sends — delayed steps are not scheduled yet. Put "Send email" as the first step (or 0h wait) for instant mail after checkout.`,
         )
         break
       }
+      // skipLeadingWait: caller (e.g. the abandoned-cart scanner) already waited the real-world
+      // delay before dispatching this trigger, so the configured wait_hours is treated as satisfied
+      // instead of stopping the run here.
       idx += 1
       continue
     }
@@ -1031,6 +1040,14 @@ async function runAutomationFlowsForCustomerEvent(opts) {
       vars.PRODUCT_OLD_PRICE = p.old_price_cents != null ? formatEuro(p.old_price_cents) : ''
       vars.PRODUCT_STOCK = p.stock != null ? String(p.stock) : ''
     }
+    // Overlay cart context for the abandoned_cart trigger — recovery link + first-item summary.
+    if (opts.cart) {
+      const { prefix } = storefrontPathPrefixFromShippingCountry(cust.country || '')
+      vars.CART_URL = absoluteStorefrontUrl(vars.SITE_URL, `${prefix}/checkout`)
+      vars.ITEM_1_QUANTITY = opts.cart.itemQuantity != null ? String(opts.cart.itemQuantity) : ''
+      vars.ITEM_1_PRICE = opts.cart.itemPriceCents != null ? formatEuro(opts.cart.itemPriceCents) : ''
+      vars.LINE_ITEMS_SUMMARY = opts.cart.totalCents != null ? formatEuro(opts.cart.totalCents) : ''
+    }
     // Prefer the UI language the customer was actually using (passed by the caller, e.g.
     // register/newsletter forms) over guessing from their shipping country — a German
     // speaker with a non-DE delivery country would otherwise get an English signup email.
@@ -1084,6 +1101,7 @@ async function runAutomationFlowsForCustomerEvent(opts) {
         orderId: '',
         customerId: cust.id ? String(cust.id) : '',
         dedupeKey: opts.dedupeKey || '',
+        skipLeadingWait: !!opts.skipLeadingWait,
       })
       total += n
     }
@@ -1227,6 +1245,89 @@ async function runWinBackScan() {
 }
 
 /**
+ * Abandoned cart (trigger_key 'abandoned_cart'): nothing else in this file ever fires this
+ * trigger — carts don't have a natural "event" the way orders do, so detecting one requires
+ * periodically scanning for carts that still have items but never became an order. Runs
+ * periodically (see server.js). The flow's own first step is normally "wait N hours" (built in
+ * Content → Flows), but sendImmediateStepsForFlow() has no scheduler for delayed steps — so this
+ * scan uses that same N (read from the flow's own wait_hours) as ITS delay before firing the
+ * trigger, then passes skipLeadingWait so the immediate-send engine treats the wait as already
+ * satisfied instead of silently dropping the email (see sendImmediateStepsForFlow).
+ */
+const ABANDONED_CART_DEFAULT_DELAY_HOURS = 2
+async function runAbandonedCartScan() {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+
+    const flowR = await client.query(
+      `SELECT f.id, s.wait_hours
+       FROM admin_hub_flows f
+       LEFT JOIN admin_hub_flow_steps s ON s.flow_id = f.id AND s.step_order = 0 AND s.step_type = 'wait_hours'
+       WHERE f.status = 'active' AND f.trigger_key = 'abandoned_cart'
+       ORDER BY f.updated_at ASC LIMIT 1`,
+    )
+    if (!flowR.rows.length) {
+      await client.end()
+      return
+    }
+    const delayHours = Number(flowR.rows[0].wait_hours) > 0 ? Number(flowR.rows[0].wait_hours) : ABANDONED_CART_DEFAULT_DELAY_HOURS
+
+    const r = await client.query(
+      `SELECT c.id, c.email,
+         COUNT(ci.id) FILTER (WHERE ci.removed_at IS NULL)::int as item_count,
+         SUM(ci.quantity) FILTER (WHERE ci.removed_at IS NULL) as total_qty,
+         SUM(ci.unit_price_cents * ci.quantity) FILTER (WHERE ci.removed_at IS NULL) as cart_total,
+         (array_agg(ci.title ORDER BY ci.created_at) FILTER (WHERE ci.removed_at IS NULL))[1] as first_title,
+         (array_agg(ci.thumbnail ORDER BY ci.created_at) FILTER (WHERE ci.removed_at IS NULL))[1] as first_thumbnail,
+         (array_agg(ci.product_handle ORDER BY ci.created_at) FILTER (WHERE ci.removed_at IS NULL))[1] as first_handle,
+         (array_agg(ci.unit_price_cents ORDER BY ci.created_at) FILTER (WHERE ci.removed_at IS NULL))[1] as first_price_cents,
+         (array_agg(ci.quantity ORDER BY ci.created_at) FILTER (WHERE ci.removed_at IS NULL))[1] as first_qty
+       FROM store_carts c
+       JOIN store_cart_items ci ON ci.cart_id = c.id
+       LEFT JOIN store_orders o ON o.cart_id = c.id
+       WHERE o.id IS NULL AND c.email IS NOT NULL AND c.email != ''
+         AND c.updated_at <= now() - ($1::numeric * interval '1 hour')
+       GROUP BY c.id, c.email
+       HAVING COUNT(ci.id) FILTER (WHERE ci.removed_at IS NULL) > 0
+       LIMIT 200`,
+      [delayHours],
+    )
+    await client.end()
+
+    for (const row of r.rows || []) {
+      await runAutomationFlowsForCustomerEvent({
+        triggerKey: 'abandoned_cart',
+        email: row.email,
+        product: {
+          title: row.first_title,
+          image: row.first_thumbnail,
+          handle: row.first_handle,
+          price_cents: row.first_price_cents != null ? Number(row.first_price_cents) : null,
+        },
+        cart: {
+          itemQuantity: row.first_qty != null ? Number(row.first_qty) : null,
+          itemPriceCents: row.first_price_cents != null ? Number(row.first_price_cents) : null,
+          totalCents: row.cart_total != null ? Number(row.cart_total) : null,
+        },
+        dedupeKey: String(row.id),
+        skipLeadingWait: true,
+      }).catch((e) => logger.warn('[flow-automation] abandoned_cart failed', e?.message || e))
+    }
+  } catch (e) {
+    logger.error('[flow-automation] abandoned cart scan failed', e?.message || e)
+    if (client) {
+      try {
+        await client.end()
+      } catch (_) {}
+    }
+  }
+}
+
+/**
  * Wishlist watchers (trigger_keys 'favorite_low_stock' / 'favorite_price_drop'): compares each
  * favorited product's current price/inventory against the last-seen snapshot and notifies every
  * customer who favorited it. Runs periodically instead of hooking every product-write path
@@ -1333,5 +1434,6 @@ module.exports = {
   buildFlowEmailPlaceholderVarsForCustomer,
   resolveSmtpSenderIdentity,
   runWinBackScan,
+  runAbandonedCartScan,
   runProductWishlistWatchers,
 }

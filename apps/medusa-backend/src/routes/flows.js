@@ -856,16 +856,24 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
     })()
     const applyFlowEmailPlaceholders = (template, extra = {}) => {
       if (template == null) return ''
-      const vars = { ...FLOW_EMAIL_SAMPLE_PLACEHOLDERS, ...extra }
       return String(template).replace(/\{([A-Za-z0-9_]+)\}/g, (_, rawKey) => {
         const keyUp = String(rawKey).toUpperCase()
-        const raw =
-          vars[keyUp] ??
-          vars[String(rawKey)] ??
-          vars[rawKey]
-        const v = raw == null ? '' : String(raw).trim()
-        if (v !== '') return v
-        return `{${rawKey}}`
+        // Prefer a real value from `extra` (customer/order data) — even when it's an empty
+        // string (e.g. SHIP_DATE/TRACKING_NUMBER before an order has shipped), that IS the
+        // authoritative "what a real send would show" (blank), so it must win over the sample.
+        // Previously an empty real value fell through to the raw-token branch below, which made
+        // known tokens like {SHIP_DATE}/{TRACKING_NUMBER} render as literal text in test emails
+        // for any customer whose latest order hadn't shipped yet.
+        const fromExtra = extra[keyUp] ?? extra[String(rawKey)] ?? extra[rawKey]
+        if (fromExtra != null) return String(fromExtra).trim()
+        // No real data available (no customer picked, or field not part of order/customer data) —
+        // fall back to a representative sample, or leave the raw {TOKEN} visible as a hint when
+        // even the sample map doesn't recognize it.
+        const sample =
+          FLOW_EMAIL_SAMPLE_PLACEHOLDERS[keyUp] ??
+          FLOW_EMAIL_SAMPLE_PLACEHOLDERS[String(rawKey)] ??
+          FLOW_EMAIL_SAMPLE_PLACEHOLDERS[rawKey]
+        return sample != null ? String(sample).trim() : `{${rawKey}}`
       })
     }
     const flowEmailHtmlToPlainText = (html) =>

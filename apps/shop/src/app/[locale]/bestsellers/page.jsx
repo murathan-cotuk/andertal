@@ -10,6 +10,8 @@ import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
+import { getLocalizedCategory } from "@/lib/format";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 
 const PageWrap = styled.div`
   min-height: 100vh;
@@ -97,25 +99,25 @@ function isBestSellerProduct(product) {
   return productSalesScore(product) > 0 || product?.metadata?.is_bestseller === true;
 }
 
-function productCategoryKeys(product) {
-  const out = [];
-  const addCollection = (c) => {
-    if (c?.id) out.push(`id:${String(c.id)}`);
-    if (c?.handle) out.push(`handle:${String(c.handle).toLowerCase()}`);
-  };
-  if (product?.collection) addCollection(product.collection);
-  if (Array.isArray(product?.collections)) product.collections.forEach(addCollection);
-  if (product?.metadata?.collection_id) out.push(`id:${String(product.metadata.collection_id)}`);
-  if (product?.metadata?.collection_handle) out.push(`handle:${String(product.metadata.collection_handle).toLowerCase()}`);
-  const ids = product?.metadata?.collection_ids;
-  if (Array.isArray(ids)) ids.forEach((id) => { if (id) out.push(`id:${String(id)}`); });
-  return [...new Set(out)];
+// Mirrors sales/page.jsx: maps every category id (root or nested) to its top-level root,
+// so a product tagged with a leaf category still groups under the right root section.
+function buildCategoryRootMap(nodes, root = null) {
+  const map = new Map();
+  for (const node of nodes || []) {
+    if (!node) continue;
+    const r = root ?? node;
+    const id = String(node.id || "").trim();
+    if (id) map.set(id, r);
+    const childMap = buildCategoryRootMap(node.children || [], r);
+    for (const [k, v] of childMap) map.set(k, v);
+  }
+  return map;
 }
 
 export default function BestsellersPage() {
   const locale = useLocale();
   const itemsPerRow = useResponsiveColumnCount(5, 2);
-  const [collections, setCollections] = useState([]);
+  const [categoryTree, setCategoryTree] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -127,14 +129,14 @@ export default function BestsellersPage() {
       try {
         setLoading(true);
         setError("");
-        const [colRes, prRes] = await Promise.all([
-          fetch("/api/store-collections", { cache: "no-store" }),
+        const [catRes, prRes] = await Promise.all([
+          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
           fetch("/api/store-products?limit=1200", { cache: "no-store" }),
         ]);
-        const colData = colRes.ok ? await colRes.json() : { collections: [] };
+        const catData = catRes.ok ? await catRes.json() : { tree: [] };
         const prData = prRes.ok ? await prRes.json() : { products: [] };
         if (!cancelled) {
-          setCollections(Array.isArray(colData?.collections) ? colData.collections : []);
+          setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
         }
       } catch (e) {
@@ -146,7 +148,7 @@ export default function BestsellersPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locale]);
 
   const copy = useMemo(() => {
     if (locale === "de") return { title: "Bestsellers", text: "Meistverkaufte Produkte nach Kategorien", seeAll: "Alle ansehen", empty: "Keine Bestseller gefunden.", all: "Alle" };
@@ -156,42 +158,37 @@ export default function BestsellersPage() {
 
   const rows = useMemo(() => {
     const bestsellers = products.filter((p) => isBestSellerProduct(p));
-    if (!bestsellers.length) return [];
+    if (!bestsellers.length || !categoryTree.length) return [];
 
-    const byCollection = new Map();
-    const byKey = new Map();
-    collections.forEach((c) => {
-      if (c?.id) byKey.set(`id:${String(c.id)}`, c);
-      if (c?.handle) byKey.set(`handle:${String(c.handle).toLowerCase()}`, c);
-    });
+    const rootCategories = categoryTree.filter((n) => n && n.has_products !== false);
+    if (!rootCategories.length) return [];
+    const catRootMap = buildCategoryRootMap(rootCategories);
 
-    bestsellers.forEach((p) => {
-      const keys = productCategoryKeys(p);
-      const key = keys.find((k) => byKey.has(k));
-      if (!key) return;
-      const c = byKey.get(key);
-      if (!c?.handle) return;
-      const mapKey = String(c.id || c.handle);
-      if (!byCollection.has(mapKey)) byCollection.set(mapKey, { collection: c, products: [] });
-      byCollection.get(mapKey).products.push(p);
-    });
+    const byRoot = new Map();
+    for (const p of bestsellers) {
+      const catId = String(p.metadata?.admin_category_id || p.metadata?.category_id || "").trim();
+      if (!catId) continue;
+      const root = catRootMap.get(catId);
+      if (!root?.id) continue;
+      const key = String(root.id);
+      if (!byRoot.has(key)) byRoot.set(key, { collection: root, products: [] });
+      byRoot.get(key).products.push(p);
+    }
 
-    const list = [...byCollection.values()]
+    return [...byRoot.values()]
       .map((entry) => ({
         collection: entry.collection,
         products: entry.products.sort((a, b) => productSalesScore(b) - productSalesScore(a)),
       }))
       .filter((entry) => entry.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
-
-    return list;
-  }, [collections, products]);
+  }, [categoryTree, products]);
 
   const filterCollections = useMemo(() => rows.map((r) => r.collection), [rows]);
 
   const visibleRows = useMemo(() => {
     if (selectedCollections.size === 0) return rows;
-    return rows.filter((r) => selectedCollections.has(String(r.collection.id || r.collection.handle)));
+    return rows.filter((r) => selectedCollections.has(String(r.collection.id)));
   }, [rows, selectedCollections]);
 
   const toggleCollection = (key) => {
@@ -222,14 +219,15 @@ export default function BestsellersPage() {
               {copy.all}
             </FilterChip>
             {filterCollections.map((c) => {
-              const key = String(c.id || c.handle);
+              const key = String(c.id);
+              const catName = getLocalizedCategory(c, locale).name || c.name || c.slug || "";
               return (
                 <FilterChip
                   key={key}
                   $active={selectedCollections.has(key)}
                   onClick={() => toggleCollection(key)}
                 >
-                  {c.title || c.name || c.handle}
+                  {catName}
                 </FilterChip>
               );
             })}
@@ -242,32 +240,36 @@ export default function BestsellersPage() {
           <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
         ) : null}
 
-        {!loading && !error && visibleRows.map(({ collection, products: list }) => (
-          <div key={collection.id || collection.handle} style={{ padding: "8px 24px 28px" }}>
-            <div style={{ width: "100%", maxWidth: 1700, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
-              <Carousel
-                contained={false}
-                navOnSides
-                gap={12}
-                visibleCount={itemsPerRow}
-                showFade={false}
-                ariaLabel={collection.title || collection.name || collection.handle || "Bestsellers category"}
-                header={(
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
-                    <h2 className="shop-typo-h2" style={{ margin: 0 }}>
-                      {collection.title || collection.name || collection.handle}
-                    </h2>
-                    <SeeAll href={`/${collection.handle}?bestseller=1`}>{copy.seeAll} →</SeeAll>
-                  </div>
-                )}
-              >
-                {list.map((p) => (
-                  <ProductCard key={p.id} product={p} plainImage isBestseller />
-                ))}
-              </Carousel>
+        {!loading && !error && visibleRows.map(({ collection, products: list }) => {
+          const catName = getLocalizedCategory(collection, locale).name || collection.name || collection.slug || "";
+          const catSlug = String(collection.slug || collection.handle || "").replace(/^\//, "");
+          return (
+            <div key={collection.id} style={{ padding: "8px 24px 28px" }}>
+              <div style={{ width: "100%", maxWidth: 1700, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
+                <Carousel
+                  contained={false}
+                  navOnSides
+                  gap={12}
+                  visibleCount={itemsPerRow}
+                  showFade={false}
+                  ariaLabel={catName || "Bestsellers category"}
+                  header={(
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
+                      <h2 className="shop-typo-h2" style={{ margin: 0 }}>
+                        {catName}
+                      </h2>
+                      {catSlug && <SeeAll href={`/${catSlug}?bestseller=1`}>{copy.seeAll} →</SeeAll>}
+                    </div>
+                  )}
+                >
+                  {list.map((p) => (
+                    <ProductCard key={p.id} product={p} plainImage isBestseller />
+                  ))}
+                </Carousel>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </Main>
       <Footer />
     </PageWrap>

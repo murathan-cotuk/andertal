@@ -34,7 +34,7 @@ try {
 
 const path = require('path')
 const fs = require('fs')
-const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent, runWinBackScan, runProductWishlistWatchers } = require('./src/flow-automation')
+const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent, runWinBackScan, runAbandonedCartScan, runProductWishlistWatchers } = require('./src/flow-automation')
 const {
   applyEuOriginMetadataPolicy,
   registerEuOriginRoutes,
@@ -1499,6 +1499,18 @@ async function start() {
         `)
 
         await client.query('CREATE INDEX IF NOT EXISTS idx_store_order_items_order_id ON store_order_items(order_id);')
+        await client.query(`ALTER TABLE store_order_items ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
+        await client.query(`
+          UPDATE store_order_items oi
+          SET seller_id = p.seller_id
+          FROM admin_hub_products p
+          WHERE (oi.seller_id IS NULL OR TRIM(COALESCE(oi.seller_id, '')) = '')
+            AND oi.product_id IS NOT NULL
+            AND p.id::text = oi.product_id::text
+            AND p.seller_id IS NOT NULL
+            AND TRIM(p.seller_id) <> ''
+            AND TRIM(p.seller_id) <> 'default'
+        `).catch(() => {})
         await client.query('CREATE INDEX IF NOT EXISTS idx_store_orders_payment_intent_id ON store_orders(payment_intent_id);')
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_product_reviews (
@@ -2202,7 +2214,11 @@ async function start() {
                 ['dhl%', order.seller_id || null]
               )
               const apiKey = (cq.rows[0]?.api_key && String(cq.rows[0].api_key).trim()) || envDhlKey
-              if (!apiKey) { await c2.end(); continue }
+              if (!apiKey) {
+                console.warn(`[runAutoTrackingRefresh] order ${order.id}: DHL tracking skipped — no API key (set store_shipping_carriers.api_key for DHL, or DHL_API_KEY env var)`)
+                await c2.end()
+                continue
+              }
               const pc = String(order.postal_code || '').trim().replace(/\s+/g, '')
               let path = `/track/shipments?trackingNumber=${encodeURIComponent(trackingNumber)}`
               if (pc) path += `&recipientPostalCode=${encodeURIComponent(pc)}`
@@ -2274,6 +2290,9 @@ async function start() {
               )
               const upsKey = (cq.rows[0]?.api_key && String(cq.rows[0].api_key).trim()) || ''
               const upsSecret = (cq.rows[0]?.api_secret && String(cq.rows[0].api_secret).trim()) || ''
+              if (!upsKey) {
+                console.warn(`[runAutoTrackingRefresh] order ${order.id}: UPS tracking skipped — no API key in store_shipping_carriers`)
+              }
               if (upsKey) {
                 const creds = Buffer.from(`${upsKey}:${upsSecret}`).toString('base64')
                 const tokenBody = 'grant_type=client_credentials'
@@ -2325,13 +2344,35 @@ async function start() {
                 )
               }
             }
+            let firedTrigger = null
             if (mostRecentStatus === 'zugestellt') {
-              await c2.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [order.id])
+              const upd = await c2.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [order.id])
               await c2.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
+              if (upd.rowCount > 0) firedTrigger = 'order_delivered'
             } else if (mostRecentStatus === 'versendet' || mostRecentStatus === 'in_transit') {
-              await c2.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
+              const upd = await c2.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
+              if (upd.rowCount > 0) firedTrigger = 'order_shipped'
             }
             await c2.end()
+            // Auto-refresh runs outside any request context, so dispatch straight to the flow
+            // engine (mirrors dispatchCustomerFlowEvent above) instead of the per-route helpers
+            // that only exist inside routes/*.js request handlers.
+            if (firedTrigger) {
+              const tk = firedTrigger
+              const oid = String(order.id)
+              try {
+                const queued = await enqueueFlowEvent('order-flow-event', { triggerKey: tk, orderId: oid })
+                if (!queued) {
+                  setImmediate(() => {
+                    runAutomationFlowsForOrder({ triggerKey: tk, orderId: oid }).catch((fe) => {
+                      console.warn(`[runAutoTrackingRefresh] runAutomationFlowsForOrder ${tk}:`, fe?.message || fe)
+                    })
+                  })
+                }
+              } catch (qe) {
+                console.warn('[runAutoTrackingRefresh] enqueue order event failed:', qe?.message || qe)
+              }
+            }
           } catch (e) {
             console.warn(`[runAutoTrackingRefresh] order ${order.id} (${order.carrier_name}) refresh failed:`, e?.message || e)
           }
@@ -2687,6 +2728,14 @@ async function start() {
       runProductWishlistWatchers().catch(() => {})
       setInterval(() => runProductWishlistWatchers().catch(() => {}), 15 * 60 * 1000)
     }, 45 * 1000) // 45s delay after startup
+
+    // Abandoned cart (trigger 'abandoned_cart'): no other code path ever fires this trigger, so
+    // it needs its own scan — checked every 15 minutes so the flow's configured wait_hours delay
+    // (e.g. "1 hr") is honored reasonably closely.
+    setTimeout(() => {
+      runAbandonedCartScan().catch(() => {})
+      setInterval(() => runAbandonedCartScan().catch(() => {}), 15 * 60 * 1000)
+    }, 50 * 1000) // 50s delay after startup
 
     startFlowQueueWorker({
       onOrderEvent: async (jobData) => {

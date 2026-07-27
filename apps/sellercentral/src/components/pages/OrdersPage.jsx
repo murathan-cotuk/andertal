@@ -9,7 +9,6 @@ import { Card } from "@andertal/ui";
 import { Button, InlineStack } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
-import ShipLabelModal from "@/components/orders/ShipLabelModal";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
@@ -498,7 +497,7 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
   );
 }
 
-function ActionMenu({ order, onUpdate, onDelete, onVersenden, onBuyLabel, isSuperuser }) {
+function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, bottom: "auto", right: 0, openUp: false });
   const router = useRouter();
@@ -544,7 +543,6 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden, onBuyLabel, isSupe
             return [
               { label: _ui.viewDetails, action: () => { router.push(`/${locale}/orders/${order.id}`); setOpen(false); } },
               { label: _ui.ship, action: () => { onVersenden?.(); setOpen(false); } },
-              ...(order.delivery_status !== "zugestellt" ? [{ label: _ui.buyLabel, action: () => { onBuyLabel?.(); setOpen(false); } }] : []),
               { label: _ui.cancelOrder, action: () => { onUpdate(order.id, { order_status: "storniert" }); setOpen(false); }, danger: true },
               ...(isSuperuser ? [{ label: _ui.deleteOrder, action: async () => { if (await confirmDelete(_ui.deleteOrder + "?")) { onDelete(order.id); } setOpen(false); }, danger: true }] : []),
             ];
@@ -761,7 +759,6 @@ export default function OrdersPage() {
   const [loadingItems, setLoadingItems] = useState({});
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [selected, setSelected] = useState(new Set());
-  const [labelModal, setLabelModal] = useState(null); // null | order object — replacement label for an already-shipped order (via "..." menu)
   const [labelFulfillResult, setLabelFulfillResult] = useState(null); // { label_url, tracking_number }
   const [allReviews, setAllReviews] = useState([]); // all product reviews
   const [reviewPopupOrderId, setReviewPopupOrderId] = useState(null);
@@ -941,9 +938,7 @@ export default function OrdersPage() {
     } catch { }
   };
 
-  // "Versenden" always starts the scan-then-ship flow (Packaging center) — items must be
-  // scanned/confirmed one by one before a carrier/label can be chosen. Etikett kaufen
-  // (Sendcloud) lives inside that flow now instead of being a separate, scan-skipping button.
+  // "Versenden" starts the packaging-center flow: scan items → package size → DHL label purchase.
   const startPacking = (ordersToShip) => {
     sessionStorage.setItem("versand_orders", JSON.stringify(ordersToShip));
     router.push(`/${locale}/versand`);
@@ -1138,7 +1133,16 @@ export default function OrdersPage() {
           )}
           <td style={{ padding: "7px 8px", textAlign: "right", borderRight: "1px solid #e5e7eb" }}>
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
-              <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => startPacking([order])} onBuyLabel={() => setLabelModal(order)} isSuperuser={isSuperuser} />
+              {order.delivery_status !== "zugestellt" && order.delivery_status !== "versendet" && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); startPacking([order]); }}
+                  style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #2563eb", background: "#eff6ff", color: "#1d4ed8", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
+                >
+                  {ui.ship}
+                </button>
+              )}
+              <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => startPacking([order])} isSuperuser={isSuperuser} />
             </div>
           </td>
         </tr>
@@ -1153,13 +1157,6 @@ export default function OrdersPage() {
           onClose={() => setShowNewOrder(false)}
           onCreated={() => fetchOrders()}
           locale={locale}
-        />
-      )}
-      {labelModal && (
-        <ShipLabelModal
-          order={labelModal}
-          locale={locale}
-          onClose={() => setLabelModal(null)}
         />
       )}
       {labelFulfillResult && (

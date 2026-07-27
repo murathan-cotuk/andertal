@@ -3282,8 +3282,8 @@ const storeOrdersPOST = async (req, res) => {
     for (const it of items) {
       await client.query(
         `INSERT INTO store_order_items
-          (order_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          (order_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle, seller_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [
           orderId,
           it.variant_id,
@@ -3293,6 +3293,7 @@ const storeOrdersPOST = async (req, res) => {
           it.title,
           it.thumbnail,
           it.product_handle,
+          cartLineSellerKey(it),
         ]
       )
     }

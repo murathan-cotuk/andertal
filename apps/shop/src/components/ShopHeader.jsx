@@ -1779,14 +1779,21 @@ export default function ShopHeader() {
             }}
           >
             <SecondMenuRowInner>
-              {secondMenuItems.map((item) => (
-                <SecondLink
-                  key={item.id}
-                  href={menuItemHref(item)}
-                >
-                  {item.label}
-                </SecondLink>
-              ))}
+              {secondMenuItems.map((item) => {
+                const href = menuItemHref(item);
+                const isActive =
+                  href !== "#" &&
+                  (headerRestPath === href || headerRestPath.startsWith(`${href}/`));
+                return (
+                  <SecondLink
+                    key={item.id}
+                    href={href}
+                    className={isActive ? "active" : undefined}
+                  >
+                    {item.label}
+                  </SecondLink>
+                );
+              })}
             </SecondMenuRowInner>
           </SubNavWrap>
         </SubNavClipper>

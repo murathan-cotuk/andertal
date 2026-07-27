@@ -4,6 +4,7 @@ const { resolveOrderPaidTotalCents } = require('../order-money')
 const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename, querySellerInfoForInvoice } = require('../order-pdf-buffers')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
+const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 
 function getClientIpFromRequest(req) {
   const xff = req.headers['x-forwarded-for']
@@ -61,7 +62,29 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         if (order_status) { params.push(order_status); conditions.push(`o.order_status = $${params.length}`) }
         if (payment_status) { params.push(payment_status); conditions.push(`o.payment_status = $${params.length}`) }
         if (delivery_status) { params.push(delivery_status); conditions.push(`o.delivery_status = $${params.length}`) }
-        if (seller_id) { params.push(seller_id); conditions.push(`o.seller_id = $${params.length}`) }
+        // Non-superuser: only orders that belong to them OR contain their line items
+        // (covers multi-seller carts that were still stamped with another seller_id).
+        const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
+        const isSuperuser = !!req.sellerUser?.is_superuser
+        // Non-superusers are always scoped to their own seller_id (ignore query spoofing).
+        const filterSellerId = isSuperuser
+          ? String(seller_id || '').trim()
+          : callerSellerId
+        if (filterSellerId) {
+          params.push(filterSellerId)
+          const n = params.length
+          conditions.push(`(
+            o.seller_id = $${n}
+            OR EXISTS (
+              SELECT 1 FROM store_order_items oi
+              WHERE oi.order_id = o.id AND (
+                NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
+                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
+                OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+              )
+            )
+          )`)
+        }
         const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
         const sortMap = {
           created_at_desc: 'o.created_at DESC', created_at_asc: 'o.created_at ASC',
@@ -74,9 +97,31 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const orderBy = sortMap[sort] || 'o.created_at DESC'
         const lim = Math.min(Number(limit) || 50, 200)
         const off = Number(offset) || 0
-        const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, o.sendcloud_label_url, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
+        const sellerSubtotalSelect = filterSellerId
+          ? `, (
+              SELECT COALESCE(SUM(oi.unit_price_cents::bigint * oi.quantity::bigint), 0)
+              FROM store_order_items oi
+              WHERE oi.order_id = o.id AND (
+                NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${params.length}
+                OR (
+                  NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
+                  AND (
+                    EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${params.length})
+                    OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${params.length})
+                  )
+                )
+              )
+            )::bigint AS seller_items_subtotal_cents`
+          : ', NULL::bigint AS seller_items_subtotal_cents'
+        const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, o.sendcloud_label_url, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered${sellerSubtotalSelect} FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
         const countR = await client.query(`SELECT COUNT(*) FROM store_orders o ${where}`, params)
-        const orders = (r.rows || []).map(row => ({
+        const orders = (r.rows || []).map(row => {
+          const paidTotal = resolveOrderPaidTotalCents(row)
+          const sellerSub = row.seller_items_subtotal_cents != null ? Number(row.seller_items_subtotal_cents) : null
+          // For non-superuser list views, show only that seller's merchandise subtotal
+          // so commission-facing totals aren't inflated by other sellers' lines.
+          const useSellerSub = !isSuperuser && filterSellerId && sellerSub != null
+          return {
           id: row.id, order_number: row.order_number ? Number(row.order_number) : null,
           order_status: row.order_status || 'offen', payment_status: row.payment_status || 'bezahlt',
           delivery_status: row.delivery_status || 'offen',
@@ -84,10 +129,11 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           email: row.email, first_name: row.first_name, last_name: row.last_name, phone: row.phone,
           address_line1: row.address_line1, address_line2: row.address_line2, city: row.city,
           postal_code: row.postal_code, country: row.country,
-          subtotal_cents: row.subtotal_cents,
+          subtotal_cents: useSellerSub ? sellerSub : row.subtotal_cents,
           shipping_cents: Number(row.shipping_cents || 0),
           discount_cents: Number(row.discount_cents || 0),
-          total_cents: resolveOrderPaidTotalCents(row),
+          total_cents: useSellerSub ? sellerSub : paidTotal,
+          seller_items_subtotal_cents: sellerSub,
           currency: row.currency,
           payment_intent_id: row.payment_intent_id, created_at: row.created_at,
           tracking_number: row.tracking_number || null,
@@ -97,7 +143,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           customer_number: row.customer_number ? Number(row.customer_number) : null,
           customer_id: row.customer_id || null,
           is_guest: !(row.c_is_registered === true || row.c_is_registered === 't'),
-        }))
+        }})
         await client.end()
         res.json({ orders, count: Number(countR.rows[0]?.count || 0) })
       } catch (e) {
@@ -119,7 +165,19 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const row = oRes.rows && oRes.rows[0]
         if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
-        const items = (iRes.rows || []).map(r => ({ id: r.id, variant_id: r.variant_id, product_id: r.product_id, quantity: r.quantity, unit_price_cents: r.unit_price_cents, title: r.title, thumbnail: r.thumbnail, product_handle: r.product_handle }))
+        let items = await enrichOrderItemRows(client, iRes.rows || [])
+        const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
+        const isSuperuser = !!req.sellerUser?.is_superuser
+        items = filterItemsForSeller(items, callerSellerId, { isSuperuser, orderSellerId: row.seller_id })
+        // Non-superuser may only open orders they own or that contain their lines.
+        if (!isSuperuser && callerSellerId) {
+          const ownsOrder = String(row.seller_id || '').trim() === callerSellerId
+          if (!ownsOrder && items.length === 0) {
+            await client.end()
+            return res.status(403).json({ message: 'Forbidden' })
+          }
+        }
+        const sellerSubtotal = itemsSubtotalCents(items)
         // Look up customer info by email
         let customerNumber = null
         let isFirstOrder = false
@@ -133,10 +191,13 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           } catch (_) {}
         }
         await client.end()
+        const paidTotal = resolveOrderPaidTotalCents(row)
         res.json({
           order: {
             ...row,
-            total_cents: resolveOrderPaidTotalCents(row),
+            subtotal_cents: !isSuperuser && callerSellerId ? sellerSubtotal : row.subtotal_cents,
+            total_cents: !isSuperuser && callerSellerId ? sellerSubtotal : paidTotal,
+            seller_items_subtotal_cents: sellerSubtotal,
             order_number: row.order_number ? Number(row.order_number) : null,
             items,
             customer_number: customerNumber,
@@ -448,12 +509,18 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const oRes = await client.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
         const row = oRes.rows && oRes.rows[0]
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
-        const items = (iRes.rows || []).map(r => ({ id: r.id, variant_id: r.variant_id, product_id: r.product_id, quantity: r.quantity, unit_price_cents: r.unit_price_cents, title: r.title, thumbnail: r.thumbnail, product_handle: r.product_handle }))
+        let items = await enrichOrderItemRows(client, iRes.rows || [])
+        const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
+        const isSuperuser = !!req.sellerUser?.is_superuser
+        items = filterItemsForSeller(items, callerSellerId, { isSuperuser, orderSellerId: row.seller_id })
+        const sellerSubtotal = itemsSubtotalCents(items)
         await client.end()
         res.json({
           order: {
             ...row,
-            total_cents: resolveOrderPaidTotalCents(row),
+            subtotal_cents: !isSuperuser && callerSellerId ? sellerSubtotal : row.subtotal_cents,
+            total_cents: !isSuperuser && callerSellerId ? sellerSubtotal : resolveOrderPaidTotalCents(row),
+            seller_items_subtotal_cents: sellerSubtotal,
             order_number: row.order_number ? Number(row.order_number) : null,
             items,
           },
