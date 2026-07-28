@@ -10,6 +10,7 @@ const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 const { renderInvoicePdfDocument, querySellerInfoForInvoice } = require('../order-pdf-buffers')
 const { resolveLocaleFromCountry } = require('../locale-from-country')
+const { createReturnLabelForOrder } = require('../return-label')
 
 const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
   const tk = String(triggerKey || '').trim()
@@ -2720,9 +2721,20 @@ const storeReturnRequestPOST = async (req, res) => {
       `UPDATE store_orders SET order_status = 'retoure_anfrage', updated_at = now() WHERE id = $1::uuid`,
       [orderId],
     )
-    await client.end()
     const ret = r.rows[0]
+    // Best-effort: auto-generate the DHL return label via Sendcloud before notifying anyone,
+    // so the customer's email (and its return_label_pdf attachment) already has it. Never
+    // blocks the response — an unconfigured/failing Sendcloud just leaves label fields empty.
+    const labelResult = await createReturnLabelForOrder(client, { returnId: ret.id, orderId }).catch((e) => {
+      console.warn('[return-label] createReturnLabelForOrder threw:', e?.message || e)
+      return { ok: false, reason: e?.message || 'unexpected_error' }
+    })
+    if (!labelResult.ok) {
+      console.warn(`[return-label] order ${orderId}: label not created (${labelResult.reason})`)
+    }
+    await client.end()
     res.json({ return_request: { ...ret, return_number: ret.return_number ? Number(ret.return_number) : null } })
+    void dispatchOrderFlowEvent('return_requested', orderId)
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     res.status(500).json({ message: e?.message || 'Error' })

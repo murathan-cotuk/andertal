@@ -30,6 +30,11 @@ const REFUND_STATUS_COLORS = {
   erstattet: { bg: "#eff6ff", color: "#1d4ed8" },
   ausstehend: { bg: "#fefce8", color: "#a16207" },
 };
+const LABEL_CHARGE_COLORS = {
+  pending: { bg: "#fefce8", color: "#a16207" },
+  charged: { bg: "#f0fdf4", color: "#15803d" },
+  charge_failed: { bg: "#fef2f2", color: "#b91c1c" },
+};
 
 /* ───────── Badge ───────── */
 function Badge({ value, map, locale }) {
@@ -395,6 +400,41 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
               {ret.refund_note && <div style={{ fontSize: 12, color: "#3b82f6", marginTop: 4 }}>{ret.refund_note}</div>}
             </div>
           )}
+
+          {/* Auto-generated DHL return label (Sendcloud) */}
+          <div style={{ background: "#f9fafb", borderRadius: 8, padding: "14px 16px", marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 8 }}>{c.dhlLabelTitle}</div>
+            {ret.label_url ? (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{ret.label_carrier_name || "DHL"}</div>
+                    {ret.label_tracking_number && (
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{c.dhlTrackingNumber}: {ret.label_tracking_number}</div>
+                    )}
+                  </div>
+                  <a href={ret.label_url} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: "#2563eb", textDecoration: "none" }}>
+                    {c.dhlLabelView} ↗
+                  </a>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>{c.dhlChargeStatus}{ret.label_cost_cents ? `: ${fmtMoney(ret.label_cost_cents, locale)}` : ""}</span>
+                  {(() => {
+                    const chargeStatus = ret.label_charge_status || "pending";
+                    const s = LABEL_CHARGE_COLORS[chargeStatus] || LABEL_CHARGE_COLORS.pending;
+                    const label = chargeStatus === "charged" ? c.dhlChargeCharged : chargeStatus === "charge_failed" ? c.dhlChargeFailed : c.dhlChargePending;
+                    return (
+                      <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: s.bg, color: s.color }}>
+                        {label}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 13, color: "#9ca3af" }}>{c.dhlNotGenerated}</div>
+            )}
+          </div>
 
           {/* Status change */}
           <div style={{ marginTop: 8 }}>

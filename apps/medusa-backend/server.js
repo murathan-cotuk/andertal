@@ -1501,6 +1501,17 @@ async function start() {
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS approved_at timestamp`).catch(() => {})
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS rejected_at timestamp`).catch(() => {})
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_sent_at timestamp`).catch(() => {})
+        // Auto-generated Sendcloud/DHL return label (created at return-request time, see return-label.js)
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_url text`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_tracking_number varchar(100)`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_carrier_name varchar(100)`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_created_at timestamp`).catch(() => {})
+        // Seller is only billed once the return parcel actually moves in the carrier network
+        // (webhook-detected), never at label-creation time — see webhooks.js /webhook/sendcloud.
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_cost_cents integer`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_first_status_id integer`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_charge_status varchar(20) DEFAULT 'pending'`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_charged_at timestamp`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS order_status varchar(50) DEFAULT 'offen'`).catch(() => {})
 
         await client.query(`
@@ -2403,9 +2414,12 @@ async function start() {
         try { await client.end() } catch (_2) {}
       }
     }
-    // Run 5 min after boot, then every 3 hours
+    // Run 5 min after boot, then every 30 min. DHL's approved quota is 250 requests/day — at
+    // 48 runs/day that's safe up to ~5 concurrently in-transit DHL orders; if that grows, either
+    // lengthen this interval or (better) switch to DHL's Push/webhook product to stop polling
+    // entirely — see runAutoTrackingRefresh's DHL branch for where a webhook receiver would replace this.
     setTimeout(() => runAutoTrackingRefresh().catch(() => {}), 5 * 60 * 1000)
-    setInterval(() => runAutoTrackingRefresh().catch(() => {}), 3 * 60 * 60 * 1000)
+    setInterval(() => runAutoTrackingRefresh().catch(() => {}), 30 * 60 * 1000)
 
     // --- Seller Account (IBAN/profile/account/password) + Subusers/Invites: extracted to src/routes/seller-account.js ---
     const createSellerAccountRouter = require('./src/routes/seller-account')

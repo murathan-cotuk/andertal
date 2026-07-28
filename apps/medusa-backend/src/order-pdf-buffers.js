@@ -279,7 +279,21 @@ async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {
   return { filename: `Provisionsfaktur-${on}.pdf`, content: buf }
 }
 
-const ALLOWED_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf'])
+const ALLOWED_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf', 'return_label_pdf'])
+
+/** Fetches the already-generated Sendcloud/DHL return label PDF (see return-label.js) for this order. */
+async function buildReturnLabelPdfAttachment(pgClient, orderId) {
+  const r = await pgClient.query(
+    `SELECT return_number, label_url FROM store_returns WHERE order_id = $1::uuid AND label_url IS NOT NULL ORDER BY created_at DESC LIMIT 1`,
+    [orderId],
+  )
+  const row = r.rows[0]
+  if (!row?.label_url) return null
+  const buf = await _fetchImageBuffer(row.label_url)
+  if (!buf) return null
+  const num = row.return_number != null ? String(row.return_number) : String(orderId).slice(0, 8)
+  return { filename: `Retourenetikett-${num}.pdf`, content: buf }
+}
 
 async function buildFlowEmailPdfAttachments(pgClient, orderId, keys) {
   const uniq = [...new Set((keys || []).map((k) => String(k)).filter((k) => ALLOWED_ATTACH_KEYS.has(k)))]
@@ -291,6 +305,9 @@ async function buildFlowEmailPdfAttachments(pgClient, orderId, keys) {
     } else if (k === 'lieferschein_pdf') {
       const a = await buildLieferscheinPdfBuffer(pgClient, orderId)
       if (a) out.push(a)
+    } else if (k === 'return_label_pdf') {
+      const a = await buildReturnLabelPdfAttachment(pgClient, orderId)
+      if (a) out.push(a)
     }
   }
   return out
@@ -300,6 +317,7 @@ module.exports = {
   buildFlowEmailPdfAttachments,
   buildInvoicePdfBuffer,
   buildLieferscheinPdfBuffer,
+  buildReturnLabelPdfAttachment,
   buildProvisionsfakturPdfBuffer,
   renderInvoicePdfDocument,
   renderLieferscheinPdfDocument,

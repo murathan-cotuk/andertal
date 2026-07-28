@@ -1,6 +1,8 @@
 'use strict'
 const { Router } = require('express')
 
+const { chargeReturnLabelOnCarrierMovement } = require('../return-label')
+
 module.exports = function createWebhooksRouter({
   getSellerDbClient,
   loadPlatformCheckoutRow,
@@ -93,6 +95,29 @@ module.exports = function createWebhooksRouter({
             await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
           } else if (internalStatus === 'versendet' || internalStatus === 'in_transit') {
             await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
+          }
+        } else {
+          // Not an outbound order tracking number — check if it's an auto-generated return label.
+          // The seller is billed here, not at label creation: the first webhook for a given
+          // tracking number is Sendcloud's "label created" event, so we record that status once
+          // and only charge when a LATER webhook reports a different status — i.e. the carrier
+          // actually scanned/moved the parcel, not merely that we created the label.
+          const retRes = await client.query(
+            `SELECT id, label_first_status_id, label_charge_status FROM store_returns WHERE label_tracking_number = $1 LIMIT 1`,
+            [trackingNumber],
+          )
+          const ret = retRes.rows[0]
+          if (ret) {
+            if (ret.label_first_status_id == null) {
+              await client.query(`UPDATE store_returns SET label_first_status_id = $1 WHERE id = $2::uuid`, [statusId, ret.id])
+            } else if (Number(ret.label_first_status_id) !== Number(statusId) && ret.label_charge_status === 'pending') {
+              const platformRow = await loadPlatformCheckoutRowFresh()
+              const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+              if (secretKey) {
+                const stripe = new (require('stripe'))(secretKey)
+                await chargeReturnLabelOnCarrierMovement(client, { returnId: ret.id, stripe })
+              }
+            }
           }
         }
         await client.end()

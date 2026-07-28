@@ -328,6 +328,12 @@ async function loadOrderContext(client, orderId) {
     : ''
 
   const prefixParts = storefrontPathPrefixFromShippingCountry(order.country)
+  const retRes = await client.query(
+    `SELECT return_number, reason, label_url, label_tracking_number, label_carrier_name
+     FROM store_returns WHERE order_id = $1::uuid ORDER BY created_at DESC LIMIT 1`,
+    [orderId],
+  )
+  const returnInfo = retRes.rows[0] || null
   return {
     order,
     items,
@@ -341,6 +347,7 @@ async function loadOrderContext(client, orderId) {
     orderItemsHtml,
     resolveUrl,
     prefixParts,
+    returnInfo,
   }
 }
 
@@ -417,6 +424,7 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     orderItemsHtml,
     resolveUrl,
     prefixParts,
+    returnInfo,
   } = ctx
   const fn = String(order.first_name || '').trim()
   const ln = String(order.last_name || '').trim()
@@ -486,6 +494,11 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
       : absoluteStorefrontUrl(baseSite, `${prefix}/`),
     LOGIN_URL: absoluteStorefrontUrl(baseSite, `${prefix}/login`),
     REGISTER_URL: absoluteStorefrontUrl(baseSite, `${prefix}/register`),
+    RETURN_NUMBER: returnInfo?.return_number != null ? String(returnInfo.return_number) : '',
+    RETURN_REASON: String(returnInfo?.reason || ''),
+    RETURN_LABEL_URL: String(returnInfo?.label_url || ''),
+    RETURN_TRACKING_NUMBER: String(returnInfo?.label_tracking_number || ''),
+    RETURN_CARRIER_NAME: String(returnInfo?.label_carrier_name || ''),
   }
   items.slice(0, 5).forEach((it, i) => {
     const n = i + 1
@@ -615,6 +628,39 @@ async function buildFlowEmailPlaceholderVarsForCustomer(client, customerId) {
   }
 
   return placeholderVarsCustomerOnly(client, cust)
+}
+
+/**
+ * A flow email actually failed to send (SMTP/Resend error) — surfaces this two ways so it isn't
+ * only visible by digging through Content → Flows → Activity: (1) a superuser-panel notification
+ * (admin_hub_notifications, type 'flow_send_failed' — see routes/notifications.js), and (2) a
+ * direct heads-up email, since the superuser may not be watching the panel in real time.
+ */
+async function notifySuperuserFlowFailure(client, { triggerKey, flowId, stepOrder, recipientEmail, errorMessage, fromEmail, fromName, transport }) {
+  const title = `Flow-Mail fehlgeschlagen: ${triggerKey || 'unbekannt'}`
+  const bodyText = `Flow ${flowId}, Schritt ${stepOrder}, Empfänger ${recipientEmail || '—'}: ${String(errorMessage || '').slice(0, 400)}`
+  try {
+    await client.query(
+      `INSERT INTO admin_hub_notifications (type, title, body, reference_id) VALUES ('flow_send_failed', $1, $2, $3)`,
+      [title, bodyText, flowId ? String(flowId) : null],
+    )
+  } catch (e) {
+    logger.warn('[flow-automation] failed to insert flow_send_failed notification', e?.message || e)
+  }
+  const alertTo = String(process.env.FLOW_FAILURE_ALERT_EMAIL || 'info@andertal.com').trim()
+  if (!alertTo) return
+  try {
+    await sendFlowOutboundEmail({
+      transport,
+      from: `"${String(fromName || 'Andertal').replace(/"/g, '')}" <${fromEmail || alertTo}>`,
+      to: alertTo,
+      subject: title,
+      html: `<p>${bodyText.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>`,
+      text: bodyText,
+    })
+  } catch (e) {
+    logger.warn('[flow-automation] failed to send flow failure alert email', e?.message || e)
+  }
 }
 
 /**
@@ -775,6 +821,16 @@ async function sendImmediateStepsForFlow({
         `[flow-automation] send failed trigger=${triggerKey} flow=${flowId} step=${stepOrder}:`,
         sendErr?.message || sendErr,
       )
+      await notifySuperuserFlowFailure(client, {
+        triggerKey,
+        flowId,
+        stepOrder,
+        recipientEmail: toEmail,
+        errorMessage: sendErr?.message || String(sendErr || 'send_failed'),
+        fromEmail,
+        fromName,
+        transport,
+      }).catch(() => {})
       idx += 1
       continue
     }

@@ -86,7 +86,7 @@ function normalizeSendEmailStep(step) {
   }
   const rawAtt = step.email_attachments;
   const email_attachments = Array.isArray(rawAtt)
-    ? rawAtt.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf")
+    ? rawAtt.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf" || k === "return_label_pdf")
     : [];
   return {
     ...step,
@@ -141,6 +141,7 @@ const T = {
       order_processing: "Order processing started",
       order_shipped: "Order shipped (tracking)",
       order_delivered: "Order delivered",
+      return_requested: "Return requested",
       review_request: "Review request",
       win_back: "Win-back (inactive customer)",
       favorite_low_stock: "Favorited product low on stock",
@@ -222,6 +223,7 @@ const T = {
       "Invoice / delivery note PDFs attach when an order exists (live sends). For tests, pick a customer who has an order.",
     attachInvoicePdf: "Invoice (Rechnung)",
     attachLieferscheinPdf: "Delivery note (Lieferschein)",
+    attachReturnLabelPdf: "Return label (DHL, auto-generated)",
     testEmailBtn: "Send test email",
     testEmailNeedAddress: "Enter your email above to send a test.",
     testEmailNeedStep: "Add subject and HTML body first.",
@@ -275,6 +277,7 @@ const T = {
       order_processing: "Bestellung wird bearbeitet",
       order_shipped: "Bestellung versendet (Tracking)",
       order_delivered: "Bestellung geliefert",
+      return_requested: "Retoure angefragt",
       review_request: "Bewertungsanfrage",
       win_back: "Rückgewinnung (inaktiver Kunde)",
       favorite_low_stock: "Merkliste-Produkt bald ausverkauft",
@@ -356,6 +359,7 @@ const T = {
       "Rechnung / Lieferschein werden angehängt, wenn eine Bestellung existiert (Live). Test: Kunde mit Bestellung wählen.",
     attachInvoicePdf: "Rechnung (PDF)",
     attachLieferscheinPdf: "Lieferschein (PDF)",
+    attachReturnLabelPdf: "Retourenetikett (DHL, automatisch erstellt)",
     testEmailBtn: "Test-E-Mail senden",
     testEmailNeedAddress: "Bitte oben eine E-Mail-Adresse eingeben.",
     testEmailNeedStep: "Zuerst Betreff und HTML-Text ausfüllen.",
@@ -409,6 +413,7 @@ const T = {
       order_processing: "Sipariş işleme alındı",
       order_shipped: "Sipariş kargoya verildi (takip)",
       order_delivered: "Sipariş teslim edildi",
+      return_requested: "İade talebi oluşturuldu",
       review_request: "Yorum isteği",
       win_back: "Pasif müşteri (win-back)",
       favorite_low_stock: "Favorilenen ürünün stoğu azaldı",
@@ -490,6 +495,7 @@ const T = {
       "Sipariş varsa fatura / irsaliye PDF eklenir (canlı). Test: siparişi olan müşteri seçin.",
     attachInvoicePdf: "Fatura (Rechnung)",
     attachLieferscheinPdf: "İrsaliye (Lieferschein)",
+    attachReturnLabelPdf: "İade etiketi (DHL, otomatik oluşturulur)",
     testEmailBtn: "Test e-postası gönder",
     testEmailNeedAddress: "Önce yukarıya e-posta yazın.",
     testEmailNeedStep: "Önce konu ve HTML gövde ekleyin.",
@@ -543,6 +549,7 @@ const T = {
       order_processing: "Commande en cours de préparation",
       order_shipped: "Commande expédiée (suivi)",
       order_delivered: "Commande livrée",
+      return_requested: "Retour demandé",
       review_request: "Demande d'avis",
       win_back: "Réactivation (client inactif)",
       favorite_low_stock: "Produit favori bientôt épuisé",
@@ -624,6 +631,7 @@ const T = {
       "Facture / bon de livraison si une commande existe (envoi réel). Test : client avec commande.",
     attachInvoicePdf: "Facture (Rechnung)",
     attachLieferscheinPdf: "Bon de livraison (Lieferschein)",
+    attachReturnLabelPdf: "Étiquette de retour (DHL, générée automatiquement)",
     testEmailBtn: "Envoyer un e-mail de test",
     testEmailNeedAddress: "Indiquez votre e-mail ci-dessus.",
     testEmailNeedStep: "Renseignez d'abord l'objet et le corps HTML.",
@@ -677,6 +685,7 @@ const T = {
       order_processing: "Ordine in lavorazione",
       order_shipped: "Ordine spedito (tracking)",
       order_delivered: "Ordine consegnato",
+      return_requested: "Reso richiesto",
       review_request: "Richiesta recensione",
       win_back: "Riattivazione (cliente inattivo)",
       favorite_low_stock: "Prodotto preferito quasi esaurito",
@@ -757,6 +766,7 @@ const T = {
       "Fattura / bolla di accompagnamento se esiste un ordine (invio reale). Test: cliente con ordine.",
     attachInvoicePdf: "Fattura (Rechnung)",
     attachLieferscheinPdf: "Documento di trasporto (Lieferschein)",
+    attachReturnLabelPdf: "Etichetta di reso (DHL, generata automaticamente)",
     testEmailBtn: "Invia e-mail di test",
     testEmailNeedAddress: "Inserisci sopra un indirizzo e-mail.",
     testEmailNeedStep: "Compila prima oggetto e corpo HTML.",
@@ -810,6 +820,7 @@ const T = {
       order_processing: "Pedido en preparación",
       order_shipped: "Pedido enviado (seguimiento)",
       order_delivered: "Pedido entregado",
+      return_requested: "Devolución solicitada",
       review_request: "Solicitud de reseña",
       win_back: "Reactivación (cliente inactivo)",
       favorite_low_stock: "Producto favorito con poco stock",
@@ -891,6 +902,7 @@ const T = {
       "Factura / albarán si hay pedido (envío real). Prueba: cliente con pedido.",
     attachInvoicePdf: "Factura (Rechnung)",
     attachLieferscheinPdf: "Albarán (Lieferschein)",
+    attachReturnLabelPdf: "Etiqueta de devolución (DHL, generada automáticamente)",
     testEmailBtn: "Enviar correo de prueba",
     testEmailNeedAddress: "Escribe tu correo arriba.",
     testEmailNeedStep: "Completa primero asunto y cuerpo HTML.",
@@ -1015,7 +1027,7 @@ export default function FlowsPage() {
     () => Object.entries(t.triggers).map(([value, label]) => ({ label, value })),
     [t],
   );
-  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "order_placed", "order_processing", "order_shipped", "order_delivered"]), []);
+  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested"]), []);
 
   const [newAudience, setNewAudience] = useState("customer");
   const [editAudience, setEditAudience] = useState("customer");
@@ -1423,7 +1435,7 @@ export default function FlowsPage() {
         && Array.isArray(att)
         && att.length
       ) {
-        payload.attachments = att.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf");
+        payload.attachments = att.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf" || k === "return_label_pdf");
       }
       await client.sendFlowTestEmail(editingFlowId, payload);
       showFlowTestFeedback("success", t.testEmailOk);
@@ -1618,7 +1630,7 @@ export default function FlowsPage() {
         const deS = String(i18n.de?.subject || "").trim();
         const deB = String(i18n.de?.body || "").trim();
         const att = Array.isArray(s.email_attachments)
-          ? s.email_attachments.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf")
+          ? s.email_attachments.filter((k) => k === "invoice_pdf" || k === "lieferschein_pdf" || k === "return_label_pdf")
           : [];
         const sid = String(s.smtp_sender_id || "").trim();
         return {
@@ -2066,6 +2078,21 @@ export default function FlowsPage() {
                                       const set = new Set(row.email_attachments || []);
                                       if (checked) set.add("lieferschein_pdf");
                                       else set.delete("lieferschein_pdf");
+                                      return { ...row, email_attachments: Array.from(set) };
+                                    }),
+                                  );
+                                }}
+                              />
+                              <Checkbox
+                                label={t.attachReturnLabelPdf}
+                                checked={(step.email_attachments || []).includes("return_label_pdf")}
+                                onChange={(checked) => {
+                                  setEditSteps((prev) =>
+                                    prev.map((row, i) => {
+                                      if (i !== idx || row.step_type !== "send_email") return row;
+                                      const set = new Set(row.email_attachments || []);
+                                      if (checked) set.add("return_label_pdf");
+                                      else set.delete("return_label_pdf");
                                       return { ...row, email_attachments: Array.from(set) };
                                     }),
                                   );

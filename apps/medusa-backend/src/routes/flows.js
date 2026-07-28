@@ -842,6 +842,62 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
           es: 'Enlace a la bandeja de entrada de Sellercentral',
         },
       },
+      {
+        key: 'RETURN_NUMBER',
+        sample: '200042',
+        category: 'order',
+        triggers: ['return_requested'],
+        desc: {
+          en: 'Return request number',
+          de: 'Retouren-Nummer',
+          tr: 'İade talep numarası',
+          fr: 'Numéro de retour',
+          it: 'Numero di reso',
+          es: 'Número de devolución',
+        },
+      },
+      {
+        key: 'RETURN_REASON',
+        sample: 'Größe passt nicht',
+        category: 'order',
+        triggers: ['return_requested'],
+        desc: {
+          en: 'Reason the customer gave for the return',
+          de: 'Vom Kunden angegebener Retourengrund',
+          tr: 'Müşterinin belirttiği iade nedeni',
+          fr: 'Motif de retour indiqué par le client',
+          it: 'Motivo del reso indicato dal cliente',
+          es: 'Motivo de la devolución indicado por el cliente',
+        },
+      },
+      {
+        key: 'RETURN_LABEL_URL',
+        sample: 'https://panel.sendcloud.sc/…/label.pdf',
+        category: 'order',
+        triggers: ['return_requested'],
+        desc: {
+          en: 'Direct link to the auto-generated DHL return label PDF (also available as the return_label_pdf attachment)',
+          de: 'Direktlink zum automatisch erstellten DHL-Retourenetikett (auch als Anhang return_label_pdf verfügbar)',
+          tr: 'Otomatik oluşturulan DHL iade etiketi PDF linki (return_label_pdf eki olarak da mevcut)',
+          fr: 'Lien direct vers l\'étiquette de retour DHL générée automatiquement (aussi disponible en pièce jointe return_label_pdf)',
+          it: 'Link diretto all\'etichetta di reso DHL generata automaticamente (disponibile anche come allegato return_label_pdf)',
+          es: 'Enlace directo a la etiqueta de devolución DHL generada automáticamente (también disponible como adjunto return_label_pdf)',
+        },
+      },
+      {
+        key: 'RETURN_TRACKING_NUMBER',
+        sample: '00340001234567890123',
+        category: 'order',
+        triggers: ['return_requested'],
+        desc: {
+          en: 'DHL tracking number for the return shipment',
+          de: 'DHL-Sendungsnummer der Rücksendung',
+          tr: 'İade kargosu için DHL takip numarası',
+          fr: 'Numéro de suivi DHL du retour',
+          it: 'Numero di tracciamento DHL del reso',
+          es: 'Número de seguimiento DHL de la devolución',
+        },
+      },
     ]
     const FLOW_EMAIL_SAMPLE_PLACEHOLDERS = (() => {
       const o = {}
@@ -900,6 +956,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       'order_processing',
       'order_shipped',
       'order_delivered',
+      'return_requested',
       'review_request',
       'win_back',
       'favorite_low_stock',
@@ -1105,7 +1162,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
 
         if (Array.isArray(body.steps)) {
           const FLOW_SAVE_LOCALES = ['de', 'en', 'tr', 'fr', 'it', 'es']
-          const FLOW_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf'])
+          const FLOW_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf', 'return_label_pdf'])
           const SMTP_SENDER_UUID_RE =
             /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
           /** Clone for PG jsonb — strips undefined / non-JSON types (avoids invalid json syntax). */
@@ -1399,7 +1456,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
 
         let pdfAttachments = []
         const attachReq = Array.isArray(body.attachments) ? body.attachments : []
-        const ALLOW_FLOW_TEST_ATTACH = new Set(['invoice_pdf', 'lieferschein_pdf'])
+        const ALLOW_FLOW_TEST_ATTACH = new Set(['invoice_pdf', 'lieferschein_pdf', 'return_label_pdf'])
         const filteredAttach = [...new Set(attachReq.map(String).filter((k) => ALLOW_FLOW_TEST_ATTACH.has(k)))]
         if (filteredAttach.length && customerIdRaw) {
           try {

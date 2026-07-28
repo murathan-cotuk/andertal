@@ -109,5 +109,14 @@ export function getOrdersReturnsCopy(locale) {
     labelAlreadySent: t("Label already sent", "Etiket zaten gönderildi", "Étiquette déjà envoyée", "Etiqueta ya enviada", "Etichetta già inviata", "Label bereits gesendet"),
     sendLabelByEmail: t("Send label by email", "Etiketi e-posta ile gönder", "Envoyer l'étiquette par e-mail", "Enviar etiqueta por correo", "Invia etichetta via e-mail", "Label per E-Mail senden"),
     email: t("Email", "E-posta", "E-mail", "Correo", "E-mail", "E-Mail"),
+    dhlLabelTitle: t("DHL return label (auto)", "DHL iade etiketi (otomatik)", "Étiquette de retour DHL (auto)", "Etiqueta de devolución DHL (auto)", "Etichetta di reso DHL (auto)", "DHL-Retourenetikett (automatisch)"),
+    dhlLabelView: t("View PDF", "PDF'i görüntüle", "Voir le PDF", "Ver PDF", "Vedi PDF", "PDF ansehen"),
+    dhlTrackingNumber: t("Tracking number", "Takip numarası", "Numéro de suivi", "Número de seguimiento", "Numero di tracciamento", "Sendungsnummer"),
+    dhlCarrier: t("Carrier", "Kargo firması", "Transporteur", "Transportista", "Corriere", "Versanddienst"),
+    dhlChargeStatus: t("Label cost", "Etiket ücreti", "Coût de l'étiquette", "Coste de la etiqueta", "Costo etichetta", "Etikettkosten"),
+    dhlChargePending: t("Pending (charged once shipped)", "Bekliyor (kargoya verilince kesilir)", "En attente (facturé une fois expédié)", "Pendiente (se cobra al enviarse)", "In attesa (addebitato alla spedizione)", "Ausstehend (wird bei Versand belastet)"),
+    dhlChargeCharged: t("Charged to seller", "Satıcıdan kesildi", "Facturé au vendeur", "Cobrado al vendedor", "Addebitato al venditore", "Verkäufer belastet"),
+    dhlChargeFailed: t("Charge failed", "Ücret kesilemedi", "Échec du prélèvement", "Error al cobrar", "Addebito non riuscito", "Belastung fehlgeschlagen"),
+    dhlNotGenerated: t("Not generated (Sendcloud not configured or unavailable)", "Oluşturulmadı (Sendcloud yapılandırılmamış veya erişilemedi)", "Non générée (Sendcloud non configuré ou indisponible)", "No generada (Sendcloud no configurado o no disponible)", "Non generata (Sendcloud non configurato o non disponibile)", "Nicht erstellt (Sendcloud nicht konfiguriert oder nicht erreichbar)"),
   };
 }

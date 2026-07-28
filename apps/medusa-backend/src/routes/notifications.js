@@ -83,6 +83,14 @@ module.exports = function createNotificationsRouter() {
            DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
           [recipientKey],
         ).catch(() => {})
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'flow_send_failed', n.id, now()
+           FROM admin_hub_notifications n WHERE n.type = 'flow_send_failed'
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        ).catch(() => {})
       }
     }
 
@@ -207,8 +215,17 @@ module.exports = function createNotificationsRouter() {
         const sellerErrorsUnreadQ = sup
           ? `SELECT COUNT(*)::int AS c FROM seller_error_logs WHERE is_read = false`
           : `SELECT 0::int AS c`
+        const flowFailuresUnreadQ = sup
+          ? `
+          SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'flow_send_failed' AND s.source_id = n.id
+          WHERE n.type = 'flow_send_failed'
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+          : `SELECT 0::int AS c`
 
-        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR, sellerErrorsR, sellerListingR, brandAuthR] = await Promise.all([
+        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR, sellerErrorsR, sellerListingR, brandAuthR, flowFailuresR] = await Promise.all([
           client.query(ordersUnreadQ, [rk, sup, sid]),
           client.query(returnsUnreadQ, [rk, sup, sid]),
           sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
@@ -219,6 +236,7 @@ module.exports = function createNotificationsRouter() {
           sup ? client.query(sellerErrorsUnreadQ).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(sellerListingUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(brandAuthUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          sup ? client.query(flowFailuresUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
         ])
 
         const recentOrders = await client.query(
@@ -300,6 +318,20 @@ module.exports = function createNotificationsRouter() {
             [rk],
           ).catch(() => ({ rows: [] }))
         }
+        let recentFlowFailures = { rows: [] }
+        if (sup) {
+          recentFlowFailures = await client.query(
+            `SELECT n.id, n.title, n.body, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'flow_send_failed' AND s.source_id = n.id
+             WHERE n.type = 'flow_send_failed'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 8`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
         let recentChangeRequests = { rows: [] }
         if (sup) {
           recentChangeRequests = await client.query(
@@ -366,10 +398,11 @@ module.exports = function createNotificationsRouter() {
         const sellerErrorsCount = sellerErrorsR.rows[0]?.c || 0
         const sellerListingCount = sellerListingR.rows[0]?.c || 0
         const brandAuthCount = brandAuthR.rows[0]?.c || 0
+        const flowFailuresCount = flowFailuresR.rows[0]?.c || 0
         const ordCount = ordersR.rows[0]?.c || 0
         const retCount = returnsR.rows[0]?.c || 0
         res.json({
-          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount + sellerErrorsCount + sellerListingCount + brandAuthCount,
+          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount + sellerErrorsCount + sellerListingCount + brandAuthCount + flowFailuresCount,
           orders: ordCount,
           returns: retCount,
           messages: messagesR.rows[0]?.c || 0,
@@ -379,6 +412,7 @@ module.exports = function createNotificationsRouter() {
           seller_errors: sellerErrorsCount,
           seller_listings_pending: sellerListingCount,
           brand_authorizations_pending: brandAuthCount,
+          flow_failures: flowFailuresCount,
           recent_orders: recentOrders.rows.map((r) => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_returns: recentReturns.rows.map((r) => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_verifications: recentVerifications.rows,
@@ -388,6 +422,7 @@ module.exports = function createNotificationsRouter() {
           recent_seller_errors: recentSellerErrors.rows || [],
           recent_seller_listings_pending: recentSellerListingPending.rows || [],
           recent_brand_authorizations_pending: recentBrandAuthPending.rows || [],
+          recent_flow_failures: recentFlowFailures.rows || [],
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -501,6 +536,20 @@ module.exports = function createNotificationsRouter() {
              LEFT JOIN seller_hub_notification_state s
                ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = n.id
              WHERE n.type = 'brand_authorization_pending'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 500`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let flowFailuresQ = { rows: [] }
+        if (sup) {
+          flowFailuresQ = await client.query(
+            `SELECT n.id, n.title, n.body, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'flow_send_failed' AND s.source_id = n.id
+             WHERE n.type = 'flow_send_failed'
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 500`,
             [rk],
@@ -672,6 +721,19 @@ module.exports = function createNotificationsRouter() {
             seller_id: r.seller_id || undefined,
           })
         }
+        const flowFailureFeedItems = []
+        for (const r of flowFailuresQ.rows || []) {
+          flowFailureFeedItems.push({
+            source_type: 'flow_send_failed',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: r.title || 'Flow-Mail fehlgeschlagen',
+            subtitle: r.body || '',
+            href: '/marketing/automations',
+            flow_id: r.reference_id ? String(r.reference_id) : undefined,
+          })
+        }
         const productChangeFeedItems = []
         for (const r of crQ.rows || []) {
           const pid = r.product_id ? String(r.product_id) : ''
@@ -775,6 +837,12 @@ module.exports = function createNotificationsRouter() {
                 description_de: 'Verkäufer warten auf Freigabe für registrierte Marken oder Vertriebspartnerschaften',
                 items: brandAuthFeedItems,
               },
+              {
+                key: 'flow_send_failed',
+                label_de: 'Flow-Mail-Fehler',
+                description_de: 'Automatisierte E-Mails, die beim Versand fehlgeschlagen sind',
+                items: flowFailureFeedItems,
+              },
             )
           }
           if (!sup) {
@@ -793,7 +861,7 @@ module.exports = function createNotificationsRouter() {
           })
         }
 
-        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems, ...campaignSubmittedFeedItems, ...sellerListingFeedItems, ...brandAuthFeedItems]
+        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems, ...campaignSubmittedFeedItems, ...sellerListingFeedItems, ...brandAuthFeedItems, ...flowFailureFeedItems]
         items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         const total = items.length
         const paged = items.slice(off, off + lim)
@@ -889,6 +957,13 @@ module.exports = function createNotificationsRouter() {
                ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
               [rk],
             ).catch(() => {})
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'flow_send_failed', n.id, now()
+               FROM admin_hub_notifications n WHERE n.type = 'flow_send_failed'
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk],
+            ).catch(() => {})
           } else if (sid) {
             await client.query(
               `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
@@ -905,7 +980,7 @@ module.exports = function createNotificationsRouter() {
             const st = String(it.source_type || '').trim()
             const id = it.source_id
             if (!st || !id) continue
-            if (!sup && (st === 'product_change_request' || st === 'metafield_pending' || st === 'verification' || st === 'campaign_submitted' || st === 'seller_listing_pending' || st === 'brand_authorization_pending')) continue
+            if (!sup && (st === 'product_change_request' || st === 'metafield_pending' || st === 'verification' || st === 'campaign_submitted' || st === 'seller_listing_pending' || st === 'brand_authorization_pending' || st === 'flow_send_failed')) continue
             await markDeleted(st, id)
           }
         }
