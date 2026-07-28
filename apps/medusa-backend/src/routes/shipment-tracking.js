@@ -2,6 +2,7 @@
 const { Router } = require('express')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
+const { chargeSellerForLabel } = require('../seller-billing')
 
 // Dispatches order-related automation flow triggers via the queue, falling back to immediate execution.
 // (Mirrors the helper in orders.js — kept separate since these two route files aren't shared modules.)
@@ -612,7 +613,9 @@ module.exports = function createShipmentTrackingRouter({
       }
     }
 
-    const adminHubLabelCheckoutPOST = async (req, res) => {
+    // Buys the label synchronously — no Stripe Checkout redirect. Charges the seller's
+    // available balance (unpaid revenue, may go negative) or, if none, their saved card.
+    const adminHubLabelPurchasePOST = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const id = (req.params.id || '').trim()
       const isSuperuser = req.sellerUser?.is_superuser === true
@@ -623,98 +626,60 @@ module.exports = function createShipmentTrackingRouter({
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const ownerCheck = await client.query(
-          'SELECT id, first_name, last_name, email, country, postal_code, city, address_line1, address_line2 FROM store_orders WHERE id=$1::uuid' + sellerOrderAccessSQL(isSuperuser),
-          isSuperuser ? [id] : [id, callerSellerId]
+        const orderR = await client.query(
+          `SELECT id, order_number, seller_id, first_name, last_name, email, phone, country, postal_code, city, address_line1, address_line2, sendcloud_label_url, tracking_number
+           FROM store_orders WHERE id=$1::uuid`,
+          [id],
         )
-        if (!ownerCheck.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
-        const checkoutRow = await loadPlatformCheckoutRow(client)
-        const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
-        await client.end()
-        if (!secretKey) {
-          return respondSellerSystemError(req, res, {
-            errorCode: 'STRIPE_NOT_CONFIGURED',
-            errorMessage: 'Stripe nicht konfiguriert (Label-Checkout)',
-            sellerId: callerSellerId,
-            context: JSON.stringify({ order_id: id, endpoint: 'label/checkout' }),
-          })
-        }
-        const { service_id, service_name, carrier, price_eur, weight_kg, length_cm, width_cm, height_cm, locale = 'de' } = req.body || {}
-        if (!service_id || !price_eur) return res.status(400).json({ message: 'service_id und price_eur erforderlich' })
-        const stripe = new (require('stripe'))(secretKey)
-        const SELLERCENTRAL_URL = (process.env.SELLERCENTRAL_URL || 'http://localhost:3002').replace(/\/$/, '')
-        const session = await stripe.checkout.sessions.create({
-          payment_method_types: ['card'],
-          mode: 'payment',
-          line_items: [{
-            price_data: {
-              currency: 'eur',
-              product_data: { name: `Versandetikett — ${service_name || carrier || 'Sendcloud'}`, description: `Bestellung #${ownerCheck.rows[0].id.slice(0,8)}` },
-              unit_amount: Math.round(Number(price_eur) * 100),
-            },
-            quantity: 1,
-          }],
-          metadata: { order_id: id, service_id: String(service_id), service_name: service_name || '', carrier: carrier || '', weight_kg: String(weight_kg||1), length_cm: String(length_cm||30), width_cm: String(width_cm||20), height_cm: String(height_cm||15), seller_id: callerSellerId || 'platform' },
-          success_url: `${SELLERCENTRAL_URL}/${locale}/orders?label_session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${SELLERCENTRAL_URL}/${locale}/orders?label_cancel=1`,
-        })
-        res.json({ checkout_url: session.url })
-      } catch (e) {
-        if (client) try { await client.end() } catch (_) {}
-        return respondSellerSystemError(req, res, {
-          errorCode: 'LABEL_CHECKOUT_ERROR',
-          errorMessage: e?.message || 'Checkout konnte nicht erstellt werden',
-          terminalOutput: e?.stack || null,
-          sellerId: callerSellerId,
-          context: JSON.stringify({ order_id: id, endpoint: 'label/checkout' }),
-        })
-      }
-    }
-
-    const adminHubLabelFulfillPOST = async (req, res) => {
-      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-      const { session_id } = req.body || {}
-      if (!session_id) return res.status(400).json({ message: 'session_id required' })
-      let client
-      try {
-        const { Client } = require('pg')
-        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
-        await client.connect()
-        const checkoutRow = await loadPlatformCheckoutRow(client)
-        const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
-        if (!secretKey) {
-          await client.end()
-          return respondSellerSystemError(req, res, {
-            errorCode: 'STRIPE_NOT_CONFIGURED',
-            errorMessage: 'Stripe nicht konfiguriert (Label-Fulfill)',
-            sellerId: req.sellerUser?.seller_id || null,
-            context: JSON.stringify({ session_id, endpoint: 'label/fulfill' }),
-          })
-        }
-        const stripe = new (require('stripe'))(secretKey)
-        const session = await stripe.checkout.sessions.retrieve(session_id)
-        if (session.payment_status !== 'paid') { await client.end(); return res.status(400).json({ message: 'Zahlung nicht abgeschlossen' }) }
-        const meta = session.metadata || {}
-        const orderId = meta.order_id
-        if (!orderId) { await client.end(); return res.status(400).json({ message: 'Keine Bestell-ID in Session' }) }
-        // Check if already fulfilled (tracking already set via this session)
-        const labelCheckR = await client.query(`SELECT sendcloud_label_url, tracking_number FROM store_orders WHERE id=$1::uuid`, [orderId])
-        const existing = labelCheckR.rows[0]
-        if (existing?.sendcloud_label_url) {
-          await client.end()
-          return res.json({ label_url: existing.sendcloud_label_url, tracking_number: existing.tracking_number, already_fulfilled: true })
-        }
-        const orderR = await client.query(`SELECT id, first_name, last_name, email, phone, country, postal_code, city, address_line1, address_line2 FROM store_orders WHERE id=$1::uuid`, [orderId])
         const order = orderR.rows[0]
-        if (!order) { await client.end(); return res.status(404).json({ message: 'Bestellung nicht gefunden' }) }
+        if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        // Strict ownership check — buying a label charges money, unlike viewing/scanning an
+        // order's own items, so only the order's own seller (or a superuser) may do this.
+        const orderSellerId = String(order.seller_id || '').trim()
+        if (!isSuperuser && orderSellerId !== String(callerSellerId || '').trim()) {
+          await client.end()
+          return res.status(403).json({ message: 'This order belongs to a different seller.' })
+        }
+        const billingSellerId = isSuperuser ? orderSellerId : callerSellerId
+
+        const { service_id, service_name, carrier, price_eur, weight_kg, length_cm, width_cm, height_cm } = req.body || {}
+        if (!service_id || !price_eur) { await client.end(); return res.status(400).json({ message: 'service_id und price_eur erforderlich' }) }
+
+        const checkoutRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(checkoutRow)
+        if (!secretKey) {
+          await client.end()
+          return respondSellerSystemError(req, res, {
+            errorCode: 'STRIPE_NOT_CONFIGURED',
+            errorMessage: 'Stripe nicht konfiguriert (Label-Kauf)',
+            sellerId: callerSellerId,
+            context: JSON.stringify({ order_id: id, endpoint: 'label/purchase' }),
+          })
+        }
+        const stripe = new (require('stripe'))(secretKey)
+
+        let chargeResult
+        try {
+          chargeResult = await chargeSellerForLabel(client, {
+            sellerId: billingSellerId,
+            orderId: id,
+            amountCents: Math.round(Number(price_eur) * 100),
+            orderNumber: order.order_number,
+            stripe,
+          })
+        } catch (chargeErr) {
+          await client.end()
+          return res.status(402).json({ message: chargeErr?.message || 'Payment failed' })
+        }
+
         const sc = await getSendcloudCredentials(client)
         if (!sc.public_key || !sc.secret_key) {
           await client.end()
           return respondSellerSystemError(req, res, {
             errorCode: 'SENDCLOUD_NOT_CONFIGURED',
-            errorMessage: 'Sendcloud nicht konfiguriert (Label-Erstellung nach Zahlung)',
-            sellerId: meta.seller_id || req.sellerUser?.seller_id || null,
-            context: JSON.stringify({ order_id: orderId, session_id, endpoint: 'label/fulfill' }),
+            errorMessage: 'Sendcloud nicht konfiguriert',
+            sellerId: billingSellerId,
+            context: JSON.stringify({ order_id: id, endpoint: 'label/purchase' }),
           })
         }
         const parcelBody = JSON.stringify({ parcel: {
@@ -726,13 +691,13 @@ module.exports = function createShipmentTrackingRouter({
           country: { iso_2: (order.country || 'DE').toUpperCase() },
           telephone: order.phone || '',
           email: order.email || '',
-          weight: String(Number(meta.weight_kg) || 1),
-          length: meta.length_cm || '30',
-          width: meta.width_cm || '20',
-          height: meta.height_cm || '15',
-          shipment: { id: Number(meta.service_id) },
+          weight: String(Number(weight_kg) || 1),
+          length: String(length_cm || 30),
+          width: String(width_cm || 20),
+          height: String(height_cm || 15),
+          shipment: { id: Number(service_id) },
           request_label: true,
-          order_number: orderId.slice(0, 8),
+          order_number: String(id).slice(0, 8),
         }})
         const scResp = await sendcloudRequest('/api/v2/parcels', sc, { method: 'POST', body: parcelBody })
         if (scResp.status >= 400) {
@@ -741,29 +706,29 @@ module.exports = function createShipmentTrackingRouter({
             errorCode: 'SENDCLOUD_PARCEL_ERROR',
             errorMessage: `Sendcloud Fehler: ${JSON.stringify(scResp.data?.error || scResp.data)}`,
             terminalOutput: JSON.stringify(scResp.data || {}),
-            sellerId: meta.seller_id || req.sellerUser?.seller_id || null,
-            context: JSON.stringify({ order_id: orderId, session_id, service_id: meta.service_id, endpoint: 'label/fulfill' }),
+            sellerId: billingSellerId,
+            context: JSON.stringify({ order_id: id, service_id, endpoint: 'label/purchase', charge_method: chargeResult.charge_method }),
           })
         }
         const parcel = scResp.data?.parcel || {}
         const trackingNumber = parcel.tracking_number || ''
         const labelUrl = parcel.label?.label_printer || parcel.label?.normal_printer || ''
-        const carrierName = meta.carrier || meta.service_name || 'Sendcloud'
+        const carrierName = carrier || service_name || 'Sendcloud'
         const updRes = await client.query(
           `UPDATE store_orders SET tracking_number=$1, carrier_name=$2, sendcloud_label_url=$3, delivery_status='versendet', shipped_at=COALESCE(shipped_at,now()), updated_at=now() WHERE id=$4::uuid AND delivery_status NOT IN ('versendet','zugestellt')`,
-          [trackingNumber, carrierName, labelUrl, orderId]
+          [trackingNumber, carrierName, labelUrl, id]
         )
         await client.end()
-        res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName })
-        if (updRes.rowCount > 0) void dispatchOrderFlowEvent('order_shipped', orderId)
+        res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName, charge_method: chargeResult.charge_method })
+        if (updRes.rowCount > 0) void dispatchOrderFlowEvent('order_shipped', id)
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         return respondSellerSystemError(req, res, {
-          errorCode: 'LABEL_FULFILL_ERROR',
+          errorCode: 'LABEL_PURCHASE_ERROR',
           errorMessage: e?.message || 'Etikett konnte nicht erstellt werden',
           terminalOutput: e?.stack || null,
           sellerId: req.sellerUser?.seller_id || null,
-          context: JSON.stringify({ session_id, endpoint: 'label/fulfill' }),
+          context: JSON.stringify({ order_id: id, endpoint: 'label/purchase' }),
         })
       }
     }
@@ -775,8 +740,7 @@ module.exports = function createShipmentTrackingRouter({
   router.delete('/admin-hub/v1/shipment-events/:eventId', adminHubShipmentEventDELETE)
   router.post('/admin-hub/v1/orders/:id/refresh-tracking', adminHubOrderRefreshTrackingPOST)
   router.post('/admin-hub/v1/orders/:id/label/rates', adminHubLabelRatesPOST)
-  router.post('/admin-hub/v1/orders/:id/label/checkout', adminHubLabelCheckoutPOST)
-  router.post('/admin-hub/v1/label/fulfill', adminHubLabelFulfillPOST)
+  router.post('/admin-hub/v1/orders/:id/label/purchase', adminHubLabelPurchasePOST)
 
   return router
 }

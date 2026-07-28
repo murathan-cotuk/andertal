@@ -992,6 +992,8 @@ async function start() {
         // Seller's last-used Sellercentral UI language — captured opportunistically when they reply to a
         // message or open a support ticket, so message-notification emails can be sent in that language.
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS locale varchar(8) DEFAULT 'de';`).catch(() => {})
+        // Barcode scanner behavior for the /versand packing screen (auto-focus, auto-submit on Enter, min length).
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS barcode_scanner_config jsonb;`).catch(() => {})
         // ── Platform legal / company info ────────────────────────────────────
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_company_name varchar(255)`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_representative varchar(255)`).catch(() => {})
@@ -1361,6 +1363,25 @@ async function start() {
             updated_at timestamp DEFAULT now()
           );
         `).catch(() => {})
+        // Non-payout ledger adjustments against a seller's account (e.g. shipping label charges) —
+        // netted out of their next payout instead of moving real money at charge time when they
+        // have enough unpaid revenue to cover it; otherwise the seller's saved card is charged.
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_ledger_adjustments (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            seller_id text NOT NULL,
+            type text NOT NULL,
+            amount_cents integer NOT NULL,
+            description_key text NOT NULL,
+            description_params jsonb DEFAULT '{}',
+            order_id uuid REFERENCES store_orders(id),
+            charge_method text,
+            stripe_payment_intent_id text,
+            settled_payout_id uuid,
+            created_at timestamptz DEFAULT now()
+          );
+        `).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_seller_ledger_adjustments_seller ON seller_ledger_adjustments(seller_id)`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS seller_payout_auto_runs (
             run_key varchar(64) PRIMARY KEY,

@@ -13,7 +13,6 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
-import { resolveSellerFacingError, readSellerIsSuperuser } from "@/lib/seller-system-errors";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function fmtCents(c) {
@@ -759,7 +758,6 @@ export default function OrdersPage() {
   const [loadingItems, setLoadingItems] = useState({});
   const [showNewOrder, setShowNewOrder] = useState(false);
   const [selected, setSelected] = useState(new Set());
-  const [labelFulfillResult, setLabelFulfillResult] = useState(null); // { label_url, tracking_number }
   const [allReviews, setAllReviews] = useState([]); // all product reviews
   const [reviewPopupOrderId, setReviewPopupOrderId] = useState(null);
   const [returnsMap, setReturnsMap] = useState({}); // order_id → has active return
@@ -852,25 +850,6 @@ export default function OrdersPage() {
   }, [search, filterOrderStatus, filterPayStatus, filterDelivery, sort]);
 
   useEffect(() => { fetchOrders(); fetchReviews(); fetchReturns(); }, [fetchOrders, fetchReviews, fetchReturns]);
-
-  // Handle return from Stripe Checkout for label purchase
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const sp = new URLSearchParams(window.location.search);
-    const sessionId = sp.get("label_session_id");
-    if (!sessionId) return;
-    // Remove param from URL immediately
-    const clean = window.location.pathname;
-    window.history.replaceState({}, "", clean);
-    getMedusaAdminClient().fulfillLabel(sessionId)
-      .then(data => {
-        setLabelFulfillResult(data);
-        fetchOrders();
-      })
-      .catch(e => {
-        setLabelFulfillResult({ error: resolveSellerFacingError(e, locale, readSellerIsSuperuser()) });
-      });
-  }, []);
 
   useEffect(() => {
     const onMove = (e) => {
@@ -1158,36 +1137,6 @@ export default function OrdersPage() {
           onCreated={() => fetchOrders()}
           locale={locale}
         />
-      )}
-      {labelFulfillResult && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 480, padding: 32, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            {labelFulfillResult.error ? (
-              <>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#b91c1c", marginBottom: 12 }}>{ui.labelError}</div>
-                <div style={{ fontSize: 13, color: "#374151", marginBottom: 20 }}>{labelFulfillResult.error}</div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#15803d", marginBottom: 8 }}>{ui.labelSuccess}</div>
-                {labelFulfillResult.tracking_number && (
-                  <div style={{ fontSize: 13, color: "#374151", marginBottom: 8 }}>
-                    {ui.trackingNumber}: <strong style={{ fontFamily: "monospace" }}>{labelFulfillResult.tracking_number}</strong>
-                  </div>
-                )}
-                {labelFulfillResult.label_url && (
-                  <div style={{ marginBottom: 20 }}>
-                    <a href={labelFulfillResult.label_url} target="_blank" rel="noopener noreferrer"
-                      style={{ display: "inline-block", padding: "10px 20px", background: "#2563eb", color: "#fff", borderRadius: 8, fontWeight: 600, fontSize: 13, textDecoration: "none" }}>
-                      {ui.labelPrint}
-                    </a>
-                  </div>
-                )}
-              </>
-            )}
-            <Button onClick={() => setLabelFulfillResult(null)}>{ui.close}</Button>
-          </div>
-        </div>
       )}
       {reviewPopupOrderId && (
         <ReviewPopup

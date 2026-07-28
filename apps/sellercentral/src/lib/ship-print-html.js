@@ -2,6 +2,10 @@
 
 import { getShipStrings } from "./ship-i18n";
 
+/** carrierName may be a fixed string (legacy) or a per-order resolver (order) => string. */
+const resolveCarrierName = (carrierName, order) =>
+  typeof carrierName === "function" ? (carrierName(order) || "—") : (carrierName || "—");
+
 export function buildShipLabelsHtml(orders, carrierName, trackings, dateStr, locale = "de") {
   const s = getShipStrings(locale);
   return orders
@@ -15,7 +19,7 @@ export function buildShipLabelsHtml(orders, carrierName, trackings, dateStr, loc
         <div style="font-size:12px">${[o.postal_code, o.city].filter(Boolean).join(" ")}</div>
         <div style="font-size:12px">${o.country || "—"}</div>
         <hr style="margin:12px 0">
-        <div style="font-size:11px;color:#666">${s.carrier}: <strong>${carrierName}</strong></div>
+        <div style="font-size:11px;color:#666">${s.carrier}: <strong>${resolveCarrierName(carrierName, o)}</strong></div>
         <div style="font-size:11px;color:#666">${s.trackingNumber}: <strong>${trackings[o.id] || "—"}</strong></div>
         <div style="font-size:11px;color:#666">${s.date}: ${dateStr}</div>
         <div style="margin-top:12px;border:1px solid #ccc;height:40px;display:flex;align-items:center;justify-content:center;font-size:20px;letter-spacing:4px">${trackings[o.id] || "—"}</div>
@@ -44,7 +48,7 @@ export function buildShipLieferscheinHtml(orders, carrierName, trackings, dateSt
           <div>
             <div style="font-size:11px;text-transform:uppercase;color:#666;margin-bottom:4px">${s.shippingInfo}</div>
             <div>${s.date}: ${dateStr}</div>
-            <div>${s.carrier}: ${carrierName}</div>
+            <div>${s.carrier}: ${resolveCarrierName(carrierName, o)}</div>
             <div>${s.trackingNumber}: ${trackings[o.id] || "—"}</div>
           </div>
         </div>

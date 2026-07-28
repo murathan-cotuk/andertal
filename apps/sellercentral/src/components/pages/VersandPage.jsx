@@ -7,11 +7,9 @@ import { useLocale } from "next-intl";
 import { fmtMoney } from "@/lib/locale-text";
 import { getShipStrings, fmtShipDate } from "@/lib/ship-i18n";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import ShipLabelModal from "@/components/orders/ShipLabelModal";
+import ShipLabelModal, { carrierBadge } from "@/components/orders/ShipLabelModal";
 import { buildShipLieferscheinHtml } from "@/lib/ship-print-html";
-
-const OTHER_CARRIER = "__other__";
-const FALLBACK_CARRIERS = ["DHL", "DPD", "GLS", "UPS", "FedEx", "Hermes", "Go! Express"];
+import { detectCarrierFromTrackingNumber } from "@/lib/carrier-detect";
 
 export default function VersandPage() {
   const router = useRouter();
@@ -23,35 +21,35 @@ export default function VersandPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isSuperuser, setIsSuperuser] = useState(false);
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
-  const [scannedItems, setScannedItems] = useState({});
+  const [scannedQty, setScannedQty] = useState({});
   const [barcodeInput, setBarcodeInput] = useState("");
   const [scanError, setScanError] = useState("");
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(0);
-  const [carrier, setCarrier] = useState("DHL");
-  const [customCarrier, setCustomCarrier] = useState("");
   const [trackings, setTrackings] = useState({});
+  const [manualCarrierOverride, setManualCarrierOverride] = useState({});
   const [saving, setSaving] = useState(false);
   const [phase, setPhase] = useState("scan");
   const barcodeRef = useRef(null);
-  const [dbCarriers, setDbCarriers] = useState([]);
-
-  const carrierOptions = useMemo(
-    () => (dbCarriers.length > 0 ? [...dbCarriers.map((dc) => dc.name), OTHER_CARRIER] : [...FALLBACK_CARRIERS, OTHER_CARRIER]),
-    [dbCarriers],
-  );
-
-  const resolveCarrierName = () => (carrier === OTHER_CARRIER ? customCarrier.trim() || s.other : carrier);
+  const [scannerConfig, setScannerConfig] = useState({ enabled: true, auto_focus: true, auto_submit: true, min_length: 3 });
 
   useEffect(() => {
-    getMedusaAdminClient().getCarriers().then((data) => {
-      const active = (data?.carriers || []).filter((c) => c.is_active);
-      if (active.length > 0) {
-        setDbCarriers(active);
-        setCarrier(active[0].name);
+    getMedusaAdminClient().getSellerSettings().then((d) => {
+      if (d?.barcode_scanner_config && typeof d.barcode_scanner_config === "object") {
+        setScannerConfig((prev) => ({ ...prev, ...d.barcode_scanner_config }));
       }
     }).catch(() => {});
   }, []);
+
+  // Carrier is derived, never chosen up front: a Sendcloud-purchased label already carries
+  // its own carrier_name; a manually typed tracking number gets a best-effort carrier guess
+  // from its shape (see carrier-detect.js) — the seller can still override per order if wrong.
+  const resolveOrderCarrierName = (order) => {
+    if (manualCarrierOverride[order.id]) return manualCarrierOverride[order.id];
+    if (order.carrier_name) return order.carrier_name;
+    const detected = detectCarrierFromTrackingNumber(trackings[order.id]);
+    return detected ? carrierBadge(detected).label : "";
+  };
 
   useEffect(() => {
     const stored = sessionStorage.getItem("versand_orders");
@@ -100,8 +98,8 @@ export default function VersandPage() {
     }));
     setOrders(enriched);
     const init = {};
-    for (const o of enriched) init[o.id] = new Set();
-    setScannedItems(init);
+    for (const o of enriched) init[o.id] = {};
+    setScannedQty(init);
     setLoading(false);
   };
 
@@ -109,11 +107,16 @@ export default function VersandPage() {
   const items = currentOrder?._items || [];
 
   const itemKeyOf = (it) => String(it.id || it.variant_id || it.product_id || it.title || "");
+  const itemMaxQty = (it) => Math.max(1, Number(it.quantity || 1));
 
-  const getScanned = (orderId) => scannedItems[orderId] || new Set();
+  const getQtyMap = (orderId) => scannedQty[orderId] || {};
+  const getUnitScanned = (orderId, key) => Number(getQtyMap(orderId)[key] || 0);
+  const isItemDone = (it) => currentOrder ? getUnitScanned(currentOrder.id, itemKeyOf(it)) >= itemMaxQty(it) : false;
+  const orderScannedUnitsTotal = (orderId) => Object.values(getQtyMap(orderId)).reduce((sum, n) => sum + Number(n || 0), 0);
+  const orderTotalUnits = (orderList) => orderList.reduce((sum, it) => sum + itemMaxQty(it), 0);
 
   const allItemsScanned = currentOrder
-    ? items.every((it) => getScanned(currentOrder.id).has(itemKeyOf(it)))
+    ? items.every((it) => isItemDone(it))
     : false;
 
   const normalizeEan = (v) => String(v || "").replace(/\D/g, "");
@@ -142,10 +145,9 @@ export default function VersandPage() {
     if (!q || !currentOrder) return [];
     const qNorm = norm(q);
     const qEan = normalizeEan(q);
-    const scanned = getScanned(currentOrder.id);
     return items
       .filter((it) => {
-        if (scanned.has(itemKeyOf(it))) return false;
+        if (isItemDone(it)) return false;
         const title = norm(it.title);
         const sku = norm(it.sku);
         const ean = normalizeEan(it.ean);
@@ -158,7 +160,7 @@ export default function VersandPage() {
         return false;
       })
       .slice(0, 8);
-  }, [barcodeInput, items, scannedItems, currentOrder]);
+  }, [barcodeInput, items, scannedQty, currentOrder]);
 
   // Order status moves offen → in_bearbeitung the moment a seller starts picking
   // an order (first item scanned/marked here), not at order placement. Fire
@@ -175,15 +177,17 @@ export default function VersandPage() {
   const markItemScanned = (match) => {
     if (!currentOrder || !match) return;
     const key = itemKeyOf(match);
-    if (getScanned(currentOrder.id).has(key)) {
+    const max = itemMaxQty(match);
+    const cur = getUnitScanned(currentOrder.id, key);
+    if (cur >= max) {
       setScanError(s.alreadyScanned);
       return;
     }
-    if (getScanned(currentOrder.id).size === 0) notifyOrderProcessingStarted(currentOrder.id);
-    setScannedItems((prev) => {
-      const scanned = new Set(prev[currentOrder.id] || []);
-      scanned.add(key);
-      return { ...prev, [currentOrder.id]: scanned };
+    if (orderScannedUnitsTotal(currentOrder.id) === 0) notifyOrderProcessingStarted(currentOrder.id);
+    setScannedQty((prev) => {
+      const orderMap = { ...(prev[currentOrder.id] || {}) };
+      orderMap[key] = Math.min(max, cur + 1);
+      return { ...prev, [currentOrder.id]: orderMap };
     });
     setBarcodeInput("");
     setSuggestOpen(false);
@@ -196,6 +200,11 @@ export default function VersandPage() {
     e.preventDefault();
     if (!currentOrder || !barcodeInput.trim()) return;
     const val = barcodeInput.trim();
+    const minLen = Math.max(1, Number(scannerConfig.min_length) || 1);
+    if (val.length < minLen) {
+      setScanError(s.searchMinChars);
+      return;
+    }
     setScanError("");
 
     // Prefer highlighted suggestion when dropdown is open
@@ -232,12 +241,28 @@ export default function VersandPage() {
   const markItemManually = (item) => {
     if (!currentOrder) return;
     const itemKey = itemKeyOf(item);
-    const alreadyScanned = getScanned(currentOrder.id).has(itemKey);
-    if (!alreadyScanned && getScanned(currentOrder.id).size === 0) notifyOrderProcessingStarted(currentOrder.id);
-    setScannedItems((prev) => {
-      const scanned = new Set(prev[currentOrder.id] || []);
-      scanned.has(itemKey) ? scanned.delete(itemKey) : scanned.add(itemKey);
-      return { ...prev, [currentOrder.id]: scanned };
+    const max = itemMaxQty(item);
+    const cur = getUnitScanned(currentOrder.id, itemKey);
+    if (cur >= max) return;
+    if (orderScannedUnitsTotal(currentOrder.id) === 0) notifyOrderProcessingStarted(currentOrder.id);
+    setScannedQty((prev) => {
+      const orderMap = { ...(prev[currentOrder.id] || {}) };
+      orderMap[itemKey] = cur + 1;
+      return { ...prev, [currentOrder.id]: orderMap };
+    });
+  };
+
+  const adjustItemQty = (item, delta) => {
+    if (!currentOrder) return;
+    const itemKey = itemKeyOf(item);
+    const max = itemMaxQty(item);
+    const cur = getUnitScanned(currentOrder.id, itemKey);
+    const next = Math.max(0, Math.min(max, cur + delta));
+    if (next === cur) return;
+    setScannedQty((prev) => {
+      const orderMap = { ...(prev[currentOrder.id] || {}) };
+      orderMap[itemKey] = next;
+      return { ...prev, [currentOrder.id]: orderMap };
     });
   };
 
@@ -254,15 +279,19 @@ export default function VersandPage() {
 
   const handleSaveAll = async () => {
     setSaving(true);
-    const carrierName = resolveCarrierName();
     const shippedAt = new Date().toISOString();
     try {
       const client = getMedusaAdminClient();
       for (const o of orders) {
+        // Never clobber an order that already has a Sendcloud-purchased label — only apply
+        // the manually typed tracking number/carrier to orders shipped without buying a label here.
+        if (o.sendcloud_label_url || o.tracking_number) continue;
+        const manualTracking = trackings[o.id] != null ? String(trackings[o.id]).trim() : "";
+        if (!manualTracking) continue;
         await client.updateOrder(o.id, {
           delivery_status: "versendet",
-          carrier_name: carrierName,
-          tracking_number: trackings[o.id] != null ? String(trackings[o.id]).trim() : "",
+          carrier_name: resolveOrderCarrierName(o) || s.other,
+          tracking_number: manualTracking,
           shipped_at: shippedAt,
         });
       }
@@ -272,9 +301,8 @@ export default function VersandPage() {
   };
 
   const handlePrintLieferscheinAll = () => {
-    const carrierName = resolveCarrierName();
     const dateStr = fmtShipDate(locale);
-    const inner = buildShipLieferscheinHtml(orders, carrierName, trackings, dateStr, locale);
+    const inner = buildShipLieferscheinHtml(orders, resolveOrderCarrierName, trackings, dateStr, locale);
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(
@@ -284,7 +312,7 @@ export default function VersandPage() {
   };
 
   const progress = orders.length > 0 ? Math.round((currentIndex / orders.length) * 100) : 0;
-  const pendingCount = currentOrder ? items.length - getScanned(currentOrder.id).size : 0;
+  const pendingCount = currentOrder ? orderTotalUnits(items) - orderScannedUnitsTotal(currentOrder.id) : 0;
 
   if (loading) {
     return (
@@ -364,31 +392,33 @@ export default function VersandPage() {
               <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#6b7280" }}>
                 {s.manualShipToggle}
               </summary>
-              <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>{s.carrier}</div>
-                  <select
-                    value={carrier}
-                    onChange={(e) => setCarrier(e.target.value)}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
-                  >
-                    {carrierOptions.map((c) => (
-                      <option key={c} value={c}>{c === OTHER_CARRIER ? s.other : c}</option>
-                    ))}
-                  </select>
-                  {carrier === OTHER_CARRIER && (
-                    <input value={customCarrier} onChange={(e) => setCustomCarrier(e.target.value)} placeholder={s.carrierPlaceholder} style={{ marginTop: 8, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" }} />
-                  )}
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>{s.trackingNumber}</div>
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>{s.trackingNumber}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <input
                     value={trackings[o.id] || ""}
                     onChange={(e) => setTrackings((t) => ({ ...t, [o.id]: e.target.value }))}
                     placeholder={s.trackingEnter}
-                    style={{ width: "100%", padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
+                    style={{ flex: 1, padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
                   />
+                  {(() => {
+                    const detectedName = resolveOrderCarrierName(o);
+                    const badge = detectedName ? carrierBadge(detectedName) : null;
+                    return badge ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 6, background: badge.color, color: badge.text, fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
+                        {badge.label}
+                      </span>
+                    ) : null;
+                  })()}
                 </div>
+                {trackings[o.id] && !resolveOrderCarrierName(o) && (
+                  <input
+                    value={manualCarrierOverride[o.id] || ""}
+                    onChange={(e) => setManualCarrierOverride((m) => ({ ...m, [o.id]: e.target.value }))}
+                    placeholder={s.carrierPlaceholder}
+                    style={{ marginTop: 8, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" }}
+                  />
+                )}
               </div>
               <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>{s.manualShipHint}</p>
             </details>
@@ -455,35 +485,56 @@ export default function VersandPage() {
 
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
-                {s.itemsScanned(getScanned(currentOrder.id).size, items.length)}
+                {s.itemsScanned(orderScannedUnitsTotal(currentOrder.id), orderTotalUnits(items))}
               </div>
               {items.map((it, i) => {
                 const key = itemKeyOf(it);
-                const scanned = getScanned(currentOrder.id).has(key);
+                const max = itemMaxQty(it);
+                const cur = getUnitScanned(currentOrder.id, key);
+                const done = cur >= max;
                 return (
                   <div
                     key={key || i}
-                    onClick={() => markItemManually(it)}
-                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 8, cursor: "pointer", background: scanned ? "#f0fdf4" : "#fff", border: `1px solid ${scanned ? "#86efac" : "#e5e7eb"}`, marginBottom: 8, transition: "all 0.15s" }}
+                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 8, background: done ? "#f0fdf4" : "#fff", border: `1px solid ${done ? "#86efac" : "#e5e7eb"}`, marginBottom: 8, transition: "all 0.15s" }}
                   >
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: scanned ? "#16a34a" : "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {scanned ? <span style={{ color: "#fff", fontSize: 14 }}>✓</span> : <span style={{ color: "#9ca3af", fontSize: 14 }}>○</span>}
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: done ? "#16a34a" : "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {done ? <span style={{ color: "#fff", fontSize: 14 }}>✓</span> : <span style={{ color: "#9ca3af", fontSize: 14 }}>○</span>}
                     </div>
                     {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover" }} />}
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: scanned ? 600 : 400, color: scanned ? "#15803d" : "#111827", textDecoration: scanned ? "line-through" : "none", opacity: scanned ? 0.7 : 1 }}>{it.title}</div>
+                      <div style={{ fontWeight: done ? 600 : 400, color: done ? "#15803d" : "#111827", textDecoration: done ? "line-through" : "none", opacity: done ? 0.7 : 1 }}>{it.title}</div>
                       <div style={{ fontSize: 12, color: "#6b7280" }}>
-                        {s.qty} {it.quantity}
+                        {s.qty} {cur}/{max}
                         {it.sku ? ` · SKU ${it.sku}` : ""}
                         {it.ean ? ` · EAN ${it.ean}` : ""}
                       </div>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{fmtMoney(it.unit_price_cents, locale)}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => adjustItemQty(it, -1)}
+                        disabled={cur <= 0}
+                        style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: cur <= 0 ? "default" : "pointer", color: cur <= 0 ? "#d1d5db" : "#374151", fontSize: 15, lineHeight: 1 }}
+                      >
+                        −
+                      </button>
+                      <span style={{ minWidth: 32, textAlign: "center", fontSize: 13, fontWeight: 700 }}>{cur}/{max}</span>
+                      <button
+                        type="button"
+                        onClick={() => adjustItemQty(it, 1)}
+                        disabled={cur >= max}
+                        style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #e5e7eb", background: cur >= max ? "#fff" : "#111827", cursor: cur >= max ? "default" : "pointer", color: cur >= max ? "#d1d5db" : "#fff", fontSize: 15, lineHeight: 1 }}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, minWidth: 64, textAlign: "right" }}>{fmtMoney(it.unit_price_cents, locale)}</div>
                   </div>
                 );
               })}
             </div>
 
+            {scannerConfig.enabled === false ? null : (
             <form onSubmit={handleBarcodeSubmit} style={{ position: "relative" }}>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
@@ -501,6 +552,12 @@ export default function VersandPage() {
                     window.setTimeout(() => setSuggestOpen(false), 150);
                   }}
                   onKeyDown={(e) => {
+                    if (e.key === "Enter" && scannerConfig.auto_submit === false) {
+                      // Auto-submit disabled: Enter only confirms a highlighted suggestion,
+                      // otherwise the seller must click "Add" explicitly.
+                      if (!(suggestOpen && scanSuggestions.length > 0)) e.preventDefault();
+                      return;
+                    }
                     if (!suggestOpen || scanSuggestions.length === 0) return;
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
@@ -513,7 +570,7 @@ export default function VersandPage() {
                     }
                   }}
                   placeholder={s.barcodePlaceholder}
-                  autoFocus
+                  autoFocus={scannerConfig.auto_focus !== false}
                   autoComplete="off"
                   style={{ flex: 1, padding: "10px 14px", border: `1px solid ${scanError ? "#ef4444" : "#e5e7eb"}`, borderRadius: 8, fontSize: 14 }}
                 />
@@ -570,6 +627,7 @@ export default function VersandPage() {
               )}
               {scanError && <div style={{ color: "#ef4444", fontSize: 12, marginTop: 6 }}>{scanError}</div>}
             </form>
+            )}
           </div>
 
           <InlineStack gap="300" wrap blockAlign="center">

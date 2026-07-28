@@ -363,6 +363,7 @@ class MedusaAdminClient {
       storefront_url: res?.storefront_url ?? '',
       announcement_bar_items: Array.isArray(res?.announcement_bar_items) ? res.announcement_bar_items : [],
       logo_config: res?.logo_config && typeof res.logo_config === 'object' ? res.logo_config : null,
+      barcode_scanner_config: res?.barcode_scanner_config && typeof res.barcode_scanner_config === 'object' ? res.barcode_scanner_config : null,
       legal_company_name: res?.legal_company_name ?? '',
       legal_representative: res?.legal_representative ?? '',
       legal_street: res?.legal_street ?? '',
@@ -1005,11 +1006,9 @@ class MedusaAdminClient {
   async getLabelRates(orderId, body) {
     return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/label/rates`, { method: 'POST', body: JSON.stringify(body) })
   }
-  async createLabelCheckout(orderId, body) {
-    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/label/checkout`, { method: 'POST', body: JSON.stringify(body) })
-  }
-  async fulfillLabel(session_id) {
-    return this.request('/admin-hub/v1/label/fulfill', { method: 'POST', body: JSON.stringify({ session_id }) })
+  /** Buys the label synchronously — charges seller balance/card, no Stripe Checkout redirect. */
+  async purchaseLabel(orderId, body) {
+    return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/label/purchase`, { method: 'POST', body: JSON.stringify(body) })
   }
 
   async testBillbeeIntegration(data) {

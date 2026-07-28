@@ -9,6 +9,8 @@ const getDbClient = () => {
   return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
 }
 
+const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
+
 module.exports = function createPayoutsRouter({
   getSellerDbClient,
   loadPlatformCheckoutRow,
@@ -187,24 +189,14 @@ module.exports = function createPayoutsRouter({
           : ''
         if (period_start) params.push(period_start)
         if (period_end) params.push(period_end)
+        const commRateR = await client.query(`SELECT commission_rate FROM seller_users WHERE seller_id = $1 LIMIT 1`, [sellerId])
+        const commissionRate = commRateR.rows[0]?.commission_rate != null ? Number(commRateR.rows[0].commission_rate) : 0.12
+
+        // Fetch matching orders un-aggregated — a shared (multi-seller) order's basis must come
+        // from only THIS seller's own line items, not the whole order's subtotal (see order-items-seller.js).
         const r = await client.query(
-          `SELECT
-             COALESCE(SUM(
-               CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
-             ), 0)::bigint AS total_cents,
-             COALESCE(SUM(
-               ROUND(
-                 (CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::numeric ELSE GREATEST(0, COALESCE(o.total_cents, 0))::numeric END)
-                 * COALESCE(s.commission_rate::numeric, 0.12)
-               )
-             ), 0)::bigint AS commission_cents,
-             COALESCE(SUM(o.shipping_cents), 0)::bigint AS shipping_cents,
-             COUNT(*)::int AS paid_count,
-             COALESCE(SUM(
-               CASE WHEN COALESCE(o.subtotal_cents, 0) > 0 THEN o.subtotal_cents::bigint ELSE GREATEST(0, COALESCE(o.total_cents, 0))::bigint END
-             ) FILTER (WHERE LOWER(TRIM(COALESCE(o.order_status, ''))) = 'refunded'), 0)::bigint AS refund_cents
+          `SELECT o.id, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.order_status
            FROM store_orders o
-           LEFT JOIN seller_users s ON s.seller_id = CASE WHEN o.seller_id IS NOT NULL AND o.seller_id != 'default' THEN o.seller_id ELSE $1::varchar END
            WHERE (
              o.seller_id = $1
              OR EXISTS (
@@ -216,11 +208,29 @@ module.exports = function createPayoutsRouter({
            ) AND o.payment_status = 'bezahlt' ${dateFilter}`,
           params
         )
-        const row = r.rows[0] || {}
-        const basis = parseInt(row.total_cents, 10) || 0
-        const commission = parseInt(row.commission_cents, 10) || 0
-        const shipping = parseInt(row.shipping_cents, 10) || 0
-        const refunds = parseInt(row.refund_cents, 10) || 0
+
+        let basis = 0
+        let commission = 0
+        let shipping = 0
+        let refunds = 0
+        let paidCount = 0
+        for (const o of r.rows) {
+          const ownsWholeOrder = String(o.seller_id || '').trim() === String(sellerId).trim()
+          let orderBasis
+          if (ownsWholeOrder) {
+            orderBasis = Number(o.subtotal_cents) > 0 ? Number(o.subtotal_cents) : Math.max(0, Number(o.total_cents) || 0)
+          } else {
+            const iRes = await client.query(`SELECT * FROM store_order_items WHERE order_id = $1`, [o.id])
+            const enriched = await enrichOrderItemRows(client, iRes.rows || [])
+            const mine = filterItemsForSeller(enriched, sellerId, { isSuperuser: false, orderSellerId: o.seller_id })
+            orderBasis = itemsSubtotalCents(mine)
+          }
+          basis += orderBasis
+          commission += Math.round(orderBasis * commissionRate)
+          if (ownsWholeOrder) shipping += Number(o.shipping_cents) || 0
+          paidCount += 1
+          if (String(o.order_status || '').trim().toLowerCase() === 'refunded') refunds += orderBasis
+        }
         // Also get payout status for this period
         let payoutStatus = null
         if (period_start && period_end) {
@@ -237,7 +247,7 @@ module.exports = function createPayoutsRouter({
             commission_cents: commission,
             shipping_cents: shipping,
             refund_cents: refunds,
-            paid_count: parseInt(row.paid_count, 10) || 0,
+            paid_count: paidCount,
             status: payoutStatus,
             ad_spend_cents: 0,
           },

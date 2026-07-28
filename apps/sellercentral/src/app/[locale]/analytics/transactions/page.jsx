@@ -621,6 +621,23 @@ function AdminTransactionsView() {
   );
 }
 
+/** Renders a seller_ledger_adjustments row's stored description_key/description_params localized. */
+function ledgerAdjustmentLabel(tx, locale) {
+  const params = tx.description_params || {};
+  if (tx.description_key === "shipping_label_for_order") {
+    return lt(
+      locale,
+      `Shipping label for order #${params.order_number || tx.order_number || ""}`,
+      `Sipariş #${params.order_number || tx.order_number || ""} için kargo etiketi`,
+      `Étiquette d'expédition pour la commande #${params.order_number || tx.order_number || ""}`,
+      `Etiqueta de envío para el pedido #${params.order_number || tx.order_number || ""}`,
+      `Etichetta di spedizione per l'ordine #${params.order_number || tx.order_number || ""}`,
+      `Versandetikett für Bestellung #${params.order_number || tx.order_number || ""}`,
+    );
+  }
+  return tx.description_key || tx.adjustment_type || "";
+}
+
 function TxTable({ rows, loading, isSuperuser, locale, copy }) {
   const fmt = (cents, currency) => fmtCents(cents, currency, locale);
   const fmtD = (d) => fmtDate(d, locale);
@@ -647,7 +664,24 @@ function TxTable({ rows, loading, isSuperuser, locale, copy }) {
         <div style={{ textAlign: "right" }}>{copy.colNet}</div>
         <div style={{ textAlign: "right" }}>{copy.colDelivery}</div>
       </div>
-      {rows.map((tx) => (
+      {rows.map((tx) => tx.type === "ledger_adjustment" ? (
+        <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center", background: "#fafafa" }}>
+          <div>
+            <div style={{ fontWeight: 600, color: "#111827" }}>{ledgerAdjustmentLabel(tx, locale)}</div>
+            <div style={{ fontSize: 11, color: "#9ca3af" }}>
+              {tx.charge_method === "card"
+                ? lt(locale, "Charged to card", "Karttan çekildi", "Débité de la carte", "Cargado a tarjeta", "Addebitato su carta", "Von Karte abgebucht")
+                : lt(locale, "Deducted from balance", "Bakiyeden düşüldü", "Déduit du solde", "Deducido del saldo", "Detratto dal saldo", "Vom Guthaben abgezogen")}
+            </div>
+          </div>
+          {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
+          <div style={{ textAlign: "right" }}>—</div>
+          <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
+          <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
+          <div style={{ textAlign: "right", color: tx.payout_cents < 0 ? "#ef4444" : "#10b981", fontWeight: 600 }}>{fmt(tx.payout_cents, tx.currency)}</div>
+          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtD(tx.created_at)}</div>
+        </div>
+      ) : (
         <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
           <div>
             <div style={{ fontWeight: 600, color: "#111827" }}>#{tx.order_number}</div>

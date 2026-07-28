@@ -3193,8 +3193,17 @@ const storeOrdersPOST = async (req, res) => {
         sellerCommissionRate = Number(crR.rows[0].commission_rate)
       }
     } catch (_) {}
+    // A cart can contain items from multiple sellers (store-checkout allows mixed-seller carts
+    // for display/coupon purposes — see cartLineSellerKey usage elsewhere in this file), but only
+    // one seller_id is stamped on the order. seller_net_after_commission_cents must reflect only
+    // THIS seller's own line items, not the whole cart's subtotal, or a shared order would pay out
+    // the "primary" seller for merchandise that isn't theirs.
+    const sellerOwnItemsSubtotalCents = items
+      .filter((it) => cartLineSellerKey(it) === sellerId)
+      .reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
+    const sellerScopedBasisCents = sellerOwnItemsSubtotalCents > 0 ? sellerOwnItemsSubtotalCents : subtotalCents
     const platformFeeMerchandiseBasis = platformCommissionCentsFromMerchandise(
-      { subtotal_cents: subtotalCents, total_cents: orderPaidTotalCents },
+      { subtotal_cents: sellerScopedBasisCents, total_cents: orderPaidTotalCents },
       sellerCommissionRate,
     )
 
@@ -3202,7 +3211,7 @@ const storeOrdersPOST = async (req, res) => {
     // The commission (application_fee_amount) was already deducted by Stripe.
     const stripeTransferInit = (piStripeAccountId && !isZeroPayOrder) ? 'destination_charge' : 'not_applicable'
     const checkoutPaymentKind = isZeroPayOrder ? 'platform_loyalty' : 'stripe'
-    const sellerNetMerchandiseCents = Math.max(0, subtotalCents - platformFeeMerchandiseBasis)
+    const sellerNetMerchandiseCents = Math.max(0, sellerScopedBasisCents - platformFeeMerchandiseBasis)
     const paymentIntentForDb = isZeroPayOrder ? null : paymentIntentId
 
     const stripeApplicationFeeForDb = piAppFeeCents != null ? piAppFeeCents : platformFeeMerchandiseBasis

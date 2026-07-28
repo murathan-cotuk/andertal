@@ -15,6 +15,7 @@ import {
   Badge,
   Box,
   InlineGrid,
+  Checkbox,
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
@@ -22,7 +23,8 @@ import { confirmDelete } from "@/lib/confirm-delete";
 import { useUI } from "@/lib/ui-strings";
 import { getShippingCopy } from "@/lib/shipping-i18n";
 import { getCountryList } from "@/lib/countries";
-import { dateLocaleFor } from "@/lib/locale-text";
+import { dateLocaleFor, lt } from "@/lib/locale-text";
+import { NumericTextField } from "@/components/NumericTextField";
 
 function normalizeSellerCountryCode(code) {
   const u = String(code ?? "").trim().toUpperCase();
@@ -630,6 +632,9 @@ export default function ShippingSettingsPage() {
   const [savingThreshold, setSavingThreshold] = useState(false);
   const [savedThreshold, setSavedThreshold] = useState(false);
   const [thresholdErr, setThresholdErr] = useState("");
+  const [scannerConfig, setScannerConfig] = useState({ enabled: true, auto_focus: true, auto_submit: true, min_length: 3 });
+  const [savingScanner, setSavingScanner] = useState(false);
+  const [savedScanner, setSavedScanner] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -642,6 +647,9 @@ export default function ShippingSettingsPage() {
     ]);
     setCarriers(carriersData.carriers || []);
     setCurrentStoreName(settings?.store_name || "");
+    if (settings?.barcode_scanner_config && typeof settings.barcode_scanner_config === "object") {
+      setScannerConfig((prev) => ({ ...prev, ...settings.barcode_scanner_config }));
+    }
     const thresholdData = loadSuperuser ? platformSettings?.free_shipping_thresholds : null;
     if (thresholdData && typeof thresholdData === "object") {
       const display = {};
@@ -690,6 +698,17 @@ export default function ShippingSettingsPage() {
     setSavingThreshold(false);
   };
 
+  const handleSaveScannerConfig = async (next) => {
+    setSavingScanner(true);
+    try {
+      await getMedusaAdminClient().updateSellerSettings({ barcode_scanner_config: next });
+      setScannerConfig(next);
+      setSavedScanner(true);
+      setTimeout(() => setSavedScanner(false), 3000);
+    } catch (_) { /* ignore */ }
+    setSavingScanner(false);
+  };
+
   const handleCarrierSaved = (carrier, mode) => {
     if (mode === "edit") {
       setCarriers((prev) => prev.map((c) => (c.id === carrier?.id ? { ...c, ...carrier } : c)));
@@ -724,6 +743,56 @@ export default function ShippingSettingsPage() {
         </div>
 
         <ShippingGroupsSection carriers={carriers} countries={countries} copy={copy} ui={ui} locale={locale} />
+
+        <Card>
+          <BlockStack gap="400">
+            <BlockStack gap="100">
+              <Text variant="headingMd" as="h2">
+                {lt(locale, "Barcode Scanner", "Barkod Tarayıcı", "Scanner de codes-barres", "Escáner de códigos de barras", "Scanner di codici a barre", "Barcode-Scanner")}
+              </Text>
+              <Text tone="subdued" as="p">
+                {lt(
+                  locale,
+                  "Most USB barcode scanners act as a keyboard — no driver needed. These settings control how the scan field on the /versand packing screen behaves.",
+                  "Çoğu USB barkod tarayıcı klavye gibi çalışır — sürücü gerekmez. Bu ayarlar /versand paketleme ekranındaki tarama kutusunun davranışını belirler.",
+                  "La plupart des scanners USB fonctionnent comme un clavier — aucun pilote requis. Ces réglages contrôlent le champ de scan sur l'écran /versand.",
+                  "La mayoría de escáneres USB funcionan como un teclado — no requieren driver. Estos ajustes controlan el campo de escaneo en /versand.",
+                  "La maggior parte degli scanner USB funziona come una tastiera — nessun driver necessario. Queste impostazioni controllano il campo di scansione in /versand.",
+                  "Die meisten USB-Barcode-Scanner verhalten sich wie eine Tastatur — kein Treiber nötig. Diese Einstellungen steuern das Scan-Feld auf der /versand-Packseite.",
+                )}
+              </Text>
+            </BlockStack>
+
+            {savedScanner && <Banner tone="success">{ui.saved}</Banner>}
+
+            <Checkbox
+              label={lt(locale, "Enabled", "Etkin", "Activé", "Activado", "Attivo", "Aktiviert")}
+              checked={scannerConfig.enabled !== false}
+              onChange={(v) => handleSaveScannerConfig({ ...scannerConfig, enabled: v })}
+            />
+            <Checkbox
+              label={lt(locale, "Auto-focus the scan field when opening an order", "Sipariş açıldığında tarama kutusuna otomatik odaklan", "Focus automatique sur le champ à l'ouverture d'une commande", "Enfocar automáticamente el campo al abrir un pedido", "Metti automaticamente a fuoco il campo all'apertura di un ordine", "Beim Öffnen einer Bestellung automatisch ins Scan-Feld springen")}
+              checked={scannerConfig.auto_focus !== false}
+              onChange={(v) => handleSaveScannerConfig({ ...scannerConfig, auto_focus: v })}
+            />
+            <Checkbox
+              label={lt(locale, "Auto-submit on Enter (standard for USB scanners)", "Enter'da otomatik gönder (USB tarayıcılar için standart)", "Validation automatique sur Entrée (standard scanners USB)", "Enviar automáticamente al pulsar Enter (estándar en escáneres USB)", "Invia automaticamente su Invio (standard per scanner USB)", "Bei Enter automatisch senden (Standard für USB-Scanner)")}
+              checked={scannerConfig.auto_submit !== false}
+              onChange={(v) => handleSaveScannerConfig({ ...scannerConfig, auto_submit: v })}
+            />
+            <div style={{ maxWidth: 260 }}>
+              <NumericTextField
+                label={lt(locale, "Minimum scan length", "Minimum tarama uzunluğu", "Longueur minimale du scan", "Longitud mínima de escaneo", "Lunghezza minima scansione", "Mindestlänge des Scans")}
+                helpText={lt(locale, "Ignore input shorter than this many characters (avoids accidental partial scans).", "Bundan kısa girişleri yok say (yanlışlıkla yarım taramaları önler).", "Ignore les saisies plus courtes que cela (évite les scans partiels accidentels).", "Ignora entradas más cortas (evita escaneos parciales accidentales).", "Ignora input più corti (evita scansioni parziali accidentali).", "Eingaben, die kürzer sind, werden ignoriert (verhindert versehentliche Teil-Scans).")}
+                value={scannerConfig.min_length ?? 3}
+                min={1}
+                max={20}
+                fallback={3}
+                onChange={(n) => handleSaveScannerConfig({ ...scannerConfig, min_length: n })}
+              />
+            </div>
+          </BlockStack>
+        </Card>
 
         {isSuperuser && <Card>
           <BlockStack gap="400">

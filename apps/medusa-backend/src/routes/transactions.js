@@ -2,6 +2,7 @@
 const { Router } = require('express')
 const { resolveOrderPaidTotalCents } = require('../order-money')
 const { renderPeriodCommissionInvoiceDocument } = require('../order-pdf-layout')
+const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -128,14 +129,27 @@ module.exports = function createTransactionsRouter({
           returnRows = rr.rows
         } catch (_) { /* returns table may not exist yet */ }
 
-        const transactions = r.rows.map(row => {
+        const transactions = await Promise.all(r.rows.map(async (row) => {
           const commRate = parseFloat(row.commission_rate ?? 0.12)
-          const sellerBasis = sellerOrderRevenueBasisCents(row)
+          // A shared (multi-seller) order's basis must come from only THIS seller's own line
+          // items — sellerOrderRevenueBasisCents() operates on the whole order and would
+          // otherwise attribute another seller's revenue to this seller too.
+          const isSharedForeignOrder = !!filterSellerId && String(row.seller_id || '').trim() !== String(filterSellerId).trim()
+          let sellerBasis = sellerOrderRevenueBasisCents(row)
+          if (isSharedForeignOrder) {
+            const iRes = await client.query(`SELECT * FROM store_order_items WHERE order_id = $1`, [row.id])
+            const enriched = await enrichOrderItemRows(client, iRes.rows || [])
+            const mine = filterItemsForSeller(enriched, filterSellerId, { isSuperuser: false, orderSellerId: row.seller_id })
+            sellerBasis = itemsSubtotalCents(mine)
+          }
           const customerPaid = resolveOrderPaidTotalCents(row)
-          const commission = resolvePlatformApplicationFeeCents(row, commRate)
+          const commission = isSharedForeignOrder
+            ? Math.round(sellerBasis * commRate)
+            : resolvePlatformApplicationFeeCents(row, commRate)
           const storedNet = Number(row.seller_net_after_commission_cents)
-          const payout =
-            Number.isFinite(storedNet) && storedNet >= 0 ? storedNet : Math.max(0, sellerBasis - commission)
+          const payout = isSharedForeignOrder
+            ? Math.max(0, sellerBasis - commission)
+            : (Number.isFinite(storedNet) && storedNet >= 0 ? storedNet : Math.max(0, sellerBasis - commission))
           return {
             id: row.id,
             type: 'order',
@@ -169,7 +183,7 @@ module.exports = function createTransactionsRouter({
             last_name: row.last_name,
             currency: row.currency || 'EUR',
           }
-        })
+        }))
         // Append returns as negative transaction entries
         for (const row of returnRows) {
           const commRate = parseFloat(row.commission_rate ?? 0.12)
@@ -196,6 +210,52 @@ module.exports = function createTransactionsRouter({
             currency: row.currency || 'EUR',
           })
         }
+        // Append seller ledger adjustments (e.g. shipping label charges) as their own entries —
+        // description_key/description_params travel as-is so the frontend can render them
+        // localized via the same lt()/copy pattern used for every other Transactions string.
+        try {
+          const ledgerParams = []
+          let ledgerWhere = ''
+          if (filterSellerId) {
+            ledgerParams.push(filterSellerId)
+            ledgerWhere = 'WHERE la.seller_id = $1'
+          }
+          const lr = await client.query(
+            `SELECT la.id, la.seller_id, la.type, la.amount_cents, la.description_key, la.description_params,
+                    la.order_id, la.charge_method, la.created_at, o.order_number, s.store_name
+             FROM seller_ledger_adjustments la
+             LEFT JOIN store_orders o ON o.id = la.order_id
+             LEFT JOIN seller_users s ON s.seller_id = la.seller_id
+             ${ledgerWhere}
+             ORDER BY la.created_at DESC LIMIT 500`,
+            ledgerParams,
+          )
+          for (const row of lr.rows || []) {
+            transactions.push({
+              id: `ledger-${row.id}`,
+              type: 'ledger_adjustment',
+              adjustment_type: row.type,
+              order_number: row.order_number,
+              seller_id: row.seller_id,
+              store_name: row.store_name || row.seller_id,
+              total_cents: Number(row.amount_cents || 0),
+              shipping_cents: 0,
+              discount_cents: 0,
+              commission_rate: 0,
+              commission_cents: 0,
+              payout_cents: Number(row.amount_cents || 0),
+              payout_eligible: false,
+              payment_status: null,
+              delivery_status: null,
+              delivery_date: null,
+              created_at: row.created_at,
+              charge_method: row.charge_method,
+              description_key: row.description_key,
+              description_params: row.description_params,
+              currency: 'EUR',
+            })
+          }
+        } catch (_) { /* seller_ledger_adjustments may not exist yet on an older DB */ }
         // Sort all by created_at desc
         transactions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         // Group by seller if superuser

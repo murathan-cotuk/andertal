@@ -19,7 +19,7 @@ function getPresets(locale) {
   ];
 }
 
-const CARRIER_LOGOS = {
+export const CARRIER_LOGOS = {
   dhl:     { color: "#FFCC00", text: "#000", label: "DHL" },
   dpd:     { color: "#DC0032", text: "#fff", label: "DPD" },
   gls:     { color: "#009DE0", text: "#fff", label: "GLS" },
@@ -31,7 +31,7 @@ const CARRIER_LOGOS = {
   colissimo: { color: "#FFCC00", text: "#000", label: "Colissimo" },
 };
 
-function carrierBadge(code) {
+export function carrierBadge(code) {
   const key = (code || "").toLowerCase();
   const found = Object.entries(CARRIER_LOGOS).find(([k]) => key.includes(k));
   if (!found) return { color: "#6b7280", text: "#fff", label: code || "?" };
@@ -114,6 +114,7 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
   const [selectedRate, setSelectedRate] = useState(null);
   const [checkingOut, setCheckingOut] = useState(false);
   const [error, setError] = useState("");
+  const [purchaseResult, setPurchaseResult] = useState(null);
   const debounceRef = useRef(null);
 
   const setDim = (k, v) => {
@@ -176,7 +177,7 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
     setCheckingOut(true);
     setError("");
     try {
-      const data = await getMedusaAdminClient().createLabelCheckout(order.id, {
+      const data = await getMedusaAdminClient().purchaseLabel(order.id, {
         service_id: selectedRate.service_id,
         service_name: selectedRate.name,
         carrier: selectedRate.carrier,
@@ -187,18 +188,18 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
         height_cm: Number(dims.height_cm),
         locale,
       });
-      if (data?.checkout_url) {
-        window.location.href = data.checkout_url;
+      if (data?.label_url || data?.tracking_number) {
+        setPurchaseResult(data);
+        onPurchased?.(data);
       } else {
         setError(isSuperuser
-          ? lt(locale, "No checkout link received.", "Ödeme bağlantısı alınamadı.", "Aucun lien de paiement reçu.", "No se recibió enlace de pago.", "Nessun link di checkout ricevuto.", "Kein Checkout-Link erhalten.")
+          ? lt(locale, "No label received.", "Etiket alınamadı.", "Aucune étiquette reçue.", "No se recibió etiqueta.", "Nessuna etichetta ricevuta.", "Kein Etikett erhalten.")
           : sellerTechnicalMessage(locale));
-        setCheckingOut(false);
       }
     } catch (e) {
       setError(resolveSellerFacingError(e, locale, isSuperuser));
-      setCheckingOut(false);
     }
+    setCheckingOut(false);
   };
 
   const hasLabel = !!(order.sendcloud_label_url || order.tracking_number);
@@ -219,7 +220,22 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
           </div>
           )}
 
-          {hasLabel && (
+          {purchaseResult && (
+            <div style={{ background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, padding: "14px 16px", marginBottom: 20, fontSize: 13, color: "#166534" }}>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                ✓ {t("Label purchased", "Etiket satın alındı", "Étiquette achetée", "Etiqueta comprada", "Etichetta acquistata", "Etikett gekauft")}
+                {purchaseResult.charge_method === "card"
+                  ? ` — ${t("charged to your card", "kartınızdan çekildi", "débité de votre carte", "cargado a su tarjeta", "addebitato sulla carta", "von Ihrer Karte abgebucht")}`
+                  : ` — ${t("deducted from your balance", "bakiyenizden düşüldü", "déduit de votre solde", "deducido de su saldo", "detratto dal saldo", "von Ihrem Guthaben abgezogen")}`}
+              </div>
+              {purchaseResult.tracking_number && <div>{t("Tracking", "Takip no", "Suivi", "Seguimiento", "Tracking", "Sendungsnummer")}: <strong>{purchaseResult.tracking_number}</strong></div>}
+              {purchaseResult.label_url && (
+                <a href={purchaseResult.label_url} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: "#166534" }}>{t("Open label PDF ↗", "Etiket PDF'i aç ↗", "Ouvrir l'étiquette PDF ↗", "Abrir etiqueta PDF ↗", "Apri etichetta PDF ↗", "Etikett-PDF öffnen ↗")}</a>
+              )}
+            </div>
+          )}
+
+          {hasLabel && !purchaseResult && (
             <div style={{ background: "#fefce8", border: "1px solid #fde047", borderRadius: 8, padding: "10px 14px", marginBottom: 20, fontSize: 13, color: "#854d0e" }}>
               ⚠ {t(
                 "This order already has a label",
@@ -242,6 +258,7 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
             </div>
           )}
 
+          {!purchaseResult && (<>
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>{t("Package size — quick select", "Paket boyutu — hızlı seçim", "Taille colis — sélection rapide", "Tamaño paquete — selección rápida", "Dimensione pacco — selezione rapida", "Paketgröße — Schnellauswahl")}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -363,23 +380,31 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
               </div>
               <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
                 {t(
-                  "Payment via Stripe · Label is generated immediately after payment and provided as PDF.",
-                  "Stripe ile ödeme · Etiket ödeme sonrası hemen oluşturulur ve PDF olarak sunulur.",
-                  "Paiement via Stripe · L'étiquette est générée immédiatement après paiement en PDF.",
-                  "Pago vía Stripe · La etiqueta se genera inmediatamente tras el pago en PDF.",
-                  "Pagamento via Stripe · L'etichetta viene generata subito dopo il pagamento in PDF.",
-                  "Zahlung via Stripe · Etikett wird sofort nach Zahlung generiert und als PDF bereitgestellt."
+                  "Charged to your balance or saved card · Label is generated immediately and provided as PDF.",
+                  "Bakiyenizden veya kayıtlı kartınızdan çekilir · Etiket hemen oluşturulur ve PDF olarak sunulur.",
+                  "Débité de votre solde ou de votre carte enregistrée · L'étiquette est générée immédiatement en PDF.",
+                  "Cargado a su saldo o tarjeta guardada · La etiqueta se genera inmediatamente en PDF.",
+                  "Addebitato sul saldo o sulla carta salvata · L'etichetta viene generata immediatamente in PDF.",
+                  "Wird von deinem Guthaben oder deiner hinterlegten Karte abgebucht · Etikett wird sofort als PDF generiert."
                 )}
               </div>
             </div>
           )}
+          </>)}
 
           <div style={{ marginTop: 16, display: "flex", justifyContent: embedded ? "flex-end" : "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            {!embedded && (
+            {!embedded && !purchaseResult && (
               <button type="button" onClick={onClose} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 500 }}>
                 {t("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}
               </button>
             )}
+            {purchaseResult ? (
+              !embedded && (
+                <button type="button" onClick={onClose} style={{ padding: "10px 22px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#111827", color: "#fff", border: "none", cursor: "pointer" }}>
+                  {t("Close", "Kapat", "Fermer", "Cerrar", "Chiudi", "Schließen")}
+                </button>
+              )
+            ) : (
             <button
               type="button"
               onClick={handleCheckout}
@@ -394,13 +419,14 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
               }}
             >
               {checkingOut ? (
-                <><span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> {t("Redirecting…", "Yönlendiriliyor…", "Redirection…", "Redirigiendo…", "Reindirizzamento…", "Weiterleitung…")}</>
+                <><span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> {t("Purchasing…", "Satın alınıyor…", "Achat…", "Comprando…", "Acquisto…", "Wird gekauft…")}</>
               ) : selectedRate ? (
                 `${t("Buy now —", "Şimdi satın al —", "Acheter —", "Comprar —", "Acquista —", "Jetzt kaufen —")} ${selectedRate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €`
               ) : (
                 t("Please select a shipping option", "Lütfen bir kargo seçeneği seçin", "Veuillez choisir une option d'expédition", "Seleccione una opción de envío", "Seleziona un'opzione di spedizione", "Bitte Versandoption wählen")
               )}
             </button>
+            )}
           </div>
         </div>
   );

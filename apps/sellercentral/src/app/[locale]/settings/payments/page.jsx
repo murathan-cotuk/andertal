@@ -1314,5 +1314,16 @@ export default function PaymentsSettingsPage() {
     );
   }
 
-  return isSuperuser ? <AdminPaymentsView /> : <SellerPaymentsView />;
+  // Superusers can also act as a seller (e.g. shipping their own orders and needing a saved
+  // card for label charges), so they get their own IBAN/card section in addition to the
+  // platform-wide payout monitor — not instead of it.
+  if (isSuperuser) {
+    return (
+      <>
+        <SellerPaymentsView />
+        <AdminPaymentsView />
+      </>
+    );
+  }
+  return <SellerPaymentsView />;
 }
