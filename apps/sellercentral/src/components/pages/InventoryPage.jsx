@@ -837,7 +837,6 @@ export default function InventoryPage() {
   const [changeRequestsModalOpen, setChangeRequestsModalOpen] = useState(false);
   const [changeRequestsModalProductId, setChangeRequestsModalProductId] = useState(null);
   const [changeRequestsModalItems, setChangeRequestsModalItems] = useState([]);
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const rowHead = {
     select: l === "tr" ? "Seç" : l === "de" ? "Ausw." : l === "fr" ? "Sél." : l === "es" ? "Sel." : l === "it" ? "Sel." : "Select",
     status: l === "tr" ? "Durum" : l === "de" ? "Status" : l === "fr" ? "Statut" : l === "es" ? "Estado" : l === "it" ? "Stato" : "Status",
@@ -1290,7 +1289,7 @@ export default function InventoryPage() {
       title={locale === "en" ? "Inventory" : locale === "tr" ? "Envanter" : locale === "fr" ? "Inventaire" : locale === "es" ? "Inventario" : locale === "it" ? "Inventario" : "Bestand"}
       primaryAction={{
         content: locale === "en" ? "Add product" : locale === "tr" ? "Ürün ekle" : locale === "fr" ? "Ajouter un produit" : locale === "es" ? "Agregar producto" : locale === "it" ? "Aggiungi prodotto" : "Produkt hinzufügen",
-        onAction: () => setAddMenuOpen((v) => !v),
+        onAction: () => router.push("/products/new"),
         connectedDisclosure: {
           accessibilityLabel: locale === "en" ? "More add options" : locale === "tr" ? "Daha fazla seçenek" : "Weitere Optionen",
           actions: [
