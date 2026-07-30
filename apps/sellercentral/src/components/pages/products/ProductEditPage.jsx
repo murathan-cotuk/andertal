@@ -440,7 +440,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   }, []);
 
   const refetchPendingChangeRequests = useCallback(async (productId) => {
-    if (!productId) {
+    // Pending-change-request review (current vs. proposed value, "suggested by") is a
+    // superuser moderation tool — a seller should never see that their own edit to an
+    // existing/shared product is sitting in a pending-approval queue.
+    if (!productId || !isSuperuser) {
       setPendingChangeRequests([]);
       return [];
     }
@@ -453,7 +456,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setPendingChangeRequests([]);
       return [];
     }
-  }, [client]);
+  }, [client, isSuperuser]);
 
   const mergeLocaleFields = useCallback((p) => {
     if (!p) return p;
@@ -2554,8 +2557,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 {currentCountryConf.label} · {currentCountryConf.currency} · {currentCountryConf.taxLabel} {currentCountryConf.vatRate}%
               </Text>
 
-              {/* Netto / Brutto with lock — currency shown beside field (Polaris prefix + controlled value breaks multi-char typing). */}
+              {/* Netto / Brutto with lock — currency shown beside field (Polaris prefix + controlled value breaks multi-char typing).
+                  Netto entry + the link toggle are superuser-only: sellers only ever enter the gross (Brutto)
+                  price shown in the shop, and Netto keeps being computed/stored automatically from it (as long
+                  as this country's price stays "linked", which is the default and can't be changed by a seller
+                  since they no longer see the toggle). Nothing about the underlying data/calc was removed. */}
               <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                {isSuperuser && (
                 <Box minWidth="130px" flex="1">
                   <div className="product-edit-label">{locale === "en" ? `Net (excl. ${currentCountryConf.taxLabel})` : locale === "tr" ? `Net (${currentCountryConf.taxLabel} hariç)` : locale === "fr" ? `Net (hors ${currentCountryConf.taxLabel})` : locale === "es" ? `Neto (excl. ${currentCountryConf.taxLabel})` : locale === "it" ? `Netto (escl. ${currentCountryConf.taxLabel})` : `Netto (exkl. ${currentCountryConf.taxLabel})`}</div>
                   <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
@@ -2596,6 +2604,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     </div>
                   </div>
                 </Box>
+                )}
+                {isSuperuser && (
                 <div style={{ paddingBottom: 8 }}>
                   <button
                     type="button"
@@ -2610,6 +2620,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     {cpLinked ? "🔒" : "🔓"}
                   </button>
                 </div>
+                )}
                 <Box minWidth="130px" flex="1">
                   <div className="product-edit-label">{locale === "en" ? `Gross (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "tr" ? `Brüt (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} dahil)` : locale === "fr" ? `Brut (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} incl.)` : locale === "es" ? `Bruto (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "it" ? `Lordo (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : `Brutto (inkl. ${currentCountryConf.taxLabel} ${currentCountryConf.vatRate > 0 ? currentCountryConf.vatRate + "%" : ""})`}</div>
                   <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>

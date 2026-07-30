@@ -25,7 +25,7 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { userError } from "@/lib/api-error-messages";
 import { getUI } from "@/lib/ui-strings";
-import { lt } from "@/lib/locale-text";
+import { lt, fmtMoney, fmtDateShort } from "@/lib/locale-text";
 import { formatDecimal } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image-url";
 import { Link as I18nLink } from "@/i18n/navigation";
@@ -812,6 +812,9 @@ export default function InventoryPage() {
   const [duplicateOptions, setDuplicateOptions] = useState(DEFAULT_DUPLICATE_OPTIONS);
   const [duplicateSaving, setDuplicateSaving] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
+  const [eanDuplicateGroups, setEanDuplicateGroups] = useState([]);
+  const [eanDuplicatesModalOpen, setEanDuplicatesModalOpen] = useState(false);
+  const [eanDuplicateMergingId, setEanDuplicateMergingId] = useState(null);
   const [mySellerId, setMySellerId] = useState("");
   const [sellerLabelById, setSellerLabelById] = useState({});
   const [productListingsMap, setProductListingsMap] = useState({});
@@ -983,6 +986,13 @@ export default function InventoryPage() {
   }, []);
 
   const refetchPendingChangeRequests = async () => {
+    // Pending-change-request review ("Proposal" marker/count) is a superuser moderation tool —
+    // a seller must never see that their own edit to an existing/shared product is queued for
+    // approval, so this is skipped entirely for non-superusers.
+    if (!isSuperuser) {
+      setPendingChangeRequestsByProductId({});
+      return {};
+    }
     try {
       const data = await medusaClient.request('/admin-hub/v1/product-change-requests?status=pending');
       const map = {};
@@ -1006,7 +1016,46 @@ export default function InventoryPage() {
 
   useEffect(() => {
     refetchPendingChangeRequests();
-  }, []);
+  }, [isSuperuser]);
+
+  const refetchEanDuplicates = async () => {
+    // Same visibility rule as change requests: only a superuser may see that two
+    // catalog rows for the same real-world EAN exist and need reconciling.
+    if (!isSuperuser) {
+      setEanDuplicateGroups([]);
+      return [];
+    }
+    try {
+      const data = await medusaClient.request('/admin-hub/v1/products/duplicate-eans');
+      const groups = Array.isArray(data?.groups) ? data.groups : [];
+      setEanDuplicateGroups(groups);
+      return groups;
+    } catch (e) {
+      console.warn('Failed to load duplicate EAN groups:', e?.message || e);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    refetchEanDuplicates();
+  }, [isSuperuser]);
+
+  const mergeEanDuplicate = async (masterId, duplicateProductId) => {
+    setEanDuplicateMergingId(duplicateProductId);
+    try {
+      await medusaClient.request(`/admin-hub/v1/products/duplicate-eans/${encodeURIComponent(masterId)}/merge`, {
+        method: 'POST',
+        body: JSON.stringify({ duplicateProductId }),
+      });
+      await refetchEanDuplicates();
+      const data = await medusaClient.getAdminHubProducts();
+      setProducts(data.products || []);
+    } catch (e) {
+      setError(userError(e, locale, 'Failed to merge duplicate product'));
+    } finally {
+      setEanDuplicateMergingId(null);
+    }
+  };
 
   const openChangeRequestsModal = async (productId) => {
     const pid = String(productId || '');
@@ -1458,6 +1507,29 @@ export default function InventoryPage() {
             </Card>
           )}
 
+          {isSuperuser && eanDuplicateGroups.length > 0 && (
+            <Banner
+              tone="warning"
+              title={lt(locale, `${eanDuplicateGroups.length} duplicate product(s) found`, `${eanDuplicateGroups.length} yinelenen ürün bulundu`, `${eanDuplicateGroups.length} produit(s) en double trouvé(s)`, `${eanDuplicateGroups.length} producto(s) duplicado(s) encontrado(s)`, `${eanDuplicateGroups.length} prodotto/i duplicato/i trovato/i`, `${eanDuplicateGroups.length} doppelte Produkt(e) gefunden`)}
+              action={{
+                content: lt(locale, "Review & merge", "İncele ve birleştir", "Vérifier et fusionner", "Revisar y fusionar", "Rivedi e unisci", "Prüfen & zusammenführen"),
+                onAction: () => setEanDuplicatesModalOpen(true),
+              }}
+            >
+              <p>
+                {lt(
+                  locale,
+                  "Multiple sellers listed the same EAN and it created separate catalog entries instead of one shared listing. Merge each group back into the original entry so ownership stays with whoever added it first.",
+                  "Birden fazla satıcı aynı EAN'i listeledi ve bu, ortak bir listing yerine ayrı katalog kayıtları oluşturdu. Sahipliğin ilk ekleyen satıcıda kalması için her grubu orijinal kayda geri birleştirin.",
+                  "Plusieurs vendeurs ont référencé le même EAN, créant des fiches catalogue distinctes au lieu d'une seule offre partagée. Fusionnez chaque groupe dans la fiche d'origine pour que la propriété reste au premier vendeur.",
+                  "Varios vendedores listaron el mismo EAN y se crearon fichas de catálogo separadas en lugar de una sola oferta compartida. Fusiona cada grupo con la ficha original para que la propiedad se mantenga con quien la añadió primero.",
+                  "Più venditori hanno inserito lo stesso EAN creando voci di catalogo separate invece di un'unica offerta condivisa. Unisci ogni gruppo alla voce originale così la proprietà resta al primo venditore.",
+                  "Mehrere Verkäufer haben dieselbe EAN gelistet, wodurch getrennte Katalogeinträge statt eines gemeinsamen Angebots entstanden sind. Führe jede Gruppe wieder mit dem ursprünglichen Eintrag zusammen, damit die Inhaberschaft beim Erstverkäufer bleibt."
+                )}
+              </p>
+            </Banner>
+          )}
+
           {isSuperuser && (
             <BlockStack gap="500">
               <Card>
@@ -1746,6 +1818,62 @@ export default function InventoryPage() {
           </BlockStack>
         </Modal.Section>
       </Modal>
+
+      {isSuperuser && (
+        <Modal
+          open={eanDuplicatesModalOpen}
+          onClose={() => setEanDuplicatesModalOpen(false)}
+          title={lt(locale, "Duplicate products", "Yinelenen ürünler", "Produits en double", "Productos duplicados", "Prodotti duplicati", "Doppelte Produkte")}
+          secondaryActions={[{ content: ui.cancel, onAction: () => setEanDuplicatesModalOpen(false) }]}
+        >
+          <Modal.Section>
+            {eanDuplicateGroups.length === 0 ? (
+              <Text as="p" tone="subdued">
+                {lt(locale, "No duplicates found.", "Yinelenen ürün bulunamadı.", "Aucun doublon trouvé.", "No se encontraron duplicados.", "Nessun duplicato trovato.", "Keine Duplikate gefunden.")}
+              </Text>
+            ) : (
+              <BlockStack gap="400">
+                {eanDuplicateGroups.map((group) => (
+                  <Card key={group.ean}>
+                    <BlockStack gap="300">
+                      <Text as="h3" variant="headingSm">EAN {group.ean}</Text>
+                      <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {lt(locale, "Original (keeps ownership)", "Orijinal (sahiplik burada kalır)", "Original (conserve la propriété)", "Original (mantiene la propiedad)", "Originale (mantiene la proprietà)", "Original (behält die Inhaberschaft)")}
+                          </Text>
+                          <Text as="p">
+                            {group.master.title || group.master.id} — {sellerLabelById[group.master.seller_id] || group.master.seller_id || "—"} · {fmtDateShort(group.master.created_at, locale)}
+                          </Text>
+                        </BlockStack>
+                      </Box>
+                      {group.duplicates.map((dup) => (
+                        <InlineStack key={dup.id} align="space-between" blockAlign="center" wrap>
+                          <BlockStack gap="050">
+                            <Text as="p">
+                              {dup.title || dup.id} — {sellerLabelById[dup.seller_id] || dup.seller_id || "—"} · {fmtDateShort(dup.created_at, locale)}
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {fmtMoney(dup.price_cents, locale)} · {lt(locale, "Stock", "Stok", "Stock", "Stock", "Scorte", "Bestand")}: {dup.inventory ?? 0}
+                            </Text>
+                          </BlockStack>
+                          <Button
+                            onClick={() => mergeEanDuplicate(group.master.id, dup.id)}
+                            loading={eanDuplicateMergingId === dup.id}
+                            disabled={Boolean(eanDuplicateMergingId) && eanDuplicateMergingId !== dup.id}
+                          >
+                            {lt(locale, "Merge into original", "Orijinalle birleştir", "Fusionner avec l'original", "Fusionar con el original", "Unisci all'originale", "Mit Original zusammenführen")}
+                          </Button>
+                        </InlineStack>
+                      ))}
+                    </BlockStack>
+                  </Card>
+                ))}
+              </BlockStack>
+            )}
+          </Modal.Section>
+        </Modal>
+      )}
     </Page>
   );
 }

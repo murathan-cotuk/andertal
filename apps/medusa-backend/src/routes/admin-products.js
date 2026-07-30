@@ -39,6 +39,22 @@ const extractEanFromHubProductRow = (p) => {
   return ''
 }
 
+// Among rows matching the same EAN, the true "master" is the oldest one that
+// already has an owner; an unowned row only wins if no owned row exists.
+// (Mirrors the `ORDER BY (seller_id IS NULL) DESC, created_at ASC` used by the
+// primary direct-SQL master lookup — keeps every EAN-dedup path consistent so a
+// later duplicate listing can never displace the original owner.)
+const pickCanonicalEanMatch = (matches) => {
+  if (!matches || !matches.length) return null
+  const sorted = [...matches].sort((a, b) => {
+    const aOwned = a && a.seller_id ? 0 : 1
+    const bOwned = b && b.seller_id ? 0 : 1
+    if (aOwned !== bOwned) return aOwned - bOwned
+    return new Date(a?.created_at || 0) - new Date(b?.created_at || 0)
+  })
+  return sorted[0]
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
 const _SELLER_JWT_SECRET = (() => {
@@ -176,7 +192,12 @@ const listAdminHubProductsDb = async (query = {}) => {
 }
 
 const BULLET_POINT_MAX_LEN = 120
-const normalizeEanValue = (v) => { if (v == null) return ''; return String(v).trim() }
+const normalizeEanValue = (v) => {
+  if (v == null) return ''
+  const s = String(v).trim()
+  const digitsOnly = normalizeStoreEan(s)
+  return digitsOnly || s
+}
 const collectVariantEans = (variants) => {
   const out = []
   if (!Array.isArray(variants)) return out
@@ -592,8 +613,7 @@ const adminHubProductsPOST = async (req, res) => {
           const rawEan = String(rawMeta.ean ?? '').trim()
           return rawEan && normalizeStoreEan(rawEan) === incomingEan
         }
-        const truemaster = allProds.find((p) => eanMatchesProd(p) && !p.seller_id)
-        masterProduct = truemaster || allProds.find((p) => eanMatchesProd(p)) || null
+        masterProduct = pickCanonicalEanMatch(allProds.filter((p) => eanMatchesProd(p)))
       }
     }
 
@@ -1193,9 +1213,7 @@ module.exports = function createAdminProductsRouter() {
       if (!ean) return res.status(400).json({ message: 'ean query param required' })
       const normEan = normalizeStoreEan(ean)
       const allProds = await listAdminHubProductsDb({ limit: 5000 })
-      const master = allProds.find((p) => extractEanFromHubProductRow(p) === normEan && !p.seller_id)
-        || allProds.find((p) => extractEanFromHubProductRow(p) === normEan)
-        || null
+      const master = pickCanonicalEanMatch(allProds.filter((p) => extractEanFromHubProductRow(p) === normEan))
       if (!master) return res.status(404).json({ message: 'No product found with this EAN' })
       const catalogProduct = {
         id: master.id, title: master.title, handle: master.handle, description: master.description,
@@ -1260,6 +1278,111 @@ module.exports = function createAdminProductsRouter() {
     } catch (err) {
       console.error('product-listings-map error:', err)
       res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    }
+  })
+
+  // Duplicate-EAN detection & merge (Görev: multi-seller ownership reconciliation).
+  // A weak EAN-normalization bug (fixed above, see normalizeEanValue) previously let a
+  // second seller's "add existing product" create a brand-new admin_hub_products row
+  // instead of a listing on the original, making the original owner's product appear
+  // to "move" to the newer seller. This tool finds any such already-existing duplicate
+  // rows and lets a superuser merge them back into the true (oldest-owned) master.
+  router.get('/admin-hub/v1/products/duplicate-eans', requireSuperuser, async (req, res) => {
+    try {
+      const allProds = await listAdminHubProductsDb({ limit: 5000 })
+      const groups = new Map()
+      for (const p of allProds) {
+        if (String(p.status || '') === 'merged') continue
+        const ean = extractEanFromHubProductRow(p)
+        if (!ean) continue
+        if (!groups.has(ean)) groups.set(ean, [])
+        groups.get(ean).push(p)
+      }
+      const duplicateGroups = []
+      for (const [ean, rows] of groups) {
+        if (rows.length < 2) continue
+        const master = pickCanonicalEanMatch(rows)
+        const duplicates = rows.filter((r) => r.id !== master.id)
+        duplicateGroups.push({
+          ean,
+          master: { id: master.id, title: master.title, seller_id: master.seller_id, created_at: master.created_at },
+          duplicates: duplicates.map((d) => ({
+            id: d.id, title: d.title, seller_id: d.seller_id, created_at: d.created_at,
+            price_cents: d.price_cents, inventory: d.inventory, sku: d.sku, status: d.status,
+          })),
+        })
+      }
+      res.json({ groups: duplicateGroups })
+    } catch (err) {
+      console.error('duplicate-eans GET error:', err)
+      res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    }
+  })
+
+  router.post('/admin-hub/v1/products/duplicate-eans/:masterId/merge', requireSuperuser, async (req, res) => {
+    const masterId = String(req.params.masterId || '').trim()
+    const duplicateProductId = String(req.body?.duplicateProductId || '').trim()
+    if (!masterId || !duplicateProductId) return res.status(400).json({ message: 'masterId and duplicateProductId required' })
+    if (masterId === duplicateProductId) return res.status(400).json({ message: 'masterId and duplicateProductId must differ' })
+    const client = getProductsDbClient()
+    if (!client) return res.status(503).json({ message: 'Database not configured' })
+    try {
+      await client.connect()
+      await client.query('BEGIN')
+
+      const dupRes = await client.query('SELECT * FROM admin_hub_products WHERE id = $1 FOR UPDATE', [duplicateProductId])
+      const dup = dupRes.rows[0]
+      const masterRes = await client.query('SELECT * FROM admin_hub_products WHERE id = $1 FOR UPDATE', [masterId])
+      const master = masterRes.rows[0]
+      if (!dup || !master) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Product not found' }) }
+
+      // 1) The duplicate row's own seller/price/inventory data becomes a normal listing
+      // on the master, if that seller doesn't already have one.
+      if (dup.seller_id) {
+        await client.query(
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku)
+           VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (product_id, seller_id) DO NOTHING`,
+          [masterId, dup.seller_id, dup.price_cents || 0, dup.inventory || 0, dup.status || 'active', dup.sku || null]
+        )
+      }
+
+      // 2) Re-point any real listing rows the duplicate already accumulated, skipping
+      // ones that would collide with a listing the master already has for that seller.
+      await client.query(
+        `DELETE FROM admin_hub_seller_listings sl
+         WHERE sl.product_id = $1
+           AND EXISTS (SELECT 1 FROM admin_hub_seller_listings m WHERE m.product_id = $2 AND m.seller_id = sl.seller_id)`,
+        [duplicateProductId, masterId]
+      )
+      await client.query('UPDATE admin_hub_seller_listings SET product_id = $1 WHERE product_id = $2', [masterId, duplicateProductId])
+
+      // 3) Re-point dependent rows that have no seller-collision risk.
+      await client.query('UPDATE admin_hub_product_change_requests SET product_id = $1 WHERE product_id = $2', [masterId, duplicateProductId])
+      await client.query('UPDATE admin_hub_eu_origin_pending SET product_id = $1 WHERE product_id = $2', [masterId, duplicateProductId])
+      await client.query(
+        `DELETE FROM store_customer_wishlist w
+         WHERE w.product_id = $1
+           AND EXISTS (SELECT 1 FROM store_customer_wishlist m WHERE m.product_id = $2 AND m.customer_id = w.customer_id)`,
+        [duplicateProductId, masterId]
+      )
+      await client.query('UPDATE store_customer_wishlist SET product_id = $1 WHERE product_id = $2', [masterId, duplicateProductId])
+
+      // 4) Never hard-delete (child rows CASCADE) — archive instead, preserving order/audit history.
+      await client.query(
+        `UPDATE admin_hub_products
+         SET status = 'merged', metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('merged_into_id', $1::text), updated_at = now()
+         WHERE id = $2`,
+        [masterId, duplicateProductId]
+      )
+
+      await client.query('COMMIT')
+      res.json({ merged: true, master_id: masterId, duplicate_product_id: duplicateProductId })
+    } catch (err) {
+      try { await client.query('ROLLBACK') } catch (_) {}
+      console.error('duplicate-eans merge error:', err)
+      res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    } finally {
+      try { await client.end() } catch (_) {}
     }
   })
 
