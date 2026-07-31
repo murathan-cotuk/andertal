@@ -545,7 +545,14 @@ const adminHubProductsPOST = async (req, res) => {
   try {
     let body = { ...(req.body || {}) }
     const isSuperuserCaller = req.sellerUser?.is_superuser || false
-    const callerSellerId = (!isSuperuserCaller && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
+    // Every seller_users row — including superuser accounts — has its own real seller_id
+    // (own_seller_id, assigned at registration). A superuser is also a selling entity in
+    // their own right, so a product they create must stay attributed to THEM, not become
+    // ownerless — otherwise a later seller listing the same EAN visually "takes over" the
+    // product (wrong section in Inventory, missing from the shop BuyBox). `isSuperuserCaller`
+    // is still used below to bypass ownership *restrictions* (ability to edit shared fields
+    // directly instead of via change-request) — that is a separate concern from attribution.
+    const callerSellerId = req.sellerUser?.seller_id ? String(req.sellerUser.seller_id).trim() : null
     if (callerSellerId) {
       body.seller_id = callerSellerId; body.seller = callerSellerId
       body.metadata = body.metadata && typeof body.metadata === 'object' ? { ...body.metadata } : {}
@@ -680,12 +687,21 @@ const adminHubProductsPOST = async (req, res) => {
         const masterTitle = (masterProduct.title || '').trim()
         const incomingTitle = (body.title || '').trim()
         if (incomingTitle && !masterTitle) { fillFields.title = incomingTitle }
-        else if (incomingTitle && masterTitle && incomingTitle !== masterTitle) { crFields.push({ field: 'title', old: masterTitle, val: incomingTitle }) }
+        else if (incomingTitle && masterTitle && incomingTitle !== masterTitle) {
+          // Superuser has direct edit authority over shared/master fields — applying it
+          // straight away instead of filing a change-request avoids them having to
+          // approve their own suggestion (mirrors adminHubProductByIdPUT's ownership gate).
+          if (isSuperuserCaller) fillFields.title = incomingTitle
+          else crFields.push({ field: 'title', old: masterTitle, val: incomingTitle })
+        }
 
         const masterDesc = (masterProduct.description || '').trim()
         const incomingDesc = (body.description || '').trim()
         if (incomingDesc && !masterDesc) { fillFields.description = incomingDesc }
-        else if (incomingDesc && masterDesc && incomingDesc !== masterDesc) { crFields.push({ field: 'description', old: masterDesc, val: incomingDesc }) }
+        else if (incomingDesc && masterDesc && incomingDesc !== masterDesc) {
+          if (isSuperuserCaller) fillFields.description = incomingDesc
+          else crFields.push({ field: 'description', old: masterDesc, val: incomingDesc })
+        }
 
         for (const mk of Object.keys(incomingMeta).filter((k) => !LISTING_ONLY_META.includes(k))) {
           const masterVal = masterMeta[mk]
@@ -694,7 +710,10 @@ const adminHubProductsPOST = async (req, res) => {
           const incomingStr = JSON.stringify(incomingVal ?? null)
           const masterStr = JSON.stringify(masterVal ?? null)
           if (masterEmpty && incomingVal != null) { fillFields[`metadata.${mk}`] = incomingVal }
-          else if (!masterEmpty && incomingStr !== masterStr) { crFields.push({ field: `metadata.${mk}`, old: masterVal == null ? null : JSON.stringify(masterVal), val: incomingVal == null ? '' : JSON.stringify(incomingVal) }) }
+          else if (!masterEmpty && incomingStr !== masterStr) {
+            if (isSuperuserCaller) fillFields[`metadata.${mk}`] = incomingVal
+            else crFields.push({ field: `metadata.${mk}`, old: masterVal == null ? null : JSON.stringify(masterVal), val: incomingVal == null ? '' : JSON.stringify(incomingVal) })
+          }
         }
 
         if (Object.keys(fillFields).length > 0) {
@@ -1386,6 +1405,34 @@ module.exports = function createAdminProductsRouter() {
     }
   })
 
+  // Repair for rows already broken by the callerSellerId-forced-to-null bug (fixed above,
+  // see adminHubProductsPOST): only ever allowed on a currently-unowned row, so it can assign
+  // a missing owner but can never reassign one that already exists.
+  router.post('/admin-hub/v1/products/:id/claim-owner', requireSuperuser, async (req, res) => {
+    const productId = String(req.params.id || '').trim()
+    const sellerId = String(req.body?.seller_id || req.sellerUser?.seller_id || '').trim()
+    if (!productId || !sellerId) return res.status(400).json({ message: 'seller_id required' })
+    const client = getProductsDbClient()
+    if (!client) return res.status(503).json({ message: 'Database not configured' })
+    try {
+      await client.connect()
+      const r = await client.query(
+        `UPDATE admin_hub_products
+         SET seller_id = $1, metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('seller_id', $1::text), updated_at = now()
+         WHERE id = $2 AND seller_id IS NULL
+         RETURNING id, seller_id`,
+        [sellerId, productId]
+      )
+      if (!r.rows[0]) return res.status(409).json({ message: 'Product already has an owner' })
+      res.json({ claimed: true, product_id: productId, seller_id: sellerId })
+    } catch (err) {
+      console.error('claim-owner error:', err)
+      res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    } finally {
+      try { await client.end() } catch (_) {}
+    }
+  })
+
   // EU-origin routes (registered directly on router)
   registerEuOriginRoutes(router, {
     requireSellerAuth,
@@ -1398,8 +1445,7 @@ module.exports = function createAdminProductsRouter() {
 
   // Bulk import
   router.post('/admin-hub/v1/products/bulk-import', async (req, res) => {
-    const isSuperuser = req.sellerUser?.is_superuser === true
-    const callerSellerId = (!isSuperuser && req.sellerUser?.seller_id) ? String(req.sellerUser.seller_id).trim() : null
+    const callerSellerId = req.sellerUser?.seller_id ? String(req.sellerUser.seller_id).trim() : null
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
     if (!rows.length) return res.status(400).json({ message: 'rows array required' })
     if (rows.length > 500) return res.status(400).json({ message: 'Max 500 rows per request' })

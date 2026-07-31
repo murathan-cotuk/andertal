@@ -2,7 +2,7 @@
 const { Router } = require('express')
 const { resolveOrderPaidTotalCents } = require('../order-money')
 const { loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform, resolveStripePublishableFromPlatform, paymentMethodTypesFromPlatformRow } = require('./platform-checkout')
-const { getBestsellerProductIds } = require('./store-products')
+const { getBestsellerProductIds, mapAdminHubToStoreProduct } = require('./store-products')
 const { getAdminHubProductByIdOrHandleDb } = require('./admin-products')
 const { normalizeHubCountryCode } = require('./seller-settings')
 const { requireSellerAuth, requireSuperuser } = require('./seller-auth')
@@ -726,8 +726,6 @@ const storeCartLineItemsPOST = async (req, res) => {
     const product = await getAdminHubProductByIdOrHandleDb(productId)
     if (!product) { await client.end(); return res.status(404).json({ message: 'Product not found' }) }
     const meta = product.metadata && typeof product.metadata === 'object' ? product.metadata : {}
-    const media = meta.media
-    const thumb = Array.isArray(media) && media[0] ? (typeof media[0] === 'string' ? media[0] : media[0].url) : (typeof media === 'string' ? media : null)
     const priceCents = product.price_cents != null ? Number(product.price_cents) : Math.round(Number(product.price || 0) * 100)
     const rawVariants = Array.isArray(product.variants) && product.variants.length > 0 ? product.variants : []
     let unitPriceCents = priceCents
@@ -752,6 +750,13 @@ const storeCartLineItemsPOST = async (req, res) => {
         variantLabel = v.title || v.value || ''
       }
     }
+    // Image resolution must match the PDP's own priority (ProductTemplate.jsx: variant's own
+    // media/image_url first, product-level thumbnail only as fallback) — a naive top-level
+    // metadata.media lookup here used to show a sibling/product-level image (e.g. inherited
+    // from "add existing product" prefill) instead of the specific variant actually added.
+    const mappedForThumb = mapAdminHubToStoreProduct(product)
+    const mappedVariant = variantIndex != null && Number.isFinite(variantIndex) ? mappedForThumb.variants?.[variantIndex] : null
+    const thumb = mappedVariant?.images?.[0] || mappedVariant?.image_url || mappedForThumb.thumbnail || null
     // If a specific seller is chosen, override price from their listing
     if (chosenSellerId) {
       const listingRow = await client.query(

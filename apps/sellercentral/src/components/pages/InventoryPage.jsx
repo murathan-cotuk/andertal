@@ -454,6 +454,8 @@ function InventoryProductRow({
   setProducts,
   pendingChangeRequests,
   onOpenChangeRequests,
+  isSuperuser,
+  onClaimOwnership,
   ui,
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
@@ -723,6 +725,29 @@ function InventoryProductRow({
                     title="View proposed changes"
                   >
                     {i18n.changeProposed} ({pendingCount})
+                  </button>
+                )}
+                {isSuperuser && !product.seller_id && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClaimOwnership(product.id);
+                    }}
+                    style={{
+                      width: "100%",
+                      height: 36,
+                      border: "none",
+                      background: "#fff",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      padding: "0 12px",
+                      fontSize: 13,
+                      color: "#111827",
+                    }}
+                    title={l === "tr" ? "Bu ürünü kendi satıcı hesabına ata" : l === "de" ? "Dieses Produkt deinem Verkäuferkonto zuordnen" : "Assign this product to your seller account"}
+                  >
+                    {l === "tr" ? "Sahipliğimi ata" : l === "de" ? "Inhaberschaft zuweisen" : l === "fr" ? "Revendiquer la propriété" : l === "es" ? "Reclamar propiedad" : l === "it" ? "Rivendica proprietà" : "Claim ownership"}
                   </button>
                 )}
                 <button
@@ -1219,6 +1244,20 @@ export default function InventoryPage() {
     setDuplicateModalOpen(true);
   };
 
+  const claimOwnership = async (productId) => {
+    setMenuOpenId(null);
+    try {
+      await medusaClient.request(`/admin-hub/v1/products/${encodeURIComponent(productId)}/claim-owner`, {
+        method: 'POST',
+        body: JSON.stringify({ seller_id: mySellerId }),
+      });
+      const data = await medusaClient.getAdminHubProducts();
+      setProducts(data.products || []);
+    } catch (err) {
+      setError(userError(err, locale, 'Failed to claim ownership'));
+    }
+  };
+
   const renderRow = (product) => (
     <InventoryProductRow
       key={product.id}
@@ -1237,6 +1276,8 @@ export default function InventoryPage() {
         setMenuOpenId(null);
         openChangeRequestsModal(pid);
       }}
+      isSuperuser={isSuperuser}
+      onClaimOwnership={claimOwnership}
       ui={ui}
     />
   );

@@ -30,8 +30,6 @@ import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import { normalizeIsoCountryCode } from "@/lib/iso-country";
 import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
-import BestsellerBadge from "@/components/BestsellerBadge";
-import { isBestsellerMetadata } from "@/lib/bestseller";
 import { groupCartItemsBySeller } from "@/lib/cart-seller-groups";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
@@ -2320,11 +2318,6 @@ export default function CheckoutPage() {
                               <img src={resolveImageUrl(item.thumbnail)} alt={lineTitle} />
                             ) : (
                               <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
-                            )}
-                            {isBestsellerMetadata(item?.product_metadata || {}) && (
-                              <div style={{ position: "absolute", top: 0, left: 0, zIndex: 8, pointerEvents: "none", lineHeight: 0 }}>
-                                <BestsellerBadge />
-                              </div>
                             )}
                           </SummaryThumb>
                           <SummaryItemDetails>

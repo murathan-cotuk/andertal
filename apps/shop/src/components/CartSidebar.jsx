@@ -10,8 +10,6 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
-import BestsellerBadge from "@/components/BestsellerBadge";
-import { isBestsellerMetadata } from "@/lib/bestseller";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 
 /* Above MobileNav bar (2147483640) — nav bar hides behind cart when open */
@@ -683,11 +681,6 @@ export default function CartSidebar() {
                   <img src={item.thumbnail} alt={getLocalizedCartLineTitle(item, locale)} />
                 ) : (
                   <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
-                )}
-                {isBestsellerMetadata(item?.product_metadata || {}) && (
-                  <div style={{ position: "absolute", top: 0, left: 0, zIndex: 8, pointerEvents: "none", lineHeight: 0 }}>
-                    <BestsellerBadge />
-                  </div>
                 )}
               </ItemImage>
               <ItemBody>
