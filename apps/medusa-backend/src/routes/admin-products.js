@@ -39,6 +39,22 @@ const extractEanFromHubProductRow = (p) => {
   return ''
 }
 
+// Unlike extractEanFromHubProductRow (which returns a single *representative* EAN — the
+// parent's own EAN takes priority — used for grouping/dedup UIs), this checks whether a
+// SPECIFIC target EAN appears ANYWHERE on the product: its own metadata.ean (parent/grouping
+// EAN for variant products) OR any variants[].ean (the sellable child EANs). Needed because a
+// variant product's parent EAN and child EANs are all distinct and must each be independently
+// searchable (Amazon-style: children are the sellable items when variants exist).
+const productHasEan = (p, targetEan) => {
+  if (!p || !targetEan) return false
+  const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+  if (normalizeStoreEan(meta.ean) === targetEan) return true
+  for (const row of parseVariantsArray(p)) {
+    if (normalizeStoreEan(row && row.ean) === targetEan) return true
+  }
+  return false
+}
+
 // Among rows matching the same EAN, the true "master" is the oldest one that
 // already has an owner; an unowned row only wins if no owned row exists.
 // (Mirrors the `ORDER BY (seller_id IS NULL) DESC, created_at ASC` used by the
@@ -613,14 +629,7 @@ const adminHubProductsPOST = async (req, res) => {
       }
       if (!eanDirectFound) {
         const allProds = await listAdminHubProductsDb({ limit: 5000 })
-        const eanMatchesProd = (p) => {
-          const e = extractEanFromHubProductRow(p)
-          if (e && e === incomingEan) return true
-          const rawMeta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
-          const rawEan = String(rawMeta.ean ?? '').trim()
-          return rawEan && normalizeStoreEan(rawEan) === incomingEan
-        }
-        masterProduct = pickCanonicalEanMatch(allProds.filter((p) => eanMatchesProd(p)))
+        masterProduct = pickCanonicalEanMatch(allProds.filter((p) => productHasEan(p, incomingEan)))
       }
     }
 
@@ -1232,16 +1241,29 @@ module.exports = function createAdminProductsRouter() {
       if (!ean) return res.status(400).json({ message: 'ean query param required' })
       const normEan = normalizeStoreEan(ean)
       const allProds = await listAdminHubProductsDb({ limit: 5000 })
-      const master = pickCanonicalEanMatch(allProds.filter((p) => extractEanFromHubProductRow(p) === normEan))
+      // Matches on the parent's own EAN OR any child/variant EAN — a variant product's
+      // sellable items are its children, so their EANs must be searchable too.
+      const master = pickCanonicalEanMatch(allProds.filter((p) => productHasEan(p, normEan)))
       if (!master) return res.status(404).json({ message: 'No product found with this EAN' })
+      const masterMeta = master.metadata && typeof master.metadata === 'object' ? master.metadata : {}
+      const matchedOnParent = normalizeStoreEan(masterMeta.ean) === normEan
+      const matchedVariant = matchedOnParent
+        ? null
+        : parseVariantsArray(master).find((v) => normalizeStoreEan(v && v.ean) === normEan) || null
       const catalogProduct = {
         id: master.id, title: master.title, handle: master.handle, description: master.description,
-        metadata: master.metadata && typeof master.metadata === 'object' ? { ...master.metadata } : {},
+        metadata: masterMeta && typeof masterMeta === 'object' ? { ...masterMeta } : {},
         variants: Array.isArray(master.variants)
           ? master.variants.map((v) => ({ ...v, sku: undefined, ean: (v && v.ean) || undefined, price: undefined, price_cents: 0, inventory: 0, inventory_quantity: 0 }))
           : [],
       }
-      res.json({ product: catalogProduct, found: true })
+      res.json({
+        product: catalogProduct,
+        found: true,
+        matched_ean: normEan,
+        matched_on: matchedOnParent ? 'parent' : 'variant',
+        matched_variant_ean: matchedVariant ? normalizeStoreEan(matchedVariant.ean) : null,
+      })
     } catch (err) { res.status(500).json({ message: err?.message || 'Lookup failed' }) }
   })
 

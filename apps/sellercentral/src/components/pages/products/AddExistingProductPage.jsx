@@ -146,7 +146,8 @@ export default function AddExistingProductPage() {
       let found = null;
 
       if (!found && eanTrim) {
-        found = await client.lookupProductByEan(eanTrim).catch(() => null);
+        const eanResult = await client.lookupProductByEan(eanTrim).catch(() => null);
+        found = eanResult?.product || null;
       }
 
       if (!found && idTrim) {

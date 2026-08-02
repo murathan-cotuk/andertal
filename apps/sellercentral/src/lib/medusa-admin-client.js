@@ -158,10 +158,12 @@ class MedusaAdminClient {
     }
   }
 
+  /** Returns { product, matched_on: "parent"|"variant", matched_variant_ean } or null if no catalog match. */
   async lookupProductByEan(ean) {
     try {
       const res = await this.request(`/admin-hub/products/ean-lookup?ean=${encodeURIComponent(ean)}`);
-      return res?.product ?? null;
+      if (!res?.product) return null;
+      return { product: res.product, matched_on: res.matched_on || "parent", matched_variant_ean: res.matched_variant_ean || null };
     } catch (err) {
       if (err?.statusCode === 404) return null;
       return null;

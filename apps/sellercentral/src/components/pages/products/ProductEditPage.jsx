@@ -363,6 +363,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
   const dragGroupIdx = useRef(null);
   const [eanLookupState, setEanLookupState] = useState(null); // null | "loading" | "found" | "not_found"
+  const [eanMatchedOn, setEanMatchedOn] = useState("parent"); // "parent" | "variant" — which EAN the lookup matched on
   const [urlSearchTerm, setUrlSearchTerm] = useState(""); // shop URL or handle to search
   const [urlSearchState, setUrlSearchState] = useState(null); // null | "loading" | "found" | "not_found"
   // Variant image picker: null = closed, option_values[] = target variant being edited
@@ -695,18 +696,22 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     if (!ean || String(ean).trim().length < 8) return;
     setEanLookupState("loading");
     try {
-      const match = await client.lookupProductByEan(String(ean).trim());
-      if (match) {
+      const result = await client.lookupProductByEan(String(ean).trim());
+      if (result) {
         setEanLookupState("found");
+        setEanMatchedOn(result.matched_on || "parent");
         // Pre-fill form with existing master product data (keep seller-owned fields empty)
         setProduct((prev) => {
           if (!prev) return prev;
-          const master = match;
+          const master = result.product;
           const masterMeta = (master.metadata && typeof master.metadata === "object") ? { ...master.metadata } : {};
+          // Matched via a child/variant EAN: the parent/grouping EAN belongs to the catalog
+          // master, not the child EAN the seller typed here — keep it, don't overwrite it.
+          const parentEan = result.matched_on === "variant" ? (masterMeta.ean || "") : String(ean).trim();
           // Keep the new seller's own fields, copy catalog fields from master
           const mergedMeta = {
             ...masterMeta,
-            ean: String(ean).trim(),
+            ean: parentEan,
             sku: prev.metadata?.sku || "",
             // clear seller-specific fields
             seller_id: prev.metadata?.seller_id,
@@ -2079,11 +2084,17 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               {eanLookupState === "found" && (
                 <Banner tone="warning">
-                  {locale === "tr"
-                    ? "Bu EAN katalogda zaten kayıtlı. Form katalog verileriyle dolduruldu — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
-                    : locale === "de"
-                    ? "Diese EAN ist bereits im Katalog registriert. Das Formular wurde mit Katalogdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
-                    : "This EAN is already registered in the catalog. The form has been pre-filled with catalog data — add your own price, SKU, and shipping details."}
+                  {eanMatchedOn === "variant"
+                    ? (locale === "tr"
+                        ? "Bu EAN, katalogdaki bir üst ürünün varyasyonuna (child) ait. Ana ürün ve tüm varyasyonları forma yüklendi — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
+                        : locale === "de"
+                        ? "Diese EAN gehört zu einer Variante eines bereits im Katalog erfassten Hauptprodukts. Hauptprodukt und alle Varianten wurden geladen — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
+                        : "This EAN belongs to a variant of a product already in the catalog. The parent product and all its variants have been loaded — add your own price, SKU, and shipping details.")
+                    : (locale === "tr"
+                        ? "Bu EAN katalogda zaten kayıtlı. Form katalog verileriyle dolduruldu — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
+                        : locale === "de"
+                        ? "Diese EAN ist bereits im Katalog registriert. Das Formular wurde mit Katalogdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
+                        : "This EAN is already registered in the catalog. The form has been pre-filled with catalog data — add your own price, SKU, and shipping details.")}
                 </Banner>
               )}
 

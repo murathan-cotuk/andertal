@@ -1182,15 +1182,16 @@ export default function InventoryPage() {
     for (const p of products) {
       if (!productMatchesFilters(p)) continue;
       if (isOwnInventoryProduct(p, mySellerId)) {
-        // For superuser: if this master product (null seller_id) has listings,
-        // put it under the primary seller instead of the superuser section.
+        // A superuser-owned master product (null seller_id) is never exclusively
+        // "claimed" by whichever seller listed it — it stays in the superuser's own
+        // section AND shows under every seller who has a listing for it.
+        own.push(p);
         const listingSellers = isSuperuser ? (productListingsMap[p.id] || []) : [];
         if (isSuperuser && listingSellers.length > 0) {
-          const primarySid = listingSellers[0];
-          if (!g.has(primarySid)) g.set(primarySid, []);
-          g.get(primarySid).push({ ...p, _listingSellerIds: listingSellers });
-        } else {
-          own.push(p);
+          for (const sid of listingSellers) {
+            if (!g.has(sid)) g.set(sid, []);
+            g.get(sid).push({ ...p, _listingSellerIds: listingSellers });
+          }
         }
       } else {
         const sid = String(p.seller_id || "unknown");
@@ -1380,21 +1381,9 @@ export default function InventoryPage() {
       primaryAction={{
         content: locale === "en" ? "Add product" : locale === "tr" ? "Ürün ekle" : locale === "fr" ? "Ajouter un produit" : locale === "es" ? "Agregar producto" : locale === "it" ? "Aggiungi prodotto" : "Produkt hinzufügen",
         onAction: () => router.push("/products/new"),
-        connectedDisclosure: {
-          accessibilityLabel: locale === "en" ? "More add options" : locale === "tr" ? "Daha fazla seçenek" : "Weitere Optionen",
-          actions: [
-            {
-              content: locale === "en" ? "New product" : locale === "tr" ? "Yeni ürün" : locale === "fr" ? "Nouveau produit" : locale === "es" ? "Nuevo producto" : locale === "it" ? "Nuovo prodotto" : "Neues Produkt",
-              onAction: () => router.push("/products/new"),
-            },
-            {
-              content: locale === "en" ? "Add existing product" : locale === "tr" ? "Mevcut ürün ekle" : locale === "fr" ? "Ajouter produit existant" : locale === "es" ? "Agregar producto existente" : locale === "it" ? "Aggiungi prodotto esistente" : "Bestehendes Produkt hinzufügen",
-              onAction: () => router.push("/products/add-existing"),
-            },
-          ],
-        },
       }}
       secondaryActions={[
+        { content: locale === "en" ? "Add existing product" : locale === "tr" ? "Mevcut ürün ekle" : locale === "fr" ? "Ajouter produit existant" : locale === "es" ? "Agregar producto existente" : locale === "it" ? "Aggiungi prodotto esistente" : "Bestehendes Produkt hinzufügen", onAction: () => router.push("/products/add-existing") },
         { content: locale === "en" ? "Bulk upload" : locale === "tr" ? "Toplu yükleme" : locale === "fr" ? "Import en masse" : locale === "es" ? "Carga masiva" : locale === "it" ? "Caricamento in blocco" : "Massenimport", url: "/import-export" },
         { content: locale === "en" ? "Export" : locale === "tr" ? "Dışa aktar" : locale === "fr" ? "Exporter" : locale === "es" ? "Exportar" : locale === "it" ? "Esporta" : "Exportieren", onAction: () => setExportModalOpen(true) },
       ]}
