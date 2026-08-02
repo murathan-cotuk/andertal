@@ -552,6 +552,10 @@ export default function OrderDetailPage() {
   const trackingUrl = getTrackingUrl(order.carrier_name, order.tracking_number);
   const activeReturn = returns.find(r => r.status !== "abgelehnt" && r.status !== "abgeschlossen");
   const approvedReturn = returns.find(r => r.status === "genehmigt");
+  // The DHL return label is now auto-generated the moment the return request is created
+  // (Sendcloud, see return-label.js) — it no longer waits on manual seller approval, so show
+  // it as soon as it exists rather than gating on status === "genehmigt".
+  const returnWithLabel = returns.find(r => r.label_url) || null;
 
   const blockedStatuses = ["storniert", "cancelled", "refunded", "retoure", "retoure_anfrage"];
   const canReturn = !activeReturn && !blockedStatuses.includes(status);
@@ -773,8 +777,8 @@ export default function OrderDetailPage() {
                 {t("returnSlip")}
               </ActionBtn>
             )}
-            {approvedReturn && (
-              <ActionBtn bg="#fffbeb" color="#92400e" onClick={() => openPdf(`/api/store-return-etikett/${order.id}`)}>
+            {returnWithLabel && (
+              <ActionBtn bg="#fffbeb" color="#92400e" onClick={() => window.open(returnWithLabel.label_url, "_blank", "noopener,noreferrer")}>
                 {t("returnLabelAction")}
               </ActionBtn>
             )}

@@ -34,7 +34,7 @@ try {
 
 const path = require('path')
 const fs = require('fs')
-const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent, runWinBackScan, runAbandonedCartScan, runProductWishlistWatchers } = require('./src/flow-automation')
+const { runAutomationFlowsForOrder, runAutomationFlowsForCustomerEvent, runWinBackScan, runAbandonedCartScan, runProductWishlistWatchers, runBirthdayScan, runReviewRequestScan } = require('./src/flow-automation')
 const {
   applyEuOriginMetadataPolicy,
   registerEuOriginRoutes,
@@ -680,6 +680,16 @@ async function start() {
         await client.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_coupons_seller_code ON admin_hub_coupons(seller_id, lower(code));').catch(() => {})
         await client.query('ALTER TABLE admin_hub_coupons ADD COLUMN IF NOT EXISTS starts_at timestamp;').catch(() => {})
         await client.query('ALTER TABLE admin_hub_coupons ADD COLUMN IF NOT EXISTS per_customer_limit integer;').catch(() => {})
+        // Birthday campaign: when set, this coupon is valid for a given customer only within
+        // N days of THEIR OWN birthday (store_customers.birth_date), evaluated live at checkout
+        // — independent of (and in addition to) the coupon's own starts_at/expires_at window.
+        // See resolveCartCouponDiscountSync in store-checkout.js.
+        await client.query('ALTER TABLE admin_hub_coupons ADD COLUMN IF NOT EXISTS birthday_window_days integer;').catch(() => {})
+        await client.query(`
+          INSERT INTO admin_hub_coupons (seller_id, code, discount_type, discount_value, per_customer_limit, active, birthday_window_days)
+          VALUES ('default', 'BIRTHDAY', 'percent', 5, 1, true, 30)
+          ON CONFLICT (seller_id, lower(code)) DO NOTHING
+        `).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_coupon_usage (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -2756,6 +2766,19 @@ async function start() {
       runWinBackScan().catch(() => {})
       setInterval(() => runWinBackScan().catch(() => {}), 24 * 60 * 60 * 1000)
     }, 60 * 1000) // 60s delay after startup
+
+    // Birthday campaign (trigger 'customer_birthday'): daily scan, sends once per customer per year.
+    setTimeout(() => {
+      runBirthdayScan().catch(() => {})
+      setInterval(() => runBirthdayScan().catch(() => {}), 24 * 60 * 60 * 1000)
+    }, 65 * 1000) // 65s delay after startup
+
+    // Review request (trigger 'review_request'): checked every 3 hours so the configured
+    // post-delivery wait (default 72h) is honored reasonably closely, same pattern as abandoned_cart.
+    setTimeout(() => {
+      runReviewRequestScan().catch(() => {})
+      setInterval(() => runReviewRequestScan().catch(() => {}), 3 * 60 * 60 * 1000)
+    }, 70 * 1000) // 70s delay after startup
 
     // Wishlist watchers (triggers 'favorite_low_stock' / 'favorite_price_drop'): checked every
     // 15 minutes so a price drop or low-stock crossing reaches favoriting customers promptly.

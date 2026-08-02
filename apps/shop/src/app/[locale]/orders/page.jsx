@@ -444,7 +444,8 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
 
   const activeReturn = returns.find(r => r.status !== "abgelehnt" && r.status !== "abgeschlossen");
   const hasApprovedReturn = returns.some(r => r.status === "genehmigt");
-  const hasLabelSent = returns.some(r => r.label_sent_at);
+  // Auto-generated at return-request time now (Sendcloud) — no longer waits on manual approval.
+  const returnWithLabel = returns.find(r => r.label_url) || null;
   const blockedForReturn = ["storniert", "refunded", "cancelled", "retoure", "retoure_anfrage"];
   const canRequestReturn = !activeReturn && !blockedForReturn.includes(status);
 
@@ -621,14 +622,13 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
               </ActionBtn>
             )}
 
-            {/* Rücksende-Etikett */}
-            {hasLabelSent && (
+            {/* Rücksende-Etikett (DHL, auto-generiert via Sendcloud) */}
+            {returnWithLabel && (
               <ActionBtn
                 color="#0369a1" bg="#e0f2fe"
-                disabled={busy === "etikett"}
-                onClick={e => { e.stopPropagation(); withBusy("etikett", () => downloadBlob(`/api/store-return-etikett/${order.id}`, `Ruecksende-Etikett-${orderNum}.pdf`, token())); }}
+                onClick={e => { e.stopPropagation(); window.open(returnWithLabel.label_url, "_blank", "noopener,noreferrer"); }}
               >
-                {busy === "etikett" ? "…" : "Rücksende-Etikett"}
+                Rücksende-Etikett
               </ActionBtn>
             )}
 

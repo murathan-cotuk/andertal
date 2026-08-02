@@ -680,24 +680,27 @@ async function sendImmediateStepsForFlow({
   orderId,
   customerId,
   dedupeKey,
-  skipLeadingWait,
+  // Hours since the triggering real-world event (e.g. cart abandonment) — lets periodic scanners
+  // (no delayed-step scheduler exists) satisfy wait_hours steps against real elapsed time instead
+  // of a single boolean. null/undefined = not applicable, only an explicit 0h wait is satisfied.
+  elapsedHours,
 }) {
   const { buildFlowEmailPdfAttachments } = require('./order-pdf-buffers')
   let idx = 0
   let emailsSent = 0
+  let cumulativeWaitHours = 0
   while (idx < steps.length) {
     const s = steps[idx]
     if (s.step_type === 'wait_hours') {
       const wh = Number(s.wait_hours || 0)
-      if (wh > 0 && !skipLeadingWait) {
+      cumulativeWaitHours += wh
+      const satisfied = wh <= 0 || (elapsedHours != null && elapsedHours >= cumulativeWaitHours)
+      if (!satisfied) {
         logger.warn(
           `[flow-automation] order ${orderId} flow ${flowId}: wait_hours=${wh} stops immediate sends — delayed steps are not scheduled yet. Put "Send email" as the first step (or 0h wait) for instant mail after checkout.`,
         )
         break
       }
-      // skipLeadingWait: caller (e.g. the abandoned-cart scanner) already waited the real-world
-      // delay before dispatching this trigger, so the configured wait_hours is treated as satisfied
-      // instead of stopping the run here.
       idx += 1
       continue
     }
@@ -1001,6 +1004,7 @@ async function runAutomationFlowsForOrder(opts) {
         placeholderVars,
         orderId,
         customerId: ctx.order.customer_id ? String(ctx.order.customer_id) : '',
+        elapsedHours: opts.elapsedHours != null ? Number(opts.elapsedHours) : null,
       })
       totalEmails += n
     }
@@ -1157,7 +1161,7 @@ async function runAutomationFlowsForCustomerEvent(opts) {
         orderId: '',
         customerId: cust.id ? String(cust.id) : '',
         dedupeKey: opts.dedupeKey || '',
-        skipLeadingWait: !!opts.skipLeadingWait,
+        elapsedHours: opts.elapsedHours != null ? Number(opts.elapsedHours) : null,
       })
       total += n
     }
@@ -1301,14 +1305,57 @@ async function runWinBackScan() {
 }
 
 /**
+ * Birthday campaign (trigger_key 'customer_birthday'): fires once a year, on the day, for every
+ * customer with a birth_date on file. Unlike win_back (one-shot forever), the idempotency
+ * dedupeKey includes the current year so the same customer gets a fresh email each birthday.
+ * Runs daily (see server.js).
+ */
+async function runBirthdayScan() {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(`
+      SELECT id FROM store_customers
+      WHERE birth_date IS NOT NULL
+        AND EXTRACT(MONTH FROM birth_date) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(DAY FROM birth_date) = EXTRACT(DAY FROM CURRENT_DATE)
+      LIMIT 500
+    `)
+    await client.end()
+    const year = String(new Date().getFullYear())
+    for (const row of r.rows || []) {
+      await runAutomationFlowsForCustomerEvent({
+        triggerKey: 'customer_birthday',
+        customerId: row.id,
+        dedupeKey: year,
+      }).catch((e) => logger.warn('[flow-automation] customer_birthday failed', e?.message || e))
+    }
+  } catch (e) {
+    logger.error('[flow-automation] birthday scan failed', e?.message || e)
+    if (client) {
+      try {
+        await client.end()
+      } catch (_) {}
+    }
+  }
+}
+
+/**
  * Abandoned cart (trigger_key 'abandoned_cart'): nothing else in this file ever fires this
  * trigger — carts don't have a natural "event" the way orders do, so detecting one requires
  * periodically scanning for carts that still have items but never became an order. Runs
- * periodically (see server.js). The flow's own first step is normally "wait N hours" (built in
- * Content → Flows), but sendImmediateStepsForFlow() has no scheduler for delayed steps — so this
- * scan uses that same N (read from the flow's own wait_hours) as ITS delay before firing the
- * trigger, then passes skipLeadingWait so the immediate-send engine treats the wait as already
- * satisfied instead of silently dropping the email (see sendImmediateStepsForFlow).
+ * periodically (see server.js). admin_hub_flow_steps has no scheduler for delayed steps, so this
+ * scan re-checks every still-abandoned cart on every run and passes the real elapsed hours since
+ * the cart was last touched (elapsedHours) — sendImmediateStepsForFlow satisfies each wait_hours
+ * step against that instead of firing every step in one burst, so a 2-step flow (e.g. wait 2h →
+ * email 1 → wait 24h → email 2) actually sends email 2 ~24h after email 1, not immediately after.
+ * Per-step idempotency (buildFlowStepIdempotencyKey, keyed by cart id) caps each cart at exactly
+ * one send per configured email step even though it's rescanned every run; once the cart is
+ * purchased or emptied it drops out of the WHERE/HAVING below and is never scanned again, so any
+ * not-yet-sent later step simply never fires.
  */
 const ABANDONED_CART_DEFAULT_DELAY_HOURS = 2
 async function runAbandonedCartScan() {
@@ -1333,7 +1380,7 @@ async function runAbandonedCartScan() {
     const delayHours = Number(flowR.rows[0].wait_hours) > 0 ? Number(flowR.rows[0].wait_hours) : ABANDONED_CART_DEFAULT_DELAY_HOURS
 
     const r = await client.query(
-      `SELECT c.id, c.email,
+      `SELECT c.id, c.email, c.updated_at,
          COUNT(ci.id) FILTER (WHERE ci.removed_at IS NULL)::int as item_count,
          SUM(ci.quantity) FILTER (WHERE ci.removed_at IS NULL) as total_qty,
          SUM(ci.unit_price_cents * ci.quantity) FILTER (WHERE ci.removed_at IS NULL) as cart_total,
@@ -1347,7 +1394,7 @@ async function runAbandonedCartScan() {
        LEFT JOIN store_orders o ON o.cart_id = c.id
        WHERE o.id IS NULL AND c.email IS NOT NULL AND c.email != ''
          AND c.updated_at <= now() - ($1::numeric * interval '1 hour')
-       GROUP BY c.id, c.email
+       GROUP BY c.id, c.email, c.updated_at
        HAVING COUNT(ci.id) FILTER (WHERE ci.removed_at IS NULL) > 0
        LIMIT 200`,
       [delayHours],
@@ -1355,6 +1402,7 @@ async function runAbandonedCartScan() {
     await client.end()
 
     for (const row of r.rows || []) {
+      const elapsedHours = row.updated_at ? (Date.now() - new Date(row.updated_at).getTime()) / (1000 * 60 * 60) : null
       await runAutomationFlowsForCustomerEvent({
         triggerKey: 'abandoned_cart',
         email: row.email,
@@ -1370,11 +1418,77 @@ async function runAbandonedCartScan() {
           totalCents: row.cart_total != null ? Number(row.cart_total) : null,
         },
         dedupeKey: String(row.id),
-        skipLeadingWait: true,
+        elapsedHours,
       }).catch((e) => logger.warn('[flow-automation] abandoned_cart failed', e?.message || e))
     }
   } catch (e) {
     logger.error('[flow-automation] abandoned cart scan failed', e?.message || e)
+    if (client) {
+      try {
+        await client.end()
+      } catch (_) {}
+    }
+  }
+}
+
+/**
+ * Review request (trigger_key 'review_request'): nothing else in this file ever fires this
+ * trigger — like abandoned_cart, it needs periodic scanning rather than a natural order event.
+ * Finds orders delivered at least N hours ago (N = the flow's own first wait_hours step, default
+ * REVIEW_REQUEST_DEFAULT_DELAY_HOURS) and dispatches via runAutomationFlowsForOrder (not the
+ * customer-only path) so PRODUCT_NAME/ORDER_NUMBER/PRODUCT_URL etc. are populated (note:
+ * {REVIEW_LINK} is documented in the flows.js merge-field catalog but not actually populated
+ * by buildPlaceholderVars — link to {PRODUCT_URL} or {ORDER_DETAIL_URL} instead in templates). Per-order
+ * idempotency caps each order at exactly one review-request email regardless of rescans. Runs
+ * periodically (see server.js).
+ *
+ * NOTE: apps/medusa-backend/src/routes/marketing-automations.js has a separate, older
+ * per-seller "review_request" automation rule (store_automation_rules) with its own hardcoded
+ * German-only email — unrelated to this Content → Flows trigger. Don't confuse the two.
+ */
+const REVIEW_REQUEST_DEFAULT_DELAY_HOURS = 72
+async function runReviewRequestScan() {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+
+    const flowR = await client.query(
+      `SELECT f.id, s.wait_hours
+       FROM admin_hub_flows f
+       LEFT JOIN admin_hub_flow_steps s ON s.flow_id = f.id AND s.step_order = 0 AND s.step_type = 'wait_hours'
+       WHERE f.status = 'active' AND f.trigger_key = 'review_request'
+       ORDER BY f.updated_at ASC LIMIT 1`,
+    )
+    if (!flowR.rows.length) {
+      await client.end()
+      return
+    }
+    const delayHours = Number(flowR.rows[0].wait_hours) > 0 ? Number(flowR.rows[0].wait_hours) : REVIEW_REQUEST_DEFAULT_DELAY_HOURS
+
+    const r = await client.query(
+      `SELECT id, delivery_date FROM store_orders
+       WHERE delivery_status = 'zugestellt' AND delivery_date IS NOT NULL
+         AND delivery_date <= now() - ($1::numeric * interval '1 hour')
+         AND order_status NOT IN ('storniert', 'refunded')
+       ORDER BY delivery_date DESC
+       LIMIT 200`,
+      [delayHours],
+    )
+    await client.end()
+
+    for (const row of r.rows || []) {
+      const elapsedHours = row.delivery_date ? (Date.now() - new Date(row.delivery_date).getTime()) / (1000 * 60 * 60) : null
+      await runAutomationFlowsForOrder({
+        triggerKey: 'review_request',
+        orderId: row.id,
+        elapsedHours,
+      }).catch((e) => logger.warn('[flow-automation] review_request failed', e?.message || e))
+    }
+  } catch (e) {
+    logger.error('[flow-automation] review request scan failed', e?.message || e)
     if (client) {
       try {
         await client.end()
@@ -1492,4 +1606,6 @@ module.exports = {
   runWinBackScan,
   runAbandonedCartScan,
   runProductWishlistWatchers,
+  runBirthdayScan,
+  runReviewRequestScan,
 }

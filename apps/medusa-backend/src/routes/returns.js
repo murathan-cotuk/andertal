@@ -42,6 +42,55 @@ const adminHubAbandonedCartsGET = async (req, res) => {
   }
 }
 
+// POST /admin-hub/v1/abandoned-carts/:id/mark-removed — soft-removes all remaining items on one
+// cart (status becomes "deleted" / "Aus Warenkorb entfernt"), which also drops it out of the
+// abandoned_cart flow scanner's WHERE/HAVING (see runAbandonedCartScan) so no further emails go out.
+const adminHubAbandonedCartMarkRemovedPOST = async (req, res) => {
+  const id = (req.params.id || '').trim()
+  if (!id) return res.status(400).json({ message: 'id required' })
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(
+      `UPDATE store_cart_items SET removed_at = now() WHERE cart_id = $1::uuid AND removed_at IS NULL RETURNING id`,
+      [id],
+    )
+    await client.end()
+    res.json({ success: true, items_removed: r.rowCount || 0 })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
+// POST /admin-hub/v1/abandoned-carts/bulk-mark-removed — marks every still-"in_cart" checkout as
+// removed in one go (used to clear a backlog of stale carts that would otherwise re-trigger the
+// abandoned_cart flow on every scan).
+const adminHubAbandonedCartsBulkMarkRemovedPOST = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(`
+      UPDATE store_cart_items ci SET removed_at = now()
+      WHERE ci.removed_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM store_orders o WHERE o.cart_id = ci.cart_id)
+      RETURNING ci.id, ci.cart_id
+    `)
+    await client.end()
+    const cartIds = new Set((r.rows || []).map((row) => row.cart_id))
+    res.json({ success: true, items_removed: r.rowCount || 0, carts_affected: cartIds.size })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
 const adminHubReturnsGET = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   let client
@@ -254,6 +303,8 @@ module.exports = function createReturnsRouter() {
   const router = Router()
 
   router.get('/admin-hub/v1/abandoned-carts', adminHubAbandonedCartsGET)
+  router.post('/admin-hub/v1/abandoned-carts/bulk-mark-removed', adminHubAbandonedCartsBulkMarkRemovedPOST)
+  router.post('/admin-hub/v1/abandoned-carts/:id/mark-removed', adminHubAbandonedCartMarkRemovedPOST)
   router.get('/admin-hub/v1/returns', adminHubReturnsGET)
   router.post('/admin-hub/v1/returns', adminHubReturnsPOST)
   router.patch('/admin-hub/v1/returns/:id', adminHubReturnPATCH)

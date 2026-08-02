@@ -40,7 +40,7 @@ function ExpandedCart({ cart, locale }) {
   const items = cart.items || [];
   return (
     <tr>
-      <td colSpan={8} style={{ padding: 0, background: "#f9fafb" }}>
+      <td colSpan={9} style={{ padding: 0, background: "#f9fafb" }}>
         <div style={{ padding: "12px 24px 16px", borderBottom: "1px solid #e5e7eb" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
@@ -85,21 +85,44 @@ export default function AbandonedCheckoutsPage() {
   const [expanded, setExpanded] = useState({});
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [tab, setTab] = useState("all");
+  const [markingId, setMarkingId] = useState(null);
+  const [bulkMarking, setBulkMarking] = useState(false);
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const client = getMedusaAdminClient();
-        const data = await client.getAbandonedCarts();
-        setCarts(data.carts || []);
-      } catch { setCarts([]); }
-      setLoading(false);
-    })();
-  }, []);
+  const loadCarts = async () => {
+    setLoading(true);
+    try {
+      const client = getMedusaAdminClient();
+      const data = await client.getAbandonedCarts();
+      setCarts(data.carts || []);
+    } catch { setCarts([]); }
+    setLoading(false);
+  };
 
-  const COLS = ["", c.customer, c.email, c.items, c.value, c.created, c.lastActive, c.status];
+  useEffect(() => { loadCarts(); }, []);
+
+  const markRemoved = async (cartId) => {
+    setMarkingId(cartId);
+    try {
+      const client = getMedusaAdminClient();
+      await client.markAbandonedCartRemoved(cartId);
+      setCarts((prev) => prev.map((c) => (c.id === cartId ? { ...c, status: "deleted", item_count: 0, items: [] } : c)));
+    } catch { /* leave as-is; user can retry */ }
+    setMarkingId(null);
+  };
+
+  const bulkMarkRemoved = async () => {
+    if (!window.confirm(c.bulkMarkConfirm(counts.in_cart))) return;
+    setBulkMarking(true);
+    try {
+      const client = getMedusaAdminClient();
+      await client.bulkMarkAbandonedCartsRemoved();
+      await loadCarts();
+    } catch { /* keep current list on failure */ }
+    setBulkMarking(false);
+  };
+
+  const COLS = ["", c.customer, c.email, c.items, c.value, c.created, c.lastActive, c.status, ""];
 
   const counts = {
     all: carts.length,
@@ -122,7 +145,18 @@ export default function AbandonedCheckoutsPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{c.pageTitle}</h1>
           <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{c.pageSubtitle}</p>
         </div>
-        <span style={{ fontSize: 13, color: "#6b7280" }}>{filteredCarts.length} {c.carts}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13, color: "#6b7280" }}>{filteredCarts.length} {c.carts}</span>
+          {counts.in_cart > 0 && (
+            <button
+              onClick={bulkMarkRemoved}
+              disabled={bulkMarking}
+              style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600, cursor: bulkMarking ? "default" : "pointer" }}
+            >
+              {bulkMarking ? c.bulkMarking : c.bulkMarkRemovedBtn}
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -159,11 +193,11 @@ export default function AbandonedCheckoutsPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
+              <tr><td colSpan={9} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
             )}
             {!loading && filteredCarts.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
+                <td colSpan={9} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🛒</div>
                   <div>{c.noCheckouts}</div>
                 </td>
@@ -198,6 +232,17 @@ export default function AbandonedCheckoutsPage() {
                   <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280" }}>{fmtDate(cart.updated_at, locale)}</td>
                   <td style={{ padding: "10px 12px" }}>
                     <StatusBadge status={cart.status} copy={c} />
+                  </td>
+                  <td style={{ padding: "10px 12px" }}>
+                    {cart.status === "in_cart" && (
+                      <button
+                        onClick={() => markRemoved(cart.id)}
+                        disabled={markingId === cart.id}
+                        style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#374151", fontSize: 11, fontWeight: 600, cursor: markingId === cart.id ? "default" : "pointer", whiteSpace: "nowrap" }}
+                      >
+                        {markingId === cart.id ? c.marking : c.markRemoved}
+                      </button>
+                    )}
                   </td>
                 </tr>
                 {expanded[cart.id] && <ExpandedCart cart={cart} locale={locale} />}

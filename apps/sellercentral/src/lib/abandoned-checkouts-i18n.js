@@ -34,5 +34,17 @@ export function getAbandonedCheckoutsCopy(locale) {
     tabInCart: t("In cart", "Sepettekiler", "Dans le panier", "En el carrito", "Nel carrello", "Im Warenkorb"),
     tabPurchased: t("Purchased", "Satin alinanlar", "Achetes", "Comprados", "Acquistati", "Gekauft"),
     tabDeleted: t("Deleted", "Silinenler", "Supprimes", "Eliminados", "Eliminati", "Geloscht"),
+    markRemoved: t("Mark removed", "Sepetten cikarildi say", "Marquer retire", "Marcar eliminado", "Segna rimosso", "Als entfernt markieren"),
+    marking: t("Marking...", "Isaretleniyor...", "Marquage...", "Marcando...", "Contrassegnando...", "Markiere..."),
+    bulkMarkRemovedBtn: t("Mark all \"in cart\" as removed", "Sepettekilerin hepsini cikar", "Marquer tout comme retire", "Marcar todo como eliminado", "Segna tutti come rimossi", "Alle im Warenkorb als entfernt markieren"),
+    bulkMarking: t("Marking all...", "Hepsi isaretleniyor...", "Marquage en cours...", "Marcando todo...", "Contrassegnando tutti...", "Markiere alle..."),
+    bulkMarkConfirm: (n) => t(
+      `Mark all ${n} "still in cart" checkouts as removed from cart? They will stop receiving abandoned-cart emails.`,
+      `Hala sepette olan ${n} kaydin hepsi sepetten cikarildi olarak isaretlensin mi? Bundan sonra terkedilen sepet e-postasi almayacaklar.`,
+      `Marquer les ${n} paniers "encore dans le panier" comme retires ? Ils ne recevront plus d'e-mails de panier abandonne.`,
+      `Marcar los ${n} carritos "todavia en el carrito" como eliminados? Dejaran de recibir correos de carrito abandonado.`,
+      `Segnare tutti i ${n} carrelli "ancora nel carrello" come rimossi? Non riceveranno piu e-mail per carrello abbandonato.`,
+      `Alle ${n} Eintraege "noch im Warenkorb" als aus dem Warenkorb entfernt markieren? Sie erhalten danach keine Warenkorbabbruch-E-Mails mehr.`,
+    ),
   };
 }

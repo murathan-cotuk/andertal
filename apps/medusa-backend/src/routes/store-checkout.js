@@ -240,7 +240,26 @@ const couponEligibleSubtotalCents = (items, couponRow) => {
  * Also checks seller_listings so that a seller's coupon works even when their products
  * are master-products (seller_id = null / 'default' on cart items).
  */
-const resolveCartCouponDiscountSync = async (client, items, rawCouponCode) => {
+/** True if `today` falls within [customer's birthday this/adjacent year, +windowDays]. */
+const isWithinBirthdayWindow = (birthDate, windowDays) => {
+  if (!birthDate || !(Number(windowDays) > 0)) return false
+  const bd = new Date(birthDate)
+  if (Number.isNaN(bd.getTime())) return false
+  const today = new Date()
+  const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+  const month = bd.getUTCMonth()
+  const day = bd.getUTCDate()
+  // Check this year's birthday plus the adjacent years so a birthday near Dec 31/Jan 1 whose
+  // window spans the new year is still evaluated correctly either direction.
+  for (const yearOffset of [-1, 0, 1]) {
+    const candidate = Date.UTC(today.getUTCFullYear() + yearOffset, month, day)
+    const windowEnd = candidate + Number(windowDays) * 24 * 60 * 60 * 1000
+    if (todayUTC >= candidate && todayUTC <= windowEnd) return true
+  }
+  return false
+}
+
+const resolveCartCouponDiscountSync = async (client, items, rawCouponCode, customerEmail = null) => {
   const normalizedInput = normalizeCouponCode(rawCouponCode)
   if (!normalizedInput) {
     return { nextCouponCode: null, couponDiscountCents: 0, invalid: false }
@@ -273,11 +292,28 @@ const resolveCartCouponDiscountSync = async (client, items, rawCouponCode) => {
      ORDER BY CASE WHEN COALESCE(NULLIF(TRIM(seller_id), ''), 'default') = 'default' THEN 1 ELSE 0 END, seller_id ASC`,
     [normalizedInput, sellerCandidates],
   )
-  const candidates = (r.rows || []).filter((row) => {
+  let candidates = (r.rows || []).filter((row) => {
     const usageLimit = row.usage_limit == null ? null : Number(row.usage_limit)
     const usedCount = Number(row.used_count || 0)
     return !(usageLimit != null && usedCount >= usageLimit)
   })
+  const needsBirthdayCheck = candidates.some((row) => row.birthday_window_days != null)
+  if (needsBirthdayCheck) {
+    let birthDate = null
+    const emailNorm = String(customerEmail || '').trim().toLowerCase()
+    if (emailNorm) {
+      try {
+        const cr = await client.query(
+          `SELECT birth_date FROM store_customers WHERE LOWER(TRIM(email)) = $1 ORDER BY created_at DESC LIMIT 1`,
+          [emailNorm],
+        )
+        birthDate = cr.rows?.[0]?.birth_date || null
+      } catch (_) {}
+    }
+    candidates = candidates.filter((row) =>
+      row.birthday_window_days == null || isWithinBirthdayWindow(birthDate, row.birthday_window_days),
+    )
+  }
   if (!candidates.length) {
     return { nextCouponCode: null, couponDiscountCents: 0, invalid: true }
   }
@@ -415,7 +451,7 @@ const syncCartCouponDiscountFromLines = async (client, cartId, cartMaybe = null)
   let nextCouponCode = cart.coupon_code || null
   let couponDiscountCents = 0
   if (nextCouponCode) {
-    const result = await resolveCartCouponDiscountSync(client, items, nextCouponCode)
+    const result = await resolveCartCouponDiscountSync(client, items, nextCouponCode, cart.email || null)
     nextCouponCode = result.nextCouponCode
     couponDiscountCents = result.couponDiscountCents
   }
@@ -510,7 +546,7 @@ const stripLegacyBonusLedgerVersandSuffix = (desc) => {
 
 const getCartWithItems = async (client, cartId) => {
   const cartRes = await client.query(
-    'SELECT id, created_at, updated_at, COALESCE(bonus_points_reserved, 0) AS bonus_points_reserved, coupon_code, COALESCE(coupon_discount_cents, 0) AS coupon_discount_cents FROM store_carts WHERE id = $1',
+    'SELECT id, created_at, updated_at, email, COALESCE(bonus_points_reserved, 0) AS bonus_points_reserved, coupon_code, COALESCE(coupon_discount_cents, 0) AS coupon_discount_cents FROM store_carts WHERE id = $1',
     [cartId],
   )
   const cartRow = cartRes.rows && cartRes.rows[0]
@@ -662,7 +698,7 @@ const storeCartPATCH = async (req, res) => {
       nextCouponCode = incoming || null
     }
     if (nextCouponCode) {
-      const result = await resolveCartCouponDiscountSync(client, items, nextCouponCode)
+      const result = await resolveCartCouponDiscountSync(client, items, nextCouponCode, cart.email || null)
       if (result.invalid) {
         if (couponCodeRaw !== undefined) {
           await client.end()
@@ -2610,7 +2646,7 @@ const storeOrdersMeGET = async (req, res) => {
     if (orderIds.length > 0) {
       try {
         const returnsR = await client.query(
-          `SELECT id, order_id, status, reason, notes, return_number, refund_status, refund_amount_cents, label_sent_at, created_at FROM store_returns WHERE order_id = ANY($1::uuid[]) ORDER BY created_at DESC`,
+          `SELECT id, order_id, status, reason, notes, return_number, refund_status, refund_amount_cents, label_sent_at, label_url, label_tracking_number, label_carrier_name, created_at FROM store_returns WHERE order_id = ANY($1::uuid[]) ORDER BY created_at DESC`,
           [orderIds]
         )
         for (const r of (returnsR.rows || [])) {

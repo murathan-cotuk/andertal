@@ -1055,6 +1055,14 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/abandoned-carts')
   }
 
+  async markAbandonedCartRemoved(id) {
+    return this.request(`/admin-hub/v1/abandoned-carts/${encodeURIComponent(id)}/mark-removed`, { method: 'POST' })
+  }
+
+  async bulkMarkAbandonedCartsRemoved() {
+    return this.request('/admin-hub/v1/abandoned-carts/bulk-mark-removed', { method: 'POST' })
+  }
+
   async getReturns(params = {}) {
     const isSuperuser = typeof window !== 'undefined' && localStorage.getItem('sellerIsSuperuser') === 'true';
     const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;
