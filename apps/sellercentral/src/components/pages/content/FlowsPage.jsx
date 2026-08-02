@@ -1057,7 +1057,7 @@ export default function FlowsPage() {
     () => Object.entries(t.triggers).map(([value, label]) => ({ label, value })),
     [t],
   );
-  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested"]), []);
+  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested", "seller_new_customer_message", "seller_support_ticket_sent", "seller_support_ticket_replied"]), []);
 
   const [newAudience, setNewAudience] = useState("customer");
   const [editAudience, setEditAudience] = useState("customer");

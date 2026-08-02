@@ -1096,6 +1096,32 @@ async function start() {
         } catch (e) {
           console.warn('[seed-message-flows]', e?.message || e)
         }
+        // Seed the seller lifecycle flows (registered/docs submitted/approved/rejected/
+        // documents required) once — same idempotent skip-if-exists pattern as above.
+        try {
+          const { seedSellerLifecycleFlows } = require('./src/seed-seller-lifecycle-flows')
+          await seedSellerLifecycleFlows(client)
+        } catch (e) {
+          console.warn('[seed-seller-lifecycle-flows]', e?.message || e)
+        }
+        try {
+          const { seedReviewRequestFlow } = require('./src/seed-review-request-flow')
+          await seedReviewRequestFlow(client)
+        } catch (e) {
+          console.warn('[seed-review-request-flow]', e?.message || e)
+        }
+        try {
+          const { seedWinBackFlow } = require('./src/seed-winback-flow')
+          await seedWinBackFlow(client)
+        } catch (e) {
+          console.warn('[seed-winback-flow]', e?.message || e)
+        }
+        try {
+          const { seedReturnRequestedFlow } = require('./src/seed-return-requested-flow')
+          await seedReturnRequestedFlow(client)
+        } catch (e) {
+          console.warn('[seed-return-requested-flow]', e?.message || e)
+        }
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_flow_snapshots (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
