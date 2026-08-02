@@ -705,13 +705,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           if (!prev) return prev;
           const master = result.product;
           const masterMeta = (master.metadata && typeof master.metadata === "object") ? { ...master.metadata } : {};
-          // Matched via a child/variant EAN: the parent/grouping EAN belongs to the catalog
-          // master, not the child EAN the seller typed here — keep it, don't overwrite it.
-          const parentEan = result.matched_on === "variant" ? (masterMeta.ean || "") : String(ean).trim();
+          const masterVariants = Array.isArray(master.variants) ? master.variants : [];
+          // Typed a child's own EAN directly (not the parent/grouping EAN): only that one
+          // child is what the seller intends to sell — list it alone, don't drag in every
+          // sibling variant. "master_total_variants" powers the "See other variations" link.
+          const singleChildMode = result.matched_on === "variant" && masterVariants.length > 1;
+          // Matched via the parent/grouping EAN: keep it as-is, seller wants the full family.
+          const parentEan = singleChildMode ? String(ean).trim() : (result.matched_on === "variant" ? (masterMeta.ean || "") : String(ean).trim());
+          if (singleChildMode) delete masterMeta.variation_groups;
           // Keep the new seller's own fields, copy catalog fields from master
           const mergedMeta = {
             ...masterMeta,
             ean: parentEan,
+            master_product_id: master.id,
+            master_total_variants: masterVariants.length,
             sku: prev.metadata?.sku || "",
             // clear seller-specific fields
             seller_id: prev.metadata?.seller_id,
@@ -727,9 +734,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             description: master.description || prev.description,
             handle: master.handle || prev.handle,
             metadata: mergedMeta,
-            variants: Array.isArray(master.variants) && master.variants.length > 0
-              ? master.variants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
-              : prev.variants,
+            variants: singleChildMode
+              ? []
+              : (masterVariants.length > 0
+                  ? masterVariants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
+                  : prev.variants),
           };
         });
       } else {
@@ -810,20 +819,33 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   }, [urlSearchTerm, client]);
 
   // On mount: if ?existing_id is set, pre-fill form with that product's catalog data.
+  // If ?variant_ean is also set, the seller picked one specific child variant (e.g. via
+  // Add Existing Product) — list only that one item instead of the whole variant matrix,
+  // since only that child is what they intend to sell (see "master_total_variants" below,
+  // which powers the "See other variations" link back to Add Existing Product).
   useEffect(() => {
     if (!isNew) return;
     const existingId = searchParams?.get("existing_id");
     if (!existingId) return;
+    const variantEanParam = String(searchParams?.get("variant_ean") || "").trim();
     (async () => {
       try {
         const { product: found } = await client.getAdminHubProductFull(existingId);
         if (!found?.id) return;
+        const foundVariants = Array.isArray(found.variants) ? found.variants : [];
+        const matchedVariant = variantEanParam
+          ? foundVariants.find((v) => String(v?.ean || v?.metadata?.ean || "").trim() === variantEanParam)
+          : null;
+        const singleChildMode = !!matchedVariant && foundVariants.length > 1;
         setProduct((prev) => {
           if (!prev) return prev;
           const masterMeta = (found.metadata && typeof found.metadata === "object") ? { ...found.metadata } : {};
+          if (singleChildMode) delete masterMeta.variation_groups;
           const mergedMeta = {
             ...masterMeta,
+            ean: singleChildMode ? variantEanParam : masterMeta.ean,
             master_product_id: existingId,
+            master_total_variants: foundVariants.length,
             sku: prev.metadata?.sku || "",
             seller_id: prev.metadata?.seller_id,
             shop_name: prev.metadata?.shop_name,
@@ -838,9 +860,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             description: found.description || prev.description,
             handle: found.handle || prev.handle,
             metadata: mergedMeta,
-            variants: Array.isArray(found.variants) && found.variants.length > 0
-              ? found.variants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
-              : prev.variants,
+            variants: singleChildMode
+              ? []
+              : (foundVariants.length > 0
+                  ? foundVariants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
+                  : prev.variants),
           };
         });
       } catch (_) {}
@@ -2059,11 +2083,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       <InlineStack gap="200" blockAlign="center" wrap={false}>
                         <span>EAN</span>
                         <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.ean" />
-                        {isSecondSeller && (
-                          <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 400, marginLeft: 4 }}>
-                            ({locale === "en" ? "locked — only first seller can change" : locale === "tr" ? "kilitli — yalnızca ilk satıcı değiştirebilir" : locale === "fr" ? "verrouillé — seul le premier vendeur peut modifier" : locale === "es" ? "bloqueado — solo el primer vendedor puede cambiar" : locale === "it" ? "bloccato — solo il primo venditore può modificare" : "gesperrt — nur Erstanbieter kann ändern"})
-                          </span>
-                        )}
                       </InlineStack>
                     }
                     value={getMeta(product, "ean")}
@@ -2086,15 +2105,35 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <Banner tone="warning">
                   {eanMatchedOn === "variant"
                     ? (locale === "tr"
-                        ? "Bu EAN, katalogdaki bir üst ürünün varyasyonuna (child) ait. Ana ürün ve tüm varyasyonları forma yüklendi — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
+                        ? "Bu EAN, katalogdaki bir üst ürünün varyasyonuna (child) ait. Bu tek varyasyon forma yüklendi — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
                         : locale === "de"
-                        ? "Diese EAN gehört zu einer Variante eines bereits im Katalog erfassten Hauptprodukts. Hauptprodukt und alle Varianten wurden geladen — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
-                        : "This EAN belongs to a variant of a product already in the catalog. The parent product and all its variants have been loaded — add your own price, SKU, and shipping details.")
+                        ? "Diese EAN gehört zu einer Variante eines bereits im Katalog erfassten Hauptprodukts. Nur diese eine Variante wurde geladen — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
+                        : "This EAN belongs to a variant of a product already in the catalog. Only this single variant has been loaded — add your own price, SKU, and shipping details.")
                     : (locale === "tr"
                         ? "Bu EAN katalogda zaten kayıtlı. Form katalog verileriyle dolduruldu — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
                         : locale === "de"
                         ? "Diese EAN ist bereits im Katalog registriert. Das Formular wurde mit Katalogdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
                         : "This EAN is already registered in the catalog. The form has been pre-filled with catalog data — add your own price, SKU, and shipping details.")}
+                </Banner>
+              )}
+
+              {Number(meta.master_total_variants || 0) > 1 && meta.master_product_id && (
+                <Banner tone="info">
+                  <InlineStack gap="300" blockAlign="center" align="space-between" wrap>
+                    <Text as="p" variant="bodySm">
+                      {locale === "tr"
+                        ? `Bu ürünün kataloğda ${meta.master_total_variants} varyasyonu var. Sadece bu tekini ekledin.`
+                        : locale === "de"
+                        ? `Dieses Produkt hat ${meta.master_total_variants} Varianten im Katalog. Du hast nur diese eine hinzugefügt.`
+                        : `This product has ${meta.master_total_variants} variants in the catalog. You've added only this one.`}
+                    </Text>
+                    <Button
+                      size="slim"
+                      onClick={() => window.open(`/products/add-existing?product_id=${encodeURIComponent(meta.master_product_id)}`, "_blank", "noopener,noreferrer")}
+                    >
+                      {locale === "tr" ? "Diğer varyasyonları gör" : locale === "de" ? "Andere Varianten ansehen" : "See other variations"}
+                    </Button>
+                  </InlineStack>
                 </Banner>
               )}
 

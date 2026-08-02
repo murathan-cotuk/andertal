@@ -202,7 +202,7 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const { id } = req.params
       const { status, rejection_reason } = req.body || {}
-      const validStatuses = ['registered', 'documents_submitted', 'pending_approval', 'approved', 'rejected', 'suspended']
+      const validStatuses = ['registered', 'documents_submitted', 'pending_approval', 'approved', 'rejected', 'suspended', 'documents_required']
       if (!validStatuses.includes(status)) return res.status(400).json({ message: `status must be one of: ${validStatuses.join(', ')}` })
       const client = getDbClient ? getDbClient() : getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
@@ -250,6 +250,17 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
 
         await client.end()
         res.json({ seller })
+        const triggerByStatus = {
+          approved: 'seller_verification_approved',
+          rejected: 'seller_verification_rejected',
+          documents_required: 'seller_documents_required',
+        }
+        const flowTrigger = triggerByStatus[status]
+        if (flowTrigger) {
+          setImmediate(() => {
+            try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: flowTrigger, sellerUserId: id }).catch(() => {}) } catch (_) {}
+          })
+        }
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -298,13 +309,24 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
+        let wasRegistered = false
+        if (body.documents !== undefined) {
+          const prev = await client.query(`SELECT approval_status FROM seller_users WHERE seller_id = $1 LIMIT 1`, [sellerId])
+          wasRegistered = String(prev.rows[0]?.approval_status || 'registered') === 'registered'
+        }
         const r = await client.query(
           `UPDATE seller_users SET ${updates.join(', ')} WHERE seller_id = $${n} RETURNING ${SELLER_SELECT}`,
           params
         )
         await client.end()
         if (!r.rows[0]) return res.status(404).json({ message: 'Seller not found' })
-        res.json({ seller: r.rows[0] })
+        const seller = r.rows[0]
+        res.json({ seller })
+        if (wasRegistered && seller.approval_status === 'documents_submitted') {
+          setImmediate(() => {
+            try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: 'seller_docs_submitted', sellerUserId: seller.id }).catch(() => {}) } catch (_) {}
+          })
+        }
       } catch (e) {
         try { await client.end() } catch (_) {}
         if (String(e?.message || '').toLowerCase().includes('invalid input syntax for type json')) {

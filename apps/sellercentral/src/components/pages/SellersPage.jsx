@@ -21,6 +21,7 @@ function getStatusMeta(status, locale) {
     approved:            { en: "Approved",             tr: "Onaylandı",         de: "Genehmigt" },
     rejected:            { en: "Rejected",             tr: "Reddedildi",        de: "Abgelehnt" },
     suspended:           { en: "Suspended",            tr: "Askıya Alındı",     de: "Gesperrt" },
+    documents_required:  { en: "New documents required", tr: "Yeni Evrak Gerekli", de: "Neue Dokumente erforderlich" },
   };
   const tones = {
     registered: "info",
@@ -29,6 +30,7 @@ function getStatusMeta(status, locale) {
     approved: "success",
     rejected: "critical",
     suspended: "critical",
+    documents_required: "warning",
   };
   const entry = map[status];
   const label = entry ? lt(locale, entry.en, entry.tr, entry.en, entry.en, entry.en, entry.de) : status;
@@ -233,7 +235,7 @@ export default function SellersPage() {
 
   const statusOptions = [
     { label: lt(locale, "All statuses", "Tüm durumlar", "All statuses", "All statuses", "All statuses", "Alle Status"), value: "all" },
-    ...["registered", "documents_submitted", "pending_approval", "approved", "rejected", "suspended"].map((k) => ({
+    ...["registered", "documents_submitted", "pending_approval", "approved", "rejected", "suspended", "documents_required"].map((k) => ({
       label: getStatusMeta(k, locale).label,
       value: k,
     })),

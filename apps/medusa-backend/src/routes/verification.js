@@ -79,6 +79,16 @@ module.exports = function createVerificationRouter({ getSellerDbClient, getProdu
         )
         await client.end()
 
+        if (canAutoAdvance) {
+          const flowTriggerByStatus = { approved: 'seller_verification_approved', rejected: 'seller_verification_rejected' }
+          const flowTrigger = flowTriggerByStatus[newStatus]
+          if (flowTrigger) {
+            setImmediate(() => {
+              try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: flowTrigger, sellerUserId: userId }).catch(() => {}) } catch (_) {}
+            })
+          }
+        }
+
         // Insert notification for superusers
         try {
           const notifClient = getProductsDbClient()
@@ -198,6 +208,14 @@ module.exports = function createVerificationRouter({ getSellerDbClient, getProdu
         )
         await client.end()
         if (!r.rows[0]) return res.status(404).json({ message: 'Seller not found' })
+
+        const flowTriggerByStatus = { approved: 'seller_verification_approved', rejected: 'seller_verification_rejected' }
+        const flowTrigger = flowTriggerByStatus[newStatus]
+        if (flowTrigger) {
+          setImmediate(() => {
+            try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: flowTrigger, sellerUserId: r.rows[0].id }).catch(() => {}) } catch (_) {}
+          })
+        }
 
         // Sync product publish status (reuse existing logic pattern)
         if (newStatus === 'approved') {

@@ -1026,6 +1026,132 @@ async function runAutomationFlowsForOrder(opts) {
 }
 
 /**
+ * Seller lifecycle events (seller_signup, seller_docs_submitted, seller_verification_approved,
+ * seller_verification_rejected, seller_documents_required): the recipient IS the seller
+ * account itself, so this reads seller_users directly (real name/store name) instead of the
+ * store_customers-based runAutomationFlowsForCustomerEvent, which a seller's email usually
+ * doesn't match — that path would leave FIRST_NAME/STORE_NAME blank for seller-facing mail.
+ * @param {{ triggerKey: string, sellerUserId: string, dedupeKey?: string }} opts
+ */
+async function runAutomationFlowsForSellerEvent(opts) {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) {
+    logger.warn('[flow-automation] skip seller event: DATABASE_URL missing')
+    return
+  }
+  const triggerKey = String(opts.triggerKey || '').trim()
+  const sellerUserId = String(opts.sellerUserId || '').trim()
+  if (!triggerKey || !sellerUserId) return
+
+  let client
+  try {
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const useResend = resolveFlowMailProvider() === 'resend'
+    let transport = null
+    if (!useResend) {
+      transport = await getSmtpTransport(client)
+      if (!transport) {
+        logger.warn('[flow-automation] skip seller event: SMTP not configured')
+        return
+      }
+    } else if (!String(process.env.RESEND_API_KEY || '').trim()) {
+      logger.warn('[flow-automation] skip seller event: RESEND_API_KEY missing')
+      return
+    }
+
+    const sr = await client.query(
+      `SELECT id, email, first_name, last_name, store_name, company_name, seller_id, rejection_reason
+       FROM seller_users WHERE id = $1::uuid LIMIT 1`,
+      [sellerUserId],
+    )
+    const seller = sr.rows[0]
+    if (!seller || !seller.email) {
+      logger.warn(`[flow-automation] skip seller event ${triggerKey}: seller ${sellerUserId} not found or has no email`)
+      await client.end()
+      return
+    }
+
+    const platformRow = await client.query(
+      `SELECT storefront_url, platform_name, support_email FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
+    )
+    const platformName = String(platformRow.rows[0]?.platform_name || 'Andertal').trim() || 'Andertal'
+    const siteUrl = resolvePublicShopBaseUrl() || String(platformRow.rows[0]?.storefront_url || '').trim().replace(/\/$/, '')
+    const supportEmail = String(platformRow.rows[0]?.support_email || '').trim()
+    const sellercentralUrl = String(process.env.SELLERCENTRAL_PUBLIC_URL || '').trim().replace(/\/$/, '') || 'https://sellercentral.andertal.com'
+
+    const fn = String(seller.first_name || '').trim()
+    const ln = String(seller.last_name || '').trim()
+    const storeName = String(seller.store_name || seller.company_name || '').trim()
+    const fullName = [fn, ln].filter(Boolean).join(' ') || storeName || String(seller.email || '').trim()
+
+    const vars = {
+      CUSTOMER_NAME: fullName,
+      CUSTOMER: fullName,
+      FIRST_NAME: fn || fullName,
+      LAST_NAME: ln,
+      EMAIL: String(seller.email || '').trim(),
+      STORE_NAME: storeName || platformName,
+      SHOP_NAME: storeName || platformName,
+      PLATFORM_NAME: platformName,
+      SITE_URL: siteUrl || 'https://',
+      SUPPORT_EMAIL: supportEmail || String(seller.email || '').trim(),
+      SELLERCENTRAL_URL: sellercentralUrl,
+      SELLERCENTRAL_LOGIN_URL: `${sellercentralUrl}/login`,
+      REJECTION_REASON: String(seller.rejection_reason || ''),
+      IMPRESSUM_URL: absoluteStorefrontUrl(siteUrl, '/impressum'),
+      DATENSCHUTZ_URL: absoluteStorefrontUrl(siteUrl, '/datenschutz'),
+    }
+
+    const flowsR = await client.query(
+      `SELECT id FROM admin_hub_flows WHERE status = 'active' AND trigger_key = $1 ORDER BY updated_at ASC`,
+      [triggerKey],
+    )
+    const flowRows = flowsR.rows || []
+    if (!flowRows.length) {
+      await client.end()
+      return
+    }
+
+    let total = 0
+    for (const fr of flowRows) {
+      const sr2 = await client.query(
+        `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
+         FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
+        [fr.id],
+      )
+      const n = await sendImmediateStepsForFlow({
+        client,
+        transport,
+        rateScopeKey: 'seller_events',
+        flowId: fr.id,
+        audience: 'seller',
+        triggerKey,
+        steps: sr2.rows || [],
+        toEmail: seller.email,
+        templateLocale: 'de',
+        placeholderVars: vars,
+        orderId: '',
+        customerId: '',
+        dedupeKey: opts.dedupeKey || '',
+      })
+      total += n
+    }
+    await client.end()
+    if (total > 0) {
+      logger.info(`[flow-automation] ${triggerKey} seller=${seller.email}: sent ${total} email(s)`)
+    }
+  } catch (e) {
+    logger.error('[flow-automation] seller event failed', triggerKey, sellerUserId, e?.message || e)
+    if (client) {
+      try {
+        await client.end()
+      } catch (_) {}
+    }
+  }
+}
+
+/**
  * @param {{ triggerKey: string, customerId?: string, email?: string }} opts
  */
 async function runAutomationFlowsForCustomerEvent(opts) {
@@ -1598,6 +1724,7 @@ async function runProductWishlistWatchers() {
 module.exports = {
   runAutomationFlowsForOrder,
   runAutomationFlowsForCustomerEvent,
+  runAutomationFlowsForSellerEvent,
   runAutomationFlowsForMessageEvent,
   resolveEmailLocaleFromCountry,
   FLOW_EMAIL_LOCALES,

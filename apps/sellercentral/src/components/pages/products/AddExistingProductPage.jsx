@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import {
   Page,
@@ -118,6 +118,7 @@ function VariantRow({ v, isMatch }) {
 
 export default function AddExistingProductPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useT();
   const client = getMedusaAdminClient();
 
@@ -185,9 +186,25 @@ export default function AddExistingProductPage() {
     }
   }, [ean, productId, shopUrl, client]);
 
+  // Deep-linked from the "See other variations" button on the product edit page.
+  useEffect(() => {
+    const pid = searchParams?.get("product_id");
+    if (!pid) return;
+    setProductId(pid);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (productId && searchParams?.get("product_id") === productId) {
+      search();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
+
   const handleAdd = () => {
     if (!foundProduct?.id) return;
-    router.push(`/products/new?existing_id=${encodeURIComponent(foundProduct.id)}`);
+    const variantEan = matchedVariant ? String(matchedVariant.ean || matchedVariant.metadata?.ean || "").trim() : "";
+    const suffix = variantEan ? `&variant_ean=${encodeURIComponent(variantEan)}` : "";
+    router.push(`/products/new?existing_id=${encodeURIComponent(foundProduct.id)}${suffix}`);
   };
 
   const variants = Array.isArray(foundProduct?.variants) ? foundProduct.variants : [];

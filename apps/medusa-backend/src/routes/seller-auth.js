@@ -285,7 +285,7 @@ const sellerAuthRegisterPOST = async (req, res) => {
     if (!is_superuser && !sub_of_seller_id) {
       notifySuperusersNewSeller({ email: user.email, store_name: displayStoreName, seller_id: effectiveSellerId, first_name: user.first_name, last_name: user.last_name }).catch((e) => console.error('notifySuperusersNewSeller:', e.message))
       setImmediate(() => {
-        try { require('../flow-automation').runAutomationFlowsForCustomerEvent({ triggerKey: 'seller_signup', email: user.email }).catch(() => {}) } catch (_) {}
+        try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: 'seller_signup', sellerUserId: user.id }).catch(() => {}) } catch (_) {}
       })
     }
   } catch (err) {
