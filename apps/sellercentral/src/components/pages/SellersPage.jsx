@@ -71,7 +71,7 @@ function StatCard({ label, value, sub }) {
   );
 }
 
-function SellerTable({ rows, router, onImpersonate, locale, headers }) {
+function SellerTable({ rows, router, onImpersonate, onDelete, deletingId, locale, headers }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -119,6 +119,16 @@ function SellerTable({ rows, router, onImpersonate, locale, headers }) {
                   >
                     {lt(locale, "Log in as seller", "Satıcı olarak giriş", "Log in as seller", "Log in as seller", "Log in as seller", "Als Seller anmelden")}
                   </Button>
+                  <Button
+                    size="slim"
+                    tone="critical"
+                    variant="plain"
+                    loading={deletingId === seller.id}
+                    disabled={deletingId != null}
+                    onClick={(e) => { e.stopPropagation(); onDelete(seller); }}
+                  >
+                    {lt(locale, "Delete", "Sil", "Delete", "Delete", "Delete", "Löschen")}
+                  </Button>
                 </InlineStack>
               </td>
             </tr>
@@ -143,6 +153,28 @@ export default function SellersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [impersonateLoading, setImpersonateLoading] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleDelete = async (seller) => {
+    const label = seller.store_name || seller.email || seller.id;
+    if (!window.confirm(lt(locale,
+      `Delete seller "${label}"? This cannot be undone.`,
+      `"${label}" satıcısını sil? Bu işlem geri alınamaz.`,
+      `Delete seller "${label}"? This cannot be undone.`,
+      `Delete seller "${label}"? This cannot be undone.`,
+      `Delete seller "${label}"? This cannot be undone.`,
+      `Verkäufer „${label}" löschen? Dies kann nicht rückgängig gemacht werden.`,
+    ))) return;
+    setDeletingId(seller.id);
+    try {
+      await client.deleteSellerUser(seller.id);
+      setSellers((prev) => prev.filter((s) => s.id !== seller.id));
+    } catch (e) {
+      setError(userError(e, locale, "Delete failed"));
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleImpersonate = async (seller) => {
     setImpersonateLoading(seller.id);
@@ -291,7 +323,7 @@ export default function SellersPage() {
                         <Text as="p" tone="subdued" alignment="center">{lt(locale, "No superusers for these filters.", "Bu filtreler için süper kullanıcı yok.", "No superusers for these filters.", "No superusers for these filters.", "No superusers for these filters.", "Keine Superuser für diese Filter.")}</Text>
                       </Box>
                     ) : (
-                      <SellerTable rows={superusersFiltered} router={router} onImpersonate={handleImpersonate} locale={locale} headers={tableHeaders} />
+                      <SellerTable rows={superusersFiltered} router={router} onImpersonate={handleImpersonate} onDelete={handleDelete} deletingId={deletingId} locale={locale} headers={tableHeaders} />
                     )}
                   </Box>
                 </div>
@@ -308,7 +340,7 @@ export default function SellersPage() {
                         <Text as="p" tone="subdued" alignment="center">{lt(locale, "No sellers for these filters.", "Bu filtreler için satıcı yok.", "No sellers for these filters.", "No sellers for these filters.", "No sellers for these filters.", "Keine Verkäufer für diese Filter.")}</Text>
                       </Box>
                     ) : (
-                      <SellerTable rows={sellersFiltered} router={router} onImpersonate={handleImpersonate} locale={locale} headers={tableHeaders} />
+                      <SellerTable rows={sellersFiltered} router={router} onImpersonate={handleImpersonate} onDelete={handleDelete} deletingId={deletingId} locale={locale} headers={tableHeaders} />
                     )}
                   </Box>
                 </div>
