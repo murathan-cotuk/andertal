@@ -6,7 +6,7 @@ import {
   Box, Divider, Spinner, TextField, Tabs, Select,
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
-import { dateLocaleFor } from "@/lib/locale-text";
+import { dateLocaleFor, lt } from "@/lib/locale-text";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import FlowEmailBodyEditor, { htmlToPlainText } from "@/components/content/FlowEmailBodyEditor";

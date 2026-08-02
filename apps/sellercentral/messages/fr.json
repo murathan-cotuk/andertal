@@ -212,7 +212,7 @@
       "emailPlaceholder": "vous@exemple.fr",
       "password": "Mot de passe",
       "passwordPlaceholder": "Min. 6 caractères",
-      "agreeText": "J'ai lu et j'accepte les {terms} et la {privacy}.",
+      "agreeText": "J'ai lu et j'accepte les <terms>conditions d'utilisation</terms> et la <privacy>politique de confidentialité</privacy>.",
       "terms": "Conditions d'utilisation",
       "privacy": "Politique de confidentialité",
       "submit": "Créer un compte vendeur",

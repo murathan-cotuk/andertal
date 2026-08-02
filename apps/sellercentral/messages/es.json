@@ -212,7 +212,7 @@
       "emailPlaceholder": "tu@ejemplo.es",
       "password": "Contraseña",
       "passwordPlaceholder": "Mín. 6 caracteres",
-      "agreeText": "He leído y acepto los {terms} y la {privacy}.",
+      "agreeText": "He leído y acepto los <terms>Términos de servicio</terms> y la <privacy>Política de privacidad</privacy>.",
       "terms": "Términos de servicio",
       "privacy": "Política de privacidad",
       "submit": "Crear cuenta de vendedor",

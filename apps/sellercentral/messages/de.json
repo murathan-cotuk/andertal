@@ -212,7 +212,7 @@
       "emailPlaceholder": "sie@beispiel.de",
       "password": "Passwort",
       "passwordPlaceholder": "Min. 6 Zeichen",
-      "agreeText": "Ich habe {terms} sowie {privacy} gelesen und akzeptiere sie.",
+      "agreeText": "Ich habe die <terms>Nutzungsbedingungen</terms> sowie die <privacy>Datenschutzrichtlinie</privacy> gelesen und akzeptiere sie.",
       "terms": "die Nutzungsbedingungen",
       "privacy": "die Datenschutzrichtlinie",
       "submit": "Verkäufer-Konto erstellen",

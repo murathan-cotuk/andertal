@@ -212,7 +212,7 @@
       "emailPlaceholder": "siz@ornek.com",
       "password": "Şifre",
       "passwordPlaceholder": "En az 6 karakter",
-      "agreeText": "{terms} ve {privacy} okudum ve kabul ediyorum.",
+      "agreeText": "<terms>Kullanım Koşulları</terms> ve <privacy>Gizlilik Politikası</privacy>'nı okudum ve kabul ediyorum.",
       "terms": "Kullanım Koşulları",
       "privacy": "Gizlilik Politikası",
       "submit": "Satıcı Hesabı Oluştur",
