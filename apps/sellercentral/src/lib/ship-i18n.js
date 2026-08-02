@@ -82,6 +82,7 @@ export function getShipStrings(locale) {
       "Alle Bestellungen wurden bereits versendet oder es gibt keine offenen Bestellungen.",
     ),
     backToOrders: lt(loc, "Back to orders", "Siparişlere dön", "Retour aux commandes", "Volver a pedidos", "Torna agli ordini", "Zur Bestellübersicht"),
+    backToOrder: lt(loc, "Back to order", "Siparişe dön", "Retour à la commande", "Volver al pedido", "Torna all'ordine", "Zur Bestellung"),
     back: lt(loc, "← Back", "← Geri", "← Retour", "← Volver", "← Indietro", "← Zurück"),
     allShipped: lt(
       loc,
@@ -237,6 +238,16 @@ export function getShipStrings(locale) {
       "Salva tracking e segna spedito",
       "Tracking speichern & als versendet markieren",
     ),
+    missingLabelOrTrackingWarning: (n) =>
+      lt(
+        loc,
+        `${n} order${n !== 1 ? "s" : ""} still need${n === 1 ? "s" : ""} a purchased label or a manually entered tracking number before they can be marked as shipped.`,
+        `${n} sipariş, gönderildi olarak işaretlenmeden önce satın alınmış bir etiket veya manuel girilmiş bir takip numarasına ihtiyaç duyuyor.`,
+        `${n} commande${n !== 1 ? "s" : ""} nécessite${n !== 1 ? "nt" : ""} encore une étiquette achetée ou un numéro de suivi saisi manuellement avant de pouvoir être marquée${n !== 1 ? "s" : ""} comme expédiée${n !== 1 ? "s" : ""}.`,
+        `${n} pedido${n !== 1 ? "s" : ""} todavía necesita${n !== 1 ? "n" : ""} una etiqueta comprada o un número de seguimiento introducido manualmente antes de poder marcarse como enviado${n !== 1 ? "s" : ""}.`,
+        `${n} ordin${n !== 1 ? "i" : "e"} necessita${n !== 1 ? "no" : ""} ancora di un'etichetta acquistata o di un numero di tracciamento inserito manualmente prima di poter essere segnat${n !== 1 ? "i" : "o"} come spedit${n !== 1 ? "i" : "o"}.`,
+        `${n} Bestellung${n !== 1 ? "en" : ""} benötig${n !== 1 ? "en" : "t"} noch ein gekauftes Etikett oder eine manuell eingetragene Trackingnummer, bevor sie als versendet markiert werden ${n !== 1 ? "können" : "kann"}.`,
+      ),
   };
 }
 

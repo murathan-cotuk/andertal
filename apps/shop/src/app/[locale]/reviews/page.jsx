@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuthGuard, getToken } from "@andertal/lib";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { useRouter } from "@/i18n/navigation";
@@ -123,6 +124,8 @@ export default function ReviewsPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
   const { user, logout } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const orderParam = searchParams.get("order");
   const [orders, setOrders] = useState([]);
   const [reviews, setReviews] = useState({});
   const [loading, setLoading] = useState(true);
@@ -156,6 +159,13 @@ export default function ReviewsPage() {
   }, []);
 
   useEffect(() => { load(); }, [user?.id, load]);
+
+  // Deep-link from review-request emails ({REVIEW_URL} = /reviews?order=<id>) — jump straight
+  // to that order's review form instead of leaving the customer to find it in the list.
+  useEffect(() => {
+    if (!orderParam || loading) return;
+    if (orders.some((o) => o.id === orderParam)) setExpandedOrder(orderParam);
+  }, [orderParam, orders, loading]);
 
   const handleSaved = (rv) => {
     const key = `${rv.order_id}:${rv.product_id}`;

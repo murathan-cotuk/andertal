@@ -315,7 +315,7 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
               {loadingRates ? (
                 <><span style={{ width: 16, height: 16, border: "2px solid #9ca3af", borderTopColor: "#374151", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> {t("Loading shipping options…", "Kargo seçenekleri yükleniyor…", "Chargement des options…", "Cargando opciones de envío…", "Caricamento opzioni spedizione…", "Lade Versandoptionen…")}</>
               ) : (
-                <>{dimsChanged ? t("⟳ Update prices", "⟳ Fiyatları güncelle", "⟳ Mettre à jour les prix", "⟳ Actualizar precios", "⟳ Aggiorna prezzi", "⟳ Preise aktualisieren") : t("Fetch DHL shipping options", "DHL kargo seçeneklerini getir", "Obtenir options DHL", "Obtener opciones DHL", "Recupera opzioni DHL", "DHL-Versandoptionen abrufen")}</>
+                <>{dimsChanged ? t("⟳ Update prices", "⟳ Fiyatları güncelle", "⟳ Mettre à jour les prix", "⟳ Actualizar precios", "⟳ Aggiorna prezzi", "⟳ Preise aktualisieren") : t("Fetch shipping options", "Kargo seçeneklerini getir", "Obtenir les options d'expédition", "Obtener opciones de envío", "Recupera opzioni di spedizione", "Versandoptionen abrufen")}</>
               )}
             </button>
           </div>

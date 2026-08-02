@@ -484,6 +484,9 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     SHOP_HOME_URL: absoluteStorefrontUrl(baseSite, `${prefix}/`),
     ACCOUNT_URL: absoluteStorefrontUrl(baseSite, `${prefix}/account`),
     ORDER_DETAIL_URL: orderDetailUrl,
+    // Deep-links straight into the "write a review" page (apps/shop/.../reviews/page.jsx),
+    // pre-expanding this order via ?order= — not the product page, which has no review form.
+    REVIEW_URL: order.id ? absoluteStorefrontUrl(baseSite, `${prefix}/reviews?order=${encodeURIComponent(order.id)}`) : absoluteStorefrontUrl(baseSite, `${prefix}/reviews`),
     IMPRESSUM_URL: absoluteStorefrontUrl(baseSite, `${prefix}/impressum`),
     DATENSCHUTZ_URL: absoluteStorefrontUrl(baseSite, `${prefix}/datenschutz`),
     MARKET_COUNTRY: String(market || '').toUpperCase(),
@@ -569,6 +572,7 @@ async function placeholderVarsCustomerOnly(client, cust) {
     SHOP_HOME_URL: absPath(`${prefix}/`),
     ACCOUNT_URL: absPath(`${prefix}/account`),
     ORDER_DETAIL_URL: '',
+    REVIEW_URL: absPath(`${prefix}/reviews`),
     IMPRESSUM_URL: absPath(`${prefix}/impressum`),
     DATENSCHUTZ_URL: absPath(`${prefix}/datenschutz`),
     MARKET_COUNTRY: String(market || '').toUpperCase(),

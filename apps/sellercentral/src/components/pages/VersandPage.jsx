@@ -277,6 +277,17 @@ export default function VersandPage() {
     }
   };
 
+  // An order can only be marked shipped once it has either a purchased Sendcloud label or a
+  // manually entered tracking number — otherwise handleSaveAll silently skips it while the UI
+  // still moved on to the "done" screen, which looked like everything shipped when it hadn't.
+  const incompleteOrders = useMemo(
+    () =>
+      orders.filter(
+        (o) => !o.sendcloud_label_url && !o.tracking_number && !String(trackings[o.id] || "").trim(),
+      ),
+    [orders, trackings],
+  );
+
   const handleSaveAll = async () => {
     setSaving(true);
     const shippedAt = new Date().toISOString();
@@ -426,17 +437,28 @@ export default function VersandPage() {
         ))}
 
         <BlockStack gap="300">
+          {phase !== "done" && incompleteOrders.length > 0 && (
+            <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#92400e" }}>
+              {s.missingLabelOrTrackingWarning(incompleteOrders.length)}
+            </div>
+          )}
           <InlineStack gap="200" wrap>
             <Button onClick={handlePrintLieferscheinAll}>{s.printDeliveryNote}</Button>
           </InlineStack>
           <InlineStack gap="200" wrap>
             {phase !== "done" && (
-              <Button variant="primary" onClick={handleSaveAll} disabled={saving} loading={saving}>
+              <Button variant="primary" onClick={handleSaveAll} disabled={saving || incompleteOrders.length > 0} loading={saving}>
                 {s.saveManualShip}
               </Button>
             )}
-            <Button onClick={() => router.push(`/${locale}/orders`)}>
-              {s.backToOrders}
+            <Button
+              onClick={() =>
+                router.push(
+                  orders.length === 1 ? `/${locale}/orders/${orders[0].id}` : `/${locale}/orders`,
+                )
+              }
+            >
+              {orders.length === 1 ? s.backToOrder : s.backToOrders}
             </Button>
           </InlineStack>
         </BlockStack>

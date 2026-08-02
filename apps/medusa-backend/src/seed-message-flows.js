@@ -96,7 +96,7 @@ const FLOWS = [
         subject: 'Neue Kundennachricht',
         body: shell(`
     <p style="font-size:15px;color:#111827;">Hallo {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">du hast eine neue Nachricht von {CUSTOMER_NAME} ({CUSTOMER_EMAIL}) erhalten:</p>
+    <p style="font-size:14px;color:#374151;">Sie haben eine neue Nachricht von {CUSTOMER_NAME} ({CUSTOMER_EMAIL}) erhalten:</p>
     ${messageBox('Nachricht des Kunden')}
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Im Sellercentral-Posteingang antworten')}`),
       },
@@ -127,16 +127,16 @@ const FLOWS = [
       it: {
         subject: 'Nuovo messaggio dal cliente',
         body: shell(`
-    <p style="font-size:15px;color:#111827;">Ciao {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">hai ricevuto un nuovo messaggio da {CUSTOMER_NAME} ({CUSTOMER_EMAIL}):</p>
+    <p style="font-size:15px;color:#111827;">Gentile {SELLER_NAME},</p>
+    <p style="font-size:14px;color:#374151;">ha ricevuto un nuovo messaggio da {CUSTOMER_NAME} ({CUSTOMER_EMAIL}):</p>
     ${messageBox('Messaggio del cliente')}
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Rispondi nella posta in arrivo')}`),
       },
       es: {
         subject: 'Nuevo mensaje de un cliente',
         body: shell(`
-    <p style="font-size:15px;color:#111827;">Hola {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">has recibido un nuevo mensaje de {CUSTOMER_NAME} ({CUSTOMER_EMAIL}):</p>
+    <p style="font-size:15px;color:#111827;">Estimado equipo de {SELLER_NAME},</p>
+    <p style="font-size:14px;color:#374151;">ha recibido un nuevo mensaje de {CUSTOMER_NAME} ({CUSTOMER_EMAIL}):</p>
     ${messageBox('Mensaje del cliente')}
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Responder en la bandeja de entrada')}`),
       },
@@ -203,12 +203,12 @@ const FLOWS = [
     audience: 'seller',
     content: {
       de: {
-        subject: 'Deine Anfrage an den Support wurde empfangen',
+        subject: 'Ihre Anfrage an den Support wurde empfangen',
         body: shell(`
     <p style="font-size:15px;color:#111827;">Hallo {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">wir haben deine Anfrage erhalten. Hier ist eine Kopie zu deinen Unterlagen:</p>
-    ${messageBox('Deine Nachricht')}
-    <p style="font-size:14px;color:#374151;">Unser Support-Team meldet sich so schnell wie möglich bei dir.</p>
+    <p style="font-size:14px;color:#374151;">wir haben Ihre Anfrage erhalten. Hier ist eine Kopie für Ihre Unterlagen:</p>
+    ${messageBox('Ihre Nachricht')}
+    <p style="font-size:14px;color:#374151;">Unser Support-Team meldet sich so schnell wie möglich bei Ihnen.</p>
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Ticket im Sellercentral ansehen')}`),
       },
       en: {
@@ -239,21 +239,21 @@ const FLOWS = [
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Voir le ticket dans Sellercentral')}`),
       },
       it: {
-        subject: 'Abbiamo ricevuto la tua richiesta di supporto',
+        subject: 'Abbiamo ricevuto la Sua richiesta di supporto',
         body: shell(`
-    <p style="font-size:15px;color:#111827;">Ciao {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">abbiamo ricevuto la tua richiesta. Ecco una copia per i tuoi archivi:</p>
-    ${messageBox('Il tuo messaggio')}
-    <p style="font-size:14px;color:#374151;">Il nostro team di supporto ti risponderà il prima possibile.</p>
+    <p style="font-size:15px;color:#111827;">Gentile {SELLER_NAME},</p>
+    <p style="font-size:14px;color:#374151;">abbiamo ricevuto la Sua richiesta. Ecco una copia per i Suoi archivi:</p>
+    ${messageBox('Il Suo messaggio')}
+    <p style="font-size:14px;color:#374151;">Il nostro team di supporto Le risponderà il prima possibile.</p>
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Vedi il ticket in Sellercentral')}`),
       },
       es: {
-        subject: 'Hemos recibido tu solicitud de soporte',
+        subject: 'Hemos recibido su solicitud de soporte',
         body: shell(`
-    <p style="font-size:15px;color:#111827;">Hola {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">hemos recibido tu solicitud. Aquí tienes una copia para tus registros:</p>
-    ${messageBox('Tu mensaje')}
-    <p style="font-size:14px;color:#374151;">Nuestro equipo de soporte te responderá lo antes posible.</p>
+    <p style="font-size:15px;color:#111827;">Estimado equipo de {SELLER_NAME},</p>
+    <p style="font-size:14px;color:#374151;">hemos recibido su solicitud. Aquí tiene una copia para sus registros:</p>
+    ${messageBox('Su mensaje')}
+    <p style="font-size:14px;color:#374151;">Nuestro equipo de soporte le responderá lo antes posible.</p>
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Ver ticket en Sellercentral')}`),
       },
     },
@@ -264,10 +264,10 @@ const FLOWS = [
     audience: 'seller',
     content: {
       de: {
-        subject: 'Antwort auf deine Support-Anfrage',
+        subject: 'Antwort auf Ihre Support-Anfrage',
         body: shell(`
     <p style="font-size:15px;color:#111827;">Hallo {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">unser Support-Team hat auf dein Ticket geantwortet:</p>
+    <p style="font-size:14px;color:#374151;">unser Support-Team hat auf Ihr Ticket geantwortet:</p>
     ${messageBox('Antwort')}
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Im Sellercentral antworten')}`),
       },
@@ -296,18 +296,18 @@ const FLOWS = [
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Répondre dans Sellercentral')}`),
       },
       it: {
-        subject: 'Risposta alla tua richiesta di supporto',
+        subject: 'Risposta alla Sua richiesta di supporto',
         body: shell(`
-    <p style="font-size:15px;color:#111827;">Ciao {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">il nostro team di supporto ha risposto al tuo ticket:</p>
+    <p style="font-size:15px;color:#111827;">Gentile {SELLER_NAME},</p>
+    <p style="font-size:14px;color:#374151;">il nostro team di supporto ha risposto al Suo ticket:</p>
     ${messageBox('Risposta')}
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Rispondi in Sellercentral')}`),
       },
       es: {
-        subject: 'Respuesta a tu solicitud de soporte',
+        subject: 'Respuesta a su solicitud de soporte',
         body: shell(`
-    <p style="font-size:15px;color:#111827;">Hola {SELLER_NAME},</p>
-    <p style="font-size:14px;color:#374151;">nuestro equipo de soporte respondió a tu ticket:</p>
+    <p style="font-size:15px;color:#111827;">Estimado equipo de {SELLER_NAME},</p>
+    <p style="font-size:14px;color:#374151;">nuestro equipo de soporte respondió a su ticket:</p>
     ${messageBox('Respuesta')}
     ${button('{SELLERCENTRAL_INBOX_URL}', 'Responder en Sellercentral')}`),
       },
