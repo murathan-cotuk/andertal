@@ -236,7 +236,9 @@
       "Bash(curl -s \"https://api.github.com/repos/jtl-scx/channel-api-client/git/trees/master?recursive=1\")",
       "Bash(curl *)",
       "Bash(rm -f \"app/[locale]/content/brands/authorizations/page.jsx\" \"components/pages/admin/BrandAuthorizationsPage.jsx\")",
-      "Bash(rmdir \"app/[locale]/content/brands/authorizations\")"
+      "Bash(rmdir \"app/[locale]/content/brands/authorizations\")",
+      "Read(//tmp/**)",
+      "Bash(npm audit *)"
     ]
   }
 }

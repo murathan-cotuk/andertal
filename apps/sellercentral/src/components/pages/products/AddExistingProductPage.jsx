@@ -197,7 +197,6 @@ export default function AddExistingProductPage() {
     if (productId && searchParams?.get("product_id") === productId) {
       search();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId]);
 
   const handleAdd = () => {
