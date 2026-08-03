@@ -78,44 +78,58 @@ module.exports = function createSellerAccountRouter({
           [cleanIban, payment_account_holder || null, payment_bic || null, payment_bank_name || null, sellerId]
         )
 
-        // Create/update Stripe Custom account for IBAN payouts
+        // Create/update Stripe Custom account for IBAN payouts. Kept in its own try/catch so a
+        // Stripe-side rejection (e.g. missing KYC fields on the connected account, an implausible
+        // account holder name) surfaces its real, actionable message to the seller — previously
+        // any error here fell through to the generic catch below and came back as an opaque
+        // "technical issue" 500 with nothing to act on (see seller_error_logs HTTP_500 entries
+        // for PATCH /admin-hub/v1/seller/iban).
         if (cleanIban) {
           const platformRow = await loadPlatformCheckoutRow(client)
           const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
           if (secretKey) {
-            const stripeInst = new (require('stripe'))(secretKey)
-            const sellerRow = (await client.query('SELECT email, stripe_custom_account_id FROM seller_users WHERE seller_id = $1', [sellerId])).rows[0]
-            let customAccountId = sellerRow?.stripe_custom_account_id
-
-            if (!customAccountId) {
-              const acct = await stripeInst.accounts.create({
-                type: 'custom',
-                country: 'DE',
-                email: sellerRow?.email || sellerEmail,
-                capabilities: { transfers: { requested: true } },
-                tos_acceptance: { service_agreement: 'full', date: Math.floor(Date.now() / 1000), ip: req.ip || '127.0.0.1' },
-              })
-              customAccountId = acct.id
-              await client.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, sellerId])
-            }
-
-            // Replace external bank account with new IBAN
             try {
-              const existing = await stripeInst.accounts.listExternalAccounts(customAccountId, { object: 'bank_account', limit: 10 })
-              for (const ba of existing.data || []) {
-                await stripeInst.accounts.deleteExternalAccount(customAccountId, ba.id).catch(() => {})
+              const stripeInst = new (require('stripe'))(secretKey)
+              const sellerRow = (await client.query('SELECT email, store_name, stripe_custom_account_id FROM seller_users WHERE seller_id = $1', [sellerId])).rows[0]
+              let customAccountId = sellerRow?.stripe_custom_account_id
+
+              if (!customAccountId) {
+                const acct = await stripeInst.accounts.create({
+                  type: 'custom',
+                  country: 'DE',
+                  email: sellerRow?.email || sellerEmail,
+                  capabilities: { transfers: { requested: true } },
+                  tos_acceptance: { service_agreement: 'full', date: Math.floor(Date.now() / 1000), ip: req.ip || '127.0.0.1' },
+                })
+                customAccountId = acct.id
+                await client.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, sellerId])
               }
-            } catch (_) {}
-            await stripeInst.accounts.createExternalAccount(customAccountId, {
-              external_account: {
-                object: 'bank_account',
-                country: 'DE',
-                currency: 'eur',
-                account_number: cleanIban,
-                account_holder_name: payment_account_holder || 'Account Holder',
-                account_holder_type: 'individual',
-              },
-            })
+
+              // Replace external bank account with new IBAN
+              try {
+                const existing = await stripeInst.accounts.listExternalAccounts(customAccountId, { object: 'bank_account', limit: 10 })
+                for (const ba of existing.data || []) {
+                  await stripeInst.accounts.deleteExternalAccount(customAccountId, ba.id).catch(() => {})
+                }
+              } catch (_) {}
+              await stripeInst.accounts.createExternalAccount(customAccountId, {
+                external_account: {
+                  object: 'bank_account',
+                  country: 'DE',
+                  currency: 'eur',
+                  account_number: cleanIban,
+                  account_holder_name: payment_account_holder || sellerRow?.store_name || 'Account Holder',
+                  account_holder_type: 'individual',
+                },
+              })
+            } catch (stripeErr) {
+              await client.end()
+              // IBAN + payment fields were already saved above — only the Stripe payout wiring
+              // failed, so tell the seller specifically what Stripe rejected instead of a blanket 500.
+              return res.status(400).json({
+                message: `IBAN gespeichert, aber Stripe-Auszahlungskonto fehlgeschlagen: ${stripeErr?.message || 'Unbekannter Stripe-Fehler'}`,
+              })
+            }
           }
         }
 

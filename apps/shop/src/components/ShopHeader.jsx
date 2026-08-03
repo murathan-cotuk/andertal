@@ -1515,12 +1515,19 @@ export default function ShopHeader() {
             ? { position: "relative", top: "auto", left: "auto", right: "auto" }
             : {}),
           ...(headerScopeCssVars || {}),
+          // The safe-area strip (::before, fills the OS status-bar area on notched phones) must
+          // always paint with the EXACT same background value the header surface below it uses —
+          // never a solid tint extracted from it. Extraction is for <meta name="theme-color">
+          // only (browsers require a flat color there); a real CSS box can render the full
+          // gradient/rgba value directly, so using anything else here creates a visible seam or,
+          // when extraction finds no plain hex in the gradient (e.g. an rgba() overlay on a hero
+          // image), falls through to black/transparent — the exact bug reported on mobile.
           ...(mobileFrostedScrollActive
             ? {
                 background: mc.frosted_bg || "rgba(255,255,255,0.92)",
                 backdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
                 WebkitBackdropFilter: backdropBlurFromToken(mc.frosted_blur || "16px"),
-                "--narrow-header-safe-fill": mc.frosted_bg || computedHeaderSolidColor,
+                "--narrow-header-safe-fill": mc.frosted_bg || "rgba(255,255,255,0.92)",
               }
             : unifiedHeaderAtTop
               ? {
@@ -1529,11 +1536,11 @@ export default function ShopHeader() {
                     : !isNarrowViewport
                       ? { background: "var(--header-chrome-bg)" }
                       : {}),
-                  "--narrow-header-safe-fill": landingHeaderBg
-                    ? extractSolidTintFromChromeCss(landingHeaderBg, computedHeaderSolidColor)
-                    : headerScopeCssVars?.["--header-chrome-bg"] ||
-                      headerScopeCssVars?.["--header-bg"] ||
-                      computedHeaderSolidColor,
+                  "--narrow-header-safe-fill":
+                    landingHeaderBg ||
+                    headerScopeCssVars?.["--header-chrome-bg"] ||
+                    headerScopeCssVars?.["--header-bg"] ||
+                    computedHeaderSolidColor,
                 }
               : {
                   "--narrow-header-safe-fill":
