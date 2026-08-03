@@ -2190,6 +2190,10 @@ async function start() {
     const createNotificationsRouter = require('./src/routes/notifications')
     httpApp.use('/', createNotificationsRouter())
 
+    // --- Personalization (product-view tracking + 15-algorithm recommendation engine): src/routes/personalization.js ---
+    const { createPersonalizationRouter } = require('./src/routes/personalization')
+    httpApp.use('/', createPersonalizationRouter())
+
     // --- Messages (admin-hub + store + templates) + SMTP settings/senders: extracted to src/routes/messages.js ---
     // getSmtpTransport is also used elsewhere in this file (automations, flow test-email, seller invitations).
     const { createMessagesRouter, getSmtpTransport } = require('./src/routes/messages')

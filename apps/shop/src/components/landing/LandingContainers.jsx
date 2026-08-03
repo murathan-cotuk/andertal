@@ -1209,72 +1209,12 @@ function PersonalizedProductRow({ container, locale = "de" }) {
 
     async function load() {
       try {
-        if (algorithm === "recently_viewed") {
-          let viewed = [];
-          try { viewed = JSON.parse(localStorage.getItem("andertal_recently_viewed") || "[]"); } catch { viewed = []; }
-          if (!Array.isArray(viewed) || viewed.length === 0) { if (!cancelled) setProducts([]); return; }
-          const handles = viewed.map((v) => v?.handle).filter(Boolean).slice(0, 8);
-          const results = await Promise.all(
-            handles.map((h) =>
-              fetch(`/api/store-products/${encodeURIComponent(h)}`, { cache: "no-store" })
-                .then((r) => r.ok ? r.json() : null)
-                .then((d) => d?.product || null)
-                .catch(() => null)
-            )
-          );
-          if (!cancelled) setProducts(results.filter(Boolean));
-          return;
-        }
-
-        if (algorithm === "reorder") {
-          const token = typeof localStorage !== "undefined" ? localStorage.getItem("andertal_customer_token") : null;
-          if (!token) { if (!cancelled) setProducts([]); return; }
-          const res = await fetch(`/api/personalized-products?algorithm=reorder&limit=8`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          });
-          const data = res.ok ? await res.json() : { products: [] };
-          if (!cancelled) setProducts(Array.isArray(data?.products) ? data.products : []);
-          return;
-        }
-
-        if (algorithm === "also_bought" || algorithm === "trending_for_you") {
-          let viewed = [];
-          try { viewed = JSON.parse(localStorage.getItem("andertal_recently_viewed") || "[]"); } catch { viewed = []; }
-          const viewedHandles = (Array.isArray(viewed) ? viewed : []).map((v) => v?.handle).filter(Boolean);
-
-          // Fetch recently-viewed products to collect their category slugs
-          const productDetails = await Promise.all(
-            viewedHandles.slice(0, 5).map((h) =>
-              fetch(`/api/store-products/${encodeURIComponent(h)}`, { cache: "no-store" })
-                .then((r) => r.ok ? r.json() : null)
-                .then((d) => d?.product || null)
-                .catch(() => null)
-            )
-          );
-          const validProducts = productDetails.filter(Boolean);
-          const categorySlugs = [...new Set(
-            validProducts.flatMap((p) => [
-              ...(p.categories || []).map((cat) => cat.handle || cat.slug).filter(Boolean),
-              ...(p.collection ? [p.collection.handle].filter(Boolean) : []),
-            ])
-          )];
-
-          if (categorySlugs.length === 0) { if (!cancelled) setProducts([]); return; }
-          const qs = new URLSearchParams({
-            algorithm,
-            categories: categorySlugs.join(","),
-            exclude: viewedHandles.join(","),
-            limit: "8",
-          });
-          const res = await fetch(`/api/personalized-products?${qs}`, { cache: "no-store" });
-          const data = res.ok ? await res.json() : { products: [] };
-          if (!cancelled) setProducts(Array.isArray(data?.products) ? data.products : []);
-          return;
-        }
-
-        // top_picks (default)
-        const res = await fetch(`/api/personalized-products?algorithm=top_picks&limit=8`, { cache: "no-store" });
+        const token = typeof localStorage !== "undefined" ? localStorage.getItem("andertal_customer_token") : null;
+        const qs = new URLSearchParams({ algorithm, limit: String(Math.max(4, visibleCount * 2)) });
+        const res = await fetch(`/api/personalized-products?${qs}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          cache: "no-store",
+        });
         const data = res.ok ? await res.json() : { products: [] };
         if (!cancelled) setProducts(Array.isArray(data?.products) ? data.products : []);
       } catch {
@@ -1284,7 +1224,7 @@ function PersonalizedProductRow({ container, locale = "de" }) {
 
     load();
     return () => { cancelled = true; };
-  }, [algorithm]);
+  }, [algorithm, visibleCount]);
 
   if (products === undefined) {
     return (

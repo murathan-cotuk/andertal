@@ -1116,6 +1116,17 @@ export default function ProductTemplateMobile() {
       list.unshift(entry);
       localStorage.setItem("andertal_recently_viewed", JSON.stringify(list.slice(0, 20)));
     } catch (_) {}
+    // Server-side view log — see ProductTemplate.jsx (desktop) for the same tracking call.
+    try {
+      const token = localStorage.getItem("andertal_customer_token");
+      if (token && product.id) {
+        fetch("/api/personalization-view", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ product_id: product.id }),
+        }).catch(() => {});
+      }
+    } catch (_) {}
   }, [product?.id]);
 
   useEffect(() => {

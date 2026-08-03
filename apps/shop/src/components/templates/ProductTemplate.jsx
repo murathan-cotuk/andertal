@@ -1072,6 +1072,19 @@ export default function ProductTemplate() {
       list.unshift(entry);
       localStorage.setItem("andertal_recently_viewed", JSON.stringify(list.slice(0, 20)));
     } catch (_) {}
+    // Server-side view log (store_customer_product_views) — only for logged-in customers, so
+    // "recently viewed" / "trending in your categories" personalization works across devices,
+    // not just in this one browser's localStorage.
+    try {
+      const token = localStorage.getItem("andertal_customer_token");
+      if (token && product.id) {
+        fetch("/api/personalization-view", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ product_id: product.id }),
+        }).catch(() => {});
+      }
+    } catch (_) {}
   }, [product?.id]);
 
   useEffect(() => {
