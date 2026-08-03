@@ -374,10 +374,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
-  // Save/approve/reject errors render in a banner at the top of the page — without this the user
-  // can be scrolled deep into a long product form and never see why the action failed.
+  // Save/approve/reject errors (and success banners like change-request) render at the top —
+  // scroll up so the seller always sees them on long product forms.
   useEffect(() => {
-    if (message.type !== "error" || !message.text) return;
+    if (!message.text || (message.type !== "error" && message.type !== "success")) return;
     const scrollEl = typeof document !== "undefined" ? document.querySelector(".andertal-scroll-wrapper") : null;
     if (scrollEl) scrollEl.scrollTo({ top: 0, behavior: "smooth" });
     else if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
@@ -965,6 +965,35 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       : locale === "it"
       ? "Questo prodotto è già stato aggiunto al catalogo da un altro venditore. Non puoi modificare direttamente titolo, descrizione, immagini e altri campi condivisi — al salvataggio la richiesta di modifica viene inviata al nostro team. Inserisci tu prezzo, SKU e spedizione."
       : "This product was already added to the catalog by another seller. You cannot directly change the title, description, images, or other shared catalog fields — when you save, a change request is sent to our team for review. Enter your own price, SKU, and shipping method.";
+
+  // After create→redirect, show green success banner from query flag
+  useEffect(() => {
+    if (isNew) return;
+    const cr = searchParams?.get("change_request");
+    const cl = searchParams?.get("catalog_listing");
+    if (cr === "1") {
+      setMessage({ type: "success", text: changeRequestSubmittedMsg });
+    } else if (cl === "1") {
+      setMessage({
+        type: "success",
+        text: locale === "tr"
+          ? "Mevcut katalog ürününe listing eklendi. Ortak alanlar (isim, açıklama vb.) doğrudan değişmez."
+          : locale === "de"
+          ? "Listing zum bestehenden Katalogprodukt hinzugefügt. Gemeinsame Felder ändern sich nicht direkt."
+          : "Listing added to the existing catalog product. Shared fields are not changed directly.",
+      });
+    } else {
+      return;
+    }
+    if (typeof window !== "undefined" && window.history?.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("change_request");
+      url.searchParams.delete("catalog_listing");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  // only on mount / when landing with these flags
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNew, searchParams]);
 
   // Per-country pricing for the currently editing country
   const currentCountryConf = PRODUCT_COUNTRIES_MAP[editingCountry] || PRODUCT_COUNTRIES_MAP["DE"];
