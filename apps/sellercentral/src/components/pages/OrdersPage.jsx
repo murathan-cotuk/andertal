@@ -920,7 +920,7 @@ export default function OrdersPage() {
   // "Versenden" starts the packaging-center flow: scan items → package size → DHL label purchase.
   const startPacking = (ordersToShip) => {
     sessionStorage.setItem("versand_orders", JSON.stringify(ordersToShip));
-    router.push(`/${locale}/versand`);
+    router.push(`/${locale}/shipping`);
   };
 
   const handleColSort = (sortKey) => {

@@ -558,7 +558,13 @@ export default function OrderDetailPage() {
   const returnWithLabel = returns.find(r => r.label_url) || null;
 
   const blockedStatuses = ["storniert", "cancelled", "refunded", "retoure", "retoure_anfrage"];
-  const canReturn = !activeReturn && !blockedStatuses.includes(status);
+  // Mirrors the backend's 14-day window (store-checkout.js storeReturnRequestPOST) so the
+  // button itself disappears once the deadline has passed, instead of only failing after
+  // the customer fills in and submits the return modal.
+  const returnWindowExpired = order.delivery_date
+    ? (Date.now() - new Date(order.delivery_date).getTime()) / (1000 * 60 * 60 * 24) > 14
+    : false;
+  const canReturn = !activeReturn && !blockedStatuses.includes(status) && !returnWindowExpired;
   const canCancel = !!order.cancellation_allowed && !cancelBusy;
 
   const handleCancel = async () => {

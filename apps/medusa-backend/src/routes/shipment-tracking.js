@@ -528,15 +528,20 @@ module.exports = function createShipmentTrackingRouter({
         const markup = 1 + (Number(sc.markup_pct) || 5) / 100
         const weightKg = weightG / 1000
         const rates = []
+        // Superuser-only diagnostic: lets us see exactly what Sendcloud returned for each DHL
+        // method's weight bracket without needing server-log access, since the account may
+        // simply not have differentiated min/max_weight configured per method.
+        const debugMethods = []
         for (const method of methods) {
           // Platform ships via DHL only for now — other carriers stay hidden until
           // seller-owned carrier integrations are wired up.
           const carrierKey = String(method.carrier || method.name || '').toLowerCase()
           if (!carrierKey.includes('dhl')) continue
-          const minW = method.min_weight != null ? Number(method.min_weight) : null
-          const maxW = method.max_weight != null ? Number(method.max_weight) : null
-          if (minW != null && weightKg < minW) continue
-          if (maxW != null && weightKg > maxW) continue
+          const minW = method.min_weight != null && method.min_weight !== '' ? Number(method.min_weight) : null
+          const maxW = method.max_weight != null && method.max_weight !== '' ? Number(method.max_weight) : null
+          if (isSuperuser) debugMethods.push({ id: method.id, name: method.name, carrier: method.carrier, min_weight: method.min_weight, max_weight: method.max_weight })
+          if (minW != null && !Number.isNaN(minW) && minW > 0 && weightKg < minW) continue
+          if (maxW != null && !Number.isNaN(maxW) && maxW > 0 && weightKg > maxW) continue
           const countryEntry = (method.countries || []).find((c) => (c.iso_2 || '').toUpperCase() === toCountry)
           if (!countryEntry) continue
           const price = countryEntry.price
@@ -570,7 +575,7 @@ module.exports = function createShipmentTrackingRouter({
             context: JSON.stringify({ order_id: id, endpoint: 'label/rates', to_country: toCountry, weight_g: weightG, methods_count: methods.length }),
           })
         }
-        res.json({ rates, to_country: toCountry, markup_pct: sc.markup_pct })
+        res.json({ rates, to_country: toCountry, markup_pct: sc.markup_pct, ...(isSuperuser ? { debug_dhl_methods: debugMethods } : {}) })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         return respondSellerSystemError(req, res, {

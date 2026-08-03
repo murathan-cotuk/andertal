@@ -83,7 +83,10 @@ function RateCard({ rate, selected, onClick, locale }) {
         <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rate.name}</div>
         {(hasWeight || rate.delivery_days) && (
           <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-            {hasWeight && <span>{rate.max_weight != null ? `${upTo} ${(rate.max_weight / 1000).toLocaleString(numLoc, { maximumFractionDigits: 1 })} kg` : ""}</span>}
+            {/* Sendcloud returns min/max_weight already in kg (e.g. "23.001"), not grams —
+                a stray /1000 here used to shrink every real value down to ~0, always showing
+                "up to 0 kg" regardless of the actual bracket. */}
+            {hasWeight && <span>{rate.max_weight != null && Number(rate.max_weight) > 0 ? `${upTo} ${Number(rate.max_weight).toLocaleString(numLoc, { maximumFractionDigits: 1 })} kg` : ""}</span>}
             {rate.delivery_days && <span style={{ marginLeft: hasWeight ? 8 : 0 }}>· {rate.delivery_days}</span>}
           </div>
         )}

@@ -79,6 +79,15 @@ function isOwnInventoryProduct(product, mySellerId) {
   return s === String(mySellerId || "").trim();
 }
 
+// A product a seller listed (but didn't originally create — e.g. an already-existing
+// catalog product) has `created_at` from the ORIGINAL owner, not from when this seller
+// added it. `seller_listing_created_at` (populated server-side only for this viewing
+// seller) reflects when THEY actually added it, so "recently added" sorts correctly
+// even for products they didn't create first.
+function effectiveAddedAt(product) {
+  return product?.seller_listing_created_at || product?.created_at || 0;
+}
+
 function sortProductsList(list, locale, sortKey) {
   const arr = [...(list || [])];
   if (sortKey === "title_desc") {
@@ -92,9 +101,9 @@ function sortProductsList(list, locale, sortKey) {
   } else if (sortKey === "price_asc") {
     arr.sort((a, b) => Number(a?.price ?? 0) - Number(b?.price ?? 0));
   } else if (sortKey === "created_desc") {
-    arr.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    arr.sort((a, b) => new Date(effectiveAddedAt(b)) - new Date(effectiveAddedAt(a)));
   } else if (sortKey === "created_asc") {
-    arr.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    arr.sort((a, b) => new Date(effectiveAddedAt(a)) - new Date(effectiveAddedAt(b)));
   } else {
     arr.sort((a, b) => getLocalizedTitle(a, locale).localeCompare(getLocalizedTitle(b, locale), undefined, { sensitivity: "base" }));
   }

@@ -143,11 +143,18 @@ const listAdminHubProductsDb = async (query = {}) => {
     const status = (query.status || '').trim()
     const collectionId = (query.collection_id || '').toString().trim()
     const skuFilter = (query.sku || '').toString().trim()
-    let sql = 'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at FROM admin_hub_products'
+    // When scoped to a seller, a product they listed (but didn't create — e.g. an already-
+    // existing catalog product) has a `created_at` from the ORIGINAL owner, not from when
+    // this seller added it. `seller_listing_created_at` exposes that seller's own listing
+    // date so the frontend can sort "my most recently added" correctly for non-owners too.
+    let sql = 'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at' +
+      (sellerId ? ', (SELECT MAX(_sl2.created_at) FROM admin_hub_seller_listings _sl2 WHERE _sl2.product_id = admin_hub_products.id AND TRIM(_sl2.seller_id) = $1) AS seller_listing_created_at' : '') +
+      ' FROM admin_hub_products'
     const params = []
     const where = []
     if (sellerId) {
-      const p = params.length + 1
+      params.push(sellerId)
+      const p = params.length
       where.push(
         '(' +
           'seller_id = $' + p +
@@ -159,7 +166,6 @@ const listAdminHubProductsDb = async (query = {}) => {
           ')' +
         ')'
       )
-      params.push(sellerId)
     }
     if (status) { where.push('status = $' + (params.length + 1)); params.push(status) }
     if (collectionId) {
@@ -198,6 +204,7 @@ const listAdminHubProductsDb = async (query = {}) => {
         price_cents: r.price_cents, inventory: r.inventory != null ? r.inventory : 0,
         thumbnail, metadata: r.metadata, variants: r.variants,
         created_at: r.created_at, updated_at: r.updated_at,
+        seller_listing_created_at: r.seller_listing_created_at || null,
       }
     })
   } catch (e) {
@@ -652,11 +659,15 @@ const adminHubProductsPOST = async (req, res) => {
         } else {
           const priceCents = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
           const inventory = parseInt(body.inventory, 10) || 0
+          // Price/inventory/SKU are seller-owned listing fields (see SELLER_LISTING_FIELDS
+          // below) — they must never require superuser approval. sku used to be dropped here
+          // silently (missing from this INSERT) even though the seller entered one.
+          const skuVal = (body.sku || '').toString().trim() || null
           // New cross-seller listings start as 'draft' so they never appear live/in the buy box
           // until the seller (or superuser review) activates them explicitly.
           const lr = await lc.query(
-            'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-            [masterProduct.id, effectiveSellerId, priceCents || masterProduct.price_cents || 0, inventory, 'draft']
+            'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+            [masterProduct.id, effectiveSellerId, priceCents || masterProduct.price_cents || 0, inventory, 'draft', skuVal]
           )
           listing = lr.rows[0]
           newListingCreated = true

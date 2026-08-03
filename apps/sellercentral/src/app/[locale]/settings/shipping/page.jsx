@@ -753,12 +753,12 @@ export default function ShippingSettingsPage() {
               <Text tone="subdued" as="p">
                 {lt(
                   locale,
-                  "Most USB barcode scanners act as a keyboard — no driver needed. These settings control how the scan field on the /versand packing screen behaves.",
-                  "Çoğu USB barkod tarayıcı klavye gibi çalışır — sürücü gerekmez. Bu ayarlar /versand paketleme ekranındaki tarama kutusunun davranışını belirler.",
-                  "La plupart des scanners USB fonctionnent comme un clavier — aucun pilote requis. Ces réglages contrôlent le champ de scan sur l'écran /versand.",
-                  "La mayoría de escáneres USB funcionan como un teclado — no requieren driver. Estos ajustes controlan el campo de escaneo en /versand.",
-                  "La maggior parte degli scanner USB funziona come una tastiera — nessun driver necessario. Queste impostazioni controllano il campo di scansione in /versand.",
-                  "Die meisten USB-Barcode-Scanner verhalten sich wie eine Tastatur — kein Treiber nötig. Diese Einstellungen steuern das Scan-Feld auf der /versand-Packseite.",
+                  "Most USB barcode scanners act as a keyboard — no driver needed. These settings control how the scan field on the /shipping packing screen behaves.",
+                  "Çoğu USB barkod tarayıcı klavye gibi çalışır — sürücü gerekmez. Bu ayarlar /shipping paketleme ekranındaki tarama kutusunun davranışını belirler.",
+                  "La plupart des scanners USB fonctionnent comme un clavier — aucun pilote requis. Ces réglages contrôlent le champ de scan sur l'écran /shipping.",
+                  "La mayoría de escáneres USB funcionan como un teclado — no requieren driver. Estos ajustes controlan el campo de escaneo en /shipping.",
+                  "La maggior parte degli scanner USB funziona come una tastiera — nessun driver necessario. Queste impostazioni controllano il campo di scansione in /shipping.",
+                  "Die meisten USB-Barcode-Scanner verhalten sich wie eine Tastatur — kein Treiber nötig. Diese Einstellungen steuern das Scan-Feld auf der /shipping-Packseite.",
                 )}
               </Text>
             </BlockStack>
