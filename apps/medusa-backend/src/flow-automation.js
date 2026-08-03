@@ -191,6 +191,15 @@ async function getSmtpTransport(client) {
   })
 }
 
+/** Recipient for "admin" audience flows (Content → Flows) — configured in Settings → Platform,
+ * distinct from support_email (the customer-facing contact shown inside email bodies). */
+async function resolveAdminNotificationEmail(client) {
+  const r = await client.query(
+    `SELECT admin_notification_email FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
+  )
+  return String(r.rows[0]?.admin_notification_email || '').trim() || 'info@andertal.com'
+}
+
 function buildFlowStepIdempotencyKey({ triggerKey, flowId, stepOrder, audience, recipientEmail, orderId, customerId, dedupeKey }) {
   const raw = [
     String(triggerKey || '').trim().toLowerCase(),
@@ -972,10 +981,12 @@ async function runAutomationFlowsForOrder(opts) {
         .filter((sid) => sid && sid !== 'default'),
     )]
 
+    let adminEmail = ''
     let totalEmails = 0
     for (const fr of flowRows) {
       const flowId = fr.id
-      const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
+      const audRaw = String(fr.audience || 'customer').toLowerCase()
+      const audience = audRaw === 'seller' ? 'seller' : audRaw === 'admin' ? 'admin' : 'customer'
 
       const sr = await client.query(
         `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
@@ -984,10 +995,12 @@ async function runAutomationFlowsForOrder(opts) {
       )
       const steps = sr.rows || []
 
-      if (audience === 'customer') {
-        const toEmail = String(ctx.order.email || '').trim()
+      if (audience === 'customer' || audience === 'admin') {
+        const toEmail = audience === 'admin'
+          ? (adminEmail || (adminEmail = await resolveAdminNotificationEmail(client)))
+          : String(ctx.order.email || '').trim()
         if (!toEmail) {
-          logger.warn(`[flow-automation] skip flow ${flowId} (customer): order has no email`)
+          logger.warn(`[flow-automation] skip flow ${flowId} (${audience}): no recipient`)
           continue
         }
         const n = await sendImmediateStepsForFlow({
@@ -999,7 +1012,7 @@ async function runAutomationFlowsForOrder(opts) {
           triggerKey,
           steps,
           toEmail,
-          templateLocale: customerLocale,
+          templateLocale: audience === 'admin' ? 'de' : customerLocale,
           placeholderVars,
           orderId,
           customerId: ctx.order.customer_id ? String(ctx.order.customer_id) : '',
@@ -1137,7 +1150,7 @@ async function runAutomationFlowsForSellerEvent(opts) {
     }
 
     const flowsR = await client.query(
-      `SELECT id FROM admin_hub_flows WHERE status = 'active' AND trigger_key = $1 ORDER BY updated_at ASC`,
+      `SELECT id, audience FROM admin_hub_flows WHERE status = 'active' AND trigger_key = $1 ORDER BY updated_at ASC`,
       [triggerKey],
     )
     const flowRows = flowsR.rows || []
@@ -1146,8 +1159,19 @@ async function runAutomationFlowsForSellerEvent(opts) {
       return
     }
 
+    let adminEmail = ''
     let total = 0
     for (const fr of flowRows) {
+      const audience = String(fr.audience || 'seller').toLowerCase() === 'admin' ? 'admin' : 'seller'
+      let toEmail = seller.email
+      if (audience === 'admin') {
+        if (!adminEmail) adminEmail = await resolveAdminNotificationEmail(client)
+        toEmail = adminEmail
+        if (!toEmail) {
+          logger.warn(`[flow-automation] skip flow ${fr.id} (admin): no admin notification email configured (Settings → Platform)`)
+          continue
+        }
+      }
       const sr2 = await client.query(
         `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
          FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
@@ -1158,10 +1182,10 @@ async function runAutomationFlowsForSellerEvent(opts) {
         transport,
         rateScopeKey: 'seller_events',
         flowId: fr.id,
-        audience: 'seller',
+        audience,
         triggerKey,
         steps: sr2.rows || [],
-        toEmail: seller.email,
+        toEmail,
         templateLocale: 'de',
         placeholderVars: vars,
         orderId: '',
@@ -1298,9 +1322,18 @@ async function runAutomationFlowsForCustomerEvent(opts) {
     const flowRows = flowsR.rows || []
     if (!flowRows.length) return
 
+    let adminEmail = ''
     let total = 0
     for (const fr of flowRows) {
-      const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
+      const audRaw = String(fr.audience || 'customer').toLowerCase()
+      const audience = audRaw === 'seller' ? 'seller' : audRaw === 'admin' ? 'admin' : 'customer'
+      const recipientEmail = audience === 'admin'
+        ? (adminEmail || (adminEmail = await resolveAdminNotificationEmail(client)))
+        : toEmail
+      if (!recipientEmail) {
+        logger.warn(`[flow-automation] skip flow ${fr.id} (${audience}): no recipient`)
+        continue
+      }
       const sr = await client.query(
         `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
          FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
@@ -1314,8 +1347,8 @@ async function runAutomationFlowsForCustomerEvent(opts) {
         audience,
         triggerKey,
         steps: sr.rows || [],
-        toEmail,
-        templateLocale: locale,
+        toEmail: recipientEmail,
+        templateLocale: audience === 'admin' ? 'de' : locale,
         placeholderVars: vars,
         orderId: '',
         customerId: cust.id ? String(cust.id) : '',
@@ -1387,9 +1420,15 @@ async function runAutomationFlowsForMessageEvent(opts) {
       return 0
     }
 
+    // Note: messaging triggers are always called with a single recipient already resolved by
+    // the caller (messages.js — the customer, or a specific seller). "Admin" audience isn't
+    // meaningful here yet (no caller path routes these to the admin inbox); an admin-audience
+    // flow on one of these triggers is simply skipped rather than silently mis-sent.
     let total = 0
     for (const fr of flowRows) {
-      const audience = String(fr.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
+      const audRaw = String(fr.audience || 'customer').toLowerCase()
+      if (audRaw === 'admin') continue
+      const audience = audRaw === 'seller' ? 'seller' : 'customer'
       const sr = await client.query(
         `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
          FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,

@@ -15,7 +15,12 @@ export function readSellerIsSuperuser() {
   return localStorage.getItem("sellerIsSuperuser") === "true";
 }
 
-const TECHNICAL_DETAIL_RE = /sendcloud|stripe|api.?key|nicht konfiguriert|not configured|versandoptionen gefunden|shipping.?option/i;
+// Deliberately narrow to the specific integrations (Sendcloud/Stripe/DHL rates) whose raw error
+// text can leak sensitive config detail (API keys, account status) — a bare "not configured" /
+// "api key" match used to also swallow unrelated errors from completely different subsystems
+// (e.g. "DB not configured", "RESEND_API_KEY missing") behind the same generic message, hiding
+// the real, more diagnosable cause for no reason.
+const TECHNICAL_DETAIL_RE = /sendcloud|stripe.{0,20}(api.?key|not configured|nicht konfiguriert)|versandoptionen gefunden|shipping.?option/i;
 
 /** Show API detail to superusers only; sellers always get the generic technical message. */
 export function resolveSellerFacingError(err, locale, isSuperuser) {

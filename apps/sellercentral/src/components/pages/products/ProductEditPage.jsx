@@ -992,7 +992,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       window.history.replaceState({}, "", url.pathname + url.search);
     }
   // only on mount / when landing with these flags
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew, searchParams]);
 
   // Per-country pricing for the currently editing country

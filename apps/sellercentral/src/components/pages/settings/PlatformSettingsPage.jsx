@@ -31,6 +31,7 @@ export default function PlatformSettingsPage() {
 
   const [platformName, setPlatformName] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [adminNotificationEmail, setAdminNotificationEmail] = useState("");
   const [storeName, setStoreName] = useState("");
   const [storefrontUrl, setStorefrontUrl] = useState("");
 
@@ -44,13 +45,15 @@ export default function PlatformSettingsPage() {
       const d = await getMedusaAdminClient().getSellerSettings("default");
       const pn = d?.platform_name || "";
       const se = d?.support_email || "";
+      const ae = d?.admin_notification_email || "";
       const sn = d?.store_name || "";
       const su = d?.storefront_url || "";
       setPlatformName(pn);
       setSupportEmail(se);
+      setAdminNotificationEmail(ae);
       setStoreName(sn);
       setStorefrontUrl(su);
-      setSnapshot(JSON.stringify({ pn, se, sn, su }));
+      setSnapshot(JSON.stringify({ pn, se, ae, sn, su }));
     } catch (e) {
       setErr(userError(e, locale, t("Loading failed.", "Yükleme başarısız.", "Échec du chargement.", "Error de carga.", "Caricamento non riuscito.", "Laden fehlgeschlagen.")));
     } finally {
@@ -66,7 +69,7 @@ export default function PlatformSettingsPage() {
 
   const isDirty =
     snapshot !== null &&
-    snapshot !== JSON.stringify({ pn: platformName, se: supportEmail, sn: storeName, su: storefrontUrl });
+    snapshot !== JSON.stringify({ pn: platformName, se: supportEmail, ae: adminNotificationEmail, sn: storeName, su: storefrontUrl });
 
   const save = async () => {
     setSaving(true);
@@ -78,6 +81,7 @@ export default function PlatformSettingsPage() {
         store_name: storeName.trim(),
         platform_name: platformName.trim(),
         support_email: supportEmail.trim(),
+        admin_notification_email: adminNotificationEmail.trim(),
         storefront_url: storefrontUrl.trim(),
       });
       setOk(t("Settings saved.", "Ayarlar kaydedildi.", "Paramètres enregistrés.", "Configuración guardada.", "Impostazioni salvate.", "Einstellungen gespeichert."));
@@ -94,6 +98,7 @@ export default function PlatformSettingsPage() {
     const s = JSON.parse(snapshot);
     setPlatformName(s.pn);
     setSupportEmail(s.se);
+    setAdminNotificationEmail(s.ae);
     setStoreName(s.sn);
     setStorefrontUrl(s.su);
     setErr("");
@@ -170,6 +175,22 @@ export default function PlatformSettingsPage() {
                     "Se muestra como dirección de contacto en el texto del correo ({SUPPORT_EMAIL}) — NO cambia la dirección del remitente. Para eso, ve a Ajustes → Integraciones → SMTP.",
                     "Mostrata come indirizzo di contatto nel testo dell'email ({SUPPORT_EMAIL}) — NON cambia l'indirizzo del mittente. Per farlo, vai su Impostazioni → Integrazioni → SMTP.",
                     "Wird als Kontaktadresse im E-Mail-Text angezeigt ({SUPPORT_EMAIL}) — ändert NICHT die Absenderadresse. Dafür: Einstellungen → Integrationen → SMTP.",
+                  )}
+                />
+                <TextField
+                  label={t("Admin notification email", "Yönetici bildirim e-postası", "E-mail de notification admin", "Correo de notificación de administrador", "Email di notifica amministratore", "Admin-Benachrichtigungs-E-Mail")}
+                  value={adminNotificationEmail}
+                  onChange={setAdminNotificationEmail}
+                  type="email"
+                  placeholder="info@andertal.com"
+                  autoComplete="off"
+                  helpText={t(
+                    "Where 'Admin' audience flows in Content → Flows are sent (e.g. new seller signups).",
+                    "Content → Flows'ta 'Admin' hedef kitleli akışların gönderileceği adres (örn. yeni satıcı kayıtları).",
+                    "Adresse d'envoi des flux à destination 'Admin' dans Content → Flows (ex. inscriptions de nouveaux vendeurs).",
+                    "Dirección de envío de los flujos con destinatario 'Admin' en Content → Flows (p. ej. nuevos registros de vendedores).",
+                    "Indirizzo di invio dei flussi con destinatario 'Admin' in Content → Flows (es. nuove registrazioni venditori).",
+                    "Adresse, an die 'Admin'-Flows in Content → Flows gesendet werden (z. B. neue Verkäufer-Anmeldungen).",
                   )}
                 />
                 <TextField

@@ -71,6 +71,9 @@ const tByLocale = (l) => {
       optional: "Opsiyonel",
       submit: "Doğrulama için gönder",
       saving: "Kaydediliyor...",
+      saveDraft: "Kaydet",
+      savingDraft: "Kaydediliyor...",
+      saveDraftOk: "İlerlemeniz kaydedildi. Daha sonra devam edebilirsiniz.",
       needAgreement: "Devam etmek için sözleşme onayı gerekli.",
       needDocs: "Ticaret sicil belgesi ve kimlik/pasaport yüklemelisiniz.",
       saveOk: "Bilgiler kaydedildi ve doğrulama süreci başlatıldı.",
@@ -145,6 +148,9 @@ const tByLocale = (l) => {
       optional: "Optional",
       submit: "Zur Verifizierung senden",
       saving: "Wird gespeichert...",
+      saveDraft: "Speichern",
+      savingDraft: "Wird gespeichert...",
+      saveDraftOk: "Fortschritt gespeichert. Du kannst später weitermachen.",
       needAgreement: "Bitte bestätige zuerst die rechtliche Vereinbarung.",
       needDocs: "Bitte lade Handelsregisterauszug und Ausweis/Reisepass hoch.",
       saveOk: "Daten gespeichert und zur Verifizierung eingereicht.",
@@ -219,6 +225,9 @@ const tByLocale = (l) => {
       optional: "Optionnel",
       submit: "Soumettre pour vérification",
       saving: "Enregistrement...",
+      saveDraft: "Enregistrer",
+      savingDraft: "Enregistrement...",
+      saveDraftOk: "Progression enregistrée. Vous pouvez continuer plus tard.",
       needAgreement: "Veuillez accepter l'accord légal pour continuer.",
       needDocs: "Veuillez télécharger l'extrait du registre du commerce et la pièce d'identité.",
       saveOk: "Enregistré avec succès et soumis pour vérification.",
@@ -293,6 +302,9 @@ const tByLocale = (l) => {
       optional: "Opcional",
       submit: "Enviar para verificación",
       saving: "Guardando...",
+      saveDraft: "Guardar",
+      savingDraft: "Guardando...",
+      saveDraftOk: "Progreso guardado. Puede continuar más tarde.",
       needAgreement: "Por favor, acepte el acuerdo legal para continuar.",
       needDocs: "Por favor, cargue el extracto del registro mercantil y el DNI/Pasaporte.",
       saveOk: "Guardado correctamente y enviado para verificación.",
@@ -367,6 +379,9 @@ const tByLocale = (l) => {
       optional: "Opzionale",
       submit: "Invia per la verifica",
       saving: "Salvataggio in corso...",
+      saveDraft: "Salva",
+      savingDraft: "Salvataggio in corso...",
+      saveDraftOk: "Progresso salvato. Puoi continuare più tardi.",
       needAgreement: "Per favore, accetta l'accordo legale per continuare.",
       needDocs: "Per favore, carica la visura camerale e il documento d'identità.",
       saveOk: "Salvato con successo e inviato per la verifica.",
@@ -440,6 +455,9 @@ const tByLocale = (l) => {
     optional: "Optional",
     submit: "Submit for verification",
     saving: "Saving...",
+    saveDraft: "Save",
+    savingDraft: "Saving...",
+    saveDraftOk: "Progress saved. You can continue later.",
     needAgreement: "Please accept the legal agreement to continue.",
     needDocs: "Please upload trade register extract and ID/Passport.",
     saveOk: "Saved successfully and submitted for verification.",
@@ -1098,6 +1116,7 @@ export default function VerificationSettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [status, setStatus] = useState("registered");
@@ -1278,6 +1297,47 @@ export default function VerificationSettingsPage() {
       setError(e?.message || "Upload failed.");
     } finally {
       setUploadingDocType(null);
+    }
+  };
+
+  // Saves whatever fields are currently filled in, with none of the "everything required"
+  // checks below — a seller may want to fill this out over several sessions. It never calls
+  // startVerification(), so the approval pipeline only actually starts via the separate
+  // "Submit for verification" button once every required field is complete.
+  const saveDraft = async () => {
+    setError("");
+    setSuccess("");
+    setSavingDraft(true);
+    try {
+      const documents = DOC_TYPES.map((dt) => form.docs[dt]).filter(Boolean);
+      const fullPhone = form.phone.trim() ? `${phoneDialCode}${form.phone.trim()}` : "";
+      await client.updateSellerCompanyInfo({
+        company_name: form.companyName.trim() || null,
+        authorized_person_name: form.authorizedPersonName.trim() || null,
+        tax_id: form.taxId.trim() || null,
+        vat_id: form.vatId.trim() || null,
+        lucid_number: form.lucidNumber.trim() || null,
+        phone: fullPhone || null,
+        business_address: {
+          street: form.street.trim() || null,
+          city: form.city.trim() || null,
+          postal_code: form.postalCode.trim() || null,
+          country: form.country.trim() || null,
+        },
+        documents,
+      });
+      await client.updateSellerIban(form.iban.trim() || null);
+      setSuccess(t.saveDraftOk);
+      setInitialSnapshot(snapshotFrom(form, agreementAccepted, phoneDialCode));
+    } catch (e) {
+      const rawMsg = String(e?.message || "");
+      if (rawMsg.toLowerCase().includes("invalid input syntax for type json")) {
+        setError(t.invalidFormatError);
+      } else {
+        setError(e?.message || "Save failed.");
+      }
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -1660,9 +1720,12 @@ export default function VerificationSettingsPage() {
             />
           </Card>
 
-          {/* Submit */}
-          <InlineStack align="end">
-            <Button variant="primary" onClick={saveVerification} loading={saving}>
+          {/* Save (keeps whatever's filled so far) + Submit (requires everything) */}
+          <InlineStack align="end" gap="200">
+            <Button onClick={saveDraft} loading={savingDraft} disabled={saving}>
+              {savingDraft ? t.savingDraft : t.saveDraft}
+            </Button>
+            <Button variant="primary" onClick={saveVerification} loading={saving} disabled={savingDraft}>
               {saving ? t.saving : t.submit}
             </Button>
           </InlineStack>

@@ -160,9 +160,11 @@ const T = {
     audienceLabel: "Recipients",
     audienceCustomer: "Customers",
     audienceSeller: "Sellers",
+    audienceAdmin: "Admin",
     filterAll: "All",
     filterCustomer: "Customer flows",
     filterSeller: "Seller flows",
+    filterAdmin: "Admin flows",
     templateLangLabel: "Template language",
     translateBtn: "Translate to other languages",
     translating: "Translating…",
@@ -301,9 +303,11 @@ const T = {
     audienceLabel: "Empfänger",
     audienceCustomer: "Kundinnen & Kunden",
     audienceSeller: "Seller",
+    audienceAdmin: "Admin",
     filterAll: "Alle",
     filterCustomer: "Kunden-Flows",
     filterSeller: "Seller-Flows",
+    filterAdmin: "Admin-Flows",
     templateLangLabel: "Vorlagen-Sprache",
     translateBtn: "In andere Sprachen übersetzen",
     translating: "Übersetzen…",
@@ -442,9 +446,11 @@ const T = {
     audienceLabel: "Alıcılar",
     audienceCustomer: "Müşteriler",
     audienceSeller: "Satıcılar",
+    audienceAdmin: "Yönetici",
     filterAll: "Tümü",
     filterCustomer: "Müşteri akışları",
     filterSeller: "Satıcı akışları",
+    filterAdmin: "Yönetici akışları",
     templateLangLabel: "Şablon dili",
     translateBtn: "Diğer dillere çevir",
     translating: "Çevriliyor…",
@@ -583,9 +589,11 @@ const T = {
     audienceLabel: "Destinataires",
     audienceCustomer: "Clients",
     audienceSeller: "Vendeurs",
+    audienceAdmin: "Admin",
     filterAll: "Tous",
     filterCustomer: "Flux clients",
     filterSeller: "Flux vendeurs",
+    filterAdmin: "Flux admin",
     templateLangLabel: "Langue du modèle",
     translateBtn: "Traduire vers les autres langues",
     translating: "Traduction…",
@@ -724,9 +732,11 @@ const T = {
     audienceLabel: "Destinatari",
     audienceCustomer: "Clienti",
     audienceSeller: "Seller",
+    audienceAdmin: "Admin",
     filterAll: "Tutti",
     filterCustomer: "Flussi clienti",
     filterSeller: "Flussi seller",
+    filterAdmin: "Flussi admin",
     templateLangLabel: "Lingua modello",
     translateBtn: "Traduci nelle altre lingue",
     translating: "Traduzione…",
@@ -864,9 +874,11 @@ const T = {
     audienceLabel: "Destinatarios",
     audienceCustomer: "Clientes",
     audienceSeller: "Vendedores",
+    audienceAdmin: "Administrador",
     filterAll: "Todos",
     filterCustomer: "Flujos cliente",
     filterSeller: "Flujos vendedor",
+    filterAdmin: "Flujos admin",
     templateLangLabel: "Idioma de plantilla",
     translateBtn: "Traducir a otros idiomas",
     translating: "Traduciendo…",
@@ -1089,8 +1101,9 @@ export default function FlowsPage() {
     () => [
       { label: t.audienceCustomer, value: "customer" },
       { label: t.audienceSeller, value: "seller" },
+      { label: t.audienceAdmin, value: "admin" },
     ],
-    [t.audienceCustomer, t.audienceSeller],
+    [t.audienceCustomer, t.audienceSeller, t.audienceAdmin],
   );
 
   const templateLangSelectOptions = useMemo(
@@ -1130,6 +1143,9 @@ export default function FlowsPage() {
     }
     if (flowAudienceFilter === "seller") {
       return flows.filter((f) => String(f.audience || "") === "seller");
+    }
+    if (flowAudienceFilter === "admin") {
+      return flows.filter((f) => String(f.audience || "") === "admin");
     }
     return flows;
   }, [flows, flowAudienceFilter]);
@@ -1836,6 +1852,9 @@ export default function FlowsPage() {
                 <Button size="slim" pressed={flowAudienceFilter === "seller"} onClick={() => setFlowAudienceFilter("seller")}>
                   {t.filterSeller}
                 </Button>
+                <Button size="slim" pressed={flowAudienceFilter === "admin"} onClick={() => setFlowAudienceFilter("admin")}>
+                  {t.filterAdmin}
+                </Button>
               </InlineStack>
               {filteredFlows.length === 0 ? (
                 <Card>
@@ -1847,7 +1866,9 @@ export default function FlowsPage() {
                 const statusLabel = t.statuses[flow.status] ?? flow.status;
                 const badgeTone   = statusBadgeTone[flow.status] ?? "default";
                 const isToggling  = togglingId === flow.id;
-                const audSeller = String(flow.audience || "") === "seller";
+                const flowAudience = String(flow.audience || "customer");
+                const audienceLabel = flowAudience === "seller" ? t.audienceSeller : flowAudience === "admin" ? t.audienceAdmin : t.audienceCustomer;
+                const audienceTone = flowAudience === "seller" ? "attention" : flowAudience === "admin" ? "critical" : "info";
                 return (
                   <Card key={flow.id}>
                     <InlineStack align="space-between" blockAlign="center" wrap={false}>
@@ -1855,7 +1876,7 @@ export default function FlowsPage() {
                         <InlineStack gap="200" blockAlign="center" wrap>
                           <Text as="h2" variant="headingSm">{flow.name}</Text>
                           <Badge tone={badgeTone}>{statusLabel}</Badge>
-                          <Badge tone={audSeller ? "attention" : "info"}>{audSeller ? t.audienceSeller : t.audienceCustomer}</Badge>
+                          <Badge tone={audienceTone}>{audienceLabel}</Badge>
                         </InlineStack>
                         <Text as="p" variant="bodySm" tone="subdued">
                           {t.trigger}: {t.triggers[flow.trigger] ?? flow.trigger}

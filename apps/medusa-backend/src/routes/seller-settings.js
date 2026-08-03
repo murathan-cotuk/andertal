@@ -92,7 +92,7 @@ const sellerSettingsGET = async (req, res) => {
     try {
       const r = await client.query(
         `SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url,
-                shop_logo_height, sellercentral_logo_height, platform_name, support_email, storefront_url,
+                shop_logo_height, sellercentral_logo_height, platform_name, support_email, admin_notification_email, storefront_url,
                 announcement_bar_items, logo_config, barcode_scanner_config,
                 legal_company_name, legal_representative, legal_street, legal_city,
                 legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email
@@ -113,6 +113,7 @@ const sellerSettingsGET = async (req, res) => {
       const sellercentral_logo_height = row && row.sellercentral_logo_height != null ? Number(row.sellercentral_logo_height) : 30
       const platform_name = row && row.platform_name ? String(row.platform_name) : ''
       const support_email = row && row.support_email ? String(row.support_email) : ''
+      const admin_notification_email = row && row.admin_notification_email ? String(row.admin_notification_email) : ''
       const storefront_url = row && row.storefront_url ? String(row.storefront_url) : ''
       let announcement_bar_items = row && row.announcement_bar_items != null ? row.announcement_bar_items : []
       if (typeof announcement_bar_items === 'string') {
@@ -138,7 +139,7 @@ const sellerSettingsGET = async (req, res) => {
       res.json({
         store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url,
         sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height,
-        platform_name, support_email, storefront_url, announcement_bar_items, logo_config, barcode_scanner_config,
+        platform_name, support_email, admin_notification_email, storefront_url, announcement_bar_items, logo_config, barcode_scanner_config,
         legal_company_name: row?.legal_company_name || '',
         legal_representative: row?.legal_representative || '',
         legal_street: row?.legal_street || '',
@@ -179,6 +180,7 @@ const sellerSettingsPATCH = async (req, res) => {
       ? Math.max(20, Math.min(120, Number(body.sellercentral_logo_height) || 30)) : undefined
     const platform_name = body.platform_name !== undefined ? (body.platform_name ? String(body.platform_name).trim() : null) : undefined
     const support_email = body.support_email !== undefined ? (body.support_email ? String(body.support_email).trim() : null) : undefined
+    const admin_notification_email = body.admin_notification_email !== undefined ? (body.admin_notification_email ? String(body.admin_notification_email).trim() : null) : undefined
     const storefront_url = body.storefront_url !== undefined ? (body.storefront_url ? String(body.storefront_url).trim().replace(/\/$/, '') : null) : undefined
     const announcement_bar_items = body.announcement_bar_items !== undefined
       ? (Array.isArray(body.announcement_bar_items) ? body.announcement_bar_items : null) : undefined
@@ -210,9 +212,9 @@ const sellerSettingsPATCH = async (req, res) => {
     await client.query(
       `INSERT INTO admin_hub_seller_settings (
          seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, logo_config,
-         legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcode_scanner_config,
+         legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcode_scanner_config, admin_notification_email,
          updated_at
-       ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, now())
+       ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, now())
        ON CONFLICT (seller_id) DO UPDATE SET
          store_name = COALESCE($2, admin_hub_seller_settings.store_name),
          free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -237,9 +239,10 @@ const sellerSettingsPATCH = async (req, res) => {
          legal_tax_id = COALESCE($22, admin_hub_seller_settings.legal_tax_id),
          legal_email = COALESCE($23, admin_hub_seller_settings.legal_email),
          barcode_scanner_config = COALESCE($24::jsonb, admin_hub_seller_settings.barcode_scanner_config),
+         admin_notification_email = COALESCE($25, admin_hub_seller_settings.admin_notification_email),
          updated_at = now()`,
       [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url, logoConfigJson !== undefined ? logoConfigJson : null,
-       legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcodeConfigJson !== undefined ? barcodeConfigJson : null]
+       legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcodeConfigJson !== undefined ? barcodeConfigJson : null, admin_notification_email]
     )
     await client.end()
     _log.info('[sellerSettingsPATCH] saved OK')

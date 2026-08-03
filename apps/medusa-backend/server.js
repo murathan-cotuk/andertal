@@ -814,6 +814,10 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sellercentral_logo_height integer DEFAULT 30`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS platform_name text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS support_email text`).catch(() => {})
+        // Recipient for "admin" audience flows (Content → Flows) — e.g. new-seller-signup
+        // notifications to the platform team, distinct from support_email (customer-facing contact).
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS admin_notification_email text`).catch(() => {})
+        await client.query(`UPDATE admin_hub_seller_settings SET admin_notification_email = 'info@andertal.com' WHERE seller_id = 'default' AND admin_notification_email IS NULL`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS announcement_bar_items jsonb`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS logo_config jsonb`).catch(() => {})
         await client.query(`
