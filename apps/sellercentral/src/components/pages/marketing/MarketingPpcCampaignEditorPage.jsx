@@ -416,6 +416,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
   const [expandedProductId, setExpandedProductId] = useState(null);
   const [keywordInput, setKeywordInput] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [pushing, setPushing] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -494,10 +495,31 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     });
   };
 
+  // A "parent" product only groups its variant-family children in Sellercentral (metadata.
+  // master_product_id on each child points back to it) — selecting the parent for a campaign
+  // should include every child, since the parent itself isn't a sellable/orderable product.
+  const childrenByParentId = useMemo(() => {
+    const map = {};
+    for (const p of products) {
+      const parentId = p?.metadata?.master_product_id ? String(p.metadata.master_product_id).trim() : "";
+      if (!parentId) continue;
+      if (!map[parentId]) map[parentId] = [];
+      map[parentId].push(p.id);
+    }
+    return map;
+  }, [products]);
+
   const toggleProduct = (id) => {
     setForm((prev) => {
       const ids = new Set(prev.product_ids);
-      if (ids.has(id)) ids.delete(id); else ids.add(id);
+      const children = childrenByParentId[id] || [];
+      if (ids.has(id)) {
+        ids.delete(id);
+        for (const cid of children) ids.delete(cid);
+      } else {
+        ids.add(id);
+        for (const cid of children) ids.add(cid);
+      }
       return { ...prev, product_ids: Array.from(ids) };
     });
   };
@@ -671,6 +693,29 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
     }
   };
 
+  const handlePush = async () => {
+    if (!campaignId) return;
+    if (!Array.isArray(form.ad_platforms) || form.ad_platforms.length === 0) {
+      setMsg({ tone: "warning", text: mc.noAdPlatformsSelected });
+      return;
+    }
+    setPushing(true);
+    setMsg(null);
+    try {
+      const r = await getMedusaAdminClient().publishCampaign(campaignId);
+      if (r?.warning) {
+        setMsg({ tone: "critical", text: r.warning });
+      } else {
+        setMsg({ tone: "success", text: mc.pushSuccess });
+      }
+      await load();
+    } catch (e) {
+      setMsg({ tone: "critical", text: e?.message || mc.pushError });
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const handlePayAndSubmit = async () => {
     if (!campaignId) return;
     const budgetEuro = parseFloat(form.budget_daily_cents);
@@ -738,6 +783,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
       subtitle={undefined}
       backAction={{ content: mc.backToOverview, url: "/marketing/campaigns" }}
       primaryAction={{ content: mc.save, onAction: save, loading: saving }}
+      secondaryActions={
+        campaignId && Array.isArray(form.ad_platforms) && form.ad_platforms.length > 0
+          ? [{ content: mc.pushToAds, onAction: handlePush, loading: pushing }]
+          : []
+      }
     >
       <div style={{ background: shell.pageBg, margin: "-16px -16px 0", paddingBottom: 48 }}>
         {sellerExperience && (

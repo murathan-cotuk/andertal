@@ -246,6 +246,8 @@
     "submitError": "Erreur lors de l'envoi",
     "cancelButton": "Annuler",
     "messageModalTitle": "Message — n° {number}",
+    "messageProductPickPrompt": "De quoi s'agit-il ? Choisissez le produit concerné par votre message.",
+    "messageChangeProduct": "Changer de produit",
     "noMessagesYet": "Aucun message pour cette commande",
     "messagePlaceholder": "Votre message…",
     "sendButton": "Envoyer",

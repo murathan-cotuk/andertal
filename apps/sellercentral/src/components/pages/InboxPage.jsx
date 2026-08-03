@@ -338,6 +338,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
     try {
       await client.sendMessage({
         order_id: selected.order_id || undefined,
+        product_id: selected.product_id || undefined,
         body: bodyOut,
         subject: selected.order_number ? `Re: ${locale === "en" ? "Order" : locale === "tr" ? "Sipariş" : locale === "fr" ? "Commande" : locale === "es" ? "Pedido" : locale === "it" ? "Ordine" : "Bestellung"} #${selected.order_number}` : ui.message,
         locale,

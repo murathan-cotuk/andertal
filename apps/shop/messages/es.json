@@ -246,6 +246,8 @@
     "submitError": "Error al enviar",
     "cancelButton": "Cancelar",
     "messageModalTitle": "Mensaje — n.º {number}",
+    "messageProductPickPrompt": "¿Sobre qué producto es? Elige el producto sobre el que quieres escribir.",
+    "messageChangeProduct": "Cambiar producto",
     "noMessagesYet": "Aún no hay mensajes para este pedido",
     "messagePlaceholder": "Tu mensaje…",
     "sendButton": "Enviar",

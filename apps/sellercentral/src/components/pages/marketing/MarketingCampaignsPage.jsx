@@ -43,7 +43,7 @@ function buildGoogleAdsUrl(customerId, externalIds) {
   return base;
 }
 
-function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPause, onResume, actionLoading, googleAdsCustomerId, locale, ui, mc }) {
+function CampaignRow({ campaign, isSuperuser, canControl, onEdit, onDelete, onPublish, onPause, onResume, actionLoading, googleAdsCustomerId, locale, ui, mc }) {
   const adStatus = campaign.ad_status || "draft";
   const customerStatus = campaign.status || "draft";
   const platforms = parseJsonIdArray(campaign.ad_platforms);
@@ -52,6 +52,7 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
   const hasGoogleAds = platforms.includes("google_ads");
   const externalIds = (() => { try { return typeof campaign.external_campaign_ids === "string" ? JSON.parse(campaign.external_campaign_ids) : (campaign.external_campaign_ids || {}); } catch { return {}; } })();
   const activePlatformLabels = getActivePlatformLabels(externalIds);
+  const missingPlatforms = platforms.filter((p) => !externalIds[p]);
 
   let myStatusLabel = adStatusLabelForLocale(locale, adStatus) || adStatus;
   let myStatusTone = AD_STATUS_TONE[adStatus] || "info";
@@ -87,17 +88,17 @@ function CampaignRow({ campaign, isSuperuser, onEdit, onDelete, onPublish, onPau
           </Text>
         </BlockStack>
         <InlineStack gap="200" wrap>
-          {isSuperuser && adStatus === "draft" && (
+          {canControl && platforms.length > 0 && missingPlatforms.length > 0 && (
             <Button size="slim" tone="success" onClick={() => onPublish(campaign.id)} loading={actionLoading === campaign.id + "_publish"}>
-              {ui.publish}
+              {adStatus === "draft" ? ui.publish : mc.pushToAds}
             </Button>
           )}
-          {isSuperuser && adStatus === "published" && (
+          {canControl && adStatus === "published" && (
             <Button size="slim" onClick={() => onPause(campaign.id)} loading={actionLoading === campaign.id + "_pause"}>
               {mc.pause}
             </Button>
           )}
-          {isSuperuser && adStatus === "paused" && (
+          {canControl && adStatus === "paused" && (
             <Button size="slim" tone="success" onClick={() => onResume(campaign.id)} loading={actionLoading === campaign.id + "_resume"}>
               {mc.resume}
             </Button>
@@ -435,6 +436,7 @@ export default function MarketingCampaignsPage() {
                       key={c.id}
                       campaign={c}
                       isSuperuser={isSuperuser}
+                      canControl
                       onEdit={goEdit}
                       onDelete={remove}
                       onPublish={handlePublish}
@@ -466,6 +468,7 @@ export default function MarketingCampaignsPage() {
                           key={c.id}
                           campaign={c}
                           isSuperuser={isSuperuser}
+                          canControl={isSuperuser}
                           onEdit={goEdit}
                           onDelete={remove}
                           onPublish={handlePublish}

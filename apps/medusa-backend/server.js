@@ -1215,6 +1215,10 @@ async function start() {
         await client.query(`ALTER TABLE store_messages ADD COLUMN IF NOT EXISTS channel varchar(20) DEFAULT 'customer';`).catch(() => {})
         await client.query(`ALTER TABLE store_messages ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE store_messages ADD COLUMN IF NOT EXISTS is_read_by_support boolean NOT NULL DEFAULT false;`).catch(() => {})
+        // Which order item this message is about — an order can mix products from several real
+        // sellers, so the customer must pick exactly one product per message and it must route
+        // only to that product's seller, never to every seller who happens to share the order.
+        await client.query(`ALTER TABLE store_messages ADD COLUMN IF NOT EXISTS product_id text;`).catch(() => {})
         // Seller onboarding / approval fields
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS approval_status varchar(30) DEFAULT 'registered';`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS company_name varchar(255) DEFAULT NULL;`).catch(() => {})

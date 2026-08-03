@@ -1316,6 +1316,12 @@ class MedusaAdminClient {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/transactions${qs}`)
   }
+  async createManualAdjustment(data) {
+    return this.request('/admin-hub/v1/transactions/manual-adjustment', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async deleteManualAdjustment(id) {
+    return this.request(`/admin-hub/v1/transactions/manual-adjustment/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
   async getPayouts(params = {}) {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/payouts${qs}`)

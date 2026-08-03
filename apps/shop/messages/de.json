@@ -263,6 +263,8 @@
     "submitError": "Fehler beim Absenden",
     "cancelButton": "Abbrechen",
     "messageModalTitle": "Nachricht — #{number}",
+    "messageProductPickPrompt": "Worum geht es? Bitte wähle das Produkt aus, zu dem du eine Nachricht schreiben möchtest.",
+    "messageChangeProduct": "Produkt ändern",
     "noMessagesYet": "Noch keine Nachrichten zu dieser Bestellung",
     "messagePlaceholder": "Deine Nachricht…",
     "sendButton": "Senden",

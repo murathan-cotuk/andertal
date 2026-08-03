@@ -276,6 +276,56 @@ module.exports = function createTransactionsRouter({
       }
     }
 
+    // POST /admin-hub/v1/transactions/manual-adjustment — superuser adds a manual credit/debit
+    // entry to a seller's ledger (e.g. a goodwill credit or a manual correction) — reuses the
+    // same seller_ledger_adjustments table as shipping-label charges, shown alongside them.
+    const adminHubManualAdjustmentPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const { seller_id, amount_cents, note } = req.body || {}
+      const sellerId = String(seller_id || '').trim()
+      const amountCents = Math.round(Number(amount_cents))
+      if (!sellerId) return res.status(400).json({ message: 'seller_id required' })
+      if (!Number.isFinite(amountCents) || amountCents === 0) return res.status(400).json({ message: 'amount_cents must be a non-zero number' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `INSERT INTO seller_ledger_adjustments (seller_id, type, amount_cents, description_key, description_params)
+           VALUES ($1, 'manual_adjustment', $2, 'manual_note', $3::jsonb)
+           RETURNING *`,
+          [sellerId, amountCents, JSON.stringify({ note: String(note || '').trim(), by: req.sellerUser?.email || null })],
+        )
+        await client.end()
+        res.status(201).json({ adjustment: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // DELETE /admin-hub/v1/transactions/manual-adjustment/:id — superuser removes a manual entry
+    // they added. Restricted to type='manual_adjustment' so this can never delete a real
+    // shipping-label charge record (those must stay for the seller's own billing history).
+    const adminHubManualAdjustmentDELETE = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `DELETE FROM seller_ledger_adjustments WHERE id = $1::uuid AND type = 'manual_adjustment' RETURNING id`,
+          [req.params.id],
+        )
+        await client.end()
+        if (!r.rows[0]) return res.status(404).json({ message: 'Not found (or not a manual adjustment)' })
+        res.json({ deleted: true })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // GET /admin-hub/v1/commission-invoices — billing tab: lists seller_payouts as commission invoices
     const adminHubCommissionInvoicesGET = async (req, res) => {
       const client = getDbClient()
@@ -402,6 +452,8 @@ module.exports = function createTransactionsRouter({
 
   const router = Router()
   router.get('/admin-hub/v1/transactions', adminHubTransactionsGET)
+  router.post('/admin-hub/v1/transactions/manual-adjustment', adminHubManualAdjustmentPOST)
+  router.delete('/admin-hub/v1/transactions/manual-adjustment/:id', adminHubManualAdjustmentDELETE)
   router.get('/admin-hub/v1/commission-invoices', adminHubCommissionInvoicesGET)
   router.get('/admin-hub/v1/seller-payouts/:id/pdf', adminHubSellerPayoutPdfGET)
 

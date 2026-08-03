@@ -263,6 +263,8 @@
     "submitError": "Error submitting",
     "cancelButton": "Cancel",
     "messageModalTitle": "Message — #{number}",
+    "messageProductPickPrompt": "What's this about? Pick the product you want to message about.",
+    "messageChangeProduct": "Change product",
     "noMessagesYet": "No messages yet for this order",
     "messagePlaceholder": "Your message…",
     "sendButton": "Send",

@@ -414,12 +414,15 @@ module.exports = function createCampaignsRouter({
     }
 
     // Publish PPC campaign to ad platforms (superuser only)
-  router.post('/admin-hub/v1/campaigns/:id/publish', requireSuperuser, async (req, res) => {
+  router.post('/admin-hub/v1/campaigns/:id/publish', async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const c = pgDbClient(); try {
         await c.connect()
         const exist = await c.query(`SELECT * FROM seller_campaigns WHERE id=$1`, [req.params.id])
         const camp = exist.rows[0]
         if (!camp) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!req.sellerUser?.is_superuser && camp.seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
         const platforms = Array.isArray(camp.ad_platforms) ? camp.ad_platforms : []
         if (!platforms.length) { await c.end(); return res.status(400).json({ message: 'Kampanya için reklam platformu seçilmemiş' }) }
         const maRows = await c.query(`SELECT * FROM platform_marketing_accounts WHERE platform = ANY($1) AND is_active = true`, [platforms])
@@ -469,22 +472,30 @@ module.exports = function createCampaignsRouter({
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    // Pause published PPC campaign (superuser only)
-  router.post('/admin-hub/v1/campaigns/:id/pause', requireSuperuser, async (req, res) => {
+    // Pause published PPC campaign (owning seller or superuser)
+  router.post('/admin-hub/v1/campaigns/:id/pause', async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const c = pgDbClient(); try {
         await c.connect()
+        const exist = await c.query(`SELECT seller_id FROM seller_campaigns WHERE id=$1`, [req.params.id])
+        if (!exist.rows[0]) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!req.sellerUser?.is_superuser && exist.rows[0].seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
         const r = await c.query(`UPDATE seller_campaigns SET ad_status='paused', status='paused', updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id])
-        if (!r.rows[0]) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
         await c.end(); res.json({ campaign: r.rows[0] })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })
 
-    // Resume paused PPC campaign (superuser only)
-  router.post('/admin-hub/v1/campaigns/:id/resume', requireSuperuser, async (req, res) => {
+    // Resume paused PPC campaign (owning seller or superuser)
+  router.post('/admin-hub/v1/campaigns/:id/resume', async (req, res) => {
+      const sellerId = req.sellerUser?.seller_id
+      if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const c = pgDbClient(); try {
         await c.connect()
+        const exist = await c.query(`SELECT seller_id FROM seller_campaigns WHERE id=$1`, [req.params.id])
+        if (!exist.rows[0]) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!req.sellerUser?.is_superuser && exist.rows[0].seller_id !== sellerId) { await c.end(); return res.status(403).json({ message: 'Forbidden' }) }
         const r = await c.query(`UPDATE seller_campaigns SET ad_status='published', status='active', updated_at=now() WHERE id=$1 RETURNING *`, [req.params.id])
-        if (!r.rows[0]) { await c.end(); return res.status(404).json({ message: 'Not found' }) }
         await c.end(); res.json({ campaign: r.rows[0] })
       } catch (e) { try { await c.end() } catch(_){} ; res.status(500).json({ message: e?.message }) }
     })

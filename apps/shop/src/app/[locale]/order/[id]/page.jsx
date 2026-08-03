@@ -253,10 +253,15 @@ function ReturnModal({ order, onClose, onDone }) {
   );
 }
 
-/* ── Message modal ── */
+/* ── Message modal ──
+ * An order can mix products from different sellers, so a message can only ever be about ONE
+ * product — picking it is mandatory before the compose box even appears, and it's what routes
+ * the message to that product's own seller (never to every seller who happens to share the order). */
 function MessageModal({ order, onClose }) {
   const t = useTranslations("order");
   const locale = useLocale();
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const [selectedProductId, setSelectedProductId] = useState(items.length === 1 ? String(items[0].product_id || "") : "");
   const [body, setBody] = useState("");
   const [history, setHistory] = useState([]);
   const [sending, setSending] = useState(false);
@@ -270,15 +275,26 @@ function MessageModal({ order, onClose }) {
     }).then(d => { if (!d?.__error) setHistory(d?.messages || []); }).catch(() => {});
   }, [order.id]);
 
+  const selectedItem = items.find(it => String(it.product_id || "") === selectedProductId) || null;
+  const historyForProduct = selectedProductId
+    ? history.filter(m => String(m.product_id || "") === selectedProductId)
+    : [];
+
   const send = async () => {
-    if (!body.trim()) return;
+    if (!body.trim() || !selectedProductId) return;
     setSending(true); setErr("");
     try {
       const token = getToken("customer");
       await getMedusaClient().request("/store/messages", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: order.id, body: body.trim(), subject: t("orderTitle", { number: order.order_number || "" }), locale }),
+        body: JSON.stringify({
+          order_id: order.id,
+          product_id: selectedProductId,
+          body: body.trim(),
+          subject: t("orderTitle", { number: order.order_number || "" }),
+          locale,
+        }),
       });
       setSent(true); setBody("");
       const d = await getMedusaClient().request(`/store/messages?order_id=${order.id}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -295,34 +311,82 @@ function MessageModal({ order, onClose }) {
           <div style={{ fontSize: 14, fontWeight: 700 }}>{t("messageModalTitle", { number: order.order_number || "-" })}</div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-          {history.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "24px 0" }}>{t("noMessagesYet")}</div>}
-          {history.map(m => {
-            const isSeller = m.sender_type === "seller";
-            return (
-              <div key={m.id} style={{ display: "flex", justifyContent: isSeller ? "flex-start" : "flex-end" }}>
-                <div style={{ maxWidth: "75%", background: isSeller ? "#f3f4f6" : ORANGE, color: isSeller ? "#111827" : "#fff", borderRadius: isSeller ? "12px 12px 12px 2px" : "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13 }}>
-                  {m.body}
-                  <div style={{ fontSize: 10, marginTop: 3, opacity: 0.6 }}>{new Date(m.created_at).toLocaleString(INTL_LOCALE[locale] || "de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+
+        {!selectedProductId ? (
+          <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
+            <div style={{ fontSize: 13, color: "#374151", marginBottom: 10 }}>{t("messageProductPickPrompt")}</div>
+            {items.map((it, i) => (
+              <button
+                key={it.id || i}
+                onClick={() => setSelectedProductId(String(it.product_id || ""))}
+                disabled={!it.product_id}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 8px",
+                  border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 8, background: "#fff",
+                  cursor: it.product_id ? "pointer" : "not-allowed", opacity: it.product_id ? 1 : 0.5, textAlign: "left",
+                }}
+              >
+                <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3f4f6" }}>
+                  {it.thumbnail ? (
+                    <img src={resolveImageUrl(it.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                  ) : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6" }}>
-          {sent && <div style={{ color: "#15803d", fontSize: 12, marginBottom: 6 }}>{t("messageSent")}</div>}
-          {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <textarea value={body} onChange={e => setBody(e.target.value)} rows={2}
-              style={{ flex: 1, padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "none" }}
-              placeholder={t("messagePlaceholder")}
-            />
-            <button onClick={send} disabled={sending || !body.trim()}
-              style={{ padding: "0 18px", background: ORANGE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: sending || !body.trim() ? "not-allowed" : "pointer", opacity: sending || !body.trim() ? 0.6 : 1 }}>
-              {sending ? "…" : t("sendButton")}
-            </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {getLocalizedCartLineTitle(it, locale)}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#9ca3af" }}>× {it.quantity}</div>
+                </div>
+              </button>
+            ))}
           </div>
-        </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
+              <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 5, overflow: "hidden", background: "#f3f4f6" }}>
+                {selectedItem?.thumbnail ? (
+                  <img src={resolveImageUrl(selectedItem.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                ) : null}
+              </div>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selectedItem ? getLocalizedCartLineTitle(selectedItem, locale) : ""}
+              </div>
+              {items.length > 1 && (
+                <button onClick={() => setSelectedProductId("")} style={{ background: "none", border: "none", color: ORANGE, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {t("messageChangeProduct")}
+                </button>
+              )}
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {historyForProduct.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "24px 0" }}>{t("noMessagesYet")}</div>}
+              {historyForProduct.map(m => {
+                const isSeller = m.sender_type === "seller";
+                return (
+                  <div key={m.id} style={{ display: "flex", justifyContent: isSeller ? "flex-start" : "flex-end" }}>
+                    <div style={{ maxWidth: "75%", background: isSeller ? "#f3f4f6" : ORANGE, color: isSeller ? "#111827" : "#fff", borderRadius: isSeller ? "12px 12px 12px 2px" : "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13 }}>
+                      {m.body}
+                      <div style={{ fontSize: 10, marginTop: 3, opacity: 0.6 }}>{new Date(m.created_at).toLocaleString(INTL_LOCALE[locale] || "de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6" }}>
+              {sent && <div style={{ color: "#15803d", fontSize: 12, marginBottom: 6 }}>{t("messageSent")}</div>}
+              {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <textarea value={body} onChange={e => setBody(e.target.value)} rows={2}
+                  style={{ flex: 1, padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "none" }}
+                  placeholder={t("messagePlaceholder")}
+                />
+                <button onClick={send} disabled={sending || !body.trim()}
+                  style={{ padding: "0 18px", background: ORANGE, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: sending || !body.trim() ? "not-allowed" : "pointer", opacity: sending || !body.trim() ? 0.6 : 1 }}>
+                  {sending ? "…" : t("sendButton")}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

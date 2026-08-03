@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLocale } from "next-intl";
 import {
   Page, Layout, Card, Text, BlockStack, InlineStack,
-  Badge, Button, Banner, Box, Select,
+  Badge, Button, Banner, Box, Select, Modal, TextField,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { confirmDelete } from "@/lib/confirm-delete";
@@ -125,6 +125,45 @@ function getTransactionsCopy(locale) {
       `Auszahlung für „${name}" als bezahlt markieren? Betrag: ${amount}`
     ),
     error: t("Error", "Hata", "Erreur", "Error", "Errore", "Fehler"),
+    addAdjustment: t("Add adjustment", "Manuel düzeltme ekle", "Ajouter un ajustement", "Añadir ajuste", "Aggiungi rettifica", "Anpassung hinzufügen"),
+    addAdjustmentModalTitle: t("Manual ledger adjustment", "Manuel bakiye düzeltmesi", "Ajustement manuel du solde", "Ajuste manual del saldo", "Rettifica manuale del saldo", "Manuelle Kontoanpassung"),
+    adjustmentSellerLabel: t("Seller", "Satıcı", "Vendeur", "Vendedor", "Venditore", "Verkäufer"),
+    adjustmentAmountLabel: t("Amount", "Tutar", "Montant", "Importe", "Importo", "Betrag"),
+    adjustmentAmountHelp: t(
+      "Use a positive value to credit the seller, negative to debit (e.g. -12.50).",
+      "Satıcıya alacak yazmak için pozitif, borç yazmak için negatif değer girin (örn. -12.50).",
+      "Utilisez une valeur positive pour créditer le vendeur, négative pour débiter (ex. -12,50).",
+      "Use un valor positivo para abonar al vendedor, negativo para cargar (p. ej. -12,50).",
+      "Usa un valore positivo per accreditare il venditore, negativo per addebitare (es. -12,50).",
+      "Positiver Wert für Gutschrift, negativer Wert für Belastung (z. B. -12,50)."
+    ),
+    adjustmentNoteLabel: t("Note", "Not", "Note", "Nota", "Nota", "Notiz"),
+    adjustmentSubmit: t("Add", "Ekle", "Ajouter", "Añadir", "Aggiungi", "Hinzufügen"),
+    cancel: t("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen"),
+    adjustmentSellerRequired: t(
+      "Please select a seller",
+      "Lütfen bir satıcı seçin",
+      "Veuillez sélectionner un vendeur",
+      "Seleccione un vendedor",
+      "Seleziona un venditore",
+      "Bitte einen Seller auswählen"
+    ),
+    adjustmentAmountRequired: t(
+      "Please enter a non-zero amount",
+      "Lütfen sıfırdan farklı bir tutar girin",
+      "Veuillez saisir un montant différent de zéro",
+      "Introduzca un importe distinto de cero",
+      "Inserisci un importo diverso da zero",
+      "Bitte einen Betrag ungleich null eingeben"
+    ),
+    removeAdjustmentConfirm: t(
+      "Remove this manual adjustment?",
+      "Bu manuel düzeltme kaldırılsın mı?",
+      "Supprimer cet ajustement manuel ?",
+      "¿Eliminar este ajuste manual?",
+      "Rimuovere questa rettifica manuale?",
+      "Diese manuelle Anpassung entfernen?"
+    ),
     eligibleBannerAdmin: t(
       "Orders delivered more than 14 days ago — ready for payout.",
       "14 günden eski teslim edilmiş siparişler — ödemeye hazır.",
@@ -396,6 +435,13 @@ function AdminTransactionsView() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [markingPaid, setMarkingPaid] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
+  const [adjModalOpen, setAdjModalOpen] = useState(false);
+  const [adjSellerId, setAdjSellerId] = useState("");
+  const [adjAmount, setAdjAmount] = useState("");
+  const [adjNote, setAdjNote] = useState("");
+  const [adjSaving, setAdjSaving] = useState(false);
+  const [adjError, setAdjError] = useState("");
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
 
@@ -478,6 +524,45 @@ function AdminTransactionsView() {
     }
   };
 
+  const openAdjModal = () => {
+    setAdjSellerId(filterSeller || "");
+    setAdjAmount("");
+    setAdjNote("");
+    setAdjError("");
+    setAdjModalOpen(true);
+  };
+
+  const submitAdjustment = async () => {
+    setAdjError("");
+    if (!adjSellerId) { setAdjError(copy.adjustmentSellerRequired); return; }
+    const amountCents = Math.round(Number(String(adjAmount).replace(",", ".")) * 100);
+    if (!Number.isFinite(amountCents) || amountCents === 0) { setAdjError(copy.adjustmentAmountRequired); return; }
+    setAdjSaving(true);
+    try {
+      await getMedusaAdminClient().createManualAdjustment({ seller_id: adjSellerId, amount_cents: amountCents, note: adjNote.trim() });
+      setAdjModalOpen(false);
+      await loadData();
+    } catch (e) {
+      setAdjError(e?.message || copy.error);
+    } finally {
+      setAdjSaving(false);
+    }
+  };
+
+  const removeAdjustment = async (tx) => {
+    if (!(await confirmDelete(copy.removeAdjustmentConfirm))) return;
+    setRemovingId(tx.id);
+    try {
+      const rawId = String(tx.id || "").replace(/^ledger-/, "");
+      await getMedusaAdminClient().deleteManualAdjustment(rawId);
+      await loadData();
+    } catch (e) {
+      alert(e?.message || copy.error);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   const isPaidForPeriod = (sellerId) =>
     payouts.some((p) => {
       const matches = p.seller_id === sellerId && (p.status === "bezahlt" || p.status === "paid");
@@ -511,7 +596,10 @@ function AdminTransactionsView() {
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center">
                 <Text variant="headingMd" as="h2">{copy.settlementPeriod}</Text>
-                <Button onClick={loadData} loading={loading} size="slim">{copy.refresh}</Button>
+                <InlineStack gap="200">
+                  <Button onClick={openAdjModal} size="slim">{copy.addAdjustment}</Button>
+                  <Button onClick={loadData} loading={loading} size="slim">{copy.refresh}</Button>
+                </InlineStack>
               </InlineStack>
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 260px", maxWidth: 340 }}>
@@ -598,7 +686,7 @@ function AdminTransactionsView() {
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", background: "#f0fdf4" }}>
                   <Text variant="bodySm" tone="success">{copy.eligibleBannerAdmin}</Text>
                 </div>
-                <TxTable rows={eligible} loading={loading} isSuperuser locale={locale} copy={copy} />
+                <TxTable rows={eligible} loading={loading} isSuperuser locale={locale} copy={copy} onRemoveAdjustment={removeAdjustment} removingId={removingId} />
               </Card>
             )}
             {tab === "pending" && (
@@ -606,7 +694,7 @@ function AdminTransactionsView() {
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", background: "#fefce8" }}>
                   <Text variant="bodySm" tone="caution">{copy.pendingBannerAdmin}</Text>
                 </div>
-                <TxTable rows={pending} loading={loading} isSuperuser locale={locale} copy={copy} />
+                <TxTable rows={pending} loading={loading} isSuperuser locale={locale} copy={copy} onRemoveAdjustment={removeAdjustment} removingId={removingId} />
               </Card>
             )}
             {tab === "payouts" && (
@@ -617,6 +705,42 @@ function AdminTransactionsView() {
           </Box>
         </Layout.Section>
       </Layout>
+
+      <Modal
+        open={adjModalOpen}
+        onClose={() => setAdjModalOpen(false)}
+        title={copy.addAdjustmentModalTitle}
+        primaryAction={{ content: copy.adjustmentSubmit, onAction: submitAdjustment, loading: adjSaving }}
+        secondaryActions={[{ content: copy.cancel, onAction: () => setAdjModalOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            {adjError && <Banner tone="critical"><Text>{adjError}</Text></Banner>}
+            <Select
+              label={copy.adjustmentSellerLabel}
+              options={summary.map((s) => ({ label: s.store_name || s.seller_id, value: s.seller_id }))}
+              value={adjSellerId}
+              onChange={setAdjSellerId}
+              placeholder={copy.allSellers}
+            />
+            <TextField
+              label={copy.adjustmentAmountLabel}
+              type="text"
+              value={adjAmount}
+              onChange={setAdjAmount}
+              helpText={copy.adjustmentAmountHelp}
+              autoComplete="off"
+            />
+            <TextField
+              label={copy.adjustmentNoteLabel}
+              value={adjNote}
+              onChange={setAdjNote}
+              multiline={2}
+              autoComplete="off"
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </Page>
   );
 }
@@ -635,10 +759,15 @@ function ledgerAdjustmentLabel(tx, locale) {
       `Versandetikett für Bestellung #${params.order_number || tx.order_number || ""}`,
     );
   }
+  if (tx.description_key === "manual_note") {
+    return params.note
+      ? params.note
+      : lt(locale, "Manual adjustment", "Manuel düzeltme", "Ajustement manuel", "Ajuste manual", "Rettifica manuale", "Manuelle Anpassung");
+  }
   return tx.description_key || tx.adjustment_type || "";
 }
 
-function TxTable({ rows, loading, isSuperuser, locale, copy }) {
+function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment, removingId }) {
   const fmt = (cents, currency) => fmtCents(cents, currency, locale);
   const fmtD = (d) => fmtDate(d, locale);
 
@@ -668,18 +797,33 @@ function TxTable({ rows, loading, isSuperuser, locale, copy }) {
         <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center", background: "#fafafa" }}>
           <div>
             <div style={{ fontWeight: 600, color: "#111827" }}>{ledgerAdjustmentLabel(tx, locale)}</div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>
-              {tx.charge_method === "card"
-                ? lt(locale, "Charged to card", "Karttan çekildi", "Débité de la carte", "Cargado a tarjeta", "Addebitato su carta", "Von Karte abgebucht")
-                : lt(locale, "Deducted from balance", "Bakiyeden düşüldü", "Déduit du solde", "Deducido del saldo", "Detratto dal saldo", "Vom Guthaben abgezogen")}
-            </div>
+            {tx.adjustment_type !== "manual_adjustment" && (
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                {tx.charge_method === "card"
+                  ? lt(locale, "Charged to card", "Karttan çekildi", "Débité de la carte", "Cargado a tarjeta", "Addebitato su carta", "Von Karte abgebucht")
+                  : lt(locale, "Deducted from balance", "Bakiyeden düşüldü", "Déduit du solde", "Deducido del saldo", "Detratto dal saldo", "Vom Guthaben abgezogen")}
+              </div>
+            )}
           </div>
           {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
           <div style={{ textAlign: "right" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: tx.payout_cents < 0 ? "#ef4444" : "#10b981", fontWeight: 600 }}>{fmt(tx.payout_cents, tx.currency)}</div>
-          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtD(tx.created_at)}</div>
+          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+            {fmtD(tx.created_at)}
+            {isSuperuser && tx.adjustment_type === "manual_adjustment" && (
+              <Button
+                size="micro"
+                tone="critical"
+                variant="plain"
+                loading={removingId === tx.id}
+                onClick={() => onRemoveAdjustment?.(tx)}
+              >
+                {lt(locale, "Remove", "Kaldır", "Supprimer", "Eliminar", "Rimuovi", "Entfernen")}
+              </Button>
+            )}
+          </div>
         </div>
       ) : (
         <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>

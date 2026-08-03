@@ -258,7 +258,9 @@ const mediaUploadPOST = async (req, res) => {
 
   const alt = (req.body && req.body.alt) || null
   const folderId = (req.body && req.body.folder_id) || null
-  const uploadSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
+  // Every seller_users row — including superuser accounts — has its own real seller_id; a
+  // superuser's own upload must be tagged with it too instead of being left NULL/ownerless.
+  const uploadSellerId = req.sellerUser?.seller_id || null
   const dbFilename = isProductImage ? outFilename : resolveUploadDisplayFilename(req)
   try {
     await client.connect()
@@ -415,7 +417,7 @@ const mediaAddByUrlPOST = async (req, res) => {
   try {
     await client.connect()
     const name = decodeMultipartFilename(filename || url.split('/').pop()?.split('?')[0] || 'image')
-    const urlSellerId = req.sellerUser?.is_superuser ? null : (req.sellerUser?.seller_id || null)
+    const urlSellerId = req.sellerUser?.seller_id || null
     const r = await client.query(
       `INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, alt, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [name, url, url, null, 0, alt || null, folder_id || null, urlSellerId]
@@ -488,9 +490,11 @@ const mediaImportUrlsPOST = async (req, res) => {
   try {
     await client.connect()
     const u = req.sellerUser
-    // Superuser can pass target_seller_id to register images under a specific seller
+    // Superuser can pass target_seller_id to register images under a specific seller; with no
+    // target specified it's their own import, so it should still be tagged with their own real
+    // seller_id rather than left ownerless.
     const sellerId = u?.is_superuser
-      ? (target_seller_id ? String(target_seller_id).trim() : null)
+      ? (target_seller_id ? String(target_seller_id).trim() : (u?.seller_id || null))
       : (u?.seller_id || null)
     // Resolve folder: get or create "Excel Import" folder for this seller
     let folderName = (folder_name || '').trim()

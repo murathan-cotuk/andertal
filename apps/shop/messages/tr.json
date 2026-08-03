@@ -263,6 +263,8 @@
     "submitError": "Gönderim hatası",
     "cancelButton": "İptal",
     "messageModalTitle": "Mesaj — #{number}",
+    "messageProductPickPrompt": "Hangi ürünle ilgili? Mesaj yazmak istediğiniz ürünü seçin.",
+    "messageChangeProduct": "Ürünü değiştir",
     "noMessagesYet": "Bu siparişe ait henüz mesaj yok",
     "messagePlaceholder": "Mesajınız…",
     "sendButton": "Gönder",
