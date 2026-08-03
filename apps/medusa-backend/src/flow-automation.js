@@ -787,7 +787,9 @@ async function sendImmediateStepsForFlow({
       idx += 1
       continue
     }
-    let sendMeta = { provider: resolveFlowMailProvider() === 'resend' ? 'resend' : 'smtp' }
+    // Placeholder only — overwritten by the real result below; only read if an exception
+    // happens before that assignment, in which case the exact provider name doesn't matter.
+    let sendMeta = { provider: 'smtp' }
     try {
       try {
         consumeFlowEmailSlot(rateScopeKey || 'default')
@@ -801,6 +803,7 @@ async function sendImmediateStepsForFlow({
         continue
       }
       sendMeta = await sendFlowOutboundEmail({
+        client,
         transport,
         from: `"${String(fromName).replace(/"/g, '')}" <${fromEmail}>`,
         to: toEmail,
@@ -898,7 +901,7 @@ async function runAutomationFlowsForOrder(opts) {
       return
     }
 
-    const useResend = resolveFlowMailProvider() === 'resend'
+    const useResend = (await resolveFlowMailProvider(client)) === 'resend'
     let transport = null
     if (!useResend) {
       transport = await getSmtpTransport(client)
@@ -957,6 +960,18 @@ async function runAutomationFlowsForOrder(opts) {
       return
     }
 
+    // order.seller_id is always the platform now (a cart/order can mix items from several real
+    // sellers) — so a "seller audience" flow can no longer resolve to a single recipient from the
+    // order row. Every distinct real seller who actually has an item in this order gets notified
+    // instead, one send each (their own item-scoped view isn't built yet — same order-level
+    // placeholders as before — but each fulfilling seller now correctly hears about their own
+    // orders, and no seller is skipped or wrongly notified about someone else's).
+    const distinctItemSellerIds = [...new Set(
+      (ctx.items || [])
+        .map((it) => String(it.seller_id || '').trim())
+        .filter((sid) => sid && sid !== 'default'),
+    )]
+
     let totalEmails = 0
     for (const fr of flowRows) {
       const flowId = fr.id
@@ -969,48 +984,62 @@ async function runAutomationFlowsForOrder(opts) {
       )
       const steps = sr.rows || []
 
-      let toEmail = ''
-      let templateLocale = customerLocale
       if (audience === 'customer') {
-        toEmail = String(ctx.order.email || '').trim()
-        templateLocale = customerLocale
-      } else {
-        templateLocale = 'de'
-        const sid = ctx.order.seller_id
-        if (!sid) {
-          logger.warn(`[flow-automation] skip flow ${flowId}: seller audience but order has no seller_id`)
+        const toEmail = String(ctx.order.email || '').trim()
+        if (!toEmail) {
+          logger.warn(`[flow-automation] skip flow ${flowId} (customer): order has no email`)
           continue
         }
+        const n = await sendImmediateStepsForFlow({
+          client,
+          transport,
+          rateScopeKey,
+          flowId,
+          audience,
+          triggerKey,
+          steps,
+          toEmail,
+          templateLocale: customerLocale,
+          placeholderVars,
+          orderId,
+          customerId: ctx.order.customer_id ? String(ctx.order.customer_id) : '',
+          elapsedHours: opts.elapsedHours != null ? Number(opts.elapsedHours) : null,
+        })
+        totalEmails += n
+        continue
+      }
+
+      if (!distinctItemSellerIds.length) {
+        logger.warn(`[flow-automation] skip flow ${flowId}: seller audience but no order items have a real seller_id`)
+        continue
+      }
+      for (const sid of distinctItemSellerIds) {
         const sur = await client.query(
           `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
           [sid],
         )
-        toEmail = String(sur.rows[0]?.email || '').trim()
+        const toEmail = String(sur.rows[0]?.email || '').trim()
+        if (!toEmail) {
+          logger.warn(`[flow-automation] skip flow ${flowId} (seller): no account email for seller ${sid}`)
+          continue
+        }
+        const n = await sendImmediateStepsForFlow({
+          client,
+          transport,
+          rateScopeKey,
+          flowId,
+          audience,
+          triggerKey,
+          steps,
+          toEmail,
+          templateLocale: 'de',
+          placeholderVars,
+          orderId,
+          customerId: ctx.order.customer_id ? String(ctx.order.customer_id) : '',
+          elapsedHours: opts.elapsedHours != null ? Number(opts.elapsedHours) : null,
+        })
+        totalEmails += n
       }
-
-      if (!toEmail) {
-        logger.warn(
-          `[flow-automation] skip flow ${flowId} (${audience}): no recipient — customer order needs email; seller flow needs seller account email`,
-        )
-        continue
-      }
-
-      const n = await sendImmediateStepsForFlow({
-        client,
-        transport,
-        rateScopeKey,
-        flowId,
-        audience,
-        triggerKey,
-        steps,
-        toEmail,
-        templateLocale,
-        placeholderVars,
-        orderId,
-        customerId: ctx.order.customer_id ? String(ctx.order.customer_id) : '',
-        elapsedHours: opts.elapsedHours != null ? Number(opts.elapsedHours) : null,
-      })
-      totalEmails += n
     }
     if (totalEmails > 0) {
       logger.info(`[flow-automation] ${triggerKey} order=${orderId}: sent ${totalEmails} email(s)`)
@@ -1051,7 +1080,7 @@ async function runAutomationFlowsForSellerEvent(opts) {
   try {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const useResend = resolveFlowMailProvider() === 'resend'
+    const useResend = (await resolveFlowMailProvider(client)) === 'resend'
     let transport = null
     if (!useResend) {
       transport = await getSmtpTransport(client)
@@ -1173,7 +1202,7 @@ async function runAutomationFlowsForCustomerEvent(opts) {
   try {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const useResend = resolveFlowMailProvider() === 'resend'
+    const useResend = (await resolveFlowMailProvider(client)) === 'resend'
     let transport = null
     if (!useResend) {
       transport = await getSmtpTransport(client)
@@ -1332,7 +1361,7 @@ async function runAutomationFlowsForMessageEvent(opts) {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
 
-    const useResend = resolveFlowMailProvider() === 'resend'
+    const useResend = (await resolveFlowMailProvider(client)) === 'resend'
     let transport = null
     if (!useResend) {
       transport = await getSmtpTransport(client)

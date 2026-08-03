@@ -601,20 +601,20 @@ module.exports = function createShipmentTrackingRouter({
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        // Ownership check — buying a label charges money, unlike viewing/scanning an order's own
+        // items, so only a seller with at least one of their own items in this order (or a
+        // superuser) may do this. order.seller_id is always the platform now (see store-checkout.js
+        // order creation), never a real seller, so this can't be a direct-equality check — it must
+        // match the same "has an item here" access pattern as every other seller-scoped order query
+        // in this file (sellerOrderAccessSQL).
         const orderR = await client.query(
           `SELECT id, order_number, seller_id, first_name, last_name, email, phone, country, postal_code, city, address_line1, address_line2, sendcloud_label_url, tracking_number
-           FROM store_orders WHERE id=$1::uuid`,
-          [id],
+           FROM store_orders WHERE id=$1::uuid${sellerOrderAccessSQL(isSuperuser)}`,
+          isSuperuser ? [id] : [id, callerSellerId],
         )
         const order = orderR.rows[0]
-        if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
-        // Strict ownership check — buying a label charges money, unlike viewing/scanning an
-        // order's own items, so only the order's own seller (or a superuser) may do this.
+        if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found or belongs to a different seller.' }) }
         const orderSellerId = String(order.seller_id || '').trim()
-        if (!isSuperuser && orderSellerId !== String(callerSellerId || '').trim()) {
-          await client.end()
-          return res.status(403).json({ message: 'This order belongs to a different seller.' })
-        }
         const billingSellerId = isSuperuser ? orderSellerId : callerSellerId
 
         const { service_id, service_name, carrier, price_eur, weight_kg, length_cm, width_cm, height_cm } = req.body || {}

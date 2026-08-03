@@ -1005,6 +1005,16 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/integrations/sendcloud/test', { method: 'POST', body: JSON.stringify(data) })
   }
 
+  async getResendIntegration() {
+    return this.request('/admin-hub/v1/integrations/resend')
+  }
+  async saveResendIntegration(data) {
+    return this.request('/admin-hub/v1/integrations/resend', { method: 'PUT', body: JSON.stringify(data) })
+  }
+  async testResendIntegration(data) {
+    return this.request('/admin-hub/v1/integrations/resend/test', { method: 'POST', body: JSON.stringify(data) })
+  }
+
   async getLabelRates(orderId, body) {
     return this.request(`/admin-hub/v1/orders/${encodeURIComponent(orderId)}/label/rates`, { method: 'POST', body: JSON.stringify(body) })
   }

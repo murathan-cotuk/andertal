@@ -1479,7 +1479,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
         }
 
         const { resolveFlowMailProvider, sendFlowOutboundEmail } = require('../email-providers')
-        const useResend = resolveFlowMailProvider() === 'resend'
+        const useResend = (await resolveFlowMailProvider(client)) === 'resend'
         let transport = null
         if (!useResend) {
           transport = await getSmtpTransport(client)
@@ -1487,19 +1487,15 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
             await client.end()
             return res.status(400).json({ message: 'SMTP not configured' })
           }
-        } else if (!String(process.env.RESEND_API_KEY || '').trim()) {
-          await client.end()
-          return res.status(400).json({ message: 'RESEND_API_KEY required when FLOW_MAIL_PROVIDER=resend' })
         }
         const bodySenderRaw = body.smtp_sender_id
         const bodySender =
           bodySenderRaw != null && String(bodySenderRaw).trim() !== '' ? String(bodySenderRaw).trim() : null
         const profileForSend = bodySender || (stepSmtpSenderId ? String(stepSmtpSenderId) : null)
         const { fromEmail, fromName } = await resolveSmtpSenderIdentity(client, profileForSend)
-        await client.end()
 
         const fromEmailTrim = String(fromEmail || '').trim()
-        if (!fromEmailTrim) return res.status(400).json({ message: 'SMTP From email not set' })
+        if (!fromEmailTrim) { await client.end(); return res.status(400).json({ message: 'SMTP From email not set' }) }
 
         const extraVars =
           body.placeholders && typeof body.placeholders === 'object' && !Array.isArray(body.placeholders)
@@ -1511,6 +1507,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
         const plain = flowEmailHtmlToPlainText(finalHtml)
 
         await sendFlowOutboundEmail({
+          client,
           transport,
           from: `"${String(fromName).replace(/"/g, '')}" <${fromEmailTrim}>`,
           to: toRaw,
@@ -1519,6 +1516,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
           text: plain || finalSubject,
           attachments: pdfAttachments.length ? pdfAttachments : undefined,
         })
+        await client.end()
         res.json({ success: true, message: 'Test email sent' })
       } catch (e) {
         try {

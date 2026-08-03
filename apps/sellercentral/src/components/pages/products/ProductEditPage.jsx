@@ -249,6 +249,52 @@ function getEmptyProduct() {
   };
 }
 
+/** Seller-owned listing fields — never copy from another seller's catalog match (EAN / URL / existing_id). */
+const SELLER_OWNED_META_KEYS = [
+  "sku",
+  "prices",
+  "uvp_cents",
+  "rabattpreis_cents",
+  "shipping_group_id",
+  "brand_id",
+  "publish_date",
+  "seller_id",
+  "seller",
+  "seller_name",
+  "shop_name",
+  "related_product_ids",
+];
+
+function stripSellerOwnedFromCatalogMeta(meta) {
+  const out = meta && typeof meta === "object" ? { ...meta } : {};
+  for (const k of SELLER_OWNED_META_KEYS) delete out[k];
+  return out;
+}
+
+function sanitizeCatalogVariants(variants) {
+  if (!Array.isArray(variants)) return [];
+  return variants.map((v) => {
+    const vMeta = v?.metadata && typeof v.metadata === "object" ? { ...v.metadata } : {};
+    delete vMeta.shipping_group_id;
+    delete vMeta.brand_id;
+    delete vMeta.sku;
+    delete vMeta.prices;
+    return {
+      ...v,
+      sku: "",
+      inventory: 0,
+      inventory_quantity: 0,
+      price: undefined,
+      price_cents: 0,
+      compare_at_price: undefined,
+      compare_at_price_cents: undefined,
+      sale_price: undefined,
+      sale_price_cents: undefined,
+      metadata: vMeta,
+    };
+  });
+}
+
 function normalizeProductForCompare(p) {
   if (!p) return null;
   return {
@@ -704,7 +750,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         setProduct((prev) => {
           if (!prev) return prev;
           const master = result.product;
-          const masterMeta = (master.metadata && typeof master.metadata === "object") ? { ...master.metadata } : {};
+          const masterMeta = stripSellerOwnedFromCatalogMeta(master.metadata);
           const masterVariants = Array.isArray(master.variants) ? master.variants : [];
           // Typed a child's own EAN directly (not the parent/grouping EAN): only that one
           // child is what the seller intends to sell — list it alone, don't drag in every
@@ -713,31 +759,26 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           // Matched via the parent/grouping EAN: keep it as-is, seller wants the full family.
           const parentEan = singleChildMode ? String(ean).trim() : (result.matched_on === "variant" ? (masterMeta.ean || "") : String(ean).trim());
           if (singleChildMode) delete masterMeta.variation_groups;
-          // Keep the new seller's own fields, copy catalog fields from master
+          // Catalog shared fields only — SKU / price / shipping stay empty for this seller
           const mergedMeta = {
             ...masterMeta,
             ean: parentEan,
             master_product_id: master.id,
             master_total_variants: masterVariants.length,
-            sku: prev.metadata?.sku || "",
-            // clear seller-specific fields
-            seller_id: prev.metadata?.seller_id,
-            shop_name: prev.metadata?.shop_name,
-            seller_name: prev.metadata?.seller_name,
-            brand_id: prev.metadata?.brand_id,
-            shipping_group_id: prev.metadata?.shipping_group_id,
-            related_product_ids: [],
           };
           return {
             ...prev,
             title: master.title || prev.title,
             description: master.description || prev.description,
             handle: master.handle || prev.handle,
+            sku: "",
+            price: 0,
+            inventory: 0,
             metadata: mergedMeta,
             variants: singleChildMode
               ? []
               : (masterVariants.length > 0
-                  ? masterVariants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
+                  ? sanitizeCatalogVariants(masterVariants)
                   : prev.variants),
           };
         });
@@ -787,25 +828,22 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         setUrlSearchState("found");
         setProduct((prev) => {
           if (!prev) return prev;
-          const masterMeta = (match.metadata && typeof match.metadata === "object") ? { ...match.metadata } : {};
+          const masterMeta = stripSellerOwnedFromCatalogMeta(match.metadata);
           const mergedMeta = {
             ...masterMeta,
-            sku: prev.metadata?.sku || "",
-            seller_id: prev.metadata?.seller_id,
-            shop_name: prev.metadata?.shop_name,
-            seller_name: prev.metadata?.seller_name,
-            brand_id: prev.metadata?.brand_id,
-            shipping_group_id: prev.metadata?.shipping_group_id,
-            related_product_ids: [],
+            master_product_id: match.id,
           };
           return {
             ...prev,
             title: match.title || prev.title,
             description: match.description || prev.description,
             handle: match.handle || prev.handle,
+            sku: "",
+            price: 0,
+            inventory: 0,
             metadata: mergedMeta,
             variants: Array.isArray(match.variants) && match.variants.length > 0
-              ? match.variants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
+              ? sanitizeCatalogVariants(match.variants)
               : prev.variants,
           };
         });
@@ -839,31 +877,27 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         const singleChildMode = !!matchedVariant && foundVariants.length > 1;
         setProduct((prev) => {
           if (!prev) return prev;
-          const masterMeta = (found.metadata && typeof found.metadata === "object") ? { ...found.metadata } : {};
+          const masterMeta = stripSellerOwnedFromCatalogMeta(found.metadata);
           if (singleChildMode) delete masterMeta.variation_groups;
           const mergedMeta = {
             ...masterMeta,
             ean: singleChildMode ? variantEanParam : masterMeta.ean,
             master_product_id: existingId,
             master_total_variants: foundVariants.length,
-            sku: prev.metadata?.sku || "",
-            seller_id: prev.metadata?.seller_id,
-            shop_name: prev.metadata?.shop_name,
-            seller_name: prev.metadata?.seller_name,
-            brand_id: prev.metadata?.brand_id,
-            shipping_group_id: prev.metadata?.shipping_group_id,
-            related_product_ids: [],
           };
           return {
             ...prev,
             title: found.title || prev.title,
             description: found.description || prev.description,
             handle: found.handle || prev.handle,
+            sku: "",
+            price: 0,
+            inventory: 0,
             metadata: mergedMeta,
             variants: singleChildMode
               ? []
               : (foundVariants.length > 0
-                  ? foundVariants.map((v) => ({ ...v, sku: "", inventory: 0, price: undefined, price_cents: 0 }))
+                  ? sanitizeCatalogVariants(foundVariants)
                   : prev.variants),
           };
         });
@@ -895,9 +929,42 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     });
   }, [isNew, editingTitle, product?.title, locale]);
 
-  // Secondary seller: logged-in seller is NOT the product owner → EAN immutable
-  const productOwnerId = product?.metadata?.seller_id;
-  const isSecondSeller = !isSuperuser && !isNew && Boolean(productOwnerId) && Boolean(currentSellerId) && String(currentSellerId) !== String(productOwnerId);
+  // Secondary seller / shared catalog: logged-in seller is NOT the sole product owner → EAN immutable;
+  // title/description/shared fields go through change-request review (not direct save).
+  const productOwnerId = product?.seller_id ?? product?.seller ?? product?.metadata?.seller_id ?? null;
+  const isSecondSeller = !isSuperuser && !isNew && Boolean(currentSellerId) && (
+    !productOwnerId || String(currentSellerId) !== String(productOwnerId)
+  );
+  const isReusingCatalogOnCreate = isNew && !isSuperuser && (
+    eanLookupState === "found" || urlSearchState === "found" || Boolean(meta.master_product_id)
+  );
+  const showSharedCatalogNotice = isSecondSeller || isReusingCatalogOnCreate;
+
+  const changeRequestSubmittedMsg =
+    locale === "tr"
+      ? "Değişiklik talebiniz ekibimize iletildi. İncelendikten sonra onaylanır veya reddedilir. Fiyat, SKU ve kargo gibi kendi alanlarınız hemen kaydedilir."
+      : locale === "de"
+      ? "Dein Änderungsantrag wurde an unser Team übermittelt und wird geprüft. Eigene Felder (Preis, SKU, Versand) wurden sofort gespeichert."
+      : locale === "fr"
+      ? "Votre demande de modification a été transmise à notre équipe et sera examinée. Vos champs propres (prix, SKU, livraison) sont enregistrés immédiatement."
+      : locale === "es"
+      ? "Tu solicitud de cambio se ha enviado a nuestro equipo y será revisada. Tus campos propios (precio, SKU, envío) se guardan de inmediato."
+      : locale === "it"
+      ? "La tua richiesta di modifica è stata inviata al nostro team e verrà esaminata. I tuoi campi (prezzo, SKU, spedizione) sono salvati subito."
+      : "Your change request has been sent to our team and will be reviewed. Your own fields (price, SKU, shipping) are saved immediately.";
+
+  const sharedCatalogNoticeMsg =
+    locale === "tr"
+      ? "Bu ürün katalogda başka bir satıcı tarafından zaten eklenmiş. Ürün adı, açıklama, görseller ve diğer ortak katalog alanlarını doğrudan değiştiremezsiniz — kaydettiğinizde değişiklik talebi olarak ekibimize iletilir ve incelenir. Fiyat, SKU ve kargo yönteminizi ise kendiniz girersiniz."
+      : locale === "de"
+      ? "Dieses Produkt wurde bereits von einem anderen Anbieter im Katalog erfasst. Titel, Beschreibung, Bilder und andere gemeinsame Katalogfelder kannst du nicht direkt ändern — beim Speichern wird ein Änderungsantrag an unser Team gesendet und geprüft. Preis, SKU und Versandmethode trägst du selbst ein."
+      : locale === "fr"
+      ? "Ce produit a déjà été ajouté au catalogue par un autre vendeur. Vous ne pouvez pas modifier directement le titre, la description, les images et les autres champs partagés — à l'enregistrement, une demande de modification est envoyée à notre équipe. Vous saisissez vous-même le prix, le SKU et la livraison."
+      : locale === "es"
+      ? "Este producto ya fue añadido al catálogo por otro vendedor. No puedes cambiar directamente el título, la descripción, las imágenes u otros campos compartidos — al guardar se envía una solicitud de cambio a nuestro equipo. Tú introduces tu propio precio, SKU y envío."
+      : locale === "it"
+      ? "Questo prodotto è già stato aggiunto al catalogo da un altro venditore. Non puoi modificare direttamente titolo, descrizione, immagini e altri campi condivisi — al salvataggio la richiesta di modifica viene inviata al nostro team. Inserisci tu prezzo, SKU e spedizione."
+      : "This product was already added to the catalog by another seller. You cannot directly change the title, description, images, or other shared catalog fields — when you save, a change request is sent to our team for review. Enter your own price, SKU, and shipping method.";
 
   // Per-country pricing for the currently editing country
   const currentCountryConf = PRODUCT_COUNTRIES_MAP[editingCountry] || PRODUCT_COUNTRIES_MAP["DE"];
@@ -1172,12 +1239,28 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         const res = await client.createAdminHubProductRaw(payload);
         const created = res?.product ?? res;
         if (res?.deduplicated) {
-          setMessage({ type: "success", text: locale === "en" ? "Existing product found — all fields pre-filled automatically." : locale === "tr" ? "Mevcut ürün bulundu — tüm alanlar otomatik dolduruldu." : locale === "fr" ? "Produit existant trouvé — tous les champs ont été pré-remplis automatiquement." : locale === "es" ? "Producto existente encontrado — todos los campos se rellenaron automáticamente." : locale === "it" ? "Prodotto esistente trovato — tutti i campi sono stati compilati automaticamente." : "Vorhandenes Produkt gefunden — alle Felder wurden automatisch befüllt." });
+          if (res?.metafield_suggestions_submitted) {
+            setMessage({ type: "success", text: changeRequestSubmittedMsg });
+          } else {
+            setMessage({
+              type: "success",
+              text: locale === "tr"
+                ? "Mevcut katalog ürününe listing eklendi. Ortak alanlar (isim, açıklama vb.) doğrudan değişmez; kendi fiyat/SKU/kargonuzu kaydedin."
+                : locale === "de"
+                ? "Listing zum bestehenden Katalogprodukt hinzugefügt. Gemeinsame Felder (Name, Beschreibung usw.) ändern sich nicht direkt — trage deinen eigenen Preis/SKU/Versand ein."
+                : "Listing added to the existing catalog product. Shared fields (name, description, etc.) are not changed directly — enter your own price/SKU/shipping.",
+            });
+          }
         } else {
           setMessage({ type: "success", text: locale === "en" ? "Product created." : locale === "tr" ? "Ürün oluşturuldu." : locale === "fr" ? "Produit créé." : locale === "es" ? "Producto creado." : locale === "it" ? "Prodotto creato." : "Produkt erstellt." });
         }
         onReload?.();
-        if (created?.id) router.push(`/products/${created.id}`);
+        if (created?.id) {
+          const qs = res?.metafield_suggestions_submitted
+            ? "?change_request=1"
+            : (res?.deduplicated ? "?catalog_listing=1" : "");
+          router.push(`/products/${created.id}${qs}`);
+        }
         return true;
       }
       const updatedRaw = await client.updateAdminHubProduct(idOrHandle, payload);
@@ -1193,7 +1276,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         }
         await refetchPendingChangeRequests(product.id);
         if (!updatedRaw?.listing_saved) {
-          setMessage({ type: "success", text: locale === "en" ? "Your change suggestion has been submitted. A superuser will review it." : locale === "tr" ? "Değişiklik öneriniz gönderildi. Bir süper kullanıcı inceleyecek." : locale === "fr" ? "Votre suggestion de modification a été soumise. Un superuser va l'examiner." : locale === "es" ? "Tu sugerencia de cambio ha sido enviada. Un superusuario la revisará." : locale === "it" ? "Il tuo suggerimento di modifica è stato inviato. Un superuser lo esaminerà." : "Dein Änderungsvorschlag wurde eingereicht. Ein Superuser wird ihn prüfen." });
+          setMessage({ type: "success", text: changeRequestSubmittedMsg });
           const merged = { ...product, ...payload, metadata: payload.metadata ?? product.metadata };
           setProduct(merged);
           setBaselineSnapshot(productSnapshot(merged));
@@ -1233,9 +1316,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         : " Änderungen können bis zu einer Minute brauchen, bis sie im Shop sichtbar sind.";
       setMessage({ type: "success", text: (updatedRaw?.listing_saved
         ? (updatedRaw?.suggestion_submitted
-            ? (locale === "en" ? "Price and inventory saved. Your shared-field change suggestion was submitted for superuser review." : locale === "tr" ? "Fiyat ve stok bilgileriniz kaydedildi. Ortak alan değişiklik öneriniz superuser onayına gönderildi." : locale === "fr" ? "Prix et stock enregistrés. Votre suggestion de modification a été soumise pour examen par un superuser." : locale === "es" ? "Precio e inventario guardados. Tu sugerencia de cambio fue enviada para revisión del superusuario." : locale === "it" ? "Prezzo e inventario salvati. Il tuo suggerimento di modifica è stato inviato per la revisione del superuser." : "Preis und Bestand gespeichert. Dein Änderungsvorschlag wurde zur Prüfung durch einen Superuser eingereicht.")
+            ? changeRequestSubmittedMsg
             : (locale === "en" ? "Price, inventory and own data saved." : locale === "tr" ? "Fiyat, stok ve özel veriler kaydedildi." : locale === "fr" ? "Prix, stock et données propres enregistrés." : locale === "es" ? "Precio, inventario y datos propios guardados." : locale === "it" ? "Prezzo, inventario e dati propri salvati." : "Preis, Bestand und eigene Daten gespeichert."))
-        : ui.saved) + cacheDelayNote });
+        : ui.saved) + (updatedRaw?.suggestion_submitted ? "" : cacheDelayNote) });
       await refetchPendingChangeRequests(savedProduct.id);
       onReload?.();
       return true;
@@ -1952,6 +2035,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </Box>
       )}
 
+      {showSharedCatalogNotice && (
+        <Box paddingBlockEnd="200">
+          <Banner tone="info">
+            {sharedCatalogNoticeMsg}
+          </Banner>
+        </Box>
+      )}
+
       {!isNew && pendingChangeRequests.length > 0 && (
         <Box paddingBlockEnd="200">
           <Banner tone="warning">
@@ -2105,15 +2196,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <Banner tone="warning">
                   {eanMatchedOn === "variant"
                     ? (locale === "tr"
-                        ? "Bu EAN, katalogdaki bir üst ürünün varyasyonuna (child) ait. Bu tek varyasyon forma yüklendi — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
+                        ? "Bu EAN, katalogdaki bir üst ürünün varyasyonuna ait. Form yüklendi — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle. Ürün adı/açıklama gibi ortak alanları doğrudan değiştiremezsin; kaydettiğinde değişiklik talebi ekibimize iletilir."
                         : locale === "de"
-                        ? "Diese EAN gehört zu einer Variante eines bereits im Katalog erfassten Hauptprodukts. Nur diese eine Variante wurde geladen — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
-                        : "This EAN belongs to a variant of a product already in the catalog. Only this single variant has been loaded — add your own price, SKU, and shipping details.")
+                        ? "Diese EAN gehört zu einer Variante eines Katalogprodukts. Formular geladen — füge deinen eigenen Preis, SKU und Versand hinzu. Gemeinsame Felder (Titel/Beschreibung) kannst du nicht direkt ändern; beim Speichern geht ein Änderungsantrag an unser Team."
+                        : "This EAN belongs to a catalog product variant. Form loaded — add your own price, SKU, and shipping. You cannot directly change shared fields (title/description); saving sends a change request to our team.")
                     : (locale === "tr"
-                        ? "Bu EAN katalogda zaten kayıtlı. Form katalog verileriyle dolduruldu — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle."
+                        ? "Bu EAN katalogda zaten kayıtlı. Form katalog verileriyle dolduruldu — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle. Ürün adı, açıklama ve diğer ortak alanlar doğrudan değişmez; kaydettiğinde değişiklik talebi ekibimize iletilir ve incelenir."
                         : locale === "de"
-                        ? "Diese EAN ist bereits im Katalog registriert. Das Formular wurde mit Katalogdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu."
-                        : "This EAN is already registered in the catalog. The form has been pre-filled with catalog data — add your own price, SKU, and shipping details.")}
+                        ? "Diese EAN ist bereits im Katalog. Formular vorausgefüllt — füge deinen eigenen Preis, SKU und Versand hinzu. Titel, Beschreibung und andere gemeinsame Felder ändern sich nicht direkt; beim Speichern wird ein Änderungsantrag an unser Team gesendet."
+                        : "This EAN is already in the catalog. Form pre-filled — add your own price, SKU, and shipping. Title, description, and other shared fields cannot be changed directly; saving sends a change request to our team for review.")}
                 </Banner>
               )}
 

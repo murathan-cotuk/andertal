@@ -204,6 +204,112 @@ function SmtpSection({ copy, ui, smtpProviders }) {
   );
 }
 
+/** Alternative outbound provider for flow-automation emails (Content → Flows), used instead of
+ * SMTP when connected. Resend rejects sends whose "from" domain isn't verified in the Resend
+ * account — the test button lists verified domains so a mismatch is visible immediately instead
+ * of silently falling back to whatever sender the flow step wasn't actually able to use. */
+function ResendSection({ copy, ui }) {
+  const locale = useLocale();
+  const [apiKey, setApiKey] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [showKey, setShowKey] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    getMedusaAdminClient().getResendIntegration()
+      .then((d) => {
+        if (d?.configured || d?.api_key) {
+          setApiKey(d.api_key || "");
+          setIsActive(d.is_active !== false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleTest = async () => {
+    setTesting(true); setTestResult(null); setErr("");
+    try {
+      const r = await getMedusaAdminClient().testResendIntegration({ api_key: apiKey.trim() });
+      const domains = Array.isArray(r?.domains) ? r.domains : [];
+      const verified = domains.filter((d) => d.status === "verified").map((d) => d.name);
+      const msg = domains.length === 0
+        ? lt(locale, "Connected, but no domains found in this Resend account.", "Bağlandı, ancak bu Resend hesabında hiç alan adı yok.", "Connecté, mais aucun domaine trouvé dans ce compte Resend.", "Conectado, pero no se encontraron dominios en esta cuenta de Resend.", "Connesso, ma nessun dominio trovato in questo account Resend.", "Verbunden, aber keine Domains in diesem Resend-Konto gefunden.")
+        : lt(locale, `Connected. Verified domains: ${verified.join(", ") || "none"}.`, `Bağlandı. Doğrulanmış alan adları: ${verified.join(", ") || "yok"}.`, `Connecté. Domaines vérifiés : ${verified.join(", ") || "aucun"}.`, `Conectado. Dominios verificados: ${verified.join(", ") || "ninguno"}.`, `Connesso. Domini verificati: ${verified.join(", ") || "nessuno"}.`, `Verbunden. Verifizierte Domains: ${verified.join(", ") || "keine"}.`);
+      setTestResult({ ok: true, msg });
+    } catch (e) {
+      setTestResult({ ok: false, msg: e?.message || copy.connectionFailed });
+    }
+    setTesting(false);
+  };
+
+  const handleSave = async () => {
+    if (!apiKey.trim()) { setErr(copy.keysRequired); return; }
+    setSaving(true); setErr(""); setSaved(false);
+    try {
+      await getMedusaAdminClient().saveResendIntegration({ api_key: apiKey.trim(), is_active: isActive });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setErr(e?.message || copy.saveError);
+    }
+    setSaving(false);
+  };
+
+  if (loading) return <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>;
+
+  return (
+    <BlockStack gap="300">
+      <InlineStack align="space-between" blockAlign="center">
+        <Text as="h3" variant="headingSm">Resend</Text>
+        {saved && <Badge tone="success">{copy.saved}</Badge>}
+      </InlineStack>
+      <Text as="p" variant="bodySm" tone="subdued">
+        {lt(locale, "Used instead of SMTP for Content → Flows emails when connected.", "Bağlandığında Content → Flows e-postaları için SMTP yerine kullanılır.", "Utilisé à la place du SMTP pour les e-mails Content → Flows lorsqu'il est connecté.", "Se usa en lugar de SMTP para los correos de Content → Flows cuando está conectado.", "Usato al posto di SMTP per le e-mail Content → Flows quando connesso.", "Wird bei Verbindung anstelle von SMTP für Content → Flows-E-Mails verwendet.")}
+      </Text>
+      <TextField
+        label={lt(locale, "API key", "API anahtarı", "Clé API", "Clave API", "Chiave API", "API-Schlüssel")}
+        type={showKey ? "text" : "password"}
+        value={apiKey}
+        onChange={(v) => { setApiKey(v); setTestResult(null); }}
+        placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxx"
+        autoComplete="off"
+        monospaced
+        suffix={
+          <Button variant="plain" size="slim" onClick={() => setShowKey((s) => !s)}>
+            {showKey ? copy.hide : copy.show}
+          </Button>
+        }
+      />
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+        {copy.active}
+      </label>
+
+      {err && <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>}
+      {testResult && (
+        <Banner tone={testResult.ok ? "success" : "critical"} onDismiss={() => setTestResult(null)}>
+          {testResult.msg}
+        </Banner>
+      )}
+
+      <InlineStack gap="300">
+        <Button variant="primary" onClick={handleSave} loading={saving}>
+          {saved ? copy.saved : ui.save}
+        </Button>
+        <Button onClick={handleTest} loading={testing} disabled={!apiKey.trim()}>
+          {ui.test || copy.smtpTest}
+        </Button>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
 /** Manage From identities (same SMTP credentials); test each; one is default / main. */
 function SmtpSendersSection({ onToast, copy, ui }) {
   const [senders, setSenders] = useState([]);
@@ -1028,6 +1134,8 @@ export default function IntegrationsSettingsPage() {
               <SmtpSection copy={copy} ui={ui} smtpProviders={smtpProviders} />
               <Divider />
               <SmtpSendersSection onToast={setMsg} copy={copy} ui={ui} />
+              <Divider />
+              <ResendSection copy={copy} ui={ui} />
             </BlockStack>
           </IntegrationsAccordion>
         )}

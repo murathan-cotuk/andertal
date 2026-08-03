@@ -8,6 +8,7 @@ async function resolveSmtpSenderIdentity(client, profileIdNullable, sellerId = '
   const sid = String(sellerId || 'default').trim() || 'default'
   const pid = profileIdNullable != null && profileIdNullable !== '' ? String(profileIdNullable).trim() : ''
   const fb = String(fallbackName || '').trim() || 'Andertal'
+  const logger = require('./logger')
 
   if (pid) {
     const r = await client.query(
@@ -20,6 +21,11 @@ async function resolveSmtpSenderIdentity(client, profileIdNullable, sellerId = '
         fromName: String(r.rows[0].from_name || fb).trim() || fb,
       }
     }
+    // A specific sender profile was requested (e.g. a flow step's own smtp_sender_id) but the
+    // exact-id lookup found nothing — silently falling through to the platform default sender
+    // is exactly the symptom reported as "I picked X but Y was used". Log it so the mismatch
+    // (deleted profile? wrong seller scope? stale id?) is visible without DB access.
+    logger.warn(`[smtp-sender-resolve] requested profile id=${pid} seller_id=${sid} not found — falling back to default sender`)
   }
 
   const d = await client.query(
@@ -27,6 +33,7 @@ async function resolveSmtpSenderIdentity(client, profileIdNullable, sellerId = '
     [sid],
   )
   if (d.rows[0]?.from_email) {
+    if (pid) logger.warn(`[smtp-sender-resolve] fallback resolved to default sender: ${d.rows[0].from_email}`)
     return {
       fromEmail: String(d.rows[0].from_email).trim(),
       fromName: String(d.rows[0].from_name || fb).trim() || fb,

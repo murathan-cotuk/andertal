@@ -102,7 +102,22 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
             LEFT JOIN admin_hub_seller_settings sh ON sh.seller_id = o.seller_id`
           conditions.push(`(m.channel = 'customer' OR m.channel IS NULL)`)
           if (orderId) { params.push(orderId); conditions.push(`m.order_id = $${params.length}::uuid`) }
-          if (sellerId) { params.push(sellerId); conditions.push(`o.seller_id = $${params.length}`) }
+          if (sellerId) {
+            params.push(sellerId)
+            const n = params.length
+            // o.seller_id is always the platform now (an order can mix items from several real
+            // sellers) — match any order where this seller actually has an item, the same
+            // ownership pattern used by orders.js/transactions.js, not a direct o.seller_id match.
+            conditions.push(`(
+              o.seller_id = $${n}
+              OR EXISTS (
+                SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+                  EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                  OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
+                )
+              )
+            )`)
+          }
           if (searchRaw) {
             const term = `%${searchRaw.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
             params.push(term)
@@ -135,7 +150,15 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
             unreadParams
           )
         } else {
-          const unreadWhere = sellerId ? `AND m2.order_id IN (SELECT id FROM store_orders WHERE seller_id = $1)` : ''
+          const unreadWhere = sellerId ? `AND m2.order_id IN (
+              SELECT o.id FROM store_orders o WHERE o.seller_id = $1
+                OR EXISTS (
+                  SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+                    EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
+                    OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $1)
+                  )
+                )
+            )` : ''
           unreadR = await client.query(
             `SELECT COUNT(*)::int AS c FROM store_messages m2 WHERE (m2.channel = 'customer' OR m2.channel IS NULL) AND m2.sender_type = 'customer' AND m2.is_read_by_seller = false ${unreadWhere}`,
             sellerId ? [sellerId] : []
@@ -229,15 +252,17 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         }
 
         // Customer channel (default) — seller/superuser replying to a customer.
+        // The message is attributed to the REPLYING seller's own account, not the order's
+        // seller_id — an order's seller_id is always the platform now (an order can mix items
+        // from several real sellers), so it can no longer stand in for "which seller is this."
+        const replyingSellerId = String(req.sellerUser?.seller_id || '').trim() || null
         let recipientEmail = null
-        let orderSellerId = null
         let orderNumber = null
         let orderLocale = ''
         let orderCountry = ''
         if (order_id) {
-          const oR = await client.query(`SELECT email, seller_id, order_number, locale, country FROM store_orders WHERE id = $1::uuid`, [order_id])
+          const oR = await client.query(`SELECT email, order_number, locale, country FROM store_orders WHERE id = $1::uuid`, [order_id])
           recipientEmail = oR.rows[0]?.email || null
-          orderSellerId = oR.rows[0]?.seller_id || null
           orderNumber = oR.rows[0]?.order_number != null ? Number(oR.rows[0].order_number) : null
           orderLocale = String(oR.rows[0]?.locale || '').trim().toLowerCase()
           orderCountry = String(oR.rows[0]?.country || '').trim()
@@ -245,7 +270,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const r = await client.query(
           `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_customer)
            VALUES ($1, 'seller', $2, $3, $4, $5, 'customer', $6, true, false) RETURNING *`,
-          [order_id || null, req.sellerUser?.email || null, recipientEmail, subject || null, body, orderSellerId]
+          [order_id || null, req.sellerUser?.email || null, recipientEmail, subject || null, body, replyingSellerId]
         )
         const msg = r.rows[0]
 
@@ -256,8 +281,8 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
           const { resolveEmailLocaleFromCountry } = require('../flow-automation')
           const customerLocale = FLOW_EMAIL_LOCALES.includes(custLocaleRaw) ? custLocaleRaw : resolveEmailLocaleFromCountry(orderCountry)
           let sellerName = ''
-          if (orderSellerId) {
-            const sh = await client.query(`SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`, [orderSellerId])
+          if (replyingSellerId) {
+            const sh = await client.query(`SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`, [replyingSellerId])
             sellerName = String(sh.rows[0]?.store_name || '').trim()
           }
           runAutomationFlowsForMessageEvent({
@@ -581,28 +606,34 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const { order_id, body, subject, locale } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
 
-        // Resolve the order's seller (if any) so the notification actually reaches that seller's own
-        // account email — previously this looked up the platform's default SMTP "From" address instead
-        // of a real seller contact, so customer messages never reached the intended seller.
-        let orderSellerId = null
+        // A customer message about an order can concern ANY of the real sellers who have items
+        // in it — the order's own seller_id is always the platform now, so it can't identify
+        // "the" seller anymore. Until the customer can pick a specific product/seller to message
+        // about (a separate, larger feature), notify every distinct real seller who has an item
+        // in this order, instead of the wrong single "primary" seller (or nobody at all).
         let orderNumber = null
+        let distinctOrderSellerIds = []
         if (order_id) {
-          const oR = await client.query(`SELECT seller_id, order_number FROM store_orders WHERE id = $1::uuid`, [order_id])
-          orderSellerId = oR.rows[0]?.seller_id || null
+          const oR = await client.query(`SELECT order_number FROM store_orders WHERE id = $1::uuid`, [order_id])
           orderNumber = oR.rows[0]?.order_number != null ? Number(oR.rows[0].order_number) : null
+          const iR = await client.query(`SELECT DISTINCT seller_id FROM store_order_items WHERE order_id = $1::uuid`, [order_id])
+          distinctOrderSellerIds = (iR.rows || [])
+            .map((row) => String(row.seller_id || '').trim())
+            .filter((sid) => sid && sid !== 'default')
         }
+        const primarySellerId = distinctOrderSellerIds[0] || null
         let sellerEmail = ''
         let sellerLocale = 'de'
         let sellerName = ''
-        if (orderSellerId) {
+        if (primarySellerId) {
           const sur = await client.query(
             `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
-            [orderSellerId],
+            [primarySellerId],
           )
           sellerEmail = String(sur.rows[0]?.email || '').trim()
           const sh = await client.query(
             `SELECT store_name, locale FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
-            [orderSellerId],
+            [primarySellerId],
           )
           sellerName = String(sh.rows[0]?.store_name || '').trim()
           const sLoc = String(sh.rows[0]?.locale || '').trim().toLowerCase()
@@ -612,7 +643,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const r = await client.query(
           `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_customer)
            VALUES ($1, 'customer', $2, $3, $4, $5, 'customer', $6, false, true) RETURNING *`,
-          [order_id || null, payload.email, sellerEmail || null, subject || null, body, orderSellerId]
+          [order_id || null, payload.email, sellerEmail || null, subject || null, body, primarySellerId]
         )
 
         const custR = await client.query(`SELECT first_name, last_name FROM store_customers WHERE LOWER(email) = LOWER($1) LIMIT 1`, [payload.email])
@@ -641,15 +672,31 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
           dedupeKey: r.rows[0]?.id || '',
         }).catch((e) => console.error('[flow-automation] customer_message_sent', e?.message || e))
 
-        // Notify the seller by email in addition to the in-app Sellercentral inbox notification.
-        if (sellerEmail) {
+        // Notify EVERY distinct real seller with an item in this order — not just the "primary"
+        // one used for the stored message row/reply-to address — so nobody who actually fulfilled
+        // part of the order misses the notification, in addition to the in-app inbox notice.
+        for (const sid of distinctOrderSellerIds) {
+          const sur = await client.query(
+            `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
+            [sid],
+          )
+          const toEmail = String(sur.rows[0]?.email || '').trim()
+          if (!toEmail) continue
+          let locale2 = 'de'
+          if (sid === primarySellerId) {
+            locale2 = sellerLocale
+          } else {
+            const sh2 = await client.query(`SELECT locale FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`, [sid])
+            const sLoc2 = String(sh2.rows[0]?.locale || '').trim().toLowerCase()
+            locale2 = FLOW_EMAIL_LOCALES.includes(sLoc2) ? sLoc2 : 'de'
+          }
           runAutomationFlowsForMessageEvent({
             triggerKey: 'seller_new_customer_message',
-            toEmail: sellerEmail,
-            locale: sellerLocale,
+            toEmail,
+            locale: locale2,
             vars: sharedVars,
             orderId: order_id || '',
-            dedupeKey: r.rows[0]?.id || '',
+            dedupeKey: `${r.rows[0]?.id || ''}-${sid}`,
           }).catch((e) => console.error('[flow-automation] seller_new_customer_message', e?.message || e))
         }
 

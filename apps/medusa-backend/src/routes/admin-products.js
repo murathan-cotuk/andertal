@@ -667,7 +667,7 @@ const adminHubProductsPOST = async (req, res) => {
           // until the seller (or superuser review) activates them explicitly.
           const lr = await lc.query(
             'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-            [masterProduct.id, effectiveSellerId, priceCents || masterProduct.price_cents || 0, inventory, 'draft', skuVal]
+            [masterProduct.id, effectiveSellerId, priceCents, inventory, 'draft', skuVal]
           )
           listing = lr.rows[0]
           newListingCreated = true
@@ -700,7 +700,11 @@ const adminHubProductsPOST = async (req, res) => {
 
       if (callerSellerId) {
         const masterMeta = masterProduct.metadata && typeof masterProduct.metadata === 'object' ? masterProduct.metadata : {}
-        const LISTING_ONLY_META = ['shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name', 'seller_id', 'seller']
+        const LISTING_ONLY_META = [
+          'shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name', 'seller_id', 'seller',
+          // Per-seller commercial fields — must not create product change-requests / overwrite master
+          'sku', 'prices', 'uvp_cents', 'rabattpreis_cents', 'related_product_ids',
+        ]
         const crFields = []
         const fillFields = {}
 
@@ -786,15 +790,20 @@ const adminHubProductsPOST = async (req, res) => {
 
       const sellerViewProduct = {
         ...masterProduct, status: 'draft', sku: null, price: 0, inventory: 0,
-        metadata: {
-          ...(masterProduct.metadata && typeof masterProduct.metadata === 'object' ? masterProduct.metadata : {}),
-          publish_date: null, seller_name: null, shop_name: null, brand_id: null, shipping_group_id: null, related_product_ids: [],
-        },
+        metadata: (() => {
+          const m = masterProduct.metadata && typeof masterProduct.metadata === 'object' ? { ...masterProduct.metadata } : {}
+          for (const k of ['sku', 'prices', 'uvp_cents', 'rabattpreis_cents', 'publish_date', 'seller_name', 'shop_name', 'brand_id', 'shipping_group_id', 'related_product_ids', 'seller_id', 'seller']) {
+            delete m[k]
+          }
+          return m
+        })(),
         variants: Array.isArray(masterProduct.variants)
           ? masterProduct.variants.map((v) => ({
               ...(v || {}), sku: null, price: undefined, price_cents: 0,
-              compare_at_price: undefined, compare_at_price_cents: undefined, inventory: 0, inventory_quantity: 0,
-              metadata: { ...(v?.metadata && typeof v.metadata === 'object' ? v.metadata : {}), brand_id: null, shipping_group_id: null },
+              compare_at_price: undefined, compare_at_price_cents: undefined,
+              sale_price: undefined, sale_price_cents: undefined,
+              inventory: 0, inventory_quantity: 0,
+              metadata: { ...(v?.metadata && typeof v.metadata === 'object' ? v.metadata : {}), brand_id: null, shipping_group_id: null, sku: null, prices: undefined },
             }))
           : [],
       }
@@ -861,7 +870,7 @@ const adminHubProductsPOST = async (req, res) => {
               // until the seller (or superuser review) activates them explicitly.
               const lrFb = await lc2.query(
                 'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-                [fallbackMaster.id, callerSellerId, priceCentsFb || fallbackMaster.price_cents || 0, inventoryFb, 'draft']
+                [fallbackMaster.id, callerSellerId, priceCentsFb, inventoryFb, 'draft']
               )
               fallbackListing = lrFb.rows[0] || null
               try {
@@ -985,7 +994,11 @@ const adminHubProductByIdPUT = async (req, res) => {
     }
 
     const SELLER_LISTING_FIELDS = ['price', 'inventory', 'status', 'sku']
-    const SELLER_LISTING_META_FIELDS = ['shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name']
+    const SELLER_LISTING_META_FIELDS = [
+      'shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name',
+      // Seller commercial data — not shared catalog / not a change-request
+      'sku', 'prices', 'uvp_cents', 'rabattpreis_cents', 'related_product_ids',
+    ]
 
     if (callerSellerId && existing && existing.seller_id && String(existing.seller_id).trim() !== callerSellerId && !isSuperuserCaller) {
       const existingMeta = existing && existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}
@@ -1261,12 +1274,39 @@ module.exports = function createAdminProductsRouter() {
       const matchedVariant = matchedOnParent
         ? null
         : parseVariantsArray(master).find((v) => normalizeStoreEan(v && v.ean) === normEan) || null
+      // Strip seller-owned commercial fields so another seller never sees SKU/price/shipping
+      const SELLER_OWNED_META = [
+        'sku', 'prices', 'uvp_cents', 'rabattpreis_cents',
+        'shipping_group_id', 'brand_id', 'publish_date',
+        'seller_id', 'seller', 'seller_name', 'shop_name', 'related_product_ids',
+      ]
+      const safeMeta = { ...masterMeta }
+      for (const k of SELLER_OWNED_META) delete safeMeta[k]
+      const sanitizeVariant = (v) => {
+        const vm = v?.metadata && typeof v.metadata === 'object' ? { ...v.metadata } : {}
+        delete vm.shipping_group_id
+        delete vm.brand_id
+        delete vm.sku
+        delete vm.prices
+        return {
+          ...v,
+          sku: undefined,
+          ean: (v && v.ean) || undefined,
+          price: undefined,
+          price_cents: 0,
+          compare_at_price: undefined,
+          compare_at_price_cents: undefined,
+          sale_price: undefined,
+          sale_price_cents: undefined,
+          inventory: 0,
+          inventory_quantity: 0,
+          metadata: vm,
+        }
+      }
       const catalogProduct = {
         id: master.id, title: master.title, handle: master.handle, description: master.description,
-        metadata: masterMeta && typeof masterMeta === 'object' ? { ...masterMeta } : {},
-        variants: Array.isArray(master.variants)
-          ? master.variants.map((v) => ({ ...v, sku: undefined, ean: (v && v.ean) || undefined, price: undefined, price_cents: 0, inventory: 0, inventory_quantity: 0 }))
-          : [],
+        metadata: safeMeta,
+        variants: Array.isArray(master.variants) ? master.variants.map(sanitizeVariant) : [],
       }
       res.json({
         product: catalogProduct,

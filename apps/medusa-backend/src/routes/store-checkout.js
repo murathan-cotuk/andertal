@@ -1017,39 +1017,14 @@ const storePaymentIntentPOST = async (req, res) => {
       })
     }
 
-    let cartSellerId = 'default'
-    try {
-      const fi = items[0]
-      if (fi && fi.product_id) {
-        const sr = await client.query('SELECT seller_id FROM admin_hub_products WHERE id = $1', [fi.product_id])
-        if (sr.rows?.[0]?.seller_id) cartSellerId = sr.rows[0].seller_id
-      }
-    } catch (_) {}
-
-    // Stripe Connect: look up seller's connected account for Destination Charges
-    let sellerStripeAccountId = null
-    let sellerConnectCommissionRate = 0.12
-    try {
-      if (cartSellerId && cartSellerId !== 'default') {
-        const scr = await client.query(
-          `SELECT stripe_account_id, stripe_onboarding_complete, commission_rate
-             FROM seller_users WHERE seller_id = $1 LIMIT 1`,
-          [cartSellerId],
-        )
-        const scRow = scr.rows?.[0]
-        if (scRow?.stripe_onboarding_complete === true && scRow?.stripe_account_id) {
-          sellerStripeAccountId = scRow.stripe_account_id
-        }
-        if (scRow?.commission_rate != null) {
-          sellerConnectCommissionRate = Number(scRow.commission_rate)
-        }
-      }
-    } catch (_) {}
-
-    const cartSellerDisplay = await resolveSellerDisplayNameForStripe(client, cartSellerId)
-    const cartSellerLabel =
-      truncateForStripeDescription(cartSellerDisplay) ||
-      (cartSellerId === 'default' ? 'Marketplace' : String(cartSellerId))
+    // The order owner is always the platform (Andertal), never "whichever seller happened to
+    // own the cart's first item" — a cart routinely mixes items from multiple sellers, and even
+    // a single-seller cart must behave the same way for consistency (see order-creation below,
+    // which mirrors this). Per-seller payout is settled internally from store_order_items.seller_id
+    // (see payouts.js/transactions.js), not by routing the customer's payment to a seller's own
+    // Stripe account — so no Destination Charge / transfer_data is used here anymore.
+    const cartSellerId = 'default'
+    const cartSellerLabel = 'Marketplace'
 
     const platformRow = await loadPlatformCheckoutRow(client)
     const secretKeyResolved = resolveStripeSecretKeyFromPlatform(platformRow)
@@ -1102,7 +1077,7 @@ const storePaymentIntentPOST = async (req, res) => {
       metadata: {
         cart_id: cartId,
         seller_id: String(cartSellerId),
-        seller_name: truncateForStripeDescription(cartSellerDisplay, 500) || cartSellerLabel,
+        seller_name: cartSellerLabel,
         subtotal_cents: String(subtotalCents),
         /** Seller/commerce basis before bonus (same as subtotal lines); bonus is platform-funded. */
         seller_settlement_basis_cents: String(subtotalCents),
@@ -1119,17 +1094,6 @@ const storePaymentIntentPOST = async (req, res) => {
       piBody.customer = stripeCustomerId
       // Required by Stripe when Customer Session has payment_method_save=enabled
       piBody.setup_future_usage = 'off_session'
-    }
-
-    // Destination Charge: route payment directly to seller's connected account.
-    // Platform keeps application_fee_amount (commission). Only applied when seller
-    // has completed Stripe Connect onboarding.
-    if (sellerStripeAccountId) {
-      const commCents = Math.max(0, Math.round(subtotalCents * sellerConnectCommissionRate))
-      piBody.transfer_data = { destination: sellerStripeAccountId }
-      piBody.application_fee_amount = commCents
-      piBody.metadata.commission_cents = String(commCents)
-      piBody.metadata.seller_stripe_account_id = sellerStripeAccountId
     }
 
     const cancelPiId = (body.cancel_payment_intent_id || '').toString().trim()
@@ -3049,22 +3013,13 @@ const storeOrdersPOST = async (req, res) => {
     const localeRaw = (body.locale || '').toString().trim().toLowerCase()
     const locale = ['en', 'de', 'tr', 'fr', 'it', 'es'].includes(localeRaw) ? localeRaw : null
 
-    // Determine seller_id from the first cart item's product
-    let sellerId = 'default'
-    try {
-      const firstItem = items[0]
-      if (firstItem && firstItem.product_id) {
-        const sellerRow = await client.query('SELECT seller_id FROM admin_hub_products WHERE id = $1', [firstItem.product_id])
-        if (sellerRow.rows && sellerRow.rows[0] && sellerRow.rows[0].seller_id) {
-          sellerId = sellerRow.rows[0].seller_id
-        }
-      }
-    } catch (_) {}
-
-    const sellerDisplayForStripe = await resolveSellerDisplayNameForStripe(client, sellerId)
-    const sellerLabelShort =
-      truncateForStripeDescription(sellerDisplayForStripe) ||
-      (sellerId === 'default' ? 'Marketplace' : String(sellerId))
+    // The order owner is always the platform — never "whichever seller happened to own the
+    // cart's first item" (see storePaymentIntentPOST's cartSellerId for the matching PaymentIntent
+    // side of this). A cart routinely mixes items from multiple sellers, and a single-seller
+    // cart behaves the same way for consistency. Per-item seller attribution for commission/
+    // payout/visibility lives on store_order_items.seller_id (set below per line item), never here.
+    const sellerId = 'default'
+    const sellerLabelShort = 'Marketplace'
 
     // Customer: angemeldet → immer Konto-E-Mail + customer_id (Bestellungen unter „Meine Bestellungen“)
     let customerId = null
@@ -3332,7 +3287,7 @@ const storeOrdersPOST = async (req, res) => {
             order_number: String(orderNumber),
             order_id: String(orderId),
             seller_id: String(sellerId),
-            seller_name: truncateForStripeDescription(sellerDisplayForStripe, 500) || sellerLabelShort,
+            seller_name: sellerLabelShort,
           },
         })
       } catch (_) {}

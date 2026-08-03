@@ -101,7 +101,22 @@ const adminHubReturnsGET = async (req, res) => {
     const sellerId = (req.query.seller_id || '').trim()
     const params = []
     let where = ''
-    if (sellerId) { params.push(sellerId); where = `WHERE o.seller_id = $${params.length}` }
+    if (sellerId) {
+      params.push(sellerId)
+      const n = params.length
+      // o.seller_id is always the platform now (an order can mix items from several real
+      // sellers) — match any order where this seller actually has an item, same pattern as
+      // orders.js/transactions.js/messages.js.
+      where = `WHERE (
+        o.seller_id = $${n}
+        OR EXISTS (
+          SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+            EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+            OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
+          )
+        )
+      )`
+    }
     const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method, o.seller_id FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ${where} ORDER BY r.created_at DESC LIMIT 100`, params)
     await client.end()
     res.json({ returns: (r.rows || []).map(row => ({ ...row, return_number: row.return_number ? Number(row.return_number) : null, order_number: row.order_number ? Number(row.order_number) : null })) })

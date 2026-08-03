@@ -147,22 +147,27 @@ module.exports = function createDac7Router({ getSellerDbClient }) {
         `SELECT
            su.seller_id, su.store_name, su.email, su.company_name,
            su.tax_id, su.vat_id, su.iban, su.business_address, su.lucid_number,
-           COALESCE(SUM(o.subtotal_cents), 0)::bigint AS revenue_cents,
-           COUNT(o.id)::int AS transaction_count,
+           COALESCE(agg.revenue_cents, 0)::bigint AS revenue_cents,
+           COALESCE(agg.transaction_count, 0)::int AS transaction_count,
            su.commission_rate
          FROM seller_users su
-         LEFT JOIN store_orders o
-           ON o.seller_id = su.seller_id
-           AND o.payment_status = 'bezahlt'
-           AND EXTRACT(YEAR FROM o.created_at) = $1
+         LEFT JOIN (
+           -- An order's own seller_id is always the platform (an order can mix items from
+           -- several real sellers) — reportable income must come from this seller's own
+           -- line items, never the whole order's subtotal.
+           SELECT oi.seller_id AS seller_id,
+                  SUM(oi.unit_price_cents * oi.quantity)::bigint AS revenue_cents,
+                  COUNT(DISTINCT oi.order_id)::int AS transaction_count
+           FROM store_order_items oi
+           JOIN store_orders o ON o.id = oi.order_id
+           WHERE o.payment_status = 'bezahlt'
+             AND EXTRACT(YEAR FROM o.created_at) = $1
+             AND oi.seller_id IS NOT NULL AND oi.seller_id != ''
+           GROUP BY oi.seller_id
+         ) agg ON agg.seller_id = su.seller_id
          WHERE su.sub_of_seller_id IS NULL
            AND su.is_superuser = false
-         GROUP BY su.seller_id, su.store_name, su.email, su.company_name,
-                  su.tax_id, su.vat_id, su.iban, su.business_address,
-                  su.lucid_number, su.commission_rate
-         HAVING
-           COALESCE(SUM(o.subtotal_cents), 0) >= $2
-           OR COUNT(o.id) >= $3
+           AND (COALESCE(agg.revenue_cents, 0) >= $2 OR COALESCE(agg.transaction_count, 0) >= $3)
          ORDER BY revenue_cents DESC`,
         [year, DAC7_MIN_REVENUE_CENTS, DAC7_MIN_TRANSACTIONS]
       )
