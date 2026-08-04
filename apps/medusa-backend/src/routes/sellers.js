@@ -326,6 +326,35 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
           setImmediate(() => {
             try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: 'seller_docs_submitted', sellerUserId: seller.id }).catch(() => {}) } catch (_) {}
           })
+          // Superuser panel notification (SellerCentral bell → "Verifizierung & Evrak").
+          // Previously ONLY POST /admin-hub/v1/verification/start inserted this row, but a
+          // seller can submit documents here (draft save) without ever reaching that gated
+          // endpoint (it requires LUCID number + trade-register + ID doc + signed agreement) —
+          // so first-time document submissions produced no admin-facing signal at all.
+          setImmediate(() => {
+            (async () => {
+              const notifClient = getDbClient ? getDbClient() : getSellerDbClient()
+              if (!notifClient) return
+              try {
+                await notifClient.connect()
+                const storeName = seller.store_name || seller.email || sellerId || 'Ein Verkäufer'
+                await notifClient.query(
+                  `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+                   VALUES ('verification_submitted', $1, $2, $3, $4)`,
+                  [
+                    `${storeName} — Evrak eingereicht`,
+                    `${storeName} hat Verifizierungsdokumente eingereicht. Bitte prüfen.`,
+                    sellerId || null,
+                    seller.id,
+                  ]
+                )
+                await notifClient.end()
+              } catch (e) {
+                try { await notifClient.end() } catch (_) {}
+                console.error('[adminHubSellerCompanyInfoPATCH] admin_hub_notifications insert failed:', e.message)
+              }
+            })()
+          })
         }
       } catch (e) {
         try { await client.end() } catch (_) {}

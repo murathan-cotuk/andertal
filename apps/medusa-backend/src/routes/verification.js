@@ -107,7 +107,9 @@ module.exports = function createVerificationRouter({ getSellerDbClient, getProdu
             )
             await notifClient.end()
           }
-        } catch (_) {}
+        } catch (e) {
+          console.error('[verification/start] admin_hub_notifications insert failed:', e.message)
+        }
 
         res.json({
           score: result.score,

@@ -147,16 +147,13 @@ function requireSuperuser(req, res, next) {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 async function notifySuperusersNewSeller({ email, store_name, seller_id, first_name, last_name }) {
-  if (!process.env.SMTP_HOST) return
+  // Recipients: explicit SUPERUSER_EMAILS env var, else the same default superuser
+  // list used to decide is_superuser at registration time (INITIAL_SUPERUSER_EMAILS).
+  // Previously this fell back to an empty list and silently no-op'd when
+  // SUPERUSER_EMAILS wasn't set, even though a superuser account clearly existed.
   const superuserEmails = (process.env.SUPERUSER_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean)
-  if (!superuserEmails.length) return
-  const nodemailer = require('nodemailer')
-  const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
-  })
+  const recipients = superuserEmails.length ? superuserEmails : INITIAL_SUPERUSER_EMAILS
+  if (!recipients.length) return
   const sellerCentralUrl = process.env.SELLER_CENTRAL_URL || 'https://andertal-sellercentral.vercel.app'
   const displayName = [first_name, last_name].filter(Boolean).join(' ') || email
   const subject = `Neuer Seller registriert: ${store_name || email}`
@@ -177,9 +174,13 @@ async function notifySuperusersNewSeller({ email, store_name, seller_id, first_n
   </a>
   <p style="margin-top:24px;font-size:12px;color:#9ca3af">Diese E-Mail wurde automatisch generiert.</p>
 </div>`
-  await transport.sendMail({
-    from: process.env.SMTP_FROM || '"Andertal Sellercentral" <noreply@andertal.de>',
-    to: superuserEmails.join(', '),
+  // Route through the shared email service (Resend, then generic SMTP_*, then a
+  // logged dev fallback) instead of a bespoke nodemailer transport gated on
+  // SMTP_HOST — this project mostly sends outbound mail via RESEND_API_KEY, which
+  // the old raw-env-var check ignored, so this notification silently never sent.
+  const { sendEmail } = require('../email')
+  await sendEmail({
+    to: recipients,
     subject,
     html,
     text: `Neuer Seller registriert\n\nName: ${displayName}\nE-Mail: ${email}\nShop: ${store_name || '—'}\nSeller ID: ${seller_id}\n\nFreischalten: ${sellerCentralUrl}/de/settings/users-permissions`,
