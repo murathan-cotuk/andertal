@@ -1,12 +1,294 @@
 'use strict'
 const { Router } = require('express')
 
+const pagesI18nJsonbOrNull = (v) => {
+  if (v === undefined || v === null) return null
+  if (typeof v !== 'object' || Array.isArray(v)) return null
+  try {
+    return JSON.stringify(v)
+  } catch {
+    return null
+  }
+}
+
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   if (!dbUrl || !dbUrl.startsWith('postgres')) return null
   const { Client } = require('pg')
   const isRender = dbUrl.includes('render.com')
   return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+}
+
+const SUPPORT_CONTAINER_TYPES = new Set([
+  'support_hero',
+  'support_case_wizard',
+  'support_topic_grid',
+  'support_faq',
+])
+const POLLUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
+const LOCALES = new Set(['de', 'en', 'tr', 'fr', 'es', 'it'])
+const PLATFORM_SUPPORT_CATEGORIES = new Set(['payment', 'account', 'bonus', 'privacy', 'technical', 'other'])
+const ORDER_SUPPORT_CATEGORIES = new Set(['order', 'delivery', 'return', 'refund', 'invoice', 'product', 'seller'])
+const COLOR_RE = /^(#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})|(?:rgb|hsl)a?\([\d\s.,%+-]+\)|transparent)$/i
+const SAFE_PATH_RE = /^\/(?!\/)[^\s<>{}\\]*$/
+const HTTPS_URL_RE = /^https:\/\/[^\s<>{}\\]+$/i
+const SAFE_ANCHOR_RE = /^#[a-z][a-z0-9_-]*$/i
+const CSS_SIZE_RE = /^(?:0|(?:\d+(?:\.\d+)?)(?:px|rem|em|%|vw|vh))$/
+const CSS_BOX_RE = /^(?:0|\d+(?:\.\d+)?(?:px|rem|em|%|vw|vh))(?:\s+(?:0|\d+(?:\.\d+)?(?:px|rem|em|%|vw|vh))){0,3}$/
+
+const isPlainObject = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+const cleanObject = (value) => {
+  if (Array.isArray(value)) return value.map(cleanObject)
+  if (!isPlainObject(value)) return value
+  const out = Object.create(null)
+  for (const [key, child] of Object.entries(value)) {
+    if (!POLLUTION_KEYS.has(key)) out[key] = cleanObject(child)
+  }
+  return out
+}
+
+const fail = (path, message) => {
+  const err = new Error(`${path}: ${message}`)
+  err.statusCode = 400
+  throw err
+}
+const text = (value, path, max, { required = false } = {}) => {
+  if (value == null && !required) return undefined
+  if (typeof value !== 'string') fail(path, 'must be a string')
+  const result = value.trim()
+  if (required && !result) fail(path, 'is required')
+  if (result.length > max) fail(path, `must be at most ${max} characters`)
+  return result
+}
+const bool = (value, path) => {
+  if (typeof value !== 'boolean') fail(path, 'must be a boolean')
+  return value
+}
+const integer = (value, path, min, max) => {
+  if (!Number.isInteger(value) || value < min || value > max) fail(path, `must be an integer from ${min} to ${max}`)
+  return value
+}
+const color = (value, path) => {
+  const result = text(value, path, 64, { required: true })
+  if (!COLOR_RE.test(result)) fail(path, 'must be a safe CSS color')
+  return result
+}
+const url = (value, path, { optional = true } = {}) => {
+  const result = text(value, path, 2048, { required: !optional })
+  if (!result) return ''
+  if (!SAFE_PATH_RE.test(result) && !HTTPS_URL_RE.test(result) && !SAFE_ANCHOR_RE.test(result)) fail(path, 'must be a relative path, anchor or HTTPS URL')
+  return result
+}
+const oneOf = (value, path, allowed) => {
+  if (!allowed.includes(value)) fail(path, `must be one of: ${allowed.join(', ')}`)
+  return value
+}
+const boundedArray = (value, path, max, min = 0) => {
+  if (!Array.isArray(value) || value.length < min || value.length > max) fail(path, `must contain ${min}-${max} items`)
+  return value
+}
+const copyFields = (source, target, fields, path) => {
+  for (const [key, max, required] of fields) {
+    if (source[key] !== undefined) target[key] = text(source[key], `${path}.${key}`, max, { required })
+  }
+}
+const localized = (source, target, fields, path) => {
+  if (source._i18n === undefined) return
+  if (!isPlainObject(source._i18n)) fail(`${path}._i18n`, 'must be an object')
+  const translations = Object.create(null)
+  for (const [locale, values] of Object.entries(source._i18n)) {
+    if (!LOCALES.has(locale) || locale === 'de') fail(`${path}._i18n.${locale}`, 'unsupported locale')
+    if (!isPlainObject(values)) fail(`${path}._i18n.${locale}`, 'must be an object')
+    const translated = Object.create(null)
+    const allowed = new Set(fields.map(([key]) => key))
+    for (const key of Object.keys(values)) if (!allowed.has(key)) fail(`${path}._i18n.${locale}.${key}`, 'unknown field')
+    copyFields(values, translated, fields, `${path}._i18n.${locale}`)
+    translations[locale] = translated
+  }
+  target._i18n = translations
+}
+const validateKeys = (source, path, allowed) => {
+  for (const key of Object.keys(source)) if (!allowed.has(key)) fail(`${path}.${key}`, 'unknown field')
+}
+
+const COMMON_FIELDS = new Set([
+  'id', 'type', 'visible', 'visible_on', 'padding', 'margin', 'content_layout', 'content_max_width', '_i18n',
+])
+const sanitizeCommon = (source, out, path) => {
+  if (source.id !== undefined) out.id = text(source.id, `${path}.id`, 100, { required: true })
+  out.type = source.type
+  if (source.visible !== undefined) out.visible = bool(source.visible, `${path}.visible`)
+  if (source.visible_on !== undefined) out.visible_on = oneOf(source.visible_on, `${path}.visible_on`, ['desktop', 'tablet', 'mobile', 'both'])
+  if (source.padding !== undefined) {
+    const padding = text(source.padding, `${path}.padding`, 100, { required: true })
+    if (!CSS_BOX_RE.test(padding)) fail(`${path}.padding`, 'must be safe CSS box spacing')
+    out.padding = padding
+  }
+  if (source.content_layout !== undefined) out.content_layout = oneOf(source.content_layout, `${path}.content_layout`, ['full', 'contained'])
+  if (source.content_max_width !== undefined) {
+    const size = text(source.content_max_width, `${path}.content_max_width`, 32, { required: true })
+    if (!CSS_SIZE_RE.test(size)) fail(`${path}.content_max_width`, 'must be a safe CSS size')
+    out.content_max_width = size
+  }
+  if (source.margin !== undefined) {
+    if (!isPlainObject(source.margin)) fail(`${path}.margin`, 'must be an object')
+    out.margin = Object.create(null)
+    for (const [key, value] of Object.entries(source.margin)) {
+      if (!['top', 'right', 'bottom', 'left'].includes(key)) fail(`${path}.margin.${key}`, 'unknown field')
+      const spacing = text(value, `${path}.margin.${key}`, 32, { required: true })
+      if (!CSS_SIZE_RE.test(spacing)) fail(`${path}.margin.${key}`, 'must be a safe CSS size')
+      out.margin[key] = spacing
+    }
+  }
+}
+
+const sanitizeSupportContainer = (source, path) => {
+  if (!isPlainObject(source)) fail(path, 'must be an object')
+  const out = Object.create(null)
+  sanitizeCommon(source, out, path)
+  const localizedFields = []
+  let allowed = new Set(COMMON_FIELDS)
+
+  if (source.type === 'support_hero') {
+    const fields = [
+      ['title', 160, true], ['description', 600], ['trust_text', 240], ['search_placeholder', 160],
+      ['primary_action_label', 100], ['secondary_action_label', 100], ['open_case_count_text', 160],
+    ]
+    fields.forEach(([key]) => allowed.add(key))
+    ;['primary_action_url', 'secondary_action_url'].forEach((key) => allowed.add(key))
+    ;['bg_color', 'text_color', 'accent_color'].forEach((key) => allowed.add(key))
+    ;['image', 'layout'].forEach((key) => allowed.add(key))
+    allowed.add('open_case_count_enabled')
+    copyFields(source, out, fields, path)
+    for (const key of ['primary_action_url', 'secondary_action_url']) if (source[key] !== undefined) out[key] = url(source[key], `${path}.${key}`)
+    for (const key of ['bg_color', 'text_color', 'accent_color']) if (source[key] !== undefined) out[key] = color(source[key], `${path}.${key}`)
+    if (source.image !== undefined) out.image = url(source.image, `${path}.image`)
+    if (source.layout !== undefined) out.layout = oneOf(source.layout, `${path}.layout`, ['centered', 'split', 'image-left'])
+    if (source.open_case_count_enabled !== undefined) out.open_case_count_enabled = bool(source.open_case_count_enabled, `${path}.open_case_count_enabled`)
+    localizedFields.push(...fields, ['image', 2048])
+  } else if (source.type === 'support_case_wizard') {
+    const fields = [
+      ['title', 160, true], ['description', 600], ['category_heading', 160],
+      ['subtopic_heading', 160], ['order_heading', 160], ['continue_label', 80], ['back_label', 80],
+    ]
+    fields.forEach(([key]) => allowed.add(key))
+    allowed.add('categories')
+    copyFields(source, out, fields, path)
+    const categories = boundedArray(source.categories, `${path}.categories`, 16, 1)
+    out.categories = categories.map((category, index) => {
+      const itemPath = `${path}.categories[${index}]`
+      if (!isPlainObject(category)) fail(itemPath, 'must be an object')
+      validateKeys(category, itemPath, new Set(['key', 'runtime_category', 'label', 'order', 'order_related', 'platform', 'subtopics', '_i18n']))
+      const item = Object.create(null)
+      item.key = text(category.key, `${itemPath}.key`, 64, { required: true })
+      if (!/^[a-z0-9_-]+$/.test(item.key)) fail(`${itemPath}.key`, 'must be a semantic key')
+      item.runtime_category = text(category.runtime_category, `${itemPath}.runtime_category`, 50, { required: true })
+      if (!PLATFORM_SUPPORT_CATEGORIES.has(item.runtime_category) && !ORDER_SUPPORT_CATEGORIES.has(item.runtime_category)) {
+        fail(`${itemPath}.runtime_category`, 'must be a backend-supported category')
+      }
+      item.label = text(category.label, `${itemPath}.label`, 120, { required: true })
+      item.order = integer(category.order, `${itemPath}.order`, 0, 999)
+      item.order_related = bool(category.order_related, `${itemPath}.order_related`)
+      item.platform = bool(category.platform, `${itemPath}.platform`)
+      if (item.platform !== PLATFORM_SUPPORT_CATEGORIES.has(item.runtime_category)) fail(`${itemPath}.platform`, 'must match runtime category routing')
+      if (item.order_related !== ORDER_SUPPORT_CATEGORIES.has(item.runtime_category)) fail(`${itemPath}.order_related`, 'must match runtime category routing')
+      item.subtopics = boundedArray(category.subtopics, `${itemPath}.subtopics`, 24, 1).map((subtopic, subIndex) => {
+        const subPath = `${itemPath}.subtopics[${subIndex}]`
+        if (!isPlainObject(subtopic)) fail(subPath, 'must be an object')
+        validateKeys(subtopic, subPath, new Set(['label', 'order', '_i18n']))
+        const sub = { label: text(subtopic.label, `${subPath}.label`, 160, { required: true }), order: integer(subtopic.order, `${subPath}.order`, 0, 999) }
+        localized(subtopic, sub, [['label', 160]], subPath)
+        return sub
+      })
+      localized(category, item, [['label', 120]], itemPath)
+      return item
+    })
+    localizedFields.push(...fields)
+  } else if (source.type === 'support_topic_grid') {
+    const fields = [['title', 160, true], ['description', 600]]
+    fields.forEach(([key]) => allowed.add(key))
+    ;['topics', 'columns'].forEach((key) => allowed.add(key))
+    copyFields(source, out, fields, path)
+    if (source.columns !== undefined) out.columns = integer(source.columns, `${path}.columns`, 2, 4)
+    out.topics = boundedArray(source.topics, `${path}.topics`, 24, 1).map((topic, index) => {
+      const itemPath = `${path}.topics[${index}]`
+      if (!isPlainObject(topic)) fail(itemPath, 'must be an object')
+      validateKeys(topic, itemPath, new Set(['icon', 'title', 'description', 'category', 'order', '_i18n']))
+      const item = {
+        icon: text(topic.icon, `${itemPath}.icon`, 80, { required: true }),
+        title: text(topic.title, `${itemPath}.title`, 120, { required: true }),
+        description: text(topic.description, `${itemPath}.description`, 400),
+        category: text(topic.category, `${itemPath}.category`, 64, { required: true }),
+        order: integer(topic.order, `${itemPath}.order`, 0, 999),
+      }
+      if (!/^[a-z0-9_-]+$/.test(item.category)) fail(`${itemPath}.category`, 'must be a semantic category key')
+      localized(topic, item, [['title', 120], ['description', 400]], itemPath)
+      return item
+    })
+    localizedFields.push(...fields)
+  } else {
+    const fields = [['title', 160, true], ['description', 600], ['section_label', 120], ['no_results_text', 240]]
+    fields.forEach(([key]) => allowed.add(key))
+    allowed.add('categories')
+    copyFields(source, out, fields, path)
+    out.categories = boundedArray(source.categories, `${path}.categories`, 16, 1).map((category, index) => {
+      const itemPath = `${path}.categories[${index}]`
+      if (!isPlainObject(category)) fail(itemPath, 'must be an object')
+      validateKeys(category, itemPath, new Set(['title', 'order', 'items', '_i18n']))
+      const item = {
+        title: text(category.title, `${itemPath}.title`, 120, { required: true }),
+        order: integer(category.order, `${itemPath}.order`, 0, 999),
+      }
+      item.items = boundedArray(category.items, `${itemPath}.items`, 40, 1).map((faq, faqIndex) => {
+        const faqPath = `${itemPath}.items[${faqIndex}]`
+        if (!isPlainObject(faq)) fail(faqPath, 'must be an object')
+        validateKeys(faq, faqPath, new Set(['question', 'answer', 'order', 'action_label', 'action_url', '_i18n']))
+        const entry = {
+          question: text(faq.question, `${faqPath}.question`, 240, { required: true }),
+          answer: text(faq.answer, `${faqPath}.answer`, 4000, { required: true }),
+          order: integer(faq.order, `${faqPath}.order`, 0, 999),
+        }
+        if (faq.action_label !== undefined) entry.action_label = text(faq.action_label, `${faqPath}.action_label`, 100)
+        if (faq.action_url !== undefined) entry.action_url = url(faq.action_url, `${faqPath}.action_url`)
+        localized(faq, entry, [['question', 240], ['answer', 4000], ['action_label', 100]], faqPath)
+        return entry
+      })
+      localized(category, item, [['title', 120]], itemPath)
+      return item
+    })
+    localizedFields.push(...fields)
+  }
+
+  validateKeys(source, path, allowed)
+  localized(source, out, localizedFields, path)
+  if (source.type === 'support_hero' && out._i18n) {
+    for (const [locale, values] of Object.entries(out._i18n)) {
+      if (values.image !== undefined) values.image = url(values.image, `${path}._i18n.${locale}.image`)
+    }
+  }
+  return out
+}
+
+const sanitizeLandingPayload = (body) => {
+  const cleaned = cleanObject(body)
+  if (!isPlainObject(cleaned)) fail('body', 'must be an object')
+  if (!Array.isArray(cleaned.containers)) fail('containers', 'must be an array')
+  if (cleaned.settings !== undefined && !isPlainObject(cleaned.settings)) fail('settings', 'must be an object')
+  const containers = cleaned.containers
+  if (containers.length > 200) fail('containers', 'must contain at most 200 items')
+  return {
+    containers: containers.map((container, index) => (
+      SUPPORT_CONTAINER_TYPES.has(container?.type)
+        ? sanitizeSupportContainer(container, `containers[${index}]`)
+        : container
+    )),
+    settings: isPlainObject(cleaned.settings) ? cleaned.settings : {},
+  }
 }
 
 const pagesListGET = async (req, res) => {
@@ -18,7 +300,8 @@ const pagesListGET = async (req, res) => {
     const pageType = (req.query.page_type || '').trim() || null
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100)
     const offset = parseInt(req.query.offset, 10) || 0
-    let q = `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at
+    let q = `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords,
+      title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at
       FROM admin_hub_pages WHERE 1=1`
     const params = []
     if (status) { params.push(status); q += ` AND status = $${params.length}` }
@@ -59,13 +342,18 @@ const pagesCreatePOST = async (req, res) => {
   const meta_title = b.meta_title != null ? String(b.meta_title).trim() || null : null
   const meta_description = b.meta_description != null ? String(b.meta_description) : null
   const meta_keywords = b.meta_keywords != null ? String(b.meta_keywords).trim() || null : null
+  const title_i18n = pagesI18nJsonbOrNull(b.title_i18n)
+  const body_i18n = pagesI18nJsonbOrNull(b.body_i18n)
+  const excerpt_i18n = pagesI18nJsonbOrNull(b.excerpt_i18n)
+  const meta_title_i18n = pagesI18nJsonbOrNull(b.meta_title_i18n)
+  const meta_description_i18n = pagesI18nJsonbOrNull(b.meta_description_i18n)
   try {
     await client.connect()
     const r = await client.query(
-      `INSERT INTO admin_hub_pages (title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at`,
-      [title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords]
+      `INSERT INTO admin_hub_pages (title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at`,
+      [title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n]
     )
     res.status(201).json(r.rows[0])
   } catch (err) {
@@ -82,7 +370,8 @@ const pageByIdGET = async (req, res) => {
   try {
     await client.connect()
     const r = await client.query(
-      `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at
+      `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords,
+              title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at
        FROM admin_hub_pages WHERE id = $1`,
       [req.params.id]
     )
@@ -112,13 +401,18 @@ const pageByIdPUT = async (req, res) => {
   if (b.meta_title !== undefined) { updates.push(`meta_title = $${i++}`); values.push(b.meta_title ? String(b.meta_title).trim() : null) }
   if (b.meta_description !== undefined) { updates.push(`meta_description = $${i++}`); values.push(b.meta_description) }
   if (b.meta_keywords !== undefined) { updates.push(`meta_keywords = $${i++}`); values.push(b.meta_keywords ? String(b.meta_keywords).trim() : null) }
+  if (b.title_i18n !== undefined) { updates.push(`title_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.title_i18n)) }
+  if (b.body_i18n !== undefined) { updates.push(`body_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.body_i18n)) }
+  if (b.excerpt_i18n !== undefined) { updates.push(`excerpt_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.excerpt_i18n)) }
+  if (b.meta_title_i18n !== undefined) { updates.push(`meta_title_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.meta_title_i18n)) }
+  if (b.meta_description_i18n !== undefined) { updates.push(`meta_description_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.meta_description_i18n)) }
   if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
   updates.push(`updated_at = now()`)
   values.push(req.params.id)
   try {
     await client.connect()
     const r = await client.query(
-      `UPDATE admin_hub_pages SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, created_at, updated_at`,
+      `UPDATE admin_hub_pages SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at`,
       values
     )
     if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
@@ -153,7 +447,8 @@ const storePagesListGET = async (req, res) => {
   try {
     await client.connect()
     const pageType = (req.query.page_type || '').trim() || null
-    let q = `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords, updated_at
+    let q = `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords,
+      title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, updated_at
       FROM admin_hub_pages WHERE status = $1`
     const params = ['published']
     if (pageType) { params.push(pageType); q += ` AND page_type = $2` }
@@ -173,7 +468,8 @@ const storePageBySlugGET = async (req, res) => {
   try {
     await client.connect()
     const r = await client.query(
-      `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords, updated_at
+      `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords,
+              title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, updated_at
        FROM admin_hub_pages WHERE slug = $1 AND status = 'published'`,
       [req.params.slug]
     )
@@ -277,8 +573,11 @@ const enrichBlogCarousel = async (containers, client) => {
         return {
           ...p,
           title: row.title,
+          title_i18n: row.title_i18n || null,
           excerpt,
+          excerpt_i18n: row.excerpt_i18n || null,
           body: row.body,
+          body_i18n: row.body_i18n || null,
           image: row.featured_image || p.image || '',
           href: (p.href && String(p.href).trim()) || `pages/${row.slug}`,
         }
@@ -316,9 +615,8 @@ const landingPagePUT = async (req, res) => {
   const client = getDbClient()
   if (!client) return res.status(503).json({ message: 'Database not configured' })
   try {
+    const { containers, settings } = sanitizeLandingPayload(req.body)
     await client.connect()
-    const containers = Array.isArray(req.body?.containers) ? req.body.containers : []
-    const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : {}
     await client.query(
       `INSERT INTO admin_hub_landing_page (id, containers, settings, updated_at) VALUES (1, $1, $2, NOW())
        ON CONFLICT (id) DO UPDATE SET containers = $1, settings = $2, updated_at = NOW()`,
@@ -326,6 +624,7 @@ const landingPagePUT = async (req, res) => {
     )
     res.json({ ok: true, containers, settings })
   } catch (err) {
+    if (err.statusCode === 400) return res.status(400).json({ message: err.message })
     console.error('Landing page PUT error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
   } finally {
@@ -368,9 +667,8 @@ const landingCategoryPUT = async (req, res) => {
   const categoryId = (req.params.categoryId || '').trim()
   if (!categoryId) return res.status(400).json({ message: 'categoryId required' })
   try {
+    const { containers, settings } = sanitizeLandingPayload(req.body)
     await client.connect()
-    const containers = Array.isArray(req.body?.containers) ? req.body.containers : []
-    const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : {}
     await client.query(
       `INSERT INTO admin_hub_landing_categories (category_id, containers, settings, updated_at)
        VALUES ($1, $2, $3, NOW())
@@ -379,6 +677,7 @@ const landingCategoryPUT = async (req, res) => {
     )
     res.json({ ok: true, containers, settings })
   } catch (err) {
+    if (err.statusCode === 400) return res.status(400).json({ message: err.message })
     console.error('Landing category PUT error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
   } finally {
@@ -425,10 +724,9 @@ const landingPageByIdPUT = async (req, res) => {
   const client = getDbClient()
   if (!client) return res.status(503).json({ message: 'Database not configured' })
   try {
+    const { containers, settings } = sanitizeLandingPayload(req.body)
     await client.connect()
     const pageId = req.params.pageId
-    const containers = Array.isArray(req.body?.containers) ? req.body.containers : []
-    const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : {}
     await client.query(
       `INSERT INTO admin_hub_landing_pages (page_id, containers, settings, updated_at) VALUES ($1, $2, $3, NOW())
        ON CONFLICT (page_id) DO UPDATE SET containers = $2, settings = $3, updated_at = NOW()`,
@@ -436,6 +734,58 @@ const landingPageByIdPUT = async (req, res) => {
     )
     res.json({ ok: true, containers, settings })
   } catch (err) {
+    if (err.statusCode === 400) return res.status(400).json({ message: err.message })
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
+
+// ── API-driven page settings (/bestsellers, /sales — hardcoded pages, not CMS containers) ──
+const API_PAGE_SLUGS = new Set(['bestsellers', 'sales'])
+const API_SORT_MODES = new Set(['sales', 'views', 'rating', 'newest', 'random'])
+
+const apiPageSettingsGET = async (req, res) => {
+  const slug = (req.params.slug || '').trim()
+  if (!API_PAGE_SLUGS.has(slug)) return res.status(404).json({ message: 'Unknown API page' })
+  const client = getDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const r = await client.query(
+      `SELECT page_slug, title_i18n, subtitle_i18n, max_items, sort_mode, updated_at FROM admin_hub_api_page_settings WHERE page_slug = $1`,
+      [slug]
+    )
+    res.json(r.rows[0] || { page_slug: slug, title_i18n: null, subtitle_i18n: null, max_items: null, sort_mode: 'sales', updated_at: null })
+  } catch (err) {
+    console.error('API page settings GET error:', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
+const apiPageSettingsPUT = async (req, res) => {
+  const slug = (req.params.slug || '').trim()
+  if (!API_PAGE_SLUGS.has(slug)) return res.status(404).json({ message: 'Unknown API page' })
+  const b = req.body || {}
+  const title_i18n = pagesI18nJsonbOrNull(b.title_i18n)
+  const subtitle_i18n = pagesI18nJsonbOrNull(b.subtitle_i18n)
+  const max_items = b.max_items != null && Number.isFinite(Number(b.max_items)) ? Math.min(Math.max(Number(b.max_items), 4), 50) : null
+  const sort_mode = API_SORT_MODES.has(b.sort_mode) ? b.sort_mode : 'sales'
+  const client = getDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    const r = await client.query(
+      `INSERT INTO admin_hub_api_page_settings (page_slug, title_i18n, subtitle_i18n, max_items, sort_mode, updated_at)
+       VALUES ($1, $2, $3, $4, $5, now())
+       ON CONFLICT (page_slug) DO UPDATE SET title_i18n = $2, subtitle_i18n = $3, max_items = $4, sort_mode = $5, updated_at = now()
+       RETURNING page_slug, title_i18n, subtitle_i18n, max_items, sort_mode, updated_at`,
+      [slug, title_i18n, subtitle_i18n, max_items, sort_mode]
+    )
+    res.json(r.rows[0])
+  } catch (err) {
+    console.error('API page settings PUT error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
   } finally {
     await client.end().catch(() => {})
@@ -454,6 +804,10 @@ module.exports = function createPagesRouter() {
   router.get('/store/pages', storePagesListGET)
   router.get('/store/pages/:slug', storePageBySlugGET)
 
+  router.get('/admin-hub/v1/api-page-settings/:slug', apiPageSettingsGET)
+  router.put('/admin-hub/v1/api-page-settings/:slug', apiPageSettingsPUT)
+  router.get('/store/api-page-settings/:slug', apiPageSettingsGET)
+
   router.get('/admin-hub/landing-page', landingPageGET)
   router.put('/admin-hub/landing-page', landingPagePUT)
   router.get('/store/landing-page', landingPageGET)
@@ -468,3 +822,4 @@ module.exports = function createPagesRouter() {
 
   return router
 }
+module.exports._sanitizeLandingPayload = sanitizeLandingPayload

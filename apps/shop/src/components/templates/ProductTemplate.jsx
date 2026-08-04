@@ -12,6 +12,7 @@ import { formatPriceCents, getLocalizedProduct, getLocalizedCategory } from "@/l
 import { resolveImageUrl } from "@/lib/image-url";
 import { colorSwatchFallback } from "@/lib/color-swatch";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
+import { SITE_URL } from "@/lib/seo";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { enrichVariationGroups } from "@/lib/product-variations";
@@ -1091,7 +1092,8 @@ export default function ProductTemplate() {
     if (typeof document === "undefined" || !product) return;
     const pathSlug = storefrontProductHandle(product, locale);
     if (!pathSlug) return;
-    const href = `${window.location.origin}/${pathSlug}`;
+    const prefix = (marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`;
+    const href = `${SITE_URL}${prefix}/${pathSlug}`;
     let link = document.querySelector('link[rel="canonical"]');
     if (!link) {
       link = document.createElement("link");
@@ -1099,7 +1101,7 @@ export default function ProductTemplate() {
       document.head.appendChild(link);
     }
     link.href = href;
-  }, [product, locale]);
+  }, [product, locale, marketPrefixVal]);
 
   // Breadcrumb: full category chain from admin_category_id / category_slug (no Home, no collection fallback).
   useEffect(() => {
@@ -1432,36 +1434,7 @@ export default function ProductTemplate() {
   ];
 
 
-  // JSON-LD structured data for SEO (Product schema)
-  const jsonLd = product ? {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: effectiveTitle || displayTitle,
-    description: displayDescription || "",
-    image: displayImages.length > 0 ? displayImages.map((i) => i.url || i) : undefined,
-    sku: variant?.sku || product.id,
-    brand: meta.brand_name ? { "@type": "Brand", name: meta.brand_name } : undefined,
-    offers: {
-      "@type": "Offer",
-      priceCurrency: "EUR",
-      price: displayCents > 0 ? (displayCents / 100).toFixed(2) : "0.00",
-      availability: inStock
-        ? "https://schema.org/InStock"
-        : "https://schema.org/OutOfStock",
-      url: typeof window !== "undefined" ? window.location.href : undefined,
-    },
-    ...(reviewCount > 0 && reviewAvg > 0
-      ? {
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: reviewAvg.toFixed(1),
-            reviewCount: reviewCount,
-            bestRating: "5",
-            worstRating: "1",
-          },
-        }
-      : {}),
-  } : null;
+  // JSON-LD is injected server-side in [handle]/layout.jsx (crawlable without JS).
 
   const variantSelectorContent = useLinkedVariations && displayVariationGroups?.length ? (
     <VariantSection>
@@ -1583,12 +1556,6 @@ export default function ProductTemplate() {
 
   return (
     <Container>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
       <Breadcrumbs items={breadcrumbItems} />
 
       <MobileHeaderBlock>

@@ -21,6 +21,8 @@ import { getLocalizedCategory } from "@/lib/format";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import LandingContainers from "@/components/landing/LandingContainers";
 import { useShopStyles } from "@/context/ShopStylesContext";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { SITE_URL } from "@/lib/seo";
 import CustomCheckbox from "../ui/CustomCheckbox";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
@@ -896,6 +898,7 @@ export default function CategoryTemplate() {
   const searchParams = useSearchParams();
   const slug = params?.slug ? String(params.slug) : params?.handle ? String(params.handle) : "";
   const locale = params?.locale ? String(params.locale) : "de";
+  const marketPrefixVal = useMarketPrefix();
   const shopStyles = useShopStyles();
   const tmpl = shopStyles?.category_template || {};
 
@@ -1073,14 +1076,15 @@ export default function CategoryTemplate() {
 
   useEffect(() => {
     if (typeof document === "undefined" || !slug) return;
+    const prefix = (marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`;
     let el = document.querySelector('link[rel="canonical"]');
     if (!el) {
       el = document.createElement("link");
       el.rel = "canonical";
       document.head.appendChild(el);
     }
-    el.href = `${window.location.origin}${window.location.pathname}`;
-  }, [slug, locale]);
+    el.href = `${SITE_URL}${prefix}/${slug}`;
+  }, [slug, locale, marketPrefixVal]);
 
   const rawFacets = buildFacetsFromProducts(products);
   const facets = Object.fromEntries(

@@ -15,6 +15,8 @@ import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { baseHandleFromUrl } from "@/lib/product-url-handle";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { SITE_URL } from "@/lib/seo";
 import {
   SORT_OPTIONS,
   PER_PAGE,
@@ -373,6 +375,36 @@ const CmsPageContent = styled.div`
   min-width: 0;
 `;
 
+/* Mobile stand-in for CmsPageSidebar (hidden below 1024px) — same category links as a
+ * horizontal scroll-snap pill row, so the category jump list isn't desktop-only. */
+const CmsPageMobilePills = styled.div`
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 10px 16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  &::-webkit-scrollbar { display: none; }
+  @media (min-width: 1024px) {
+    display: none;
+  }
+`;
+
+const CmsPageMobilePill = styled(Link)`
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-decoration: none;
+  white-space: nowrap;
+  &:hover { background: #f3f4f6; }
+`;
+
 const SidebarOverlay = styled.div`
   display: none;
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
@@ -710,6 +742,7 @@ export default function CollectionPage() {
   const router = useRouter();
   const locale = params?.locale ?? "en";
   const handle = params?.handle ? String(params.handle) : undefined;
+  const marketPrefixVal = useMarketPrefix();
   const shopStyles = useShopStyles();
   const tmpl = shopStyles?.collection_template || {};
   const saleOnly = (searchParams?.get("sale") || "").trim() === "1";
@@ -911,31 +944,45 @@ export default function CollectionPage() {
     let cancelled = false;
     getMedusaClient()
       .request(`/store/landing-page/${encodeURIComponent(cmsPage.id)}`, { cache: "no-store" })
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return;
         const containers = Array.isArray(data?.containers) ? data.containers : [];
         const seen = new Set();
-        const links = [];
+        const candidates = [];
         for (const c of containers) {
           if (c?.type !== "bestseller_carousel" || c?.visible === false) continue;
           const slug = String(c.category_slug || "").trim();
           if (!slug || seen.has(slug)) continue;
           seen.add(slug);
-          links.push({ slug, title: (c.title || "").trim() || slug });
+          candidates.push({ slug, title: (c.title || "").trim() || slug });
         }
-        setCmsPageCategoryLinks(links);
+        if (!candidates.length) { setCmsPageCategoryLinks([]); return; }
+        // A sidebar link pointing at an empty section (no products in that category right now)
+        // is dead — check the same product source BestsellerCarousel itself renders from and
+        // drop links whose category currently has nothing.
+        const withCounts = await Promise.all(
+          candidates.map((l) =>
+            fetch(`/api/store-products?category=${encodeURIComponent(l.slug)}&limit=1`, { cache: "no-store" })
+              .then((r) => r.json())
+              .then((d) => ({ ...l, hasProducts: Array.isArray(d?.products) && d.products.length > 0 }))
+              .catch(() => ({ ...l, hasProducts: false }))
+          )
+        );
+        if (cancelled) return;
+        setCmsPageCategoryLinks(withCounts.filter((l) => l.hasProducts));
       })
       .catch(() => { if (!cancelled) setCmsPageCategoryLinks([]); });
     return () => { cancelled = true; };
   }, [cmsPage?.id]);
 
-  /* ── Canonical ── */
+  /* ── Canonical (market-aware public URL) ── */
   useEffect(() => {
     if (typeof document === "undefined" || !collection?.handle) return;
+    const prefix = (marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`;
     let el = document.querySelector('link[rel="canonical"]');
     if (!el) { el = document.createElement("link"); el.rel = "canonical"; document.head.appendChild(el); }
-    el.href = `${window.location.origin}/${locale}/${collection.handle}`;
-  }, [locale, collection?.handle]);
+    el.href = `${SITE_URL}${prefix}/${collection.handle}`;
+  }, [locale, collection?.handle, marketPrefixVal]);
 
   const facets = buildFacetsFromProducts(products);
 
@@ -1042,6 +1089,15 @@ export default function CollectionPage() {
       <PageWrap>
         <ShopHeader />
         <Main style={{ paddingTop: HEADER_H }}>
+          {cmsPageCategoryLinks.length > 0 && (
+            <CmsPageMobilePills>
+              {cmsPageCategoryLinks.map((l) => (
+                <CmsPageMobilePill key={l.slug} href={`/${l.slug}?sort=bestseller`}>
+                  {l.title}
+                </CmsPageMobilePill>
+              ))}
+            </CmsPageMobilePills>
+          )}
           {cmsPageCategoryLinks.length > 0 ? (
             <CmsPageWithSidebar>
               <CmsPageSidebar>

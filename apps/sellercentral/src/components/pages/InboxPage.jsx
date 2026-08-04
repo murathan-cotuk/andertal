@@ -9,6 +9,8 @@ import { useLocale } from "next-intl";
 import { dateLocaleFor, lt } from "@/lib/locale-text";
 import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { getSupportCaseText } from "@/lib/support-case-i18n";
+import SupportCaseInbox from "@/components/support/SupportCaseInbox";
 import FlowEmailBodyEditor, { htmlToPlainText } from "@/components/content/FlowEmailBodyEditor";
 import {
   MESSAGE_TEMPLATE_PLACEHOLDER_OPTIONS,
@@ -216,7 +218,7 @@ function useMessageTemplates(client, locale) {
 
 // ── Customer tab (original inbox) ──────────────────────────────────────────
 
-function CustomerInbox({ client, isSuperuser, sellerNames }) {
+function CustomerInbox({ client, isSuperuser, sellerNames, readOnly = false }) {
   const locale = useLocale();
   const ui = getUI(locale);
   const [threads, setThreads] = useState([]);
@@ -554,7 +556,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
               })}
               <div ref={bottomRef} />
             </div>
-            <Box padding="300" borderBlockStartWidth="025" borderColor="border">
+            {!readOnly && <Box padding="300" borderBlockStartWidth="025" borderColor="border">
               <BlockStack gap="200">
                 {err && <Text as="p" variant="bodySm" tone="critical">{err}</Text>}
                 {templatesErr && <Text as="p" variant="bodySm" tone="critical">{templatesErr}</Text>}
@@ -619,7 +621,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames }) {
                   </Box>
                 </InlineStack>
               </BlockStack>
-            </Box>
+            </Box>}
           </>
         )}
       </div>
@@ -711,7 +713,7 @@ function unreadTotalForSellerSupportThread(sellerThread, isSuperuser) {
   }, 0);
 }
 
-function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUserIds }) {
+function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUserIds, readOnly = false }) {
   const locale = useLocale();
   const ui = getUI(locale);
   const [rawMessages, setRawMessages] = useState([]);
@@ -1049,7 +1051,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
           <BlockStack gap="200">
             <InlineStack align="space-between" blockAlign="center" gap="200">
               <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued">{locale === "en" ? "Topics" : locale === "tr" ? "Konular" : locale === "fr" ? "Sujets" : locale === "es" ? "Temas" : locale === "it" ? "Argomenti" : "Themen"}</Text>
-              {(!isSuperuser || selectedSellerThread) && (
+              {!readOnly && (!isSuperuser || selectedSellerThread) && (
                 <Button variant="plain" size="slim" onClick={startNewSubject} disabled={isSuperuser && !selectedSellerThread}>
                   + {locale === "en" ? "New" : locale === "tr" ? "Yeni" : locale === "fr" ? "Nouveau" : locale === "es" ? "Nuevo" : locale === "it" ? "Nuovo" : "Neu"}
                 </Button>
@@ -1185,7 +1187,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
               </div>
             )}
 
-            <Box padding="300" borderBlockStartWidth="025" borderColor="border">
+            {!readOnly && <Box padding="300" borderBlockStartWidth="025" borderColor="border">
               <BlockStack gap="200">
                 {err && <Text as="p" variant="bodySm" tone="critical">{err}</Text>}
                 {templatesErr && <Text as="p" variant="bodySm" tone="critical">{templatesErr}</Text>}
@@ -1251,7 +1253,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                   </Button>
                 </InlineStack>
               </BlockStack>
-            </Box>
+            </Box>}
           </>
         )}
       </div>
@@ -1264,11 +1266,13 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
 export default function InboxPage() {
   const locale = useLocale();
   const ui = getUI(locale);
+  const caseText = getSupportCaseText(locale);
   const [activeTab, setActiveTab] = useState(0);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [mySellerID, setMySellerID] = useState(null);
   const [sellerNames, setSellerNames] = useState({});
   const [sellerUserIds, setSellerUserIds] = useState({});
+  const [sellerOptions, setSellerOptions] = useState([]);
   const client = getMedusaAdminClient();
 
   useEffect(() => {
@@ -1296,13 +1300,21 @@ export default function InboxPage() {
         }
         setSellerNames(names);
         setSellerUserIds(userIds);
+        setSellerOptions((data?.sellers || [])
+          .filter((seller) => seller.seller_id)
+          .map((seller) => ({
+            value: String(seller.seller_id),
+            label: `${names[String(seller.seller_id)] || seller.seller_id} · ${seller.seller_id}`,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label)));
       }).catch(() => {});
     }
   }, [client]);
 
   const tabs = [
-    { id: "customer", content: locale === "en" ? "Customers" : locale === "tr" ? "Müşteriler" : locale === "fr" ? "Clients" : locale === "es" ? "Clientes" : locale === "it" ? "Clienti" : "Kunden" },
-    { id: "support", content: isSuperuser ? "Sellers" : "Support Team" },
+    { id: "cases", content: caseText.title },
+    { id: "customer-legacy", content: caseText.legacyCustomers },
+    { id: "support-legacy", content: caseText.legacySupport },
   ];
 
   return (
@@ -1312,16 +1324,26 @@ export default function InboxPage() {
       </div>
       <div style={{ marginTop: 12 }}>
         {activeTab === 0 && (
-          <CustomerInbox client={client} isSuperuser={isSuperuser} sellerNames={sellerNames} />
+          <SupportCaseInbox client={client} isSuperuser={isSuperuser} sellerOptions={sellerOptions} />
         )}
         {activeTab === 1 && (
+          <>
+            <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 8, background: "var(--p-color-bg-surface-secondary)", color: "var(--p-color-text-subdued)" }}>{caseText.legacyNotice}</div>
+            <CustomerInbox client={client} isSuperuser={isSuperuser} sellerNames={sellerNames} readOnly />
+          </>
+        )}
+        {activeTab === 2 && (
+          <>
+          <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 8, background: "var(--p-color-bg-surface-secondary)", color: "var(--p-color-text-subdued)" }}>{caseText.legacyNotice}</div>
           <SupportInbox
             client={client}
             isSuperuser={isSuperuser}
             mySellerID={mySellerID}
             sellerNames={sellerNames}
             sellerUserIds={sellerUserIds}
+            readOnly
           />
+          </>
         )}
       </div>
     </Page>

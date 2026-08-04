@@ -30,6 +30,7 @@ import { useLocale } from "next-intl";
 import { getNewContainerSeed } from "@/lib/landing-page-editor-i18n";
 import { createContext, useContext } from "react";
 import { getLandingEditorCopy, getContainerTypes } from "@/lib/landing-page-editor-i18n";
+import ApiPageSettingsPanel from "@/components/pages/content/ApiPageSettingsPanel";
 
 const LandingCopyContext = createContext(null);
 function useLandingCopy() {
@@ -120,6 +121,10 @@ const CONTAINER_PADDING_DEFAULTS = {
   newsletter: "48px 24px 48px 24px",
   feature_grid: "64px 24px 64px 24px",
   testimonials: "64px 24px 64px 24px",
+  support_hero: "64px 24px 64px 24px",
+  support_case_wizard: "48px 24px 48px 24px",
+  support_topic_grid: "48px 24px 48px 24px",
+  support_faq: "48px 24px 48px 24px",
 };
 
 function getContainerPaddingDefault(type) {
@@ -167,6 +172,7 @@ function getContainerTypesFromLocale(locale) {
 const CAT_HEADING = "__heading_categories__";
 const PAGE_HEADING = "__heading_cms_pages__";
 const BLOG_HEADING = "__heading_blog_posts__";
+const API_HEADING = "__heading_api_pages__";
 
 function flattenCategoriesForSelect(nodes, depth = 0, acc = []) {
   if (!Array.isArray(nodes)) return acc;
@@ -438,6 +444,30 @@ function newContainer(type) {
         bg_color: "#ffffff",
         padding: "32px 24px",
         content_layout: "full",
+      };
+    case "support_hero":
+      return {
+        ...base, title: "", description: "", trust_text: "", search_placeholder: "",
+        primary_action_label: "", primary_action_url: "", secondary_action_label: "", secondary_action_url: "",
+        open_case_count_enabled: true, open_case_count_text: "",
+        bg_color: "#f5f7ff", text_color: "#17213c", accent_color: "#ff971c", image: "",
+        layout: "split", padding: "64px 24px", content_layout: "contained", content_max_width: "1200px",
+      };
+    case "support_case_wizard":
+      return {
+        ...base, title: "", description: "", category_heading: "", subtopic_heading: "", order_heading: "",
+        continue_label: "", back_label: "", categories: [],
+        padding: "48px 24px", content_layout: "contained", content_max_width: "1000px",
+      };
+    case "support_topic_grid":
+      return {
+        ...base, title: "", description: "", columns: 3, topics: [],
+        padding: "48px 24px", content_layout: "contained", content_max_width: "1200px",
+      };
+    case "support_faq":
+      return {
+        ...base, title: "", description: "", section_label: "", no_results_text: "", categories: [],
+        padding: "48px 24px", content_layout: "contained", content_max_width: "1000px",
       };
     default:
       return base;
@@ -2723,6 +2753,250 @@ function ContainerChromePanel({ container, onChange, deviceTab = 0 }) {
   );
 }
 
+function ArrayItemActions({ index, length, onMove, onRemove }) {
+  const c = useLandingCopy();
+  return (
+    <InlineStack gap="200">
+      <Button size="slim" disabled={index === 0} onClick={() => onMove(index, -1)}>↑</Button>
+      <Button size="slim" disabled={index === length - 1} onClick={() => onMove(index, 1)}>↓</Button>
+      <Button size="slim" tone="critical" onClick={() => onRemove(index)}>{c.remove}</Button>
+    </InlineStack>
+  );
+}
+
+function moveArrayItem(items, index, direction) {
+  const next = [...items];
+  const target = index + direction;
+  if (target < 0 || target >= next.length) return items;
+  [next[index], next[target]] = [next[target], next[index]];
+  return next.map((item, order) => ({ ...item, order }));
+}
+
+function SupportTextField({ object, field, editLang, onChange, ...props }) {
+  return (
+    <TextField
+      {...props}
+      value={gi(object, field, editLang)}
+      onChange={(value) => onChange(si(object, field, editLang, value))}
+      autoComplete="off"
+    />
+  );
+}
+
+function SupportHeroEditor({ container, onChange, editLang = "de" }) {
+  const c = useLandingCopy();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  return (
+    <BlockStack gap="400">
+      {pickerOpen && (
+        <MediaPickerModal
+          open
+          multiple={false}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(urls) => {
+            if (urls[0]) onChange(si(container, "image", editLang, urls[0]));
+            setPickerOpen(false);
+          }}
+        />
+      )}
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.supportCoreContent}</Text>
+          <SupportTextField object={container} field="title" editLang={editLang} onChange={onChange} label={c.title} />
+          <SupportTextField object={container} field="description" editLang={editLang} onChange={onChange} label={c.description} multiline={3} />
+          <SupportTextField object={container} field="trust_text" editLang={editLang} onChange={onChange} label={c.supportTrustText} />
+          <SupportTextField object={container} field="search_placeholder" editLang={editLang} onChange={onChange} label={c.supportSearchPlaceholder} />
+          <Checkbox label={c.supportOpenCaseCountEnabled} checked={container.open_case_count_enabled === true} onChange={(v) => onChange({ ...container, open_case_count_enabled: v })} />
+          {container.open_case_count_enabled && (
+            <SupportTextField object={container} field="open_case_count_text" editLang={editLang} onChange={onChange} label={c.supportOpenCaseCountText} />
+          )}
+        </BlockStack>
+      </Card>
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.supportPrimaryAction}</Text>
+          <div style={EDITOR_FIELD_GRID}>
+            <SupportTextField object={container} field="primary_action_label" editLang={editLang} onChange={onChange} label={c.supportActionLabel} />
+            <TextField label={c.supportActionUrl} value={container.primary_action_url || ""} onChange={(v) => onChange({ ...container, primary_action_url: v })} autoComplete="off" />
+          </div>
+          <Text as="h3" variant="headingSm">{c.supportSecondaryAction}</Text>
+          <div style={EDITOR_FIELD_GRID}>
+            <SupportTextField object={container} field="secondary_action_label" editLang={editLang} onChange={onChange} label={c.supportActionLabel} />
+            <TextField label={c.supportActionUrl} value={container.secondary_action_url || ""} onChange={(v) => onChange({ ...container, secondary_action_url: v })} autoComplete="off" />
+          </div>
+        </BlockStack>
+      </Card>
+      <Card>
+        <BlockStack gap="300">
+          <Select label={c.supportLayout} options={c.supportLayoutOptions()} value={container.layout || "split"} onChange={(v) => onChange({ ...container, layout: v })} />
+          <ImageField label={c.image} value={gi(container, "image", editLang)} onPick={() => setPickerOpen(true)} onClear={() => onChange(si(container, "image", editLang, ""))} />
+          <div style={EDITOR_FIELD_GRID}>
+            <ColorField label={c.backgroundColor} value={container.bg_color || "#f5f7ff"} onChange={(v) => onChange({ ...container, bg_color: v })} />
+            <ColorField label={c.textColor} value={container.text_color || "#17213c"} onChange={(v) => onChange({ ...container, text_color: v })} />
+            <ColorField label={c.supportAccentColor} value={container.accent_color || "#ff971c"} onChange={(v) => onChange({ ...container, accent_color: v })} />
+          </div>
+        </BlockStack>
+      </Card>
+    </BlockStack>
+  );
+}
+
+function SupportCaseWizardEditor({ container, onChange, editLang = "de" }) {
+  const c = useLandingCopy();
+  const categories = Array.isArray(container.categories) ? container.categories : [];
+  const setCategories = (next) => onChange({ ...container, categories: next });
+  const updateCategory = (index, updater) => setCategories(categories.map((item, i) => i === index ? updater(item) : item));
+  return (
+    <BlockStack gap="400">
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.supportWizardHeadings}</Text>
+          <SupportTextField object={container} field="title" editLang={editLang} onChange={onChange} label={c.title} />
+          <SupportTextField object={container} field="description" editLang={editLang} onChange={onChange} label={c.description} multiline={3} />
+          <div style={EDITOR_FIELD_GRID}>
+            {[
+              ["category_heading", c.supportCategoryHeading], ["subtopic_heading", c.supportSubtopicHeading],
+              ["order_heading", c.supportOrderHeading], ["continue_label", c.supportContinueLabel], ["back_label", c.supportBackLabel],
+            ].map(([field, label]) => <SupportTextField key={field} object={container} field={field} editLang={editLang} onChange={onChange} label={label} />)}
+          </div>
+        </BlockStack>
+      </Card>
+      <Text as="h3" variant="headingSm">{c.supportCategories}</Text>
+      {categories.map((category, index) => {
+        const subtopics = Array.isArray(category.subtopics) ? category.subtopics : [];
+        const setSubtopics = (next) => updateCategory(index, (item) => ({ ...item, subtopics: next }));
+        return (
+          <Card key={`${category.key}-${index}`}>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h3" variant="headingSm">{c.supportCategory} {index + 1}</Text>
+                <ArrayItemActions index={index} length={categories.length} onMove={(i, d) => setCategories(moveArrayItem(categories, i, d))} onRemove={(i) => setCategories(categories.filter((_, x) => x !== i).map((item, order) => ({ ...item, order })))} />
+              </InlineStack>
+              <div style={EDITOR_FIELD_GRID}>
+                <SupportTextField object={category} field="label" editLang={editLang} onChange={(next) => updateCategory(index, () => next)} label={c.title} />
+                <TextField label={c.supportCategoryKey} value={category.key || ""} onChange={(v) => updateCategory(index, (item) => ({ ...item, key: v }))} autoComplete="off" />
+                <TextField label={c.supportRuntimeCategory} value={category.runtime_category || category.key || ""} onChange={(v) => updateCategory(index, (item) => ({ ...item, runtime_category: v }))} autoComplete="off" helpText={c.supportRuntimeCategoryHelp} />
+                <TextField label={c.supportOrder} type="number" value={String(category.order ?? index)} onChange={(v) => updateCategory(index, (item) => ({ ...item, order: Number(v) || 0 }))} autoComplete="off" />
+              </div>
+              <InlineStack gap="400">
+                <Checkbox label={c.supportOrderRelated} checked={category.order_related === true} onChange={(v) => updateCategory(index, (item) => ({ ...item, order_related: v }))} />
+                <Checkbox label={c.supportPlatform} checked={category.platform === true} onChange={(v) => updateCategory(index, (item) => ({ ...item, platform: v }))} />
+              </InlineStack>
+              <Text as="h4" variant="headingSm">{c.supportSubtopics}</Text>
+              {subtopics.map((subtopic, subIndex) => (
+                <Card key={subIndex}>
+                  <BlockStack gap="200">
+                    <InlineStack align="space-between" blockAlign="center">
+                      <Text as="span">{c.supportSubtopic} {subIndex + 1}</Text>
+                      <ArrayItemActions index={subIndex} length={subtopics.length} onMove={(i, d) => setSubtopics(moveArrayItem(subtopics, i, d))} onRemove={(i) => setSubtopics(subtopics.filter((_, x) => x !== i).map((item, order) => ({ ...item, order })))} />
+                    </InlineStack>
+                    <SupportTextField object={subtopic} field="label" editLang={editLang} onChange={(next) => setSubtopics(subtopics.map((item, i) => i === subIndex ? next : item))} label={c.supportSubtopic} />
+                  </BlockStack>
+                </Card>
+              ))}
+              <Button size="slim" onClick={() => setSubtopics([...subtopics, { label: "", order: subtopics.length }])}>{c.supportAddSubtopic}</Button>
+            </BlockStack>
+          </Card>
+        );
+      })}
+      <Button onClick={() => setCategories([...categories, { key: `category_${categories.length + 1}`, runtime_category: "technical", label: "", order: categories.length, order_related: false, platform: true, subtopics: [{ label: "", order: 0 }] }])}>{c.supportAddCategory}</Button>
+    </BlockStack>
+  );
+}
+
+function SupportTopicGridEditor({ container, onChange, editLang = "de" }) {
+  const c = useLandingCopy();
+  const topics = Array.isArray(container.topics) ? container.topics : [];
+  const setTopics = (next) => onChange({ ...container, topics: next });
+  const update = (index, updater) => setTopics(topics.map((item, i) => i === index ? updater(item) : item));
+  return (
+    <BlockStack gap="400">
+      <Card>
+        <BlockStack gap="300">
+          <SupportTextField object={container} field="title" editLang={editLang} onChange={onChange} label={c.title} />
+          <SupportTextField object={container} field="description" editLang={editLang} onChange={onChange} label={c.description} multiline={3} />
+          <Select label={c.columnsDesktop} options={[2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))} value={String(container.columns || 3)} onChange={(v) => onChange({ ...container, columns: Number(v) })} />
+        </BlockStack>
+      </Card>
+      <Text as="h3" variant="headingSm">{c.supportTopics}</Text>
+      {topics.map((topic, index) => (
+        <Card key={index}>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <Text as="h3" variant="headingSm">{c.supportTopic} {index + 1}</Text>
+              <ArrayItemActions index={index} length={topics.length} onMove={(i, d) => setTopics(moveArrayItem(topics, i, d))} onRemove={(i) => setTopics(topics.filter((_, x) => x !== i).map((item, order) => ({ ...item, order })))} />
+            </InlineStack>
+            <div style={EDITOR_FIELD_GRID}>
+              <TextField label={c.iconEmoji} value={topic.icon || ""} onChange={(v) => update(index, (item) => ({ ...item, icon: v }))} autoComplete="off" />
+              <SupportTextField object={topic} field="title" editLang={editLang} onChange={(next) => update(index, () => next)} label={c.title} />
+              <TextField label={c.supportTopicCategory} value={topic.category || ""} onChange={(v) => update(index, (item) => ({ ...item, category: v }))} autoComplete="off" />
+              <TextField label={c.supportOrder} type="number" value={String(topic.order ?? index)} onChange={(v) => update(index, (item) => ({ ...item, order: Number(v) || 0 }))} autoComplete="off" />
+            </div>
+            <SupportTextField object={topic} field="description" editLang={editLang} onChange={(next) => update(index, () => next)} label={c.description} multiline={3} />
+          </BlockStack>
+        </Card>
+      ))}
+      <Button onClick={() => setTopics([...topics, { icon: "❓", title: "", description: "", category: "general", order: topics.length }])}>{c.supportAddTopic}</Button>
+    </BlockStack>
+  );
+}
+
+function SupportFaqEditor({ container, onChange, editLang = "de" }) {
+  const c = useLandingCopy();
+  const categories = Array.isArray(container.categories) ? container.categories : [];
+  const setCategories = (next) => onChange({ ...container, categories: next });
+  const updateCategory = (index, updater) => setCategories(categories.map((item, i) => i === index ? updater(item) : item));
+  return (
+    <BlockStack gap="400">
+      <Card>
+        <BlockStack gap="300">
+          <SupportTextField object={container} field="title" editLang={editLang} onChange={onChange} label={c.title} />
+          <SupportTextField object={container} field="description" editLang={editLang} onChange={onChange} label={c.description} multiline={3} />
+          <div style={EDITOR_FIELD_GRID}>
+            <SupportTextField object={container} field="section_label" editLang={editLang} onChange={onChange} label={c.supportSectionLabel} />
+            <SupportTextField object={container} field="no_results_text" editLang={editLang} onChange={onChange} label={c.supportNoResults} />
+          </div>
+        </BlockStack>
+      </Card>
+      <Text as="h3" variant="headingSm">{c.supportFaqCategories}</Text>
+      {categories.map((category, index) => {
+        const items = Array.isArray(category.items) ? category.items : [];
+        const setItems = (next) => updateCategory(index, (current) => ({ ...current, items: next }));
+        return (
+          <Card key={index}>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h3" variant="headingSm">{c.supportFaqCategory} {index + 1}</Text>
+                <ArrayItemActions index={index} length={categories.length} onMove={(i, d) => setCategories(moveArrayItem(categories, i, d))} onRemove={(i) => setCategories(categories.filter((_, x) => x !== i).map((item, order) => ({ ...item, order })))} />
+              </InlineStack>
+              <SupportTextField object={category} field="title" editLang={editLang} onChange={(next) => updateCategory(index, () => next)} label={c.title} />
+              <Text as="h4" variant="headingSm">{c.supportFaqItems}</Text>
+              {items.map((item, itemIndex) => (
+                <Card key={itemIndex}>
+                  <BlockStack gap="300">
+                    <InlineStack align="space-between" blockAlign="center">
+                      <Text as="span">{c.supportFaqItem} {itemIndex + 1}</Text>
+                      <ArrayItemActions index={itemIndex} length={items.length} onMove={(i, d) => setItems(moveArrayItem(items, i, d))} onRemove={(i) => setItems(items.filter((_, x) => x !== i).map((entry, order) => ({ ...entry, order })))} />
+                    </InlineStack>
+                    <SupportTextField object={item} field="question" editLang={editLang} onChange={(next) => setItems(items.map((entry, i) => i === itemIndex ? next : entry))} label={c.supportQuestion} />
+                    <SupportTextField object={item} field="answer" editLang={editLang} onChange={(next) => setItems(items.map((entry, i) => i === itemIndex ? next : entry))} label={c.supportAnswer} multiline={4} />
+                    <div style={EDITOR_FIELD_GRID}>
+                      <SupportTextField object={item} field="action_label" editLang={editLang} onChange={(next) => setItems(items.map((entry, i) => i === itemIndex ? next : entry))} label={`${c.supportActionLabel} ${c.optional}`} />
+                      <TextField label={`${c.supportActionUrl} ${c.optional}`} value={item.action_url || ""} onChange={(v) => setItems(items.map((entry, i) => i === itemIndex ? { ...entry, action_url: v } : entry))} autoComplete="off" />
+                    </div>
+                  </BlockStack>
+                </Card>
+              ))}
+              <Button size="slim" onClick={() => setItems([...items, { question: "", answer: "", order: items.length, action_label: "", action_url: "" }])}>{c.supportAddFaq}</Button>
+            </BlockStack>
+          </Card>
+        );
+      })}
+      <Button onClick={() => setCategories([...categories, { title: "", order: categories.length, items: [{ question: "", answer: "", order: 0, action_label: "", action_url: "" }] }])}>{c.supportAddCategory}</Button>
+    </BlockStack>
+  );
+}
+
 function PersonalizedProductRowEditor({ container, onChange, editLang = "de" }) {
   const c = useLandingCopy();
   return (
@@ -2794,6 +3068,10 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "testimonials":              editor = <TestimonialsEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "video_block":               editor = <VideoBlockEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "personalized_product_row":  editor = <PersonalizedProductRowEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
+    case "support_hero":              editor = <SupportHeroEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "support_case_wizard":       editor = <SupportCaseWizardEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "support_topic_grid":        editor = <SupportTopicGridEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "support_faq":               editor = <SupportFaqEditor container={container} onChange={onChange} editLang={editLang} />; break;
     default: return null;
   }
   return (
@@ -3154,7 +3432,7 @@ export default function LandingPageEditor() {
   }, [client]);
 
   useEffect(() => {
-    if (selectedPageId) loadContainers(selectedPageId);
+    if (selectedPageId && !String(selectedPageId).startsWith("api:")) loadContainers(selectedPageId);
     else setContainers([]);
   }, [selectedPageId, loadContainers]);
 
@@ -3344,8 +3622,12 @@ export default function LandingPageEditor() {
     ...(blogPosts.length
       ? blogPosts.map((p) => ({ label: `${p.title || copy.defaultPost} (/${p.slug || p.id})`, value: String(p.id) }))
       : [{ label: copy.noBlogPosts, value: "__no_blog__", disabled: true }]),
+    { label: copy.apiPagesHeading, value: API_HEADING, disabled: true },
+    { label: copy.apiBestsellerLabel, value: "api:bestsellers" },
+    { label: copy.apiSaleLabel, value: "api:sales" },
   ];
   const isCategorySelection = String(selectedPageId).startsWith("cat:");
+  const isApiSelection = String(selectedPageId).startsWith("api:");
   const editorTabs = [
     { id: "containers", content: copy.tabContainers },
     { id: "category", content: copy.tabCategory },
@@ -3397,7 +3679,7 @@ export default function LandingPageEditor() {
                 options={pageOptions}
                 value={selectedPageId}
                 onChange={(v) => {
-                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === BLOG_HEADING || v === "__no_cat__" || v === "__no_page__" || v === "__no_blog__") return;
+                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === BLOG_HEADING || v === API_HEADING || v === "__no_cat__" || v === "__no_page__" || v === "__no_blog__") return;
                   setSelectedPageId(v);
                   setExpandedId(null);
                   setActiveTab(0);
@@ -3407,7 +3689,18 @@ export default function LandingPageEditor() {
           </Card>
         </Layout.Section>}
 
-        {mainTab === 0 && selectedPageId && (
+        {mainTab === 0 && selectedPageId && isApiSelection && (
+          <Layout.Section>
+            <Card>
+              <ApiPageSettingsPanel
+                slug={String(selectedPageId).slice(4)}
+                pageLabel={String(selectedPageId) === "api:bestsellers" ? copy.apiBestsellerLabel : copy.apiSaleLabel}
+              />
+            </Card>
+          </Layout.Section>
+        )}
+
+        {mainTab === 0 && selectedPageId && !isApiSelection && (
           <Layout.Section>
             <Card>
               <PolarisTabs tabs={editorTabs} selected={activeTab} onSelect={setActiveTab}>

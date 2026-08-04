@@ -101,6 +101,23 @@ module.exports = function createNotificationsRouter() {
            DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
           [recipientKey],
         ).catch(() => {})
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'support_case', n.id, now()
+           FROM admin_hub_notifications n WHERE n.type = 'support_case' AND n.seller_id IS NULL
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        ).catch(() => {})
+      } else if (sid) {
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'support_case', n.id, now()
+           FROM admin_hub_notifications n WHERE n.type = 'support_case' AND n.seller_id = $2
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey, sid],
+        ).catch(() => {})
       }
     }
 
@@ -252,8 +269,19 @@ module.exports = function createNotificationsRouter() {
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
           : `SELECT 0::int AS c`
+        const supportCasesUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'support_case' AND s.source_id = n.id
+          WHERE n.type = 'support_case'
+            AND (
+              ($2::boolean AND n.seller_id IS NULL)
+              OR (NOT $2::boolean AND n.seller_id = $3)
+            )
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
 
-        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR, sellerErrorsR, sellerListingR, brandAuthR, flowFailuresR] = await Promise.all([
+        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR, sellerErrorsR, sellerListingR, brandAuthR, flowFailuresR, supportCasesR] = await Promise.all([
           client.query(ordersUnreadQ, [rk, sup, sid]),
           client.query(returnsUnreadQ, [rk, sup, sid]),
           sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
@@ -265,6 +293,7 @@ module.exports = function createNotificationsRouter() {
           sup ? client.query(sellerListingUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(brandAuthUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(flowFailuresUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          (sup || sid) ? client.query(supportCasesUnreadQ, [rk, !!sup, sid || '']).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
         ])
 
         const recentOrders = await client.query(
@@ -426,6 +455,24 @@ module.exports = function createNotificationsRouter() {
              ORDER BY e.created_at DESC LIMIT 8`,
           ).catch(() => ({ rows: [] }))
         }
+        let recentSupportCases = { rows: [] }
+        if (sup || sid) {
+          recentSupportCases = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'support_case' AND s.source_id = n.id
+             WHERE n.type = 'support_case'
+               AND (
+                 ($2::boolean AND n.seller_id IS NULL)
+                 OR (NOT $2::boolean AND n.seller_id = $3)
+               )
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 8`,
+            [rk, !!sup, sid || ''],
+          ).catch(() => ({ rows: [] }))
+        }
 
         await client.end()
         const verCount = verificationsR.rows[0]?.c || 0
@@ -437,10 +484,11 @@ module.exports = function createNotificationsRouter() {
         const sellerListingCount = sellerListingR.rows[0]?.c || 0
         const brandAuthCount = brandAuthR.rows[0]?.c || 0
         const flowFailuresCount = flowFailuresR.rows[0]?.c || 0
+        const supportCasesCount = supportCasesR.rows[0]?.c || 0
         const ordCount = ordersR.rows[0]?.c || 0
         const retCount = returnsR.rows[0]?.c || 0
         res.json({
-          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount + sellerErrorsCount + sellerListingCount + brandAuthCount + flowFailuresCount,
+          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount + sellerErrorsCount + sellerListingCount + brandAuthCount + flowFailuresCount + supportCasesCount,
           orders: ordCount,
           returns: retCount,
           messages: messagesR.rows[0]?.c || 0,
@@ -451,6 +499,7 @@ module.exports = function createNotificationsRouter() {
           seller_listings_pending: sellerListingCount,
           brand_authorizations_pending: brandAuthCount,
           flow_failures: flowFailuresCount,
+          support_cases: supportCasesCount,
           recent_orders: recentOrders.rows.map((r) => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_returns: recentReturns.rows.map((r) => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_verifications: recentVerifications.rows,
@@ -461,6 +510,7 @@ module.exports = function createNotificationsRouter() {
           recent_seller_listings_pending: recentSellerListingPending.rows || [],
           recent_brand_authorizations_pending: recentBrandAuthPending.rows || [],
           recent_flow_failures: recentFlowFailures.rows || [],
+          recent_support_cases: recentSupportCases.rows || [],
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -645,6 +695,24 @@ module.exports = function createNotificationsRouter() {
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 500`,
             [rk, sid],
+          ).catch(() => ({ rows: [] }))
+        }
+        let supportCasesQ = { rows: [] }
+        if (sup || sid) {
+          supportCasesQ = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'support_case' AND s.source_id = n.id
+             WHERE n.type = 'support_case'
+               AND (
+                 ($2::boolean AND n.seller_id IS NULL)
+                 OR (NOT $2::boolean AND n.seller_id = $3)
+               )
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 500`,
+            [rk, !!sup, sid || ''],
           ).catch(() => ({ rows: [] }))
         }
         const metaDefByKey = {}
@@ -836,6 +904,19 @@ module.exports = function createNotificationsRouter() {
             href: ref ? `/products/${ref}` : '/products/inventory',
           })
         }
+        const supportCaseFeedItems = []
+        for (const r of supportCasesQ.rows || []) {
+          const ref = r.reference_id ? String(r.reference_id) : ''
+          supportCaseFeedItems.push({
+            source_type: 'support_case',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: r.title || 'Support case',
+            subtitle: r.body || '',
+            href: ref ? `/inbox?case=${encodeURIComponent(ref)}` : '/inbox',
+          })
+        }
 
         const groupedMode = req.query.grouped === '1' || req.query.grouped === 'true'
         if (groupedMode) {
@@ -901,6 +982,12 @@ module.exports = function createNotificationsRouter() {
               items: sellerNoticeFeedItems,
             })
           }
+          groups.push({
+            key: 'support_case',
+            label_de: 'Support-Fälle',
+            description_de: 'Kunden-Support-Fälle und Aktualisierungen',
+            items: supportCaseFeedItems,
+          })
           const grand_total = groups.reduce((s, g) => s + g.items.length, 0)
           return res.json({
             grouped: true,
@@ -909,7 +996,7 @@ module.exports = function createNotificationsRouter() {
           })
         }
 
-        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems, ...campaignSubmittedFeedItems, ...sellerListingFeedItems, ...brandAuthFeedItems, ...flowFailureFeedItems]
+        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems, ...campaignSubmittedFeedItems, ...sellerListingFeedItems, ...brandAuthFeedItems, ...flowFailureFeedItems, ...supportCaseFeedItems]
         items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         const total = items.length
         const paged = items.slice(off, off + lim)
@@ -1031,6 +1118,20 @@ module.exports = function createNotificationsRouter() {
                  AND n.seller_id = $2
                ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
               [rk, sid],
+            ).catch(() => {})
+          }
+          if (sup || sid) {
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'support_case', n.id, now()
+               FROM admin_hub_notifications n
+               WHERE n.type = 'support_case'
+                 AND (
+                   ($2::boolean AND n.seller_id IS NULL)
+                   OR (NOT $2::boolean AND n.seller_id = $3)
+                 )
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk, !!sup, sid || ''],
             ).catch(() => {})
           }
         } else {

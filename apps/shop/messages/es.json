@@ -254,11 +254,21 @@
     "messageSent": "Mensaje enviado ✓",
     "genericError": "Error",
     "status": {
-      "offen": "Abierto", "in_bearbeitung": "En proceso", "versendet": "Enviado",
-      "zugestellt": "Entregado", "abgeschlossen": "Completado", "storniert": "Cancelado",
-      "bezahlt": "Pagado", "refunded": "Reembolsado", "retoure": "Devolución",
-      "retoure_anfrage": "Devolución en curso", "pending": "Abierto", "shipped": "Enviado",
-      "delivered": "Entregado", "completed": "Completado", "cancelled": "Cancelado",
+      "offen": "Abierto",
+      "in_bearbeitung": "En proceso",
+      "versendet": "Enviado",
+      "zugestellt": "Entregado",
+      "abgeschlossen": "Completado",
+      "storniert": "Cancelado",
+      "bezahlt": "Pagado",
+      "refunded": "Reembolsado",
+      "retoure": "Devolución",
+      "retoure_anfrage": "Devolución en curso",
+      "pending": "Abierto",
+      "shipped": "Enviado",
+      "delivered": "Entregado",
+      "completed": "Completado",
+      "cancelled": "Cancelado",
       "processing": "En proceso"
     }
   },
@@ -564,5 +574,284 @@
     "add": "Añadir a favoritos",
     "remove": "Eliminar de favoritos",
     "loginHint": "para añadir productos a tu lista de deseos"
+  },
+  "supportCenter": {
+    "common": {
+      "loading": "Cargando…",
+      "back": "Atrás",
+      "continue": "Continuar",
+      "remove": "Quitar"
+    },
+    "hero": {
+      "eyebrow": "Atención al cliente",
+      "title": "¿Cómo podemos ayudarte?",
+      "subtitle": "Encuentra una respuesta o abre un caso con nuestro equipo.",
+      "searchLabel": "Buscar en ayuda",
+      "searchPlaceholder": "Busca un tema o una pregunta",
+      "searchAction": "Buscar",
+      "openCase": "Abrir un caso",
+      "myCases": "Mis casos",
+      "openCount": "{count} casos abiertos"
+    },
+    "topics": {
+      "title": "¿Con qué necesitas ayuda?",
+      "subtitle": "Elige un tema para recibir ayuda relevante."
+    },
+    "categories": {
+      "order_delivery": "Order & delivery",
+      "returns_refunds": "Returns & refunds",
+      "product_issue": "Product issue",
+      "payment": "Pago",
+      "account": "Cuenta",
+      "platform": "Platform & feedback",
+      "order": "Pedido",
+      "delivery": "Entrega",
+      "return": "Devolución",
+      "refund": "Reembolso",
+      "product": "Producto",
+      "seller": "Vendedor",
+      "invoice": "Factura",
+      "bonus": "Bono y cupón",
+      "privacy": "Privacidad",
+      "technical": "Problema técnico",
+      "other": "Otro",
+      "legacy": "Mensaje anterior"
+    },
+    "categoryDescriptions": {
+      "order_delivery": "Tracking, delays or missing items",
+      "returns_refunds": "Returns, cancellations and refunds",
+      "product_issue": "Damage, defects or warranty",
+      "payment": "Pagos fallidos o poco claros",
+      "account": "Acceso, perfil y cuenta",
+      "platform": "Technical issues and general feedback",
+      "order": "Estado, artículos faltantes y cambios",
+      "return": "Devoluciones, cancelaciones y reembolsos",
+      "invoice": "Encuentra una factura o informa un error",
+      "bonus": "Puntos, cupones y promociones",
+      "product": "Daños, defectos y preguntas",
+      "technical": "Errores del sitio y sus funciones",
+      "privacy": "Acceso, eliminación y privacidad",
+      "other": "Cualquier otra solicitud"
+    },
+    "subtopics": {
+      "delivery_late": "Delivery is late",
+      "tracking": "Tracking question",
+      "missing_item": "Item is missing",
+      "wrong_item": "Wrong item received",
+      "return": "Return an item",
+      "refund": "Refund status",
+      "cancellation": "Cancel an order",
+      "damaged": "Item arrived damaged",
+      "defective": "Product is defective",
+      "not_as_described": "Not as described",
+      "warranty": "Warranty or repair",
+      "usage": "Help using a product",
+      "payment_failed": "Payment failed",
+      "charged_twice": "Charged twice",
+      "invoice": "Invoice question",
+      "promotion": "Voucher or promotion",
+      "login": "Sign-in problem",
+      "profile": "Profile settings",
+      "privacy": "Privacy request",
+      "security": "Account security",
+      "technical": "Technical issue",
+      "accessibility": "Accessibility",
+      "feedback": "Feedback",
+      "other": "Other",
+      "invoice_incorrect": "La factura es incorrecta",
+      "bonus_missing": "Falta el bono o cupón",
+      "data_deletion": "Acceso o eliminación de datos"
+    },
+    "wizard": {
+      "title": "Open a support case",
+      "subtitle": "Tell us what happened. We will guide you step by step.",
+      "progressLabel": "Case creation progress",
+      "steps": {
+        "1": "Topic",
+        "2": "Details",
+        "3": "Order",
+        "4": "Message",
+        "5": "Review",
+        "6": "Done"
+      },
+      "categoryPrompt": "Choose a topic",
+      "subtopicPrompt": "What best describes your request?",
+      "orderPrompt": "Select the relevant order",
+      "orderPlaceholder": "Choose an order",
+      "orderLabel": "Order #{number}",
+      "itemPrompt": "Selecciona al menos un artículo afectado",
+      "unknownItem": "Order item",
+      "multiSellerNotice": "Your selected items are from {count} sellers. We may create linked cases so each seller can respond. You do not need to choose a seller.",
+      "platformNoOrder": "This topic is not linked to an order. You can continue without selecting one.",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Briefly summarize the issue",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Describe what happened and what outcome you expect.",
+      "attachmentsLabel": "Attachments (optional)",
+      "attachmentsHint": "Up to {count} JPEG, PNG, WebP or PDF files, max. {size} MB each.",
+      "reviewTitle": "Review your request",
+      "categoryLabel": "Category",
+      "subcategoryLabel": "Subtopic",
+      "orderReviewLabel": "Order",
+      "submit": "Submit case",
+      "redirecting": "Case created. Opening your inbox…"
+    },
+    "errors": {
+      "loadOrders": "Orders could not be loaded.",
+      "fileCount": "You can attach up to {count} files.",
+      "fileTypeSize": "Use JPEG, PNG, WebP or PDF files up to 10 MB.",
+      "upload": "An attachment could not be uploaded.",
+      "submit": "The case could not be created. Please try again."
+    },
+    "faq": {
+      "title": "Frequently asked questions",
+      "subtitle": "Quick answers and self-service options.",
+      "categoryLabel": "Category",
+      "allCategories": "All categories",
+      "searchLabel": "Search questions",
+      "searchPlaceholder": "Enter a keyword",
+      "noResults": "No matching answer was found.",
+      "openCase": "Open a support case",
+      "selfServiceLabel": "Self-service links",
+      "selfService": "Self-service",
+      "defaultOrders": "Mis pedidos",
+      "defaultAccount": "Configuración de la cuenta",
+      "defaults": {
+        "order_delivery": {
+          "question": "Where can I track my order?",
+          "answer": "Open your order details to see the latest tracking information. If the expected date has passed, open a support case."
+        },
+        "returns_refunds": {
+          "question": "How do returns and refunds work?",
+          "answer": "Open a case and select the order and affected items. We will show the next steps for your request."
+        },
+        "product_issue": {
+          "question": "What should I do if an item is damaged?",
+          "answer": "Take clear photos and attach them to a case with the relevant order item selected."
+        },
+        "payment": {
+          "question": "Where can I find my invoice?",
+          "answer": "Invoices are available in your order details when issued. Contact support if an invoice is missing."
+        },
+        "account": {
+          "question": "How can I update my account details?",
+          "answer": "You can update your profile and addresses from your account settings."
+        },
+        "platform": {
+          "question": "How do I report a technical problem?",
+          "answer": "Open a platform case and describe your device, browser and the steps that caused the problem."
+        }
+      }
+    }
+  },
+  "caseInbox": {
+    "title": "Casos de soporte",
+    "subtitle": "Tus conversaciones con soporte",
+    "caseListLabel": "Support case list",
+    "refresh": "Actualizar casos",
+    "filterLabel": "Filter cases",
+    "filters": {
+      "open": "Open",
+      "awaiting_customer": "Awaiting you",
+      "awaiting_seller": "Awaiting seller",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "unread": "Unread"
+    },
+    "statuses": {
+      "open": "Open",
+      "awaiting_customer": "Awaiting you",
+      "awaiting_seller": "Awaiting seller",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "in_progress": "In progress",
+      "reopened": "Reopened",
+      "awaiting_support": "Esperando al soporte"
+    },
+    "categories": {
+      "order_delivery": "Order & delivery",
+      "returns_refunds": "Returns & refunds",
+      "product_issue": "Product issue",
+      "payment": "Pago",
+      "account": "Cuenta",
+      "platform": "Platform & feedback",
+      "order": "Pedido",
+      "delivery": "Entrega",
+      "return": "Devolución",
+      "refund": "Reembolso",
+      "product": "Producto",
+      "seller": "Vendedor",
+      "invoice": "Factura",
+      "bonus": "Bono y cupón",
+      "privacy": "Privacidad",
+      "technical": "Problema técnico",
+      "other": "Otro",
+      "legacy": "Mensaje anterior"
+    },
+    "loadingCases": "Loading cases…",
+    "loadingDetail": "Loading case…",
+    "empty": "No cases in this filter.",
+    "selectCase": "Select a case to read it.",
+    "untitled": "Support request",
+    "caseReference": "Case #{number}",
+    "orderReference": "Order #{number}",
+    "backToCases": "Cases",
+    "paginationLabel": "Case pages",
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {page}",
+    "summary": {
+      "status": "Status",
+      "category": "Category",
+      "order": "Order",
+      "created": "Created"
+    },
+    "timelineLabel": "Case timeline",
+    "roles": {
+      "customer": "You",
+      "seller": "Seller",
+      "support": "Support",
+      "admin": "Support",
+      "system": "System"
+    },
+    "events": {
+      "created": "Case created",
+      "closed": "Case closed",
+      "reopened": "Case reopened",
+      "resolved": "Case resolved",
+      "updated": "Caso actualizado",
+      "case_created": "Caso creado",
+      "case_closed": "Caso cerrado",
+      "case_reopened": "Caso reabierto",
+      "case_resolved": "Caso resuelto",
+      "message_added": "Mensaje añadido",
+      "case_hidden": "Caso oculto"
+    },
+    "attachments": "Attachments",
+    "retentionNotice": "Este caso cerrado seguirá visible durante 30 días. Puedes ocultarlo antes.",
+    "closeCase": "Cerrar caso",
+    "reopenCase": "Reabrir",
+    "hideCase": "Ocultar caso",
+    "replyLabel": "Respuesta",
+    "replyPlaceholder": "Write your reply…",
+    "addAttachments": "Add attachments",
+    "send": "Enviar",
+    "sending": "Enviando…",
+    "inactiveReply": "Replies are only available while the case is active.",
+    "closeModal": {
+      "title": "Close this case?",
+      "description": "You will no longer be able to reply unless you reopen the case.",
+      "confirm": "Close case",
+      "cancel": "Cancel"
+    },
+    "errors": {
+      "unauthorized": "Please sign in again to view your cases.",
+      "forbidden": "You do not have access to this case.",
+      "notFound": "This case could not be found.",
+      "caseClosed": "This case is closed and cannot receive replies.",
+      "fileValidation": "Use up to 5 JPEG, PNG, WebP or PDF files of no more than 10 MB each.",
+      "generic": "Something went wrong. Please refresh and try again."
+    },
+    "legacyReadOnly": "Este mensaje anterior está disponible en modo de solo lectura."
   }
 }

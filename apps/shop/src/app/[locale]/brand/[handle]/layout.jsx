@@ -1,9 +1,10 @@
-﻿const BASE =
-  typeof process !== "undefined"
-    ? (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "")
-    : "";
+﻿import { headers } from "next/headers";
+import { buildPageMetadata, marketFromHeader, stripHtml } from "@/lib/seo";
 
-/** Site adı: NEXT_PUBLIC_SITE_NAME varsa o; yoksa NEXT_PUBLIC_SITE_URL hostundan; yoksa Andertal */
+const BASE = (
+  process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
+).replace(/\/$/, "");
+
 function siteDisplayName() {
   const explicit = (process.env.NEXT_PUBLIC_SITE_NAME || "").trim();
   if (explicit) return explicit;
@@ -19,30 +20,49 @@ function siteDisplayName() {
 }
 
 export async function generateMetadata({ params }) {
-  const { handle } = await params;
+  const { handle, locale } = await params;
+  const h = await headers();
+  const market = marketFromHeader(h.get("x-andertal-market-prefix"), locale);
   const site = siteDisplayName();
+  const brandNameFallback = String(handle || "").replace(/-/g, " ");
+
   if (!handle) {
-    return { title: { absolute: site } };
+    return buildPageMetadata({
+      title: site,
+      market,
+      locale,
+      path: "brands",
+    });
   }
+
   try {
     const res = await fetch(`${BASE}/store/brands/${encodeURIComponent(handle)}`, {
-      cache: "no-store",
+      next: { revalidate: 120 },
     });
-    const brandNameFallback = String(handle).replace(/-/g, " ");
-    if (!res.ok) {
-      const t = `${site} | ${brandNameFallback}`;
-      return { title: { absolute: t }, openGraph: { title: t } };
-    }
-    const data = await res.json();
-    const brandName = (data?.brand?.name || brandNameFallback).trim();
-    const title = `${site} | ${brandName}`;
-    return {
+    const data = res.ok ? await res.json().catch(() => ({})) : {};
+    const brand = data?.brand || {};
+    const brandName = (brand.name || brandNameFallback).trim();
+    const title = `${brandName} | ${site}`;
+    const description =
+      stripHtml(brand.description || brand.about || "", 160) ||
+      `${brandName} products on ${site}`;
+    const images = [brand.logo_image, brand.banner_image].filter(Boolean);
+    return buildPageMetadata({
       title: { absolute: title },
-      openGraph: { title },
-    };
+      description,
+      market,
+      locale,
+      path: `brand/${brand.handle || handle}`,
+      images,
+    });
   } catch {
-    const t = `${site} | ${String(handle).replace(/-/g, " ")}`;
-    return { title: { absolute: t }, openGraph: { title: t } };
+    const title = `${brandNameFallback} | ${site}`;
+    return buildPageMetadata({
+      title: { absolute: title },
+      market,
+      locale,
+      path: `brand/${handle}`,
+    });
   }
 }
 

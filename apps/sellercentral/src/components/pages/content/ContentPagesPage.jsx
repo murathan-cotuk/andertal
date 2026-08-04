@@ -23,6 +23,17 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import { getContentPagesCopy } from "@/lib/content-pages-i18n";
 import { dateLocaleFor } from "@/lib/locale-text";
+import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
+
+/** Read a translatable field: DE lives on the plain column, other languages under the matching *_i18n jsonb column. */
+function giPageField(obj, field, i18nField, lang) {
+  if (!lang || lang === "de") return obj?.[field] ?? "";
+  return obj?.[i18nField]?.[lang]?.[field] ?? "";
+}
+/** Merge a translated field into an *_i18n object for the given language, leaving other languages untouched. */
+function setPageI18nField(i18nObj, field, lang, value) {
+  return { ...(i18nObj || {}), [lang]: { ...(i18nObj?.[lang] || {}), [field]: value } };
+}
 
 const BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
@@ -78,7 +89,14 @@ export default function ContentPagesPage({ blogOnly = false }) {
     meta_title: "",
     meta_description: "",
     meta_keywords: "",
+    title_i18n: {},
+    body_i18n: {},
+    excerpt_i18n: {},
+    meta_title_i18n: {},
+    meta_description_i18n: {},
   });
+  const [editLang, setEditLang] = useState("de");
+  const langOptions = getLandingEditorCopy(locale).shopContentLangOptions();
   const client = getMedusaAdminClient();
 
   const fetchPages = async () => {
@@ -106,6 +124,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
   const openCreate = () => {
     setEditingId(null);
     setSlugManuallyEdited(false);
+    setEditLang("de");
     setForm({
       title: "",
       slug: "",
@@ -117,6 +136,11 @@ export default function ContentPagesPage({ blogOnly = false }) {
       meta_title: "",
       meta_description: "",
       meta_keywords: "",
+      title_i18n: {},
+      body_i18n: {},
+      excerpt_i18n: {},
+      meta_title_i18n: {},
+      meta_description_i18n: {},
     });
     setModalOpen(true);
   };
@@ -124,6 +148,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
   const openEdit = async (page) => {
     setEditingId(page.id);
     setSlugManuallyEdited(true);
+    setEditLang("de");
     setForm({
       title: page.title || "",
       slug: page.slug || "",
@@ -135,6 +160,11 @@ export default function ContentPagesPage({ blogOnly = false }) {
       meta_title: page.meta_title || "",
       meta_description: page.meta_description || "",
       meta_keywords: page.meta_keywords || "",
+      title_i18n: page.title_i18n || {},
+      body_i18n: page.body_i18n || {},
+      excerpt_i18n: page.excerpt_i18n || {},
+      meta_title_i18n: page.meta_title_i18n || {},
+      meta_description_i18n: page.meta_description_i18n || {},
     });
     setModalOpen(true);
   };
@@ -164,6 +194,11 @@ export default function ContentPagesPage({ blogOnly = false }) {
       meta_title: (form.meta_title || "").trim() || null,
       meta_description: form.meta_description || "",
       meta_keywords: (form.meta_keywords || "").trim() || null,
+      title_i18n: form.title_i18n || {},
+      body_i18n: form.body_i18n || {},
+      excerpt_i18n: form.excerpt_i18n || {},
+      meta_title_i18n: form.meta_title_i18n || {},
+      meta_description_i18n: form.meta_description_i18n || {},
     };
   };
 
@@ -303,41 +338,55 @@ export default function ContentPagesPage({ blogOnly = false }) {
       >
         <Modal.Section>
           <BlockStack gap="400">
+            <Select
+              label="Language"
+              options={langOptions}
+              value={editLang}
+              onChange={setEditLang}
+            />
             <TextField
               label={c.fieldTitle}
-              value={form.title}
-              onChange={handleTitleChange}
+              value={giPageField(form, "title", "title_i18n", editLang)}
+              onChange={(value) => {
+                if (editLang === "de") { handleTitleChange(value); return; }
+                setForm((prev) => ({ ...prev, title_i18n: setPageI18nField(prev.title_i18n, "title", editLang, value) }));
+              }}
               autoComplete="off"
               placeholder={blogOnly ? c.titlePhBlog : c.titlePhPage}
             />
-            <TextField
-              label={c.colSlug}
-              value={form.slug}
-              onChange={(value) => {
-                if (!editingId && !value.trim()) {
-                  setSlugManuallyEdited(false);
+            {editLang === "de" && (
+              <TextField
+                label={c.colSlug}
+                value={form.slug}
+                onChange={(value) => {
+                  if (!editingId && !value.trim()) {
+                    setSlugManuallyEdited(false);
+                    setForm((prev) => ({
+                      ...prev,
+                      slug: pageSlugFromTitle(prev.title),
+                    }));
+                    return;
+                  }
+                  setSlugManuallyEdited(true);
                   setForm((prev) => ({
                     ...prev,
-                    slug: pageSlugFromTitle(prev.title),
+                    slug: sanitizeSeoHandleInput(value.toLowerCase()),
                   }));
-                  return;
-                }
-                setSlugManuallyEdited(true);
-                setForm((prev) => ({
-                  ...prev,
-                  slug: sanitizeSeoHandleInput(value.toLowerCase()),
-                }));
-              }}
-              autoComplete="off"
-              placeholder={c.slugPh}
-              helpText={c.slugHelp}
-            />
+                }}
+                autoComplete="off"
+                placeholder={c.slugPh}
+                helpText={c.slugHelp}
+              />
+            )}
             {blogOnly && (
               <>
                 <TextField
                   label={c.teaserLabel}
-                  value={form.excerpt}
-                  onChange={(value) => setForm((prev) => ({ ...prev, excerpt: value }))}
+                  value={giPageField(form, "excerpt", "excerpt_i18n", editLang)}
+                  onChange={(value) => {
+                    if (editLang === "de") { setForm((prev) => ({ ...prev, excerpt: value })); return; }
+                    setForm((prev) => ({ ...prev, excerpt_i18n: setPageI18nField(prev.excerpt_i18n, "excerpt", editLang, value) }));
+                  }}
                   multiline={3}
                   autoComplete="off"
                   helpText={c.teaserHelp}
@@ -395,8 +444,11 @@ export default function ContentPagesPage({ blogOnly = false }) {
             )}
             <RichTextEditor
               label={blogOnly ? c.bodyBlog : c.bodyPage}
-              value={form.body}
-              onChange={(html) => setForm((prev) => ({ ...prev, body: html }))}
+              value={giPageField(form, "body", "body_i18n", editLang)}
+              onChange={(html) => {
+                if (editLang === "de") { setForm((prev) => ({ ...prev, body: html })); return; }
+                setForm((prev) => ({ ...prev, body_i18n: setPageI18nField(prev.body_i18n, "body", editLang, html) }));
+              }}
               minHeight="260px"
               placeholder={c.bodyPh}
               helpText={c.bodyHelp}
@@ -406,14 +458,20 @@ export default function ContentPagesPage({ blogOnly = false }) {
                 <Text as="h3" variant="headingSm">{c.seoHeading}</Text>
                 <TextField
                   label={c.metaTitle}
-                  value={form.meta_title}
-                  onChange={(value) => setForm((prev) => ({ ...prev, meta_title: value }))}
+                  value={giPageField(form, "meta_title", "meta_title_i18n", editLang)}
+                  onChange={(value) => {
+                    if (editLang === "de") { setForm((prev) => ({ ...prev, meta_title: value })); return; }
+                    setForm((prev) => ({ ...prev, meta_title_i18n: setPageI18nField(prev.meta_title_i18n, "meta_title", editLang, value) }));
+                  }}
                   autoComplete="off"
                 />
                 <TextField
                   label={c.metaDescription}
-                  value={form.meta_description}
-                  onChange={(value) => setForm((prev) => ({ ...prev, meta_description: value }))}
+                  value={giPageField(form, "meta_description", "meta_description_i18n", editLang)}
+                  onChange={(value) => {
+                    if (editLang === "de") { setForm((prev) => ({ ...prev, meta_description: value })); return; }
+                    setForm((prev) => ({ ...prev, meta_description_i18n: setPageI18nField(prev.meta_description_i18n, "meta_description", editLang, value) }));
+                  }}
                   multiline={3}
                   autoComplete="off"
                 />

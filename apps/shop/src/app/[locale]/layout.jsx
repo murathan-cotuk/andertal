@@ -59,6 +59,12 @@ export default async function LocaleLayout({ children, params }) {
     <NextIntlClientProvider locale={locale} messages={messages}>
       <StyledComponentsRegistry>
         <MarketPrefixProvider value={marketPrefixValue}>
+          {/* Ensure <html lang> matches active locale even when root layout header is stale */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `try{document.documentElement.lang=${JSON.stringify(locale)}}catch(e){}`,
+            }}
+          />
           <Providers>{children}</Providers>
         </MarketPrefixProvider>
       </StyledComponentsRegistry>

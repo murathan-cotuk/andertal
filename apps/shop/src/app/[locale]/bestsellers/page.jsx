@@ -99,6 +99,43 @@ function isBestSellerProduct(product) {
   return productSalesScore(product) > 0 || product?.metadata?.is_bestseller === true;
 }
 
+const MAX_ITEMS_PER_CAROUSEL = 20;
+
+// Alternate scoring strategies selectable via the Sellercentral API-page settings panel.
+const SORT_SCORERS = {
+  sales: productSalesScore,
+  views: (p) => Number(p?.metadata?.view_count || p?.metadata?.views || 0) || 0,
+  rating: (p) => {
+    const reviewCount = Number(p?.metadata?.review_count || 0) || 0;
+    const reviewAvg = Number(p?.metadata?.review_avg || 0) || 0;
+    return reviewAvg * reviewCount;
+  },
+  newest: (p) => {
+    const t = p?.created_at ? new Date(p.created_at).getTime() : 0;
+    return Number.isFinite(t) ? t : 0;
+  },
+};
+
+function seededRandom(seed) {
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function hashStr(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  return h || 1;
+}
+
+function pickI18n(i18n, locale) {
+  if (!i18n) return null;
+  return i18n[locale] || i18n.de || null;
+}
+
 // Mirrors sales/page.jsx: maps every category id (root or nested) to its top-level root,
 // so a product tagged with a leaf category still groups under the right root section.
 function buildCategoryRootMap(nodes, root = null) {
@@ -122,6 +159,7 @@ export default function BestsellersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCollections, setSelectedCollections] = useState(new Set());
+  const [pageSettings, setPageSettings] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,15 +167,18 @@ export default function BestsellersPage() {
       try {
         setLoading(true);
         setError("");
-        const [catRes, prRes] = await Promise.all([
+        const [catRes, prRes, settingsRes] = await Promise.all([
           fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
           fetch("/api/store-products?limit=1200", { cache: "no-store" }),
+          fetch("/api/store-api-page-settings/bestsellers", { cache: "no-store" }).catch(() => null),
         ]);
         const catData = catRes.ok ? await catRes.json() : { tree: [] };
         const prData = prRes.ok ? await prRes.json() : { products: [] };
+        const settingsData = settingsRes && settingsRes.ok ? await settingsRes.json().catch(() => null) : null;
         if (!cancelled) {
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
+          setPageSettings(settingsData || null);
         }
       } catch (e) {
         if (!cancelled) setError(e?.message || "Error");
@@ -155,6 +196,18 @@ export default function BestsellersPage() {
     if (locale === "tr") return { title: "Cok Satanlar", text: "Kategorilere gore en cok satilan urunler", seeAll: "Tumunu gor", empty: "Cok satan urun bulunamadi.", all: "Tumu" };
     return { title: "Bestsellers", text: "Top-selling products by category", seeAll: "See all", empty: "No bestsellers found.", all: "All" };
   }, [locale]);
+
+  const maxItems = (pageSettings?.max_items && Number(pageSettings.max_items) > 0)
+    ? Number(pageSettings.max_items)
+    : MAX_ITEMS_PER_CAROUSEL;
+  const sortMode = pageSettings?.sort_mode && (SORT_SCORERS[pageSettings.sort_mode] || pageSettings.sort_mode === "random")
+    ? pageSettings.sort_mode
+    : "sales";
+  const scorer = SORT_SCORERS[sortMode] || productSalesScore;
+  const titleOverride = pickI18n(pageSettings?.title_i18n, locale)?.title || "";
+  const textOverride = pickI18n(pageSettings?.subtitle_i18n, locale)?.subtitle || "";
+  const pageTitle = titleOverride || copy.title;
+  const pageText = textOverride || copy.text;
 
   const rows = useMemo(() => {
     const bestsellers = products.filter((p) => isBestSellerProduct(p));
@@ -176,13 +229,22 @@ export default function BestsellersPage() {
     }
 
     return [...byRoot.values()]
-      .map((entry) => ({
-        collection: entry.collection,
-        products: entry.products.sort((a, b) => productSalesScore(b) - productSalesScore(a)),
-      }))
+      .map((entry) => {
+        let sorted;
+        if (sortMode === "random") {
+          const rand = seededRandom(hashStr(String(entry.collection.id)));
+          sorted = entry.products
+            .map((p) => ({ p, r: rand() }))
+            .sort((a, b) => a.r - b.r)
+            .map(({ p }) => p);
+        } else {
+          sorted = [...entry.products].sort((a, b) => scorer(b) - scorer(a));
+        }
+        return { collection: entry.collection, products: sorted.slice(0, maxItems) };
+      })
       .filter((entry) => entry.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
-  }, [categoryTree, products]);
+  }, [categoryTree, products, sortMode, scorer, maxItems]);
 
   const filterCollections = useMemo(() => rows.map((r) => r.collection), [rows]);
 
@@ -205,8 +267,8 @@ export default function BestsellersPage() {
       <ShopHeader />
       <Main>
         <Intro>
-          <IntroTitle className="shop-typo-catalog-title">{copy.title}</IntroTitle>
-          <IntroText>{copy.text}</IntroText>
+          <IntroTitle className="shop-typo-catalog-title">{pageTitle}</IntroTitle>
+          <IntroText>{pageText}</IntroText>
         </Intro>
 
         {/* Horizontal category filter chips */}

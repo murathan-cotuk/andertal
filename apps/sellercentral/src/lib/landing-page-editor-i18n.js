@@ -87,6 +87,22 @@ export function getContainerTypes(locale) {
       label: t(loc, "Personalized products", "Kişiselleştirilmiş ürünler", "Produits personnalisés", "Productos personalizados", "Prodotti personalizzati", "Personalisierte Produkte"),
       description: t(loc, "4 product cards tailored to the customer: recently viewed, reorder, collaborative filter or trending picks", "Müşteriye özel 4 ürün kartı: son görüntülenen, yeniden sipariş, kolaboratif filtre veya trend ürünler", "4 fiches produit adaptées: vus récemment, recommande, filtre collaboratif ou tendances", "4 tarjetas de producto personalizadas: vistas, reordenar, filtro colaborativo o tendencias", "4 schede prodotto personalizzate: visti, riordina, filtro collaborativo o tendenze", "4 personalisierte Produktkarten: Zuletzt gesehen, Nachbestellen, Kollaborativer Filter oder Trends"),
     },
+    support_hero: {
+      label: t(loc, "Support hero", "Destek kahraman alanı", "En-tête assistance", "Cabecera de soporte", "Testata assistenza", "Support-Einstieg"),
+      description: t(loc, "Customer-support introduction, search and safe action links", "Müşteri desteği tanıtımı, arama ve güvenli işlem bağlantıları", "Introduction, recherche et liens d'assistance sûrs", "Introducción, búsqueda y enlaces seguros", "Introduzione, ricerca e link sicuri", "Einführung, Suche und sichere Hilfe-Links"),
+    },
+    support_case_wizard: {
+      label: t(loc, "Support case wizard", "Destek talebi sihirbazı", "Assistant de demande", "Asistente de solicitud", "Procedura richiesta assistenza", "Support-Anfrageassistent"),
+      description: t(loc, "Headings, ordered categories and subtopics for guided support", "Yönlendirmeli destek için başlıklar, sıralı kategoriler ve alt konular", "Titres, catégories et sous-thèmes ordonnés", "Títulos, categorías y subtemas ordenados", "Titoli, categorie e argomenti ordinati", "Überschriften, geordnete Kategorien und Unterthemen"),
+    },
+    support_topic_grid: {
+      label: t(loc, "Support topic grid", "Destek konu ızgarası", "Grille des thèmes d'aide", "Cuadrícula de ayuda", "Griglia argomenti assistenza", "Support-Themenraster"),
+      description: t(loc, "Ordered icon cards for popular support topics", "Popüler destek konuları için sıralı ikon kartları", "Cartes à icônes ordonnées pour les thèmes fréquents", "Tarjetas ordenadas para temas frecuentes", "Schede ordinate per gli argomenti frequenti", "Geordnete Themenkarten mit Icon"),
+    },
+    support_faq: {
+      label: t(loc, "Support FAQ", "Destek SSS", "FAQ assistance", "Preguntas de soporte", "FAQ assistenza", "Support-FAQ"),
+      description: t(loc, "Categorized, ordered Q&A with optional self-service links", "Opsiyonel self servis bağlantılarıyla kategorili ve sıralı SSS", "Questions classées avec liens libre-service facultatifs", "Preguntas por categoría con enlaces opcionales", "Domande per categoria con link self-service", "Kategorisierte Fragen mit optionalen Self-Service-Links"),
+    },
   };
   return Object.entries(types).map(([type, { label, description }]) => ({ type, label, description }));
 }
@@ -120,6 +136,9 @@ export function getLandingEditorCopy(locale) {
     blogPostsHeading: x("—— Blog posts ——", "—— Blog yazıları ——", "—— Articles de blog ——", "—— Entradas de blog ——", "—— Articoli blog ——", "—— Blog-Beiträge ——"),
     noCmsPages: x("(No CMS pages)", "(CMS sayfası yok)", "(Aucune page CMS)", "(Sin páginas CMS)", "(Nessuna pagina CMS)", "(Keine CMS-Seiten)"),
     noBlogPosts: x("(No blog posts)", "(Blog yazısı yok)", "(Aucun article)", "(Sin entradas)", "(Nessun articolo)", "(Keine Blog-Beiträge)"),
+    apiPagesHeading: x("—— API ——", "—— API ——", "—— API ——", "—— API ——", "—— API ——", "—— API ——"),
+    apiBestsellerLabel: x("Bestsellers (/bestsellers)", "Çok satanlar (/bestsellers)", "Meilleures ventes (/bestsellers)", "Más vendidos (/bestsellers)", "Più venduti (/bestsellers)", "Bestseller (/bestsellers)"),
+    apiSaleLabel: x("Sale (/sales)", "İndirim (/sales)", "Soldes (/sales)", "Rebajas (/sales)", "Saldi (/sales)", "Sale (/sales)"),
     defaultPage: x("Page", "Sayfa", "Page", "Página", "Pagina", "Seite"),
     defaultPost: x("Post", "Yazı", "Article", "Entrada", "Articolo", "Beitrag"),
     loading: x("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Laden…"),
@@ -170,6 +189,53 @@ export function getLandingEditorCopy(locale) {
     secondNavClassicHelp: x("Desktop only (≥1024px): forces classic links on this landing route.", "Yalnızca desktop (≥1024px): bu landing rotasında klasik linkler.", "Desktop uniquement (≥1024px).", "Solo escritorio (≥1024px).", "Solo desktop (≥1024px).", "Nur Desktop (≥1024px): erzwingt klassische Links auf dieser Landing-Route."),
     pagePaddingTop: x("Spacing header → first section (page_padding_top)", "Header → ilk bölüm arası (page_padding_top)", "Espacement en-tête → première section", "Espacio cabecera → primera sección", "Spazio header → prima sezione", "Abstand Header → erste Sektion (page_padding_top)"),
     pagePaddingTopHelp: x("Top spacing of the landing area under navigation. e.g. 0px, 8px, 24px. Empty = default.", "Landing alanının üst boşluğu. örn. 0px, 8px, 24px. Boş = varsayılan.", "Espacement supérieur sous la navigation.", "Espacio superior bajo la navegación.", "Spazio superiore sotto la navigazione.", "Steuert den oberen Abstand des Landing-Page-Bereichs direkt unter der Navigation."),
+    supportCoreContent: x("Core content", "Temel içerik", "Contenu principal", "Contenido principal", "Contenuto principale", "Kerninhalte"),
+    supportTrustText: x("Trust text", "Güven metni", "Texte de confiance", "Texto de confianza", "Testo di fiducia", "Vertrauenstext"),
+    supportSearchPlaceholder: x("Search placeholder", "Arama yer tutucusu", "Texte de recherche", "Texto de búsqueda", "Testo ricerca", "Such-Platzhalter"),
+    supportOpenCaseCountEnabled: x("Show open-case count", "Açık talep sayısını göster", "Afficher le nombre de demandes ouvertes", "Mostrar casos abiertos", "Mostra richieste aperte", "Anzahl offener Anfragen anzeigen"),
+    supportOpenCaseCountText: x("Open-case count text", "Açık talep sayısı metni", "Texte des demandes ouvertes", "Texto de casos abiertos", "Testo richieste aperte", "Text für offene Anfragen"),
+    supportPrimaryAction: x("Primary action", "Birincil işlem", "Action principale", "Acción principal", "Azione principale", "Primäre Aktion"),
+    supportSecondaryAction: x("Secondary action", "İkincil işlem", "Action secondaire", "Acción secundaria", "Azione secondaria", "Sekundäre Aktion"),
+    supportActionLabel: x("Action label", "İşlem etiketi", "Libellé de l'action", "Etiqueta de acción", "Etichetta azione", "Aktionsbezeichnung"),
+    supportActionUrl: x("Safe action URL", "Güvenli işlem URL'si", "URL d'action sûre", "URL de acción segura", "URL azione sicuro", "Sichere Aktions-URL"),
+    supportAccentColor: x("Accent color", "Vurgu rengi", "Couleur d'accent", "Color de acento", "Colore accento", "Akzentfarbe"),
+    supportLayout: x("Support layout", "Destek düzeni", "Disposition assistance", "Diseño de soporte", "Layout assistenza", "Support-Layout"),
+    supportLayoutOptions: () => [
+      { label: x("Centered", "Ortalanmış", "Centré", "Centrado", "Centrato", "Zentriert"), value: "centered" },
+      { label: x("Text left, image right", "Metin solda, görsel sağda", "Texte à gauche, image à droite", "Texto izquierda, imagen derecha", "Testo a sinistra, immagine a destra", "Text links, Bild rechts"), value: "split" },
+      { label: x("Image left, text right", "Görsel solda, metin sağda", "Image à gauche, texte à droite", "Imagen izquierda, texto derecha", "Immagine a sinistra, testo a destra", "Bild links, Text rechts"), value: "image-left" },
+    ],
+    supportWizardHeadings: x("Wizard headings", "Sihirbaz başlıkları", "Titres de l'assistant", "Títulos del asistente", "Titoli procedura", "Assistent-Überschriften"),
+    supportCategoryHeading: x("Category heading", "Kategori başlığı", "Titre des catégories", "Título de categoría", "Titolo categoria", "Kategorie-Überschrift"),
+    supportSubtopicHeading: x("Subtopic heading", "Alt konu başlığı", "Titre des sous-thèmes", "Título de subtema", "Titolo sottoargomento", "Unterthemen-Überschrift"),
+    supportOrderHeading: x("Order heading", "Sipariş başlığı", "Titre de commande", "Título de pedido", "Titolo ordine", "Bestellungs-Überschrift"),
+    supportContinueLabel: x("Continue label", "Devam etiketi", "Libellé Continuer", "Etiqueta Continuar", "Etichetta Continua", "Weiter-Bezeichnung"),
+    supportBackLabel: x("Back label", "Geri etiketi", "Libellé Retour", "Etiqueta Atrás", "Etichetta Indietro", "Zurück-Bezeichnung"),
+    supportCategories: x("Support categories", "Destek kategorileri", "Catégories d'assistance", "Categorías de soporte", "Categorie assistenza", "Support-Kategorien"),
+    supportCategory: x("Category", "Kategori", "Catégorie", "Categoría", "Categoria", "Kategorie"),
+    supportCategoryKey: x("Semantic category key", "Anlamsal kategori anahtarı", "Clé sémantique", "Clave semántica", "Chiave semantica", "Semantischer Kategorie-Schlüssel"),
+    supportRuntimeCategory: x("Backend runtime category", "Backend çalışma kategorisi", "Catégorie backend", "Categoría backend", "Categoria backend", "Backend-Laufzeitkategorie"),
+    supportRuntimeCategoryHelp: x("Must be a backend-supported routing key.", "Backend tarafından desteklenen yönlendirme anahtarı olmalıdır.", "Doit être une clé de routage prise en charge.", "Debe ser una clave compatible.", "Deve essere una chiave supportata.", "Muss ein unterstützter Routing-Schlüssel sein."),
+    supportOrder: x("Order", "Sıra", "Ordre", "Orden", "Ordine", "Reihenfolge"),
+    supportOrderRelated: x("Order-related", "Siparişle ilgili", "Lié à une commande", "Relacionado con pedido", "Relativo a un ordine", "Bestellungsbezogen"),
+    supportPlatform: x("Platform-managed", "Platform tarafından yönetilir", "Géré par la plateforme", "Gestionado por la plataforma", "Gestito dalla piattaforma", "Von der Plattform verwaltet"),
+    supportSubtopics: x("Subtopics", "Alt konular", "Sous-thèmes", "Subtemas", "Sottoargomenti", "Unterthemen"),
+    supportSubtopic: x("Subtopic", "Alt konu", "Sous-thème", "Subtema", "Sottoargomento", "Unterthema"),
+    supportAddCategory: x("+ Add category", "+ Kategori ekle", "+ Ajouter catégorie", "+ Añadir categoría", "+ Aggiungi categoria", "+ Kategorie hinzufügen"),
+    supportAddSubtopic: x("+ Add subtopic", "+ Alt konu ekle", "+ Ajouter sous-thème", "+ Añadir subtema", "+ Aggiungi sottoargomento", "+ Unterthema hinzufügen"),
+    supportTopics: x("Support topics", "Destek konuları", "Thèmes d'assistance", "Temas de soporte", "Argomenti assistenza", "Support-Themen"),
+    supportTopic: x("Topic", "Konu", "Thème", "Tema", "Argomento", "Thema"),
+    supportTopicCategory: x("Category key", "Kategori anahtarı", "Clé de catégorie", "Clave de categoría", "Chiave categoria", "Kategorie-Schlüssel"),
+    supportAddTopic: x("+ Add topic", "+ Konu ekle", "+ Ajouter thème", "+ Añadir tema", "+ Aggiungi argomento", "+ Thema hinzufügen"),
+    supportFaqCategories: x("FAQ categories", "SSS kategorileri", "Catégories FAQ", "Categorías FAQ", "Categorie FAQ", "FAQ-Kategorien"),
+    supportFaqCategory: x("FAQ category", "SSS kategorisi", "Catégorie FAQ", "Categoría FAQ", "Categoria FAQ", "FAQ-Kategorie"),
+    supportFaqItems: x("Questions and answers", "Sorular ve cevaplar", "Questions et réponses", "Preguntas y respuestas", "Domande e risposte", "Fragen und Antworten"),
+    supportFaqItem: x("Q&A", "Soru ve cevap", "Question-réponse", "Pregunta y respuesta", "Domanda e risposta", "Frage und Antwort"),
+    supportSectionLabel: x("Section label", "Bölüm etiketi", "Libellé de section", "Etiqueta de sección", "Etichetta sezione", "Sektionsbezeichnung"),
+    supportNoResults: x("No-results text", "Sonuç yok metni", "Texte sans résultat", "Texto sin resultados", "Testo nessun risultato", "Kein-Ergebnis-Text"),
+    supportQuestion: x("Question", "Soru", "Question", "Pregunta", "Domanda", "Frage"),
+    supportAnswer: x("Answer", "Cevap", "Réponse", "Respuesta", "Risposta", "Antwort"),
+    supportAddFaq: x("+ Add Q&A", "+ Soru-cevap ekle", "+ Ajouter question", "+ Añadir pregunta", "+ Aggiungi domanda", "+ Frage hinzufügen"),
     // Common field labels
     noImage: x("No image", "Görsel yok", "Aucune image", "Sin imagen", "Nessuna immagine", "Kein Bild"),
     changeImage: x("Change image", "Görseli değiştir", "Changer l'image", "Cambiar imagen", "Cambia immagine", "Bild ändern"),
@@ -665,6 +731,7 @@ export function getLandingEditorCopy(locale) {
 export function getNewContainerSeed(locale, type) {
   const loc = String(locale || "de").slice(0, 2).toLowerCase();
   const x = (en, tr, fr, es, it, de) => t(loc, en, tr, fr, es, it, de);
+  const ml = (base, translations) => ({ ...base, _i18n: translations });
 
   switch (type) {
     case "hero_banner":
@@ -764,6 +831,124 @@ export function getNewContainerSeed(locale, type) {
           },
         ],
       };
+    case "support_hero":
+      return ml({
+        title: "Wie können wir Ihnen helfen?",
+        description: "Finden Sie schnell Antworten oder starten Sie eine geführte Support-Anfrage.",
+        trust_text: "Sichere Hilfe rund um Bestellung, Rückgabe, Zahlung und Konto",
+        search_placeholder: "Wie können wir Ihnen helfen?",
+        open_case_count_enabled: true,
+        open_case_count_text: "{count} offene Support-Anfragen",
+        primary_action_label: "Neue Support-Anfrage",
+        primary_action_url: "#support-wizard",
+        secondary_action_label: "Meine Anfragen ansehen",
+        secondary_action_url: "/nachrichten",
+      }, {
+        en: { title: "How can we help?", description: "Find answers quickly or start a guided support request.", trust_text: "Secure help with orders, returns, payments and your account", search_placeholder: "How can we help?", open_case_count_text: "{count} open support requests", primary_action_label: "New support request", secondary_action_label: "View my requests" },
+        tr: { title: "Size nasıl yardımcı olabiliriz?", description: "Yanıtları hızla bulun veya yönlendirmeli destek talebi başlatın.", trust_text: "Sipariş, iade, ödeme ve hesabınız için güvenli yardım", search_placeholder: "Size nasıl yardımcı olabiliriz?", open_case_count_text: "{count} açık destek talebi", primary_action_label: "Yeni destek talebi", secondary_action_label: "Taleplerimi görüntüle" },
+        fr: { title: "Comment pouvons-nous vous aider ?", description: "Trouvez rapidement une réponse ou lancez une demande guidée.", trust_text: "Aide sécurisée pour commandes, retours, paiements et compte", search_placeholder: "Comment pouvons-nous vous aider ?", open_case_count_text: "{count} demandes ouvertes", primary_action_label: "Nouvelle demande", secondary_action_label: "Voir mes demandes" },
+        es: { title: "¿Cómo podemos ayudarte?", description: "Encuentra respuestas o inicia una solicitud de soporte guiada.", trust_text: "Ayuda segura con pedidos, devoluciones, pagos y cuenta", search_placeholder: "¿Cómo podemos ayudarte?", open_case_count_text: "{count} solicitudes abiertas", primary_action_label: "Nueva solicitud", secondary_action_label: "Ver mis solicitudes" },
+        it: { title: "Come possiamo aiutarti?", description: "Trova subito una risposta o avvia una richiesta guidata.", trust_text: "Assistenza sicura per ordini, resi, pagamenti e account", search_placeholder: "Come possiamo aiutarti?", open_case_count_text: "{count} richieste aperte", primary_action_label: "Nuova richiesta", secondary_action_label: "Vedi le mie richieste" },
+      });
+    case "support_case_wizard": {
+      const category = (key, runtimeCategory, label, order, orderRelated, platform, subtopics, translations) => ml({
+        key, runtime_category: runtimeCategory, label, order, order_related: orderRelated, platform,
+        subtopics: subtopics.map((item, index) => ml({ label: item.de, order: index }, {
+          en: { label: item.en }, tr: { label: item.tr }, fr: { label: item.fr }, es: { label: item.es }, it: { label: item.it },
+        })),
+      }, translations);
+      const issue = (de, en, tr, fr, es, it) => ({ de, en, tr, fr, es, it });
+      const labels = (en, tr, fr, es, it) => ({ en: { label: en }, tr: { label: tr }, fr: { label: fr }, es: { label: es }, it: { label: it } });
+      return ml({
+        title: "Worum geht es?",
+        description: "Wählen Sie zuerst einen Bereich und anschließend das passende Thema.",
+        category_heading: "Bereich auswählen",
+        subtopic_heading: "Thema auswählen",
+        order_heading: "Welche Bestellung betrifft Ihre Anfrage?",
+        continue_label: "Weiter",
+        back_label: "Zurück",
+        categories: [
+          category("order", "order", "Bestellung", 0, true, false, [issue("Falscher Artikel erhalten", "Wrong item received", "Yanlış ürün geldi", "Mauvais article reçu", "Artículo incorrecto", "Articolo errato"), issue("Bestellung unvollständig", "Order incomplete", "Sipariş eksik", "Commande incomplète", "Pedido incompleto", "Ordine incompleto")], labels("Order", "Sipariş", "Commande", "Pedido", "Ordine")),
+          category("delivery", "delivery", "Lieferung", 1, true, false, [issue("Paket nicht angekommen", "Package not received", "Paket gelmedi", "Colis non reçu", "Paquete no recibido", "Pacco non ricevuto")], labels("Delivery", "Teslimat", "Livraison", "Entrega", "Consegna")),
+          category("return", "return", "Rückgabe", 2, true, false, [issue("Rückgabe gewünscht", "Return wanted", "İade etmek istiyorum", "Retour souhaité", "Quiero devolverlo", "Voglio effettuare un reso")], labels("Return", "İade", "Retour", "Devolución", "Reso")),
+          category("refund", "refund", "Erstattung", 3, true, false, [issue("Erstattung fehlt", "Refund missing", "Para iadesi eksik", "Remboursement manquant", "Falta el reembolso", "Rimborso mancante")], labels("Refund", "Para iadesi", "Remboursement", "Reembolso", "Rimborso")),
+          category("payment", "payment", "Zahlung", 4, false, true, [issue("Zahlung fehlgeschlagen", "Payment failed", "Ödeme başarısız", "Paiement échoué", "Pago fallido", "Pagamento non riuscito")], labels("Payment", "Ödeme", "Paiement", "Pago", "Pagamento")),
+          category("invoice", "invoice", "Rechnung", 5, true, false, [issue("Rechnung ist falsch", "Invoice is incorrect", "Fatura yanlış", "Facture incorrecte", "Factura incorrecta", "Fattura errata")], labels("Invoice", "Fatura", "Facture", "Factura", "Fattura")),
+          category("account", "account", "Konto", 6, false, true, [issue("Konto nicht zugänglich", "Account inaccessible", "Hesaba erişilemiyor", "Compte inaccessible", "Cuenta inaccesible", "Account non accessibile")], labels("Account", "Hesap", "Compte", "Cuenta", "Account")),
+          category("bonus", "bonus", "Bonus & Gutschein", 7, false, true, [issue("Bonus oder Gutschein funktioniert nicht", "Bonus or coupon not working", "Bonus veya kupon çalışmıyor", "Bonus ou coupon invalide", "Bono o cupón no funciona", "Bonus o coupon non funziona")], labels("Bonus & coupon", "Bonus ve kupon", "Bonus et coupon", "Bono y cupón", "Bonus e coupon")),
+          category("product", "product", "Produkt", 8, true, false, [issue("Produkt beschädigt", "Product damaged", "Ürün hasarlı", "Produit endommagé", "Producto dañado", "Prodotto danneggiato")], labels("Product", "Ürün", "Produit", "Producto", "Prodotto")),
+          category("seller", "seller", "Verkäufer", 9, true, false, [issue("Beschwerde über Verkäufer", "Seller complaint", "Satıcı şikayeti", "Réclamation vendeur", "Queja sobre vendedor", "Reclamo venditore")], labels("Seller", "Satıcı", "Vendeur", "Vendedor", "Venditore")),
+          category("technical", "technical", "Technisches Problem", 10, false, true, [issue("Technischer Fehler", "Technical error", "Teknik hata", "Erreur technique", "Error técnico", "Errore tecnico")], labels("Technical issue", "Teknik sorun", "Problème technique", "Problema técnico", "Problema tecnico")),
+          category("privacy", "privacy", "Datenschutz", 11, false, true, [issue("Datenschutzanfrage", "Privacy request", "Gizlilik talebi", "Demande de confidentialité", "Solicitud de privacidad", "Richiesta privacy")], labels("Privacy", "Gizlilik", "Confidentialité", "Privacidad", "Privacy")),
+          category("other", "other", "Sonstiges", 12, false, true, [issue("Anderes Anliegen", "Other issue", "Diğer konu", "Autre demande", "Otro asunto", "Altro problema")], labels("Other", "Diğer", "Autre", "Otro", "Altro")),
+        ],
+      }, {
+        en: { title: "What do you need help with?", description: "Choose an area, then select the matching topic.", category_heading: "Choose an area", subtopic_heading: "Choose a topic", order_heading: "Which order is this about?", continue_label: "Continue", back_label: "Back" },
+        tr: { title: "Hangi konuda yardıma ihtiyacınız var?", description: "Önce alanı, ardından uygun konuyu seçin.", category_heading: "Alan seçin", subtopic_heading: "Konu seçin", order_heading: "Hangi siparişle ilgili?", continue_label: "Devam", back_label: "Geri" },
+        fr: { title: "Comment pouvons-nous vous aider ?", description: "Choisissez un domaine puis le thème correspondant.", category_heading: "Choisir un domaine", subtopic_heading: "Choisir un thème", order_heading: "Quelle commande est concernée ?", continue_label: "Continuer", back_label: "Retour" },
+        es: { title: "¿Con qué necesitas ayuda?", description: "Elige un área y después el tema correspondiente.", category_heading: "Elegir área", subtopic_heading: "Elegir tema", order_heading: "¿Qué pedido está relacionado?", continue_label: "Continuar", back_label: "Atrás" },
+        it: { title: "Come possiamo aiutarti?", description: "Scegli un'area e poi l'argomento adatto.", category_heading: "Scegli un'area", subtopic_heading: "Scegli un argomento", order_heading: "Quale ordine riguarda?", continue_label: "Continua", back_label: "Indietro" },
+      });
+    }
+    case "support_topic_grid": {
+      const topic = (icon, category, order, values) => ml({ icon, category, order, title: values.de[0], description: values.de[1] }, {
+        en: { title: values.en[0], description: values.en[1] }, tr: { title: values.tr[0], description: values.tr[1] },
+        fr: { title: values.fr[0], description: values.fr[1] }, es: { title: values.es[0], description: values.es[1] }, it: { title: values.it[0], description: values.it[1] },
+      });
+      return ml({
+        title: "Beliebte Hilfethemen",
+        description: "Direkt zu den am häufigsten gesuchten Antworten.",
+        topics: [
+          topic("📦", "order", 0, { de: ["Bestellung & Lieferung", "Status, fehlende Pakete und unvollständige Bestellungen."], en: ["Orders & delivery", "Status, missing parcels and incomplete orders."], tr: ["Sipariş ve teslimat", "Durum, eksik paketler ve siparişler."], fr: ["Commandes et livraison", "Statut, colis manquants et commandes incomplètes."], es: ["Pedidos y entrega", "Estado, paquetes y pedidos incompletos."], it: ["Ordini e consegna", "Stato, pacchi mancanti e ordini incompleti."] }),
+          topic("↩️", "return", 1, { de: ["Rückgabe & Erstattung", "Rückgabe starten oder fehlende Erstattung melden."], en: ["Returns & refunds", "Start a return or report a missing refund."], tr: ["İade ve para iadesi", "İade başlatın veya eksik geri ödemeyi bildirin."], fr: ["Retours et remboursements", "Lancer un retour ou signaler un remboursement."], es: ["Devoluciones y reembolsos", "Inicia una devolución o reclama un reembolso."], it: ["Resi e rimborsi", "Avvia un reso o segnala un rimborso."] }),
+          topic("💳", "payment", 2, { de: ["Zahlung", "Fehlgeschlagene oder unklare Zahlungen klären."], en: ["Payment", "Resolve failed or unclear payments."], tr: ["Ödeme", "Başarısız veya belirsiz ödemeleri çözün."], fr: ["Paiement", "Résoudre les paiements échoués."], es: ["Pago", "Resuelve pagos fallidos."], it: ["Pagamento", "Risolvi pagamenti non riusciti."] }),
+          topic("🧾", "invoice", 3, { de: ["Rechnung", "Rechnung finden oder Fehler melden."], en: ["Invoice", "Find an invoice or report an error."], tr: ["Fatura", "Fatura bulun veya hatayı bildirin."], fr: ["Facture", "Trouver une facture ou signaler une erreur."], es: ["Factura", "Encuentra una factura o informa un error."], it: ["Fattura", "Trova una fattura o segnala un errore."] }),
+          topic("🔐", "account", 4, { de: ["Konto", "Zugang und persönliche Daten verwalten."], en: ["Account", "Manage access and personal data."], tr: ["Hesap", "Erişim ve kişisel verileri yönetin."], fr: ["Compte", "Gérer l'accès et les données."], es: ["Cuenta", "Gestiona acceso y datos."], it: ["Account", "Gestisci accesso e dati."] }),
+          topic("🎁", "bonus", 5, { de: ["Bonus & Gutschein", "Punkte und Gutscheine prüfen."], en: ["Bonus & coupon", "Check points and coupons."], tr: ["Bonus ve kupon", "Puanları ve kuponları kontrol edin."], fr: ["Bonus et coupon", "Vérifier points et coupons."], es: ["Bono y cupón", "Comprueba puntos y cupones."], it: ["Bonus e coupon", "Controlla punti e coupon."] }),
+          topic("🛍️", "product", 6, { de: ["Produkt & Verkäufer", "Produktproblem oder Verkäuferbeschwerde melden."], en: ["Product & seller", "Report a product issue or seller complaint."], tr: ["Ürün ve satıcı", "Ürün sorununu veya satıcı şikayetini bildirin."], fr: ["Produit et vendeur", "Signaler un problème ou une réclamation."], es: ["Producto y vendedor", "Informa un problema o queja."], it: ["Prodotto e venditore", "Segnala un problema o reclamo."] }),
+          topic("🛠️", "technical", 7, { de: ["Technisches Problem", "Fehler bei Website oder Funktion melden."], en: ["Technical issue", "Report a website or feature error."], tr: ["Teknik sorun", "Site veya özellik hatasını bildirin."], fr: ["Problème technique", "Signaler une erreur du site."], es: ["Problema técnico", "Informa un error del sitio."], it: ["Problema tecnico", "Segnala un errore del sito."] }),
+          topic("🛡️", "privacy", 8, { de: ["Datenschutz", "Auskunft, Löschung und Datenschutzfragen."], en: ["Privacy", "Access, deletion and privacy questions."], tr: ["Gizlilik", "Erişim, silme ve gizlilik soruları."], fr: ["Confidentialité", "Accès, suppression et confidentialité."], es: ["Privacidad", "Acceso, eliminación y privacidad."], it: ["Privacy", "Accesso, cancellazione e privacy."] }),
+          topic("❓", "other", 9, { de: ["Sonstiges", "Ein anderes Anliegen beschreiben."], en: ["Other", "Describe another issue."], tr: ["Diğer", "Başka bir konuyu açıklayın."], fr: ["Autre", "Décrire une autre demande."], es: ["Otro", "Describe otro asunto."], it: ["Altro", "Descrivi un altro problema."] }),
+        ],
+      }, {
+        en: { title: "Popular help topics", description: "Go straight to the answers customers search for most." },
+        tr: { title: "Popüler yardım konuları", description: "En sık aranan yanıtlara doğrudan ulaşın." },
+        fr: { title: "Thèmes d'aide populaires", description: "Accédez directement aux réponses les plus recherchées." },
+        es: { title: "Temas de ayuda populares", description: "Accede a las respuestas más buscadas." },
+        it: { title: "Argomenti di assistenza popolari", description: "Vai direttamente alle risposte più cercate." },
+      });
+    }
+    case "support_faq": {
+      const faq = (question, answer, order, actionLabel = {}, actionUrl = "") => ml({
+        question: question.de, answer: answer.de, order, action_label: actionLabel.de || "", action_url: actionUrl,
+      }, Object.fromEntries(["en", "tr", "fr", "es", "it"].map((language) => [language, { question: question[language], answer: answer[language], action_label: actionLabel[language] || "" }])));
+      const category = (title, translations, order, item) => ml({ title, order, items: [item] }, Object.fromEntries(["en", "tr", "fr", "es", "it"].map((language) => [language, { title: translations[language] }])));
+      const openOrders = { de: "Bestellungen öffnen", en: "Open orders", tr: "Siparişleri aç", fr: "Ouvrir les commandes", es: "Abrir pedidos", it: "Apri ordini" };
+      const openCases = { de: "Meine Anfragen", en: "My requests", tr: "Taleplerim", fr: "Mes demandes", es: "Mis solicitudes", it: "Le mie richieste" };
+      return ml({
+        title: "Häufig gestellte Fragen",
+        description: "Klare Antworten auf die wichtigsten Fragen rund um Ihren Einkauf.",
+        section_label: "Alle Hilfethemen",
+        no_results_text: "Keine passende Antwort gefunden. Versuchen Sie einen anderen Suchbegriff.",
+        categories: [
+          category("Bestellungen", { en: "Orders", tr: "Siparişler", fr: "Commandes", es: "Pedidos", it: "Ordini" }, 0, faq({ de: "Wie prüfe ich meine Bestellung?", en: "How do I check my order?", tr: "Siparişimi nasıl kontrol ederim?", fr: "Comment vérifier ma commande ?", es: "¿Cómo consulto mi pedido?", it: "Come controllo il mio ordine?" }, { de: "Status und Details finden Sie in Ihren Bestellungen.", en: "Find status and details in your orders.", tr: "Durum ve ayrıntılar siparişlerinizdedir.", fr: "Le statut se trouve dans vos commandes.", es: "El estado está en tus pedidos.", it: "Stato e dettagli sono nei tuoi ordini." }, 0, openOrders, "/account/orders")),
+          category("Versand", { en: "Shipping", tr: "Teslimat", fr: "Livraison", es: "Envío", it: "Spedizione" }, 1, faq({ de: "Wo ist mein Paket?", en: "Where is my parcel?", tr: "Paketim nerede?", fr: "Où est mon colis ?", es: "¿Dónde está mi paquete?", it: "Dov'è il mio pacco?" }, { de: "Öffnen Sie die Bestellung, um die Sendungsverfolgung zu sehen.", en: "Open the order to view tracking.", tr: "Takibi görmek için siparişi açın.", fr: "Ouvrez la commande pour le suivi.", es: "Abre el pedido para ver el seguimiento.", it: "Apri l'ordine per il tracking." }, 0, openOrders, "/account/orders")),
+          category("Rückgabe & Erstattung", { en: "Returns & refunds", tr: "İade ve geri ödeme", fr: "Retours et remboursements", es: "Devoluciones y reembolsos", it: "Resi e rimborsi" }, 2, faq({ de: "Wie starte ich eine Rückgabe?", en: "How do I start a return?", tr: "İade nasıl başlatılır?", fr: "Comment commencer un retour ?", es: "¿Cómo inicio una devolución?", it: "Come avvio un reso?" }, { de: "Öffnen Sie die Bestellung und wählen Sie die Rückgabeoption.", en: "Open the order and choose the return option.", tr: "Siparişi açıp iade seçeneğini seçin.", fr: "Ouvrez la commande et choisissez le retour.", es: "Abre el pedido y elige devolución.", it: "Apri l'ordine e scegli il reso." }, 0, openOrders, "/account/orders")),
+          category("Zahlung", { en: "Payment", tr: "Ödeme", fr: "Paiement", es: "Pago", it: "Pagamento" }, 3, faq({ de: "Was tun bei fehlgeschlagener Zahlung?", en: "What if payment fails?", tr: "Ödeme başarısız olursa ne yapmalıyım?", fr: "Que faire si le paiement échoue ?", es: "¿Qué hago si falla el pago?", it: "Cosa fare se il pagamento fallisce?" }, { de: "Prüfen Sie Ihre Zahlungsdaten und versuchen Sie es erneut; bei Abbuchung kontaktieren Sie den Support.", en: "Check payment details and retry; contact support if charged.", tr: "Ödeme bilgilerini kontrol edin; ücret alındıysa desteğe yazın.", fr: "Vérifiez les données; contactez-nous si débité.", es: "Comprueba los datos; contáctanos si hubo cargo.", it: "Controlla i dati; contattaci se addebitato." }, 0, openCases, "/nachrichten")),
+          category("Rechnung", { en: "Invoice", tr: "Fatura", fr: "Facture", es: "Factura", it: "Fattura" }, 4, faq({ de: "Meine Rechnung ist falsch – was nun?", en: "My invoice is wrong — what now?", tr: "Faturam yanlış, ne yapmalıyım?", fr: "Ma facture est incorrecte, que faire ?", es: "Mi factura es incorrecta, ¿qué hago?", it: "La fattura è errata, cosa faccio?" }, { de: "Öffnen Sie eine Anfrage und nennen Sie die betroffene Bestellung.", en: "Open a request and include the affected order.", tr: "Talep açıp ilgili siparişi belirtin.", fr: "Ouvrez une demande avec la commande concernée.", es: "Abre una solicitud con el pedido afectado.", it: "Apri una richiesta con l'ordine interessato." }, 0, openCases, "/nachrichten")),
+          category("Konto", { en: "Account", tr: "Hesap", fr: "Compte", es: "Cuenta", it: "Account" }, 5, faq({ de: "Ich kann nicht auf mein Konto zugreifen.", en: "I cannot access my account.", tr: "Hesabıma erişemiyorum.", fr: "Je ne peux pas accéder à mon compte.", es: "No puedo acceder a mi cuenta.", it: "Non riesco ad accedere all'account." }, { de: "Prüfen Sie Ihre E-Mail-Adresse und setzen Sie das Passwort zurück.", en: "Check your email address and reset the password.", tr: "E-postanızı kontrol edip parolayı sıfırlayın.", fr: "Vérifiez l'e-mail et réinitialisez le mot de passe.", es: "Comprueba el correo y restablece la contraseña.", it: "Controlla l'email e reimposta la password." }, 0, openCases, "/nachrichten")),
+          category("Bonus & Gutschein", { en: "Bonus & coupon", tr: "Bonus ve kupon", fr: "Bonus et coupon", es: "Bono y cupón", it: "Bonus e coupon" }, 6, faq({ de: "Warum funktioniert mein Gutschein nicht?", en: "Why does my coupon not work?", tr: "Kuponum neden çalışmıyor?", fr: "Pourquoi mon coupon ne fonctionne-t-il pas ?", es: "¿Por qué no funciona mi cupón?", it: "Perché il coupon non funziona?" }, { de: "Prüfen Sie Gültigkeit, Mindestwert und teilnehmende Produkte.", en: "Check validity, minimum spend and eligible products.", tr: "Geçerlilik, alt limit ve uygun ürünleri kontrol edin.", fr: "Vérifiez validité, minimum et produits éligibles.", es: "Comprueba vigencia, mínimo y productos.", it: "Controlla validità, minimo e prodotti." }, 0, openCases, "/nachrichten")),
+          category("Verkäufer", { en: "Sellers", tr: "Satıcılar", fr: "Vendeurs", es: "Vendedores", it: "Venditori" }, 7, faq({ de: "Wie melde ich ein Problem mit einem Verkäufer?", en: "How do I report a seller issue?", tr: "Satıcı sorununu nasıl bildiririm?", fr: "Comment signaler un vendeur ?", es: "¿Cómo informo un problema con un vendedor?", it: "Come segnalo un problema con un venditore?" }, { de: "Starten Sie eine Anfrage und wählen Sie Produkt oder Verkäufer.", en: "Start a request and choose Product or Seller.", tr: "Talep başlatıp Ürün veya Satıcı seçin.", fr: "Lancez une demande et choisissez Produit ou Vendeur.", es: "Inicia una solicitud y elige Producto o Vendedor.", it: "Avvia una richiesta e scegli Prodotto o Venditore." }, 0, openCases, "/nachrichten")),
+          category("Datenschutz", { en: "Privacy", tr: "Gizlilik", fr: "Confidentialité", es: "Privacidad", it: "Privacy" }, 8, faq({ de: "Wie stelle ich eine Datenschutzanfrage?", en: "How do I make a privacy request?", tr: "Gizlilik talebi nasıl oluşturulur?", fr: "Comment faire une demande de confidentialité ?", es: "¿Cómo hago una solicitud de privacidad?", it: "Come invio una richiesta privacy?" }, { de: "Starten Sie eine Support-Anfrage und wählen Sie Datenschutz.", en: "Start a support request and choose Privacy.", tr: "Destek talebi başlatıp Gizlilik seçin.", fr: "Lancez une demande et choisissez Confidentialité.", es: "Inicia una solicitud y elige Privacidad.", it: "Avvia una richiesta e scegli Privacy." }, 0, openCases, "/nachrichten")),
+        ],
+      }, {
+        en: { title: "Frequently asked questions", description: "Clear answers to the most important shopping questions.", section_label: "All help topics", no_results_text: "No matching answer found. Try another search term." },
+        tr: { title: "Sık sorulan sorular", description: "Alışverişle ilgili önemli sorulara net yanıtlar.", section_label: "Tüm yardım konuları", no_results_text: "Uygun yanıt bulunamadı. Başka bir arama deneyin." },
+        fr: { title: "Questions fréquentes", description: "Des réponses claires aux questions essentielles.", section_label: "Tous les thèmes", no_results_text: "Aucune réponse trouvée. Essayez un autre terme." },
+        es: { title: "Preguntas frecuentes", description: "Respuestas claras a las preguntas más importantes.", section_label: "Todos los temas", no_results_text: "No encontramos una respuesta. Prueba otra búsqueda." },
+        it: { title: "Domande frequenti", description: "Risposte chiare alle domande più importanti.", section_label: "Tutti gli argomenti", no_results_text: "Nessuna risposta trovata. Prova un'altra ricerca." },
+      });
+    }
     default:
       return {};
   }

@@ -239,7 +239,10 @@
       "Bash(rmdir \"app/[locale]/content/brands/authorizations\")",
       "Read(//tmp/**)",
       "Bash(npm audit *)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "Bash(identify logo/*.png ai-pics/*.png)",
+      "Bash(pkill -f \"next dev -p 3911\")",
+      "Bash(pkill -f \"next dev -p 3912\")"
     ]
   }
 }

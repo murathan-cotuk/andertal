@@ -11,6 +11,7 @@ const { resolveOrderPaidTotalCents } = require('./order-money')
 const { resolveFlowMailProvider, sendFlowOutboundEmail } = require('./email-providers')
 const { consumeFlowEmailSlot } = require('./flow-email-rate-limit')
 const { SUPPORTED_LOCALES: FLOW_EMAIL_LOCALES, resolveLocaleFromCountry: resolveEmailLocaleFromCountry } = require('./locale-from-country')
+const { enrichOrderItemRows } = require('./order-items-seller')
 
 /** Mirrors apps/shop/src/lib/shop-market.js — URL language segment from market country. */
 function storefrontLangFromMarketCountry(market) {
@@ -269,7 +270,9 @@ async function loadOrderContext(client, orderId) {
     `SELECT * FROM store_order_items WHERE order_id = $1::uuid ORDER BY created_at ASC`,
     [orderId],
   )
-  const items = iRes.rows || []
+  // enrichOrderItemRows resolves the purchased variant's own sku/ean (store_order_items has
+  // no sku/ean columns of its own) — without this, {ITEM_n_SKU} was always blank in emails.
+  const items = await enrichOrderItemRows(client, iRes.rows || [])
   let storeName = 'Shop'
   let supportEmail = ''
   const sid = order.seller_id
@@ -518,7 +521,7 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     vars[`ITEM_${n}_IMAGE`] = resolveUrl ? resolveUrl(it.thumbnail || '') : (it.thumbnail || '')
     vars[`ITEM_${n}_QUANTITY`] = String(Number(it.quantity || 1))
     vars[`ITEM_${n}_PRICE`] = formatEuro(it.unit_price_cents)
-    vars[`ITEM_${n}_SKU`] = String(it.sku || it.variant_sku || '').trim()
+    vars[`ITEM_${n}_SKU`] = String(it.sku || '').trim()
   })
   if (customerProfile) {
     overlayCustomerProfile(vars, customerProfile)
@@ -1420,15 +1423,12 @@ async function runAutomationFlowsForMessageEvent(opts) {
       return 0
     }
 
-    // Note: messaging triggers are always called with a single recipient already resolved by
-    // the caller (messages.js — the customer, or a specific seller). "Admin" audience isn't
-    // meaningful here yet (no caller path routes these to the admin inbox); an admin-audience
-    // flow on one of these triggers is simply skipped rather than silently mis-sent.
+    // Message/support-case callers resolve the exact recipient. Admin audience is therefore
+    // safe here as well: it is sent only to the explicit toEmail supplied by the caller.
     let total = 0
     for (const fr of flowRows) {
       const audRaw = String(fr.audience || 'customer').toLowerCase()
-      if (audRaw === 'admin') continue
-      const audience = audRaw === 'seller' ? 'seller' : 'customer'
+      const audience = audRaw === 'seller' ? 'seller' : audRaw === 'admin' ? 'admin' : 'customer'
       const sr = await client.query(
         `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
          FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,

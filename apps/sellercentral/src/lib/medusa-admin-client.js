@@ -71,6 +71,7 @@ class MedusaAdminClient {
         const err = new Error(formatApiError({ message: rawMsg }, getClientLocale()));
         err.originalMessage = rawMsg;
         err.statusCode = response.status;
+        err.code = errorBody?.code || null;
         throw err;
       }
 
@@ -84,6 +85,7 @@ class MedusaAdminClient {
       const out = new Error(formatApiError({ message: rawFriendly }, getClientLocale()));
       out.originalMessage = rawFriendly;
       out.statusCode = error?.statusCode;
+      out.code = error?.code || null;
       out.cause = error;
       if (error?.statusCode === 404 || error?.statusCode === 503 || isNetworkError) {
         console.warn(`Medusa Admin API (${endpoint}):`, error?.message || error?.statusCode);
@@ -817,6 +819,18 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/pages/${id}`)
   }
 
+  /** Settings for a hardcoded API-driven storefront page (/bestsellers, /sales) — not a CMS container page. */
+  async getApiPageSettings(slug) {
+    return this.request(`/admin-hub/v1/api-page-settings/${encodeURIComponent(slug)}`)
+  }
+
+  async updateApiPageSettings(slug, data) {
+    return this.request(`/admin-hub/v1/api-page-settings/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    })
+  }
+
   async createPage(data) {
     return this.request('/admin-hub/v1/pages', {
       method: 'POST',
@@ -1182,6 +1196,58 @@ class MedusaAdminClient {
     const payload = { seller_id, mark_as };
     if (subject_thread !== undefined) payload.subject_thread = subject_thread;
     return this.request('/admin-hub/v1/messages/support/mark-read', { method: 'PATCH', body: JSON.stringify(payload) })
+  }
+  async getSupportCases(params = {}) {
+    const clean = Object.fromEntries(Object.entries(params).filter(([, value]) => value != null && value !== ''))
+    const qs = new URLSearchParams(clean).toString()
+    return this.request(`/admin-hub/v1/support-cases${qs ? `?${qs}` : ''}`)
+  }
+  async getSupportCase(id) {
+    return this.request(`/admin-hub/v1/support-cases/${encodeURIComponent(id)}`)
+  }
+  async sendSupportCaseMessage(id, data) {
+    return this.request(`/admin-hub/v1/support-cases/${encodeURIComponent(id)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    })
+  }
+  async closeSupportCase(id, resolutionNote = '') {
+    return this.request(`/admin-hub/v1/support-cases/${encodeURIComponent(id)}/close`, {
+      method: 'POST',
+      body: JSON.stringify({ resolution_note: resolutionNote }),
+    })
+  }
+  async reopenSupportCase(id) {
+    return this.request(`/admin-hub/v1/support-cases/${encodeURIComponent(id)}/reopen`, { method: 'POST' })
+  }
+  async markSupportCaseRead(id) {
+    return this.request(`/admin-hub/v1/support-cases/${encodeURIComponent(id)}/read`, { method: 'POST' })
+  }
+  async reassignSupportCase(id, sellerId) {
+    return this.request(`/admin-hub/v1/support-cases/${encodeURIComponent(id)}/reassign`, {
+      method: 'PATCH',
+      body: JSON.stringify({ seller_id: sellerId || null }),
+    })
+  }
+  async uploadSupportCaseAttachments(files) {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const token = this.overrideToken || (typeof window !== 'undefined' ? localStorage.getItem('sellerToken') : null)
+    const formData = new FormData()
+    for (const file of files || []) formData.append('files', file)
+    const response = await fetch(`${base}/admin-hub/v1/support-cases/attachments/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ message: response.statusText }))
+      const error = new Error(formatApiError({ message: body?.message || response.statusText }, getClientLocale()))
+      error.originalMessage = body?.message || response.statusText
+      error.statusCode = response.status
+      error.code = body?.code || null
+      throw error
+    }
+    return response.json()
   }
   async getMessageTemplates() {
     return this.request('/admin-hub/v1/message-templates')

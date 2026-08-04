@@ -220,6 +220,41 @@ function productPerfScore(product) {
   return sold * 1000 + views * 10 + reviewAvg * reviewCount * 5;
 }
 
+// Alternate scoring strategies selectable via the Sellercentral API-page settings panel.
+const SORT_SCORERS = {
+  sales: productPerfScore,
+  views: (p) => Number(p?.metadata?.view_count || p?.metadata?.views || 0) || 0,
+  rating: (p) => {
+    const reviewCount = Number(p?.metadata?.review_count || 0) || 0;
+    const reviewAvg = Number(p?.metadata?.review_avg || 0) || 0;
+    return reviewAvg * reviewCount;
+  },
+  newest: (p) => {
+    const t = p?.created_at ? new Date(p.created_at).getTime() : 0;
+    return Number.isFinite(t) ? t : 0;
+  },
+};
+
+function seededRandom(seed) {
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function hashStr(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  return h || 1;
+}
+
+function pickI18n(i18n, locale) {
+  if (!i18n) return null;
+  return i18n[locale] || i18n.de || null;
+}
+
 const pageCopy = {
   de: { title: "Angebote", empty: "Keine reduzierten Produkte gefunden.", seeAll: "Alle ansehen" },
   tr: { title: "İndirimler", empty: "İndirimli ürün bulunamadı.", seeAll: "Tümünü gör" },
@@ -239,6 +274,7 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState(null);
+  const [pageSettings, setPageSettings] = useState(null);
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -247,15 +283,18 @@ export default function SalesPage() {
       try {
         setLoading(true);
         setError("");
-        const [catRes, prRes] = await Promise.all([
+        const [catRes, prRes, settingsRes] = await Promise.all([
           fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
           fetch("/api/store-products?limit=1200", { cache: "no-store" }),
+          fetch("/api/store-api-page-settings/sales", { cache: "no-store" }).catch(() => null),
         ]);
         const catData = catRes.ok ? await catRes.json() : { tree: [] };
         const prData = prRes.ok ? await prRes.json() : { products: [] };
+        const settingsData = settingsRes && settingsRes.ok ? await settingsRes.json().catch(() => null) : null;
         if (!cancelled) {
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
+          setPageSettings(settingsData || null);
         }
       } catch (e) {
         if (!cancelled) setError(e?.message || "Error");
@@ -265,6 +304,18 @@ export default function SalesPage() {
     })();
     return () => { cancelled = true; };
   }, [locale]);
+
+  const maxItems = (pageSettings?.max_items && Number(pageSettings.max_items) > 0)
+    ? Number(pageSettings.max_items)
+    : MAX_ITEMS_PER_CAROUSEL;
+  const sortMode = pageSettings?.sort_mode && (SORT_SCORERS[pageSettings.sort_mode] || pageSettings.sort_mode === "random")
+    ? pageSettings.sort_mode
+    : "sales";
+  const scorer = SORT_SCORERS[sortMode] || productPerfScore;
+
+  const titleOverride = pickI18n(pageSettings?.title_i18n, l)?.title || "";
+  const subtitleOverride = pickI18n(pageSettings?.subtitle_i18n, l)?.subtitle || "";
+  const pageTitle = titleOverride || copy.title;
 
   const rows = useMemo(() => {
     const discounted = products.filter(isDiscountedProduct);
@@ -287,15 +338,22 @@ export default function SalesPage() {
     }
 
     return [...byRoot.values()]
-      .map(({ category, products: list }) => ({
-        category,
-        products: list
-          .sort((a, b) => productPerfScore(b) - productPerfScore(a))
-          .slice(0, MAX_ITEMS_PER_CAROUSEL),
-      }))
+      .map(({ category, products: list }) => {
+        let sorted;
+        if (sortMode === "random") {
+          const rand = seededRandom(hashStr(String(category.id)));
+          sorted = list
+            .map((p) => ({ p, r: rand() }))
+            .sort((a, b) => a.r - b.r)
+            .map(({ p }) => p);
+        } else {
+          sorted = [...list].sort((a, b) => scorer(b) - scorer(a));
+        }
+        return { category, products: sorted.slice(0, maxItems) };
+      })
       .filter((r) => r.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
-  }, [categoryTree, products]);
+  }, [categoryTree, products, sortMode, scorer, maxItems]);
 
   // Sidebar active section via IntersectionObserver
   useEffect(() => {
@@ -343,7 +401,7 @@ export default function SalesPage() {
           {/* Left sidebar */}
           {showContent && rows.length > 0 && (
             <Sidebar>
-              <SidebarTitle>{copy.title}</SidebarTitle>
+              <SidebarTitle>{pageTitle}</SidebarTitle>
               <SidebarList>
                 {rows.map(({ category }) => {
                   const catName = getLocalizedCategory(category, locale).name || category.name || "";
@@ -371,9 +429,12 @@ export default function SalesPage() {
             ) : (
               <>
                 <PageHeader>
-                  <PageTitle>{copy.title}</PageTitle>
+                  <PageTitle>{pageTitle}</PageTitle>
                   {totalCount > 0 && <ProductCount>{totalCount}</ProductCount>}
                 </PageHeader>
+                {subtitleOverride && (
+                  <p style={{ margin: "0 8px 8px", fontSize: 13, color: "#6b7280" }}>{subtitleOverride}</p>
+                )}
 
                 {rows.map(({ category, products: list }) => {
                   const catName = getLocalizedCategory(category, locale).name || category.name || category.slug || "";

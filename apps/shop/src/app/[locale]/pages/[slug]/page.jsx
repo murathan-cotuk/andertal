@@ -4,9 +4,16 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { useLocale } from "next-intl";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
+
+/** DE lives on the plain field; other locales live under `${field}_i18n[locale][field]`, falling back to DE. */
+function lt(page, field, locale) {
+  if (!locale || locale === "de") return page?.[field] || "";
+  return page?.[`${field}_i18n`]?.[locale]?.[field] || page?.[field] || "";
+}
 
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
@@ -19,6 +26,7 @@ function sanitizeHtml(html) {
 
 export default function CmsPageBySlug() {
   const params = useParams();
+  const locale = useLocale();
   const slug = params?.slug != null ? String(params.slug) : undefined;
 
   const [page, setPage] = useState(null);
@@ -71,7 +79,8 @@ export default function CmsPageBySlug() {
     );
   }
 
-  const safeBody = sanitizeHtml(page.body || "");
+  const localizedTitle = lt(page, "title", locale);
+  const safeBody = sanitizeHtml(lt(page, "body", locale));
   const hero = page.featured_image ? resolveImageUrl(page.featured_image) : "";
 
   return (
@@ -85,12 +94,12 @@ export default function CmsPageBySlug() {
           <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">
             <img
               src={hero}
-              alt={page.title || ""}
+              alt={localizedTitle}
               className="w-full max-h-[min(42vh,400px)] object-cover block"
             />
           </div>
         ) : null}
-        <h1 className="text-3xl font-semibold text-gray-900 mb-6">{page.title}</h1>
+        <h1 className="text-3xl font-semibold text-gray-900 mb-6">{localizedTitle}</h1>
         {safeBody ? (
           <div
             className="prose prose-gray max-w-none"

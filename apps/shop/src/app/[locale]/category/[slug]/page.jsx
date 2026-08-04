@@ -1,18 +1,7 @@
-"use client";
+import { permanentRedirect } from "next/navigation";
 
-import ShopHeader from "@/components/ShopHeader";
-import Footer from "@/components/Footer";
-import CategoryTemplate from "@/components/templates/CategoryTemplate";
-
-export default function CategoryPage() {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <ShopHeader />
-      <main className="flex-grow">
-        <CategoryTemplate />
-      </main>
-      <Footer />
-    </div>
-  );
+/** Legacy /category/[slug] → canonical /[slug] (same CategoryTemplate). */
+export default async function CategoryPage({ params }) {
+  const { locale, slug } = await params;
+  permanentRedirect(`/${locale}/${slug}`);
 }
-

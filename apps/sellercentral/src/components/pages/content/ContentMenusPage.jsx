@@ -31,6 +31,17 @@ import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
 import { getContentMenusCopy, linkTypesForLocale, apiFunctionOptionsForLocale } from "@/lib/content-menus-i18n";
+import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
+
+/** Read a translatable field: DE lives on the plain column, other languages under the *_i18n jsonb column. */
+function giI18n(obj, field, i18nKey, lang) {
+  if (!lang || lang === "de") return obj?.[field] ?? "";
+  return obj?.[i18nKey]?.[lang]?.[field] ?? "";
+}
+/** Merge a translated field into an *_i18n object for the given language, leaving other languages untouched. */
+function setI18nField(i18nObj, field, lang, value) {
+  return { ...(i18nObj || {}), [lang]: { ...(i18nObj?.[lang] || {}), [field]: value } };
+}
 
 const TAB_SIZE = 28;
 const NEST_BOUNDARY_PX = 20 + 3 * TAB_SIZE;
@@ -170,6 +181,9 @@ function parseCategoriesCsvToCreateList(csvText) {
 
 function MenuEditorPanel(props) {
   const {
+    uiLocale,
+    editLang,
+    setEditLang,
     panelMode,
     panelMenuId,
     selectedMenuId,
@@ -242,15 +256,26 @@ function MenuEditorPanel(props) {
   const tree = buildMenuTree(items);
   const openInlineAdd = (parentId) => {
     setAddUnderParentId(parentId ?? null);
-    setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" });
+    setItemForm({ label: "", label_i18n: {}, slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" });
     setInlineNewOpen(true);
     setEditingItemId(null);
   };
   const [localMenuName, setLocalMenuName] = useState(panelMenu?.name ?? menuForm.name ?? "");
+  const [localMenuNameI18n, setLocalMenuNameI18n] = useState(panelMenu?.name_i18n ?? {});
   const [localMenuSlug, setLocalMenuSlug] = useState(panelMenu?.slug ?? menuForm.slug ?? "");
   const [localMenuLocation, setLocalMenuLocation] = useState(panelMenu?.location ?? menuForm.location ?? "main");
   const isNew = panelMode === "new";
   const hasMenuId = !!effectiveMenuId && !isNew;
+  const langOptions = getLandingEditorCopy(uiLocale).shopContentLangOptions();
+  const displayedMenuName = editLang === "de" ? localMenuName : (localMenuNameI18n?.[editLang]?.name || "");
+  const setDisplayedMenuName = (value) => {
+    if (editLang === "de") {
+      setLocalMenuName(value);
+      if (!menuSlugManuallyEdited) setLocalMenuSlug(slugFromName(value));
+    } else {
+      setLocalMenuNameI18n((prev) => setI18nField(prev, "name", editLang, value));
+    }
+  };
 
   // Always-current refs so save/discard callbacks never go stale
   const latestSaveRef = useRef(null);
@@ -258,16 +283,19 @@ function MenuEditorPanel(props) {
 
   const menuFormDirty = isNew
     ? !!(localMenuName?.trim() || localMenuSlug?.trim())
-    : (localMenuName !== (panelMenu?.name ?? "")) || (localMenuSlug !== (panelMenu?.slug ?? "")) || (localMenuLocation !== (panelMenu?.location ?? "main"));
+    : (localMenuName !== (panelMenu?.name ?? "")) || (localMenuSlug !== (panelMenu?.slug ?? "")) || (localMenuLocation !== (panelMenu?.location ?? "main"))
+      || JSON.stringify(localMenuNameI18n || {}) !== JSON.stringify(panelMenu?.name_i18n || {});
 
   useEffect(() => {
     if (panelMenu) {
       setLocalMenuName(panelMenu.name ?? "");
+      setLocalMenuNameI18n(panelMenu.name_i18n ?? {});
       setLocalMenuSlug(panelMenu.slug ?? "");
       setLocalMenuLocation(panelMenu.location ?? "main");
       setMenuSlugManuallyEdited(false);
     } else if (isNew) {
       setLocalMenuName(menuForm.name);
+      setLocalMenuNameI18n({});
       setLocalMenuSlug(menuForm.slug);
       setLocalMenuLocation(menuForm.location ?? "main");
       setMenuSlugManuallyEdited(false);
@@ -286,11 +314,13 @@ function MenuEditorPanel(props) {
   const handleDiscardMenuForm = () => {
     if (panelMenu) {
       setLocalMenuName(panelMenu.name ?? "");
+      setLocalMenuNameI18n(panelMenu.name_i18n ?? {});
       setLocalMenuSlug(panelMenu.slug ?? "");
       setLocalMenuLocation(panelMenu.location ?? "main");
       setMenuSlugManuallyEdited(false);
     } else {
       setLocalMenuName(menuForm.name);
+      setLocalMenuNameI18n({});
       setLocalMenuSlug(menuForm.slug);
       setLocalMenuLocation(menuForm.location ?? "main");
       setMenuSlugManuallyEdited(false);
@@ -310,13 +340,13 @@ function MenuEditorPanel(props) {
       setError(null);
       const location = localMenuLocation || "main";
       if (isNew) {
-        const created = await client.createMenu({ name, slug, location });
+        const created = await client.createMenu({ name, slug, location, name_i18n: localMenuNameI18n });
         await fetchMenus();
         if (router) router.push(`/content/menus/${created.id}`);
         return;
       }
       if (panelMenuId) {
-        await client.updateMenu(panelMenuId, { name, slug, location });
+        await client.updateMenu(panelMenuId, { name, slug, location, name_i18n: localMenuNameI18n });
         await fetchMenus();
         if (onMenuSaved) await onMenuSaved(panelMenuId);
       }
@@ -371,26 +401,35 @@ function MenuEditorPanel(props) {
               <BlockStack gap="200">
                 <TextField
                   label={menusCopy.menuName}
-                  value={localMenuName}
-                  onChange={(value) => {
-                    setLocalMenuName(value);
-                    if (!menuSlugManuallyEdited) setLocalMenuSlug(slugFromName(value));
-                  }}
+                  value={displayedMenuName}
+                  onChange={setDisplayedMenuName}
                   placeholder={menusCopy.menuNamePh}
                   autoComplete="off"
+                  helpText={editLang !== "de" ? menusCopy.menuNamePh : undefined}
                 />
-                <TextField
-                  label={menusCopy.itemSlug}
-                  value={localMenuSlug}
-                  onChange={(value) => {
-                    setMenuSlugManuallyEdited(true);
-                    setLocalMenuSlug(value);
-                  }}
-                  placeholder={menusCopy.menuSlugPh}
-                  autoComplete="off"
-                  helpText={menusCopy.slugHelp}
-                />
+                {editLang === "de" && (
+                  <TextField
+                    label={menusCopy.itemSlug}
+                    value={localMenuSlug}
+                    onChange={(value) => {
+                      setMenuSlugManuallyEdited(true);
+                      setLocalMenuSlug(value);
+                    }}
+                    placeholder={menusCopy.menuSlugPh}
+                    autoComplete="off"
+                    helpText={menusCopy.slugHelp}
+                  />
+                )}
               </BlockStack>
+            </div>
+            <div style={{ minWidth: 160 }}>
+              <Select
+                label="Language"
+                labelHidden
+                options={langOptions}
+                value={editLang}
+                onChange={setEditLang}
+              />
             </div>
             <div style={{ minWidth: 180 }}>
               <Select
@@ -519,6 +558,7 @@ function MenuEditorPanel(props) {
                         out.push(
                           <div key={node.id} style={{ borderBottom: "1px solid var(--p-color-border-subdued)" }}>
                             <InlineItemRow
+                              editLang={editLang}
                               itemForm={itemForm}
                               setItemForm={setItemForm}
                               menusCopy={menusCopy}
@@ -691,6 +731,7 @@ function MenuEditorPanel(props) {
                       {inlineNewOpen && (
                         <div style={{ borderBottom: "1px solid var(--p-color-border-subdued)" }}>
                           <InlineItemRow
+                            editLang={editLang}
                             itemForm={itemForm}
                             setItemForm={setItemForm}
                             menusCopy={menusCopy}
@@ -703,7 +744,7 @@ function MenuEditorPanel(props) {
                             flatItems={flatItems}
                             parentOptionsForForm={parentOptionsForForm}
                             onSave={inlineSaveItem}
-                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", slug: "", link_type: "url", link_value: "", parent_id: "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" }); }}
+                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", label_i18n: {}, slug: "", link_type: "url", link_value: "", parent_id: "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" }); }}
                             saving={saving}
                           />
                         </div>
@@ -726,32 +767,40 @@ function MenuEditorPanel(props) {
   );
 }
 
-function InlineItemRow({ itemForm, setItemForm, menusCopy, collections, categories, products, pages, LINK_TYPES, apiFunctionOptions, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
+function InlineItemRow({ editLang, itemForm, setItemForm, menusCopy, collections, categories, products, pages, LINK_TYPES, apiFunctionOptions, flatItems, parentOptionsForForm, onSave, onCancel, saving }) {
+  const displayedLabel = !editLang || editLang === "de" ? (itemForm.label || "") : (itemForm.label_i18n?.[editLang]?.label || "");
   return (
     <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr auto", gap: "16px", padding: "14px 20px", alignItems: "center", background: "var(--p-color-bg-surface-secondary)", borderRadius: "8px", margin: "8px 12px" }}>
       <span />
       <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 1fr) minmax(160px, 220px)", gap: 8, alignItems: "center" }}>
         <TextField
           label={LINK_TYPES?.length ? "Label" : "Label"}
-          value={itemForm.label}
-          onChange={(v) => setItemForm((p) => ({
-            ...p,
-            label: v,
-            slug: p.slug === normalizeItemSlug(p.label || "") || !p.slug ? normalizeItemSlug(v) : p.slug,
-            custom_slug: p.custom_slug === normalizeItemSlug(p.label || "") || !p.custom_slug ? normalizeItemSlug(v) : p.custom_slug,
-          }))}
+          value={displayedLabel}
+          onChange={(v) => setItemForm((p) => {
+            if (!editLang || editLang === "de") {
+              return {
+                ...p,
+                label: v,
+                slug: p.slug === normalizeItemSlug(p.label || "") || !p.slug ? normalizeItemSlug(v) : p.slug,
+                custom_slug: p.custom_slug === normalizeItemSlug(p.label || "") || !p.custom_slug ? normalizeItemSlug(v) : p.custom_slug,
+              };
+            }
+            return { ...p, label_i18n: setI18nField(p.label_i18n, "label", editLang, v) };
+          })}
           placeholder={LINK_TYPES?.length ? "Label" : "Label"}
           autoComplete="off"
           labelHidden
         />
-        <TextField
-          label={LINK_TYPES?.length ? "Slug" : "Slug"}
-          value={itemForm.slug || ""}
-          onChange={(v) => setItemForm((p) => ({ ...p, slug: normalizeItemSlug(v), custom_slug: normalizeItemSlug(v) }))}
-          placeholder="slug"
-          autoComplete="off"
-          labelHidden
-        />
+        {(!editLang || editLang === "de") && (
+          <TextField
+            label={LINK_TYPES?.length ? "Slug" : "Slug"}
+            value={itemForm.slug || ""}
+            onChange={(v) => setItemForm((p) => ({ ...p, slug: normalizeItemSlug(v), custom_slug: normalizeItemSlug(v) }))}
+            placeholder="slug"
+            autoComplete="off"
+            labelHidden
+          />
+        )}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Select label="Link type" options={LINK_TYPES} value={itemForm.link_type} onChange={(v) => setItemForm((p) => ({ ...p, link_type: v }))} labelHidden />
@@ -825,6 +874,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   const [menuSlugManuallyEdited, setMenuSlugManuallyEdited] = useState(false);
   const [itemForm, setItemForm] = useState({
     label: "",
+    label_i18n: {},
     slug: "",
     link_type: "url",
     link_value: "",
@@ -848,6 +898,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   const [importUnderParentId, setImportUnderParentId] = useState("");
   const [importProgress, setImportProgress] = useState(null); // { total, done, error } | null
   const [menuLocations, setMenuLocations] = useState([]);
+  const [editLang, setEditLang] = useState("de");
   const dragJustEndedRef = useRef(false);
   const lastDropTimeRef = useRef(0);
   const hasInitializedExpandedRef = useRef(false);
@@ -1070,6 +1121,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     setAddUnderParentId(parentId || null);
     setItemForm({
       label: "",
+      label_i18n: {},
       slug: "",
       link_type: "url",
       link_value: "",
@@ -1126,6 +1178,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
     }
     setItemForm({
       label: item.label || "",
+      label_i18n: item.label_i18n || {},
       slug: item.slug || custom_slug || normalizeItemSlug(item.label || ""),
       link_type: item.link_type || "url",
       link_value: item.link_type === "url" || item.link_type === "policy" || item.link_type === "blog" || item.link_type === "blog_post" ? (item.link_value || "") : "",
@@ -1218,6 +1271,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       if (editingItemId) {
         await client.updateMenuItem(menuId, editingItemId, {
           label: itemForm.label,
+          label_i18n: itemForm.label_i18n || null,
           slug: itemSlug,
           link_type: itemForm.link_type || "url",
           link_value: link_value || null,
@@ -1226,6 +1280,7 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       } else {
         const created = await client.createMenuItem(menuId, {
           label: itemForm.label,
+          label_i18n: itemForm.label_i18n || null,
           slug: itemSlug,
           link_type: itemForm.link_type || "url",
           link_value: link_value || null,
@@ -1433,6 +1488,9 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
           <Layout.Section>
             <Card>
               <MenuEditorPanel
+              uiLocale={locale}
+              editLang={editLang}
+              setEditLang={setEditLang}
               panelMode={panelMode}
               panelMenuId={panelMenuId}
               selectedMenuId={selectedMenuId}

@@ -189,13 +189,16 @@ const listAdminHubProductsDb = async (query = {}) => {
     return (res.rows || []).map((r) => {
       const meta = r.metadata || {}
       const mediaArr = Array.isArray(meta.media) ? meta.media : (meta.media ? [meta.media] : [])
-      let thumbnail = meta.thumbnail || (mediaArr[0] ? (typeof mediaArr[0] === 'string' ? mediaArr[0] : (mediaArr[0]?.url || null)) : null)
-      if (!thumbnail && Array.isArray(r.variants) && r.variants.length > 0) {
-        for (const v of r.variants) {
-          const vMeta = v && v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
-          const vImg = (Array.isArray(vMeta.media) && vMeta.media.length > 0 ? vMeta.media[0] : null) || v.image_url || v.image || null
-          if (vImg) { thumbnail = typeof vImg === 'string' ? vImg : (vImg?.url || null); break }
-        }
+      const ownThumbnail = meta.thumbnail || (mediaArr[0] ? (typeof mediaArr[0] === 'string' ? mediaArr[0] : (mediaArr[0]?.url || null)) : null)
+      // A product with variants is an umbrella row — show the first variant's own image,
+      // falling back to the row's own image only when that variant has none of its own.
+      let thumbnail = ownThumbnail
+      if (Array.isArray(r.variants) && r.variants.length > 0) {
+        const v = r.variants[0]
+        const vMeta = v && v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
+        const vImg = (Array.isArray(vMeta.media) && vMeta.media.length > 0 ? vMeta.media[0] : null) || v.image_url || v.image || null
+        const resolvedVImg = vImg ? (typeof vImg === 'string' ? vImg : (vImg?.url || null)) : null
+        if (resolvedVImg) thumbnail = resolvedVImg
       }
       return {
         id: r.id, title: r.title, handle: r.handle, slug: r.handle, sku: r.sku,

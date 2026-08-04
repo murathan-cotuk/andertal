@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import ShopHeader from "@/components/ShopHeader";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
@@ -9,71 +9,207 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
+import { isRecentProduct } from "@/lib/catalog-listing";
+import { getLocalizedCategory } from "@/lib/format";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 
 const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #fafafa;
+  background: #f5f5f5;
 `;
 
 const Main = styled.main`
   flex: 1;
 `;
 
-const Intro = styled.section`
-  max-width: 1280px;
+/* ── Two-column layout ───────────────────────────────── */
+const Inner = styled.div`
+  max-width: 1380px;
   margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 24px 24px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+`;
 
-  @media (max-width: 767px) {
-    padding: 20px 16px 6px;
+/* ── Left sidebar ─────────────────────────────────────── */
+const Sidebar = styled.aside`
+  width: 200px;
+  flex-shrink: 0;
+  padding: 16px 0 40px 16px;
+  position: sticky;
+  top: 72px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+
+  @media (max-width: 960px) {
+    display: none;
   }
 `;
 
-const IntroTitle = styled.h1`
-  margin: 0 0 8px;
+const SidebarTitle = styled.div`
+  font-size: 12px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e5e7eb;
 `;
 
-const IntroText = styled.p`
+const SidebarList = styled.ul`
+  list-style: none;
   margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+`;
+
+const SidebarItem = styled.a`
+  display: block;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: ${(p) => (p.$active ? "700" : "500")};
+  color: ${(p) => (p.$active ? "#111" : "#374151")};
+  background: ${(p) => (p.$active ? "#dbeafe" : "transparent")};
+  text-decoration: none;
+  line-height: 1.35;
+  border-left: 3px solid ${(p) => (p.$active ? "#2563eb" : "transparent")};
+  transition: background 0.12s, color 0.12s;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #111;
+  }
+`;
+
+/* ── Mobile category pills ─────────────────────────── */
+const MobilePills = styled.div`
+  display: none;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 10px 16px 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+
+  @media (max-width: 960px) {
+    display: flex;
+  }
+`;
+
+const Pill = styled.a`
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover { background: #f3f4f6; }
+`;
+
+/* ── Main content column ─────────────────────────────── */
+const ContentCol = styled.div`
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px 40px;
+
+  @media (max-width: 960px) {
+    padding: 4px 0 40px;
+  }
+`;
+
+const PageHeader = styled.div`
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 8px 4px;
+
+  @media (max-width: 960px) {
+    padding: 10px 16px 4px;
+  }
+`;
+
+const PageTitle = styled.h1`
+  margin: 0;
+  font-size: clamp(17px, 2vw, 22px);
+  font-weight: 700;
+  color: #111;
+`;
+
+const ProductCount = styled.span`
+  font-size: 13px;
   color: #6b7280;
-  font-size: 14px;
+`;
+
+/* ── Section (one per category) ─────────────────────── */
+const Section = styled.section`
+  background: #fff;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+
+  @media (max-width: 960px) {
+    border-radius: 0;
+    margin-bottom: 6px;
+  }
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 6px;
+  flex-wrap: wrap;
+`;
+
+const SectionTitle = styled.h2`
+  margin: 0;
+  font-size: clamp(14px, 1.8vw, 16px);
+  font-weight: 700;
+  color: #111;
 `;
 
 const SeeAll = styled(Link)`
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   text-decoration: none;
-  color: #111827;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  border-radius: 999px;
+  color: #2563eb;
   font-size: 12px;
   font-weight: 600;
-  line-height: 1;
-  padding: 8px 12px;
+  white-space: nowrap;
+
+  &:hover { text-decoration: underline; }
 `;
 
-function isRecentProduct(product, months = 2) {
-  const now = new Date();
-  const threshold = new Date(now);
-  threshold.setMonth(threshold.getMonth() - months);
-  const candidates = [
-    product?.created_at,
-    product?.metadata?.publish_date,
-    product?.metadata?.created_at,
-    product?.updated_at,
-  ];
-  for (const raw of candidates) {
-    if (!raw) continue;
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) return d >= threshold;
+const MAX_ITEMS_PER_CAROUSEL = 20;
+const CARD_WIDTH = 180;
+const CARD_GAP = 10;
+const NEW_ARRIVAL_MONTHS = 2;
+
+function buildCategoryRootMap(nodes, root = null) {
+  const map = new Map();
+  for (const node of nodes || []) {
+    if (!node) continue;
+    const r = root ?? node;
+    const id = String(node.id || "").trim();
+    if (id) map.set(id, r);
+    const childMap = buildCategoryRootMap(node.children || [], r);
+    for (const [k, v] of childMap) map.set(k, v);
   }
-  return false;
+  return map;
 }
 
 function productPerfScore(product) {
@@ -85,27 +221,26 @@ function productPerfScore(product) {
   return sold * 1000 + views * 10 + reviewAvg * reviewCount * 5;
 }
 
-function productCategoryKeys(product) {
-  const out = [];
-  const collectionId = product?.collection?.id || product?.metadata?.collection_id || null;
-  const collectionHandle = product?.collection?.handle || product?.metadata?.collection_handle || null;
-  if (collectionId) out.push(`id:${String(collectionId)}`);
-  if (collectionHandle) out.push(`handle:${String(collectionHandle).toLowerCase()}`);
-  const ids = product?.metadata?.collection_ids;
-  if (Array.isArray(ids)) {
-    ids.forEach((id) => {
-      if (id) out.push(`id:${String(id)}`);
-    });
-  }
-  return [...new Set(out)];
-}
+const pageCopy = {
+  de: { title: "Neuheiten", empty: "Keine Neuheiten gefunden.", seeAll: "Alle ansehen" },
+  tr: { title: "Yeni Gelenler", empty: "Yeni ürün bulunamadı.", seeAll: "Tümünü gör" },
+  fr: { title: "Nouveautés", empty: "Aucune nouveauté trouvée.", seeAll: "Tout voir" },
+  es: { title: "Novedades", empty: "No se encontraron novedades.", seeAll: "Ver todo" },
+  it: { title: "Novità", empty: "Nessuna novità trovata.", seeAll: "Vedi tutto" },
+  en: { title: "New Arrivals", empty: "No new arrivals found.", seeAll: "See all" },
+};
 
 export default function NeuheitenPage() {
   const locale = useLocale();
-  const [collections, setCollections] = useState([]);
+  const l = String(locale || "en").toLowerCase();
+  const copy = pageCopy[l] || pageCopy.en;
+
+  const [categoryTree, setCategoryTree] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeId, setActiveId] = useState(null);
+  const observerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,14 +248,14 @@ export default function NeuheitenPage() {
       try {
         setLoading(true);
         setError("");
-        const [colRes, prRes] = await Promise.all([
-          fetch("/api/store-collections", { cache: "no-store" }),
+        const [catRes, prRes] = await Promise.all([
+          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
           fetch("/api/store-products?limit=1200", { cache: "no-store" }),
         ]);
-        const colData = colRes.ok ? await colRes.json() : { collections: [] };
+        const catData = catRes.ok ? await catRes.json() : { tree: [] };
         const prData = prRes.ok ? await prRes.json() : { products: [] };
         if (!cancelled) {
-          setCollections(Array.isArray(colData?.collections) ? colData.collections : []);
+          setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
         }
       } catch (e) {
@@ -129,91 +264,150 @@ export default function NeuheitenPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const copy = useMemo(() => {
-    if (locale === "de") return { title: "Neuheiten", text: "Produkte aus den letzten 2 Monaten nach Kategorien", seeAll: "Alle ansehen", empty: "Keine Neuheiten gefunden." };
-    if (locale === "tr") return { title: "Yeni Gelenler", text: "Son 2 ayda eklenen urunler kategorilere gore", seeAll: "Tumunu gor", empty: "Yeni urun bulunamadi." };
-    return { title: "New arrivals", text: "Products added in the last 2 months by category", seeAll: "See all", empty: "No new arrivals found." };
+    return () => { cancelled = true; };
   }, [locale]);
 
   const rows = useMemo(() => {
-    const fresh = products.filter((p) => isRecentProduct(p, 2));
-    if (!fresh.length) return [];
+    const fresh = products.filter((p) => isRecentProduct(p, NEW_ARRIVAL_MONTHS));
+    if (!fresh.length || !categoryTree.length) return [];
 
-    const byCollection = new Map();
-    const byKey = new Map();
-    collections.forEach((c) => {
-      if (c?.id) byKey.set(`id:${String(c.id)}`, c);
-      if (c?.handle) byKey.set(`handle:${String(c.handle).toLowerCase()}`, c);
-    });
+    const rootCategories = categoryTree.filter((n) => n && n.has_products !== false);
+    if (!rootCategories.length) return [];
 
-    fresh.forEach((p) => {
-      const keys = productCategoryKeys(p);
-      const key = keys.find((k) => byKey.has(k));
-      if (!key) return;
-      const c = byKey.get(key);
-      if (!c?.handle) return;
-      const mapKey = String(c.id || c.handle);
-      if (!byCollection.has(mapKey)) byCollection.set(mapKey, { collection: c, products: [] });
-      byCollection.get(mapKey).products.push(p);
-    });
+    const catRootMap = buildCategoryRootMap(rootCategories);
 
-    const list = [...byCollection.values()]
-      .map((entry) => ({
-        collection: entry.collection,
-        products: entry.products.sort((a, b) => productPerfScore(b) - productPerfScore(a)),
+    const byRoot = new Map();
+    for (const p of fresh) {
+      const catId = String(p.metadata?.admin_category_id || p.metadata?.category_id || "").trim();
+      if (!catId) continue;
+      const root = catRootMap.get(catId);
+      if (!root?.id) continue;
+      const key = String(root.id);
+      if (!byRoot.has(key)) byRoot.set(key, { category: root, products: [] });
+      byRoot.get(key).products.push(p);
+    }
+
+    return [...byRoot.values()]
+      .map(({ category, products: list }) => ({
+        category,
+        products: list
+          .sort((a, b) => productPerfScore(b) - productPerfScore(a))
+          .slice(0, MAX_ITEMS_PER_CAROUSEL),
       }))
-      .filter((entry) => entry.products.length > 0)
+      .filter((r) => r.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
+  }, [categoryTree, products]);
 
-    return list;
-  }, [collections, products]);
+  // Sidebar active section via IntersectionObserver
+  useEffect(() => {
+    if (!rows.length) return;
+    if (observerRef.current) observerRef.current.disconnect();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveId(entry.target.id);
+        }
+      },
+      { rootMargin: "-64px 0px -55% 0px", threshold: 0 },
+    );
+    observerRef.current = observer;
+
+    for (const { category } of rows) {
+      const el = document.getElementById(`cat-${category.id}`);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [rows]);
+
+  const totalCount = rows.reduce((s, r) => s + r.products.length, 0);
+  const showContent = !loading && !error;
 
   return (
     <PageWrap>
       <ShopHeader />
       <Main>
-        <Intro>
-          <IntroTitle className="shop-typo-catalog-title">{copy.title}</IntroTitle>
-          <IntroText>{copy.text}</IntroText>
-        </Intro>
+        {/* Mobile category pills */}
+        {showContent && rows.length > 0 && (
+          <MobilePills>
+            {rows.map(({ category }) => {
+              const catName = getLocalizedCategory(category, locale).name || category.name || "";
+              return (
+                <Pill key={category.id} href={`#cat-${category.id}`}>{catName}</Pill>
+              );
+            })}
+          </MobilePills>
+        )}
 
-        {loading ? <GlobalPageLoader /> : null}
-        {error ? <p style={{ color: "#b91c1c", padding: "0 24px" }}>{error}</p> : null}
-        {!loading && !error && rows.length === 0 ? (
-          <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
-        ) : null}
+        <Inner>
+          {/* Left sidebar */}
+          {showContent && rows.length > 0 && (
+            <Sidebar>
+              <SidebarTitle>{copy.title}</SidebarTitle>
+              <SidebarList>
+                {rows.map(({ category }) => {
+                  const catName = getLocalizedCategory(category, locale).name || category.name || "";
+                  const id = `cat-${category.id}`;
+                  return (
+                    <li key={id}>
+                      <SidebarItem href={`#${id}`} $active={activeId === id}>
+                        {catName}
+                      </SidebarItem>
+                    </li>
+                  );
+                })}
+              </SidebarList>
+            </Sidebar>
+          )}
 
-        {!loading && !error && rows.map(({ collection, products: list }) => (
-          <Carousel
-            key={collection.id || collection.handle}
-            contained={false}
-            navOnSides
-            gap={16}
-            visibleCount={2}
-            showFade={false}
-            ariaLabel={collection.title || collection.name || collection.handle || "Neuheiten category"}
-            header={(
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
-                <h2 className="shop-typo-h2" style={{ margin: 0 }}>
-                  {collection.title || collection.name || collection.handle}
-                </h2>
-                <SeeAll href={`/${collection.handle}?neu=1`}>{copy.seeAll} →</SeeAll>
-              </div>
+          {/* Main content */}
+          <ContentCol>
+            {loading ? (
+              <GlobalPageLoader />
+            ) : error ? (
+              <p style={{ color: "#b91c1c", padding: "16px" }}>{error}</p>
+            ) : rows.length === 0 ? (
+              <p style={{ color: "#6b7280", padding: "16px" }}>{copy.empty}</p>
+            ) : (
+              <>
+                <PageHeader>
+                  <PageTitle>{copy.title}</PageTitle>
+                  {totalCount > 0 && <ProductCount>{totalCount}</ProductCount>}
+                </PageHeader>
+
+                {rows.map(({ category, products: list }) => {
+                  const catName = getLocalizedCategory(category, locale).name || category.name || category.slug || "";
+                  const catSlug = String(category.slug || category.handle || "").replace(/^\//, "");
+                  return (
+                    <Section key={category.id} id={`cat-${category.id}`}>
+                      <SectionHeader>
+                        <SectionTitle>{catName}</SectionTitle>
+                        {catSlug && (
+                          <SeeAll href={`/${catSlug}?neu=1`}>{copy.seeAll} →</SeeAll>
+                        )}
+                      </SectionHeader>
+                      <Carousel
+                        contained={false}
+                        navOnSides
+                        itemWidth={CARD_WIDTH}
+                        gap={CARD_GAP}
+                        showFade={false}
+                        ariaLabel={catName}
+                      >
+                        {list.map((p) => (
+                          <ProductCard key={p.id} product={p} plainImage />
+                        ))}
+                      </Carousel>
+                    </Section>
+                  );
+                })}
+              </>
             )}
-          >
-            {list.map((p) => (
-              <ProductCard key={p.id} product={p} plainImage />
-            ))}
-          </Carousel>
-        ))}
+          </ContentCol>
+        </Inner>
       </Main>
       <Footer />
     </PageWrap>
   );
 }
-

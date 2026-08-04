@@ -10,6 +10,7 @@ import { toSalesScore } from "@/lib/bestseller";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
+import SupportLanding from "@/components/support/SupportLanding";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
 
@@ -2621,6 +2622,10 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "feature_grid":         inner = <FeatureGrid container={c} locale={locale} />; break;
     case "testimonials":              inner = <Testimonials container={c} locale={locale} />; break;
     case "personalized_product_row":  inner = <PersonalizedProductRow container={c} locale={locale} />; break;
+    case "support_hero":
+    case "support_case_wizard":
+    case "support_topic_grid":
+    case "support_faq":                inner = <SupportLanding type={c.type} container={c} locale={locale} />; break;
     default: return null;
   }
   const m = c.margin || {};

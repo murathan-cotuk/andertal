@@ -5,6 +5,7 @@ import styled from "styled-components";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { useViewportBand } from "@/hooks/useViewportBand";
 import { bestsellerBadgeWidthForBand } from "@/lib/bestseller";
+import { resolveImageUrl } from "@/lib/image-url";
 
 const Badge = styled.span`
   display: inline-flex;
@@ -35,7 +36,7 @@ export function useBestsellerBadgeWidth() {
 export default function BestsellerBadge({ children = "Bestseller", className, style }) {
   const shopStyles = useShopStyles();
   const band = useViewportBand();
-  const imgUrl = shopStyles?.bestseller_badge?.image_url;
+  const imgUrl = resolveImageUrl(shopStyles?.bestseller_badge?.image_url);
   const badgeWidth = bestsellerBadgeWidthForBand(shopStyles?.bestseller_badge, band);
 
   if (imgUrl) {

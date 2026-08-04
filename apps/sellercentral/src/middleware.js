@@ -74,5 +74,10 @@ export default function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+  // `icon`/`apple-icon` are Next.js's extensionless metadata routes (from src/app/icon.png,
+  // apple-icon.png) — no dot in the path, so the `.*\..*` exclusion doesn't catch them.
+  // Without this they were falling through to the auth check (redirected to /login, since
+  // isPublic() only recognizes `/favicon` and dotted paths) and then to intlMiddleware
+  // (redirected to a locale-prefixed path) — either way the favicon/apple-touch-icon 404'd.
+  matcher: ["/((?!api|_next|_vercel|icon$|apple-icon$|.*\\..*).*)"],
 };

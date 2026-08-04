@@ -1,0 +1,119 @@
+.shell {
+  display: grid;
+  grid-template-columns: minmax(300px, 38%) minmax(0, 1fr);
+  min-height: 640px;
+  height: calc(100vh - 245px);
+  border: 1px solid var(--p-color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--p-color-bg-surface);
+}
+
+.queue, .detail { min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.queue { border-right: 1px solid var(--p-color-border); }
+.toolbar { padding: 14px; border-bottom: 1px solid var(--p-color-border); background: var(--p-color-bg-surface); }
+.filters { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; border-bottom: 1px solid var(--p-color-border); scrollbar-width: thin; }
+.filter {
+  border: 1px solid var(--p-color-border);
+  border-radius: 999px;
+  background: var(--p-color-bg-surface);
+  color: var(--p-color-text);
+  padding: 0 14px;
+  min-height: 44px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.filterActive { background: #1f2937; border-color: #1f2937; color: #fff; }
+.list { flex: 1; overflow-y: auto; }
+.caseRow {
+  width: 100%;
+  min-height: 112px;
+  border: 0;
+  border-bottom: 1px solid var(--p-color-border);
+  border-left: 4px solid transparent;
+  padding: 13px 14px 13px 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.caseRow:hover { background: var(--p-color-bg-surface-hover); }
+.caseRowActive { background: #fff7ed; border-left-color: #f97316; }
+.caseRowUnread:not(.caseRowActive) { background: #eff6ff; border-left-color: #2563eb; }
+.rowTop, .rowMeta, .detailHeader, .actions, .attachments, .pagination, .routeControl {
+  display: flex; align-items: center; gap: 8px;
+}
+.rowTop, .detailHeader, .pagination { justify-content: space-between; }
+.rowTop strong { font-size: 13px; }
+.rowSubject { margin: 6px 0 3px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowMeta { color: var(--p-color-text-subdued); font-size: 12px; flex-wrap: wrap; }
+.preview { margin-top: 6px; color: var(--p-color-text-subdued); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumbs { display: flex; margin-left: auto; }
+.thumb { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; border: 2px solid #fff; margin-left: -6px; background: #eee; }
+.unreadDot { width: 9px; height: 9px; border-radius: 50%; background: #2563eb; flex: none; }
+.status { display: inline-flex; align-items: center; min-height: 24px; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; background: #f3f4f6; }
+.statusAwaiting { color: #854d0e; background: #fef9c3; }
+.statusOpen { color: #075985; background: #e0f2fe; }
+.statusTerminal { color: #166534; background: #dcfce7; }
+.empty { flex: 1; display: grid; place-items: center; color: var(--p-color-text-subdued); text-align: center; padding: 36px; }
+.pagination { min-height: 58px; padding: 8px 14px; border-top: 1px solid var(--p-color-border); }
+.iconButton, .secondaryButton, .primaryButton, .dangerButton {
+  min-height: 44px; border-radius: 8px; padding: 0 14px; font-weight: 650; cursor: pointer;
+}
+.secondaryButton, .iconButton { border: 1px solid var(--p-color-border); background: var(--p-color-bg-surface); color: inherit; }
+.primaryButton { border: 1px solid #1f2937; background: #1f2937; color: #fff; }
+.dangerButton { border: 1px solid #b91c1c; background: #b91c1c; color: #fff; }
+.primaryButton:disabled, .secondaryButton:disabled, .iconButton:disabled, .dangerButton:disabled { opacity: .5; cursor: not-allowed; }
+.detailHeader { padding: 16px 18px; border-bottom: 1px solid var(--p-color-border); align-items: flex-start; }
+.detailTitle { min-width: 0; }
+.detailTitle h2 { margin: 4px 0; font-size: 18px; line-height: 1.3; }
+.summary { padding: 12px 18px; background: var(--p-color-bg-surface-secondary); border-bottom: 1px solid var(--p-color-border); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.summaryBlock { min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.summaryLabel { display: block; color: var(--p-color-text-subdued); font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 3px; }
+.routeControl { grid-column: 1 / -1; align-items: flex-end; }
+.routeControl > div { flex: 1; }
+.messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.message { max-width: 78%; align-self: flex-start; }
+.messageOwn { align-self: flex-end; }
+.role { font-size: 11px; font-weight: 800; color: var(--p-color-text-subdued); margin: 0 0 4px 4px; text-transform: uppercase; letter-spacing: .03em; }
+.bubble { white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 13px 13px 13px 3px; padding: 10px 13px; border: 1px solid var(--p-color-border); background: var(--p-color-bg-surface-secondary); }
+.messageOwn .bubble { border-radius: 13px 13px 3px 13px; background: #1f2937; color: #fff; border-color: #1f2937; }
+.time { font-size: 10px; opacity: .7; margin-top: 5px; }
+.attachmentLink { display: block; margin-top: 8px; color: inherit; text-decoration: underline; overflow-wrap: anywhere; }
+.attachmentImage { display: block; max-width: 240px; max-height: 180px; margin-top: 8px; border-radius: 8px; object-fit: contain; background: #fff; }
+.audit { border-top: 1px solid var(--p-color-border); padding: 12px 18px; max-height: 160px; overflow: auto; }
+.audit summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; }
+.auditItem { font-size: 12px; padding: 6px 0; border-top: 1px solid var(--p-color-border-subdued); }
+.composer { padding: 14px 18px; border-top: 1px solid var(--p-color-border); }
+.composer textarea { width: 100%; min-height: 88px; resize: vertical; padding: 10px 12px; border: 1px solid var(--p-color-border); border-radius: 8px; font: inherit; color: inherit; background: var(--p-color-bg-surface); }
+.composer textarea:focus, .filter:focus-visible, .caseRow:focus-visible, .iconButton:focus-visible, .secondaryButton:focus-visible, .primaryButton:focus-visible, .dangerButton:focus-visible {
+  outline: 3px solid #93c5fd; outline-offset: 2px;
+}
+.fileInput { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fileLabel { min-height: 44px; display: inline-flex; align-items: center; border: 1px solid var(--p-color-border); border-radius: 8px; padding: 0 14px; font-weight: 650; cursor: pointer; }
+.fileRules { color: var(--p-color-text-subdued); font-size: 11px; margin-top: 6px; }
+.fileChip { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 8px; background: var(--p-color-bg-surface-secondary); font-size: 12px; }
+.fileChip button { border: 0; background: none; color: inherit; min-width: 30px; min-height: 30px; cursor: pointer; }
+.locked { padding: 14px 18px; border-top: 1px solid var(--p-color-border); background: #fefce8; }
+.error { margin: 8px 0; color: #b91c1c; font-size: 13px; }
+.modalBackdrop { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 20px; background: rgba(17, 24, 39, .58); }
+.modal { width: min(520px, 100%); background: var(--p-color-bg-surface); color: var(--p-color-text); border-radius: 14px; padding: 22px; box-shadow: 0 24px 60px rgba(0,0,0,.28); }
+.modal h2 { margin: 0 0 8px; font-size: 20px; }
+.modal textarea { width: 100%; min-height: 90px; margin: 16px 0; padding: 10px; border: 1px solid var(--p-color-border); border-radius: 8px; font: inherit; }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; height: auto; min-height: 0; overflow: visible; }
+  .queue { border-right: 0; min-height: 460px; max-height: 60vh; }
+  .detail { min-height: 620px; border-top: 1px solid var(--p-color-border); }
+  .summary { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 540px) {
+  .summary { grid-template-columns: 1fr; }
+  .detailHeader { flex-direction: column; }
+  .message { max-width: 92%; }
+  .actions { width: 100%; flex-wrap: wrap; }
+  .actions > button { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell *, .modalBackdrop * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}

@@ -48,6 +48,28 @@ function eanFromProductRow(p, variantId) {
   return ean || ''
 }
 
+// Mirrors eanFromProductRow: a product row with variants is an umbrella record — the
+// purchased variant's own sku must win over the umbrella row's top-level sku.
+function skuFromProductRow(p, variantId) {
+  let sku = String(p?.sku || '').trim()
+  const variants = parseVariants(p?.variants)
+  if (variantId && variants.length) {
+    const vid = String(variantId)
+    const match = variants.find((v) => {
+      if (!v) return false
+      if (v.id != null && String(v.id) === vid) return true
+      if (v.variant_id != null && String(v.variant_id) === vid) return true
+      const m = vid.match(/-v-(\d+)$/)
+      if (m && String(v.index ?? v.i ?? '') === m[1]) return true
+      return false
+    })
+    if (match && match.sku) sku = String(match.sku).trim()
+  } else if (!sku && variants.length === 1 && variants[0].sku) {
+    sku = String(variants[0].sku).trim()
+  }
+  return sku || ''
+}
+
 /**
  * Load sku/ean/seller for a list of order-item rows.
  * @param {import('pg').Client} client
@@ -100,7 +122,7 @@ async function enrichOrderItemRows(client, itemRows) {
     // Master products: if exactly one listing seller, attribute the line to them.
     if (!resolvedSeller && listingSellers.length === 1) resolvedSeller = listingSellers[0]
     const listingSku = resolvedSeller ? listingSkuByKey[`${pid}::${resolvedSeller}`] : ''
-    const sku = String(listingSku || p?.sku || '').trim()
+    const sku = String(listingSku || skuFromProductRow(p, r.variant_id) || '').trim()
     const ean = eanFromProductRow(p, r.variant_id)
     return {
       id: r.id,

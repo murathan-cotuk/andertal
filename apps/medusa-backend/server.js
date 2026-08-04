@@ -575,7 +575,27 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_title varchar(512);`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_description text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_keywords varchar(512);`).catch(() => {})
+        // Per-language overrides (DE stays on the plain columns above; other locales live here,
+        // keyed by locale, same {locale: {field: value}} shape as admin_hub_menus.name_i18n).
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS title_i18n jsonb;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS body_i18n jsonb;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS excerpt_i18n jsonb;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_title_i18n jsonb;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_description_i18n jsonb;`).catch(() => {})
         await client.query(`UPDATE admin_hub_pages SET page_type = 'page' WHERE page_type IS NULL`).catch(() => {})
+        // Editable settings for the hardcoded API-driven storefront pages (/bestsellers, /sales) —
+        // these pages aren't container-based CMS pages, but Sellercentral still needs a place to
+        // adjust their title copy, item count and sort/data-source strategy per page.
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS admin_hub_api_page_settings (
+            page_slug varchar(50) PRIMARY KEY,
+            title_i18n jsonb,
+            subtitle_i18n jsonb,
+            max_items integer,
+            sort_mode varchar(30),
+            updated_at timestamp NOT NULL DEFAULT now()
+          );
+        `).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_collections (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1099,6 +1119,12 @@ async function start() {
           await seedMessageFlows(client)
         } catch (e) {
           console.warn('[seed-message-flows]', e?.message || e)
+        }
+        try {
+          const { seedSupportCaseFlows } = require('./src/seed-support-case-flows')
+          await seedSupportCaseFlows(client)
+        } catch (e) {
+          console.warn('[seed-support-case-flows]', e?.message || e)
         }
         // Seed the seller lifecycle flows (registered/docs submitted/approved/rejected/
         // documents required) once — same idempotent skip-if-exists pattern as above.
@@ -1797,8 +1823,10 @@ async function start() {
         `).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_shop_live_presence_last_seen ON shop_live_presence(last_seen_at DESC)`).catch(() => {})
         await client.query(`CREATE INDEX IF NOT EXISTS idx_shop_live_presence_country ON shop_live_presence(country_code)`).catch(() => {})
+        const { initializeSupportCaseSchema } = require('./src/support-case-schema')
+        await initializeSupportCaseSchema(client)
         await client.end()
-        log.info('Admin Hub: seller_campaigns (PPC columns), platform_marketing_accounts tabloları hazır')
+        log.info('Admin Hub and support-case tables ready')
       } catch (migErr) {
         console.warn('Admin Hub migration (menus) skipped or failed:', migErr && migErr.message)
       }
@@ -2198,6 +2226,12 @@ async function start() {
     // getSmtpTransport is also used elsewhere in this file (automations, flow test-email, seller invitations).
     const { createMessagesRouter, getSmtpTransport } = require('./src/routes/messages')
     httpApp.use('/', createMessagesRouter({ verifyCustomerToken, requireSuperuser }))
+
+    // --- Secure customer/seller support cases (legacy store_messages remains read-only here) ---
+    const createSupportCasesRouter = require('./src/routes/support-cases')
+    httpApp.use('/', createSupportCasesRouter({ verifyCustomerToken }))
+    const { startSupportArchiveJob } = require('./src/support-case-schema')
+    startSupportArchiveJob()
 
     // --- Marketing Automations (low_stock_alert/review_request/welcome_email background runner): extracted to src/routes/marketing-automations.js ---
     const createMarketingAutomationsRunner = require('./src/routes/marketing-automations')

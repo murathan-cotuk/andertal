@@ -160,6 +160,7 @@ export default function proxy(request) {
     u.pathname = internal;
     const h = new Headers(request.headers);
     h.set("x-andertal-market-prefix", mp);
+    h.set("x-andertal-locale", String(triple.lang || "").toLowerCase());
     const curCookie = (request.cookies.get("andertal_currency")?.value || "").trim().toLowerCase();
     if (curCookie && isValidCurrency(curCookie)) {
       h.set("x-andertal-currency", curCookie);
@@ -237,5 +238,9 @@ export default function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next|_vercel|monitoring|.*\\..*).*)"],
+  // `icon`/`apple-icon` are Next.js's extensionless metadata routes (from src/app/icon.png,
+  // apple-icon.png) — they have no dot in the path so the `.*\..*` exclusion below doesn't
+  // catch them, and without this they get swept into intlMiddleware and 307-redirected to a
+  // locale-prefixed path (e.g. /en/icon), which broke the favicon / apple-touch-icon entirely.
+  matcher: ["/((?!api|_next|_vercel|monitoring|icon$|apple-icon$|.*\\..*).*)"],
 };

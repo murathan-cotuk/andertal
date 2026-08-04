@@ -275,18 +275,12 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
 const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
   const media = meta.media
-  let rawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
-  if (rawMediaList.length === 0 && (meta.image_url || meta.image)) rawMediaList = [meta.image_url || meta.image]
-  if (rawMediaList.length === 0 && Array.isArray(p.variants) && p.variants.length > 0) {
-    for (const v of p.variants) {
-      const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
-      const firstVMedia = Array.isArray(vMeta.media) && vMeta.media.length > 0 ? vMeta.media[0] : null
-      const vImg = firstVMedia || v.image_url || v.image || null
-      if (vImg) { rawMediaList = [vImg]; break }
-    }
-  }
-  const thumb = resolveUploadUrl(rawMediaList[0] || null)
-  const imagesResolved = rawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
+  // "Own" media = this product row's own fields. When the row has variants, this row is
+  // purely the umbrella/parent record grouping them — its own image is only a last-resort
+  // fallback (below, once variants[] is built) for when the display variant has no image
+  // of its own, never the first thing shown for a variant product.
+  const ownRawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
+  if (ownRawMediaList.length === 0 && (meta.image_url || meta.image)) ownRawMediaList.push(meta.image_url || meta.image)
   const country = String(marketCountry || 'DE').toUpperCase()
   const parentPriceByCountry = meta.prices && typeof meta.prices === 'object' ? meta.prices[country] : null
   const priceCents = parentPriceByCountry && parentPriceByCountry.brutto_cents != null
@@ -354,6 +348,24 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   const compareCents = parentPriceByCountry && parentPriceByCountry.uvp_cents != null
     ? Number(parentPriceByCountry.uvp_cents)
     : null
+  // Display resolution: a product WITH variants is purely an umbrella row grouping its
+  // children — the card/listing must show the first variant's own image, never the
+  // umbrella row's own metadata.media. The row's own image is kept only as a last-resort
+  // fallback for when that first variant itself has no image of its own.
+  // Price/compare-price are deliberately NOT swapped to the variant here: this row's
+  // top-level price_cents/price is read by non-display consumers (isDiscountedProduct's
+  // legacy metadata.rabattpreis_cents comparison, price-range sorting, structured data)
+  // that expect it to stay the family's canonical price. The frontend (ProductCard /
+  // ProductTemplate) already resolves the variant's own price independently via
+  // variant.metadata.prices, so no product-family consumer needs this field to change.
+  const firstVariant = variants[0] || null
+  const ownThumb = resolveUploadUrl(ownRawMediaList[0] || null)
+  const ownImagesResolved = ownRawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
+  const variantImagesResolved = firstVariant
+    ? (firstVariant.images && firstVariant.images.length > 0 ? firstVariant.images : (firstVariant.image_url ? [firstVariant.image_url] : []))
+    : []
+  const thumb = variantImagesResolved[0] || ownThumb || null
+  const imagesResolved = variantImagesResolved.length > 0 ? variantImagesResolved : ownImagesResolved
   const metaTranslations = meta.translations && typeof meta.translations === 'object'
     ? Object.fromEntries(
         Object.entries(meta.translations).map(([loc, tr]) => {

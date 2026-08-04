@@ -60,8 +60,15 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser === true
+        const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
         const orderId = req.query.order_id || null
-        const sellerId = (req.query.seller_id || '').trim()
+        // Non-superusers must only see their own seller scope — never trust query seller_id.
+        let sellerId = (req.query.seller_id || '').trim()
+        if (!isSuperuser) {
+          if (!jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+          sellerId = jwtSellerId
+        }
         const searchRaw = (req.query.q || req.query.search || '').trim()
         // channel: 'customer' (default) = customer<->seller msgs, 'support' = seller<->support team msgs
         const channel = (req.query.channel || 'customer').trim()
@@ -109,14 +116,19 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
             // sellers) — match any order where this seller actually has an item, the same
             // ownership pattern used by orders.js/transactions.js, not a direct o.seller_id match.
             conditions.push(`(
-              o.seller_id = $${n}
+              m.seller_id = $${n}
+              OR o.seller_id = $${n}
               OR EXISTS (
                 SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                  EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                  oi.seller_id = $${n}
+                  OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
                   OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
                 )
               )
             )`)
+          } else if (!isSuperuser) {
+            await client.end()
+            return res.status(403).json({ message: 'Forbidden' })
           }
           if (searchRaw) {
             const term = `%${searchRaw.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
@@ -150,15 +162,18 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
             unreadParams
           )
         } else {
-          const unreadWhere = sellerId ? `AND m2.order_id IN (
+          const unreadWhere = sellerId ? `AND (
+              m2.seller_id = $1
+              OR m2.order_id IN (
               SELECT o.id FROM store_orders o WHERE o.seller_id = $1
                 OR EXISTS (
                   SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                    EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
+                    oi.seller_id = $1
+                    OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
                     OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $1)
                   )
                 )
-            )` : ''
+            ))` : ''
           unreadR = await client.query(
             `SELECT COUNT(*)::int AS c FROM store_messages m2 WHERE (m2.channel = 'customer' OR m2.channel IS NULL) AND m2.sender_type = 'customer' AND m2.is_read_by_seller = false ${unreadWhere}`,
             sellerId ? [sellerId] : []
@@ -187,14 +202,19 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser === true
+        const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
         const { order_id, product_id, body, subject, channel, sender_seller_id, locale } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
+        if (!isSuperuser && !jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
 
         // Opportunistically remember the acting seller's current Sellercentral UI language, so
         // automated notification emails to them can be sent in that language later.
         const requestedLocale = String(locale || '').trim().toLowerCase()
         const callerLocale = FLOW_EMAIL_LOCALES.includes(requestedLocale) ? requestedLocale : ''
-        const actingSellerId = String(sender_seller_id || req.sellerUser?.seller_id || '').trim()
+        const actingSellerId = isSuperuser
+          ? String(sender_seller_id || req.body.target_seller_id || jwtSellerId || '').trim()
+          : jwtSellerId
         if (callerLocale && actingSellerId) {
           await client.query(
             `INSERT INTO admin_hub_seller_settings (seller_id, locale) VALUES ($1, $2)
@@ -204,11 +224,19 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         }
 
         if (channel === 'support') {
-          // Support channel: seller <-> support team (superusers)
-          // sender_seller_id: if set, sender is a seller (opening/continuing a ticket); if null, sender is support team replying.
-          const isSupportSide = !sender_seller_id
+          // Support channel: seller <-> support team (superusers).
+          // Non-superusers may only write as their own seller; never trust body seller ids.
+          let isSupportSide
+          let msgSellerId
+          if (isSuperuser) {
+            isSupportSide = !sender_seller_id
+            msgSellerId = String(sender_seller_id || req.body.target_seller_id || '').trim() || null
+            if (!msgSellerId) { await client.end(); return res.status(400).json({ message: 'seller_id required' }) }
+          } else {
+            isSupportSide = false
+            msgSellerId = jwtSellerId
+          }
           const senderType = isSupportSide ? 'seller' : 'customer' // 'customer' = seller side, 'seller' = support side
-          const msgSellerId = sender_seller_id || req.body.target_seller_id || null
           const r = await client.query(
             `INSERT INTO store_messages (order_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_support, is_read_by_customer)
              VALUES ($1, $2, $3, $4, $5, $6, 'support', $7, $8, $9, false) RETURNING *`,
@@ -255,13 +283,30 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         // The message is attributed to the REPLYING seller's own account, not the order's
         // seller_id — an order's seller_id is always the platform now (an order can mix items
         // from several real sellers), so it can no longer stand in for "which seller is this."
-        const replyingSellerId = String(req.sellerUser?.seller_id || '').trim() || null
+        const replyingSellerId = isSuperuser ? (jwtSellerId || null) : jwtSellerId
         let recipientEmail = null
         let orderNumber = null
         let orderLocale = ''
         let orderCountry = ''
         if (order_id) {
           const oR = await client.query(`SELECT email, order_number, locale, country FROM store_orders WHERE id = $1::uuid`, [order_id])
+          if (!oR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+          if (!isSuperuser) {
+            const owns = await client.query(
+              `SELECT 1 FROM store_orders o WHERE o.id = $1::uuid AND (
+                o.seller_id = $2
+                OR EXISTS (
+                  SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+                    EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $2)
+                    OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $2)
+                    OR oi.seller_id = $2
+                  )
+                )
+              ) LIMIT 1`,
+              [order_id, jwtSellerId],
+            )
+            if (!owns.rows[0]) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+          }
           recipientEmail = oR.rows[0]?.email || null
           orderNumber = oR.rows[0]?.order_number != null ? Number(oR.rows[0].order_number) : null
           orderLocale = String(oR.rows[0]?.locale || '').trim().toLowerCase()
@@ -318,6 +363,35 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        const isSuperuser = req.sellerUser?.is_superuser === true
+        const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
+        if (!isSuperuser && !jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        const msg = (await client.query(`SELECT * FROM store_messages WHERE id = $1::uuid`, [id])).rows[0]
+        if (!msg) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
+        if (!isSuperuser) {
+          const channel = msg.channel || 'customer'
+          if (channel === 'support') {
+            if (String(msg.seller_id || '') !== jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+          } else {
+            const owns = await client.query(
+              `SELECT 1 FROM store_messages m
+               LEFT JOIN store_orders o ON o.id = m.order_id
+               WHERE m.id = $1::uuid AND (
+                 m.seller_id = $2
+                 OR o.seller_id = $2
+                 OR EXISTS (
+                   SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+                     EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $2)
+                     OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $2)
+                     OR oi.seller_id = $2
+                   )
+                 )
+               ) LIMIT 1`,
+              [id, jwtSellerId],
+            )
+            if (!owns.rows[0]) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+          }
+        }
         // Support channel: seller reads support-side msgs (sender_type seller); support reads seller msgs (sender_type customer).
         // Customer channel: seller marks customer msgs read (existing behavior).
         await client.query(
@@ -327,10 +401,10 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
               WHEN channel = 'customer' OR channel IS NULL THEN true
               ELSE is_read_by_seller END,
             is_read_by_support = CASE
-              WHEN channel = 'support' AND sender_type = 'customer' THEN true
+              WHEN channel = 'support' AND sender_type = 'customer' AND $2::boolean THEN true
               ELSE is_read_by_support END
           WHERE id = $1::uuid`,
-          [id]
+          [id, isSuperuser]
         )
         await client.end()
         res.json({ success: true })
@@ -348,7 +422,15 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const { seller_id, mark_as, subject_thread } = req.body || {}
+        const isSuperuser = req.sellerUser?.is_superuser === true
+        const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
+        let { seller_id, mark_as, subject_thread } = req.body || {}
+        seller_id = String(seller_id || '').trim()
+        if (!isSuperuser) {
+          if (!jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+          seller_id = jwtSellerId
+          if (mark_as === 'support') { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        }
         if (!seller_id) { await client.end(); return res.status(400).json({ message: 'seller_id required' }) }
         const subj = (subject_thread === undefined || subject_thread === null) ? null : String(subject_thread).trim()
         const subjectClause =
@@ -605,41 +687,57 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         await client.connect()
         const { order_id, product_id, body, subject, locale } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
-        if (!order_id || !product_id) { await client.end(); return res.status(400).json({ message: 'order_id and product_id required — pick which product this message is about.' }) }
+        // product_id is only required when an order is attached — a message concerns exactly ONE
+        // product so it can only ever go to that product's own seller (an order can otherwise mix
+        // items from several unrelated real sellers). A general inquiry with NO order attached is
+        // a separate, legitimate case (no product to pick) and must not be rejected here — it's
+        // stored with seller_id/product_id null and only the customer's own confirmation copy
+        // fires below, since there's no single seller to notify.
+        if (order_id && !product_id) { await client.end(); return res.status(400).json({ message: 'product_id required — pick which product this message is about.' }) }
 
-        // A message concerns exactly ONE product, so it can only ever go to that product's own
-        // seller — an order can otherwise mix items from several unrelated real sellers, and a
-        // message about seller A's product must never reach seller B just because they happen to
-        // share the order. product_id is looked up against this exact order's own items, so a
-        // customer can't message a seller about a product that isn't even in this order.
-        const oR = await client.query(`SELECT order_number FROM store_orders WHERE id = $1::uuid`, [order_id])
-        const orderNumber = oR.rows[0]?.order_number != null ? Number(oR.rows[0].order_number) : null
-        const itemR = await client.query(
-          `SELECT seller_id, title FROM store_order_items WHERE order_id = $1::uuid AND product_id = $2 LIMIT 1`,
-          [order_id, String(product_id)],
-        )
-        const item = itemR.rows[0]
-        if (!item) { await client.end(); return res.status(404).json({ message: 'Product not found in this order.' }) }
-        const productSellerId = String(item.seller_id || '').trim()
-        if (!productSellerId || productSellerId === 'default') {
-          await client.end()
-          return res.status(400).json({ message: 'This product has no seller to message.' })
-        }
+        let orderNumber = null
+        let item = { title: '' }
+        let productSellerId = null
         let sellerEmail = ''
         let sellerLocale = 'de'
         let sellerName = ''
-        const sur = await client.query(
-          `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
-          [productSellerId],
-        )
-        sellerEmail = String(sur.rows[0]?.email || '').trim()
-        const sh = await client.query(
-          `SELECT store_name, locale FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
-          [productSellerId],
-        )
-        sellerName = String(sh.rows[0]?.store_name || '').trim()
-        const sLoc = String(sh.rows[0]?.locale || '').trim().toLowerCase()
-        sellerLocale = FLOW_EMAIL_LOCALES.includes(sLoc) ? sLoc : 'de'
+
+        if (order_id) {
+          // product_id is looked up against this exact order's own items, so a customer can't
+          // message a seller about a product that isn't even in this order.
+          // Also require the authenticated customer to own the order (ignore forged order_id).
+          const customerId = String(payload?.id || payload?.customer_id || '').trim() || null
+          const oR = await client.query(
+            `SELECT order_number FROM store_orders WHERE id = $1::uuid
+              AND (($2::uuid IS NOT NULL AND customer_id = $2::uuid) OR lower(email) = lower($3))`,
+            [order_id, customerId && /^[0-9a-f-]{36}$/i.test(customerId) ? customerId : null, payload.email],
+          )
+          if (!oR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+          orderNumber = oR.rows[0]?.order_number != null ? Number(oR.rows[0].order_number) : null
+          const itemR = await client.query(
+            `SELECT seller_id, title FROM store_order_items WHERE order_id = $1::uuid AND product_id = $2 LIMIT 1`,
+            [order_id, String(product_id)],
+          )
+          item = itemR.rows[0]
+          if (!item) { await client.end(); return res.status(404).json({ message: 'Product not found in this order.' }) }
+          productSellerId = String(item.seller_id || '').trim()
+          if (!productSellerId || productSellerId === 'default') {
+            await client.end()
+            return res.status(400).json({ message: 'This product has no seller to message.' })
+          }
+          const sur = await client.query(
+            `SELECT email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL ORDER BY created_at ASC LIMIT 1`,
+            [productSellerId],
+          )
+          sellerEmail = String(sur.rows[0]?.email || '').trim()
+          const sh = await client.query(
+            `SELECT store_name, locale FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+            [productSellerId],
+          )
+          sellerName = String(sh.rows[0]?.store_name || '').trim()
+          const sLoc = String(sh.rows[0]?.locale || '').trim().toLowerCase()
+          sellerLocale = FLOW_EMAIL_LOCALES.includes(sLoc) ? sLoc : 'de'
+        }
 
         const r = await client.query(
           `INSERT INTO store_messages (order_id, product_id, sender_type, sender_email, recipient_email, subject, body, channel, seller_id, is_read_by_seller, is_read_by_customer)
@@ -1019,14 +1117,16 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
       }
     }
     const storeMessagesUnreadCountGET = async (req, res) => {
+      const payload = verifyCustomerToken((req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim())
+      const email = String(payload?.email || '').trim().toLowerCase()
+      if (!email) return res.status(401).json({ message: 'Unauthorized' })
       const client = getDbClient()
       if (!client) return res.json({ count: 0 })
       try {
         await client.connect()
-        const email = req.query.email
-        if (!email) return res.json({ count: 0 })
         const r = await client.query(
-          `SELECT COUNT(*)::int AS c FROM store_messages WHERE recipient_email = $1 AND sender_type = 'seller' AND is_read_by_customer = false`,
+          `SELECT COUNT(*)::int AS c FROM store_messages
+            WHERE lower(recipient_email) = lower($1) AND sender_type = 'seller' AND is_read_by_customer = false`,
           [email]
         )
         res.json({ count: r.rows[0]?.c || 0 })
@@ -1034,15 +1134,23 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
     }
 
     const storeMessagesMarkReadPATCH = async (req, res) => {
+      const payload = verifyCustomerToken((req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim())
+      const email = String(payload?.email || '').trim().toLowerCase()
+      if (!email) return res.status(401).json({ message: 'Unauthorized' })
       const client = getDbClient()
       if (!client) return res.json({ ok: true })
       try {
         await client.connect()
-        const { email, order_id } = req.body || {}
-        if (!email) return res.json({ ok: true })
-        let q = `UPDATE store_messages SET is_read_by_customer = true WHERE recipient_email = $1 AND sender_type = 'seller'`
+        const { order_id } = req.body || {}
+        let q = `UPDATE store_messages SET is_read_by_customer = true
+          WHERE lower(recipient_email) = lower($1) AND sender_type = 'seller'`
         const params = [email]
-        if (order_id) { params.push(order_id); q += ` AND order_id = $2` }
+        if (order_id) {
+          params.push(order_id)
+          q += ` AND order_id = $2::uuid AND EXISTS (
+            SELECT 1 FROM store_orders o WHERE o.id = store_messages.order_id AND lower(o.email) = lower($1)
+          )`
+        }
         else q += ` AND order_id IS NULL`
         await client.query(q, params)
         res.json({ ok: true })

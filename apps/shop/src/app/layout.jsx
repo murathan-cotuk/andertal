@@ -1,8 +1,17 @@
 ﻿import "./globals.css";
 import Script from "next/script";
+import { headers } from "next/headers";
 import TrustpilotInviteBootstrap from "@/components/TrustpilotInviteBootstrap";
 import UnhandledRejectionGuard from "@/components/UnhandledRejectionGuard";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
+import SeoJsonLd from "@/components/SeoJsonLd";
+import {
+  SEO_DEFAULT_LOCALE,
+  SITE_URL,
+  buildOrganizationJsonLd,
+  buildWebsiteJsonLd,
+} from "@/lib/seo";
+import { isValidLocale as isShopLocale } from "@/lib/shop-market";
 
 /* Safari / iOS status area + first paint: keep in sync with --header-bg fallback in ShopHeader (MIDDLE_BAR_BG) */
 const DEFAULT_STATUS_THEME = "#1b8880";
@@ -33,12 +42,21 @@ export async function generateMetadata() {
   const { title, description } = await getHomepageMetaFromStyles();
   const brand = String(title).split(" - ")[0]?.trim() || "Andertal";
   return {
+    metadataBase: new URL(SITE_URL),
     title: {
       default: title,
       template: `%s | ${brand}`,
     },
     description,
     openGraph: {
+      type: "website",
+      url: SITE_URL,
+      title,
+      description,
+      siteName: brand,
+    },
+    twitter: {
+      card: "summary_large_image",
       title,
       description,
     },
@@ -66,10 +84,25 @@ export const viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }) {
+async function resolveHtmlLang() {
+  try {
+    const h = await headers();
+    const fromHeader = String(h.get("x-andertal-locale") || "").toLowerCase();
+    if (isShopLocale(fromHeader)) return fromHeader;
+    const prefix = String(h.get("x-andertal-market-prefix") || "");
+    const parts = prefix.split("/").filter(Boolean);
+    if (parts[1] && isShopLocale(parts[1])) return parts[1].toLowerCase();
+  } catch {
+    /* headers() unavailable outside request */
+  }
+  return SEO_DEFAULT_LOCALE;
+}
+
+export default async function RootLayout({ children }) {
+  const lang = await resolveHtmlLang();
   return (
     <html
-      lang="en"
+      lang={lang}
       translate="no"
       className="notranslate"
       suppressHydrationWarning
@@ -84,6 +117,7 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body suppressHydrationWarning>
+        <SeoJsonLd data={[buildOrganizationJsonLd(), buildWebsiteJsonLd()]} />
         {/*
           Register before React / Next overlay: noisy Promise rejects with raw DOM Events
           stringify as "[object Event]". Duplicate logic documented in lib/unhandled-rejection-suppress.js

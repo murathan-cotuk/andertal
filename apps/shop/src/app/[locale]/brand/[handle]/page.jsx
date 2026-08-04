@@ -7,6 +7,8 @@ import { Link } from "@/i18n/navigation";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, notFound } from "next/navigation";
 import { resolveImageUrl } from "@/lib/image-url";
+import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { SITE_URL } from "@/lib/seo";
 import {
   SORT_OPTIONS,
   PER_PAGE,
@@ -543,6 +545,7 @@ const Desc = styled.div`
 export default function BrandPage() {
   const params   = useParams();
   const locale   = params?.locale ?? "en";
+  const marketPrefixVal = useMarketPrefix();
   const handle   = params?.handle ? String(params.handle) : undefined;
 
   const [brand,       setBrand]       = useState(null);
@@ -586,13 +589,14 @@ export default function BrandPage() {
     })();
   }, [handle]);
 
-  /* ── Canonical ── */
+  /* ── Canonical (market-aware public URL) ── */
   useEffect(() => {
     if (typeof document === "undefined" || !brand?.handle) return;
+    const prefix = (marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`;
     let el = document.querySelector('link[rel="canonical"]');
     if (!el) { el = document.createElement("link"); el.rel = "canonical"; document.head.appendChild(el); }
-    el.href = `${window.location.origin}/${locale}/brand/${brand.handle}`;
-  }, [locale, brand?.handle]);
+    el.href = `${SITE_URL}${prefix}/brand/${brand.handle}`;
+  }, [locale, brand?.handle, marketPrefixVal]);
 
   useEffect(() => {
     let cancelled = false;

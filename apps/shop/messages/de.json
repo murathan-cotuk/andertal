@@ -271,11 +271,21 @@
     "messageSent": "Nachricht gesendet ✓",
     "genericError": "Fehler",
     "status": {
-      "offen": "Offen", "in_bearbeitung": "In Bearbeitung", "versendet": "Versendet",
-      "zugestellt": "Zugestellt", "abgeschlossen": "Abgeschlossen", "storniert": "Storniert",
-      "bezahlt": "Bezahlt", "refunded": "Erstattet", "retoure": "Retoure",
-      "retoure_anfrage": "Rückgabe läuft", "pending": "Offen", "shipped": "Versendet",
-      "delivered": "Zugestellt", "completed": "Abgeschlossen", "cancelled": "Storniert",
+      "offen": "Offen",
+      "in_bearbeitung": "In Bearbeitung",
+      "versendet": "Versendet",
+      "zugestellt": "Zugestellt",
+      "abgeschlossen": "Abgeschlossen",
+      "storniert": "Storniert",
+      "bezahlt": "Bezahlt",
+      "refunded": "Erstattet",
+      "retoure": "Retoure",
+      "retoure_anfrage": "Rückgabe läuft",
+      "pending": "Offen",
+      "shipped": "Versendet",
+      "delivered": "Zugestellt",
+      "completed": "Abgeschlossen",
+      "cancelled": "Storniert",
       "processing": "In Bearbeitung"
     }
   },
@@ -581,5 +591,284 @@
     "add": "Auf den Merkzettel",
     "remove": "Vom Merkzettel entfernen",
     "loginHint": "um Produkte auf Ihren Merkzettel zu legen"
+  },
+  "supportCenter": {
+    "common": {
+      "loading": "Wird geladen…",
+      "back": "Zurück",
+      "continue": "Weiter",
+      "remove": "Entfernen"
+    },
+    "hero": {
+      "eyebrow": "Kundenservice",
+      "title": "Wie können wir helfen?",
+      "subtitle": "Finden Sie schnell Antworten oder eröffnen Sie einen Fall bei unserem Support-Team.",
+      "searchLabel": "Support durchsuchen",
+      "searchPlaceholder": "Thema oder Frage suchen",
+      "searchAction": "Suchen",
+      "openCase": "Fall eröffnen",
+      "myCases": "Meine Fälle",
+      "openCount": "{count, plural, =0 {Keine offenen Fälle} one {# offener Fall} other {# offene Fälle}}"
+    },
+    "topics": {
+      "title": "Wobei benötigen Sie Hilfe?",
+      "subtitle": "Wählen Sie ein Thema, um passende Hilfe zu erhalten."
+    },
+    "categories": {
+      "order_delivery": "Bestellung & Lieferung",
+      "returns_refunds": "Rückgabe & Erstattung",
+      "product_issue": "Produktproblem",
+      "payment": "Zahlung",
+      "account": "Konto",
+      "platform": "Plattform & Feedback",
+      "order": "Bestellung",
+      "delivery": "Lieferung",
+      "return": "Rückgabe",
+      "refund": "Erstattung",
+      "product": "Produkt",
+      "seller": "Verkäufer",
+      "invoice": "Rechnung",
+      "bonus": "Bonus & Gutschein",
+      "privacy": "Datenschutz",
+      "technical": "Technisches Problem",
+      "other": "Sonstiges",
+      "legacy": "Frühere Nachricht"
+    },
+    "categoryDescriptions": {
+      "order_delivery": "Sendungsverfolgung, Verzögerungen oder fehlende Artikel",
+      "returns_refunds": "Rückgaben, Stornierungen und Erstattungen",
+      "product_issue": "Schäden, Mängel oder Garantie",
+      "payment": "Fehlgeschlagene oder unklare Zahlungen",
+      "account": "Anmeldung, Profil und Kontozugang",
+      "platform": "Technische Probleme und allgemeines Feedback",
+      "order": "Bestellstatus, fehlende Artikel und Änderungen",
+      "return": "Rückgaben, Stornierungen und Erstattungen",
+      "invoice": "Rechnung finden oder Fehler melden",
+      "bonus": "Punkte, Gutscheine und Aktionen",
+      "product": "Schäden, Mängel und Produktfragen",
+      "technical": "Fehler bei Website oder Funktionen",
+      "privacy": "Auskunft, Löschung und Datenschutz",
+      "other": "Alle anderen Support-Anliegen"
+    },
+    "subtopics": {
+      "delivery_late": "Lieferung verspätet",
+      "tracking": "Frage zur Sendungsverfolgung",
+      "missing_item": "Artikel fehlt",
+      "wrong_item": "Falschen Artikel erhalten",
+      "return": "Artikel zurückgeben",
+      "refund": "Status der Erstattung",
+      "cancellation": "Bestellung stornieren",
+      "damaged": "Artikel beschädigt angekommen",
+      "defective": "Produkt ist defekt",
+      "not_as_described": "Nicht wie beschrieben",
+      "warranty": "Garantie oder Reparatur",
+      "usage": "Hilfe zur Verwendung",
+      "payment_failed": "Zahlung fehlgeschlagen",
+      "charged_twice": "Doppelt belastet",
+      "invoice": "Frage zur Rechnung",
+      "promotion": "Gutschein oder Aktion",
+      "login": "Anmeldeproblem",
+      "profile": "Profileinstellungen",
+      "privacy": "Datenschutzanfrage",
+      "security": "Kontosicherheit",
+      "technical": "Technisches Problem",
+      "accessibility": "Barrierefreiheit",
+      "feedback": "Feedback",
+      "other": "Sonstiges",
+      "invoice_incorrect": "Rechnung ist falsch",
+      "bonus_missing": "Bonus oder Gutschein fehlt",
+      "data_deletion": "Datenauskunft oder Löschung"
+    },
+    "wizard": {
+      "title": "Support-Fall eröffnen",
+      "subtitle": "Schildern Sie uns, was passiert ist. Wir führen Sie Schritt für Schritt.",
+      "progressLabel": "Fortschritt der Fallerstellung",
+      "steps": {
+        "1": "Thema",
+        "2": "Details",
+        "3": "Bestellung",
+        "4": "Nachricht",
+        "5": "Prüfen",
+        "6": "Fertig"
+      },
+      "categoryPrompt": "Thema auswählen",
+      "subtopicPrompt": "Was beschreibt Ihr Anliegen am besten?",
+      "orderPrompt": "Relevante Bestellung auswählen",
+      "orderPlaceholder": "Bestellung auswählen",
+      "orderLabel": "Bestellung #{number}",
+      "itemPrompt": "Mindestens einen betroffenen Artikel auswählen",
+      "unknownItem": "Bestellartikel",
+      "multiSellerNotice": "Ihre ausgewählten Artikel stammen von {count} Verkäufern. Wir können verknüpfte Fälle erstellen, damit jeder Verkäufer antworten kann. Sie müssen keinen Verkäufer auswählen.",
+      "platformNoOrder": "Dieses Thema ist nicht mit einer Bestellung verknüpft. Sie können ohne Auswahl fortfahren.",
+      "titleLabel": "Titel",
+      "titlePlaceholder": "Problem kurz zusammenfassen",
+      "descriptionLabel": "Beschreibung",
+      "descriptionPlaceholder": "Beschreiben Sie, was passiert ist und welche Lösung Sie erwarten.",
+      "attachmentsLabel": "Anhänge (optional)",
+      "attachmentsHint": "Bis zu {count} JPEG-, PNG-, WebP- oder PDF-Dateien, max. {size} MB je Datei.",
+      "reviewTitle": "Anfrage prüfen",
+      "categoryLabel": "Kategorie",
+      "subcategoryLabel": "Unterthema",
+      "orderReviewLabel": "Bestellung",
+      "submit": "Fall absenden",
+      "redirecting": "Fall erstellt. Ihr Postfach wird geöffnet…"
+    },
+    "errors": {
+      "loadOrders": "Bestellungen konnten nicht geladen werden.",
+      "fileCount": "Sie können bis zu {count} Dateien anhängen.",
+      "fileTypeSize": "Verwenden Sie JPEG, PNG, WebP oder PDF bis 10 MB.",
+      "upload": "Ein Anhang konnte nicht hochgeladen werden.",
+      "submit": "Der Fall konnte nicht erstellt werden. Bitte versuchen Sie es erneut."
+    },
+    "faq": {
+      "title": "Häufig gestellte Fragen",
+      "subtitle": "Schnelle Antworten und Selbsthilfe.",
+      "categoryLabel": "Kategorie",
+      "allCategories": "Alle Kategorien",
+      "searchLabel": "Fragen durchsuchen",
+      "searchPlaceholder": "Suchbegriff eingeben",
+      "noResults": "Keine passende Antwort gefunden.",
+      "openCase": "Support-Fall eröffnen",
+      "selfServiceLabel": "Selbsthilfe-Links",
+      "selfService": "Selbsthilfe",
+      "defaultOrders": "Meine Bestellungen",
+      "defaultAccount": "Kontoeinstellungen",
+      "defaults": {
+        "order_delivery": {
+          "question": "Wo kann ich meine Bestellung verfolgen?",
+          "answer": "In den Bestelldetails finden Sie die aktuelle Sendungsverfolgung. Ist der erwartete Termin überschritten, eröffnen Sie einen Support-Fall."
+        },
+        "returns_refunds": {
+          "question": "Wie funktionieren Rückgaben und Erstattungen?",
+          "answer": "Eröffnen Sie einen Fall und wählen Sie Bestellung sowie betroffene Artikel. Wir zeigen Ihnen die nächsten Schritte."
+        },
+        "product_issue": {
+          "question": "Was tun bei einem beschädigten Artikel?",
+          "answer": "Fotografieren Sie den Schaden deutlich und hängen Sie die Bilder an einen Fall mit dem betroffenen Artikel an."
+        },
+        "payment": {
+          "question": "Wo finde ich meine Rechnung?",
+          "answer": "Ausgestellte Rechnungen finden Sie in den Bestelldetails. Kontaktieren Sie den Support, falls sie fehlt."
+        },
+        "account": {
+          "question": "Wie ändere ich meine Kontodaten?",
+          "answer": "Profil und Adressen können Sie in den Kontoeinstellungen aktualisieren."
+        },
+        "platform": {
+          "question": "Wie melde ich ein technisches Problem?",
+          "answer": "Eröffnen Sie einen Plattform-Fall und nennen Sie Gerät, Browser und die Schritte, die zum Problem führten."
+        }
+      }
+    }
+  },
+  "caseInbox": {
+    "title": "Support-Fälle",
+    "subtitle": "Ihre Gespräche mit dem Support",
+    "caseListLabel": "Liste der Support-Fälle",
+    "refresh": "Fälle aktualisieren",
+    "filterLabel": "Fälle filtern",
+    "filters": {
+      "open": "Offen",
+      "awaiting_customer": "Wartet auf Sie",
+      "awaiting_seller": "Wartet auf Verkäufer",
+      "resolved": "Gelöst",
+      "closed": "Geschlossen",
+      "unread": "Ungelesen"
+    },
+    "statuses": {
+      "open": "Offen",
+      "awaiting_customer": "Wartet auf Sie",
+      "awaiting_seller": "Wartet auf Verkäufer",
+      "resolved": "Gelöst",
+      "closed": "Geschlossen",
+      "in_progress": "In Bearbeitung",
+      "reopened": "Wiedereröffnet",
+      "awaiting_support": "Wartet auf Support"
+    },
+    "categories": {
+      "order_delivery": "Bestellung & Lieferung",
+      "returns_refunds": "Rückgabe & Erstattung",
+      "product_issue": "Produktproblem",
+      "payment": "Zahlung",
+      "account": "Konto",
+      "platform": "Plattform & Feedback",
+      "order": "Bestellung",
+      "delivery": "Lieferung",
+      "return": "Rückgabe",
+      "refund": "Erstattung",
+      "product": "Produkt",
+      "seller": "Verkäufer",
+      "invoice": "Rechnung",
+      "bonus": "Bonus & Gutschein",
+      "privacy": "Datenschutz",
+      "technical": "Technisches Problem",
+      "other": "Sonstiges",
+      "legacy": "Frühere Nachricht"
+    },
+    "loadingCases": "Fälle werden geladen…",
+    "loadingDetail": "Fall wird geladen…",
+    "empty": "Keine Fälle in diesem Filter.",
+    "selectCase": "Wählen Sie einen Fall aus.",
+    "untitled": "Support-Anfrage",
+    "caseReference": "Fall #{number}",
+    "orderReference": "Bestellung #{number}",
+    "backToCases": "Fälle",
+    "paginationLabel": "Fallseiten",
+    "previous": "Zurück",
+    "next": "Weiter",
+    "page": "Seite {page}",
+    "summary": {
+      "status": "Status",
+      "category": "Kategorie",
+      "order": "Bestellung",
+      "created": "Erstellt"
+    },
+    "timelineLabel": "Fallverlauf",
+    "roles": {
+      "customer": "Sie",
+      "seller": "Verkäufer",
+      "support": "Support",
+      "admin": "Support",
+      "system": "System"
+    },
+    "events": {
+      "created": "Fall erstellt",
+      "closed": "Fall geschlossen",
+      "reopened": "Fall wiedereröffnet",
+      "resolved": "Fall gelöst",
+      "updated": "Fall aktualisiert",
+      "case_created": "Fall erstellt",
+      "case_closed": "Fall geschlossen",
+      "case_reopened": "Fall wiedereröffnet",
+      "case_resolved": "Fall gelöst",
+      "message_added": "Nachricht hinzugefügt",
+      "case_hidden": "Fall ausgeblendet"
+    },
+    "attachments": "Anhänge",
+    "retentionNotice": "Dieser geschlossene Fall bleibt 30 Tage sichtbar. Sie können ihn vorher ausblenden.",
+    "closeCase": "Fall schließen",
+    "reopenCase": "Fall wiedereröffnen",
+    "hideCase": "Fall ausblenden",
+    "replyLabel": "Antwort",
+    "replyPlaceholder": "Antwort schreiben…",
+    "addAttachments": "Anhänge hinzufügen",
+    "send": "Senden",
+    "sending": "Wird gesendet…",
+    "inactiveReply": "Antworten sind nur bei aktiven Fällen möglich.",
+    "closeModal": {
+      "title": "Diesen Fall schließen?",
+      "description": "Sie können erst wieder antworten, nachdem Sie den Fall wiedereröffnet haben.",
+      "confirm": "Fall schließen",
+      "cancel": "Abbrechen"
+    },
+    "errors": {
+      "unauthorized": "Bitte melden Sie sich erneut an.",
+      "forbidden": "Sie haben keinen Zugriff auf diesen Fall.",
+      "notFound": "Dieser Fall wurde nicht gefunden.",
+      "caseClosed": "Dieser Fall ist geschlossen und kann keine Antworten erhalten.",
+      "fileValidation": "Verwenden Sie bis zu 5 JPEG-, PNG-, WebP- oder PDF-Dateien mit höchstens 10 MB je Datei.",
+      "generic": "Etwas ist schiefgelaufen. Bitte aktualisieren Sie die Seite."
+    },
+    "legacyReadOnly": "Dies ist eine frühere Nachricht und nur noch lesbar."
   }
 }
