@@ -35,12 +35,6 @@ const Title = styled.h1`
   margin: 0 0 16px;
 `;
 
-const Subtitle = styled.p`
-  margin: 0 0 20px;
-  font-size: 14px;
-  color: #6b7280;
-`;
-
 const ToolBar = styled.div`
   display: flex;
   align-items: center;
@@ -137,9 +131,9 @@ export default function BrandsPage() {
   const [sort, setSort] = useState("name_asc");
 
   const copy = useMemo(() => {
-    if (locale === "tr") return { title: "Markalar", subtitle: "Tum markalari kesfedin", cta: "Markaya git", empty: "Henuz marka bulunmuyor.", noMatch: "Aramanla eslesen marka bulunamadi.", searchPlaceholder: "Marka ara...", sortNameAsc: "Isim (A-Z)", sortNameDesc: "Isim (Z-A)", sortNewest: "En yeni" };
-    if (locale === "de") return { title: "Marken", subtitle: "Entdecke alle Marken", cta: "Zur Marke", empty: "Noch keine Marken vorhanden.", noMatch: "Keine Marken für diese Suche gefunden.", searchPlaceholder: "Marke suchen...", sortNameAsc: "Name (A-Z)", sortNameDesc: "Name (Z-A)", sortNewest: "Neueste" };
-    return { title: "Brands", subtitle: "Explore all brands", cta: "Go to brand", empty: "No brands yet.", noMatch: "No brands match your search.", searchPlaceholder: "Search brands...", sortNameAsc: "Name (A-Z)", sortNameDesc: "Name (Z-A)", sortNewest: "Newest" };
+    if (locale === "tr") return { title: "Markalar", cta: "Markaya git", empty: "Henuz marka bulunmuyor.", noMatch: "Aramanla eslesen marka bulunamadi.", searchPlaceholder: "Marka ara...", sortNameAsc: "Isim (A-Z)", sortNameDesc: "Isim (Z-A)", sortNewest: "En yeni" };
+    if (locale === "de") return { title: "Marken", cta: "Zur Marke", empty: "Noch keine Marken vorhanden.", noMatch: "Keine Marken für diese Suche gefunden.", searchPlaceholder: "Marke suchen...", sortNameAsc: "Name (A-Z)", sortNameDesc: "Name (Z-A)", sortNewest: "Neueste" };
+    return { title: "Brands", cta: "Go to brand", empty: "No brands yet.", noMatch: "No brands match your search.", searchPlaceholder: "Search brands...", sortNameAsc: "Name (A-Z)", sortNameDesc: "Name (Z-A)", sortNewest: "Newest" };
   }, [locale]);
 
   useEffect(() => {
@@ -199,7 +193,6 @@ export default function BrandsPage() {
       <Main>
         <Container>
           <Title className="shop-typo-catalog-title">{copy.title}</Title>
-          <Subtitle>{copy.subtitle}</Subtitle>
           {loading ? <GlobalPageLoader /> : null}
           {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
           {!loading && !error && brands.length > 0 ? (

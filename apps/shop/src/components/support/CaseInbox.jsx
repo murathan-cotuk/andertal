@@ -339,14 +339,6 @@ export default function CaseInbox() {
         if (!errorResult) {
           nextCases = Array.isArray(exact?.cases) ? exact.cases : [];
           nextCount = Number(exact?.total ?? exact?.count ?? nextCases.length);
-          if (filter === "closed" && page === 1) {
-            const legacyResult = await requestCases(`page=1&limit=${limit}`);
-            if (!legacyResult?.__error) {
-              const legacy = (legacyResult?.cases || []).filter((entry) => entry?.legacy_read_only || caseId(entry).startsWith("legacy-"));
-              nextCases = [...nextCases, ...legacy];
-              nextCount += legacy.length;
-            }
-          }
         }
       }
       if (errorResult) {

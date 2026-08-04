@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { resolveImageUrl } from "@/lib/image-url";
+import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const LOCALES = [
@@ -89,20 +90,7 @@ function RegisterForm() {
   }, []);
 
   useEffect(() => {
-    const fav = (branding.favicon || "").trim();
-    if (!fav || typeof document === "undefined") return;
-    const upsert = (rel) => {
-      let link = document.querySelector(`link[rel='${rel}']`);
-      if (!link) {
-        link = document.createElement("link");
-        link.setAttribute("rel", rel);
-        document.head.appendChild(link);
-      }
-      link.setAttribute("href", fav);
-      link.setAttribute("type", "image/x-icon");
-    };
-    upsert("icon");
-    upsert("shortcut icon");
+    applyDocumentFavicon("/api/brand-favicon");
   }, [branding.favicon]);
 
   useEffect(() => {

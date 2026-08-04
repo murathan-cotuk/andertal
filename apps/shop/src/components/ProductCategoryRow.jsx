@@ -7,7 +7,7 @@ import { CartContext } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedProduct } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
-import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale } from "@/lib/product-locale-media";
+import { resolveProductListingImage } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue } from "@/lib/variation-labels";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
@@ -22,7 +22,11 @@ import styled from "styled-components";
 
 function resolveImg(src) {
   if (!src) return null;
-  return resolveImageUrl(src);
+  if (typeof src === "object") {
+    const nested = src.url ?? src.src ?? src.path ?? "";
+    return nested ? resolveImageUrl(String(nested)) : null;
+  }
+  return resolveImageUrl(src) || null;
 }
 
 const Row = styled.article`
@@ -275,10 +279,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
   })();
 
   const variant = normalizedVariants[effectiveIdx] ?? normalizedVariants[0] ?? variants[0];
-  const localeMedia = localizedProductMediaList(product, locale);
-  const variantMedia = variant ? variantMediaForLocale(variant, locale) : [];
-  const rawImg =
-    variantImageUrlForLocale(variant, locale) || variantMedia[0] || product.images?.[0]?.url || product.thumbnail || localeMedia[0] || null;
+  const rawImg = resolveProductListingImage(product, locale, variant);
   const imgSrc = resolveImg(rawImg);
   const productHandle = storefrontProductHandle(product, locale);
   const productUrl = productHandle ? `/${productHandle}` : null;

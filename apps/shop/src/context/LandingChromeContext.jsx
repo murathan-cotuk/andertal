@@ -9,6 +9,7 @@ const LandingChromeContext = createContext({
   secondNavDesktopClassic: false,
   setSecondNavDesktopClassic: () => {},
   landingHeaderBg: null,
+  landingHeaderStatusColor: null,
   setLandingHeaderBg: () => {},
 });
 
@@ -20,12 +21,14 @@ export function LandingChromeProvider({ children }) {
   const [showHeaderFilterBar, setShow] = useState(true);
   const [secondNavDesktopClassic, setSecondNavDesktopClassic_] = useState(false);
   const [landingHeaderBg, setLandingHeaderBg_] = useState(null);
+  const [landingHeaderStatusColor, setLandingHeaderStatusColor_] = useState(null);
   const pathname = usePathname();
 
   useEffect(() => {
     setShow(true);
     setSecondNavDesktopClassic_(false);
     setLandingHeaderBg_(null);
+    setLandingHeaderStatusColor_(null);
   }, [pathname]);
 
   const setLandingHeaderFilterBar = useCallback((visible) => {
@@ -36,8 +39,12 @@ export function LandingChromeProvider({ children }) {
     setSecondNavDesktopClassic_(classic === true);
   }, []);
 
-  const setLandingHeaderBg = useCallback((bg) => {
+  const setLandingHeaderBg = useCallback((bg, statusColor = null) => {
     setLandingHeaderBg_(bg || null);
+    const solid = statusColor != null && String(statusColor).trim()
+      ? String(statusColor).trim()
+      : null;
+    setLandingHeaderStatusColor_(solid);
   }, []);
 
   const value = useMemo(
@@ -47,6 +54,7 @@ export function LandingChromeProvider({ children }) {
       secondNavDesktopClassic,
       setSecondNavDesktopClassic,
       landingHeaderBg,
+      landingHeaderStatusColor,
       setLandingHeaderBg,
     }),
     [
@@ -55,6 +63,7 @@ export function LandingChromeProvider({ children }) {
       secondNavDesktopClassic,
       setSecondNavDesktopClassic,
       landingHeaderBg,
+      landingHeaderStatusColor,
       setLandingHeaderBg,
     ],
   );

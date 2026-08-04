@@ -44,6 +44,7 @@ import { useShopStyles } from "@/context/ShopStylesContext";
 import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
+import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import { getLocalizedCategory } from "@/lib/format";
 
 /** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
@@ -118,13 +119,14 @@ const HeaderWrap = styled.header`
   overflow: visible;
 
   /*
-   * Üst safe-area (çentik / durum çubuğu altı) — viewport-fit=cover;
-   * dar ve geniş ekranda aynı mantık; --header-chrome-bg :root’tan gelir.
+   * Status-bar / notch strip (in-viewport). Must sit at top:0 inside the padded
+   * header — NOT at top:-safe-area (that paints above the screen and never shows).
+   * Paint uses the same value as the navbar surface (--narrow-header-safe-fill).
    */
   &::before {
     content: "";
     position: absolute;
-    top: calc(env(safe-area-inset-top, 0px) * -1);
+    top: 0;
     left: 0;
     right: 0;
     height: env(safe-area-inset-top, 0px);
@@ -133,6 +135,7 @@ const HeaderWrap = styled.header`
       var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}))
     );
     pointer-events: none;
+    z-index: 0;
   }
 
   &[data-mobile-compact="true"] {
@@ -143,9 +146,7 @@ const HeaderWrap = styled.header`
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     background: var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}));
-    /* Push header content below the OS status bar so it doesn't overlap the clock/battery row.
-       The ::before pseudo-element (top: -env(safe-area-inset-top)) fills the status bar area
-       behind it with the same header color, giving a seamless bleed. */
+    /* Push logo/search/icons below the OS status bar; ::before fills that inset. */
     padding-top: env(safe-area-inset-top, 0px);
   }
 `;
@@ -949,7 +950,7 @@ const SHOP_LOCALES = [
 ];
 
 export default function ShopHeader() {
-  const { showHeaderFilterBar, landingHeaderBg, secondNavDesktopClassic } = useLandingChrome();
+  const { showHeaderFilterBar, landingHeaderBg, landingHeaderStatusColor, secondNavDesktopClassic } = useLandingChrome();
   const { publishMobileBottomNavScroll } = useMobileBottomNavScroll();
   const ctxPrefix = useMarketPrefix();
   const pathname = usePathname() || "/";
@@ -1059,29 +1060,22 @@ export default function ShopHeader() {
   }, []);
 
   useEffect(() => {
-    const fav = (shopBranding.shop_favicon_url || "").trim();
-    if (!fav || typeof document === "undefined") return;
-    let link = document.querySelector("link[rel='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.setAttribute("rel", "icon");
-      document.head.appendChild(link);
-    }
-    link.setAttribute("href", fav);
+    // Same-origin proxy (shop_favicon_url only). Re-bust when settings change.
+    applyDocumentFavicon("/api/brand-favicon");
   }, [shopBranding.shop_favicon_url]);
 
   useEffect(() => {
     if (typeof document === "undefined" || typeof window === "undefined") return;
     const root = document.documentElement;
 
-    const ensureThemeMeta = () => {
-      let meta = document.querySelector("meta[name='theme-color']");
-      if (!meta) {
-        meta = document.createElement("meta");
-        meta.setAttribute("name", "theme-color");
-        document.head.appendChild(meta);
-      }
-      return meta;
+    const setThemeColor = (color) => {
+      const value = String(color || MIDDLE_BAR_BG).trim() || MIDDLE_BAR_BG;
+      // iOS often ignores in-place content updates — remove + reinsert the meta tag.
+      document.querySelectorAll("meta[name='theme-color']").forEach((el) => el.remove());
+      const meta = document.createElement("meta");
+      meta.setAttribute("name", "theme-color");
+      meta.setAttribute("content", value);
+      document.head.appendChild(meta);
     };
 
     /**
@@ -1096,21 +1090,21 @@ export default function ShopHeader() {
         const headerBg = cs.getPropertyValue("--header-bg").trim() || MIDDLE_BAR_BG;
         const solid = extractSolidTintFromChromeCss(chrome || headerBg, headerBg);
         setComputedHeaderSolidColor(solid || MIDDLE_BAR_BG);
-        const themeMeta = ensureThemeMeta();
         const mcLocal = shopStyles?.mobileChrome || {};
         const frostedScrollTint =
           isNarrowViewport &&
           scrollPastThreshold &&
           String(mcLocal.header_on_scroll || "") !== "inherit";
         if (frostedScrollTint) {
-          themeMeta.setAttribute(
-            "content",
+          setThemeColor(
             extractSolidTintFromChromeCss(mcLocal.frosted_bg || "rgba(255,255,255,0.92)", "#ffffff"),
           );
+        } else if (landingHeaderStatusColor) {
+          setThemeColor(extractSolidTintFromChromeCss(landingHeaderStatusColor, headerBg));
         } else if (landingHeaderBg) {
-          themeMeta.setAttribute("content", extractSolidTintFromChromeCss(landingHeaderBg, headerBg));
+          setThemeColor(extractSolidTintFromChromeCss(landingHeaderBg, headerBg));
         } else {
-          themeMeta.setAttribute("content", solid);
+          setThemeColor(solid);
         }
       });
     };
@@ -1121,7 +1115,7 @@ export default function ShopHeader() {
     return () => {
       window.removeEventListener(SHOP_THEME_CSS_UPDATED, onThemeInjected);
     };
-  }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg, scrollPastThreshold, isNarrowViewport]);
+  }, [pathname, shopStyles, headerScopeCssVars, landingHeaderBg, landingHeaderStatusColor, scrollPastThreshold, isNarrowViewport]);
 
   useEffect(() => {
     const norm = (s) => String(s || "").toLowerCase().trim();
@@ -1515,13 +1509,9 @@ export default function ShopHeader() {
             ? { position: "relative", top: "auto", left: "auto", right: "auto" }
             : {}),
           ...(headerScopeCssVars || {}),
-          // The safe-area strip (::before, fills the OS status-bar area on notched phones) must
-          // always paint with the EXACT same background value the header surface below it uses —
-          // never a solid tint extracted from it. Extraction is for <meta name="theme-color">
-          // only (browsers require a flat color there); a real CSS box can render the full
-          // gradient/rgba value directly, so using anything else here creates a visible seam or,
-          // when extraction finds no plain hex in the gradient (e.g. an rgba() overlay on a hero
-          // image), falls through to black/transparent — the exact bug reported on mobile.
+          // Safe-area strip (::before, height = inset-top only) must use a SOLID top stop —
+          // the same linear-gradient string sized to the short strip fades too fast and
+          // seams against the navbar. HeaderWrap.background keeps the full-height gradient.
           ...(mobileFrostedScrollActive
             ? {
                 background: mc.frosted_bg || "rgba(255,255,255,0.92)",
@@ -1537,7 +1527,10 @@ export default function ShopHeader() {
                       ? { background: "var(--header-chrome-bg)" }
                       : {}),
                   "--narrow-header-safe-fill":
-                    landingHeaderBg ||
+                    landingHeaderStatusColor ||
+                    (landingHeaderBg
+                      ? extractSolidTintFromChromeCss(landingHeaderBg, computedHeaderSolidColor)
+                      : null) ||
                     headerScopeCssVars?.["--header-chrome-bg"] ||
                     headerScopeCssVars?.["--header-bg"] ||
                     computedHeaderSolidColor,

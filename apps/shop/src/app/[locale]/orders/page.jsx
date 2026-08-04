@@ -12,6 +12,8 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { useLocale } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
+import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
 
 /* ─────────────── Design tokens ─────────────── */
 const T = {
@@ -432,6 +434,7 @@ const RETOURE_REASONS = [
 /* ─────────────── OrderCard ─────────────── */
 function OrderCard({ order, expanded, onToggle, onRefresh }) {
   const locale = useLocale();
+  const router = useRouter();
   const items = order.items || [];
   const returns = order.returns || [];
   const status = displayStatus(order);
@@ -454,6 +457,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
   const [retoureReason, setRetoureReason] = useState(RETOURE_REASONS[0]);
   const [retoureNotes, setRetoureNotes] = useState("");
   const [messageBody, setMessageBody] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState(items.length === 1 ? String(items[0]?.id || "") : "");
   const [busy, setBusy] = useState(null);
   const [actionErr, setActionErr] = useState(null);
   const [actionOk, setActionOk] = useState(null);
@@ -754,10 +758,25 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
             </div>
           )}
 
-          {/* Message form */}
+          {/* Message form → support case → /nachrichten */}
           {showMessage && (
             <div style={{ margin: "0 18px 16px", background: "#f8fafc", border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px", fontFamily: T.font }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 12 }}>Nachricht senden</div>
+              {items.length > 1 && (
+                <>
+                  <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Produkt</label>
+                  <select
+                    value={selectedItemId}
+                    onChange={(e) => setSelectedItemId(e.target.value)}
+                    style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, background: "#fff", marginBottom: 10, fontFamily: T.font }}
+                  >
+                    <option value="">Bitte wählen…</option>
+                    {items.map((it) => (
+                      <option key={it.id} value={String(it.id || "")}>{it.title || it.product_title || it.id}</option>
+                    ))}
+                  </select>
+                </>
+              )}
               <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Nachricht</label>
               <textarea
                 value={messageBody}
@@ -766,28 +785,38 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 placeholder={`Ihre Frage zur Bestellung #${orderNum}…`}
                 style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, resize: "vertical", fontFamily: T.font, boxSizing: "border-box", marginBottom: 10 }}
               />
+              <div style={{ fontSize: 12, color: T.gray2, marginBottom: 10 }}>
+                Die Nachricht wird als Support-Fall angelegt und unter Nachrichten fortgesetzt.
+              </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={e => {
                     e.stopPropagation();
                     if (!messageBody.trim()) return;
+                    const itemId = selectedItemId || String(items[0]?.id || "");
+                    if (!itemId) return;
                     withBusy("message", async () => {
-                      const res = await getMedusaClient().request("/store/messages", {
-                        method: "POST",
-                        headers: { Authorization: `Bearer ${token()}` },
-                        body: JSON.stringify({ order_id: order.id, body: messageBody, subject: `Anfrage zu Bestellung #${orderNum}` }),
+                      const res = await createOrderSupportCase({
+                        orderId: order.id,
+                        itemIds: [itemId],
+                        title: `Anfrage zu Bestellung #${orderNum}`,
+                        description: messageBody.trim(),
+                        locale,
+                        category: "seller",
+                        subcategory: "message",
                       });
                       if (res?.__error) throw new Error(res.message || "Fehler");
-                      setActionOk("Nachricht gesendet.");
+                      const caseId = primaryCaseIdFromCreate(res);
                       setShowMessage(false);
                       setMessageBody("");
+                      router.push(caseId ? `/nachrichten?case=${encodeURIComponent(caseId)}` : "/nachrichten");
                     });
                   }}
-                  disabled={busy === "message" || !messageBody.trim()}
+                  disabled={busy === "message" || !messageBody.trim() || (items.length > 1 && !selectedItemId)}
                   style={{
                     fontSize: 13, fontWeight: 700, color: "#fff", background: T.dark,
                     border: "none", borderRadius: 8, padding: "8px 18px", cursor: "pointer",
-                    fontFamily: T.font, opacity: (!messageBody.trim() || busy === "message") ? 0.5 : 1,
+                    fontFamily: T.font, opacity: (!messageBody.trim() || busy === "message" || (items.length > 1 && !selectedItemId)) ? 0.5 : 1,
                   }}
                 >
                   {busy === "message" ? "Wird gesendet…" : "Absenden"}

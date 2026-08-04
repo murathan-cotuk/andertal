@@ -38,6 +38,7 @@ import {
   AppsIcon,
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
+import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import { polarisI18nFor } from "@/lib/polaris-locale";
 import { getApprovalBannerCopy } from "@/lib/approval-banner-i18n";
 import "@shopify/polaris/build/esm/styles.css";
@@ -569,15 +570,8 @@ export default function PolarisLayout({ children }) {
   }, [scLogoByDevice, logoViewportTier, sellercentralFavicon]);
 
   useEffect(() => {
-    const fav = (platformBranding.sellercentral_favicon_url || "").trim();
-    if (!fav || typeof document === "undefined") return;
-    let link = document.querySelector("link[rel='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.setAttribute("rel", "icon");
-      document.head.appendChild(link);
-    }
-    link.setAttribute("href", fav);
+    // Same-origin proxy (sellercentral_favicon_url only — never shop).
+    applyDocumentFavicon("/api/brand-favicon");
   }, [platformBranding.sellercentral_favicon_url]);
 
   useEffect(() => {

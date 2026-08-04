@@ -2420,7 +2420,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     if (img?.color) {
       const dir = img.gradient_direction || "to bottom";
       const stop = img.gradient_stop || "80%";
-      setLandingHeaderBg(`linear-gradient(${dir}, ${img.color} 0%, transparent ${stop})`);
+      setLandingHeaderBg(`linear-gradient(${dir}, ${img.color} 0%, transparent ${stop})`, img.color);
     } else {
       setLandingHeaderBg(null);
     }

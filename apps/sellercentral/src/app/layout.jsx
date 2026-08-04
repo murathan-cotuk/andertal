@@ -6,6 +6,17 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata = {
   title: "Seller Central - Andertal",
   description: "Manage your store on Andertal",
+  icons: {
+    icon: [
+      { url: "/api/brand-favicon", type: "image/png", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    shortcut: "/api/brand-favicon",
+    apple: [
+      { url: "/api/brand-favicon", sizes: "180x180", type: "image/png" },
+      { url: "/icon-192.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }) {

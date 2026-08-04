@@ -8,6 +8,8 @@ import { useLocale } from "next-intl";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
+import LandingContainers from "@/components/landing/LandingContainers";
+import { SectionErrorBoundary } from "@/components/ErrorBoundary";
 
 /** DE lives on the plain field; other locales live under `${field}_i18n[locale][field]`, falling back to DE. */
 function lt(page, field, locale) {
@@ -32,6 +34,7 @@ export default function CmsPageBySlug() {
   const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [hasContainers, setHasContainers] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -40,9 +43,20 @@ export default function CmsPageBySlug() {
       try {
         setLoading(true);
         setNotFound(false);
+        setHasContainers(false);
         const client = getMedusaClient();
         const data = await client.getPageBySlug(slug);
         setPage(data);
+        if (data?.id) {
+          // A page built with the Sellercentral landing-page container editor (e.g. the
+          // "Kundenservice"/customer-support page) has its real content there, not in `body`.
+          try {
+            const landing = await client.request(`/store/landing-page/${encodeURIComponent(data.id)}`, { cache: "no-store" });
+            setHasContainers(Array.isArray(landing?.containers) && landing.containers.length > 0);
+          } catch {
+            setHasContainers(false);
+          }
+        }
       } catch (err) {
         setPage(null);
         setNotFound(true);
@@ -82,6 +96,22 @@ export default function CmsPageBySlug() {
   const localizedTitle = lt(page, "title", locale);
   const safeBody = sanitizeHtml(lt(page, "body", locale));
   const hero = page.featured_image ? resolveImageUrl(page.featured_image) : "";
+
+  if (hasContainers) {
+    // Page content lives in the Sellercentral landing-page container editor
+    // (e.g. hero + support wizard + topic grid + FAQ) instead of the plain `body` field.
+    return (
+      <div className="min-h-screen flex flex-col">
+        <ShopHeader />
+        <main className="flex-1">
+          <SectionErrorBoundary>
+            <LandingContainers pageId={page.id} />
+          </SectionErrorBoundary>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

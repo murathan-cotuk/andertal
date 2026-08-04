@@ -57,6 +57,64 @@ export function buildCategorySlugToNameMap(tree) {
   return m;
 }
 
+/** Flatten category tree → Map(id string → node). */
+export function buildCategoryIdMap(tree) {
+  const m = new Map();
+  const walk = (nodes) => {
+    if (!Array.isArray(nodes)) return;
+    for (const n of nodes) {
+      if (!n || n.id == null) continue;
+      m.set(String(n.id).trim(), n);
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(tree);
+  return m;
+}
+
+/** Unique category ids referenced by a product's metadata. */
+export function productCategoryIds(product) {
+  const ids = new Set();
+  const push = (value) => {
+    const id = String(value || "").trim();
+    if (id) ids.add(id);
+  };
+  const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+  push(meta.admin_category_id);
+  push(meta.category_id);
+  if (Array.isArray(meta.category_ids)) meta.category_ids.forEach(push);
+  return ids;
+}
+
+/**
+ * Categories that appear on the given product list, resolved against the category tree.
+ * Sorted by product count (desc), then name.
+ */
+export function deriveCategoriesFromProducts(products, categoryTree) {
+  const byId = buildCategoryIdMap(categoryTree);
+  const counts = new Map();
+  for (const product of products || []) {
+    for (const id of productCategoryIds(product)) {
+      if (!byId.has(id)) continue;
+      counts.set(id, (counts.get(id) || 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([id, count]) => {
+      const node = byId.get(id);
+      const name = String(node?.name || node?.title || node?.slug || "").trim();
+      if (!name) return null;
+      return {
+        id,
+        name,
+        slug: String(node?.slug || "").replace(/^\//, "").trim(),
+        count,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
 /** Sidebar / chip label: category facet values show category name, not slug. */
 export function formatFacetOptionLabel(facetKey, rawValue, categorySlugToName) {
   const k = String(facetKey || "")

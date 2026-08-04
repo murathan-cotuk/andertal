@@ -62,6 +62,17 @@ export async function generateMetadata() {
     },
     /* iOS Safari: tints the status bar / top chrome; client updates this when --header-bg is loaded from store theme */
     themeColor: DEFAULT_STATUS_THEME,
+    icons: {
+      icon: [
+        { url: "/api/brand-favicon", type: "image/png", sizes: "any" },
+        { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      ],
+      shortcut: "/api/brand-favicon",
+      apple: [
+        { url: "/api/brand-favicon", sizes: "180x180", type: "image/png" },
+        { url: "/icon-192.png", sizes: "180x180", type: "image/png" },
+      ],
+    },
     /*
      * "Add to Home Screen" (iOS): without statusBarStyle="black-translucent" the OS paints its
      * own opaque status bar over the safe-area, so ShopHeader's ::before safe-area-fill (which

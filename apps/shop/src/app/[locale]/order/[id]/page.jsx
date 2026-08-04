@@ -13,6 +13,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
+import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
 
 const ORANGE = "#ff971c";
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -253,55 +254,41 @@ function ReturnModal({ order, onClose, onDone }) {
   );
 }
 
-/* ── Message modal ──
- * An order can mix products from different sellers, so a message can only ever be about ONE
- * product — picking it is mandatory before the compose box even appears, and it's what routes
- * the message to that product's own seller (never to every seller who happens to share the order). */
+/* ── Message modal → creates a support case, then opens /nachrichten ── */
 function MessageModal({ order, onClose }) {
   const t = useTranslations("order");
   const locale = useLocale();
+  const router = useRouter();
   const items = Array.isArray(order?.items) ? order.items : [];
-  const [selectedProductId, setSelectedProductId] = useState(items.length === 1 ? String(items[0].product_id || "") : "");
+  const [selectedItemId, setSelectedItemId] = useState(items.length === 1 ? String(items[0].id || "") : "");
   const [body, setBody] = useState("");
-  const [history, setHistory] = useState([]);
   const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
 
-  useEffect(() => {
-    const token = getToken("customer");
-    getMedusaClient().request(`/store/messages?order_id=${order.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(d => { if (!d?.__error) setHistory(d?.messages || []); }).catch(() => {});
-  }, [order.id]);
-
-  const selectedItem = items.find(it => String(it.product_id || "") === selectedProductId) || null;
-  const historyForProduct = selectedProductId
-    ? history.filter(m => String(m.product_id || "") === selectedProductId)
-    : [];
+  const selectedItem = items.find((it) => String(it.id || "") === selectedItemId) || null;
 
   const send = async () => {
-    if (!body.trim() || !selectedProductId) return;
-    setSending(true); setErr("");
+    if (!body.trim() || !selectedItemId) return;
+    setSending(true);
+    setErr("");
     try {
-      const token = getToken("customer");
-      await getMedusaClient().request("/store/messages", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: order.id,
-          product_id: selectedProductId,
-          body: body.trim(),
-          subject: t("orderTitle", { number: order.order_number || "" }),
-          locale,
-        }),
+      const result = await createOrderSupportCase({
+        orderId: order.id,
+        itemIds: [selectedItemId],
+        title: t("orderTitle", { number: order.order_number || "" }),
+        description: body.trim(),
+        locale,
+        category: "seller",
+        subcategory: "message",
       });
-      setSent(true); setBody("");
-      const d = await getMedusaClient().request(`/store/messages?order_id=${order.id}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!d?.__error) setHistory(d?.messages || []);
-      setTimeout(() => setSent(false), 3000);
-    } catch (e) { setErr(e?.message || t("genericError")); }
-    setSending(false);
+      if (result?.__error) throw new Error(result.message || t("genericError"));
+      const caseId = primaryCaseIdFromCreate(result);
+      onClose();
+      router.push(caseId ? `/nachrichten?case=${encodeURIComponent(caseId)}` : "/nachrichten");
+    } catch (e) {
+      setErr(e?.message || t("genericError"));
+      setSending(false);
+    }
   };
 
   return (
@@ -312,18 +299,18 @@ function MessageModal({ order, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
 
-        {!selectedProductId ? (
+        {!selectedItemId ? (
           <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
             <div style={{ fontSize: 13, color: "#374151", marginBottom: 10 }}>{t("messageProductPickPrompt")}</div>
             {items.map((it, i) => (
               <button
                 key={it.id || i}
-                onClick={() => setSelectedProductId(String(it.product_id || ""))}
-                disabled={!it.product_id}
+                onClick={() => setSelectedItemId(String(it.id || ""))}
+                disabled={!it.id}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 8px",
                   border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 8, background: "#fff",
-                  cursor: it.product_id ? "pointer" : "not-allowed", opacity: it.product_id ? 1 : 0.5, textAlign: "left",
+                  cursor: it.id ? "pointer" : "not-allowed", opacity: it.id ? 1 : 0.5, textAlign: "left",
                 }}
               >
                 <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3f4f6" }}>
@@ -352,30 +339,20 @@ function MessageModal({ order, onClose }) {
                 {selectedItem ? getLocalizedCartLineTitle(selectedItem, locale) : ""}
               </div>
               {items.length > 1 && (
-                <button onClick={() => setSelectedProductId("")} style={{ background: "none", border: "none", color: ORANGE, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+                <button onClick={() => setSelectedItemId("")} style={{ background: "none", border: "none", color: ORANGE, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
                   {t("messageChangeProduct")}
                 </button>
               )}
             </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-              {historyForProduct.length === 0 && <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "24px 0" }}>{t("noMessagesYet")}</div>}
-              {historyForProduct.map(m => {
-                const isSeller = m.sender_type === "seller";
-                return (
-                  <div key={m.id} style={{ display: "flex", justifyContent: isSeller ? "flex-start" : "flex-end" }}>
-                    <div style={{ maxWidth: "75%", background: isSeller ? "#f3f4f6" : ORANGE, color: isSeller ? "#111827" : "#fff", borderRadius: isSeller ? "12px 12px 12px 2px" : "12px 12px 2px 12px", padding: "9px 13px", fontSize: 13 }}>
-                      {m.body}
-                      <div style={{ fontSize: 10, marginTop: 3, opacity: 0.6 }}>{new Date(m.created_at).toLocaleString(INTL_LOCALE[locale] || "de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ padding: "14px 20px", color: "#6b7280", fontSize: 13 }}>
+              {t.has?.("messageCreatesCaseHint")
+                ? t("messageCreatesCaseHint")
+                : "Ihre Nachricht wird als Support-Fall angelegt und unter Nachrichten fortgesetzt."}
             </div>
             <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6" }}>
-              {sent && <div style={{ color: "#15803d", fontSize: 12, marginBottom: 6 }}>{t("messageSent")}</div>}
               {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
               <div style={{ display: "flex", gap: 8 }}>
-                <textarea value={body} onChange={e => setBody(e.target.value)} rows={2}
+                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3}
                   style={{ flex: 1, padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "none" }}
                   placeholder={t("messagePlaceholder")}
                 />

@@ -2,31 +2,49 @@
  * Product / variant images stored by sellercentral:
  * - Gallery: metadata.media (DE) or metadata.translations[locale].media when set.
  * - Variants: image_url (default) + image_urls[locale] overrides.
+ * - Parent umbrella rows often have no own media; listing cards must use the
+ *   first child variant's first image.
  */
+
+/** Normalize media entries (string | {url|src|path}) to a non-empty URL string. */
+export function coerceMediaUrl(entry) {
+  if (entry == null || entry === "") return "";
+  if (typeof entry === "string") return entry.trim();
+  if (typeof entry === "object") {
+    const nested = entry.url ?? entry.src ?? entry.path ?? entry.href ?? "";
+    return typeof nested === "string" ? nested.trim() : "";
+  }
+  return "";
+}
+
+function coerceMediaList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(coerceMediaUrl).filter(Boolean);
+}
 
 export function localizedProductMediaList(product, locale) {
   const meta = product?.metadata || {};
   const loc = String(locale || "de").toLowerCase();
   const tr = meta.translations?.[loc];
-  if (tr && Array.isArray(tr.media) && tr.media.length > 0) return tr.media;
-  return Array.isArray(meta.media) ? meta.media : [];
+  if (tr && Array.isArray(tr.media) && tr.media.length > 0) return coerceMediaList(tr.media);
+  return coerceMediaList(Array.isArray(meta.media) ? meta.media : []);
 }
 
 export function variantImageUrlForLocale(variant, locale) {
   if (!variant) return "";
   const loc = String(locale || "de").toLowerCase();
   const map = variant.image_urls && typeof variant.image_urls === "object" ? variant.image_urls : {};
-  if (map[loc]) return map[loc];
-  const keys = Object.keys(map).filter((k) => map[k] != null && String(map[k]).trim() !== "");
-  if (keys.length === 0) return variant.image_url || "";
-  if (map.de) return map.de;
-  if (loc === "de") return variant.image_url || "";
-  return variant.image_url || "";
+  if (map[loc]) return coerceMediaUrl(map[loc]);
+  const keys = Object.keys(map).filter((k) => coerceMediaUrl(map[k]));
+  if (keys.length === 0) return coerceMediaUrl(variant.image_url || variant.image || "");
+  if (map.de) return coerceMediaUrl(map.de);
+  if (loc === "de") return coerceMediaUrl(variant.image_url || variant.image || "");
+  return coerceMediaUrl(variant.image_url || variant.image || "");
 }
 
 /**
  * Returns the full image list for a variant in the given locale.
- * Priority: locale-specific media → default media → single image_url fallback.
+ * Priority: locale media → default media → mapped images[] → single image_url.
  */
 export function variantMediaForLocale(variant, locale) {
   if (!variant) return [];
@@ -35,15 +53,69 @@ export function variantMediaForLocale(variant, locale) {
   // 1. Locale-specific media in translations
   const tr = vMeta.translations;
   if (tr && tr[loc] && Array.isArray(tr[loc].media) && tr[loc].media.length > 0) {
-    return tr[loc].media.filter((u) => u && String(u).trim());
+    const list = coerceMediaList(tr[loc].media);
+    if (list.length) return list;
   }
   // 2. Default variant media (locale-agnostic)
   if (Array.isArray(vMeta.media) && vMeta.media.length > 0) {
-    return vMeta.media.filter((u) => u && String(u).trim());
+    const list = coerceMediaList(vMeta.media);
+    if (list.length) return list;
   }
-  // 3. Fallback: single cover image
+  // 3. Backend-mapped images array (already resolved URL strings)
+  if (Array.isArray(variant.images) && variant.images.length > 0) {
+    const list = coerceMediaList(variant.images);
+    if (list.length) return list;
+  }
+  // 4. Fallback: single cover image
   const single = variantImageUrlForLocale(variant, locale);
   return single ? [single] : [];
+}
+
+/**
+ * Listing / card cover image.
+ * Prefer the selected (or first) child variant's first image; then walk remaining
+ * children; finally fall back to parent gallery / thumbnail.
+ */
+export function resolveProductListingImage(product, locale, preferredVariant = null) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  const ordered = [];
+  if (preferredVariant) ordered.push(preferredVariant);
+  for (const variant of variants) {
+    if (variant && variant !== preferredVariant) ordered.push(variant);
+  }
+
+  for (const variant of ordered) {
+    const media = variantMediaForLocale(variant, locale);
+    if (media[0]) return media[0];
+  }
+
+  const parentMedia = localizedProductMediaList(product, locale);
+  if (parentMedia[0]) return parentMedia[0];
+
+  const images = Array.isArray(product?.images) ? coerceMediaList(product.images) : [];
+  if (images[0]) return images[0];
+
+  return coerceMediaUrl(product?.thumbnail || product?.image_url || product?.image || "");
+}
+
+/** Second image for hover swap — second frame from the same source as the primary. */
+export function resolveProductListingImageSecondary(product, locale, preferredVariant = null) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  const ordered = [];
+  if (preferredVariant) ordered.push(preferredVariant);
+  for (const variant of variants) {
+    if (variant && variant !== preferredVariant) ordered.push(variant);
+  }
+
+  for (const variant of ordered) {
+    const media = variantMediaForLocale(variant, locale);
+    if (media[0]) return media[1] || "";
+  }
+
+  const parentMedia = localizedProductMediaList(product, locale);
+  if (parentMedia[0]) return parentMedia[1] || "";
+  const images = Array.isArray(product?.images) ? coerceMediaList(product.images) : [];
+  return images[1] || "";
 }
 
 /**

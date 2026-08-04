@@ -14,6 +14,8 @@ import {
   PER_PAGE,
   buildFacetsFromProducts,
   buildCategorySlugToNameMap,
+  deriveCategoriesFromProducts,
+  productCategoryIds,
   filterProductsByFacets,
   applyCatalogSort,
   formatFacetOptionLabel,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+import { useTranslations } from "next-intl";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
   CATALOG_FILTER_OVERLAY_Z,
@@ -403,6 +406,45 @@ const ClearAllBtn = styled.button`
   &:hover { border-color: #111; color: #111; }
 `;
 
+const CategoryNavGroup = styled.div`
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e6;
+`;
+
+const CategoryNavTitle = styled.div`
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #111;
+  margin-bottom: 6px;
+`;
+
+const CategoryNavBtn = styled.button`
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: ${(p) => (p.$active ? "#111827" : "#4b5563")};
+  font-weight: ${(p) => (p.$active ? 600 : 400)};
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
+  margin-bottom: 2px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+
+  &:hover {
+    background: #e5e7eb;
+    color: #111827;
+  }
+`;
+
+const MOBILE_CATEGORIES_KEY = "__categories";
+
 /* ─── Body (Kategorie-/Kollektion-Layout: flex + Sticky-Sidebar) ─ */
 const ContentWrap = styled.div`
   max-width: 1440px;
@@ -547,6 +589,7 @@ export default function BrandPage() {
   const locale   = params?.locale ?? "en";
   const marketPrefixVal = useMarketPrefix();
   const handle   = params?.handle ? String(params.handle) : undefined;
+  const tCommon  = useTranslations("common");
 
   const [brand,       setBrand]       = useState(null);
   const [products,    setProducts]    = useState([]);
@@ -556,10 +599,12 @@ export default function BrandPage() {
   const [sort,        setSort]        = useState("default");
   const [page,        setPage]        = useState(1);
   const [filters,     setFilters]     = useState({});
+  const [activeCategoryId, setActiveCategoryId] = useState(null);
   const [panelOpen,   setPanelOpen]   = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
   const [categorySlugToName, setCategorySlugToName] = useState(() => new Map());
+  const [categoryTree, setCategoryTree] = useState([]);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
@@ -568,6 +613,9 @@ export default function BrandPage() {
   /* ── Fetch ── */
   useEffect(() => {
     if (!handle) return;
+    setActiveCategoryId(null);
+    setFilters({});
+    setPage(1);
     (async () => {
       try {
         setLoading(true);
@@ -604,7 +652,9 @@ export default function BrandPage() {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        setCategorySlugToName(buildCategorySlugToNameMap(data.tree || []));
+        const tree = data.tree || [];
+        setCategoryTree(tree);
+        setCategorySlugToName(buildCategorySlugToNameMap(tree));
       })
       .catch(() => {});
     return () => {
@@ -614,7 +664,14 @@ export default function BrandPage() {
 
   const facets = useMemo(() => buildFacetsFromProducts(products), [products]);
   const hasFacets = Object.keys(facets).length > 0;
-  const showCatalogSidebar = hasFacets;
+  const brandCategories = useMemo(
+    () => deriveCategoriesFromProducts(products, categoryTree),
+    [products, categoryTree],
+  );
+  const hasCategories = brandCategories.length > 0;
+  const showCatalogSidebar = hasFacets || hasCategories;
+  const useFilterDrawerLayout = hasFacets || hasCategories;
+  const activeCategory = brandCategories.find((entry) => entry.id === activeCategoryId) || null;
 
   // facets her render’da yeni obje olmamalı — [facets] deps ile aksi halde max update depth.
   // Yeni facet anahtarı geldiğinde açık/kapalı için filters’ı ref’ten oku (deps’e gerek yok).
@@ -645,12 +702,16 @@ export default function BrandPage() {
   }, [panelOpen]);
 
   useEffect(() => {
-    if (!panelOpen || !hasFacets) return;
-    const keys = Object.keys(facets);
-    if (keys.length > 0 && (!activeMobileFilterGroup || !facets[activeMobileFilterGroup])) {
-      setActiveMobileFilterGroup(keys[0]);
+    if (!panelOpen || !useFilterDrawerLayout) return;
+    if (hasCategories && !hasFacets) {
+      setActiveMobileFilterGroup(MOBILE_CATEGORIES_KEY);
+      return;
     }
-  }, [panelOpen, facets, hasFacets, activeMobileFilterGroup]);
+    const keys = Object.keys(facets);
+    if (keys.length > 0 && (!activeMobileFilterGroup || (activeMobileFilterGroup !== MOBILE_CATEGORIES_KEY && !facets[activeMobileFilterGroup]))) {
+      setActiveMobileFilterGroup(hasCategories ? MOBILE_CATEGORIES_KEY : keys[0]);
+    }
+  }, [panelOpen, facets, hasFacets, hasCategories, useFilterDrawerLayout, activeMobileFilterGroup]);
 
   const toggle = (key, val) => {
     setFilters((prev) => {
@@ -666,7 +727,21 @@ export default function BrandPage() {
     setPage(1);
   };
 
+  const selectCategory = (categoryId) => {
+    setActiveCategoryId((prev) => (prev === categoryId ? null : categoryId));
+    setPage(1);
+  };
+
+  const clearAll = () => {
+    setFilters({});
+    setActiveCategoryId(null);
+    setPage(1);
+  };
+
   let filtered = filterProductsByFacets(products, filters);
+  if (activeCategoryId) {
+    filtered = filtered.filter((product) => productCategoryIds(product).has(activeCategoryId));
+  }
   const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
 
   const total      = sorted.length;
@@ -674,7 +749,7 @@ export default function BrandPage() {
   const curPage    = Math.min(page, totalPages);
   const paginated  = sorted.slice((curPage - 1) * PER_PAGE, curPage * PER_PAGE);
 
-  const activeCount = Object.values(filters).reduce((n, v) => n + (v?.length || 0), 0);
+  const activeCount = Object.values(filters).reduce((n, v) => n + (v?.length || 0), 0) + (activeCategoryId ? 1 : 0);
 
   const title     = brand?.name ?? handle ?? "";
   const bannerUrl = brand?.banner_image ? resolveImageUrl(brand.banner_image) : "";
@@ -773,7 +848,7 @@ export default function BrandPage() {
                   <circle cx="11" cy="6"  r="1.5" fill="#111" stroke="none"/>
                   <circle cx="5"  cy="10" r="1.5" fill="#111" stroke="none"/>
                 </svg>
-                Filter {activeCount > 0 ? `(${activeCount})` : ""}
+                {hasCategories && !hasFacets ? tCommon("categories") : tCommon("filter")}{activeCount > 0 ? ` (${activeCount})` : ""}
               </FilterBtn>
             )}
 
@@ -803,55 +878,78 @@ export default function BrandPage() {
             <CatalogDrawerPortal>
               <>
                 <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />
-                <SidebarCol $open={panelOpen} $filterMode={hasFacets}>
-              <SidebarHead $filterMode={hasFacets}>
+                <SidebarCol $open={panelOpen} $filterMode={useFilterDrawerLayout}>
+              <SidebarHead $filterMode={useFilterDrawerLayout}>
                 <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  Filter{activeCount > 0 ? ` (${activeCount})` : ""}
+                  {hasCategories && !hasFacets ? tCommon("categories") : tCommon("filter")}{activeCount > 0 ? ` (${activeCount})` : ""}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "2px 8px", fontSize: 10 }}>
-                      Löschen
+                    <ClearAllBtn type="button" onClick={clearAll} style={{ padding: "2px 8px", fontSize: 10 }}>
+                      {tCommon("clear")}
                     </ClearAllBtn>
                   )}
-                  <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }} aria-label="Schließen">×</button>
+                  <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }} aria-label={tCommon("close")}>×</button>
                 </div>
               </SidebarHead>
 
-              {/* Desktop: accordion layout */}
+              {/* Desktop: categories + accordion filters */}
               <DesktopSidebarContent>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                    Filter
-                    {activeCount > 0 && (
-                      <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
-                        Clear
-                      </ClearAllBtn>
-                    )}
-                  </div>
-                  {Object.entries(facets).map(([key, vals]) => (
-                    <FilterGroup key={key}>
-                      <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                        <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
-                        <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
-                      </FilterGroupTitle>
-                      <FilterGroupBody $open={!!openFilterGroups[key]}>
-                        {vals.map((val) => {
-                          const on = (filters[key] || []).includes(val);
-                          const label = formatFacetOptionLabel(key, val, categorySlugToName);
-                          return (
-                            <CheckRow key={val} $on={on}>
-                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
-                              {label}
-                            </CheckRow>
-                          );
-                        })}
-                      </FilterGroupBody>
-                    </FilterGroup>
-                  ))}
+                  {hasCategories && (
+                    <CategoryNavGroup>
+                      <CategoryNavTitle>{tCommon("categories")}</CategoryNavTitle>
+                      <CategoryNavBtn type="button" $active={!activeCategoryId} onClick={() => { setActiveCategoryId(null); setPage(1); }}>
+                        {tCommon("allProducts")}
+                      </CategoryNavBtn>
+                      {brandCategories.map((entry) => (
+                        <CategoryNavBtn
+                          key={entry.id}
+                          type="button"
+                          $active={activeCategoryId === entry.id}
+                          onClick={() => selectCategory(entry.id)}
+                        >
+                          {entry.name}
+                          <span style={{ float: "right", color: "#9ca3af", fontWeight: 400, fontSize: 11 }}>{entry.count}</span>
+                        </CategoryNavBtn>
+                      ))}
+                    </CategoryNavGroup>
+                  )}
+                  {hasFacets && (
+                    <>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
+                        {tCommon("filter")}
+                        {activeCount > 0 && (
+                          <ClearAllBtn type="button" onClick={clearAll} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
+                            {tCommon("clear")}
+                          </ClearAllBtn>
+                        )}
+                      </div>
+                      {Object.entries(facets).map(([key, vals]) => (
+                        <FilterGroup key={key}>
+                          <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                            <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                            <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                          </FilterGroupTitle>
+                          <FilterGroupBody $open={!!openFilterGroups[key]}>
+                            {vals.map((val) => {
+                              const on = (filters[key] || []).includes(val);
+                              const label = formatFacetOptionLabel(key, val, categorySlugToName);
+                              return (
+                                <CheckRow key={val} $on={on}>
+                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
+                                  {label}
+                                </CheckRow>
+                              );
+                            })}
+                          </FilterGroupBody>
+                        </FilterGroup>
+                      ))}
+                    </>
+                  )}
                   {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>
-                      Clear all filters
+                    <ClearAllBtn type="button" onClick={() => { clearAll(); setPanelOpen(false); }}>
+                      {tCommon("clearAllFilters")}
                     </ClearAllBtn>
                   )}
                 </div>
@@ -860,6 +958,16 @@ export default function BrandPage() {
               {/* Mobile: two-panel layout */}
               <MobileFilterSplit>
                 <MobileFilterLeft>
+                  {hasCategories && (
+                    <MobileFilterLeftBtn
+                      type="button"
+                      $active={activeMobileFilterGroup === MOBILE_CATEGORIES_KEY}
+                      onClick={() => setActiveMobileFilterGroup(MOBILE_CATEGORIES_KEY)}
+                    >
+                      {tCommon("categories")}
+                      {activeCategoryId && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>1</span>}
+                    </MobileFilterLeftBtn>
+                  )}
                   {Object.entries(facets).map(([key]) => {
                     const cnt = (filters[key] || []).length;
                     return (
@@ -871,7 +979,23 @@ export default function BrandPage() {
                   })}
                 </MobileFilterLeft>
                 <MobileFilterRight>
-                  {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
+                  {activeMobileFilterGroup === MOBILE_CATEGORIES_KEY && hasCategories ? (
+                    <MobileFilterPillGrid>
+                      <MobileFilterPill type="button" $on={!activeCategoryId} onClick={() => { setActiveCategoryId(null); setPage(1); }}>
+                        {tCommon("allProducts")}
+                      </MobileFilterPill>
+                      {brandCategories.map((entry) => (
+                        <MobileFilterPill
+                          key={entry.id}
+                          type="button"
+                          $on={activeCategoryId === entry.id}
+                          onClick={() => selectCategory(entry.id)}
+                        >
+                          {entry.name}
+                        </MobileFilterPill>
+                      ))}
+                    </MobileFilterPillGrid>
+                  ) : activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
                     <MobileFilterPillGrid>
                       {facets[activeMobileFilterGroup].map((val) => {
                         const on = (filters[activeMobileFilterGroup] || []).includes(val);
@@ -883,7 +1007,7 @@ export default function BrandPage() {
                       })}
                     </MobileFilterPillGrid>
                   ) : (
-                    <div style={{ color: "#aaa", fontSize: 12 }}>Wähle einen Filter</div>
+                    <div style={{ color: "#aaa", fontSize: 12 }}>{tCommon("filterSelectHint")}</div>
                   )}
                 </MobileFilterRight>
               </MobileFilterSplit>
@@ -895,6 +1019,11 @@ export default function BrandPage() {
           <MainCol>
             {activeCount > 0 && (
               <ChipBar>
+                {activeCategory && (
+                  <Chip type="button" onClick={() => selectCategory(activeCategory.id)}>
+                    {activeCategory.name} ×
+                  </Chip>
+                )}
                 {Object.entries(filters).flatMap(([k, vals]) =>
                   (vals || []).map((v) => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>

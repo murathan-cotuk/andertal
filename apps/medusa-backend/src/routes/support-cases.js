@@ -479,7 +479,12 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
          ORDER BY c.updated_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
         params,
       )
-      const legacy = page === 1 && !status && !category && !filter && !view
+      // Legacy store_messages stay visible in the new inbox (read-only). Include them on
+      // page 1 for open/unread/closed (and unfiltered) so customers don't lose history.
+      const includeLegacy = page === 1 && !category && !filter
+        && (!status || status === 'closed')
+        && (!view || view === 'open' || view === 'unread')
+      const legacy = includeLegacy
         ? await client.query(
           `SELECT m.id, m.order_id, m.subject, m.body, m.created_at, m.seller_id,
                   m.sender_type, m.is_read_by_customer, o_legacy.order_number,
@@ -490,45 +495,159 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
             WHERE (lower(m.sender_email) = lower($1) OR lower(m.recipient_email) = lower($1)
               OR EXISTS (SELECT 1 FROM store_orders o WHERE o.id = m.order_id
                 AND (($2::uuid IS NOT NULL AND o.customer_id = $2::uuid) OR lower(o.email) = lower($1))))
-            ORDER BY m.created_at DESC LIMIT 10`,
+            ORDER BY m.created_at DESC LIMIT 200`,
           [actor.email, actor.customerId],
         )
         : { rows: [] }
-      return { rows: rows.rows, legacy: legacy.rows }
+      return { rows: rows.rows, legacy: legacy.rows, includeLegacyUnreadOnly: view === 'unread' }
     })
-    const legacyCases = result.legacy.map((row) => ({
-      id: `legacy-${row.id}`, case_number: `LEGACY-${String(row.id).slice(0, 8).toUpperCase()}`,
-      order_id: row.order_id, seller_id: row.seller_id, category: 'legacy', subcategory: 'message',
-      title: row.subject || normalizePlainText(row.body, 80), status: 'closed', created_at: row.created_at,
-      updated_at: row.created_at, last_message_at: row.created_at, legacy_read_only: true,
-      order_number: row.order_number == null ? null : Number(row.order_number),
-      seller_display_name: row.seller_display_name || 'Andertal Support',
-      items: [], item_thumbnails: [],
-      last_message: { id: row.id, body: row.body, preview: normalizePlainText(row.body, 180), sender_role: row.sender_type, created_at: row.created_at },
-      unread_count: row.sender_type === 'seller' && !row.is_read_by_customer ? 1 : 0,
-    }))
-    res.json({ cases: [...result.rows.map(inboxCase), ...legacyCases], page, limit, total: result.rows[0]?.total || 0, legacy_count: legacyCases.length })
+    const legacyByThread = new Map()
+    for (const row of result.legacy) {
+      const key = row.order_id || '__no_order__'
+      if (!legacyByThread.has(key)) legacyByThread.set(key, [])
+      legacyByThread.get(key).push(row)
+    }
+    const legacyCases = [...legacyByThread.entries()].map(([key, messages]) => {
+      const ordered = [...messages].sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+      const last = ordered[ordered.length - 1]
+      const first = ordered[0]
+      const unread = ordered.filter((m) => m.sender_type === 'seller' && !m.is_read_by_customer).length
+      if (result.includeLegacyUnreadOnly && unread < 1) return null
+      const orderId = key === '__no_order__' ? null : key
+      const id = orderId ? `legacy-order-${orderId}` : `legacy-none`
+      return {
+        id,
+        case_number: orderId
+          ? `LEGACY-${String(orderId).slice(0, 8).toUpperCase()}`
+          : 'LEGACY-GENERAL',
+        order_id: orderId,
+        seller_id: last?.seller_id || null,
+        category: 'legacy',
+        subcategory: 'message',
+        title: first?.subject || normalizePlainText(last?.body, 80) || 'Frühere Nachricht',
+        status: 'closed',
+        created_at: first?.created_at,
+        updated_at: last?.created_at,
+        last_message_at: last?.created_at,
+        legacy_read_only: true,
+        order_number: last?.order_number == null ? null : Number(last.order_number),
+        seller_display_name: last?.seller_display_name || 'Andertal Support',
+        items: [],
+        item_thumbnails: [],
+        last_message: {
+          id: last?.id,
+          body: last?.body,
+          preview: normalizePlainText(last?.body, 180),
+          sender_role: last?.sender_type,
+          created_at: last?.created_at,
+        },
+        unread_count: unread,
+      }
+    }).filter(Boolean)
+    const cases = [...result.rows.map(inboxCase), ...legacyCases].sort((a, b) =>
+      String(b.last_message_at || b.updated_at || "").localeCompare(String(a.last_message_at || a.updated_at || "")),
+    )
+    res.json({
+      cases,
+      page,
+      limit,
+      total: (result.rows[0]?.total || 0) + legacyCases.length,
+      legacy_count: legacyCases.length,
+    })
   }))
 
   router.get('/store/support/cases/:id', requireCustomer, asyncRoute(async (req, res) => {
     const actor = req.supportActor
     const id = String(req.params.id || '')
-    if (id.startsWith('legacy-') && UUID_RE.test(id.slice(7))) {
+    const legacyOwnership = `(lower(m.sender_email) = lower($2) OR lower(m.recipient_email) = lower($2)
+      OR EXISTS (SELECT 1 FROM store_orders o WHERE o.id = m.order_id
+        AND (($3::uuid IS NOT NULL AND o.customer_id = $3::uuid) OR lower(o.email) = lower($2))))`
+    if (id === 'legacy-none' || (id.startsWith('legacy-order-') && UUID_RE.test(id.slice(13))) || (id.startsWith('legacy-') && UUID_RE.test(id.slice(7)))) {
       const legacy = await withClient(async (client) => {
-        const result = await client.query(
-          `SELECT m.* FROM store_messages m
-            WHERE m.id = $1::uuid AND
-             (lower(m.sender_email) = lower($2) OR lower(m.recipient_email) = lower($2)
-              OR EXISTS (SELECT 1 FROM store_orders o WHERE o.id = m.order_id
-                AND (($3::uuid IS NOT NULL AND o.customer_id = $3::uuid) OR lower(o.email) = lower($2))))`,
+        if (id === 'legacy-none') {
+          return (await client.query(
+            `SELECT m.*, o_legacy.order_number, settings_legacy.store_name AS seller_display_name
+               FROM store_messages m
+               LEFT JOIN store_orders o_legacy ON o_legacy.id=m.order_id
+               LEFT JOIN admin_hub_seller_settings settings_legacy ON settings_legacy.seller_id=m.seller_id
+              WHERE m.order_id IS NULL AND ${legacyOwnership}
+              ORDER BY m.created_at ASC`,
+            [null, actor.email, actor.customerId],
+          )).rows
+        }
+        if (id.startsWith('legacy-order-')) {
+          return (await client.query(
+            `SELECT m.*, o_legacy.order_number, settings_legacy.store_name AS seller_display_name
+               FROM store_messages m
+               LEFT JOIN store_orders o_legacy ON o_legacy.id=m.order_id
+               LEFT JOIN admin_hub_seller_settings settings_legacy ON settings_legacy.seller_id=m.seller_id
+              WHERE m.order_id = $1::uuid AND ${legacyOwnership}
+              ORDER BY m.created_at ASC`,
+            [id.slice(13), actor.email, actor.customerId],
+          )).rows
+        }
+        const single = (await client.query(
+          `SELECT m.*, o_legacy.order_number, settings_legacy.store_name AS seller_display_name
+             FROM store_messages m
+             LEFT JOIN store_orders o_legacy ON o_legacy.id=m.order_id
+             LEFT JOIN admin_hub_seller_settings settings_legacy ON settings_legacy.seller_id=m.seller_id
+            WHERE m.id = $1::uuid AND ${legacyOwnership}`,
           [id.slice(7), actor.email, actor.customerId],
-        )
-        return result.rows[0]
+        )).rows
+        return single
       })
-      if (!legacy) return res.status(404).json({ message: 'Case not found' })
+      if (!legacy?.length) return res.status(404).json({ message: 'Case not found' })
+      const first = legacy[0]
+      const last = legacy[legacy.length - 1]
+      // Best-effort mark-read for seller→customer legacy messages (same ownership as list).
+      await withClient(async (client) => {
+        if (id.startsWith('legacy-order-')) {
+          await client.query(
+            `UPDATE store_messages m SET is_read_by_customer = true
+              WHERE m.order_id = $1::uuid AND m.sender_type = 'seller' AND ${legacyOwnership}`,
+            [id.slice(13), actor.email, actor.customerId],
+          )
+        } else if (id === 'legacy-none') {
+          await client.query(
+            `UPDATE store_messages m SET is_read_by_customer = true
+              WHERE m.order_id IS NULL AND m.sender_type = 'seller' AND ${legacyOwnership}`,
+            [null, actor.email, actor.customerId],
+          )
+        } else {
+          await client.query(
+            `UPDATE store_messages m SET is_read_by_customer = true
+              WHERE m.id = $1::uuid AND m.sender_type = 'seller' AND ${legacyOwnership}`,
+            [id.slice(7), actor.email, actor.customerId],
+          )
+        }
+      }).catch(() => {})
       return res.json({
-        case: { id, case_number: `LEGACY-${legacy.id.slice(0, 8).toUpperCase()}`, category: 'legacy', title: legacy.subject || 'Legacy message', status: 'closed', legacy_read_only: true },
-        items: [], messages: [{ id: legacy.id, sender_role: legacy.sender_type, body: legacy.body, created_at: legacy.created_at, attachments: [] }], events: [],
+        case: {
+          id,
+          case_number: first.order_id
+            ? `LEGACY-${String(first.order_id).slice(0, 8).toUpperCase()}`
+            : `LEGACY-${String(first.id).slice(0, 8).toUpperCase()}`,
+          category: 'legacy',
+          subcategory: 'message',
+          title: first.subject || 'Frühere Nachricht',
+          status: 'closed',
+          legacy_read_only: true,
+          order_id: first.order_id || null,
+          order_number: first.order_number == null ? null : Number(first.order_number),
+          seller_display_name: first.seller_display_name || last.seller_display_name || 'Andertal Support',
+          created_at: first.created_at,
+          updated_at: last.created_at,
+          last_message_at: last.created_at,
+        },
+        items: [],
+        messages: legacy.map((row) => ({
+          id: row.id,
+          sender_role: row.sender_type,
+          body: row.body,
+          created_at: row.created_at,
+          attachments: [],
+        })),
+        events: [],
       })
     }
     if (!UUID_RE.test(id)) return res.status(404).json({ message: 'Case not found' })

@@ -8,6 +8,7 @@ import { useMedusaAuth } from "@/hooks/useMedusaAuth";
 import { useCustomerAuth as useAuth, useAuthGuard } from "@andertal/lib";
 import { tokens } from "@/design-system/tokens";
 import { resolveImageUrl } from "@/lib/image-url";
+import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import { DEFAULT_CURRENCY, marketPrefix, parseMarketPath } from "@/lib/shop-market";
 
 /* ── Monkey SVG (password‑blind feature) ─────────────────── */
@@ -93,12 +94,12 @@ export default function LoginPage() {
       .then((d) => {
         if (cancelled) return;
         setBranding({
-          logo: resolveImageUrl(d?.shop_logo_url || d?.sellercentral_logo_url || ""),
-          favicon: resolveImageUrl(d?.shop_favicon_url || d?.sellercentral_favicon_url || ""),
+          logo: resolveImageUrl(d?.shop_logo_url || ""),
+          favicon: resolveImageUrl(d?.shop_favicon_url || ""),
           logoHeight:
             d?.shop_logo_height != null
               ? Number(d.shop_logo_height)
-              : (d?.sellercentral_logo_height != null ? Number(d.sellercentral_logo_height) : 34),
+              : 34,
         });
       })
       .catch(() => {});
@@ -106,20 +107,7 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    const fav = (branding.favicon || "").trim();
-    if (!fav || typeof document === "undefined") return;
-    const upsert = (rel) => {
-      let link = document.querySelector(`link[rel='${rel}']`);
-      if (!link) {
-        link = document.createElement("link");
-        link.setAttribute("rel", rel);
-        document.head.appendChild(link);
-      }
-      link.setAttribute("href", fav);
-      link.setAttribute("type", "image/x-icon");
-    };
-    upsert("icon");
-    upsert("shortcut icon");
+    applyDocumentFavicon("/api/brand-favicon");
   }, [branding.favicon]);
 
   useEffect(() => {

@@ -313,6 +313,9 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
         const vImages = Array.isArray(vMeta.media)
           ? vMeta.media.map((u) => resolveUploadUrl(u)).filter(Boolean)
           : []
+        // Prefer explicit cover image first when gallery media is empty.
+        const coverUrl = resolveUploadUrl(v.image_url || v.image || null)
+        if (coverUrl && !vImages.includes(coverUrl)) vImages.unshift(coverUrl)
         const translations = vMeta.translations && typeof vMeta.translations === 'object'
           ? Object.fromEntries(
               Object.entries(vMeta.translations).map(([loc, tr]) => {
@@ -336,7 +339,7 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
           inventory_quantity: parseInt(v.inventory, 10) || 0,
           option_values: optionValues,
           option_labels: optionLabels,
-          image_url: resolveUploadUrl(v.image_url || v.image || null) || null,
+          image_url: coverUrl || null,
           swatch_image_url: resolveUploadUrl(v.swatch_image_url || v.swatch_image || null) || null,
           image_urls,
           images: vImages,

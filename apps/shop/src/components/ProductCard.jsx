@@ -9,7 +9,7 @@ import { formatPriceCents, getLocalizedProduct, htmlToText } from "@/lib/format"
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { colorSwatchFallback } from "@/lib/color-swatch";
-import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale } from "@/lib/product-locale-media";
+import { resolveProductListingImage, resolveProductListingImageSecondary } from "@/lib/product-locale-media";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
@@ -30,7 +30,11 @@ import styled, { css } from "styled-components";
  * ─────────────────────────────────────────────────────────── */
 function resolveImg(src) {
   if (!src) return null;
-  return resolveImageUrl(src);
+  if (typeof src === "object") {
+    const nested = src.url ?? src.src ?? src.path ?? "";
+    return nested ? resolveImageUrl(String(nested)) : null;
+  }
+  return resolveImageUrl(src) || null;
 }
 
 /* ─────────────────────────────────────────────────────────── *
@@ -494,21 +498,10 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
 
   const variant = normalizedVariants[effectiveIdx] ?? normalizedVariants[0] ?? variants[0];
 
-  const localeMedia = localizedProductMediaList(product, locale);
-  const variantMedia = variant ? variantMediaForLocale(variant, locale) : [];
-  /* Resolve primary and second image (hover) */
-  const rawImg =
-    variantImageUrlForLocale(variant, locale) ||
-    variantMedia[0] ||
-    product.images?.[0]?.url ||
-    product.thumbnail ||
-    localeMedia[0] ||
-    null;
+  /* Cover: selected/first child image; if that child has none, walk other children, then parent. */
+  const rawImg = resolveProductListingImage(product, locale, variant);
   const imgSrc = resolveImg(rawImg);
-  const rawImg2 =
-    variantMedia[1] ||
-    product.images?.[1]?.url ||
-    (localeMedia[1] ? localeMedia[1] : null);
+  const rawImg2 = resolveProductListingImageSecondary(product, locale, variant);
   const imgSrc2 = resolveImg(rawImg2);
 
   /* Price — single EUR list price; VAT/shipping vary by market */
@@ -982,8 +975,7 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
   const cartTimers = useRef({ hide: null, clear: null });
 
-  const localeMedia = localizedProductMediaList(product, locale);
-  const rawImg = variantImageUrlForLocale(variant, locale) || product.images?.[0]?.url || product.thumbnail || localeMedia[0] || null;
+  const rawImg = resolveProductListingImage(product, locale, variant);
   const imgSrc = resolveImg(rawImg);
 
   const variantCountryPrice = (() => {
