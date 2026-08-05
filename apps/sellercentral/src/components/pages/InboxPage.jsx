@@ -1312,9 +1312,8 @@ export default function InboxPage() {
   }, [client]);
 
   const tabs = [
-    { id: "cases", content: caseText.title },
-    { id: "customer-legacy", content: caseText.legacyCustomers },
-    { id: "support-legacy", content: caseText.legacySupport },
+    { id: "cases", content: caseText.customersTab || caseText.title },
+    { id: "support", content: caseText.supportTab || caseText.legacySupport },
   ];
 
   return (
@@ -1327,23 +1326,13 @@ export default function InboxPage() {
           <SupportCaseInbox client={client} isSuperuser={isSuperuser} sellerOptions={sellerOptions} />
         )}
         {activeTab === 1 && (
-          <>
-            <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 8, background: "var(--p-color-bg-surface-secondary)", color: "var(--p-color-text-subdued)" }}>{caseText.legacyNotice}</div>
-            <CustomerInbox client={client} isSuperuser={isSuperuser} sellerNames={sellerNames} readOnly />
-          </>
-        )}
-        {activeTab === 2 && (
-          <>
-          <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 8, background: "var(--p-color-bg-surface-secondary)", color: "var(--p-color-text-subdued)" }}>{caseText.legacyNotice}</div>
           <SupportInbox
             client={client}
             isSuperuser={isSuperuser}
             mySellerID={mySellerID}
             sellerNames={sellerNames}
             sellerUserIds={sellerUserIds}
-            readOnly
           />
-          </>
         )}
       </div>
     </Page>

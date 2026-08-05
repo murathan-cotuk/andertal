@@ -855,6 +855,7 @@
     "send": "Gönder",
     "sending": "Gönderiliyor…",
     "inactiveReply": "Replies are only available while the case is active.",
+    "reopenByReplyHint": "Yeni bir mesaj bu vakayı yeniden açar.",
     "closeModal": {
       "title": "Close this case?",
       "description": "You will no longer be able to reply unless you reopen the case.",

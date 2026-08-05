@@ -830,7 +830,22 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
       try {
         const row = (await client.query('SELECT * FROM support_cases WHERE id = $1::uuid FOR UPDATE', [id])).rows[0]
         if (!canAccessCase(actor, row)) throw Object.assign(new Error('Case not found'), { status: 404 })
-        if (TERMINAL_STATUSES.has(row.status)) throw Object.assign(new Error('Closed cases cannot receive messages'), { status: 409, code: 'CASE_CLOSED' })
+        // Sending a message on a closed/resolved case reopens it (within archive window).
+        if (TERMINAL_STATUSES.has(row.status)) {
+          const reopenTo = transitionFor(actor.role, 'reopen', row.status)
+          if (!reopenTo) throw Object.assign(new Error('Closed cases cannot receive messages'), { status: 409, code: 'CASE_CLOSED' })
+          if (row.auto_archive_at && new Date(row.auto_archive_at) <= new Date()) {
+            throw Object.assign(new Error('Reopen window expired'), { status: 409, code: 'REOPEN_WINDOW_EXPIRED' })
+          }
+          const reopened = (await client.query(
+            `UPDATE support_cases SET status=$2, updated_at=now(), closed_at=NULL, reopened_at=now(),
+               customer_hidden_at=NULL, auto_archive_at=NULL
+             WHERE id=$1::uuid RETURNING *`,
+            [id, reopenTo],
+          )).rows[0]
+          await insertEvent(client, id, 'case_reopened', actor, { from: row.status, to: reopenTo, via: 'message' })
+          Object.assign(row, reopened)
+        }
         const attachments = await consumeAttachments(client, attachmentIds, actor, id)
         const inserted = (await client.query(
           `INSERT INTO support_case_messages

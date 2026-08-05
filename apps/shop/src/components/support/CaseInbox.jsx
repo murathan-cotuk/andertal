@@ -141,6 +141,8 @@ function CaseDetail({ detail, loading, error, onBack, onRefresh, onMutated, date
   const id = caseId(detail);
   const status = statusOf(detail);
   const readOnly = detail?.legacy_read_only === true || id.startsWith("legacy-");
+  // Closed/resolved cases stay replyable — sending a message reopens them on the backend.
+  const canReply = !readOnly && (ACTIVE_STATUSES.has(status) || status === "closed" || status === "resolved");
   const active = !readOnly && ACTIVE_STATUSES.has(status);
   const messages = Array.isArray(detail?.messages) ? detail.messages : [];
   const events = Array.isArray(detail?.timeline) ? detail.timeline : Array.isArray(detail?.events) ? detail.events : [];
@@ -266,14 +268,16 @@ function CaseDetail({ detail, loading, error, onBack, onRefresh, onMutated, date
         })}
         <div ref={bottomRef} />
       </div>
-      {readOnly ? <p className={styles.retentionNotice}>{t("legacyReadOnly")}</p> : status === "closed" && <p className={styles.retentionNotice}>{t("retentionNotice")}</p>}
+      {readOnly ? <p className={styles.retentionNotice}>{t("legacyReadOnly")}</p> : null}
       <div className={styles.caseActions}>
         {active && <button type="button" onClick={() => setConfirmClose(true)} disabled={busy}>{t("closeCase")}</button>}
-        {!readOnly && (status === "closed" || status === "resolved") && <button type="button" onClick={() => mutate("reopen")} disabled={busy}>{t("reopenCase")}</button>}
         {!readOnly && (status === "closed" || status === "resolved") && <button type="button" onClick={() => mutate("hide")} disabled={busy}>{t("hideCase")}</button>}
       </div>
-      {active ? (
+      {canReply ? (
         <div className={styles.replyBox}>
+          {(status === "closed" || status === "resolved") && (
+            <p className={styles.retentionNotice} style={{ marginTop: 0 }}>{t.has("reopenByReplyHint") ? t("reopenByReplyHint") : "Sending a reply reopens this case."}</p>
+          )}
           <label htmlFor="case-reply">{t("replyLabel")}</label>
           <textarea id="case-reply" rows={4} value={reply} onChange={(event) => setReply(event.target.value)} placeholder={t("replyPlaceholder")} />
           <div className={styles.replyTools}>
@@ -297,7 +301,7 @@ function CaseDetail({ detail, loading, error, onBack, onRefresh, onMutated, date
   );
 }
 
-export default function CaseInbox() {
+export default function CaseInbox({ embedded = false }) {
   const t = useTranslations("caseInbox");
   const locale = useLocale();
   const searchParams = useSearchParams();
@@ -414,7 +418,7 @@ export default function CaseInbox() {
   };
 
   return (
-    <div className={`${styles.inbox} ${selectedId ? styles.hasSelection : ""}`}>
+    <div className={`${styles.inbox} ${embedded ? styles.embedded : ""} ${selectedId ? styles.hasSelection : ""}`}>
       <aside className={styles.sidebar} aria-label={t("caseListLabel")}>
         <div className={styles.sidebarHeader}><div><h1>{t("title")}</h1><p>{t("subtitle")}</p></div><button type="button" className={styles.iconButton} onClick={refresh} aria-label={t("refresh")}>↻</button></div>
         <div className={styles.filters} role="group" aria-label={t("filterLabel")}>

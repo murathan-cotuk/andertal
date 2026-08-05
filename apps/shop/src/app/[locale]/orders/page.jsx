@@ -454,10 +454,11 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
 
   const [showRetoure, setShowRetoure] = useState(false);
   const [showMessage, setShowMessage] = useState(false);
+  const [messageStep, setMessageStep] = useState("pick"); // pick | compose
   const [retoureReason, setRetoureReason] = useState(RETOURE_REASONS[0]);
   const [retoureNotes, setRetoureNotes] = useState("");
   const [messageBody, setMessageBody] = useState("");
-  const [selectedItemId, setSelectedItemId] = useState(items.length === 1 ? String(items[0]?.id || "") : "");
+  const [selectedItemId, setSelectedItemId] = useState("");
   const [busy, setBusy] = useState(null);
   const [actionErr, setActionErr] = useState(null);
   const [actionOk, setActionOk] = useState(null);
@@ -468,6 +469,20 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
   }
 
   const token = () => getToken("customer");
+  const openMessageFlow = () => {
+    setShowRetoure(false);
+    setShowMessage(true);
+    setMessageBody("");
+    setActionErr(null);
+    if (items.length === 1 && items[0]?.id) {
+      setSelectedItemId(String(items[0].id));
+      setMessageStep("compose");
+    } else {
+      setSelectedItemId("");
+      setMessageStep("pick");
+    }
+  };
+  const selectedMessageItem = items.find((it) => String(it.id || "") === String(selectedItemId || "")) || null;
 
   /* thumbnail strip for collapsed view */
   const thumbs = items.slice(0, 3).filter(it => it.thumbnail);
@@ -652,7 +667,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
             {/* Nachricht */}
             <ActionBtn
               color={T.gray1} bg="#f9fafb"
-              onClick={e => { e.stopPropagation(); setShowMessage(v => !v); setShowRetoure(false); }}
+              onClick={e => { e.stopPropagation(); openMessageFlow(); }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -758,76 +773,139 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
             </div>
           )}
 
-          {/* Message form → support case → /nachrichten */}
+          {/* Message form: 1) Produkt wählen → 2) Nachricht → Support-Fall */}
           {showMessage && (
             <div style={{ margin: "0 18px 16px", background: "#f8fafc", border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px", fontFamily: T.font }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 12 }}>Nachricht senden</div>
-              {items.length > 1 && (
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 12 }}>
+                {messageStep === "pick" ? "Produkt wählen" : "Nachricht senden"}
+              </div>
+
+              {messageStep === "pick" && (
                 <>
-                  <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Produkt</label>
-                  <select
-                    value={selectedItemId}
-                    onChange={(e) => setSelectedItemId(e.target.value)}
-                    style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, background: "#fff", marginBottom: 10, fontFamily: T.font }}
+                  <p style={{ fontSize: 12.5, color: T.gray1, margin: "0 0 10px" }}>
+                    Wählen Sie zuerst das Produkt, zu dem Ihre Nachricht gehört.
+                  </p>
+                  {items.length === 0 && (
+                    <p style={{ fontSize: 12.5, color: "#b91c1c" }}>Keine Produkte in dieser Bestellung gefunden.</p>
+                  )}
+                  {items.map((it) => (
+                    <button
+                      key={it.id || it.product_id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!it.id) return;
+                        setSelectedItemId(String(it.id));
+                        setMessageStep("compose");
+                      }}
+                      disabled={!it.id}
+                      style={{
+                        width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 8px",
+                        border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 8, background: "#fff",
+                        cursor: it.id ? "pointer" : "not-allowed", opacity: it.id ? 1 : 0.5, textAlign: "left",
+                        fontFamily: T.font,
+                      }}
+                    >
+                      <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3f4f6" }}>
+                        {it.thumbnail ? (
+                          <img src={resolveImageUrl(it.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                        ) : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {it.title || it.product_title || "Produkt"}
+                        </div>
+                        <div style={{ fontSize: 11, color: T.gray3 }}>× {it.quantity}</div>
+                      </div>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); setShowMessage(false); }}
+                    style={{ fontSize: 13, color: T.gray2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", fontFamily: T.font }}
                   >
-                    <option value="">Bitte wählen…</option>
-                    {items.map((it) => (
-                      <option key={it.id} value={String(it.id || "")}>{it.title || it.product_title || it.id}</option>
-                    ))}
-                  </select>
+                    Abbrechen
+                  </button>
                 </>
               )}
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Nachricht</label>
-              <textarea
-                value={messageBody}
-                onChange={e => setMessageBody(e.target.value)}
-                rows={4}
-                placeholder={`Ihre Frage zur Bestellung #${orderNum}…`}
-                style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, resize: "vertical", fontFamily: T.font, boxSizing: "border-box", marginBottom: 10 }}
-              />
-              <div style={{ fontSize: 12, color: T.gray2, marginBottom: 10 }}>
-                Die Nachricht wird als Support-Fall angelegt und unter Nachrichten fortgesetzt.
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (!messageBody.trim()) return;
-                    const itemId = selectedItemId || String(items[0]?.id || "");
-                    if (!itemId) return;
-                    withBusy("message", async () => {
-                      const res = await createOrderSupportCase({
-                        orderId: order.id,
-                        itemIds: [itemId],
-                        title: `Anfrage zu Bestellung #${orderNum}`,
-                        description: messageBody.trim(),
-                        locale,
-                        category: "seller",
-                        subcategory: "message",
-                      });
-                      if (res?.__error) throw new Error(res.message || "Fehler");
-                      const caseId = primaryCaseIdFromCreate(res);
-                      setShowMessage(false);
-                      setMessageBody("");
-                      router.push(caseId ? `/nachrichten?case=${encodeURIComponent(caseId)}` : "/nachrichten");
-                    });
-                  }}
-                  disabled={busy === "message" || !messageBody.trim() || (items.length > 1 && !selectedItemId)}
-                  style={{
-                    fontSize: 13, fontWeight: 700, color: "#fff", background: T.dark,
-                    border: "none", borderRadius: 8, padding: "8px 18px", cursor: "pointer",
-                    fontFamily: T.font, opacity: (!messageBody.trim() || busy === "message" || (items.length > 1 && !selectedItemId)) ? 0.5 : 1,
-                  }}
-                >
-                  {busy === "message" ? "Wird gesendet…" : "Absenden"}
-                </button>
-                <button
-                  onClick={e => { e.stopPropagation(); setShowMessage(false); }}
-                  style={{ fontSize: 13, color: T.gray2, background: "none", border: "none", cursor: "pointer", padding: "8px", fontFamily: T.font }}
-                >
-                  Abbrechen
-                </button>
-              </div>
+
+              {messageStep === "compose" && (
+                <>
+                  {selectedMessageItem && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, background: "#fff", marginBottom: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 6, overflow: "hidden", background: "#f3f4f6", flexShrink: 0 }}>
+                        {selectedMessageItem.thumbnail ? (
+                          <img src={resolveImageUrl(selectedMessageItem.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        ) : null}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {selectedMessageItem.title || selectedMessageItem.product_title || "Produkt"}
+                      </div>
+                      {items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setMessageStep("pick"); setMessageBody(""); }}
+                          style={{ background: "none", border: "none", color: T.orange, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.font }}
+                        >
+                          Ändern
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Nachricht</label>
+                  <textarea
+                    value={messageBody}
+                    onChange={e => setMessageBody(e.target.value)}
+                    rows={4}
+                    placeholder={`Ihre Frage zur Bestellung #${orderNum}…`}
+                    style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, resize: "vertical", fontFamily: T.font, boxSizing: "border-box", marginBottom: 10 }}
+                  />
+                  <div style={{ fontSize: 12, color: T.gray2, marginBottom: 10 }}>
+                    Die Nachricht wird als Support-Fall angelegt und unter Nachrichten fortgesetzt.
+                  </div>
+                  {actionErr && <div style={{ fontSize: 12, color: "#b91c1c", marginBottom: 8 }}>{actionErr}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!messageBody.trim() || !selectedItemId) return;
+                        withBusy("message", async () => {
+                          const res = await createOrderSupportCase({
+                            orderId: order.id,
+                            itemIds: [selectedItemId],
+                            title: `Anfrage zu Bestellung #${orderNum}`,
+                            description: messageBody.trim(),
+                            locale,
+                            category: "seller",
+                            subcategory: "message",
+                          });
+                          if (res?.__error) throw new Error(res.message || "Fehler");
+                          const caseId = primaryCaseIdFromCreate(res);
+                          setShowMessage(false);
+                          setMessageBody("");
+                          router.push(caseId ? `/nachrichten?case=${encodeURIComponent(caseId)}` : "/nachrichten");
+                        });
+                      }}
+                      disabled={busy === "message" || !messageBody.trim() || !selectedItemId}
+                      style={{
+                        fontSize: 13, fontWeight: 700, color: "#fff", background: T.dark,
+                        border: "none", borderRadius: 8, padding: "8px 18px", cursor: "pointer",
+                        fontFamily: T.font, opacity: (!messageBody.trim() || busy === "message" || !selectedItemId) ? 0.5 : 1,
+                      }}
+                    >
+                      {busy === "message" ? "Wird gesendet…" : "Absenden"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); setShowMessage(false); }}
+                      style={{ fontSize: 13, color: T.gray2, background: "none", border: "none", cursor: "pointer", padding: "8px", fontFamily: T.font }}
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

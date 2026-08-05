@@ -204,7 +204,7 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
   };
 
   const sendReply = async () => {
-    if (!selectedId || !reply.trim() || TERMINAL.has(detail?.case?.status)) return;
+    if (!selectedId || !reply.trim()) return;
     setBusy(true);
     setError("");
     try {
@@ -421,9 +421,26 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
                 </details>
               )}
               {terminal ? (
-                <div className={styles.locked}>
-                  <p>{text.conversationLocked}</p>
-                  <button type="button" className={styles.primaryButton} onClick={reopenCase} disabled={busy}>{text.reopenCase}</button>
+                <div className={styles.composer}>
+                  <p className={styles.locked} style={{ marginBottom: 10 }}>{text.reopenByReplyHint || text.conversationLocked}</p>
+                  <label htmlFor="support-case-reply">{text.reply}</label>
+                  <textarea id="support-case-reply" value={reply} onChange={(event) => setReply(event.target.value)} maxLength={10000} placeholder={text.replyPlaceholder} />
+                  <div className={styles.attachments}>
+                    <label className={styles.fileLabel}>
+                      {text.addFiles}
+                      <input className={styles.fileInput} type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" multiple onChange={(event) => { handleFiles(event.target.files); event.target.value = ""; }} />
+                    </label>
+                    {files.map((file, index) => (
+                      <span key={`${file.name}-${file.lastModified}`} className={styles.fileChip}>
+                        {file.name}<button type="button" onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} aria-label={`${text.remove} ${file.name}`}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className={styles.fileRules}>{text.fileRules}</div>
+                  <div className={styles.actions} style={{ marginTop: 10 }}>
+                    <button type="button" className={styles.primaryButton} onClick={sendReply} disabled={busy || !reply.trim()}>{text.send}</button>
+                    <button type="button" className={styles.secondaryButton} onClick={reopenCase} disabled={busy}>{text.reopenCase}</button>
+                  </div>
                 </div>
               ) : (
                 <div className={styles.composer}>

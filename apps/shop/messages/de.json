@@ -855,6 +855,7 @@
     "send": "Senden",
     "sending": "Wird gesendet…",
     "inactiveReply": "Antworten sind nur bei aktiven Fällen möglich.",
+    "reopenByReplyHint": "Eine neue Nachricht öffnet diesen Fall wieder.",
     "closeModal": {
       "title": "Diesen Fall schließen?",
       "description": "Sie können erst wieder antworten, nachdem Sie den Fall wiedereröffnet haben.",
@@ -865,7 +866,7 @@
       "unauthorized": "Bitte melden Sie sich erneut an.",
       "forbidden": "Sie haben keinen Zugriff auf diesen Fall.",
       "notFound": "Dieser Fall wurde nicht gefunden.",
-      "caseClosed": "Dieser Fall ist geschlossen und kann keine Antworten erhalten.",
+      "caseClosed": "Dieser Fall ist geschlossen. Eine neue Nachricht öffnet ihn wieder — außer das Archivfenster ist abgelaufen.",
       "fileValidation": "Verwenden Sie bis zu 5 JPEG-, PNG-, WebP- oder PDF-Dateien mit höchstens 10 MB je Datei.",
       "generic": "Etwas ist schiefgelaufen. Bitte aktualisieren Sie die Seite."
     },

@@ -838,6 +838,7 @@
     "send": "Invia",
     "sending": "Invio…",
     "inactiveReply": "Replies are only available while the case is active.",
+    "reopenByReplyHint": "Un nuovo messaggio riapre questo caso.",
     "closeModal": {
       "title": "Close this case?",
       "description": "You will no longer be able to reply unless you reopen the case.",

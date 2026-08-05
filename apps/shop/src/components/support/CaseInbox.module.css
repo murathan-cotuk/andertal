@@ -12,6 +12,13 @@
   box-shadow: 0 16px 50px rgb(20 38 58 / 8%);
 }
 
+.inbox.embedded {
+  width: 100%;
+  min-height: 620px;
+  margin: 0;
+  box-shadow: 0 8px 28px rgb(20 38 58 / 6%);
+}
+
 .sidebar {
   min-width: 0;
   border-right: 1px solid #e1e6ea;

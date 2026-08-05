@@ -838,6 +838,7 @@
     "send": "Enviar",
     "sending": "Enviando…",
     "inactiveReply": "Replies are only available while the case is active.",
+    "reopenByReplyHint": "Un nuevo mensaje reabre este caso.",
     "closeModal": {
       "title": "Close this case?",
       "description": "You will no longer be able to reply unless you reopen the case.",
