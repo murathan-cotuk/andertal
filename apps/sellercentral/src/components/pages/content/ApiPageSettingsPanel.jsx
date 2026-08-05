@@ -96,7 +96,6 @@ export default function ApiPageSettingsPanel({ slug, pageLabel }) {
       .catch((e) => { if (!cancelled) setError(e?.message || c.saveError); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const displayedTitle = editLang === "de" ? settings.title : gi(settings, "title", "title_i18n", editLang);
