@@ -1,142 +1,143 @@
-5) önceden nachrichten sayfasinin solunda diger konto menüleri görünmeye devam ederdi. übersicht, meine bestellungen, merkzettel vs. bu bar her konto iteminde gözüküyordu. mobilde de üstte slider olarak gözüküyordu. tasarimi komple degistirmissin güzel gözüküyor. ancak diger konto itemleri görünmeye devam etmeli. önceden mesajlasma sistemi kötü bile olsa calisiyordu. simdi ise müsteri mesaj yazamiyor, sellercentralde 3 tab var nachricten kisminda falan. ya zor degil aslinda. sellercentralde olusturdugum /customer-support sayfasini landing page e gidip yapacaksin. oradan müsteri support ticket acacak. orders altindaki nachricht butonuna basilinca ÜRÜN SECIP nachricht gönderilecek ancak bu da support ticket olacak. tüm bu support ticketler shopta müsterinin nachrichten menüsünde toplanacak. karman corman gözükmeyecek, solda side bar gözükecek. superuserda ise iki tab olacak. biri sellerdan gelen biri müsteriden gelen. bunlar eskisi gibi durabilir. cözüme kavusan ticketler gelöst denecek. bu kadar basit. sellerlarda da iki tab olacak. müsteri ve seller support. burasi da eskisi gibi kalabilir. bi case kapandiginda tekrar mesaj atilarak yeniden acilabilsin. mesela su anda kapanmis case lere mesaj yazilamiyoru.
-
-shopta orders sayfasinda nachricht e basip bir mesaj göndermek istedigimde su uyariyi aliyorum: product_id required — pick which product this message is about.
-yani burasi icin istedigim mesaj göndermeye bastiktan sonra ürünün secilmesi, sonrasinda mesajin gönderilmesiydi. bok gibi kurulmus. bu hatayi almamam gerekiyor. elden gecir
-
-6) sepete bi ürün ekledim ve sonra checkouta gittim. abandoned-checkouts sayfasinda gözüküyor bu. ancak flow tetiklenmedi ve abandoned checkout icin belirlenen süre sonrasinda emaili almadim.
-
-8) sellercentralde siparise versand diyorum. /versand sayfasi aciliyor verpackungszentrumda siparisin icindeki ürünleri scanlememi ya da ürünü arayip bulmami isteyen bi kutu oluyor. oraya a yazip hinzufügen diyorum kabul ediyor direkt. ne alaka abi? sepetteki satin alinan gercek ürünün secilmesi ya da scanlenmesi gerekiyor. ayrica siparisler icinde yalnizca o seller in sattigi ürünün gözükmesi gerekiyor. A isimli seller in aldigi siparisin icinde B sellerinin ürününün de gözükmesi cok sacma olur. hem baskalarinin ürünlerini görüp kafa karismamali, hem de tutar fazla olacagi icin fazla komisyon almis olur. sadece kendi sattigi ürün gözüksün siparislerin icinde ki hem komisyon alirken kendi komisyonu olsun, hem de ürün gönderirken sadece kendi ürünlerini scanleyebilsin. ayrica rastgele bisey yazip hinzufügen diyince reddetsin amk. ya ean yazilsin ya sku ya da ürün adiyla aransin. asagida da yazdikca dropdown seklinde secenekler acilsin es zamanli. 
-
-9) siparislerin saginda versenden ve etikett kaufen diye iki secenek var. böyle olmamali. yalnizca versenden almali. etikett kaufen e basildiginda icinde cikan fonksiyonlar da versenden e basildiginda ürünler scanlendikten sonraki adimda acilmali. yani lütfen adam akilli yap sunu iyice detayli analiz et incele. ayri ayri olmasi kafa karistirir. scanlenen ürünler sonrasi paket ölcüsü secimi, ölcülere göre sendcloudun gönderdigi fiyatlarin üstüne ekledigimiz bizim fiyatlar ile kargo paketi teklifleri gözükmeli. yalnizca dhl paket secenekleri gözükmeli simdilik. sonra satin alinabilmeli. tabii kendi kargo saglayicisi var ise onu entegre edebilir saticilar. orasi baska
+# Andertal — açık görevler
 
 ---
 
-# LIVE'A ÇIKIŞ PLANI
+## TASK-1 — Sipariş → Versand akışı (EKSİK / NETLEŞTİR)
 
-Amaç ilk aşamada kusursuz ve bütün özellikleri tamamlanmış bir marketplace kurmak değildir. Amaç, tek satıcıyla gerçek siparişlerin güvenli şekilde alınabildiği, gönderilebildiği, iptal/iade edilebildiği kontrollü bir pilot başlatmaktır. Aşağıdaki kapsam tamamlanana kadar yeni özellik eklenmeyecek.
+**Durum:** Kullanıcı notu yarım kaldı. Uygulamadan önce netleştir veya aşağıdaki varsayılan hipotezi doğrula.
 
-## BENİM YAPACAĞIM İŞLER
+**Ham not:**
+> sellercentralde bir siparise versand diyorum. shipping sayfasinda …
 
-1. İlk pilotta yalnızca anlaşmalı tek satıcının ürünlerini yayınlayacağım.
-2. İlk pilotu yalnızca Almanya pazarıyla sınırlayacağım.
-3. Satıcıdan şirket unvanı, adres, vergi numarası/USt-IdNr., IBAN, iade adresi, kargo yöntemi ve ürün verilerini eksiksiz alacağım.
-4. Satıcının ürün fiyatlarını, stoklarını, KDV durumunu, EAN/SKU bilgilerini ve kargo gruplarını kontrol edeceğim.
-5. Sendcloud'u şimdilik pasif tutacağım. Satıcı etiketi kendi DHL/Hermes/ERP sistemi üzerinden oluşturacak ve takip numarasını Sellercentral'a girecek.
-6. Bonus puan ve kuponları pilot boyunca kapalı tutacağım veya yalnızca muhasebe ve settlement hesapları doğrulandıktan sonra açacağım.
-7. Impressum, Datenschutzerklärung, AGB, Widerrufsbelehrung, satıcı sözleşmesi ve müşteri faturası metinlerini bir Alman e-ticaret/vergi uzmanına kontrol ettireceğim.
-8. Stripe canlı hesap, webhook, banka hesabı ve iade yetkilerini kontrol edeceğim.
-9. Gerçek düşük tutarlı en az üç sipariş vereceğim:
-   - normal ödeme, gönderim ve teslimat;
-   - müşteri iptali ve tam para iadesi;
-   - iade talebi ve refund.
-10. Her testte Shop, Sellercentral, Stripe, e-posta, stok, fatura, takip numarası ve payout tutarlarını karşılaştıracağım.
-11. Kod veya veritabanına elle müdahale etmeden üç test siparişi tamamlanmadan reklam vermeyeceğim.
-12. Testler başarılı olunca önce 5-10 kişilik kapalı pilot, ardından 10-20 gerçek siparişlik düşük trafikli soft launch yapacağım. Bundan sonra küçük reklam bütçesi açacağım.
+**Varsayılan hipotez (doğrulanmalı):**
+Sellercentral’da bir siparişe “Versand” denince sipariş `/orders/shipping` (Versand) sayfasında doğru görünmeli / işlenebilmeli. Şu an akış kopuk veya eksik olabilir (`sessionStorage` `versand_orders`, `VersandPage.jsx`, sipariş detayındaki Versand aksiyonu).
 
-## CLAUDE'UN KODDA YAPACAĞI İŞLER
+**Kabul kriterleri (hipotez doğruysa):**
+- [ ] Sipariş listesi veya detaydan Versand’a gönderilen sipariş(ler) Versand sayfasında listelenir.
+- [ ] Sayfa yenilense / başka sekmeden gelse beklenen davranış net ve tutarlıdır (gerekirse URL query veya backend state; kırılgan `sessionStorage`-only yetmezse düzelt).
+- [ ] Seller yalnızca kendi satır kalemlerini görür / gönderir (TASK-5 ile uyumlu).
 
-Claude önce mevcut davranışı okuyup doğrulayacak, sonra aşağıdaki sırayla çalışacak. Kapsam dışı refactor, tasarım yenilemesi veya yeni özellik eklemeyecek. Her madde için ilgili backend ve frontend testlerini çalıştıracak ve sonucu kısa şekilde raporlayacak.
+**İlgili dosyalar (başlangıç):**
+- `apps/sellercentral/src/components/pages/VersandPage.jsx`
+- Sipariş detay / listede Versand aksiyonunu tetikleyen bileşenler
+- `apps/sellercentral/src/lib/ship-*.js`
 
-### P0 — LIVE ÖNCESİ MUTLAKA TAMAMLANACAK
+**Not:** Kullanıcıdan eksik cümleyi tamamlatmadan büyük refactor yapma.
 
-1. Multi-seller sipariş ve ödeme sahipliğini tamamla:
-   - `store_orders.seller_id` her siparişte platformu (`default`) temsil etsin.
-   - Gerçek satıcı sahipliği `store_order_items.seller_id` üzerinden belirlensin.
-   - PaymentIntent hiçbir zaman sepetteki ilk satıcıya Destination Charge olarak yönlendirilmesin; tahsilat platform Stripe hesabında gerçekleşsin.
-   - Sipariş listesi, sipariş detayı, fulfillment, kargo, e-posta, payout, transaction ve yetki kontrollerinde `store_orders.seller_id` üzerinden satıcı sahipliği varsayımını kaldır.
+---
 
-2. Satıcı izolasyonunu doğrula:
-   - Satıcı yalnızca kendi ürün satırlarını, kendi ürün tutarını ve kendi gönderim işlerini görebilsin.
-   - Bir satıcı başka satıcının ürününü, cirosunu, müşteri dışı özel verisini veya gönderim işlemini göremesin/değiştiremesin.
-   - Sellercentral sipariş listesi, detay, ürün tarama, kargo ve PDF endpoint'lerini doğrudan API çağrılarıyla da yetki testine tabi tut.
+## TASK-2 — Speichern toast’ları viewport’ta sabit görünsün
 
-3. Para ve settlement hesabını tek kurala bağla:
-   - Satıcı baz tutarı yalnızca kendi ürün satırlarının toplamı olsun.
-   - Bonus puan ve superuser/platform kuponu tamamen platform tarafından finanse edilsin; satıcı netinden ve komisyon bazından düşülmesin.
-   - Satıcı tarafından oluşturulan kupon yalnızca o satıcının ürünlerine uygulansın ve maliyeti yalnızca o satıcının settlement hesabına yansısın.
-   - Komisyon, seller net, payout, transaction raporu ve commission invoice aynı hesaplama kaynağını kullansın.
-   - Yuvarlama kuruş bazında deterministik olsun; Stripe tahsilatı ile sipariş toplamı birebir eşleşsin.
+**Problem:**
+Sellercentral’da Speichern sonrası başarı/hata bildirimi sayfanın en üstünde (document top) çıkıyor. Kullanıcı sayfanın altındayken scroll etmeden toast’ı göremiyor.
 
-4. Fatura ve vergi belgelerini düzelt:
-   - Multi-seller siparişte müşteri için satıcı başına ayrı fatura üret.
-   - Her faturada yalnızca ilgili satıcının ürünleri, doğru satıcı unvanı/adresi/USt-IdNr. veya §19 bilgisi bulunsun.
-   - Platform bonusu/platform kuponu ile satıcı kuponunu belgede birbirinden ayır.
-   - Müşterinin ödemesi, faturalar, platform sübvansiyonu ve kargo toplamı matematiksel olarak uzlaşsın.
-   - Provisionsrechnung yalnızca ilgili satıcının gerçek komisyon bazına göre oluşsun.
-   - `%19` değerini her siparişe körlemesine uygulama; ürün/satıcı/vergi durumuna göre doğrulanmış veriyi kullan.
+**Hedef:**
+Toast / banner, sayfanın neresinde olursa olsun **viewport içinde** (ekranın üstünde veya görünür köşede) sabit görünsün.
 
-5. DAC7 ve raporlamayı satır bazlı yap:
-   - DAC7 satıcı cirosunu `store_orders.seller_id` ve tüm sipariş subtotal'ından hesaplama.
-   - İlgili satıcının order item tutarlarını ve satıcıya ait gerçek transaction sayısını kullan.
-   - Payout, dashboard, analytics ve export sonuçlarının aynı satış verileriyle tutarlı olduğunu test et.
+**Kabul kriterleri:**
+- [ ] Uzun bir ayar/içerik sayfasının en altına scroll edip Speichern → toast viewport’ta görünür; `window.scrollTo(0)` zorunlu olmasın.
+- [ ] Success ve error (critical) aynı davranır.
+- [ ] Polaris `Frame` / `Toast` kullanılıyorsa `position: fixed` / Frame toast slot’u doğru bağlanmış olsun; sayfa-içi absolute banner varsa fixed’e çek.
+- [ ] Mevcut toast metinleri ve süreleri bozulmasın.
 
-6. İptal, iade ve refund akışını doğrula:
-   - Tam ve kısmi iadede doğru satıcı kalemlerini, komisyonu, payout'u, stoku ve bonus ledger'ını tersine çevir.
-   - Stripe refund toplamı müşteriden tahsil edilen tutarı aşamasın.
-   - Aynı webhook veya buton işlemi iki kez geldiğinde çift refund, çift stok artışı veya çift bonus hareketi oluşmasın.
+**İlgili alanlar:**
+- `PolarisLayout.jsx` (`toastMarkup`, Frame)
+- Sayfa lokal toast’lar (ör. `FlowsPage`, settings sayfaları, `onToast` kullanan paneller)
+- Ortak bir toast helper varsa onu düzelt; yoksa tutarsız banner’ları Frame toast’a taşımayı tercih et.
 
-7. Sipariş oluşturma güvenliğini doğrula:
-   - Aynı Stripe webhook'u/checkout isteği iki kere işlense bile tek sipariş oluşsun.
-   - Ödeme tutarı güncel sepet, indirim ve kargoyla uyuşmuyorsa sipariş oluşturulmasın.
-   - Ödeme başarılı olup sipariş kaydı başarısız olursa tespit edilebilir bir recovery/log mekanizması olsun.
+---
 
-8. Fiyat ve stok güvenliğini doğrula:
-   - Checkout sırasında fiyatı frontend'den kabul etme; veritabanındaki güncel listing/variant fiyatını kullan.
-   - Stok yetersizse ödeme öncesi engelle.
-   - Başarılı siparişte stok bir kez düşsün; iptal/iade kuralına göre bir kez geri eklensin.
+## TASK-3 — Lieferschein şablonları = Rechnung şablonları seviyesi
 
-9. Kritik webhook ve e-posta akışlarını doğrula:
-   - Stripe webhook imzası zorunlu olsun ve idempotent işlensin.
-   - Sipariş alındı, ödeme, gönderildi, teslim edildi, iptal ve iade e-postaları doğru müşteriye ve ilgili satıcılara bir kez gitsin.
-   - E-postalarda doldurulamayan placeholder'lar `{PLACEHOLDER}` olarak görünmesin.
+**Problem:**
+Rechnung (invoice) PDF/şablon sistemi ayarlanabilir / zengin; Lieferschein (delivery note) geride kalmış.
 
-10. Üretim güvenliği ve gözlemlenebilirliği doğrula:
-    - Production secret'ları repoda veya frontend bundle'da bulunmasın.
-    - Müşteri ve seller endpoint'lerinde yetki kontrolleri zorunlu olsun.
-    - Kritik ödeme/sipariş/refund/webhook hataları yapılandırılmış loglara yazılsın.
-    - Sağlık kontrolü, veritabanı yedeği ve geri yükleme prosedürü doğrulansın.
+**Hedef:**
+Lieferschein şablonlarını Rechnung ile **aynı model ve kalitede** hizala (ayarlar, alanlar, marka/logo, dil, PDF üretimi).
 
-### P1 — PİLOT ÖNCESİ TAMAMLANACAK
+**Kabul kriterleri:**
+- [ ] Rechnung’ta olan şablon ayarları / editör / varsayılanlar Lieferschein için de mevcut (veya bilinçli olarak paylaşılan ortak layout + Lieferschein’e özgü alan farkları belgelenmiş).
+- [ ] Siparişten Lieferschein PDF indirme / yazdırma Rechnung ile tutarlı görünür.
+- [ ] Versand sayfasındaki toplu Lieferschein yazdırma (`buildShipLieferscheinHtml` / backend PDF) yeni şablonla uyumlu.
+- [ ] Locale (de/en/tr/…) bozulmaz.
 
-1. `/versand` ürün tarama akışını düzelt:
-   - Rastgele metin kabul edilmesin.
-   - Yalnızca siparişteki ilgili satıcıya ait gerçek ürün EAN, SKU veya seçilmiş ürün adıyla doğrulanabilsin.
-   - Ürün adı aramasında yazdıkça dropdown açılsın; seçim yapılmadan ürün eklenmesin.
-   - Siparişteki adet kadar tarama yapılmadan gönderim adımına geçilmesin.
+**İlgili alanlar:**
+- Invoice template ayarları + PDF pipeline (sellercentral + `medusa-backend` order PDF)
+- `apps/sellercentral/src/lib/ship-print-html.js`
+- `apps/sellercentral/src/lib/order-pdf-url.js` (`kind: "lieferschein"`)
+- Backend Lieferschein PDF üretimi (Rechnung karşılığı)
 
-2. Sendcloud'u gerçekten pasif hale getir:
-   - `is_active=false` olduğunda backend Sendcloud rates, label purchase ve otomatik return-label çağrısı yapmasın.
-   - Sellercentral'da Sendcloud etiket satın alma bölümü gizlensin.
-   - Manuel DHL/Hermes/diğer taşıyıcı ve takip numarası girişi açık kalsın.
-   - Önceden oluşturulmuş etiket ve takip bilgileri görünmeye devam etsin.
+---
 
-3. Manuel gönderim akışını tamamla:
-   - Satıcı takip numarası ve taşıyıcı girmeden siparişi gönderildi sayamasın.
-   - Gönderim kaydından sonra müşteri e-postası ve takip bağlantısı doğru oluşsun.
-   - Teslimat durumu manuel veya entegrasyon webhook'uyla güncellenebilsin.
+## TASK-4 — Customer Support (shop + sellercentral) uçtan uca
 
-4. Abandoned cart akışını düzelt ve zaman ayarına göre tek e-posta gönderildiğini test et.
+**Özet:** Shop’ta müşteri Support merkezi; sellercentral’da scoped case inbox; siparişten ürün seçerek case; kapalı case mesaja reopen.
 
-5. Shop ve Sellercentral'ın temel mobil/masaüstü akışlarında kırık link, boş ekran, sonsuz loading ve kullanıcıya gösterilen ham backend hatalarını düzelt.
+### 4.1 Shop — menü ve sayfa adı
+- [ ] Shop menü / hesap linkindeki **Nachrichten** adı **Support** olsun (locale: de/en/tr/fr/es/it mesaj dosyaları).
+- [ ] Route kullanıcıya “Support” olarak görünsün; eski `/nachrichten` kırılmasın (redirect veya aynı sayfa alias).
+- [ ] Sayfa hesabın **sol sidebar** layout’u içinde açılsın; dağınık full-page inbox olmasın.
 
-### LAUNCH SONRASINA BIRAKILACAKLAR
+### 4.2 Shop — Customer Support landing + yeni ticket
+- [ ] Sellercentral’da tanımlı **customer-support** landing page içeriği shop’ta yayınlansın / çalışsın (`/pages/...` veya Support landing component).
+- [ ] Müşteri buradan **yeni support ticket** açabilsin (kategori/alt kategori, metin, ek).
+- [ ] Açılan tüm case’ler müşterinin Support inbox’ında listelensin.
 
-1. Billbee ve JTL üzerinden otomatik sipariş, stok, tracking ve belge senkronizasyonu.
-2. Sendcloud veya başka sağlayıcı üzerinden platformun otomatik DHL/Hermes etiketi satması.
-3. Satıcıların kendi DHL/Hermes sözleşmelerini bağlaması.
-4. Birden fazla satıcıyla geniş çaplı katalog ve reklam kampanyaları.
-5. Gelişmiş kampanyalar, bonus puan, otomasyonlar, analitik ve tasarım rötuşları.
-6. Satın almayı veya yasal/finansal doğruluğu engellemeyen bütün kozmetik hatalar.
+### 4.3 Shop — siparişten Nachricht = support case
+- [ ] Orders / sipariş detayındaki **Nachricht** → önce **ürün seçimi** → support case oluşturulsun (eski `store_messages` product_id required akışına düşmesin).
+- [ ] Case Support inbox’ta açılsın (`?case=<id>`).
 
-## BİTİŞ KRİTERİ
+### 4.4 Shop — kapalı case reopen
+- [ ] `resolved` / `closed` case’e müşteri (veya karşı taraf) mesaj atınca case **yeniden açılsın** (reopened); mesaj reddedilmesin.
 
-Claude “hazır” demeden önce test kanıtı sunacak. Aşağıdakiler sağlanırsa pilot başlayabilir:
+### 4.5 Sellercentral — Inbox sekmeleri
+- [ ] **Seller:** iki sekme — (1) Müşteri case’leri (yalnızca kendi `seller_id`) (2) Seller ↔ platform support (eski davranış kalabilir).
+- [ ] **Superuser:** iki sekme — (1) Müşteriden gelen (2) Seller’dan gelen; süperuser hepsini görür.
+- [ ] Seller, başka seller’ın case / mesajlarını **görmez**.
+- [ ] Kunden sekmesinde müşterilerin yazdığı support ticket’lar gerçekten listelenir (boş / eksik API sorunu varsa düzelt).
+- [ ] Çözülen case’ler UI’da **gelöst / resolved** olarak kategorize edilsin.
 
-- Tek satıcılı üç gerçek sipariş kod/veritabanı müdahalesi olmadan tamamlandı.
-- Normal teslimat, iptal/refund ve iade senaryoları başarılı.
-- Stripe, sipariş, müşteri faturası, satıcı görünümü, komisyon ve payout kuruşu kuruşuna tutarlı.
-- Satıcı yalnızca kendi ürünlerini ve tutarlarını görüyor.
-- Kritik endpoint yetki ve idempotency testleri geçiyor.
-- Açık P0 veya P1 hata bulunmuyor.
+**İlgili alanlar:**
+- `apps/shop` — `nachrichten`, Support landing, account layout, i18n (`messages/*.json`)
+- `apps/sellercentral` — `InboxPage`, `SupportCaseInbox`
+- `apps/medusa-backend` — `support-cases.js`, `support-case-core.js`, legacy messages bridge
+- Landing: customer-support CMS / `setup-customer-support-landing.js`
 
-P2/P3 seviyesindeki kozmetik veya “olsa güzel olur” işleri launch tarihini ertelemeyecek; backlog'a yazılacak.
+**Not:** Bu alanda kısmi iş yapılmış olabilir. Önce mevcut davranışı smoke-test et; çalışan parçayı bozmadan boşlukları kapat.
+
+---
+
+## TASK-5 — Sipariş detayında yalnızca kendi ürünleri + ürün ekleme araması
+
+### 5.1 Seller sipariş izolasyonu
+**Problem:** Multi-seller sepette sipariş başlığı `default` olabilir; A seller’ı B’nin satırlarını görüyor → kafa karışıklığı + şişmiş tutar/komisyon.
+
+**Hedef:**
+Non-superuser seller sipariş listesi/detayında **yalnızca kendi sattığı kalemleri** görsün; tutar/komisyon kendi kalemlerine göre olsun; Versand/scan yalnızca kendi SKU’ları.
+
+**Kabul kriterleri:**
+- [ ] Seller A, B’nin kalemlerini detayda görmez.
+- [ ] Gösterilen ara toplam / komisyon tabanı A’nın kalemleriyle uyumlu.
+- [ ] Superuser tüm kalemleri görmeye devam eder.
+- [ ] Backend zorunlu filtre (yalnızca UI gizleme yetmez). Ownership: `store_order_items.seller_id` (+ legacy fallback); `o.seller_id = 'default'` sahiplik sayılmaz.
+
+### 5.2 Siparişe ürün ekleme (Hinzufügen)
+**Problem:** Rastgele metin yazıp Hinzufügen kabul edilebiliyor.
+
+**Hedef:**
+Yalnızca geçerli eşleşme eklensin: **EAN**, **SKU** veya **ürün adı** araması; yazıldıkça **dropdown** öneriler.
+
+**Kabul kriterleri:**
+- [ ] Serbest/rastgele string → reddedilir (net hata mesajı).
+- [ ] EAN / SKU / title ile typeahead; listeden seçim veya net tek eşleşme gerekir.
+- [ ] Seller yalnızca kendi satabileceği / yetkili olduğu ürünleri ekleyebilir (superuser ayrı kural).
+
+**İlgili alanlar:**
+- `apps/medusa-backend/src/routes/orders.js`, `order-items-seller.js`, `seller-scope.js`
+- Sellercentral sipariş detay — kalem listesi + Hinzufügen UI
+
+---
+
+6) sellercentralde content/pages sayfasinda düzenlenen sayfa en üstte olmasin. en son eklenen en üstte olsun. alfabetik olarak da siralayabilelim.
+7) content/menus sayfasinda menüeinträge kismina ekledigmiz menü itemleri her dile göre yazabilelim. su an yazilanlar her dilde gözükecek. böyle olmamali
+8) sayfada bir sürü kategori ve subkategori var. ben bunlari tek tek dillerine ceviremem. 20000 den fazla var. senden ricam bunlari shopta secilen dilde göstermen. mesela bizim kategorimiz var adi "Home". benim isim burada bitsin. müsteri türkce dili secerse shopta "Ev" görsün. bunu ayarla

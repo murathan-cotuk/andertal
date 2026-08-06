@@ -1,8 +1,10 @@
 .inbox {
-  width: min(1380px, calc(100% - 32px));
+  width: min(1680px, calc(100% - 32px));
+  height: calc(100vh - 140px);
   min-height: 680px;
+  max-height: 920px;
   display: grid;
-  grid-template-columns: minmax(320px, 390px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
   margin: 28px auto 48px;
   overflow: hidden;
   border: 1px solid #dfe4e8;
@@ -14,15 +16,38 @@
 
 .inbox.embedded {
   width: 100%;
+  height: calc(100vh - 220px);
   min-height: 620px;
+  max-height: none;
   margin: 0;
   box-shadow: 0 8px 28px rgb(20 38 58 / 6%);
 }
 
 .sidebar {
+  display: flex;
   min-width: 0;
+  min-height: 0;
+  flex-direction: column;
   border-right: 1px solid #e1e6ea;
   background: #fbfaf7;
+}
+
+.newCaseButton {
+  display: block;
+  margin: 12px 14px 0;
+  padding: 9px 14px;
+  border: 1px solid #14263a;
+  border-radius: 8px;
+  color: #fff;
+  background: #14263a;
+  text-align: center;
+  text-decoration: none;
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.newCaseButton:hover {
+  opacity: .92;
 }
 
 .sidebarHeader,
@@ -88,7 +113,8 @@
 }
 
 .caseList {
-  max-height: 610px;
+  min-height: 0;
+  flex: 1;
   overflow-y: auto;
 }
 
@@ -224,11 +250,13 @@
 
 .detailPane {
   min-width: 0;
+  min-height: 0;
   background: #f5f1e9;
 }
 
 .detail {
   height: 100%;
+  min-height: 0;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -271,17 +299,18 @@
 }
 
 .summary {
-  margin: 16px 20px 0;
-  padding: 17px;
+  flex: 0 0 auto;
+  margin: 10px 20px 0;
+  padding: 10px 14px;
   border: 1px solid #e2ded5;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
 }
 
 .summary dl {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 28px;
+  gap: 6px 22px;
   margin: 0;
 }
 
@@ -303,10 +332,10 @@
 }
 
 .summary > p {
-  margin: 16px 0 0;
+  margin: 8px 0 0;
   color: #4f5f6d;
-  font-size: .88rem;
-  line-height: 1.55;
+  font-size: .85rem;
+  line-height: 1.45;
   white-space: pre-wrap;
 }
 
@@ -345,8 +374,7 @@
 
 .timeline {
   display: flex;
-  min-height: 270px;
-  max-height: 500px;
+  min-height: 0;
   flex: 1;
   flex-direction: column;
   gap: 14px;
@@ -604,7 +632,9 @@
 @media (max-width: 760px) {
   .inbox {
     width: 100%;
+    height: auto;
     min-height: calc(100vh - 70px);
+    max-height: none;
     display: block;
     margin: 0;
     border: 0;

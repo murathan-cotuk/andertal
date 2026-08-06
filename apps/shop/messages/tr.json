@@ -189,7 +189,7 @@
     "navWishlist": "İstek listesi",
     "navAddresses": "Adresler",
     "navPayment": "Ödeme",
-    "navMessages": "Mesajlar",
+    "navMessages": "Destek",
     "navReviews": "Yorumlar",
     "navBonus": "Puan"
   },
@@ -557,7 +557,7 @@
     "wishlist": "İstek Listesi",
     "addresses": "Adreslerim",
     "paymentMethods": "Ödeme Yöntemleri",
-    "messages": "Mesajlar",
+    "messages": "Destek",
     "reviews": "Değerlendirmeler",
     "bonus": "Bonus Puanlar"
   },
@@ -631,8 +631,7 @@
       "bonus": "Bonus ve kupon",
       "privacy": "Gizlilik",
       "technical": "Teknik sorun",
-      "other": "Diğer",
-      "legacy": "Önceki mesaj"
+      "other": "Diğer"
     },
     "categoryDescriptions": {
       "order_delivery": "Tracking, delays or missing items",
@@ -764,6 +763,7 @@
   "caseInbox": {
     "title": "Destek talepleri",
     "subtitle": "Destek görüşmeleriniz",
+    "newCase": "Yeni talep",
     "caseListLabel": "Support case list",
     "refresh": "Talepleri yenile",
     "filterLabel": "Filter cases",
@@ -771,8 +771,7 @@
       "open": "Open",
       "awaiting_customer": "Awaiting you",
       "awaiting_seller": "Awaiting seller",
-      "resolved": "Resolved",
-      "closed": "Closed",
+      "done": "Tamamlandı",
       "unread": "Unread"
     },
     "statuses": {
@@ -802,8 +801,7 @@
       "bonus": "Bonus ve kupon",
       "privacy": "Gizlilik",
       "technical": "Teknik sorun",
-      "other": "Diğer",
-      "legacy": "Önceki mesaj"
+      "other": "Diğer"
     },
     "loadingCases": "Loading cases…",
     "loadingDetail": "Loading case…",

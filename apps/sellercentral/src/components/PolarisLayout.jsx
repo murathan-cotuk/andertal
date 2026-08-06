@@ -137,6 +137,22 @@ function sanitizePolarisNavItems(items) {
   });
 }
 
+/** Drop superuserOnly entries for non-superusers before sanitize. */
+function stripSuperuserOnlyNav(items, isSuperuser) {
+  if (!Array.isArray(items)) return [];
+  if (isSuperuser) return items;
+  return items
+    .filter((item) => !item.superuserOnly)
+    .map((item) => {
+      if (!Array.isArray(item.subNavigationItems)) return item;
+      return {
+        ...item,
+        subNavigationItems: item.subNavigationItems.filter((sub) => !sub.superuserOnly),
+      };
+    })
+    .filter((item) => !item.subNavigationItems || item.subNavigationItems.length > 0 || !item.url?.includes("-menu"));
+}
+
 /** Href path fragments for superuser-only entries (matches locale-prefixed URLs). */
 const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/products/collections",
@@ -369,15 +385,22 @@ const isModifiedOrNewTabClick = (e) => {
   );
 };
 
+// Toggle-only parents (see PARENT_NAV_URLS) never get a real href: even if some click
+// interceptor upstream (Next's <Link>, a browser extension, bfcache restore, etc.) ever
+// fails to honor preventDefault(), a "#" target is a guaranteed no-op instead of a real
+// navigation into the first child page.
+const isToggleOnlyNavUrl = (url, onClick) => PARENT_NAV_URLS.has(url || "") && typeof onClick === "function";
+
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
-  const href = NAV_VIRTUAL_URL_FALLBACK[url] || (url || "");
+  const toggleOnly = isToggleOnlyNavUrl(url, onClick);
+  const href = toggleOnly ? "#" : (NAV_VIRTUAL_URL_FALLBACK[url] || (url || ""));
   const handleClick = (e) => {
     // Keep browser-native new-tab behavior (Ctrl/Cmd click, middle click, etc.)
     if (isModifiedOrNewTabClick(e)) {
       onClick?.(e);
       return;
     }
-    if (PARENT_NAV_URLS.has(url || "") && typeof onClick === "function") {
+    if (toggleOnly) {
       e.preventDefault();
     }
     onClick?.(e);
@@ -391,14 +414,15 @@ const NextLink = forwardRef(function NextLink({ url, children, external, onClick
 
 const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, external, onClick, ...rest }, ref) {
   const ctx = useUnsavedChanges();
-  const href = NAV_VIRTUAL_URL_FALLBACK[url] || (url || "#");
+  const toggleOnly = isToggleOnlyNavUrl(url, onClick);
+  const href = toggleOnly ? "#" : (NAV_VIRTUAL_URL_FALLBACK[url] || (url || "#"));
   const handleClick = (e) => {
     // Do not block browser-native new-tab actions.
     if (isModifiedOrNewTabClick(e)) {
       onClick?.(e);
       return;
     }
-    if (PARENT_NAV_URLS.has(url || "") && typeof onClick === "function") {
+    if (toggleOnly) {
       e.preventDefault();
       onClick?.(e);
       return;
@@ -660,6 +684,7 @@ export default function PolarisLayout({ children }) {
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
     "/customers/newsletter",
+    "/marketing/automations",
     "/settings/checkout",
   ]);
 
@@ -677,7 +702,7 @@ export default function PolarisLayout({ children }) {
       if (cachedPerms) {
         try { setUserPermissions(JSON.parse(cachedPerms)); } catch { setUserPermissions(null); }
       }
-      // Fetch fresh profile to get latest permissions
+      // Fetch fresh profile to get latest permissions + authoritative role/seller_id
       getMedusaAdminClient().getSellerProfile().then((d) => {
         const perms = d?.user?.permissions || null;
         localStorage.setItem("sellerPermissions", perms ? JSON.stringify(perms) : "null");
@@ -687,8 +712,16 @@ export default function PolarisLayout({ children }) {
         const status = String(d?.user?.approval_status || "").toLowerCase();
         if (status) localStorage.setItem("sellerApprovalStatus", status);
         setApprovalStatus(status);
+        const accountSuper = d?.user?.is_superuser === true;
+        localStorage.setItem("sellerIsSuperuser", accountSuper ? "true" : "false");
+        setIsSuperuser(accountSuper);
+        const accountSellerId = String(d?.user?.seller_id || d?.user?.effective_seller_id || "").trim();
+        if (accountSellerId) localStorage.setItem("sellerId", accountSellerId);
+        if (!accountSuper && SELLER_BLOCKED_ROUTES.has(pathname)) {
+          router.replace("/dashboard");
+        }
       }).catch(() => {});
-      // Redirect non-superusers away from blocked routes
+      // Redirect non-superusers away from blocked routes (cached role; account fetch re-checks)
       if (!superuser && SELLER_BLOCKED_ROUTES.has(pathname)) {
         router.replace("/dashboard");
         return;
@@ -1112,14 +1145,20 @@ export default function PolarisLayout({ children }) {
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
     "/customers/newsletter",
+    "/marketing/automations",
+    "/sellers",
+    "/sellers/errors",
   ]);
 
   const filterNavForRole = (items) => {
     if (isSuperuser) return items;
-    // If user has custom permissions, use those; otherwise use default blocked set
+    // Custom permissions are an allow-list, but never grant superuser-only routes.
     const isAllowed = (url) => {
+      if (SELLER_BLOCKED_NAV.has(url) || SUPERUSER_NAV_HREF_FRAGMENTS.some((frag) => url === frag || url.startsWith(frag + "/"))) {
+        return false;
+      }
       if (userPermissions) return userPermissions.some((p) => url === p || url.startsWith(p + "/"));
-      return !SELLER_BLOCKED_NAV.has(url);
+      return true;
     };
     return items
       .filter((item) => isAllowed(item.url) || item.subNavigationItems?.some((s) => isAllowed(s.url)))
@@ -1129,7 +1168,9 @@ export default function PolarisLayout({ children }) {
       });
   };
 
-  const menuMain = sanitizePolarisNavItems(filterNavForRole(getMenuItemsMain(t, isSuperuser)));
+  const menuMain = sanitizePolarisNavItems(
+    filterNavForRole(stripSuperuserOnlyNav(getMenuItemsMain(t, isSuperuser), isSuperuser)),
+  );
   const menuSettings = getMenuItemsSettings(t, isSuperuser);
   const navLocation = pathname && pathname !== "" ? pathname : "/";
 

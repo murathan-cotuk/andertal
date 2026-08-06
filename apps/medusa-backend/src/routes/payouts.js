@@ -1,5 +1,6 @@
 'use strict'
 const { Router } = require('express')
+const { resolveSellerScope } = require('../seller-scope')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -22,12 +23,22 @@ module.exports = function createPayoutsRouter({
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const isSuperuser = req.sellerUser?.is_superuser || false
-        const callerSellerId = req.sellerUser?.seller_id
-        const filterSellerId = req.query.seller_id || (!isSuperuser ? callerSellerId : null)
+        const scope = resolveSellerScope(req.sellerUser)
+        if (!scope) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        const isSuperuser = scope.isSuperuser
+        const filterSellerId = isSuperuser
+          ? (String(req.query.seller_id || '').trim() || null)
+          : scope.sellerId
         const params = []
         let where = ''
         if (filterSellerId) { params.push(filterSellerId); where = `WHERE p.seller_id = $1` }
+        else if (!isSuperuser) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
         const r = await client.query(
           `SELECT p.*, s.store_name FROM seller_payouts p LEFT JOIN seller_users s ON s.seller_id = p.seller_id ${where} ORDER BY p.period_start DESC LIMIT 200`,
           params

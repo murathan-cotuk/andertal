@@ -189,7 +189,7 @@
     "navWishlist": "Wishlist",
     "navAddresses": "Addresses",
     "navPayment": "Payment",
-    "navMessages": "Messages",
+    "navMessages": "Support",
     "navReviews": "Reviews",
     "navBonus": "Points"
   },
@@ -557,7 +557,7 @@
     "wishlist": "Wishlist",
     "addresses": "Addresses",
     "paymentMethods": "Payment methods",
-    "messages": "Messages",
+    "messages": "Support",
     "reviews": "Reviews",
     "bonus": "Bonus points"
   },
@@ -631,8 +631,7 @@
       "bonus": "Bonus & coupon",
       "privacy": "Privacy",
       "technical": "Technical issue",
-      "other": "Other",
-      "legacy": "Previous message"
+      "other": "Other"
     },
     "categoryDescriptions": {
       "order_delivery": "Tracking, delays or missing items",
@@ -764,6 +763,7 @@
   "caseInbox": {
     "title": "Support cases",
     "subtitle": "Your conversations with support",
+    "newCase": "New request",
     "caseListLabel": "Support case list",
     "refresh": "Refresh cases",
     "filterLabel": "Filter cases",
@@ -771,8 +771,7 @@
       "open": "Open",
       "awaiting_customer": "Awaiting you",
       "awaiting_seller": "Awaiting seller",
-      "resolved": "Resolved",
-      "closed": "Closed",
+      "done": "Done",
       "unread": "Unread"
     },
     "statuses": {
@@ -802,8 +801,7 @@
       "bonus": "Bonus & coupon",
       "privacy": "Privacy",
       "technical": "Technical issue",
-      "other": "Other",
-      "legacy": "Previous message"
+      "other": "Other"
     },
     "loadingCases": "Loading cases…",
     "loadingDetail": "Loading case…",

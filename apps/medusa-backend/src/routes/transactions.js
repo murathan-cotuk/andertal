@@ -3,6 +3,7 @@ const { Router } = require('express')
 const { resolveOrderPaidTotalCents } = require('../order-money')
 const { renderPeriodCommissionInvoiceDocument } = require('../order-pdf-layout')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
+const { resolveSellerScope, sqlOrderOwnedBySeller } = require('../seller-scope')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -24,9 +25,15 @@ module.exports = function createTransactionsRouter({
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const isSuperuser = req.sellerUser?.is_superuser || false
-        const callerSellerId = req.sellerUser?.seller_id
-        const filterSellerId = req.query.seller_id || (!isSuperuser ? callerSellerId : null)
+        const scope = resolveSellerScope(req.sellerUser)
+        if (!scope) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        const isSuperuser = scope.isSuperuser
+        const filterSellerId = isSuperuser
+          ? (String(req.query.seller_id || '').trim() || null)
+          : scope.sellerId
         const limitDays = parseInt(req.query.payout_days || '14', 10)
         const includePending = req.query.include_pending === 'true'
         const params = []
@@ -48,16 +55,10 @@ module.exports = function createTransactionsRouter({
         if (filterSellerId) {
           params.push(filterSellerId)
           sellerParamNum = params.length
-          // Match orders directly assigned to this seller OR orders whose items link to this seller via listings/products
-          where.push(`(
-            o.seller_id = $${sellerParamNum}
-            OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${sellerParamNum})
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${sellerParamNum})
-              )
-            )
-          )`)
+          where.push(sqlOrderOwnedBySeller('o', `$${sellerParamNum}`))
+        } else if (!isSuperuser) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
         }
         const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
         // Join seller_users using the actual seller or falling back to filterSellerId for 'default' orders
@@ -89,15 +90,7 @@ module.exports = function createTransactionsRouter({
         if (filterSellerId) {
           returnParams.push(filterSellerId)
           returnSellerParamNum = returnParams.length
-          returnWhere.push(`(
-            o.seller_id = $${returnSellerParamNum}
-            OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${returnSellerParamNum})
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${returnSellerParamNum})
-              )
-            )
-          )`)
+          returnWhere.push(sqlOrderOwnedBySeller('o', `$${returnSellerParamNum}`))
         }
         if (req.query.period_start) {
           returnParams.push(req.query.period_start)

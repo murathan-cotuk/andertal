@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
@@ -50,6 +51,7 @@ function LocaleSwitcher() {
 
 export default function Login() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("auth.login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -115,6 +117,15 @@ export default function Login() {
     if (!sessionRes.ok) {
       const body = await sessionRes.json().catch(() => ({}));
       throw new Error(body?.error || `Session error ${sessionRes.status}`);
+    }
+    // middleware.js sends unauthenticated visitors here with ?next=<original locale-prefixed
+    // path> (e.g. from an email "open message" link → /de/inbox?case=...). Honor it instead
+    // of always dropping the user on /dashboard, otherwise deep links from emails are lost
+    // the moment a login is required.
+    const next = searchParams?.get("next") || "";
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      window.location.href = next;
+      return;
     }
     router.push("/dashboard");
   };

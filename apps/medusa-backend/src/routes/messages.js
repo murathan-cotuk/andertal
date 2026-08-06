@@ -2,6 +2,7 @@
 const { Router } = require('express')
 const { runAutomationFlowsForMessageEvent, FLOW_EMAIL_LOCALES } = require('../flow-automation')
 const { resolveSmtpSenderIdentity } = require('../smtp-sender-resolve')
+const { sqlOrderOwnedBySeller } = require('../seller-scope')
 
 const resolveShopBaseUrl = () => {
   const candidates = [
@@ -64,9 +65,10 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
         const orderId = req.query.order_id || null
         // Non-superusers must only see their own seller scope — never trust query seller_id.
+        // `default` is the platform order stamp, not a seller identity.
         let sellerId = (req.query.seller_id || '').trim()
         if (!isSuperuser) {
-          if (!jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+          if (!jwtSellerId || jwtSellerId === 'default') { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
           sellerId = jwtSellerId
         }
         const searchRaw = (req.query.q || req.query.search || '').trim()
@@ -112,19 +114,10 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
           if (sellerId) {
             params.push(sellerId)
             const n = params.length
-            // o.seller_id is always the platform now (an order can mix items from several real
-            // sellers) — match any order where this seller actually has an item, the same
-            // ownership pattern used by orders.js/transactions.js, not a direct o.seller_id match.
+            // Prefer line-item seller_id; never treat platform o.seller_id='default' as ownership.
             conditions.push(`(
               m.seller_id = $${n}
-              OR o.seller_id = $${n}
-              OR EXISTS (
-                SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                  oi.seller_id = $${n}
-                  OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
-                  OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
-                )
-              )
+              OR ${sqlOrderOwnedBySeller('o', `$${n}`)}
             )`)
           } else if (!isSuperuser) {
             await client.end()
@@ -165,14 +158,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
           const unreadWhere = sellerId ? `AND (
               m2.seller_id = $1
               OR m2.order_id IN (
-              SELECT o.id FROM store_orders o WHERE o.seller_id = $1
-                OR EXISTS (
-                  SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                    oi.seller_id = $1
-                    OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
-                    OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $1)
-                  )
-                )
+              SELECT o.id FROM store_orders o WHERE ${sqlOrderOwnedBySeller('o', '$1')}
             ))` : ''
           unreadR = await client.query(
             `SELECT COUNT(*)::int AS c FROM store_messages m2 WHERE (m2.channel = 'customer' OR m2.channel IS NULL) AND m2.sender_type = 'customer' AND m2.is_read_by_seller = false ${unreadWhere}`,
@@ -206,7 +192,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
         const { order_id, product_id, body, subject, channel, sender_seller_id, locale } = req.body || {}
         if (!body) { await client.end(); return res.status(400).json({ message: 'body required' }) }
-        if (!isSuperuser && !jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        if (!isSuperuser && (!jwtSellerId || jwtSellerId === 'default')) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
 
         // Opportunistically remember the acting seller's current Sellercentral UI language, so
         // automated notification emails to them can be sent in that language later.
@@ -293,16 +279,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
           if (!oR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
           if (!isSuperuser) {
             const owns = await client.query(
-              `SELECT 1 FROM store_orders o WHERE o.id = $1::uuid AND (
-                o.seller_id = $2
-                OR EXISTS (
-                  SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                    EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $2)
-                    OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $2)
-                    OR oi.seller_id = $2
-                  )
-                )
-              ) LIMIT 1`,
+              `SELECT 1 FROM store_orders o WHERE o.id = $1::uuid AND ${sqlOrderOwnedBySeller('o', '$2')} LIMIT 1`,
               [order_id, jwtSellerId],
             )
             if (!owns.rows[0]) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
@@ -365,7 +342,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         await client.connect()
         const isSuperuser = req.sellerUser?.is_superuser === true
         const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
-        if (!isSuperuser && !jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        if (!isSuperuser && (!jwtSellerId || jwtSellerId === 'default')) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
         const msg = (await client.query(`SELECT * FROM store_messages WHERE id = $1::uuid`, [id])).rows[0]
         if (!msg) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
         if (!isSuperuser) {
@@ -378,14 +355,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
                LEFT JOIN store_orders o ON o.id = m.order_id
                WHERE m.id = $1::uuid AND (
                  m.seller_id = $2
-                 OR o.seller_id = $2
-                 OR EXISTS (
-                   SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                     EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $2)
-                     OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $2)
-                     OR oi.seller_id = $2
-                   )
-                 )
+                 OR ${sqlOrderOwnedBySeller('o', '$2')}
                ) LIMIT 1`,
               [id, jwtSellerId],
             )
@@ -427,7 +397,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         let { seller_id, mark_as, subject_thread } = req.body || {}
         seller_id = String(seller_id || '').trim()
         if (!isSuperuser) {
-          if (!jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+          if (!jwtSellerId || jwtSellerId === 'default') { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
           seller_id = jwtSellerId
           if (mark_as === 'support') { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
         }

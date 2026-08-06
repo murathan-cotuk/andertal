@@ -148,10 +148,11 @@ async function applyMenuLocale(menusWithItems, targetLocale, opts = {}) {
   let client = opts.pgClient || null
   let ownsClient = false
   if (!client) {
-    const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-    if (dbUrl && dbUrl.startsWith('postgres')) {
-      const { Client } = require('pg')
-      client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    // Runs on every /store/menus request — pooled to avoid a fresh Postgres TCP+TLS
+    // handshake per request (see src/db-pool.js).
+    const { getPooledClient } = require('./db-pool')
+    client = getPooledClient()
+    if (client) {
       ownsClient = true
       await client.connect()
     }

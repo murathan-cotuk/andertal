@@ -172,7 +172,7 @@
     "navWishlist": "Lista desideri",
     "navAddresses": "Indirizzi",
     "navPayment": "Pagamento",
-    "navMessages": "Messaggi",
+    "navMessages": "Supporto",
     "navReviews": "Recensioni",
     "navBonus": "Punti"
   },
@@ -540,7 +540,7 @@
     "wishlist": "Lista desideri",
     "addresses": "Indirizzi",
     "paymentMethods": "Metodi di pagamento",
-    "messages": "Messaggi",
+    "messages": "Supporto",
     "reviews": "Recensioni",
     "bonus": "Punti bonus"
   },
@@ -747,6 +747,7 @@
   "caseInbox": {
     "title": "Richieste di assistenza",
     "subtitle": "Le tue conversazioni con l’assistenza",
+    "newCase": "Nuova richiesta",
     "caseListLabel": "Support case list",
     "refresh": "Aggiorna richieste",
     "filterLabel": "Filter cases",

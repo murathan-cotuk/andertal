@@ -189,7 +189,7 @@
     "navWishlist": "Merkzettel",
     "navAddresses": "Adressen",
     "navPayment": "Zahlung",
-    "navMessages": "Nachrichten",
+    "navMessages": "Support",
     "navReviews": "Bewertungen",
     "navBonus": "Bonus"
   },
@@ -557,7 +557,7 @@
     "wishlist": "Merkzettel",
     "addresses": "Adressen",
     "paymentMethods": "Zahlungsmethoden",
-    "messages": "Nachrichten",
+    "messages": "Support",
     "reviews": "Bewertungen",
     "bonus": "Bonuspunkte"
   },
@@ -631,8 +631,7 @@
       "bonus": "Bonus & Gutschein",
       "privacy": "Datenschutz",
       "technical": "Technisches Problem",
-      "other": "Sonstiges",
-      "legacy": "Frühere Nachricht"
+      "other": "Sonstiges"
     },
     "categoryDescriptions": {
       "order_delivery": "Sendungsverfolgung, Verzögerungen oder fehlende Artikel",
@@ -764,6 +763,7 @@
   "caseInbox": {
     "title": "Support-Fälle",
     "subtitle": "Ihre Gespräche mit dem Support",
+    "newCase": "Neue Anfrage",
     "caseListLabel": "Liste der Support-Fälle",
     "refresh": "Fälle aktualisieren",
     "filterLabel": "Fälle filtern",
@@ -771,8 +771,7 @@
       "open": "Offen",
       "awaiting_customer": "Wartet auf Sie",
       "awaiting_seller": "Wartet auf Verkäufer",
-      "resolved": "Gelöst",
-      "closed": "Geschlossen",
+      "done": "Erledigt",
       "unread": "Ungelesen"
     },
     "statuses": {
@@ -802,8 +801,7 @@
       "bonus": "Bonus & Gutschein",
       "privacy": "Datenschutz",
       "technical": "Technisches Problem",
-      "other": "Sonstiges",
-      "legacy": "Frühere Nachricht"
+      "other": "Sonstiges"
     },
     "loadingCases": "Fälle werden geladen…",
     "loadingDetail": "Fall wird geladen…",

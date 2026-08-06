@@ -172,7 +172,7 @@
     "navWishlist": "Lista de deseos",
     "navAddresses": "Direcciones",
     "navPayment": "Pago",
-    "navMessages": "Mensajes",
+    "navMessages": "Soporte",
     "navReviews": "Reseñas",
     "navBonus": "Puntos"
   },
@@ -540,7 +540,7 @@
     "wishlist": "Lista de deseos",
     "addresses": "Direcciones",
     "paymentMethods": "Métodos de pago",
-    "messages": "Mensajes",
+    "messages": "Soporte",
     "reviews": "Reseñas",
     "bonus": "Puntos bonus"
   },
@@ -747,6 +747,7 @@
   "caseInbox": {
     "title": "Casos de soporte",
     "subtitle": "Tus conversaciones con soporte",
+    "newCase": "Nueva solicitud",
     "caseListLabel": "Support case list",
     "refresh": "Actualizar casos",
     "filterLabel": "Filter cases",
@@ -754,8 +755,7 @@
       "open": "Open",
       "awaiting_customer": "Awaiting you",
       "awaiting_seller": "Awaiting seller",
-      "resolved": "Resolved",
-      "closed": "Closed",
+      "done": "Completado",
       "unread": "Unread"
     },
     "statuses": {

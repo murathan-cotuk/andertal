@@ -5,10 +5,11 @@ import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { getToken } from "@andertal/lib";
+import { Link } from "@/i18n/navigation";
 import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
 import styles from "./CaseInbox.module.css";
 
-const FILTERS = ["open", "awaiting_customer", "awaiting_seller", "resolved", "closed", "unread"];
+const FILTERS = ["open", "awaiting_customer", "awaiting_seller", "done", "unread"];
 const ACTIVE_STATUSES = new Set(["open", "awaiting_customer", "awaiting_seller", "awaiting_support", "in_progress", "reopened"]);
 const ACCEPTED = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const MAX_FILES = 5;
@@ -237,7 +238,7 @@ function CaseDetail({ detail, loading, error, onBack, onRefresh, onMutated, date
       <div className={styles.summary}>
         <dl>
           <div><dt>{t("summary.status")}</dt><dd><span className={`${styles.status} ${styles[`status_${status}`] || ""}`}>{translatedStatus(detail, t)}</span></dd></div>
-          <div><dt>{t("summary.category")}</dt><dd>{t.has(`categories.${detail.category}`) ? t(`categories.${detail.category}`) : detail.category}</dd></div>
+          {detail.category ? <div><dt>{t("summary.category")}</dt><dd>{t.has(`categories.${detail.category}`) ? t(`categories.${detail.category}`) : detail.category}</dd></div> : null}
           {detail.order_number && <div><dt>{t("summary.order")}</dt><dd>{detail.order_number}</dd></div>}
           <div><dt>{t("summary.created")}</dt><dd>{dateFormatter(detail.created_at)}</dd></div>
         </dl>
@@ -330,7 +331,7 @@ export default function CaseInbox({ embedded = false }) {
       let nextCases = [];
       let nextCount = 0;
       let errorResult = null;
-      if (filter === "open" || filter === "unread") {
+      if (filter === "open" || filter === "unread" || filter === "done") {
         const result = await requestCases(`page=${page}&limit=${limit}&view=${encodeURIComponent(filter)}`);
         errorResult = result?.__error ? result : null;
         if (!errorResult) {
@@ -420,7 +421,11 @@ export default function CaseInbox({ embedded = false }) {
   return (
     <div className={`${styles.inbox} ${embedded ? styles.embedded : ""} ${selectedId ? styles.hasSelection : ""}`}>
       <aside className={styles.sidebar} aria-label={t("caseListLabel")}>
-        <div className={styles.sidebarHeader}><div><h1>{t("title")}</h1><p>{t("subtitle")}</p></div><button type="button" className={styles.iconButton} onClick={refresh} aria-label={t("refresh")}>↻</button></div>
+        <div className={styles.sidebarHeader}>
+          <div><h1>{t("title")}</h1><p>{t("subtitle")}</p></div>
+          <button type="button" className={styles.iconButton} onClick={refresh} aria-label={t("refresh")}>↻</button>
+        </div>
+        <Link href="/customer-support#support-wizard" className={styles.newCaseButton}>{t("newCase")}</Link>
         <div className={styles.filters} role="group" aria-label={t("filterLabel")}>
           {FILTERS.map((entry) => <button type="button" key={entry} aria-pressed={filter === entry} onClick={() => { setFilter(entry); setPage(1); }}>{t(`filters.${entry}`)}</button>)}
         </div>

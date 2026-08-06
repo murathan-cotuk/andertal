@@ -68,14 +68,12 @@ const buildAdminHubCategoryTreeFromFlat = (flat) => {
   return sortCategories(roots)
 }
 
+// /store/categories?tree=true is fetched on nearly every storefront page load and was
+// observed taking multiple seconds under load — pooled to avoid a fresh Postgres
+// TCP+TLS handshake per request (see src/db-pool.js).
 function getCategoriesPgClient() {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  return new Client({
-    connectionString: dbUrl,
-    ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false,
-  })
+  const { getPooledClient } = require('./db-pool')
+  return getPooledClient()
 }
 
 function categoriesPgUnavailable(res) {

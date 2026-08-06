@@ -1,14 +1,12 @@
 'use strict'
 const { Router } = require('express')
+const { getPooledClient } = require('../db-pool')
 
 const _log = { info: (...a) => { if (process.env.NODE_ENV !== 'production') console.log(...a) } }
 
-const getDbClient = () => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
-}
+// Branding/settings are fetched on every page load in shop + Sellercentral — pooled to
+// avoid a fresh Postgres TCP+TLS handshake per request (see src/db-pool.js).
+const getDbClient = () => getPooledClient()
 
 // ── Utilities (also exported for store-products and other modules) ─────────────
 
@@ -167,7 +165,20 @@ const sellerSettingsPATCH = async (req, res) => {
   try {
     const body = req.body || {}
     const store_name = (body.store_name != null ? String(body.store_name) : '').trim()
-    const sellerId = (body.seller_id || req.query.seller_id || 'default').toString().trim() || 'default'
+    const isSuperuser = req.sellerUser?.is_superuser === true
+    const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
+    const requestedId = (body.seller_id || req.query.seller_id || '').toString().trim()
+    // Non-superusers may only write their own settings. Platform `default` is superuser-only.
+    let sellerId
+    if (isSuperuser) {
+      sellerId = requestedId || 'default'
+    } else {
+      if (!jwtSellerId) return res.status(403).json({ message: 'Forbidden' })
+      if (requestedId && requestedId !== jwtSellerId) {
+        return res.status(403).json({ message: 'Cannot modify another seller\'s settings' })
+      }
+      sellerId = jwtSellerId
+    }
     let free_shipping_thresholds = (body.free_shipping_thresholds && typeof body.free_shipping_thresholds === 'object')
       ? body.free_shipping_thresholds : null
     const shop_logo_url = body.shop_logo_url !== undefined ? (body.shop_logo_url ? String(body.shop_logo_url).trim() : null) : undefined

@@ -13,23 +13,18 @@ const { getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerPro
 const { resolveUploadUrl, storeProductCategoryIds } = require('./store-products')
 const { resolveMenuService } = require('./menus')
 const { applyMenuLocale, normalizeMenuLocale } = require('../menu-auto-translate')
+const { getPooledClient } = require('../db-pool')
 
-const getDbClient = () => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  const isRender = dbUrl.includes('render.com')
-  return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
-}
+// These storefront routes are hit on nearly every page load — pooled to avoid a fresh
+// Postgres TCP+TLS handshake per request (see src/db-pool.js).
+const getDbClient = () => getPooledClient()
 
 const storeCollectionsGET = async (req, res) => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return res.json({ collections: [] })
   const handleQuery = (req.query.handle || req.query.slug || '').toString().trim()
   let client
   try {
-    const { Client } = require('pg')
-    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    client = getPooledClient()
+    if (!client) return res.json({ collections: [] })
     await client.connect()
     if (handleQuery) {
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(handleQuery.trim())
@@ -224,12 +219,11 @@ const storeCategoriesGET = async (req, res) => {
 }
 
 const getStoreMenusFromDb = async () => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
   try {
-    const { Client } = require('pg')
-    const isRender = dbUrl.includes('render.com')
-    const client = new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+    // /store/menus is fetched on every storefront page load — pooled to avoid a fresh
+    // Postgres TCP+TLS handshake per request (see src/db-pool.js).
+    const client = getPooledClient()
+    if (!client) return null
     await client.connect()
     const menusRes = await client.query('SELECT id, name, slug, location, categories_with_products, name_i18n FROM admin_hub_menus ORDER BY name')
     const menus = (menusRes.rows || []).map((r) => ({

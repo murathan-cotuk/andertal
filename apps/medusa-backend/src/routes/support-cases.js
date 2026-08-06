@@ -221,6 +221,25 @@ async function notifyCase(client, supportCase, kind, actor, messageId = '') {
   const shopBase = String(process.env.STOREFRONT_PUBLIC_URL || process.env.SHOP_PUBLIC_URL || process.env.PUBLIC_SHOP_URL || '').replace(/\/$/, '')
   const customerUrl = `${shopBase}/nachrichten?case=${encodeURIComponent(supportCase.id)}`
   const recipients = []
+  let sellerLabel = supportCase.seller_id ? String(supportCase.seller_id) : ''
+  if (supportCase.seller_id) {
+    const sellerName = (await client.query(
+      `SELECT COALESCE(NULLIF(TRIM(store_name), ''), seller_id) AS label
+         FROM admin_hub_seller_settings WHERE seller_id=$1 LIMIT 1`,
+      [supportCase.seller_id],
+    )).rows[0]
+    if (sellerName?.label) sellerLabel = String(sellerName.label)
+  }
+  const customerLabel = supportCase.customer_email ? String(supportCase.customer_email) : 'Kunde'
+  // Human-readable "who sent whom what" line for the superuser copy, since a superuser
+  // reads many cases at once and the sender/recipient direction isn't obvious from the
+  // generic case vars alone (customer -> seller and seller -> customer look identical
+  // otherwise).
+  const eventSummary = actor?.role === 'customer'
+    ? `Kunde ${customerLabel} hat Verkäufer ${sellerLabel || 'Support'} eine Nachricht geschickt (Fall ${supportCase.case_number}).`
+    : actor?.role === 'seller'
+      ? `Verkäufer ${sellerLabel} hat Kunde ${customerLabel} eine Nachricht geschickt (Fall ${supportCase.case_number}).`
+      : `Support-Team hat eine Aktualisierung an Fall ${supportCase.case_number} vorgenommen (${kind}).`
   const addSellerRecipient = async () => {
     if (!supportCase.seller_id) return false
     const seller = (await client.query(
@@ -239,21 +258,26 @@ async function notifyCase(client, supportCase, kind, actor, messageId = '') {
     })
     return true
   }
-  const addSupportRecipients = async () => {
+  const addSupportRecipients = async (excludeEmail) => {
     const dbRecipients = await client.query(
       `SELECT email FROM seller_users WHERE is_superuser=true AND email IS NOT NULL
        UNION SELECT admin_notification_email AS email FROM admin_hub_seller_settings
         WHERE seller_id='default' AND admin_notification_email IS NOT NULL`,
     )
     const envRecipients = String(process.env.SUPERUSER_EMAILS || '').split(',')
+    const exclude = String(excludeEmail || '').trim().toLowerCase()
     for (const raw of [...dbRecipients.rows.map((row) => row.email), ...envRecipients]) {
       const email = String(raw || '').trim()
-      if (email) recipients.push({ email, locale: 'de', triggerKey: 'admin_support_case_updated', url: sellerInboxUrl })
+      if (!email || email.toLowerCase() === exclude) continue
+      recipients.push({ email, locale: 'de', triggerKey: 'admin_support_case_updated', url: sellerInboxUrl })
     }
   }
 
   if (actor?.role === 'customer') {
-    if (!(await addSellerRecipient())) await addSupportRecipients()
+    await addSellerRecipient()
+    // Superuser gets cc'd on every customer message, not only when no seller was found —
+    // they want full visibility into who messaged whom, not just an escalation fallback.
+    await addSupportRecipients()
   } else {
     if (supportCase.customer_email) {
       recipients.push({
@@ -263,7 +287,12 @@ async function notifyCase(client, supportCase, kind, actor, messageId = '') {
         url: customerUrl,
       })
     }
-    if (kind === 'reassigned') {
+    if (actor?.role === 'seller') {
+      // Superuser gets cc'd on every seller reply too. Superuser actions themselves come
+      // through as actor.role === 'support' (see sellerActor()), which never lands here,
+      // so there's no risk of notifying a superuser about their own message.
+      await addSupportRecipients()
+    } else if (kind === 'reassigned') {
       if (!(await addSellerRecipient())) await addSupportRecipients()
     }
   }
@@ -293,6 +322,10 @@ async function notifyCase(client, supportCase, kind, actor, messageId = '') {
         CASE_STATUS: supportCase.status,
         SUPPORT_CASE_EVENT: kind,
         SUPPORT_CASE_URL: recipient.url,
+        SENDER_ROLE: actor?.role || '',
+        CUSTOMER_LABEL: customerLabel,
+        SELLER_LABEL: sellerLabel,
+        EVENT_SUMMARY: eventSummary,
       },
       orderId: supportCase.order_id || '',
       dedupeKey: emailDedupe,
@@ -441,6 +474,7 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
       ]
       if (status) { params.push(status); filters.push(`c.status = $${params.length}`) }
       if (view === 'open') filters.push(`c.status IN ('open','reopened','awaiting_seller','awaiting_customer','awaiting_support')`)
+      if (view === 'done') filters.push(`c.status IN ('resolved','closed')`)
       if (view === 'unread') filters.push('unread.unread_count > 0')
       if (category) { params.push(category); filters.push(`c.category = $${params.length}`) }
       if (filter) {
@@ -517,12 +551,14 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
       const id = orderId ? `legacy-order-${orderId}` : `legacy-none`
       return {
         id,
-        case_number: orderId
-          ? `LEGACY-${String(orderId).slice(0, 8).toUpperCase()}`
-          : 'LEGACY-GENERAL',
+        // Real reference, no "LEGACY" prefix: prefer the human-readable order number,
+        // fall back to a short id derived from the thread's first message.
+        case_number: last?.order_number != null
+          ? String(last.order_number)
+          : String(first?.id || orderId || '').slice(0, 8).toUpperCase(),
         order_id: orderId,
         seller_id: last?.seller_id || null,
-        category: 'legacy',
+        category: null,
         subcategory: 'message',
         title: first?.subject || normalizePlainText(last?.body, 80) || 'Frühere Nachricht',
         status: 'closed',
@@ -624,10 +660,10 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
       return res.json({
         case: {
           id,
-          case_number: first.order_id
-            ? `LEGACY-${String(first.order_id).slice(0, 8).toUpperCase()}`
-            : `LEGACY-${String(first.id).slice(0, 8).toUpperCase()}`,
-          category: 'legacy',
+          case_number: first.order_number != null
+            ? String(first.order_number)
+            : String(first.order_id || first.id).slice(0, 8).toUpperCase(),
+          category: null,
           subcategory: 'message',
           title: first.subject || 'Frühere Nachricht',
           status: 'closed',

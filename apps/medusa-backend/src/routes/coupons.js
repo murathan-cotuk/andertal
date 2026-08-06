@@ -1,5 +1,6 @@
 'use strict'
 const { Router } = require('express')
+const { resolveSellerScope } = require('../seller-scope')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -16,12 +17,22 @@ module.exports = function createCouponsRouter({ normalizeCouponCode }) {
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const isSuperuser = req.sellerUser?.is_superuser || false
-        const callerSellerId = req.sellerUser?.seller_id
-        const sellerId = req.query.seller_id || (!isSuperuser ? callerSellerId : null)
+        const scope = resolveSellerScope(req.sellerUser)
+        if (!scope) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        const isSuperuser = scope.isSuperuser
+        const sellerId = isSuperuser
+          ? (String(req.query.seller_id || '').trim() || null)
+          : scope.sellerId
         const params = []
         let where = ''
         if (sellerId) { params.push(sellerId); where = `WHERE seller_id = $1` }
+        else if (!isSuperuser) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
         const r = await client.query(
           `SELECT id, seller_id, code, discount_type, discount_value, min_subtotal_cents, usage_limit, per_customer_limit, used_count, active, starts_at, expires_at, created_at, updated_at
            FROM admin_hub_coupons ${where}
@@ -42,16 +53,20 @@ module.exports = function createCouponsRouter({ normalizeCouponCode }) {
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const isSuperuser = req.sellerUser?.is_superuser || false
-        const callerSellerId = req.sellerUser?.seller_id
+        const scope = resolveSellerScope(req.sellerUser)
+        if (!scope) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
+        const isSuperuser = scope.isSuperuser
         const body = req.body || {}
         // Superuser without explicit seller_id → 'default' (platform-wide coupon)
         // Superuser with explicit seller_id → coupon for that specific seller
         // Normal seller → always their own seller_id
-        const sellerId = (isSuperuser
-          ? String(body.seller_id || 'default')
-          : String(callerSellerId || 'default')).trim() || 'default'
-        if (!isSuperuser && sellerId !== callerSellerId) {
+        const sellerId = isSuperuser
+          ? (String(body.seller_id || 'default').trim() || 'default')
+          : scope.sellerId
+        if (!isSuperuser && (!sellerId || sellerId === 'default')) {
           await client.end()
           return res.status(403).json({ message: 'Forbidden' })
         }

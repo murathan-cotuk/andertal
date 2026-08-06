@@ -1,13 +1,12 @@
 'use strict'
 const { Router } = require('express')
+const { getPooledClient } = require('../db-pool')
 
-const getDbClient = () => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  const isRender = dbUrl.includes('render.com')
-  return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
-}
+// /store/styles is fetched on every single page load (shop + Sellercentral branding/theme
+// bootstrap) — was opening a brand-new Postgres connection per request, which is the
+// dominant contributor to the multi-second/occasional-500 latency seen under concurrent
+// load. Pooled client keeps the exact same connect()/query()/end() shape used below.
+const getDbClient = () => getPooledClient()
 
 const stylesGET = async (req, res) => {
   const client = getDbClient()

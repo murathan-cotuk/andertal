@@ -556,8 +556,11 @@ const updateAdminHubProductDb = async (id, body) => {
 const adminHubProductsGET = async (req, res) => {
   try {
     const q = { ...(req.query || {}) }
-    if (!req.sellerUser.is_superuser && req.sellerUser.seller_id) {
-      q.seller_id = String(req.sellerUser.seller_id).trim()
+    const isSuperuser = req.sellerUser?.is_superuser === true
+    const sellerId = String(req.sellerUser?.seller_id || '').trim()
+    if (!isSuperuser) {
+      if (!sellerId) return res.status(403).json({ message: 'Forbidden' })
+      q.seller_id = sellerId
     }
     const products = await listAdminHubProductsDb(q)
     res.json({ products, count: products.length })

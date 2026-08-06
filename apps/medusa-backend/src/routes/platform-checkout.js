@@ -34,12 +34,11 @@ const paymentMethodTypesFromPlatformRow = (row) => {
   return types
 }
 
-const getDbClient = () => {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
-}
+const { getPooledClient } = require('../db-pool')
+
+// Includes /store/seller-settings, fetched on every page load — pooled to avoid a fresh
+// Postgres TCP+TLS handshake per request (see src/db-pool.js).
+const getDbClient = () => getPooledClient()
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 

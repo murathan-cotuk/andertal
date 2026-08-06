@@ -65,24 +65,33 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         // Non-superuser: only orders that belong to them OR contain their line items
         // (covers multi-seller carts that were still stamped with another seller_id).
         const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
-        const isSuperuser = !!req.sellerUser?.is_superuser
+        const isSuperuser = req.sellerUser?.is_superuser === true
         // Non-superusers are always scoped to their own seller_id (ignore query spoofing).
         const filterSellerId = isSuperuser
           ? String(seller_id || '').trim()
           : callerSellerId
+        if (!isSuperuser && (!filterSellerId || filterSellerId === 'default')) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
+        }
         if (filterSellerId) {
           params.push(filterSellerId)
           const n = params.length
           conditions.push(`(
-            o.seller_id = $${n}
-            OR EXISTS (
+            EXISTS (
               SELECT 1 FROM store_order_items oi
               WHERE oi.order_id = o.id AND (
                 NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
-                OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                OR (
+                  NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
+                  AND (
+                    EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
+                    OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                  )
+                )
               )
             )
+            OR (o.seller_id = $${n} AND o.seller_id IS DISTINCT FROM 'default')
           )`)
         }
         const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''

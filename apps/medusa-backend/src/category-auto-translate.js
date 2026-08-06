@@ -23,14 +23,12 @@ function deepLang(loc) {
   return m[u.slice(0, 2)] || 'EN'
 }
 
+// applyCategoryLocale() runs on every /store/categories request (called on nearly every
+// storefront page load) — pooled to avoid a fresh Postgres TCP+TLS handshake per request
+// (see src/db-pool.js).
 function pgClientFromEnv() {
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
-  const { Client } = require('pg')
-  return new Client({
-    connectionString: dbUrl,
-    ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false,
-  })
+  const { getPooledClient } = require('./db-pool')
+  return getPooledClient()
 }
 
 async function ensureCacheTable(client) {

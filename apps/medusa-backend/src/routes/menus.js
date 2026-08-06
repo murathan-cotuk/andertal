@@ -1,20 +1,19 @@
 'use strict'
 const { Router } = require('express')
 const { container } = require('@medusajs/framework')
+const { getPooledClient } = require('../db-pool')
 
 const resolveMenuService = () => {
   try { return container.resolve('menuService') } catch { return null }
 }
 
+// /store/menus + /store/menu-locations are fetched on every storefront page load —
+// pooled to avoid a fresh Postgres TCP+TLS handshake per request (see src/db-pool.js).
 const getMenuDbClient = () => {
-  const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL || ''
-  const dbUrl = raw.replace(/^postgresql:\/\//, 'postgres://')
-  if (!dbUrl || !dbUrl.startsWith('postgres')) return null
   try {
-    const { Client } = require('pg')
-    return new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    return getPooledClient()
   } catch (e) {
-    console.warn('Menu DB: pg client create failed', e && e.message)
+    console.warn('Menu DB: pooled client create failed', e && e.message)
     return null
   }
 }

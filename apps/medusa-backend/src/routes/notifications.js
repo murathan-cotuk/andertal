@@ -1,16 +1,20 @@
 'use strict'
 const { Router } = require('express')
+const { resolveSellerScope, sqlOrderVisibleToActor } = require('../seller-scope')
 
 module.exports = function createNotificationsRouter() {
     // ── Notifications (per-recipient read/delete state: seller_hub_notification_state) ──
     const getNotifRecipientContext = (req) => {
-      const u = req.sellerUser
-      if (!u) return null
-      const isSuperuser = !!u.is_superuser
-      const sellerId = String(u.seller_id || '').trim()
-      if (!isSuperuser && !sellerId) return null
-      return { isSuperuser, sellerId, recipientKey: isSuperuser ? '__superuser__' : sellerId }
+      const scope = resolveSellerScope(req.sellerUser)
+      if (!scope) return null
+      return {
+        isSuperuser: scope.isSuperuser,
+        sellerId: scope.sellerId,
+        recipientKey: scope.isSuperuser ? '__superuser__' : scope.sellerId,
+      }
     }
+
+    const orderScopeSql = (superParam, sellerParam) => sqlOrderVisibleToActor('o', superParam, sellerParam)
 
     const markAllNotificationsRead = async (client, recipientKey, isSuperuser, sellerId) => {
       const sup = !!isSuperuser
@@ -18,12 +22,7 @@ module.exports = function createNotificationsRouter() {
       await client.query(
         `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
          SELECT $1::varchar, 'order', o.id, now() FROM store_orders o
-         WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+         WHERE ${orderScopeSql('$2', '$3')}
          ON CONFLICT (recipient_key, source_type, source_id)
          DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
         [recipientKey, sup, sid],
@@ -32,12 +31,7 @@ module.exports = function createNotificationsRouter() {
         `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
          SELECT $1::varchar, 'return', r.id, now()
          FROM store_returns r INNER JOIN store_orders o ON o.id = r.order_id
-         WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+         WHERE ${orderScopeSql('$2', '$3')}
          ON CONFLICT (recipient_key, source_type, source_id)
          DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
         [recipientKey, sup, sid],
@@ -135,20 +129,14 @@ module.exports = function createNotificationsRouter() {
         if (!sup) {
           messagesR = await client.query(
             `SELECT COUNT(*)::int AS c FROM store_messages m
+             LEFT JOIN store_orders o ON o.id = m.order_id
              WHERE m.is_read_by_seller = false
                AND (
                  (
                    (m.channel = 'customer' OR m.channel IS NULL)
                    AND m.sender_type = 'customer'
-                   AND m.order_id IN (
-                     SELECT o.id FROM store_orders o WHERE o.seller_id = $1
-                       OR EXISTS (
-                         SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                           EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
-                           OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $1)
-                         )
-                       )
-                   )
+                   AND m.order_id IS NOT NULL
+                   AND ${orderScopeSql('false', '$1')}
                  )
                  OR (
                    m.channel = 'support' AND m.seller_id = $1 AND m.sender_type = 'seller'
@@ -178,12 +166,7 @@ module.exports = function createNotificationsRouter() {
           SELECT COUNT(*)::int AS c FROM store_orders o
           LEFT JOIN seller_hub_notification_state s
             ON s.recipient_key = $1 AND s.source_type = 'order' AND s.source_id = o.id
-          WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+          WHERE ${orderScopeSql('$2', '$3')}
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
         const returnsUnreadQ = `
@@ -191,12 +174,7 @@ module.exports = function createNotificationsRouter() {
           INNER JOIN store_orders o ON o.id = r.order_id
           LEFT JOIN seller_hub_notification_state s
             ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
-          WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+          WHERE ${orderScopeSql('$2', '$3')}
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
         const verificationsUnreadQ = sup
@@ -302,12 +280,7 @@ module.exports = function createNotificationsRouter() {
            FROM store_orders o
            LEFT JOIN seller_hub_notification_state s
              ON s.recipient_key = $1 AND s.source_type = 'order' AND s.source_id = o.id
-           WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+           WHERE ${orderScopeSql('$2', '$3')}
              AND (s.id IS NULL OR s.deleted_at IS NULL)
            ORDER BY o.created_at DESC LIMIT 8`,
           [rk, sup, sid],
@@ -319,12 +292,7 @@ module.exports = function createNotificationsRouter() {
            INNER JOIN store_orders o ON o.id = r.order_id
            LEFT JOIN seller_hub_notification_state s
              ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
-           WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+           WHERE ${orderScopeSql('$2', '$3')}
              AND (s.id IS NULL OR s.deleted_at IS NULL)
            ORDER BY r.created_at DESC LIMIT 8`,
           [rk, sup, sid],
@@ -554,12 +522,7 @@ module.exports = function createNotificationsRouter() {
            FROM store_orders o
            LEFT JOIN seller_hub_notification_state s
              ON s.recipient_key = $1 AND s.source_type = 'order' AND s.source_id = o.id
-           WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+           WHERE ${orderScopeSql('$2', '$3')}
              AND (s.id IS NULL OR s.deleted_at IS NULL)
            ORDER BY o.created_at DESC LIMIT 500`,
           [rk, sup, sid],
@@ -571,12 +534,7 @@ module.exports = function createNotificationsRouter() {
            INNER JOIN store_orders o ON o.id = r.order_id
            LEFT JOIN seller_hub_notification_state s
              ON s.recipient_key = $1 AND s.source_type = 'return' AND s.source_id = r.id
-           WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+           WHERE ${orderScopeSql('$2', '$3')}
              AND (s.id IS NULL OR s.deleted_at IS NULL)
            ORDER BY r.created_at DESC LIMIT 500`,
           [rk, sup, sid],
@@ -1035,12 +993,7 @@ module.exports = function createNotificationsRouter() {
           await client.query(
             `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
              SELECT $1::varchar, 'order', o.id, now() FROM store_orders o
-             WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+             WHERE ${orderScopeSql('$2', '$3')}
              ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
             [rk, sup, sid],
           )
@@ -1048,12 +1001,7 @@ module.exports = function createNotificationsRouter() {
             `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
              SELECT $1::varchar, 'return', r.id, now()
              FROM store_returns r INNER JOIN store_orders o ON o.id = r.order_id
-             WHERE ($2::boolean OR o.seller_id = $3 OR EXISTS (
-              SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $3)
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $3)
-              )
-            ))
+             WHERE ${orderScopeSql('$2', '$3')}
              ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
             [rk, sup, sid],
           )

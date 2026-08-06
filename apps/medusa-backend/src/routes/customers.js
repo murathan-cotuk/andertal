@@ -12,15 +12,36 @@ const adminHubCustomersGET = async (req, res) => {
     const { search = '', limit = '50', offset = '0' } = req.query
     const lim = Math.min(Number(limit)||50, 200)
     const off = Number(offset)||0
-    // Seller isolation: non-superusers only see customers who ordered from them
-    const isSuperuser = req.sellerUser?.is_superuser || false
-    const sellerSellerId = req.sellerUser?.seller_id
+    // Seller isolation: non-superusers only see customers who ordered their items
+    const isSuperuser = req.sellerUser?.is_superuser === true
+    const sellerSellerId = String(req.sellerUser?.seller_id || '').trim()
     let whereParts = []
     let params = []
-    // Restrict to seller's own customers
-    if (!isSuperuser && sellerSellerId) {
+    if (!isSuperuser) {
+      if (!sellerSellerId || sellerSellerId === 'default') {
+        await client.end()
+        return res.status(403).json({ message: 'Forbidden' })
+      }
       params.push(sellerSellerId)
-      whereParts.push(`EXISTS (SELECT 1 FROM store_orders o WHERE LOWER(o.email) = LOWER(c.email) AND o.seller_id = $${params.length})`)
+      const n = params.length
+      whereParts.push(`EXISTS (
+        SELECT 1 FROM store_orders o
+        WHERE LOWER(o.email) = LOWER(c.email) AND (
+          EXISTS (
+            SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
+              NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
+              OR (
+                NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
+                AND (
+                  EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                  OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
+                )
+              )
+            )
+          )
+          OR (o.seller_id = $${n} AND o.seller_id IS DISTINCT FROM 'default')
+        )
+      )`)
     }
     if (search) {
       params.push(`%${search}%`)
@@ -32,8 +53,22 @@ const adminHubCustomersGET = async (req, res) => {
       }
     }
     const where = whereParts.length > 0 ? 'WHERE ' + whereParts.join(' AND ') : ''
-    // For stats, also filter by seller if not superuser
-    const orderStatsSeller = (!isSuperuser && sellerSellerId) ? `WHERE seller_id = '${sellerSellerId.replace(/'/g,"''")}'` : ''
+    // Stats must use item ownership — store_orders.seller_id is platform `default`.
+    const orderStatsSeller = (!isSuperuser && sellerSellerId)
+      ? `WHERE EXISTS (
+           SELECT 1 FROM store_order_items oi
+           WHERE oi.order_id = store_orders.id AND (
+             NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = '${sellerSellerId.replace(/'/g, "''")}'
+             OR (
+               NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
+               AND (
+                 EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = '${sellerSellerId.replace(/'/g, "''")}')
+                 OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = '${sellerSellerId.replace(/'/g, "''")}')
+               )
+             )
+           )
+         )`
+      : ''
     const q = `
       SELECT c.id, c.customer_number, c.email, c.first_name, c.last_name, c.phone, c.country,
              c.account_type, c.created_at,

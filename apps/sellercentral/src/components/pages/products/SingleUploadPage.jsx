@@ -102,7 +102,12 @@ export default function SingleUploadPage() {
   }, []);
 
   useEffect(() => {
-    const sellerId = typeof localStorage !== "undefined" ? localStorage.getItem("sellerId") : null;
+    // Guard against the literal string "null"/"undefined" — localStorage.setItem() stringifies
+    // whatever it's given, so a login response with seller_id: null silently becomes the 4-char
+    // string "null" here, which is truthy and used to look valid while actually breaking every
+    // downstream check that only tests `!!sellerId` (e.g. the create-product button below).
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem("sellerId") : null;
+    const sellerId = raw && raw !== "null" && raw !== "undefined" ? raw : "";
     if (sellerId) setFormData((prev) => ({ ...prev, seller: sellerId }));
   }, []);
 
@@ -158,7 +163,7 @@ export default function SingleUploadPage() {
     setMessage({ type: "", text: "" });
     const SKU = formData.SKU || formData.title.toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-]/g, "");
     const slug = SKU.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    let sellerId = formData.seller || (typeof localStorage !== "undefined" ? localStorage.getItem("sellerId") : null);
+    const sellerId = formData.seller;
 
     if (!sellerId) {
       setMessage({ type: "error", text: copy.sellerRequired });
@@ -262,6 +267,12 @@ export default function SingleUploadPage() {
           </Layout.Section>
         )}
 
+        {!formData.seller && (
+          <Layout.Section>
+            <Banner tone="warning">{copy.sellerRequired}</Banner>
+          </Layout.Section>
+        )}
+
         {categoriesApiFailed && (
           <Layout.Section>
             <Banner tone="warning">
@@ -356,11 +367,11 @@ export default function SingleUploadPage() {
                       />
                       <TextField
                         label={copy.sellerId}
-                        value={formData.seller || (typeof localStorage !== "undefined" ? localStorage.getItem("sellerId") : "") || ""}
+                        value={formData.seller || ""}
                         onChange={(value) => setFormData((prev) => ({ ...prev, seller: value }))}
                         placeholder={copy.fromLogin}
                         autoComplete="off"
-                        disabled={!!(typeof localStorage !== "undefined" && localStorage.getItem("sellerId"))}
+                        disabled={Boolean(formData.seller)}
                       />
                     </FormLayout.Group>
                   </FormLayout>

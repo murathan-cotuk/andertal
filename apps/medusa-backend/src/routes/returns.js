@@ -98,23 +98,35 @@ const adminHubReturnsGET = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const sellerId = (req.query.seller_id || '').trim()
+    const isSuperuser = req.sellerUser?.is_superuser === true
+    const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
+    // Non-superusers are forced to their JWT seller — never trust query, never fail-open.
+    const sellerId = isSuperuser
+      ? String(req.query.seller_id || '').trim()
+      : jwtSellerId
+    if (!isSuperuser && !sellerId) {
+      await client.end()
+      return res.status(403).json({ message: 'Forbidden' })
+    }
     const params = []
     let where = ''
     if (sellerId) {
       params.push(sellerId)
       const n = params.length
-      // o.seller_id is always the platform now (an order can mix items from several real
-      // sellers) — match any order where this seller actually has an item, same pattern as
-      // orders.js/transactions.js/messages.js.
       where = `WHERE (
-        o.seller_id = $${n}
-        OR EXISTS (
+        EXISTS (
           SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-            EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
-            OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
+            NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
+            OR (
+              NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
+              AND (
+                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
+              )
+            )
           )
         )
+        OR (o.seller_id = $${n} AND o.seller_id IS DISTINCT FROM 'default')
       )`
     }
     const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method, o.seller_id FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ${where} ORDER BY r.created_at DESC LIMIT 100`, params)

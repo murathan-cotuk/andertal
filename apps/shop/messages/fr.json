@@ -172,7 +172,7 @@
     "navWishlist": "Liste d'envies",
     "navAddresses": "Adresses",
     "navPayment": "Paiement",
-    "navMessages": "Messages",
+    "navMessages": "Support",
     "navReviews": "Avis",
     "navBonus": "Points"
   },
@@ -540,7 +540,7 @@
     "wishlist": "Liste de souhaits",
     "addresses": "Adresses",
     "paymentMethods": "Moyens de paiement",
-    "messages": "Messages",
+    "messages": "Support",
     "reviews": "Avis",
     "bonus": "Points bonus"
   },
@@ -614,8 +614,7 @@
       "bonus": "Bonus et coupon",
       "privacy": "Confidentialité",
       "technical": "Problème technique",
-      "other": "Autre",
-      "legacy": "Ancien message"
+      "other": "Autre"
     },
     "categoryDescriptions": {
       "order_delivery": "Tracking, delays or missing items",
@@ -747,6 +746,7 @@
   "caseInbox": {
     "title": "Dossiers d’assistance",
     "subtitle": "Vos échanges avec l’assistance",
+    "newCase": "Nouvelle demande",
     "caseListLabel": "Support case list",
     "refresh": "Actualiser les dossiers",
     "filterLabel": "Filter cases",
@@ -754,8 +754,7 @@
       "open": "Open",
       "awaiting_customer": "Awaiting you",
       "awaiting_seller": "Awaiting seller",
-      "resolved": "Resolved",
-      "closed": "Closed",
+      "done": "Terminé",
       "unread": "Unread"
     },
     "statuses": {
@@ -785,8 +784,7 @@
       "bonus": "Bonus et coupon",
       "privacy": "Confidentialité",
       "technical": "Problème technique",
-      "other": "Autre",
-      "legacy": "Ancien message"
+      "other": "Autre"
     },
     "loadingCases": "Loading cases…",
     "loadingDetail": "Loading case…",

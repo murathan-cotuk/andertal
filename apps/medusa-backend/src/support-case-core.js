@@ -53,7 +53,7 @@ function routeCategory(category) {
 
 function normalizeCaseView(view) {
   const normalized = normalizePlainText(view, 20).toLowerCase()
-  return normalized === '' || normalized === 'open' || normalized === 'unread' ? normalized : null
+  return ['', 'open', 'unread', 'done'].includes(normalized) ? normalized : null
 }
 
 function groupOrderItemsBySeller(items, category) {
