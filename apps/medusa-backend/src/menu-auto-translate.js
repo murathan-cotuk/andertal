@@ -119,9 +119,15 @@ async function translateAndCache(client, texts, sourceLang, targetLang) {
   return cached
 }
 
-function manualOverride(i18nField, locale) {
+// Sellercentral's editor writes name_i18n/label_i18n as { [locale]: { [field]: value } }
+// (matching pages.js's title_i18n shape) — NOT { [locale]: value }. Reading i18nField[locale]
+// directly returned the nested object itself, which String()-coerced to "[object Object]"
+// in the shop whenever a manual translation was set for a menu name or item label.
+function manualOverride(i18nField, locale, field) {
   if (!i18nField || typeof i18nField !== 'object') return ''
-  const v = i18nField[locale]
+  const entry = i18nField[locale]
+  if (!entry) return ''
+  const v = typeof entry === 'object' ? entry[field] : entry
   return v ? String(v).trim() : ''
 }
 
@@ -137,9 +143,9 @@ async function applyMenuLocale(menusWithItems, targetLocale, opts = {}) {
 
   const texts = []
   for (const menu of menusWithItems) {
-    if (!manualOverride(menu.name_i18n, locale) && menu.name) texts.push(String(menu.name).trim())
+    if (!manualOverride(menu.name_i18n, locale, 'name') && menu.name) texts.push(String(menu.name).trim())
     for (const item of menu.items || []) {
-      if (!manualOverride(item.label_i18n, locale) && item.label) texts.push(String(item.label).trim())
+      if (!manualOverride(item.label_i18n, locale, 'label') && item.label) texts.push(String(item.label).trim())
     }
   }
   const unique = [...new Set(texts)]
@@ -166,7 +172,7 @@ async function applyMenuLocale(menusWithItems, targetLocale, opts = {}) {
   }
 
   for (const menu of menusWithItems) {
-    const manualName = manualOverride(menu.name_i18n, locale)
+    const manualName = manualOverride(menu.name_i18n, locale, 'name')
     if (manualName) {
       menu.name = manualName
     } else if (menu.name) {
@@ -174,7 +180,7 @@ async function applyMenuLocale(menusWithItems, targetLocale, opts = {}) {
       if (translated) menu.name = translated
     }
     for (const item of menu.items || []) {
-      const manualLabel = manualOverride(item.label_i18n, locale)
+      const manualLabel = manualOverride(item.label_i18n, locale, 'label')
       if (manualLabel) {
         item.label = manualLabel
       } else if (item.label) {

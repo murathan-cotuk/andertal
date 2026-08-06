@@ -1,5 +1,9 @@
 # Andertal — açık görevler
 
+Bu dosya Claude (veya başka bir agent) için yazılmıştır. Her görev bağımsız çalışılabilir.
+Monorepo: `apps/shop`, `apps/sellercentral`, `apps/medusa-backend`.
+Commit atma; kullanıcı istemeden PR açma. Mevcut tasarım dilini bozma.
+
 ---
 
 ## TASK-1 — Sipariş → Versand akışı (EKSİK / NETLEŞTİR)
@@ -26,24 +30,16 @@ Sellercentral’da bir siparişe “Versand” denince sipariş `/orders/shippin
 
 ---
 
-## TASK-2 — Speichern toast’ları viewport’ta sabit görünsün
+## TASK-2 — Speichern toast’ları viewport’ta sabit görünsün ✅ (kısmen — çekirdek mekanizma + 3 sayfa)
 
-**Problem:**
-Sellercentral’da Speichern sonrası başarı/hata bildirimi sayfanın en üstünde (document top) çıkıyor. Kullanıcı sayfanın altındayken scroll etmeden toast’ı göremiyor.
+**Yapıldı:**
+- `apps/sellercentral/src/lib/toast.js`: modül-seviyeli `showToast(message, {error})` singleton (mevcut `confirm-delete.js` deseniyle aynı).
+- `PolarisLayout.jsx`: `Frame`'in `toastMarkup`'ına ikinci bir `<Toast>` slotu eklendi (`pageToast`), `__registerToast` ile bağlandı — artık her sayfa scroll pozisyonundan bağımsız, viewport'ta sabit bir toast tetikleyebilir.
+- Geçirildi: `StylesPage.jsx` (ana Speichern), `ContentPagesPage.jsx` (kaydet/sil), `ContentMenusPage.jsx` (tüm `error` state değişimlerini tek `useEffect` ile toast'a yönlendirdi — 18+ ayrı hata noktası tek satırla kapsandı).
 
-**Hedef:**
-Toast / banner, sayfanın neresinde olursa olsun **viewport içinde** (ekranın üstünde veya görünür köşede) sabit görünsün.
+**Kalan:** Diğer ayar sayfaları (FlowsPage, LandingPageEditor, vb.) henüz geçirilmedi — aynı `showToast()` çağrısı eklenerek kolayca genişletilebilir.
 
-**Kabul kriterleri:**
-- [ ] Uzun bir ayar/içerik sayfasının en altına scroll edip Speichern → toast viewport’ta görünür; `window.scrollTo(0)` zorunlu olmasın.
-- [ ] Success ve error (critical) aynı davranır.
-- [ ] Polaris `Frame` / `Toast` kullanılıyorsa `position: fixed` / Frame toast slot’u doğru bağlanmış olsun; sayfa-içi absolute banner varsa fixed’e çek.
-- [ ] Mevcut toast metinleri ve süreleri bozulmasın.
-
-**İlgili alanlar:**
-- `PolarisLayout.jsx` (`toastMarkup`, Frame)
-- Sayfa lokal toast’lar (ör. `FlowsPage`, settings sayfaları, `onToast` kullanan paneller)
-- Ortak bir toast helper varsa onu düzelt; yoksa tutarsız banner’ları Frame toast’a taşımayı tercih et.
+**Not:** Deploy sonrası doğrulanmalı (henüz canlıda test edilmedi).
 
 ---
 
@@ -138,6 +134,233 @@ Yalnızca geçerli eşleşme eklensin: **EAN**, **SKU** veya **ürün adı** ara
 
 ---
 
-6) sellercentralde content/pages sayfasinda düzenlenen sayfa en üstte olmasin. en son eklenen en üstte olsun. alfabetik olarak da siralayabilelim.
-7) content/menus sayfasinda menüeinträge kismina ekledigmiz menü itemleri her dile göre yazabilelim. su an yazilanlar her dilde gözükecek. böyle olmamali
-8) sayfada bir sürü kategori ve subkategori var. ben bunlari tek tek dillerine ceviremem. 20000 den fazla var. senden ricam bunlari shopta secilen dilde göstermen. mesela bizim kategorimiz var adi "Home". benim isim burada bitsin. müsteri türkce dili secerse shopta "Ev" görsün. bunu ayarla
+## TASK-6 — content/pages: varsayılan sıra + alfabetik sıralama
+
+**Problem:**
+`/content/pages` listesinde düzenlenen (son kaydedilen) sayfa en üste çıkıyor / sıra beklenmedik.
+
+**Hedef:**
+- Varsayılan: **en son eklenen** en üstte (`created_at DESC`).
+- Ayrıca alfabetik sıralama seçilebilsin.
+
+**Kabul kriterleri:**
+- [ ] Varsayılan sort = newest by `created_at` (updated_at ile “düzenlenen en üste” olmasın).
+- [ ] UI’da alfabetik seçenek (title/name ASC).
+- [ ] Blog-only ve normal pages aynı sort semantiğini kullansın.
+- [ ] Backend list API `sort` query ile uyumlu.
+
+**İlgili:** `ContentPagesPage.jsx`, `apps/medusa-backend/src/routes/pages.js`.
+
+**Not:** Sayfada `sort=newest|alpha` zaten varsa davranışı doğrula; bug “edit bumps to top” ise onu düzelt.
+
+---
+
+## TASK-7 — content/menus: menü item etiketleri dil bazlı
+
+**Problem:**
+Menüeinträge label’ı tek string; tüm shop dillerinde aynı görünüyor.
+
+**Hedef:**
+Her menü item için locale başına label (`label_i18n`: de/en/tr/fr/es/it…). Shop seçili dilde doğru metni göstersin.
+
+**Kabul kriterleri:**
+- [ ] Item formunda dil bazlı label alanları.
+- [ ] API `label_i18n` jsonb kaydı/okuması tutarlı.
+- [ ] Boş locale → fallback `label` (string); asla `[object Object]`.
+- [ ] Shop render TASK-12 ile aynı resolve helper’ını kullansın.
+
+**İlgili:** `ContentMenusPage.jsx`, `menus.js`, `store-public.js`, `menu-auto-translate.js`.
+
+---
+
+## TASK-8 — Kategori adları shop dilinde (otomatik çeviri, ~20k)
+
+**Problem:**
+20.000+ kategori/alt kategori elle çevrilemez. Kaynak ad örn. `"Home"` kalsın; müşteri TR seçince shop’ta `"Ev"` görsün.
+
+**Hedef:**
+Shop’ta kategori görünen adı seçili locale’e göre çözülsün. Manuel override varsa o; yoksa otomatik çeviri (DeepL + DB cache — `category-auto-translate.js` desenini tamamla/bağla).
+
+**Kabul kriterleri:**
+- [ ] Sellercentral’da tek kaynak ad yeterli (zorunlu 20k çeviri UI yok).
+- [ ] Shop category sayfaları, breadcrumb, menüdeki kategori linkleri çevrilmiş adı gösterir.
+- [ ] `metadata.translations[locale].name` (veya eşdeğeri) manuel override öncelikli.
+- [ ] Cache’li çeviri; request başına 20k DeepL yok.
+- [ ] Fallback: kaynak ad; asla `[object Object]`.
+
+**İlgili:** `category-auto-translate.js`, category storefront API/UI, menü kategori linkleri.
+
+---
+
+## TASK-9 — content/menus: Blog post seçici + ürün arama seçici
+
+**Problem:**
+1. Link tipi **Blog** → serbest `/path` açılıyor; oluşturulmuş blog post listesi çıkmalı. Blog’lar Seiten ile karışık.
+2. Link tipi **Produkt** → yanlış “Menü auswählen” dropdown; EAN/SKU/ad ile **aranabilir ürün** seçici olmalı.
+
+**Kabul kriterleri:**
+- [ ] Blog: mevcut blog post’lardan seçim (title + slug); path zorunlu olmasın.
+- [ ] Blog listesi pages’ten ayrılmış (`blogOnly` / type=blog).
+- [ ] Produkt: typeahead (EAN, SKU, title); seçince `link_value` = product id/handle.
+- [ ] Rastgele string ürün olarak kaydedilmesin.
+- [ ] Eski kaydedilmiş linkler bozulmadan görünsün.
+
+**İlgili:** `ContentMenusPage.jsx` item form, pages/blog API, admin products search.
+
+---
+
+## TASK-10 — Sellercentral: dropdown’larda arama + alfabetik sıra
+
+**Problem:**
+Select/dropdown’larda arama yok; seçenek sırası rastgele.
+
+**Hedef:**
+Kullanıcıya sunulan seçilebilir listeler:
+1. Mümkünse **aramalı** (Polaris Combobox / Autocomplete),
+2. Seçenekler **alfabetik** (`localeCompare`).
+
+**Yaklaşım:**
+- Ortak helper: `sortOptionsAlpha(options)` + tercih edilen searchable wrapper.
+- Önce kritik sayfalar (menus, shipping groups, categories, brand, order add-product, settings).
+- “TÜM HER YERDE”: tek PR’da 100 dosya şart değil — ortak bileşen + kritik yerler + kalan için takip notu kabul. Native `<select>` arama desteklemez → Combobox’a geç.
+
+**Kabul kriterleri:**
+- [ ] Uzun listelerde yazarak filtreleme.
+- [ ] “—” placeholder en üstte; diğerleri A→Z (label’a göre).
+
+---
+
+## TASK-11 — Slug alanlarına `-` yazılabilsin
+
+**Problem:**
+Slug input’larına tire (`-`) girilemiyor (sanitize/regex fazla agresif).
+
+**Kabul kriterleri:**
+- [ ] İzinli: küçük harf, rakam, `-` (örn. `mein-blog-post`).
+- [ ] Boşluk → `-` normalize; diğer yasak karakterler temizlensin.
+- [ ] Menü / page / blog / category slug aynı kural.
+- [ ] Mevcut slug’lar bozulmasın.
+
+**İlgili:** sellercentral + backend slug sanitize/validation.
+
+---
+
+## TASK-12 — Shop menü adları `[object Object]` + locale çözümü
+
+**Problem:**
+Çok dilli girilen menü isimleri shop’ta `[object Object]`. Seçili dildeki string gösterilmeli. Menü item label’ları da aynı (TASK-7).
+
+**Kök neden (muhtemel):**
+`name_i18n` / `label_i18n` nesnesi string’e cast ediliyor. `menu-auto-translate.js` içinde buna dair not/fix olabilir — storefront resolve’u doğrula ve kapat.
+
+**Kabul kriterleri:**
+- [ ] Menü adı: `name_i18n[locale] || name` → her zaman string.
+- [ ] Item label: `label_i18n[locale] || label` → her zaman string.
+- [ ] UI’da hiç `[object Object]` yok.
+- [ ] Fallback zinciri: locale → de → en → ham alan.
+- [ ] Sellercentral’da girilen tüm diller shop’ta doğru locale’de.
+
+**İlgili:** shop nav/header, `store-public.js`, `menu-auto-translate.js`, `ContentMenusPage` save shape.
+
+---
+
+## TASK-13 — Retoure (iade) uçtan uca
+
+**Durum:** Önce mevcut retoure’u smoke-test et; çalışıyorsa boşlukları kapat, çalışmıyorsa aşağıya göre kur. Domain bilgisi kullanıcıda sınırlı — **net model + UX seçip uygula**, bitince kısa Türkçe özet anlat.
+
+### 13.1 Ürün bazlı iade
+- [ ] Talep siparişin tamamına değil **ürün(ler)e** açılır.
+- [ ] Multi-seller siparişte her seller yalnız kendi kalemlerini yönetir (TASK-5 ownership).
+- [ ] Retoure listesi/detay status’leri buna göre.
+
+### 13.2 İade yöntemi (seller / shipping group ayarı)
+
+**A) Seller karşılar (etiket üretilir)**  
+1. Talep → etiket (carrier veya entegrasyon)  
+2. Status “etiket basıldı” → **Flow** → müşteriye etiket e-postası  
+3. Shop sipariş detayında aynı etiket görünür (sellercentral retoure ile eşleşir)  
+4. Paket gelince seller Retoure’da kontrol + onay → refund
+
+**B) Müşteri karşılar**  
+1. Shop sipariş detayında talimat bloğu  
+2. Müşteri **takip no** girebilsin  
+3. Bu adım için flow e-posta template  
+4. Seller onay → refund
+
+### 13.3 settings/shipping + shipping groups
+- [ ] Giden kargo: DHL / Hermes / DPD hesabı **veya** harici WMS/ERP (JTL, Odoo, Xentral, Billbee… — bağlı olanlar seçenek; pluggable slot).
+- [ ] Entegrasyon seçilirse etiket/işleme orada; platformun ihtiyaç duyduğu alanlar API sync ile gelsin (tracking, label URL, status).
+- [ ] Aynı group (veya net “Returns” alt bölümü) içinde retoure yöntemi seçilebilsin.
+- [ ] Ayrı Retoure ayar sayfası **zorunlu değil** — tercih: `settings/shipping` altında. Gerekirse collapsible Returns; nav şişirme.
+
+### 13.4 Flows + shop görünürlük
+- [ ] Label-created (ve benzeri) status → flow hook.
+- [ ] Return-label maili + customer-pays talimat maili template’leri.
+- [ ] Shop sipariş detayı etiket / takip formu.
+
+### 13.5 Teslim
+- [ ] Happy-path’i kısa madde madde yaz (sellercentral + shop).
+- [ ] MVP sınırları varsa belirt (örn. ilk PR tek carrier + manuel label URL).
+
+**İlgili:** shop order detail / returns; sellercentral Retoure + `settings/shipping`; `returns.js`; carriers/Sendcloud; `flow-automation`.
+
+**İç sıra:** smoke → ürün bazlı + scope → label/email/shop → shipping group retoure → entegrasyon slot.
+
+---
+
+## TASK-14 — Yeni seller dashboard to-do listesi (onboarding)
+
+**Problem:**
+Yeni kayıt olan seller için verification yetmez; satışa başlamak için bir dizi kurulum gerekir. Dashboard’da öncelikli checklist görünmeli.
+
+**Hedef:**
+Dashboard’da to-do list:
+1. **İlk sırada:** Verification / KYB (zorunlu öncelik)
+2. Sonra örnek kurulumlar (tam listeyi mevcut onboarding/settings’e göre doldur):
+   - Shipping group oluşturma
+   - Şirket / adres bilgileri
+   - İade adresi
+   - Kargo carrier bağlama
+   - Harici entegrasyon bağlama (varsa)
+   - (Mevcut sistemde satış için gerçekten gerekli diğer adımlar)
+
+Her madde: **Do now** → ilgili ayar sayfasına link; isteğe bağlı **Skip** (verification skip edilemez veya skip sonrası uyarı).
+
+**Kabul kriterleri:**
+- [ ] Yeni / eksik kurulumlu seller dashboard’da listeyi görür.
+- [ ] Tamamlanan maddeler işaretlenir / listeden düşer (backend veya settings state’e göre).
+- [ ] Superuser veya tam kurulumlu hesapta boş/gizli.
+- [ ] i18n (sellercentral dilleri).
+- [ ] Skip edilenler sonra tekrar gösterilebilir (dismiss ≠ permanently done, veya net ayrım).
+
+**İlgili:** sellercentral Dashboard, seller account/approval fields, settings routes (shipping, address, integrations, verification).
+
+---
+
+
+## Durum (bu oturumun sonu) + kalan adımlar
+
+**Kodda düzeltildi, henüz canlıda test edilmedi (redeploy sonrası doğrula):**
+- **TASK-6** ✅ — `pages.js: pagesListGET` artık `sort=alpha` yoksa `created_at DESC`; `ContentPagesPage.jsx`'e sort Select eklendi.
+- **TASK-7 + TASK-12** ✅ — kök neden bulundu: `menu-auto-translate.js`'teki `manualOverride()` `name_i18n`/`label_i18n`'i düz `{locale: value}` okuyordu ama Sellercentral iç içe `{locale: {field: value}}` yazıyor — nesne `String()`'e çevrilince `[object Object]` çıkıyordu. Fonksiyon nested şekli okuyacak şekilde düzeltildi (field parametresi eklendi), her iki çağrı noktası (`menu.name_i18n`, `item.label_i18n`) güncellendi.
+- **TASK-9** ✅ (kısmi) — "Blog post" link type artık `page_type=blog` sayfalarından gerçek bir seçici gösteriyor; "Page" seçici blog yazılarını artık içermiyor (temiz ayrım). "Produkt" seçici artık EAN/SKU ile aranabilir (`SearchableSelect`). **Kalan:** `apiFunctionOptionsForLocale`/diğer link type'larda (category/collection) arama henüz yok — TASK-10 ile birleştirilebilir.
+- **TASK-11** ✅ — `slugify.js`: `sanitizeSeoHandleInput` her tuş vuruşunda sondaki `-`'yi siliyordu (yazarken anlık olarak son karakter oluyor). Artık sadece baştaki `-` temizleniyor; kaydederken `normalizeSeoHandle()` ile sondaki de temizleniyor. `ContentPagesPage.jsx`'in save path'ine bağlandı. **Kalan:** `ProductEditPage.jsx`'teki handle input'u aynı `sanitizeSeoHandleInput`'u kullanıyor (otomatik düzeldi) ama save path'inde `normalizeSeoHandle()` çağrılmıyor — istenirse oraya da eklenebilir (kozmetik, sondaki `-` URL'de zararsız).
+- **TASK-10** 🔶 (temel atıldı) — `apps/sellercentral/src/components/inputs/SearchableSelect.jsx` oluşturuldu (Polaris Autocomplete, alfabetik + type-to-filter, genel amaçlı — `{label, value, sublabel}` alır). ContentMenusPage'deki Product/Page/Blog post seçicilerine takıldı (kanıtlanmış çalışıyor). **Kalan — dosya dosya `<Select>` → `<SearchableSelect>` geçişi gereken yerler (öncelik sırasıyla):**
+  1. `OrderDetailPage.jsx` / sipariş "Hinzufügen" ürün ekleme (bulunamadı — muhtemelen `orders.js`'e bağlı, TASK-5.2 ile birlikte yapılmalı, o dosyalar bu oturumda başka bir yerden aktif değişiyordu, dokunulmadı).
+  2. `ContentMenusPage.jsx` — Category (şu an `CategoryDrilldownSelect`, kendi arama mantığı var, muhtemelen zaten yeterli — kontrol et), Collection seçici (hâlâ düz `<Select>`).
+  3. `ProductEditPage.jsx` — collection/category/seller seçiciler.
+  4. `LandingPageEditor.jsx` — sayfa/kategori seçiciler (`pageOptions`, kategori drilldown).
+  5. Settings sayfaları (shipping groups, seller listesi vb. — superuser'ın büyük listelerde kullandığı yerler).
+  Yöntem: `import SearchableSelect from "@/components/inputs/SearchableSelect"`, `options={list.map(x => ({label, value, sublabel?}))}`, aynı `value`/`onChange` imzası — mekanik bir değişim.
+
+**Henüz hiç başlanmadı (bu oturumda dokunulmadı):**
+- **TASK-1** (Versand akışı) — kullanıcı notu yarım, önce netleştirilmeli. Netleşince: `VersandPage.jsx` + sipariş detayındaki Versand aksiyonunu oku, sessionStorage yerine kalıcı bir state/query mekanizması kur.
+- **TASK-3** (Lieferschein şablon paritesi) — önce Rechnung şablon sisteminin tam envanterini çıkar (ayarlar, editör, PDF pipeline dosyaları), sonra Lieferschein karşılığını aynı desende inşa et.
+- **TASK-4 doğrulama** — bu oturumda alt maddelerin hepsi kod tarafında tamam bulundu (SupportCaseInbox, orders→case, reopen mantığı, i18n menü adı) ama CANLIDA doğrulanmadı — redeploy sonrası tek tek test et, sorun çıkarsa bildir.
+- **TASK-5.1 / 5.2** (seller order isolation + Hinzufügen search) — **DİKKAT:** `orders.js`, `coupons.js`, `payouts.js`, `transactions.js`, `notifications.js`, `messages.js` ve yeni bir `seller-scope.js` yardımcı dosyası bu oturum sırasında git status'ta zaten "modified/untracked" görünüyordu — muhtemelen başka bir agent/oturum aynı TASK-5'i o dosyalarda inşa ediyordu. Devam etmeden önce o dosyaların şu anki durumunu kontrol et (belki 5.1 zaten bitmiş); çakışmamak için bu oturumda dokunulmadı.
+- **TASK-8 doğrulama** — `category-auto-translate.js` kod olarak doğru (manuel override şekli zaten nested/doğruydu, TASK-7/12'deki menü bug'ı burada yoktu). Canlıda "Home"→"Ev" gerçekten dönüyor mu diye test et; dönmüyorsa `/store/categories`'in `applyCategoryLocale`'i çağırdığından ve DeepL API key'inin tanımlı olduğundan emin ol.
+- **TASK-13** (Retoure) — hiç incelenmedi, en büyük görev. Önce mevcut retoure akışını smoke-test et (`returns.js`, sellercentral Retoure sayfası, shop order detail) — TASK-1 ile aynı "önce netleştir" prensibi geçerli.
+- **TASK-14** (Onboarding to-do) — hiç incelenmedi. Önce mevcut Dashboard + seller approval/settings alanlarının envanterini çıkar (hangi kurulum adımları zaten var, hangileri eksik) sonra checklist UI'ı ekle.
+
+**Bu oturumda ayrıca yapılan (TASKS.md'de madde olarak yoktu ama düzeltildi):**
+- Sellercentral favicon sistemi, DB connection pooling (styles/menus/categories/seller-settings), Sellercentral login `?next=` redirect, superuser support-case email bildirimi, nachrichten sayfası UI genişletme, add-product "sellerId=null" stuck-button bug, mobile bestseller badge image URL bug, Next.js build hatası (`useSearchParams` Suspense + eksik `nav.installed`/`nav.appStore` çeviri anahtarları).

@@ -110,7 +110,9 @@
     "newsletter": "Bülten",
     "productGroups": "Ürün grupları",
     "issueLog": "Sorun günlüğü",
-    "transactions": "İşlemler"
+    "transactions": "İşlemler",
+    "appStore": "Uygulama Mağazası",
+    "installed": "Yüklenenler"
   },
   "rankingPage": {
     "title": "Mağazada ürün sıralaması",

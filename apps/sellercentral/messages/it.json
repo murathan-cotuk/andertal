@@ -110,7 +110,9 @@
     "newsletter": "Newsletter",
     "productGroups": "Gruppi di prodotti",
     "issueLog": "Registro problemi",
-    "transactions": "Transazioni"
+    "transactions": "Transazioni",
+    "appStore": "App Store",
+    "installed": "Installate"
   },
   "rankingPage": {
     "title": "Posizionamento prodotti in negozio",

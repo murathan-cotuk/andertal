@@ -46,6 +46,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { fieldNameDisplayLabel } from "@/lib/product-change-request-format";
 import { getNotificationsCopy } from "@/lib/notifications-i18n";
 import { statusLabel as localizeStatus } from "@/lib/status-labels";
+import { __registerToast } from "@/lib/toast";
 
 const discardBtnStyles = `
   .andertal-discard-topbar-btn,
@@ -500,6 +501,10 @@ export default function PolarisLayout({ children }) {
   const [notifData, setNotifData] = useState(null);
   const [msgUnread, setMsgUnread] = useState(0);
   const [orderToast, setOrderToast] = useState(null);
+  const [pageToast, setPageToast] = useState(null);
+  useEffect(() => {
+    __registerToast(setPageToast);
+  }, []);
   const prevOrdersCountRef = useRef(null);
   const notifRef = useRef(null);
   // Track which parent nav item has its sub-menu expanded
@@ -1284,7 +1289,12 @@ export default function PolarisLayout({ children }) {
         topBar={topBarMarkup}
         showMobileNavigation={showMobileNav}
         onNavigationDismiss={() => setShowMobileNav(false)}
-        toastMarkup={orderToast ? <Toast content={orderToast} onDismiss={() => setOrderToast(null)} duration={6000} /> : null}
+        toastMarkup={(
+          <>
+            {orderToast ? <Toast content={orderToast} onDismiss={() => setOrderToast(null)} duration={6000} /> : null}
+            {pageToast ? <Toast key={pageToast.key} content={pageToast.message} error={pageToast.error} duration={pageToast.duration} onDismiss={() => setPageToast(null)} /> : null}
+          </>
+        )}
       >
         {isSuperuser ? <style>{SUPERUSER_NAV_ACCENT_CSS}</style> : null}
         {approvalBanner && (

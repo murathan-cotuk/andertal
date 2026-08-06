@@ -811,6 +811,7 @@ class MedusaAdminClient {
     if (params.offset != null && params.offset !== '') sp.set('offset', String(params.offset));
     if (params.status) sp.set('status', String(params.status));
     if (params.page_type) sp.set('page_type', String(params.page_type));
+    if (params.sort) sp.set('sort', String(params.sort));
     const qs = sp.toString();
     return this.request(`/admin-hub/v1/pages${qs ? `?${qs}` : ''}`)
   }

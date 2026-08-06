@@ -20,6 +20,7 @@ import {
   Modal,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { showToast } from "@/lib/toast";
 import {
   mergeLoadedShopStyles,
   ensureActiveVariant,
@@ -1280,8 +1281,10 @@ export default function StylesPage() {
       }
       setSavedMsg(c.stylesSaved);
       setTimeout(() => setSavedMsg(""), 4000);
+      showToast(c.stylesSaved);
     } catch (e) {
       setErrMsg(e?.message || ui.error);
+      showToast(e?.message || ui.error, { error: true });
     }
     setSaving(false);
   }, [styles, branding, client, c.stylesSaved]);
@@ -1441,16 +1444,6 @@ export default function StylesPage() {
       }}
     >
       <Layout>
-        {errMsg && (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setErrMsg("")}>{errMsg}</Banner>
-          </Layout.Section>
-        )}
-        {savedMsg && (
-          <Layout.Section>
-            <Banner tone="success" onDismiss={() => setSavedMsg("")}>{savedMsg}</Banner>
-          </Layout.Section>
-        )}
         <Layout.Section>
           <Banner tone="info">
             <p>{c.stylesLoadHint}</p>

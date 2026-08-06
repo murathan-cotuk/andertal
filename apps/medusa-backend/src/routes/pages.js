@@ -300,13 +300,17 @@ const pagesListGET = async (req, res) => {
     const pageType = (req.query.page_type || '').trim() || null
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100)
     const offset = parseInt(req.query.offset, 10) || 0
+    // Editing a page must not bump it to the top of the list — sort by creation date
+    // (or title) rather than updated_at, which jumped around on every save.
+    const sort = (req.query.sort || '').trim()
+    const orderBy = sort === 'alpha' ? 'LOWER(title) ASC' : 'created_at DESC'
     let q = `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords,
       title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at
       FROM admin_hub_pages WHERE 1=1`
     const params = []
     if (status) { params.push(status); q += ` AND status = $${params.length}` }
     if (pageType) { params.push(pageType); q += ` AND page_type = $${params.length}` }
-    q += ' ORDER BY updated_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
+    q += ` ORDER BY ${orderBy} LIMIT $` + (params.length + 1) + ' OFFSET $' + (params.length + 2)
     params.push(limit, offset)
     const r = await client.query(q, params)
     let countSql = 'SELECT COUNT(*)::int AS c FROM admin_hub_pages WHERE 1=1'

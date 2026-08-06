@@ -48,10 +48,22 @@ export function titleToHandle(str) {
   return segments.join("-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 }
 
-/** Allow manual edits: letters, digits, hyphens; collapse repeated hyphens. */
+/**
+ * Allow manual edits: letters, digits, hyphens; collapse repeated hyphens.
+ * Does NOT strip a trailing hyphen — this runs on every keystroke (onChange), and
+ * trimming the trailing "-" the instant it's typed made it look like "-" could never
+ * be entered at all (each keypress immediately erased the hyphen the user just typed
+ * at the cursor/end position). Leading hyphens are still stripped since a slug can't
+ * usefully start with one and users don't type at position 0 while mid-edit.
+ */
 export function sanitizeSeoHandleInput(raw) {
   return String(raw || "")
     .replace(/[^a-zA-Z0-9-]/g, "-")
     .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replace(/^-/, "");
+}
+
+/** Final cleanup at save time: also drop a trailing hyphen left over from editing. */
+export function normalizeSeoHandle(raw) {
+  return sanitizeSeoHandleInput(raw).replace(/-$/, "");
 }

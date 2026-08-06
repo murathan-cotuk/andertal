@@ -110,7 +110,9 @@
     "newsletter": "Newsletter",
     "productGroups": "Produktgruppen",
     "issueLog": "Issue-Log",
-    "transactions": "Transaktionen"
+    "transactions": "Transaktionen",
+    "appStore": "App Store",
+    "installed": "Installiert"
   },
   "rankingPage": {
     "title": "Produkt-Sortierung im Shop",

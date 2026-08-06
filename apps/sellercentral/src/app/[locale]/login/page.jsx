@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter, usePathname } from "@/i18n/navigation";
@@ -50,6 +50,14 @@ function LocaleSwitcher() {
 }
 
 export default function Login() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations("auth.login");

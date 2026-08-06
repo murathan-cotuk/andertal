@@ -110,7 +110,9 @@
     "newsletter": "Newsletter",
     "productGroups": "Groupes de produits",
     "issueLog": "Journal des incidents",
-    "transactions": "Transactions"
+    "transactions": "Transactions",
+    "appStore": "App Store",
+    "installed": "Installées"
   },
   "rankingPage": {
     "title": "Classement des produits dans la boutique",

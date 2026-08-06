@@ -18,12 +18,13 @@ import {
 } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
+import { titleToHandle, sanitizeSeoHandleInput, normalizeSeoHandle } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import { getContentPagesCopy } from "@/lib/content-pages-i18n";
 import { dateLocaleFor } from "@/lib/locale-text";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
+import { showToast } from "@/lib/toast";
 
 /** Read a translatable field: DE lives on the plain column, other languages under the matching *_i18n jsonb column. */
 function giPageField(obj, field, i18nField, lang) {
@@ -96,6 +97,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
     meta_description_i18n: {},
   });
   const [editLang, setEditLang] = useState("de");
+  const [sort, setSort] = useState("newest");
   const langOptions = getLandingEditorCopy(locale).shopContentLangOptions();
   const client = getMedusaAdminClient();
 
@@ -103,7 +105,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
     try {
       setLoading(true);
       setError(null);
-      const params = { limit: 100 };
+      const params = { limit: 100, sort };
       // Aynı tablo (admin_hub_pages); ayrı ekranlar: Blog nur blog, Pages nur normale Seiten
       if (blogOnly) params.page_type = "blog";
       else params.page_type = "page";
@@ -119,7 +121,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
 
   useEffect(() => {
     fetchPages();
-  }, [blogOnly]);
+  }, [blogOnly, sort]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -182,7 +184,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
 
   const payloadFromForm = () => {
     const title = (form.title || "").trim();
-    const slug = (form.slug || "").trim() || pageSlugFromTitle(title);
+    const slug = normalizeSeoHandle(form.slug || "").trim() || pageSlugFromTitle(title);
     return {
       title,
       slug,
@@ -218,8 +220,10 @@ export default function ContentPagesPage({ blogOnly = false }) {
       }
       setModalOpen(false);
       await fetchPages();
+      showToast(c.saved);
     } catch (err) {
       setError(err?.message || c.saveError);
+      showToast(err?.message || c.saveError, { error: true });
     } finally {
       setSaving(false);
     }
@@ -240,6 +244,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
       await fetchPages();
     } catch (err) {
       setError(err?.message || c.deleteError);
+      showToast(err?.message || c.deleteError, { error: true });
     }
   };
 
@@ -281,6 +286,19 @@ export default function ContentPagesPage({ blogOnly = false }) {
             </Banner>
           </Layout.Section>
         )}
+        <Layout.Section>
+          <div style={{ maxWidth: 260 }}>
+            <Select
+              label={c.sortLabel}
+              options={[
+                { label: c.sortNewest, value: "newest" },
+                { label: c.sortAlpha, value: "alpha" },
+              ]}
+              value={sort}
+              onChange={setSort}
+            />
+          </div>
+        </Layout.Section>
 
         <Layout.Section>
           <Card>

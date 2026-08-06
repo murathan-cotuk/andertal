@@ -28,10 +28,12 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
 import { getContentMenusCopy, linkTypesForLocale, apiFunctionOptionsForLocale } from "@/lib/content-menus-i18n";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
+import { showToast } from "@/lib/toast";
 
 /** Read a translatable field: DE lives on the plain column, other languages under the *_i18n jsonb column. */
 function giI18n(obj, field, i18nKey, lang) {
@@ -256,7 +258,7 @@ function MenuEditorPanel(props) {
   const tree = buildMenuTree(items);
   const openInlineAdd = (parentId) => {
     setAddUnderParentId(parentId ?? null);
-    setItemForm({ label: "", label_i18n: {}, slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" });
+    setItemForm({ label: "", label_i18n: {}, slug: "", link_type: "url", link_value: "", parent_id: parentId ?? "", category_id: "", collection_id: "", product_id: "", page_id: "", blog_post_id: "", custom_slug: "", api_function: "brand" });
     setInlineNewOpen(true);
     setEditingItemId(null);
   };
@@ -350,6 +352,7 @@ function MenuEditorPanel(props) {
         await fetchMenus();
         if (onMenuSaved) await onMenuSaved(panelMenuId);
       }
+      showToast(menusCopy.saved);
     } catch (err) {
       setError(err?.message || "Failed to save menu");
     } finally {
@@ -744,7 +747,7 @@ function MenuEditorPanel(props) {
                             flatItems={flatItems}
                             parentOptionsForForm={parentOptionsForForm}
                             onSave={inlineSaveItem}
-                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", label_i18n: {}, slug: "", link_type: "url", link_value: "", parent_id: "", category_id: "", collection_id: "", product_id: "", page_id: "", custom_slug: "", api_function: "brand" }); }}
+                            onCancel={() => { setInlineNewOpen(false); setItemForm({ label: "", label_i18n: {}, slug: "", link_type: "url", link_value: "", parent_id: "", category_id: "", collection_id: "", product_id: "", page_id: "", blog_post_id: "", custom_slug: "", api_function: "brand" }); }}
                             saving={saving}
                           />
                         </div>
@@ -821,10 +824,38 @@ function InlineItemRow({ editLang, itemForm, setItemForm, menusCopy, collections
           <Select label="Collection" labelHidden options={[{ label: `— ${menusCopy.selectMenu} —`, value: "" }, ...collections.map((c) => ({ label: c.title || c.handle, value: c.id }))]} value={itemForm.collection_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, collection_id: v }))} />
         )}
         {itemForm.link_type === "product" && (
-          <Select label="Product" labelHidden options={[{ label: `— ${menusCopy.selectMenu} —`, value: "" }, ...(products || []).map((p) => ({ label: p.title || p.handle, value: p.id }))]} value={itemForm.product_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, product_id: v }))} />
+          <div style={{ minWidth: 280, flex: 1 }}>
+            <SearchableSelect
+              label="Product"
+              labelHidden
+              options={(products || []).map((p) => ({ label: p.title || p.handle, value: p.id, sublabel: p.metadata?.ean || p.sku || "" }))}
+              value={itemForm.product_id || ""}
+              onChange={(v) => setItemForm((p) => ({ ...p, product_id: v }))}
+              placeholder="Search by title, SKU or EAN…"
+            />
+          </div>
         )}
         {itemForm.link_type === "page" && (
-          <Select label="Page" labelHidden options={[{ label: `— ${menusCopy.selectMenu} —`, value: "" }, ...(pages || []).map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) }))]} value={itemForm.page_id || ""} onChange={(v) => setItemForm((p) => ({ ...p, page_id: v }))} />
+          <div style={{ minWidth: 280, flex: 1 }}>
+            <SearchableSelect
+              label="Page"
+              labelHidden
+              options={(pages || []).filter((pg) => pg.page_type !== "blog").map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) }))}
+              value={itemForm.page_id || ""}
+              onChange={(v) => setItemForm((p) => ({ ...p, page_id: v }))}
+            />
+          </div>
+        )}
+        {itemForm.link_type === "blog_post" && (
+          <div style={{ minWidth: 280, flex: 1 }}>
+            <SearchableSelect
+              label="Blog post"
+              labelHidden
+              options={(pages || []).filter((pg) => pg.page_type === "blog").map((pg) => ({ label: pg.title || pg.slug, value: String(pg.id) }))}
+              value={itemForm.blog_post_id || ""}
+              onChange={(v) => setItemForm((p) => ({ ...p, blog_post_id: v }))}
+            />
+          </div>
         )}
         {itemForm.link_type === "api" && (
           <Select
@@ -835,7 +866,7 @@ function InlineItemRow({ editLang, itemForm, setItemForm, menusCopy, collections
             onChange={(v) => setItemForm((p) => ({ ...p, api_function: v }))}
           />
         )}
-        {(itemForm.link_type === "url" || itemForm.link_type === "policy" || itemForm.link_type === "blog" || itemForm.link_type === "blog_post") && (
+        {(itemForm.link_type === "url" || itemForm.link_type === "policy" || itemForm.link_type === "blog") && (
           <TextField label="URL/Path" value={itemForm.link_value} onChange={(v) => setItemForm((p) => ({ ...p, link_value: v }))} placeholder={itemForm.link_type === "url" ? "https://…" : "/path"} labelHidden />
         )}
       </div>
@@ -861,6 +892,13 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // This page has many independent save/delete/move actions, several of which fire
+  // while a Modal is open (hiding the page-level Banner behind the overlay) or after
+  // the user has scrolled down a long menu — a viewport-fixed toast mirrors every
+  // error here in one place instead of adding showToast() to each call site.
+  useEffect(() => {
+    if (error) showToast(error, { error: true });
+  }, [error]);
   const [menuModalOpen, setMenuModalOpen] = useState(false);
   const [itemModalOpen, setItemModalOpen] = useState(false);
   const [editingMenuId, setEditingMenuId] = useState(null);
@@ -1169,6 +1207,13 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
         if (v && v.label_slug) custom_slug = v.label_slug;
       } catch (_) {}
     }
+    let blog_post_id = "";
+    if (item.link_type === "blog_post" && item.link_value) {
+      try {
+        const v = JSON.parse(item.link_value);
+        if (v && v.id) blog_post_id = String(v.id);
+      } catch (_) {}
+    }
     let api_function = "brand";
     if (item.link_type === "api" && item.link_value) {
       try {
@@ -1181,12 +1226,13 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       label_i18n: item.label_i18n || {},
       slug: item.slug || custom_slug || normalizeItemSlug(item.label || ""),
       link_type: item.link_type || "url",
-      link_value: item.link_type === "url" || item.link_type === "policy" || item.link_type === "blog" || item.link_type === "blog_post" ? (item.link_value || "") : "",
+      link_value: item.link_type === "url" || item.link_type === "policy" || item.link_type === "blog" ? (item.link_value || "") : "",
       parent_id: item.parent_id || "",
       category_id,
       collection_id,
       product_id,
       page_id,
+      blog_post_id,
       custom_slug,
       api_function,
     });
@@ -1260,6 +1306,9 @@ export default function ContentMenusPage({ panelMode = null, panelMenuId = null 
       const pg = pages.find((x) => String(x.id) === itemForm.page_id);
       const labelSlug = normalizeItemSlug(itemForm.custom_slug || itemSlug || label);
       link_value = JSON.stringify({ id: pg?.id, title: pg?.title, slug: pg?.slug, label_slug: labelSlug });
+    } else if (itemForm.link_type === "blog_post" && itemForm.blog_post_id) {
+      const post = pages.find((x) => String(x.id) === itemForm.blog_post_id);
+      link_value = JSON.stringify({ id: post?.id, title: post?.title, slug: post?.slug });
     } else if (itemForm.link_type === "api") {
       link_value = JSON.stringify({ function: itemForm.api_function || "brand" });
     } else if (itemForm.link_type !== "url") {
