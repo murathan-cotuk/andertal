@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -34,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -52,7 +52,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -70,15 +70,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: '22'
 
-      - name: Install dependencies
-        run: npm ci
-
+      # npm audit only needs the lockfile — no install required.
       - name: Run npm audit (high+)
-        # Soft-gate by default: reports high/critical (Medusa transitive debt) without failing CI.
-        # Set AUDIT_STRICT=1 later when the dependency upgrade wave is complete.
         run: node scripts/ci-npm-audit.js
         env:
           AUDIT_LEVEL: high
@@ -94,7 +89,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -117,7 +112,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
