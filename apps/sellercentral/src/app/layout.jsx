@@ -7,14 +7,15 @@ export const metadata = {
   title: "Seller Central - Andertal",
   description: "Manage your store on Andertal",
   icons: {
+    // Prefer Sellercentral-only proxy. Do not point at shop favicon assets.
     icon: [
-      { url: "/api/brand-favicon", type: "image/png", sizes: "any" },
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/api/brand-favicon?app=sellercentral", type: "image/png", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
     ],
-    shortcut: "/api/brand-favicon",
+    shortcut: "/api/brand-favicon?app=sellercentral",
     apple: [
-      { url: "/api/brand-favicon", sizes: "180x180", type: "image/png" },
-      { url: "/icon-192.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/api/brand-favicon?app=sellercentral", sizes: "180x180", type: "image/png" },
     ],
   },
 };

@@ -600,7 +600,7 @@ export default function PolarisLayout({ children }) {
 
   useEffect(() => {
     // Same-origin proxy (sellercentral_favicon_url only — never shop).
-    applyDocumentFavicon("/api/brand-favicon");
+    applyDocumentFavicon("/api/brand-favicon?app=sellercentral");
   }, [platformBranding.sellercentral_favicon_url]);
 
   useEffect(() => {

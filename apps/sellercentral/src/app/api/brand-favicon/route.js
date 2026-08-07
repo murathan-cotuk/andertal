@@ -16,6 +16,13 @@ function absolutize(url, backend) {
   return s;
 }
 
+function normalizeUrl(url) {
+  return String(url || "")
+    .trim()
+    .replace(/\/+$/, "")
+    .toLowerCase();
+}
+
 async function fallbackIcon() {
   try {
     const filePath = path.join(process.cwd(), "src", "app", "brand-fallback-icon.png");
@@ -25,6 +32,7 @@ async function fallbackIcon() {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=60",
+        "X-Andertal-Favicon": "sellercentral-fallback",
       },
     });
   } catch {
@@ -40,7 +48,14 @@ export async function GET() {
       cache: "no-store",
     });
     const settings = await settingsRes.json().catch(() => ({}));
-    const remote = absolutize(settings?.sellercentral_favicon_url, backend);
+    const scRemote = absolutize(settings?.sellercentral_favicon_url, backend);
+    const shopRemote = absolutize(settings?.shop_favicon_url, backend);
+
+    // If Sellercentral favicon is missing OR identical to the shop favicon, use SC fallback.
+    // This prevents Styles mis-saves / copy-paste from showing the shop tab icon here.
+    const remote =
+      scRemote && normalizeUrl(scRemote) !== normalizeUrl(shopRemote) ? scRemote : "";
+
     if (remote) {
       const imgRes = await fetch(remote, { cache: "no-store" });
       if (imgRes.ok) {
@@ -51,6 +66,7 @@ export async function GET() {
           headers: {
             "Content-Type": type,
             "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+            "X-Andertal-Favicon": "sellercentral-remote",
           },
         });
       }

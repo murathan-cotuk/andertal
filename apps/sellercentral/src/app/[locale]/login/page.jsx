@@ -87,7 +87,7 @@ function LoginForm() {
   }, []);
 
   useEffect(() => {
-    applyDocumentFavicon("/api/brand-favicon");
+    applyDocumentFavicon("/api/brand-favicon?app=sellercentral");
   }, [branding.favicon]);
 
   useEffect(() => {
