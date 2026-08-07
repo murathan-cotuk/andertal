@@ -64,7 +64,6 @@ jobs:
   audit:
     name: Security Audit (high+)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
 
@@ -72,9 +71,18 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run npm audit (high+)
-        run: npm audit --audit-level=high
+        # Soft-gate by default: reports high/critical (Medusa transitive debt) without failing CI.
+        # Set AUDIT_STRICT=1 later when the dependency upgrade wave is complete.
+        run: node scripts/ci-npm-audit.js
+        env:
+          AUDIT_LEVEL: high
+          AUDIT_STRICT: "0"
 
   build:
     name: Build
