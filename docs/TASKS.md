@@ -4,7 +4,7 @@ Bu dosya Claude (veya başka bir agent) için yazılmıştır. Her görev bağı
 Monorepo: `apps/shop`, `apps/sellercentral`, `apps/medusa-backend`.
 Commit atma; kullanıcı istemeden PR açma. Mevcut tasarım dilini bozma.
 
----
+--- 
 
 ## TASK-1 — Sipariş → Versand akışı (EKSİK / NETLEŞTİR)
 

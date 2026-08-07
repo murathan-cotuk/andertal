@@ -1,0 +1,5 @@
+regex:Co-Authored-By: Claude.*==>
+regex:Co-authored-by: Claude.*==>
+regex:Co-authored-by: Cursor.*==>
+regex:Claude-Session:.*==>
+regex:Made-with: Cursor==>
