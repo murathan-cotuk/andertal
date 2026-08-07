@@ -2555,6 +2555,10 @@ async function start() {
       getAdminHubProductByIdOrHandleDb,
     }))
 
+    // --- SEO Hub (superuser: entity meta audit / live analyze / auto-generate) ---
+    const createSeoHubRouter = require('./src/routes/seo-hub')
+    httpApp.use('/', createSeoHubRouter())
+
     // --- Seller Listings CRUD + Product Change Requests: extracted to src/routes/seller-listings.js ---
     const createSellerListingsRouter = require('./src/routes/seller-listings')
     httpApp.use('/', createSellerListingsRouter())

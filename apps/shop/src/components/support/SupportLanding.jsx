@@ -133,6 +133,21 @@ function orderLabel(order) {
   return order?.display_id || order?.order_number || order?.number || String(order?.id || "").slice(-8);
 }
 
+function orderCardMeta(order) {
+  const items = normalizeItems(order);
+  const first = items[0];
+  return {
+    image: first?.image || first?.thumbnail || "",
+    name: first?.title || first?.product_title || orderLabel(order),
+    itemCount: items.length,
+    date: order?.created_at || order?.ordered_at || null,
+  };
+}
+
+function defaultSubcategory(categoryEntry) {
+  return categoryEntry?.subtopics?.[0]?.id || categoryEntry?.runtimeCategory || categoryEntry?.id || "other";
+}
+
 function SupportHero({ container, locale }) {
   const t = useTranslations("supportCenter");
   const [openCount, setOpenCount] = useState(null);
@@ -233,7 +248,7 @@ function categoryConfig(container, locale, t) {
         subtopics,
       };
     })
-    .filter((entry) => entry.id && entry.subtopics.length)
+    .filter((entry) => entry.id)
     .sort((a, b) => a.order - b.order);
 }
 
@@ -283,7 +298,7 @@ function SupportTopicGrid({ container, locale }) {
 function WizardProgress({ step, t }) {
   return (
     <ol className={styles.progress} aria-label={t("wizard.progressLabel")}>
-      {Array.from({ length: 6 }, (_, index) => (
+      {Array.from({ length: 5 }, (_, index) => (
         <li key={index} aria-current={step === index ? "step" : undefined} className={step === index ? styles.currentStep : step > index ? styles.doneStep : ""}>
           <span>{index + 1}</span><small>{t(`wizard.steps.${index + 1}`)}</small>
         </li>
@@ -296,6 +311,10 @@ function SupportCaseWizard({ container, locale }) {
   const t = useTranslations("supportCenter");
   const router = useRouter();
   const categories = useMemo(() => categoryConfig(container, locale, t), [container, locale, t]);
+  const dateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale || "de", { day: "2-digit", month: "short", year: "numeric" }),
+    [locale],
+  );
   const [step, setStep] = useState(0);
   const [category, setCategory] = useState("");
   const [subcategory, setSubcategory] = useState("");
@@ -325,7 +344,9 @@ function SupportCaseWizard({ container, locale }) {
         || categories.find((entry) => entry.runtimeCategory === runtimeCategoryFor({ key: topic }));
       if (match) {
         setCategory(match.id);
-        setSubcategory("");
+        setSubcategory(defaultSubcategory(match));
+        setOrderId("");
+        setItemIds([]);
         setStep(1);
       }
     };
@@ -336,7 +357,7 @@ function SupportCaseWizard({ container, locale }) {
   }, [categories]);
 
   useEffect(() => {
-    if (step !== 2 || !selectedCategory?.orderRelated || orders.length) return;
+    if (step !== 1 || !selectedCategory?.orderRelated || orders.length) return;
     setBusy(true);
     getMedusaClient().request("/store/support/orders?limit=10", { headers: authHeaders(false), cache: "no-store" })
       .then((data) => {
@@ -347,11 +368,18 @@ function SupportCaseWizard({ container, locale }) {
   }, [step, selectedCategory?.orderRelated, orders.length, t]);
 
   const chooseCategory = (id) => {
+    const match = categories.find((entry) => entry.id === id);
     setCategory(id);
-    setSubcategory("");
+    setSubcategory(defaultSubcategory(match));
     setOrderId("");
     setItemIds([]);
     emitTopic(id);
+  };
+
+  const chooseOrder = (id) => {
+    const order = orders.find((entry) => String(entry.id) === String(id));
+    setOrderId(String(id));
+    setItemIds(normalizeItems(order).map((item) => String(item.id)).filter(Boolean));
   };
 
   const validateFiles = (incoming) => {
@@ -392,7 +420,7 @@ function SupportCaseWizard({ container, locale }) {
         headers: authHeaders(),
         body: JSON.stringify({
           category: selectedCategory?.runtimeCategory,
-          subcategory,
+          subcategory: subcategory || defaultSubcategory(selectedCategory),
           title: title.trim(),
           description: description.trim(),
           order_id: selectedCategory?.orderRelated ? orderId || null : null,
@@ -406,7 +434,7 @@ function SupportCaseWizard({ container, locale }) {
       const primaryId = result?.primary_case_id || result?.case?.id || result?.id;
       if (!primaryId) throw new Error(t("errors.submit"));
       uploadedRef.current = null;
-      setStep(5);
+      setStep(4);
       router.push(`/nachrichten?case=${encodeURIComponent(primaryId)}`);
     } catch (submitError) {
       setError(submitError?.message || t("errors.submit"));
@@ -417,7 +445,6 @@ function SupportCaseWizard({ container, locale }) {
 
   const canContinue = [
     Boolean(category),
-    Boolean(subcategory),
     !selectedCategory?.orderRelated || (Boolean(orderId) && itemIds.length > 0),
     title.trim().length >= 3 && description.trim().length >= 10,
     true,
@@ -444,42 +471,48 @@ function SupportCaseWizard({ container, locale }) {
           </fieldset>
         )}
         {step === 1 && (
-          <fieldset className={styles.choiceGrid}>
-            <legend>{localized(container, "subtopic_heading", locale, t("wizard.subtopicPrompt"))}</legend>
-            {selectedCategory?.subtopics.map((entry) => (
-              <label key={entry.id} className={subcategory === entry.id ? styles.selectedChoice : styles.choice}>
-                <input type="radio" name="support-subcategory" value={entry.id} checked={subcategory === entry.id} onChange={() => setSubcategory(entry.id)} />
-                <strong>{entry.label}</strong>
-              </label>
-            ))}
-          </fieldset>
-        )}
-        {step === 2 && (
           selectedCategory?.orderRelated ? (
             <div>
-              <label className={styles.field}><span>{localized(container, "order_heading", locale, t("wizard.orderPrompt"))}</span>
-                <select value={orderId} onChange={(event) => { setOrderId(event.target.value); setItemIds([]); }}>
-                  <option value="">{busy ? t("common.loading") : t("wizard.orderPlaceholder")}</option>
-                  {orders.map((order) => <option key={order.id} value={order.id}>{t("wizard.orderLabel", { number: orderLabel(order) })}</option>)}
-                </select>
-              </label>
-              {selectedOrder && (
-                <fieldset className={styles.itemList}>
-                  <legend>{t("wizard.itemPrompt")}</legend>
-                  {normalizeItems(selectedOrder).map((item) => (
-                    <label key={item.id}>
-                      <input type="checkbox" checked={itemIds.includes(String(item.id))} onChange={(event) => setItemIds((current) => event.target.checked ? [...current, String(item.id)] : current.filter((id) => id !== String(item.id)))} />
-                      {(item.image || item.thumbnail) && <Image src={imageUrl(item.image || item.thumbnail)} alt="" width={52} height={52} />}
-                      <span>{item.title || item.product_title || t("wizard.unknownItem")}</span>
-                    </label>
-                  ))}
-                </fieldset>
+              <h3 className={styles.orderHeading}>{localized(container, "order_heading", locale, t("wizard.orderPrompt"))}</h3>
+              {busy && !orders.length ? <p className={styles.notice}>{t("common.loading")}</p> : null}
+              {!busy && !orders.length ? <p className={styles.notice}>{t("wizard.noOrders")}</p> : null}
+              {orders.length > 0 && (
+                <div className={styles.orderCardGrid} role="listbox" aria-label={t("wizard.orderPrompt")}>
+                  {orders.map((order) => {
+                    const meta = orderCardMeta(order);
+                    const selected = String(order.id) === orderId;
+                    const thumb = imageUrl(meta.image);
+                    return (
+                      <button
+                        key={order.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={selected ? styles.orderCardSelected : styles.orderCard}
+                        onClick={() => chooseOrder(order.id)}
+                      >
+                        <span className={styles.orderCardThumb}>
+                          {thumb ? (
+                            <Image src={thumb} alt="" width={72} height={72} />
+                          ) : (
+                            <span aria-hidden="true">📦</span>
+                          )}
+                        </span>
+                        <span className={styles.orderCardBody}>
+                          <strong>{meta.name}</strong>
+                          <span>{t("wizard.orderLabel", { number: orderLabel(order) })}</span>
+                          {meta.date ? <time dateTime={String(meta.date)}>{dateFormatter.format(new Date(meta.date))}</time> : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
               {sellerCount > 1 && <p className={styles.notice} role="status">{t("wizard.multiSellerNotice", { count: sellerCount })}</p>}
             </div>
           ) : <p className={styles.notice}>{t("wizard.platformNoOrder")}</p>
         )}
-        {step === 3 && (
+        {step === 2 && (
           <div className={styles.formStack}>
             <label className={styles.field}><span>{t("wizard.titleLabel")}</span>
               <input value={title} maxLength={160} onChange={(event) => setTitle(event.target.value)} placeholder={t("wizard.titlePlaceholder")} />
@@ -494,12 +527,11 @@ function SupportCaseWizard({ container, locale }) {
             {files.length > 0 && <ul className={styles.fileList}>{files.map((file, index) => <li key={`${file.name}-${index}`}>{file.name}<button type="button" onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}>{t("common.remove")}</button></li>)}</ul>}
           </div>
         )}
-        {step === 4 && (
+        {step === 3 && (
           <div className={styles.review}>
             <h3>{t("wizard.reviewTitle")}</h3>
             <dl>
               <div><dt>{t("wizard.categoryLabel")}</dt><dd>{selectedCategory?.label}</dd></div>
-              <div><dt>{t("wizard.subcategoryLabel")}</dt><dd>{selectedCategory?.subtopics.find((entry) => entry.id === subcategory)?.label}</dd></div>
               {selectedCategory?.orderRelated && <div><dt>{t("wizard.orderReviewLabel")}</dt><dd>{orderLabel(selectedOrder)}</dd></div>}
               <div><dt>{t("wizard.titleLabel")}</dt><dd>{title}</dd></div>
               <div><dt>{t("wizard.descriptionLabel")}</dt><dd>{description}</dd></div>
@@ -507,13 +539,13 @@ function SupportCaseWizard({ container, locale }) {
             </dl>
           </div>
         )}
-        {step === 5 && <p className={styles.notice}>{t("wizard.redirecting")}</p>}
+        {step === 4 && <p className={styles.notice}>{t("wizard.redirecting")}</p>}
         {error && <p className={styles.error} role="alert">{error}</p>}
-        {step < 5 && (
+        {step < 4 && (
           <div className={styles.wizardActions}>
             {step > 0 && <button type="button" className={styles.backButton} onClick={() => { setError(""); setStep((current) => current - 1); }}>{localized(container, "back_label", locale, t("common.back"))}</button>}
-            <button type="button" className={styles.continueButton} disabled={!canContinue || busy} onClick={() => step === 4 ? submit() : setStep((current) => current + 1)}>
-              {busy ? t("common.loading") : step === 4 ? t("wizard.submit") : localized(container, "continue_label", locale, t("common.continue"))}
+            <button type="button" className={styles.continueButton} disabled={!canContinue || busy} onClick={() => step === 3 ? submit() : setStep((current) => current + 1)}>
+              {busy ? t("common.loading") : step === 3 ? t("wizard.submit") : localized(container, "continue_label", locale, t("common.continue"))}
             </button>
           </div>
         )}

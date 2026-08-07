@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "dashboard": "Panel",
     "products": "Productos",
@@ -25,6 +25,7 @@
     "campaigns": "Campañas",
     "attribution": "Atribución",
     "automations": "Automatizaciones",
+    "seo": "SEO",
     "discounts": "Descuentos",
     "metaobjects": "Metaobjetos",
     "categories": "Categorías",

@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "save": "Enregistrer",
     "saving": "Enregistrement…",
@@ -82,6 +82,7 @@
     "campaigns": "Campagnes",
     "attribution": "Attribution",
     "automations": "Automatisations",
+    "seo": "SEO",
     "discounts": "Remises",
     "metaobjects": "Métaobjets",
     "categories": "Catégories",

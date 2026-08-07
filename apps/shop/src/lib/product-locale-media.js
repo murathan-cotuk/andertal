@@ -44,7 +44,7 @@ export function variantImageUrlForLocale(variant, locale) {
 
 /**
  * Returns the full image list for a variant in the given locale.
- * Priority: locale media → default media → mapped images[] → single image_url.
+ * Priority: locale media → default media → top-level media/images → mapped images[] → single image_url.
  */
 export function variantMediaForLocale(variant, locale) {
   if (!variant) return [];
@@ -61,12 +61,17 @@ export function variantMediaForLocale(variant, locale) {
     const list = coerceMediaList(vMeta.media);
     if (list.length) return list;
   }
-  // 3. Backend-mapped images array (already resolved URL strings)
+  // 3. Top-level media on the variant object (some payloads)
+  if (Array.isArray(variant.media) && variant.media.length > 0) {
+    const list = coerceMediaList(variant.media);
+    if (list.length) return list;
+  }
+  // 4. Backend-mapped images array (already resolved URL strings)
   if (Array.isArray(variant.images) && variant.images.length > 0) {
     const list = coerceMediaList(variant.images);
     if (list.length) return list;
   }
-  // 4. Fallback: single cover image
+  // 5. Fallback: single cover image / locale map
   const single = variantImageUrlForLocale(variant, locale);
   return single ? [single] : [];
 }
@@ -74,7 +79,7 @@ export function variantMediaForLocale(variant, locale) {
 /**
  * Listing / card cover image.
  * Prefer the selected (or first) child variant's first image; then walk remaining
- * children; finally fall back to parent gallery / thumbnail.
+ * children; finally fall back to parent gallery / product.images / thumbnail.
  */
 export function resolveProductListingImage(product, locale, preferredVariant = null) {
   const variants = Array.isArray(product?.variants) ? product.variants : [];
@@ -95,7 +100,14 @@ export function resolveProductListingImage(product, locale, preferredVariant = n
   const images = Array.isArray(product?.images) ? coerceMediaList(product.images) : [];
   if (images[0]) return images[0];
 
-  return coerceMediaUrl(product?.thumbnail || product?.image_url || product?.image || "");
+  // Mapper often already copied first-variant cover onto thumbnail / metadata.thumbnail.
+  return coerceMediaUrl(
+    product?.thumbnail ||
+      product?.metadata?.thumbnail ||
+      product?.image_url ||
+      product?.image ||
+      "",
+  );
 }
 
 /** Second image for hover swap — second frame from the same source as the primary. */

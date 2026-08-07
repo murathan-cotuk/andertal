@@ -1797,6 +1797,45 @@ class MedusaAdminClient {
     })
   }
 
+  // ── SEO Hub (superuser) ─────────────────────────────────────────────────────
+  async getSeoRules() {
+    return this.request('/admin-hub/v1/seo/rules')
+  }
+
+  async getSeoEntities({ type, q = '', limit = 40, offset = 0 } = {}) {
+    const params = new URLSearchParams()
+    if (type) params.set('type', type)
+    if (q) params.set('q', q)
+    params.set('limit', String(limit))
+    params.set('offset', String(offset))
+    return this.request(`/admin-hub/v1/seo/entities?${params.toString()}`)
+  }
+
+  async getSeoEntity(type, id) {
+    return this.request(`/admin-hub/v1/seo/entities/${encodeURIComponent(type)}/${encodeURIComponent(id)}`)
+  }
+
+  async patchSeoEntity(type, id, body) {
+    return this.request(`/admin-hub/v1/seo/entities/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body || {}),
+    })
+  }
+
+  async analyzeSeo(body) {
+    return this.request('/admin-hub/v1/seo/analyze', {
+      method: 'POST',
+      body: JSON.stringify(body || {}),
+    })
+  }
+
+  async autoGenerateProductSeo(body = {}) {
+    return this.request('/admin-hub/v1/seo/products/auto-generate', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
   // ── Stripe Connect ───────────────────────────────────────────────────────────
   async stripeConnectOnboard() {
     return this.request('/admin-hub/v1/stripe-connect/onboard', { method: 'POST' })

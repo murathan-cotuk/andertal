@@ -684,15 +684,16 @@
       "progressLabel": "Fortschritt der Fallerstellung",
       "steps": {
         "1": "Thema",
-        "2": "Details",
-        "3": "Bestellung",
-        "4": "Nachricht",
-        "5": "Prüfen",
-        "6": "Fertig"
+        "2": "Bestellung",
+        "3": "Nachricht",
+        "4": "Prüfen",
+        "5": "Fertig"
       },
+
       "categoryPrompt": "Thema auswählen",
       "subtopicPrompt": "Was beschreibt Ihr Anliegen am besten?",
       "orderPrompt": "Relevante Bestellung auswählen",
+      "noOrders": "Keine früheren Bestellungen gefunden.",
       "orderPlaceholder": "Bestellung auswählen",
       "orderLabel": "Bestellung #{number}",
       "itemPrompt": "Mindestens einen betroffenen Artikel auswählen",

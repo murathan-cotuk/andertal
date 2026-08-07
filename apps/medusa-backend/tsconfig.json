@@ -15,6 +15,7 @@
     "allowJs": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "ignoreDeprecations": "6.0",
     "types": ["node"],
     "typeRoots": [
       "./node_modules/@types",

@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { category: "Customers", label: "Customers", url: "/customers", keywords: "customers" },
   { category: "Marketing", label: "Campaigns", url: "/marketing/campaigns", keywords: "campaigns" },
   { category: "Marketing", label: "Attribution", url: "/marketing/attribution", keywords: "attribution" },
+  { category: "Marketing", label: "SEO", url: "/marketing/seo", keywords: "seo meta search engine" },
   { category: "Marketing", label: "Automations", url: "/marketing/automations", keywords: "automations" },
   { category: "Navigation", label: "Discounts", url: "/discounts", keywords: "discounts" },
   { category: "Content", label: "Categories", url: "/content/categories", keywords: "categories" },

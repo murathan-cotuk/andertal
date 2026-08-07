@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "save": "Kaydet",
     "saving": "Kaydediliyor…",
@@ -82,6 +82,7 @@
     "campaigns": "Kampanyalar",
     "attribution": "Atıf",
     "automations": "Otomasyonlar",
+    "seo": "SEO",
     "discounts": "İndirimler",
     "metaobjects": "Meta nesneler",
     "categories": "Kategoriler",

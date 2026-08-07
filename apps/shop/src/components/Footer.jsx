@@ -8,55 +8,7 @@ import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { formatPriceCents } from "@/lib/format";
-
-function slugify(s) {
-  return (s || "")
-    .replace(/[äÄ]/g, "ae").replace(/[öÖ]/g, "oe").replace(/[üÜ]/g, "ue").replace(/ß/g, "ss")
-    .toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-}
-function menuItemHref(item) {
-  if (!item) return "#";
-  const raw = item.link_value;
-  let value = raw;
-  let parsed = null;
-  const itemSlug = String(item.slug || "").trim();
-  if (typeof raw === "string" && raw.trim().startsWith("{")) {
-    try { parsed = JSON.parse(raw); } catch (_) {}
-  }
-  if (item.link_type === "page") {
-    const pageSlug = parsed?.slug || parsed?.label_slug || itemSlug || slugify(item.label);
-    return pageSlug ? `/${pageSlug}` : "#";
-  }
-  if (item.link_type === "api") {
-    const fn = String(parsed?.function || parsed?.api_function || value || "").trim().toLowerCase();
-    if (fn === "brand" || fn === "marke" || fn === "brands") return "/brands";
-    if (fn === "sales") return "/sales";
-    if (fn === "neuheiten") return "/neuheiten";
-    if (fn === "bestsellers") return "/bestsellers";
-    return "#";
-  }
-  if (item.link_type === "category") {
-    const slug = (parsed?.slug || parsed?.handle || itemSlug || "").replace(/^\//, "").trim();
-    return slug ? `/${slug}` : "#";
-  }
-  if (item.link_type === "collection") {
-    const handle = (parsed?.handle || parsed?.slug || itemSlug || "").replace(/^\//, "").trim();
-    return handle ? `/${handle}` : "#";
-  }
-  if (item.link_type === "product") {
-    const handle = (parsed?.handle || itemSlug || "").replace(/^\//, "").trim();
-    return handle ? `/${handle}` : "#";
-  }
-  if (parsed) {
-    if (itemSlug) value = itemSlug;
-    else if (parsed.handle) value = parsed.handle;
-    else if (parsed.slug) value = parsed.slug;
-  } else if (itemSlug) {
-    value = itemSlug;
-  }
-  if (item.link_type === "url" && value) return String(value).startsWith("http") ? value : `/${String(value).replace(/^\//, "")}`;
-  return value ? `/${String(value).replace(/^\//, "")}` : "#";
-}
+import { menuItemHref } from "@/lib/shop-menu-href";
 
 const FooterContainer = styled.footer`
   background-color: var(--footer-bg, #136761);

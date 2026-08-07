@@ -684,15 +684,16 @@
       "progressLabel": "Case creation progress",
       "steps": {
         "1": "Topic",
-        "2": "Details",
-        "3": "Order",
-        "4": "Message",
-        "5": "Review",
-        "6": "Done"
+        "2": "Order",
+        "3": "Message",
+        "4": "Review",
+        "5": "Done"
       },
+
       "categoryPrompt": "Choose a topic",
       "subtopicPrompt": "What best describes your request?",
       "orderPrompt": "Select the relevant order",
+      "noOrders": "No previous orders found.",
       "orderPlaceholder": "Choose an order",
       "orderLabel": "Order #{number}",
       "itemPrompt": "Select at least one affected item",

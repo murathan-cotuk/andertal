@@ -75,14 +75,24 @@ async function categoryIdsFromProductQuery(client, sql, params) {
 
 async function productsByIds(client, ids, limit) {
   if (!ids.length) return []
+  // Must include variants + full row so ProductCard can resolve first-variant cover images
+  // (parent umbrella rows often have no own media). Map through the same storefront mapper
+  // as /store/products so carousels/cards get thumbnail + variants[].images.
+  const { mapAdminHubToStoreProduct } = require('./store-products')
   const r = await client.query(
-    `SELECT id, title, handle, price_cents, inventory, metadata, status
-     FROM admin_hub_products WHERE id = ANY($1::uuid[]) AND status = 'published' LIMIT $2`,
-    [ids, limit],
+    `SELECT id, title, handle, sku, description, status, seller_id, collection_id,
+            price_cents, inventory, metadata, variants, created_at, updated_at
+       FROM admin_hub_products
+      WHERE id = ANY($1::uuid[]) AND status = 'published'`,
+    [ids],
   )
   // Preserve caller's ordering (ANY() doesn't guarantee it)
   const byId = new Map(r.rows.map((p) => [String(p.id), p]))
-  return ids.map((id) => byId.get(String(id))).filter(Boolean).slice(0, limit)
+  return ids
+    .map((id) => byId.get(String(id)))
+    .filter(Boolean)
+    .slice(0, limit)
+    .map((p) => mapAdminHubToStoreProduct(p, 'DE'))
 }
 
 const SALES_SCORE_SQL = `COALESCE((metadata->>'sold_last_month')::int, 0)`

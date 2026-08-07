@@ -11,12 +11,13 @@ import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { useLocale } from "next-intl";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { baseHandleFromUrl } from "@/lib/product-url-handle";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
-import { SITE_URL } from "@/lib/seo";
+import { SITE_URL, localizedCmsField } from "@/lib/seo";
 import {
   SORT_OPTIONS,
   PER_PAGE,
@@ -740,7 +741,7 @@ export default function CollectionPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const locale = params?.locale ?? "en";
+  const locale = useLocale() || params?.locale || "de";
   const handle = params?.handle ? String(params.handle) : undefined;
   const marketPrefixVal = useMarketPrefix();
   const shopStyles = useShopStyles();
@@ -752,6 +753,7 @@ export default function CollectionPage() {
   const [collection,  setCollection]  = useState(null);
   const [cmsPage,     setCmsPage]     = useState(null);
   const [cmsPageCategoryLinks, setCmsPageCategoryLinks] = useState([]);
+  const [cmsHasContainers, setCmsHasContainers] = useState(false);
   const [products,    setProducts]    = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
@@ -940,13 +942,18 @@ export default function CollectionPage() {
    * (?sort=bestseller) rather than duplicating filter logic for a page that has
    * no flat product list of its own. ── */
   useEffect(() => {
-    if (!cmsPage?.id) { setCmsPageCategoryLinks([]); return; }
+    if (!cmsPage?.id) {
+      setCmsPageCategoryLinks([]);
+      setCmsHasContainers(false);
+      return;
+    }
     let cancelled = false;
     getMedusaClient()
       .request(`/store/landing-page/${encodeURIComponent(cmsPage.id)}`, { cache: "no-store" })
       .then(async (data) => {
         if (cancelled) return;
         const containers = Array.isArray(data?.containers) ? data.containers : [];
+        setCmsHasContainers(containers.length > 0);
         const seen = new Set();
         const candidates = [];
         for (const c of containers) {
@@ -971,7 +978,12 @@ export default function CollectionPage() {
         if (cancelled) return;
         setCmsPageCategoryLinks(withCounts.filter((l) => l.hasProducts));
       })
-      .catch(() => { if (!cancelled) setCmsPageCategoryLinks([]); });
+      .catch(() => {
+        if (!cancelled) {
+          setCmsPageCategoryLinks([]);
+          setCmsHasContainers(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [cmsPage?.id]);
 
@@ -1076,12 +1088,13 @@ export default function CollectionPage() {
   const contentPadX   = tmpl.content_padding_x || "32px";
 
   if (cmsPage) {
+    const localizedBody = localizedCmsField(cmsPage, "body", locale);
     const pageBody = (
       <>
         <LandingContainers pageId={String(cmsPage.id)} />
-        {cmsPage.body ? (
+        {!cmsHasContainers && localizedBody ? (
           <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}
-            dangerouslySetInnerHTML={{ __html: sanitize(cmsPage.body) }} />
+            dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
         ) : null}
       </>
     );

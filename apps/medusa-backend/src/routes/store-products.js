@@ -286,7 +286,7 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   const priceCents = parentPriceByCountry && parentPriceByCountry.brutto_cents != null
     ? Number(parentPriceByCountry.brutto_cents)
     : (p.price != null ? Math.round(Number(p.price) * 100) : 0)
-  const rawVariants = Array.isArray(p.variants) && p.variants.length > 0 ? p.variants : []
+  const rawVariants = parseVariantsArray(p)
   const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : null
   const variants = rawVariants.length > 0
     ? rawVariants.map((v, i) => {
@@ -310,12 +310,18 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
           }
           if (Object.keys(m).length > 0) image_urls = m
         }
-        const vImages = Array.isArray(vMeta.media)
-          ? vMeta.media.map((u) => resolveUploadUrl(u)).filter(Boolean)
-          : []
+        const rawVMedia = Array.isArray(vMeta.media)
+          ? vMeta.media
+          : (Array.isArray(v.media) ? v.media : (Array.isArray(v.images) ? v.images : []))
+        const vImages = rawVMedia.map((u) => resolveUploadUrl(u)).filter(Boolean)
         // Prefer explicit cover image first when gallery media is empty.
         const coverUrl = resolveUploadUrl(v.image_url || v.image || null)
         if (coverUrl && !vImages.includes(coverUrl)) vImages.unshift(coverUrl)
+        // Locale override map: if gallery still empty, use first available locale cover.
+        if (!vImages.length && image_urls) {
+          const preferred = image_urls.de || image_urls.en || Object.values(image_urls).find(Boolean)
+          if (preferred) vImages.push(preferred)
+        }
         const translations = vMeta.translations && typeof vMeta.translations === 'object'
           ? Object.fromEntries(
               Object.entries(vMeta.translations).map(([loc, tr]) => {

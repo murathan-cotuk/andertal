@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "dashboard": "Dashboard",
     "products": "Produkte",
@@ -25,6 +25,7 @@
     "campaigns": "Kampagnen",
     "attribution": "Attribution",
     "automations": "Automationen",
+    "seo": "SEO",
     "discounts": "Rabatte",
     "metaobjects": "Metaobjekte",
     "categories": "Kategorien",

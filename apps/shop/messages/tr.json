@@ -683,16 +683,17 @@
       "subtitle": "Tell us what happened. We will guide you step by step.",
       "progressLabel": "Case creation progress",
       "steps": {
-        "1": "Topic",
-        "2": "Details",
-        "3": "Order",
-        "4": "Message",
-        "5": "Review",
-        "6": "Done"
+        "1": "Konu",
+        "2": "Sipariş",
+        "3": "Mesaj",
+        "4": "Kontrol",
+        "5": "Bitti"
       },
+
       "categoryPrompt": "Choose a topic",
       "subtopicPrompt": "What best describes your request?",
       "orderPrompt": "Select the relevant order",
+      "noOrders": "Önceki sipariş bulunamadı.",
       "orderPlaceholder": "Choose an order",
       "orderLabel": "Order #{number}",
       "itemPrompt": "Etkilenen en az bir ürünü seçin",

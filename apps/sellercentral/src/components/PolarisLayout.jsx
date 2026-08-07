@@ -162,6 +162,7 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/sellers",
   "/customers/newsletter",
   "/marketing/automations",
+  "/marketing/seo",
   "/content/menus",
   "/content/categories",
   "/content/landing-page",
@@ -304,6 +305,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/marketing/campaigns", label: tx("campaigns", "Campaigns") },
         { url: "/marketing/attribution", label: tx("attribution", "Attribution") },
+        { url: "/marketing/seo", label: tx("seo", "SEO"), superuserOnly: true },
         { url: "/marketing/automations", label: tx("automations", "Automations"), superuserOnly: true },
       ],
     },
@@ -690,6 +692,7 @@ export default function PolarisLayout({ children }) {
     "/orders/abandoned-checkouts",
     "/customers/newsletter",
     "/marketing/automations",
+    "/marketing/seo",
     "/settings/checkout",
   ]);
 
@@ -1151,6 +1154,7 @@ export default function PolarisLayout({ children }) {
     "/orders/abandoned-checkouts",
     "/customers/newsletter",
     "/marketing/automations",
+    "/marketing/seo",
     "/sellers",
     "/sellers/errors",
   ]);
