@@ -86,7 +86,15 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
                   NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
                   AND (
                     EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
-                    OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                    -- Only infer via listings when exactly one seller lists this product — for a
+                    -- product listed by multiple sellers, an unstamped item's true seller is
+                    -- genuinely ambiguous, and guessing "any of them" leaked every listing
+                    -- seller's own unrelated orders to each other (see docs/TASKS.md).
+                    OR EXISTS (
+                      SELECT 1 FROM admin_hub_seller_listings sl
+                      WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n}
+                        AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
+                    )
                   )
                 )
               )
@@ -116,7 +124,11 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
                   NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
                   AND (
                     EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${params.length})
-                    OR EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${params.length})
+                    OR EXISTS (
+                      SELECT 1 FROM admin_hub_seller_listings sl
+                      WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${params.length}
+                        AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
+                    )
                   )
                 )
               )

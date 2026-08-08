@@ -120,7 +120,11 @@ const adminHubReturnsGET = async (req, res) => {
             OR (
               NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
               AND (
-                EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n})
+                EXISTS (
+                  SELECT 1 FROM admin_hub_seller_listings sl
+                  WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n}
+                    AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
+                )
                 OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
               )
             )

@@ -15,7 +15,11 @@ async function getSellerAvailableCents(client, sellerId) {
        o.seller_id = $1
        OR EXISTS (
          SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-           EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1)
+           EXISTS (
+             SELECT 1 FROM admin_hub_seller_listings sl
+             WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $1
+               AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
+           )
            OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $1)
          )
        )
