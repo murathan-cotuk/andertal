@@ -1317,7 +1317,7 @@ export default function InboxPage() {
   ];
 
   return (
-    <Page title={locale === "en" ? "Messages" : locale === "tr" ? "Mesajlar" : locale === "fr" ? "Messages" : locale === "es" ? "Mensajes" : locale === "it" ? "Messaggi" : "Nachrichten"} secondaryActions={[{ content: locale === "en" ? "Templates" : locale === "tr" ? "Şablonlar" : locale === "fr" ? "Modèles" : locale === "es" ? "Plantillas" : locale === "it" ? "Modelli" : "Vorlagen", url: "/inbox/templates" }]}>
+    <Page fullWidth title={locale === "en" ? "Messages" : locale === "tr" ? "Mesajlar" : locale === "fr" ? "Messages" : locale === "es" ? "Mensajes" : locale === "it" ? "Messaggi" : "Nachrichten"} secondaryActions={[{ content: locale === "en" ? "Templates" : locale === "tr" ? "Şablonlar" : locale === "fr" ? "Modèles" : locale === "es" ? "Plantillas" : locale === "it" ? "Modelli" : "Vorlagen", url: "/inbox/templates" }]}>
       <div style={{ marginBottom: 0 }}>
         <Tabs tabs={tabs} selected={activeTab} onSelect={setActiveTab} fitted={false} />
       </div>

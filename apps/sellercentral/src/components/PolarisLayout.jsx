@@ -812,7 +812,13 @@ export default function PolarisLayout({ children }) {
     ? (notifData.orders || 0) +
       (notifData.returns || 0) +
       (notifData.verifications || 0) +
-      (notifData.change_requests || 0)
+      (notifData.change_requests || 0) +
+      (notifData.campaigns || 0) +
+      (notifData.seller_errors || 0) +
+      (notifData.seller_listings_pending || 0) +
+      (notifData.brand_authorizations_pending || 0) +
+      (notifData.flow_failures || 0) +
+      (notifData.support_cases || 0)
     : 0;
 
   const topBarIconStyle = {
@@ -939,18 +945,40 @@ export default function PolarisLayout({ children }) {
               )}
             </button>
             {notifOpen && (
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 320, background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb", zIndex: 9999 }}>
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 400, maxWidth: "calc(100vw - 24px)", background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb", zIndex: 9999 }}>
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 13, fontWeight: 700, color: "#111827" }}>{notifCopy.title}</div>
-                <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                <div style={{ maxHeight: 420, overflowY: "auto" }}>
                   {(!notifData?.recent_orders?.length &&
                     !notifData?.recent_returns?.length &&
                     !notifData?.recent_verifications?.length &&
                     !notifData?.recent_product_change_requests?.length &&
                     !notifData?.recent_campaigns_submitted?.length &&
-                    !notifData?.recent_seller_errors?.length) ? (
+                    !notifData?.recent_seller_errors?.length &&
+                    !notifData?.recent_support_cases?.length) ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>{notifCopy.empty}</div>
                   ) : (
                     <>
+                      {(notifData?.recent_support_cases || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {notifCopy.supportCases}
+                        </div>
+                      )}
+                      {(notifData?.recent_support_cases || []).map((c) => (
+                        <Link
+                          key={c.id}
+                          href={`/inbox?case=${encodeURIComponent(c.reference_id || "")}`}
+                          onClick={() => setNotifOpen(false)}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                        >
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>💬</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.title || notifCopy.newSupportCase}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2, whiteSpace: "pre-line", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                              {String(c.body || "").split("\n")[0]}
+                            </div>
+                          </div>
+                        </Link>
+                      ))}
                       {(notifData?.recent_seller_errors || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.sellerErrors}

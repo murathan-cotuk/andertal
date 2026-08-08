@@ -242,7 +242,8 @@
       "PowerShell(Get-Process *)",
       "Bash(identify logo/*.png ai-pics/*.png)",
       "Bash(pkill -f \"next dev -p 3911\")",
-      "Bash(pkill -f \"next dev -p 3912\")"
+      "Bash(pkill -f \"next dev -p 3912\")",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

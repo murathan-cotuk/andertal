@@ -30,5 +30,7 @@ export function getNotificationsCopy(locale) {
     orderRef: (n) => t(`Order #${n}`, `Sipariş #${n}`, `Commande #${n}`, `Pedido #${n}`, `Ordine #${n}`, `Bestellung #${n}`),
     sellerErrors: t("Seller issues", "Satıcı sorunları", "Problèmes vendeurs", "Problemas de vendedores", "Problemi venditori", "Seller-Fehler"),
     sellerErrorTitle: (name) => t(`Issue: ${name}`, `Sorun: ${name}`, `Problème : ${name}`, `Problema: ${name}`, `Problema: ${name}`, `Fehler: ${name}`),
+    supportCases: t("Support tickets", "Destek talepleri", "Tickets de support", "Tickets de soporte", "Ticket di supporto", "Support-Tickets"),
+    newSupportCase: t("New support message", "Yeni destek mesajı", "Nouveau message de support", "Nuevo mensaje de soporte", "Nuovo messaggio di supporto", "Neue Support-Nachricht"),
   };
 }

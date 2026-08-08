@@ -212,6 +212,17 @@ async function notifyCase(client, supportCase, kind, actor, messageId = '') {
          VALUES ('support_case', $1, $2, $3, $4)`,
         [`Support case ${supportCase.case_number}`, `${kind}: ${supportCase.title}\n${sellerInboxUrl}`, supportCase.seller_id, supportCase.id],
       )
+      if (supportCase.seller_id) {
+        // The row above is seller-scoped (seller_id set) so it's invisible to the superuser
+        // bell/notifications feed, which only reads support_case rows with seller_id IS NULL.
+        // Superusers need visibility into every case, not just unassigned ones, so mirror it
+        // with a second, superuser-scoped row.
+        await client.query(
+          `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+           VALUES ('support_case', $1, $2, NULL, $3)`,
+          [`Support case ${supportCase.case_number}`, `${kind}: ${supportCase.title}\n${sellerInboxUrl}`, supportCase.id],
+        )
+      }
     } catch (error) {
       await client.query(`DELETE FROM support_notification_dedupe WHERE dedupe_key=$1 AND channel='in_app'`, [dedupeKey]).catch(() => {})
       throw error
@@ -332,6 +343,24 @@ async function notifyCase(client, supportCase, kind, actor, messageId = '') {
     })
   }
   return pendingEmails
+}
+
+// notifyCase can fail on a genuine DB error (not just a JS throw), which leaves the
+// enclosing transaction in Postgres' "aborted" state — a plain try/catch around the call
+// wouldn't be enough, because the following COMMIT would then silently discard everything,
+// including the actual case/message write. A SAVEPOINT lets a notifyCase failure roll back
+// only the notification side-effect while the primary write still commits normally.
+async function notifyCaseSafe(client, logLabel, ...args) {
+  await client.query('SAVEPOINT notify_case')
+  try {
+    const result = await notifyCase(client, ...args)
+    await client.query('RELEASE SAVEPOINT notify_case')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT notify_case').catch(() => {})
+    console.error(`[support-cases] notifyCase failed for ${logLabel}, continuing without notification:`, error?.message || error)
+    return []
+  }
 }
 
 function dispatchPendingEmails(pendingEmails = []) {
@@ -833,7 +862,7 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
             [inserted.id, actor.id, description, JSON.stringify(messageAttachments)],
           )).rows[0]
           await insertEvent(client, inserted.id, 'case_created', actor, { status: initialStatus, parent_case_id: inserted.parent_case_id }, `created:${idempotencyKey}:${index}`)
-          pendingEmails.push(...(await notifyCase(client, inserted, 'created', actor, message.id)))
+          pendingEmails.push(...(await notifyCaseSafe(client, 'case creation', inserted, 'created', actor, message.id)))
           created.push(publicCase(inserted))
         }
         const payload = { cases: created, primary_case_id: primaryId }
@@ -895,7 +924,7 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
         const status = nextStatusAfterMessage(actor.role, !!row.seller_id)
         await client.query('UPDATE support_cases SET status=$2, updated_at=now(), last_message_at=now() WHERE id=$1::uuid', [id, status])
         await insertEvent(client, id, 'message_added', actor, { message_id: inserted.id, status }, `message:${inserted.id}`)
-        pendingEmails = await notifyCase(client, { ...row, status }, 'message', actor, inserted.id)
+        pendingEmails = await notifyCaseSafe(client, 'message reply', { ...row, status }, 'message', actor, inserted.id)
         await client.query('COMMIT')
         return inserted
       } catch (error) {
@@ -932,7 +961,7 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
           [id, next, action, ARCHIVE_DAYS, resolution],
         )).rows[0]
         await insertEvent(client, id, action === 'close' ? 'case_closed' : 'case_reopened', actor, { from: row.status, to: next })
-        pendingEmails = await notifyCase(client, updated, action, actor)
+        pendingEmails = await notifyCaseSafe(client, action, updated, action, actor)
         await client.query('COMMIT')
         return updated
       } catch (error) {
@@ -1114,7 +1143,7 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
         }
         const row = (await client.query('UPDATE support_cases SET seller_id=$2, updated_at=now() WHERE id=$1::uuid RETURNING *', [id, sellerId])).rows[0]
         await insertEvent(client, id, 'case_reassigned', actor, { from: previous.seller_id, to: sellerId })
-        const emails = await notifyCase(client, row, 'reassigned', actor, `${previous.seller_id || 'support'}:${sellerId || 'support'}`)
+        const emails = await notifyCaseSafe(client, 'reassign', row, 'reassigned', actor, `${previous.seller_id || 'support'}:${sellerId || 'support'}`)
         await client.query('COMMIT')
         return { row, emails }
       } catch (error) {

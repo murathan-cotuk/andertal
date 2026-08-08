@@ -17,7 +17,10 @@ export default function NachrichtenPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
-        <div style={ACCOUNT_PAGE_MAIN_INNER}>
+        {/* Wider than the shared ACCOUNT_PAGE_MAIN_INNER: this page hosts a two-pane
+            case list + conversation view (CaseInbox), which needs real width to keep
+            messages readable, unlike the narrow forms/lists on other account pages. */}
+        <div style={{ ...ACCOUNT_PAGE_MAIN_INNER, maxWidth: 1600 }}>
           <AccountPageLayout title={tMessages("title")}>
             <Suspense fallback={<GlobalPageLoader />}>
               <CaseInbox embedded />
