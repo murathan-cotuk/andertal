@@ -364,3 +364,24 @@ Her madde: **Do now** → ilgili ayar sayfasına link; isteğe bağlı **Skip** 
 
 **Bu oturumda ayrıca yapılan (TASKS.md'de madde olarak yoktu ama düzeltildi):**
 - Sellercentral favicon sistemi, DB connection pooling (styles/menus/categories/seller-settings), Sellercentral login `?next=` redirect, superuser support-case email bildirimi, nachrichten sayfası UI genişletme, add-product "sellerId=null" stuck-button bug, mobile bestseller badge image URL bug, Next.js build hatası (`useSearchParams` Suspense + eksik `nav.installed`/`nav.appStore` çeviri anahtarları).
+
+---
+
+## Durum (Claude — ayrı oturum, 2026-08-09) — son 5 düzeltme + debug bulgusu
+
+**1) Güvenlik: Seller'lar arası sipariş/bildirim görünürlüğü sızıntısı — DÜZELTİLDİ**
+Bir ürünü birden fazla seller listelediğinde (`admin_hub_seller_listings`), o üründeki `store_order_items.seller_id` boş kalmış siparişler **listeleyen tüm seller'lara** gösteriliyordu (gerçek veride doğrulandı: 3 seller'ın listelediği bir üründe 5 gerçek sipariş üçüne de görünüyordu). Kök neden: `admin_hub_seller_listings` üzerinden "bu ürünü kim listeliyor" fallback'i, ürün birden fazla seller'a aitse **hepsine** eşleşiyordu. 6 dosyada (`routes/orders.js`, `customers.js`, `returns.js`, `payouts.js`, `shipment-tracking.js`, `seller-billing.js`) aynı fallback'e "sadece TEK seller listeliyorsa geçerli say" koşulu eklendi. Gerçek veriyle önce/sonra test edildi.
+
+**2) Güvenlik: JWT gizli anahtar sertleştirmesi — KOD HAZIR, Render env var bekleniyor**
+`seller-auth.js` ve `store-checkout.js`'teki oturum token imzalama anahtarı, production'da tanımlı değilse (ve `NODE_ENV` tam "production" değilse) sessizce herkese açık, kaynak koddaki sabit bir string'e düşüyordu — bu string'i bilen biri istediği seller/customer olarak sahte token üretebilirdi. Artık kontrol `NODE_ENV` yerine "gerçek DB'ye (render.com) bağlı mıyız" sinyaline bakıyor, hangi ortamda olursa olsun anahtar yoksa sunucu başlamayı reddediyor. **ÖNEMLİ:** Render'da `SELLER_JWT_SECRET` ve `CUSTOMER_JWT_SECRET` tanımlı olduğu teyit edilmeden bu deploy edilirse sunucu çökebilir — önce Render panelinden kontrol edilmeli.
+
+**3) Kişiselleştirme/öneri motoru — 15 gerçek algoritma + sunucu taraflı görüntüleme takibi**
+Eski `/api/personalized-products`, Medusa'nın hiç kullanılmayan (boş) yerleşik `order`/`product` tablolarını sorguluyordu — tüm "reorder/trending/top picks" önerileri pratikte hep boş dönüyordu. Yeni `apps/medusa-backend/src/routes/personalization.js` (355 satır) gerçek tablolardan (satın alma geçmişi, favoriler, yeni eklenen `store_customer_product_views` görüntüleme tablosu) 15 algoritma sunuyor; sonuçlar 48 saat cache'leniyor. Sellercentral'daki "Personalized Product Row" bloğunun algoritma dropdown'u 5 seçenekten 15'e çıkarıldı.
+
+**4) Superuser: Ülke yönetim paneli — ürün sayısı + aç/kapa**
+`settings/shipping` sayfasına yeni bir superuser-only bölüm eklendi: shop'un ülke seçicisinde görünen her ülke, kaç ürüne tanımlı olduğuyla birlikte listeleniyor; bir aç/kapa düğmesiyle ülke tamamen kapatılabiliyor (kapatılınca `/store/shipping-groups` uç noktası o ülkeyi hiç döndürmüyor — shop'ta hiç görünmüyor, ürün tanımlı olsa bile). Backend: `admin_hub_country_overrides` tablosu + `GET/PATCH /admin-hub/v1/country-overview`.
+
+**5) Küçük hata düzeltmeleri (mobil header gradient, IBAN 500 hatası, build hatası)**
+- Mobilde header'ın üstündeki durum çubuğu şeridi (`ShopHeader.jsx`), header'ın gerçek arka planını düz bir renge çeviren bir fonksiyondan geçiriliyordu — gradient'in ilk rengi bulunamayınca siyaha düşüyordu. Artık ham arka plan değerini birebir kullanıyor.
+- `seller-account.js`'teki IBAN kaydetme uç noktası, Stripe hata verdiğinde genel bir "teknik hata" (500) dönüyordu, gerçek sebep hiçbir yere yazılmıyordu — artık Stripe'ın gerçek hata mesajı (400 ile) dönüyor.
+- **Debug bulgusu (bu oturumda tesadüfen bulundu):** `apps/shop/src/components/support/SupportLanding.module.css` içinde geçersiz bir CSS Modules seçicisi (`:global(html)` — yerel bir class/id içermeden tek başına kullanılmış) `next dev` derlemesini kırıyordu; bu, "kategoriler bozuldu" şikayetinin bir nedeni olabilir (aynı derlemeye bağımlı sayfalar etkilenir). Kural zaten `app/globals.css`'te global olarak tanımlıydı, modül dosyasındaki geçersiz kopya kaldırıldı. **Doğrulanamayan iki şikayet:** (a) "Arnavutluk seçince URL'de us oluyor" — ilgili tüm fonksiyonlar (`shop-market.js`, `countries.js`, `ShopHeader.jsx`, `proxy.js`) tek tek okundu ve doğrudan test edildi (`/al/de` gerçekten `AL` ile render oldu, `us`'a yönlenmedi), hata yeniden üretilemedi — CSS build hatası düzeldiği için bu da çözülmüş olabilir, yeniden test edilmeli. (b) "Kategoriler bozuldu" — build hatası düzeltildi ama sayfa client-side render olduğu için tarayıcıda gerçek bir kullanıcı testiyle doğrulanmalı.

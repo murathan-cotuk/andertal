@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Card,
   Text,
@@ -31,21 +32,145 @@ function formatJoined(d, locale) {
   }
 }
 
-function summarizeUserAgent(ua, locale) {
-  if (!ua || typeof ua !== "string") return locale === "en" ? "This device" : locale === "tr" ? "Bu cihaz" : "Dieses Gerät";
-  const u = ua.toLowerCase();
-  let os = locale === "en" ? "Unknown system" : locale === "tr" ? "Bilinmeyen sistem" : "Unbekanntes System";
-  if (u.includes("windows")) os = "Windows";
-  else if (u.includes("mac os") || u.includes("macintosh")) os = "macOS";
-  else if (u.includes("linux")) os = "Linux";
-  else if (u.includes("android")) os = "Android";
-  else if (u.includes("iphone") || u.includes("ipad")) os = "iOS";
-  let browser = "Browser";
-  if (u.includes("edg/")) browser = "Edge";
-  else if (u.includes("chrome") && !u.includes("chromium")) browser = "Chrome";
-  else if (u.includes("firefox")) browser = "Firefox";
-  else if (u.includes("safari") && !u.includes("chrome")) browser = "Safari";
-  return `${os} · ${browser}`;
+function formatSessionDate(d, locale) {
+  if (!d) return "—";
+  try {
+    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+    return new Date(d).toLocaleString(loc, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "—";
+  }
+}
+
+function DevicesCard({ locale }) {
+  const router = useRouter();
+  const [sessions, setSessions] = useState(null); // null = loading
+  const [err, setErr] = useState("");
+  const [busyId, setBusyId] = useState(null);
+  const [revokingAll, setRevokingAll] = useState(false);
+
+  const t = (en, tr, de) => (locale === "en" ? en : locale === "tr" ? tr : de);
+
+  const load = useCallback(async () => {
+    try {
+      const d = await getMedusaAdminClient().getSellerSessions();
+      setSessions(Array.isArray(d?.sessions) ? d.sessions : []);
+    } catch (e) {
+      setSessions([]);
+      setErr(e?.message || t("Could not load devices.", "Cihazlar yüklenemedi.", "Geräte konnten nicht geladen werden."));
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const localLogout = () => {
+    ["sellerLoggedIn", "sellerEmail", "sellerId", "storeName", "sellerToken", "sellerIsSuperuser", "sellerPermissions", "sellerApprovalStatus"]
+      .forEach((k) => localStorage.removeItem(k));
+    fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
+    router.push("/login");
+  };
+
+  const revokeOne = async (session) => {
+    setErr("");
+    setBusyId(session.id);
+    try {
+      await getMedusaAdminClient().revokeSellerSession(session.id);
+      if (session.is_current) {
+        localLogout();
+        return;
+      }
+      setSessions((list) => (list || []).filter((s) => s.id !== session.id));
+    } catch (e) {
+      setErr(e?.message || t("Could not end this session.", "Bu oturum sonlandırılamadı.", "Sitzung konnte nicht beendet werden."));
+    }
+    setBusyId(null);
+  };
+
+  const revokeAllOthers = async () => {
+    setErr("");
+    setRevokingAll(true);
+    try {
+      await getMedusaAdminClient().revokeAllSellerSessions({ includeCurrent: false });
+      await load();
+    } catch (e) {
+      setErr(e?.message || t("Could not end other sessions.", "Diğer oturumlar sonlandırılamadı.", "Andere Sitzungen konnten nicht beendet werden."));
+    }
+    setRevokingAll(false);
+  };
+
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <InlineStack align="space-between" blockAlign="center" wrap>
+          <Text variant="headingMd" as="h2">
+            {t("Devices", "Cihazlar", "Geräte")}
+          </Text>
+          {sessions && sessions.length > 1 && (
+            <Button tone="critical" onClick={revokeAllOthers} loading={revokingAll} size="slim">
+              {t("Log out other devices", "Diğer cihazlardan çıkış yap", "Andere Geräte abmelden")}
+            </Button>
+          )}
+        </InlineStack>
+        <Text as="p" tone="subdued">
+          {t(
+            "Every device currently logged into your account. If you don't recognize one, end it.",
+            "Hesabınızda şu anda oturum açık olan tüm cihazlar. Tanımadığınız biri varsa oturumunu sonlandırın.",
+            "Alle Geräte, die aktuell in Ihrem Konto angemeldet sind. Erkennen Sie eines nicht, beenden Sie es.",
+          )}
+        </Text>
+
+        {err ? (
+          <Banner tone="critical" onDismiss={() => setErr("")}>
+            <Text as="p">{err}</Text>
+          </Banner>
+        ) : null}
+
+        {sessions === null ? (
+          <Text as="p" tone="subdued">{t("Loading…", "Yükleniyor…", "Wird geladen…")}</Text>
+        ) : sessions.length === 0 ? (
+          <Text as="p" tone="subdued">
+            {t(
+              "No tracked devices yet — you'll appear here after your next login.",
+              "Henüz takip edilen bir cihaz yok — bir sonraki girişinizde burada görüneceksiniz.",
+              "Noch keine erfassten Geräte — nach Ihrer nächsten Anmeldung erscheinen Sie hier.",
+            )}
+          </Text>
+        ) : (
+          <BlockStack gap="200">
+            {sessions.map((s) => (
+              <Box key={s.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                <InlineStack align="space-between" blockAlign="center" wrap>
+                  <BlockStack gap="050">
+                    <InlineStack gap="150" blockAlign="center">
+                      <Text variant="bodyMd" fontWeight="semibold">{s.device_label}</Text>
+                      {s.is_current && (
+                        <Badge tone="success">{t("This device", "Bu cihaz", "Dieses Gerät")}</Badge>
+                      )}
+                    </InlineStack>
+                    <Text variant="bodySm" tone="subdued">
+                      {t("Last active", "Son aktif", "Zuletzt aktiv")}: {formatSessionDate(s.last_seen_at, locale)}
+                      {s.ip_address ? ` · ${s.ip_address}` : ""}
+                    </Text>
+                  </BlockStack>
+                  <Button
+                    tone="critical"
+                    variant="plain"
+                    size="slim"
+                    loading={busyId === s.id}
+                    onClick={() => revokeOne(s)}
+                  >
+                    {s.is_current
+                      ? t("Log out", "Çıkış yap", "Abmelden")
+                      : t("End session", "Oturumu sonlandır", "Sitzung beenden")}
+                  </Button>
+                </InlineStack>
+              </Box>
+            ))}
+          </BlockStack>
+        )}
+      </BlockStack>
+    </Card>
+  );
 }
 
 function TotpSetupCard({ onStatusChange, locale }) {
@@ -306,7 +431,6 @@ export default function SecuritySettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [account, setAccount] = useState(null);
-  const [sessionHint, setSessionHint] = useState("");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -331,10 +455,6 @@ export default function SecuritySettingsPage() {
   useEffect(() => {
     loadAccount();
   }, [loadAccount]);
-
-  useEffect(() => {
-    if (typeof navigator !== "undefined") setSessionHint(summarizeUserAgent(navigator.userAgent, locale));
-  }, [locale]);
 
   const displayName = (() => {
     const fn = (account?.first_name || "").trim();
@@ -511,34 +631,7 @@ export default function SecuritySettingsPage() {
         </BlockStack>
       </Card>
 
-      <Card>
-        <BlockStack gap="300">
-          <Text variant="headingMd" as="h2">
-            {locale === "en" ? "Current session" : locale === "tr" ? "Geçerli oturum" : "Aktuelle Sitzung"}
-          </Text>
-          <Text as="p" tone="subdued">
-            {locale === "en"
-              ? "You are logged in with this browser. A central list of all devices is not currently available; for protection you can end all other sessions below (only this browser remains active as long as cookies are kept)."
-              : locale === "tr"
-              ? "Bu tarayıcıyla giriş yaptınız. Tüm cihazların merkezi listesi şu anda mevcut değil; koruma için aşağıdan diğer tüm oturumları sonlandırabilirsiniz (çerezler korunduğu sürece yalnızca bu tarayıcı aktif kalır)."
-              : "Sie sind mit diesem Browser angemeldet. Eine zentrale Liste aller Geräte ist derzeit nicht verfügbar; zum Schutz können Sie unten alle anderen Sitzungen beenden (nur dieser Browser bleibt aktiv, sofern Cookies erhalten bleiben)."}
-          </Text>
-          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-            <BlockStack gap="100">
-              <Text variant="bodyMd" fontWeight="semibold">
-                {sessionHint || (locale === "en" ? "This device" : locale === "tr" ? "Bu cihaz" : "Dieses Gerät")}
-              </Text>
-              <Text variant="bodySm" tone="subdued">
-                {locale === "en"
-                  ? "Device hint is derived locally from your browser — not stored on the server."
-                  : locale === "tr"
-                  ? "Cihaz ipucu tarayıcınızdan yerel olarak türetilir — sunucuda saklanmaz."
-                  : "Gerätehinweis wird lokal aus Ihrem Browser abgeleitet — nicht auf dem Server gespeichert."}
-              </Text>
-            </BlockStack>
-          </Box>
-        </BlockStack>
-      </Card>
+      <DevicesCard locale={locale} />
 
       <TotpSetupCard locale={locale} />
     </BlockStack>

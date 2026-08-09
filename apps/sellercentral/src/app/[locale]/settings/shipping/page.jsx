@@ -448,6 +448,116 @@ function CarrierModal({ mode, carrier, onClose, onSaved, copy, ui }) {
   );
 }
 
+/* ── Country overview (superuser only) ─────────────────────────
+   Every country that appears in ANY seller's shipping-group prices (the same set the shop's
+   top-right country selector shows, since it reads from /store/shipping-groups), with how many
+   published products currently route through a shipping group that includes it, and a per-country
+   on/off switch. Switching a country off strips it out of /store/shipping-groups server-side, so
+   it disappears from the shop selector and becomes unbuyable — no product data changes. */
+function CountryToggle({ checked, onChange, disabled }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 40, height: 22, borderRadius: 999, border: "none", padding: 2,
+        background: checked ? "#008060" : "#d1d5db", cursor: disabled ? "default" : "pointer",
+        display: "inline-flex", alignItems: "center", transition: "background 0.15s", flexShrink: 0,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <span style={{
+        width: 18, height: 18, borderRadius: "50%", background: "#fff",
+        transform: checked ? "translateX(18px)" : "translateX(0)",
+        transition: "transform 0.15s", boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
+      }} />
+    </button>
+  );
+}
+
+function CountryOverviewSection({ locale, copy }) {
+  const [countries, setCountries] = useState(null); // null = loading
+  const [err, setErr] = useState("");
+  const [pending, setPending] = useState({}); // country_code -> true while PATCH in flight
+  const countryNames = useMemo(() => getCountryList(locale), [locale]);
+
+  const load = useCallback(() => {
+    getMedusaAdminClient()
+      .request("/admin-hub/v1/country-overview")
+      .then((d) => setCountries(Array.isArray(d?.countries) ? d.countries : []))
+      .catch((e) => setErr(e?.message || copy.countryOverviewLoadError))
+    ;
+  }, [copy.countryOverviewLoadError]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = async (countryCode, nextEnabled) => {
+    setPending((p) => ({ ...p, [countryCode]: true }));
+    setCountries((list) => (list || []).map((c) => c.country_code === countryCode ? { ...c, is_enabled: nextEnabled } : c));
+    try {
+      await getMedusaAdminClient().request(`/admin-hub/v1/country-overview/${countryCode}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_enabled: nextEnabled }),
+      });
+    } catch (e) {
+      setErr(e?.message || copy.countryOverviewSaveError);
+      setCountries((list) => (list || []).map((c) => c.country_code === countryCode ? { ...c, is_enabled: !nextEnabled } : c));
+    }
+    setPending((p) => { const n = { ...p }; delete n[countryCode]; return n; });
+  };
+
+  if (countries === null) return null;
+
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <BlockStack gap="100">
+          <Text variant="headingSm" as="h3">{copy.countryOverviewTitle}</Text>
+          <Text variant="bodySm" tone="subdued">{copy.countryOverviewSub}</Text>
+        </BlockStack>
+
+        {err && <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>}
+
+        {countries.length === 0 ? (
+          <Text tone="subdued">{copy.countryOverviewEmpty}</Text>
+        ) : (
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+            {countries.map((c, i) => {
+              const name = countryNames.find((n) => n.code === c.country_code)?.label || c.country_code;
+              return (
+                <div
+                  key={c.country_code}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                    borderBottom: i < countries.length - 1 ? "1px solid #f3f4f6" : "none",
+                    background: "#fff", opacity: c.is_enabled ? 1 : 0.6,
+                  }}
+                >
+                  <span style={{ minWidth: 200, fontSize: 13, color: "#374151" }}>
+                    <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11, marginRight: 6 }}>{c.country_code}</span>
+                    {name}
+                  </span>
+                  <span style={{ flex: 1, fontSize: 13, color: "#6d7175" }}>
+                    {copy.countryOverviewProductCount(c.product_count)}
+                  </span>
+                  <CountryToggle
+                    checked={c.is_enabled}
+                    disabled={!!pending[c.country_code]}
+                    onChange={(next) => toggle(c.country_code, next)}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </BlockStack>
+    </Card>
+  );
+}
+
 /* ── Sendcloud Config Section (superuser only) ───────────────── */
 function SendcloudSection({ copy, ui }) {
   const [cfg, setCfg] = useState({ public_key: "", secret_key: "", markup_pct: 5, is_active: true });
@@ -876,6 +986,8 @@ export default function ShippingSettingsPage() {
             </InlineStack>
           </BlockStack>
         </Card>}
+
+        {isSuperuser && <CountryOverviewSection locale={locale} copy={copy} />}
 
         {isSuperuser && <SendcloudSection copy={copy} ui={ui} />}
 

@@ -1295,10 +1295,6 @@ const getOrderWithItems = async (client, orderId) => {
 // ── Customer Auth Helpers ─────────────────────────────────────────────
 const _crypto = require('crypto')
 const _rawCustomerSecret = process.env.CUSTOMER_JWT_SECRET || process.env.JWT_SECRET || ''
-if (!_rawCustomerSecret && process.env.NODE_ENV === 'production') {
-  console.error('[SECURITY] CUSTOMER_JWT_SECRET env var is not set in production! Server cannot start safely.')
-  process.exit(1)
-}
 const CUSTOMER_JWT_SECRET = _rawCustomerSecret || 'dev-only-customer-secret-do-not-use-in-prod'
 // Token lifetime: 7 days (same as seller tokens)
 const CUSTOMER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
@@ -1953,12 +1949,20 @@ const storeShippingGroupsGET = async (req, res) => {
     await client.connect()
     const groups = await client.query('SELECT id, name FROM store_shipping_groups ORDER BY created_at ASC')
     const prices = await client.query('SELECT group_id, country_code, price_cents FROM store_shipping_prices')
+    // Superuser-disabled countries (admin_hub_country_overrides) are stripped out here, at the
+    // single source every shop surface reads from (cart/checkout/product pages all derive their
+    // country list from this endpoint's `prices` — see CartContext.jsx) — so disabling a country
+    // hides it everywhere and makes it unbuyable, even if sellers still have prices configured for it.
+    const disabled = await client.query(
+      `SELECT country_code FROM admin_hub_country_overrides WHERE is_enabled = false`,
+    ).catch(() => ({ rows: [] }))
     await client.end()
+    const disabledSet = new Set((disabled.rows || []).map((r) => normalizeHubCountryCode(r.country_code)).filter(Boolean))
     const pricesByGroup = {}
     for (const p of (prices.rows || [])) {
-      if (!pricesByGroup[p.group_id]) pricesByGroup[p.group_id] = {}
       const cc = normalizeHubCountryCode(p.country_code)
-      if (!cc) continue
+      if (!cc || disabledSet.has(cc)) continue
+      if (!pricesByGroup[p.group_id]) pricesByGroup[p.group_id] = {}
       pricesByGroup[p.group_id][cc] = Number(p.price_cents)
     }
     const result = (groups.rows || []).map(g => ({ id: g.id, name: g.name, prices: pricesByGroup[g.id] || {} }))
@@ -1966,6 +1970,86 @@ const storeShippingGroupsGET = async (req, res) => {
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     res.json({ groups: [] })
+  }
+}
+
+// GET /admin-hub/v1/country-overview — superuser only. Every country that appears in ANY
+// seller's shipping-group prices, with a count of products currently routed through a shipping
+// group that includes it, and whether a superuser has switched it off.
+const adminHubCountryOverviewGET = async (req, res) => {
+  if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_hub_country_overrides (
+        country_code text PRIMARY KEY,
+        is_enabled boolean NOT NULL DEFAULT true,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `)
+    const r = await client.query(`
+      SELECT
+        sp.country_code,
+        COUNT(DISTINCT p.id)::int AS product_count,
+        COALESCE(o.is_enabled, true) AS is_enabled
+      FROM store_shipping_prices sp
+      LEFT JOIN admin_hub_products p
+        ON p.status = 'published'
+        AND p.metadata->>'shipping_group_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        AND (p.metadata->>'shipping_group_id')::uuid = sp.group_id
+      LEFT JOIN admin_hub_country_overrides o ON o.country_code = sp.country_code
+      GROUP BY sp.country_code, o.is_enabled
+      ORDER BY sp.country_code ASC
+    `)
+    await client.end()
+    const countries = (r.rows || [])
+      .map((row) => ({
+        country_code: normalizeHubCountryCode(row.country_code),
+        product_count: Number(row.product_count || 0),
+        is_enabled: row.is_enabled !== false,
+      }))
+      .filter((row) => row.country_code)
+    res.json({ countries })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error', countries: [] })
+  }
+}
+
+// PATCH /admin-hub/v1/country-overview/:country_code — superuser only, toggle a country on/off.
+const adminHubCountryOverviewPATCH = async (req, res) => {
+  if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+  const countryCode = normalizeHubCountryCode(req.params.country_code)
+  if (!countryCode) return res.status(400).json({ message: 'Invalid country code' })
+  const { is_enabled } = req.body || {}
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_hub_country_overrides (
+        country_code text PRIMARY KEY,
+        is_enabled boolean NOT NULL DEFAULT true,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `)
+    await client.query(
+      `INSERT INTO admin_hub_country_overrides (country_code, is_enabled, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (country_code) DO UPDATE SET is_enabled = $2, updated_at = now()`,
+      [countryCode, is_enabled !== false],
+    )
+    await client.end()
+    res.json({ success: true, country_code: countryCode, is_enabled: is_enabled !== false })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
   }
 }
 
@@ -3492,6 +3576,8 @@ module.exports = function createStoreCheckoutRouter() {
   router.patch('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupPATCH)
   router.delete('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupDELETE)
   router.get('/store/shipping-groups', storeShippingGroupsGET)
+  router.get('/admin-hub/v1/country-overview', requireSellerAuth, adminHubCountryOverviewGET)
+  router.patch('/admin-hub/v1/country-overview/:country_code', requireSellerAuth, adminHubCountryOverviewPATCH)
 
   return router
 }

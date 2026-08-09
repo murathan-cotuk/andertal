@@ -658,7 +658,7 @@
     transition: none;
   }
 
-  :global(html) {
-    scroll-behavior: auto;
-  }
+  /* html scroll-behavior for reduced motion is already handled globally in app/globals.css —
+     a bare :global(html) selector isn't valid here anyway (CSS Modules requires at least one
+     locally-scoped class/id in the selector; this rule broke the whole page's compilation). */
 }

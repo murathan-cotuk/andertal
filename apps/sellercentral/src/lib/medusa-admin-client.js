@@ -1442,6 +1442,18 @@ class MedusaAdminClient {
   async updateSellerIban(iban) {
     return this.request('/admin-hub/v1/seller/iban', { method: 'PATCH', body: JSON.stringify({ iban }) })
   }
+
+  /** Devices/sessions for the logged-in account — Settings → Security. */
+  async getSellerSessions() {
+    return this.request('/admin-hub/v1/sessions')
+  }
+  async revokeSellerSession(id) {
+    return this.request(`/admin-hub/v1/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
+  async revokeAllSellerSessions({ includeCurrent = false } = {}) {
+    const qs = includeCurrent ? '?include_current=1' : ''
+    return this.request(`/admin-hub/v1/sessions${qs}`, { method: 'DELETE' })
+  }
   async inviteUser(data) {
     return this.request('/admin-hub/users/invite', { method: 'POST', body: JSON.stringify(data) })
   }

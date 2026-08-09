@@ -35,6 +35,44 @@ const SELLER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
 const INITIAL_SUPERUSER_EMAILS = (process.env.SUPERUSER_EMAILS || 'murathan.cotuk@gmail.com')
   .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
 
+// ── Sessions (devices) ───────────────────────────────────────────────────────
+// Login-issued tokens are plain stateless JWTs (see verifySellerToken) — there was no way to
+// list "which device is logged in" or force one of them out, since nothing server-side tracked
+// them. Each login now also writes a row here and embeds its id as `sid` in the token; requests
+// carrying a `sid` get checked against this table (revoked/missing → 401), so revoking a device
+// actually ends that session instead of just hiding it in a UI. Tokens issued before this change
+// have no `sid` and keep working un-tracked until they naturally expire (7 days) — no forced logout.
+async function ensureSellerSessionsTable(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS seller_sessions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL,
+      seller_id text,
+      user_agent text,
+      ip_address text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      last_seen_at timestamptz NOT NULL DEFAULT now(),
+      revoked_at timestamptz
+    )
+  `)
+  await client.query(`CREATE INDEX IF NOT EXISTS idx_seller_sessions_user ON seller_sessions (user_id, revoked_at)`)
+}
+
+function clientIpFromRequest(req) {
+  const xff = req.headers['x-forwarded-for']
+  if (typeof xff === 'string' && xff.trim()) return xff.split(',')[0].trim()
+  return req.socket?.remoteAddress || req.ip || ''
+}
+
+async function createSellerSession(client, { userId, sellerId, req }) {
+  await ensureSellerSessionsTable(client)
+  const r = await client.query(
+    `INSERT INTO seller_sessions (user_id, seller_id, user_agent, ip_address) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [userId, sellerId || null, String(req.headers['user-agent'] || '').slice(0, 500), clientIpFromRequest(req)],
+  )
+  return r.rows[0]?.id || null
+}
+
 function signSellerToken(payload) {
   const _c = require('crypto')
   const header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')
@@ -131,12 +169,35 @@ function getSellerDbClient() {
 
 // ── Middleware (exported so server.js can mount at /admin-hub before routes) ──
 
-function requireSellerAuth(req, res, next) {
+async function requireSellerAuth(req, res, next) {
   const auth = req.headers['authorization'] || ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
   const payload = verifySellerToken(token)
   if (!payload) return res.status(401).json({ message: 'Unauthorized' })
+  // No `sid` = token issued before session tracking existed — let it through untracked
+  // rather than force-logging-out everyone already signed in when this shipped.
+  if (payload.sid) {
+    const { getPooledClient } = require('../db-pool')
+    const client = getPooledClient()
+    if (client) {
+      try {
+        await client.connect()
+        const r = await client.query(
+          `UPDATE seller_sessions SET last_seen_at = now() WHERE id = $1::uuid AND revoked_at IS NULL RETURNING id`,
+          [payload.sid],
+        )
+        await client.end()
+        if (!r.rows.length) return res.status(401).json({ message: 'Session revoked' })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        // DB hiccup shouldn't lock everyone out — fail open on infra errors, not on a
+        // confirmed revocation (that path returns 401 above, before this catch).
+        console.error('[requireSellerAuth] session check failed:', e?.message || e)
+      }
+    }
+  }
   req.sellerUser = payload
+  req.sellerSessionId = payload.sid || null
   next()
 }
 
@@ -280,8 +341,9 @@ const sellerAuthRegisterPOST = async (req, res) => {
       const parentRow = await client.query(`SELECT store_name FROM seller_users WHERE seller_id = $1 LIMIT 1`, [user.sub_of_seller_id]).catch(() => ({ rows: [] }))
       displayStoreName = parentRow.rows[0]?.store_name || ''
     }
+    const sessionId = await createSellerSession(client, { userId: user.id, sellerId: effectiveSellerId, req }).catch(() => null)
     await client.end()
-    const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName })
+    const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName, sid: sessionId || undefined })
     res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName } })
     if (!is_superuser && !sub_of_seller_id) {
       notifySuperusersNewSeller({ email: user.email, store_name: displayStoreName, seller_id: effectiveSellerId, first_name: user.first_name, last_name: user.last_name }).catch((e) => console.error('notifySuperusersNewSeller:', e.message))
@@ -345,8 +407,9 @@ const sellerAuthLoginPOST = async (req, res) => {
       const ss = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [effectiveSellerId])
       displayStoreName = (ss.rows[0]?.store_name || '').trim()
     }
+    const sessionId = await createSellerSession(client, { userId: user.id, sellerId: effectiveSellerId, req }).catch(() => null)
     await client.end()
-    const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName })
+    const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, sid: sessionId || undefined })
     res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, permissions: user.permissions || null } })
   } catch (err) {
     try { await client.end() } catch (_) {}
@@ -586,6 +649,107 @@ const sellerUserDeleteDELETE = async (req, res) => {
   }
 }
 
+// ── Sessions (devices) API — list / revoke this login account's own sessions ──
+// Scoped to req.sellerUser.id (the individual login identity), not seller_id — a sub-user
+// should manage their own devices, not force-logout every other user on the same seller account.
+function summarizeUserAgentServer(ua) {
+  const u = String(ua || '').toLowerCase()
+  let os = 'Unknown'
+  if (u.includes('windows')) os = 'Windows'
+  else if (u.includes('mac os') || u.includes('macintosh')) os = 'macOS'
+  else if (u.includes('android')) os = 'Android'
+  else if (u.includes('iphone') || u.includes('ipad')) os = 'iOS'
+  else if (u.includes('linux')) os = 'Linux'
+  let browser = 'Browser'
+  if (u.includes('edg/')) browser = 'Edge'
+  else if (u.includes('chrome') && !u.includes('chromium')) browser = 'Chrome'
+  else if (u.includes('firefox')) browser = 'Firefox'
+  else if (u.includes('safari') && !u.includes('chrome')) browser = 'Safari'
+  return `${os} · ${browser}`
+}
+
+const sellerSessionsGET = async (req, res) => {
+  const userId = req.sellerUser?.id
+  if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    await ensureSellerSessionsTable(client)
+    const r = await client.query(
+      `SELECT id, user_agent, ip_address, created_at, last_seen_at
+       FROM seller_sessions WHERE user_id = $1::uuid AND revoked_at IS NULL
+       ORDER BY last_seen_at DESC`,
+      [userId],
+    )
+    await client.end()
+    const sessions = r.rows.map((row) => ({
+      id: row.id,
+      device_label: summarizeUserAgentServer(row.user_agent),
+      ip_address: row.ip_address || null,
+      created_at: row.created_at,
+      last_seen_at: row.last_seen_at,
+      is_current: row.id === req.sellerSessionId,
+    }))
+    res.json({ sessions, current_session_id: req.sellerSessionId })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message || 'Error' })
+  }
+}
+
+const sellerSessionRevokeDELETE = async (req, res) => {
+  const userId = req.sellerUser?.id
+  if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+  const sessionId = (req.params.id || '').trim()
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    await ensureSellerSessionsTable(client)
+    // user_id match is the ownership check — a session id alone isn't enough to revoke it.
+    const r = await client.query(
+      `UPDATE seller_sessions SET revoked_at = now() WHERE id = $1::uuid AND user_id = $2::uuid AND revoked_at IS NULL RETURNING id`,
+      [sessionId, userId],
+    )
+    await client.end()
+    if (!r.rows.length) return res.status(404).json({ message: 'Session not found' })
+    res.json({ success: true })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message || 'Error' })
+  }
+}
+
+const sellerSessionsRevokeAllDELETE = async (req, res) => {
+  const userId = req.sellerUser?.id
+  if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+  // Default: keep the caller's own current session alive (matches "log out other devices").
+  // ?include_current=1 ends every session, including this one.
+  const includeCurrent = String(req.query.include_current || '') === '1'
+  const client = getSellerDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  try {
+    await client.connect()
+    await ensureSellerSessionsTable(client)
+    const params = [userId]
+    let extra = ''
+    if (!includeCurrent && req.sellerSessionId) {
+      params.push(req.sellerSessionId)
+      extra = ' AND id != $2::uuid'
+    }
+    const r = await client.query(
+      `UPDATE seller_sessions SET revoked_at = now() WHERE user_id = $1::uuid AND revoked_at IS NULL${extra} RETURNING id`,
+      params,
+    )
+    await client.end()
+    res.json({ success: true, revoked_count: r.rows.length })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    res.status(500).json({ message: err?.message || 'Error' })
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 module.exports = function createSellerAuthRouter() {
@@ -603,6 +767,9 @@ module.exports = function createSellerAuthRouter() {
   router.patch('/admin-hub/users/:id', requireSuperuser, sellerUserUpdatePATCH)
   router.delete('/admin-hub/users/:id', requireSuperuser, sellerUserDeleteDELETE)
   router.patch('/admin-hub/users/:id/superuser', requireSuperuser, sellerUserSuperuserPATCH)
+  router.get('/admin-hub/v1/sessions', sellerSessionsGET)
+  router.delete('/admin-hub/v1/sessions/:id', sellerSessionRevokeDELETE)
+  router.delete('/admin-hub/v1/sessions', sellerSessionsRevokeAllDELETE)
 
   return router
 }
