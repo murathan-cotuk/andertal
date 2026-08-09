@@ -918,9 +918,11 @@ export default function OrdersPage() {
   };
 
   // "Versenden" starts the packaging-center flow: scan items → package size → DHL label purchase.
+  // Order ids travel in the URL (not sessionStorage) so a refresh or a link shared/reopened in
+  // another tab still lands on the same order set — VersandPage re-fetches full detail per id anyway.
   const startPacking = (ordersToShip) => {
-    sessionStorage.setItem("versand_orders", JSON.stringify(ordersToShip));
-    router.push(`/${locale}/shipping`);
+    const ids = ordersToShip.map((o) => o.id).filter(Boolean);
+    router.push(`/${locale}/shipping?ids=${encodeURIComponent(ids.join(","))}`);
   };
 
   const handleColSort = (sortKey) => {

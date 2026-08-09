@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button, InlineStack, BlockStack } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { fmtMoney } from "@/lib/locale-text";
@@ -13,6 +13,7 @@ import { detectCarrierFromTrackingNumber } from "@/lib/carrier-detect";
 
 export default function VersandPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const locale = useLocale();
   const s = useMemo(() => getShipStrings(locale), [locale]);
 
@@ -51,20 +52,20 @@ export default function VersandPage() {
     return detected ? carrierBadge(detected).label : "";
   };
 
+  // Order ids come from the URL (?ids=100006,100007), not sessionStorage — loadItemsForOrders
+  // always re-fetches full detail per id from the backend, so the id list alone is enough and
+  // survives a refresh or the link being reopened, unlike a one-shot sessionStorage read.
   useEffect(() => {
-    const stored = sessionStorage.getItem("versand_orders");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setOrders(parsed);
-        loadItemsForOrders(parsed);
-        sessionStorage.removeItem("versand_orders");
-        setLoading(false);
+    const idsParam = searchParams.get("ids");
+    if (idsParam) {
+      const ids = idsParam.split(",").map((id) => id.trim()).filter(Boolean);
+      if (ids.length) {
+        loadItemsForOrders(ids.map((id) => ({ id })));
         return;
-      } catch { /* ignore */ }
+      }
     }
     fetchPendingOrders();
-  }, []);
+  }, [searchParams]);
 
   const fetchPendingOrders = async () => {
     setLoading(true);
