@@ -385,3 +385,22 @@ Eski `/api/personalized-products`, Medusa'nın hiç kullanılmayan (boş) yerle�
 - Mobilde header'ın üstündeki durum çubuğu şeridi (`ShopHeader.jsx`), header'ın gerçek arka planını düz bir renge çeviren bir fonksiyondan geçiriliyordu — gradient'in ilk rengi bulunamayınca siyaha düşüyordu. Artık ham arka plan değerini birebir kullanıyor.
 - `seller-account.js`'teki IBAN kaydetme uç noktası, Stripe hata verdiğinde genel bir "teknik hata" (500) dönüyordu, gerçek sebep hiçbir yere yazılmıyordu — artık Stripe'ın gerçek hata mesajı (400 ile) dönüyor.
 - **Debug bulgusu (bu oturumda tesadüfen bulundu):** `apps/shop/src/components/support/SupportLanding.module.css` içinde geçersiz bir CSS Modules seçicisi (`:global(html)` — yerel bir class/id içermeden tek başına kullanılmış) `next dev` derlemesini kırıyordu; bu, "kategoriler bozuldu" şikayetinin bir nedeni olabilir (aynı derlemeye bağımlı sayfalar etkilenir). Kural zaten `app/globals.css`'te global olarak tanımlıydı, modül dosyasındaki geçersiz kopya kaldırıldı. **Doğrulanamayan iki şikayet:** (a) "Arnavutluk seçince URL'de us oluyor" — ilgili tüm fonksiyonlar (`shop-market.js`, `countries.js`, `ShopHeader.jsx`, `proxy.js`) tek tek okundu ve doğrudan test edildi (`/al/de` gerçekten `AL` ile render oldu, `us`'a yönlenmedi), hata yeniden üretilemedi — CSS build hatası düzeldiği için bu da çözülmüş olabilir, yeniden test edilmeli. (b) "Kategoriler bozuldu" — build hatası düzeltildi ama sayfa client-side render olduğu için tarayıcıda gerçek bir kullanıcı testiyle doğrulanmalı.
+
+---
+
+## Durum (Claude — ayrı oturum, 2026-08-09 devam) — TASK-1 / TASK-5.2 / TASK-14
+
+**JWT sertleştirmesi commit edildi** (`c8b3d87`) — Render'da `SELLER_JWT_SECRET`/`CUSTOMER_JWT_SECRET` tanımlı olduğu teyit edildikten sonra.
+
+**TASK-1 — Versand akışı — DÜZELTİLDİ (commit `1ce1d0a`)**
+Hipotez doğrulandı: `OrdersPage.jsx`'teki `startPacking` seçili siparişleri `sessionStorage.versand_orders`'a yazıp `/shipping`'e yönlendiriyordu; `VersandPage.jsx` bunu bir kere okuyup hemen siliyordu (`removeItem`). Sayfa yenilenirse veya link başka sekmede açılırsa seçim sessizce kayboluyor, tüm açık siparişler listesine düşüyordu. `VersandPage` zaten her sipariş için `client.getOrder(id)` ile tam veriyi yeniden çekiyor — yani sessionStorage'daki tek gerekli bilgi id'lerdi. Artık id'ler URL'de taşınıyor (`/shipping?ids=...`), sayfa yenilense de kaybolmuyor. `useSearchParams` kullanımı için `shipping/page.jsx`'e `Suspense` sınırı eklendi (aynı `login/page.jsx` deseni). `next build` ile derleme doğrulandı.
+
+**TASK-5.2 — Sipariş "Hinzufügen" — YENİ ÖZELLİK OLARAK KURULDU (commit `2f85e68`)**
+Meğerse mevcut bir "serbest metin kabul ediliyor" bug'ı değilmiş — sipariş detayında bir ürün EKLEME özelliği hiç yokmuş (ne backend endpoint, ne UI). `POST /admin-hub/v1/orders/:id/items` eklendi: yalnızca gerçek bir `admin_hub_products` kaydına karşılık gelen `product_id` kabul ediyor, seller'ın o ürünü satma yetkisi olup olmadığını (kendi ürünü veya `admin_hub_seller_listings` kaydı) kontrol ediyor, fiyatı seller listing override'ından veya taban fiyattan alıyor, `store_order_items`'a ekliyor ve siparişin subtotal/total'ını yeniden hesaplıyor. `OrderDetailPage.jsx`'e mevcut `SearchableSelect` bileşeniyle (başlık/SKU/EAN arama) ürün seçici + adet + Ekle butonu eklendi. Canlı DB'ye karşı transaction içinde (ROLLBACK ile) uçtan uca test edildi.
+
+**TASK-14 — Onboarding checklist — KURULDU (commit `77ad1b5`)**
+Dashboard'a `OnboardingChecklist` bileşeni eklendi. Görev listesinde önerilen bazı örnek maddeler ("Şirket/adres bilgileri", "İade adresi") sistemde ayrı, kontrol edilebilir bir alan olarak karşılık bulmadı (şirket/adres zaten verification akışının parçası; iade adresi diye bir alan hiç yok — TASK-13 henüz kurulmadığı için) — bu yüzden gerçekten var olan ve kontrol edilebilir 4 sinyalle kuruldu: doğrulama/KYB (`approval_status`, zorunlu, atlanamaz), Stripe Connect ödeme kurulumu, en az bir kargo/shipping group, en az bir bağlı carrier. Superuser'da ve her şey tamamlandığında gizli. Atlanan (zorunlu olmayan) maddeler seller_id bazlı localStorage'da tutulup "ertelenenler" şeridinden geri getirilebiliyor.
+
+**Kalan (bu oturumda başlanmadı, büyük kapsamlı):**
+- **TASK-3** (Lieferschein şablon paritesi) — Rechnung şablon sisteminin envanteri çıkarılmadı.
+- **TASK-13** (Retoure uçtan uca) — hâlâ hiç incelenmedi, TASKS.md'nin kendi notuna göre "en büyük görev"; smoke-test + model/UX kararları gerektiriyor.
