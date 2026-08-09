@@ -21,10 +21,20 @@ function validate(schema, body, res) {
 }
 
 // ── Crypto helpers ────────────────────────────────────────────────────────────
+// Gate on "are we pointed at the real production DB", not NODE_ENV — NODE_ENV can be
+// unset/misconfigured on the actual deployment while DATABASE_URL still points at the real
+// Render Postgres instance, in which case the old NODE_ENV-only check silently let every seller
+// (and everyone else, since the fallback string is public source code) sign a valid token for
+// ANY seller_id, reading/acting as any other seller. That's the real severity behind "sellers
+// can see other sellers' notifications" — this isn't scoped to notifications, it's full
+// impersonation. render.com in DATABASE_URL mirrors the same signal this codebase already uses
+// everywhere else to detect "this is the real deployment" (see the repeated
+// `dbUrl.includes('render.com')` SSL checks throughout src/routes/*.js).
 const _SELLER_JWT_SECRET = (() => {
   const s = process.env.SELLER_JWT_SECRET || process.env.JWT_SECRET || ''
-  if (!s && process.env.NODE_ENV === 'production') {
-    console.error('[SECURITY] SELLER_JWT_SECRET env var is not set in production!')
+  const isRealDeployment = process.env.NODE_ENV === 'production' || /render\.com/i.test(process.env.DATABASE_URL || '')
+  if (!s && isRealDeployment) {
+    console.error('[SECURITY] SELLER_JWT_SECRET env var is not set — refusing to start with a guessable fallback secret against a real database.')
     process.exit(1)
   }
   return s || 'dev-only-seller-secret-do-not-use-in-prod'

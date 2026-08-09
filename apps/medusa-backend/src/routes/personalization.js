@@ -13,6 +13,13 @@ const crypto = require('crypto')
  * that file doesn't export its verify function, and this is a small, self-contained check).
  */
 const _rawCustomerSecret = process.env.CUSTOMER_JWT_SECRET || process.env.JWT_SECRET || ''
+// Same guard as store-checkout.js's CUSTOMER_JWT_SECRET (this file is required into the same
+// process, so that guard already protects real deployments — duplicated here for defense in
+// depth in case this module is ever loaded independently).
+if (!_rawCustomerSecret && (process.env.NODE_ENV === 'production' || /render\.com/i.test(process.env.DATABASE_URL || ''))) {
+  console.error('[SECURITY] CUSTOMER_JWT_SECRET env var is not set — refusing to start with a guessable fallback secret against a real database.')
+  process.exit(1)
+}
 const CUSTOMER_JWT_SECRET = _rawCustomerSecret || 'dev-only-customer-secret-do-not-use-in-prod'
 const _CUSTOMER_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 

@@ -1295,6 +1295,14 @@ const getOrderWithItems = async (client, orderId) => {
 // ── Customer Auth Helpers ─────────────────────────────────────────────
 const _crypto = require('crypto')
 const _rawCustomerSecret = process.env.CUSTOMER_JWT_SECRET || process.env.JWT_SECRET || ''
+// Same rationale as SELLER_JWT_SECRET in seller-auth.js: gate on "pointed at the real DB", not
+// NODE_ENV, which can be unset on the actual deployment and silently leave every customer
+// impersonable via the public fallback secret.
+const _isRealCustomerDeployment = process.env.NODE_ENV === 'production' || /render\.com/i.test(process.env.DATABASE_URL || '')
+if (!_rawCustomerSecret && _isRealCustomerDeployment) {
+  console.error('[SECURITY] CUSTOMER_JWT_SECRET env var is not set — refusing to start with a guessable fallback secret against a real database.')
+  process.exit(1)
+}
 const CUSTOMER_JWT_SECRET = _rawCustomerSecret || 'dev-only-customer-secret-do-not-use-in-prod'
 // Token lifetime: 7 days (same as seller tokens)
 const CUSTOMER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
