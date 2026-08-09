@@ -8,6 +8,7 @@ import { statusLabel } from "@/lib/status-labels";
 import { Page, Banner, Button, Spinner } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import LiveVisitorsPanel from "@/components/dashboard/LiveVisitorsPanel";
+import OnboardingChecklist from "@/components/dashboard/OnboardingChecklist";
 import RevenueAreaChart from "@/components/dashboard/RevenueAreaChart";
 import {
   generatePayoutPeriods,
@@ -358,6 +359,8 @@ export default function DashboardHome() {
           <Button variant="plain" onClick={() => router.push("/settings/payments")}>{ui.settingsPayments}</Button>
         </div>
       </div>
+
+      <OnboardingChecklist locale={locale} isSuperuser={isSuperuser} />
 
       {isSuperuser && <LiveVisitorsPanel />}
 
