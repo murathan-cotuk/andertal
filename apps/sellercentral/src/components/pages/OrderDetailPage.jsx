@@ -8,6 +8,7 @@ import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import TrackingSection from "@/components/orders/TrackingSection";
+import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
 import { statusLabel } from "@/lib/status-labels";
@@ -111,6 +112,37 @@ export default function OrderDetailPage() {
   const [orderStatus, setOrderStatus] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
   const [deliveryStatus, setDeliveryStatus] = useState("");
+
+  // Add-product (TASK-5.2): only a real catalog match (title/SKU/EAN via SearchableSelect) can be
+  // added — no free-text line items — the backend re-validates ownership + price regardless.
+  const [products, setProducts] = useState([]);
+  const [addProductId, setAddProductId] = useState("");
+  const [addQty, setAddQty] = useState(1);
+  const [addingItem, setAddingItem] = useState(false);
+  const [addItemError, setAddItemError] = useState("");
+
+  useEffect(() => {
+    getMedusaAdminClient().getAdminHubProducts().then((r) => {
+      const list = (r.products || []).filter((p) => (p.status || "").toLowerCase() !== "draft");
+      setProducts(list);
+    }).catch(() => setProducts([]));
+  }, []);
+
+  const handleAddItem = async () => {
+    if (!addProductId) { setAddItemError(c.selectProductFirst); return; }
+    setAddingItem(true);
+    setAddItemError("");
+    try {
+      const client = getMedusaAdminClient();
+      const res = await client.addOrderItem(id, { product_id: addProductId, quantity: Math.max(1, Number(addQty) || 1) });
+      if (res?.order) setOrder((o) => ({ ...o, ...res.order }));
+      setAddProductId("");
+      setAddQty(1);
+    } catch (e) {
+      setAddItemError(userError(e, locale, c.addProductFailed));
+    }
+    setAddingItem(false);
+  };
 
   const loadOrder = useCallback(async () => {
     if (!id) {
@@ -357,6 +389,34 @@ export default function OrderDetailPage() {
                 </tr>
               </tfoot>
             </table>
+
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #f3f4f6", display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+              <div style={{ minWidth: 260, flex: 1 }}>
+                <SearchableSelect
+                  label={c.addProduct}
+                  options={products.map((p) => ({ label: p.title || p.handle, value: p.id, sublabel: p.metadata?.ean || p.sku || "" }))}
+                  value={addProductId}
+                  onChange={setAddProductId}
+                  placeholder={c.addProductSearchPlaceholder}
+                />
+              </div>
+              <div style={{ width: 80 }}>
+                <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 3 }}>{c.qty}</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={addQty}
+                  onChange={(e) => setAddQty(e.target.value)}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
+                />
+              </div>
+              <Button onClick={handleAddItem} loading={addingItem} disabled={addingItem}>
+                {c.add}
+              </Button>
+            </div>
+            {addItemError && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#b91c1c" }}>{addItemError}</div>
+            )}
           </Section>
 
           {/* Status management */}

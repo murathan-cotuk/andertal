@@ -887,6 +887,11 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/orders/${id}`, { method: 'DELETE' })
   }
 
+  /** Add a real catalog product as a new line item on an existing order (order detail "Hinzufügen"). */
+  async addOrderItem(id, { product_id, quantity = 1 }) {
+    return this.request(`/admin-hub/v1/orders/${id}/items`, { method: 'POST', body: JSON.stringify({ product_id, quantity }) })
+  }
+
   /** Superuser: aktive Shop-Besucher (Live View) */
   async getLiveVisitors(params = {}) {
     const queryParams = new URLSearchParams(

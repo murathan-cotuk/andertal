@@ -561,6 +561,99 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       }
     }
 
+    // Add a real product line item to an existing order (TASK-5.2 — replaces free-text "Hinzufügen").
+    // Only accepts a product_id that resolves to an actual admin_hub_products row the caller is
+    // allowed to sell (own product, or a listing for it) — no arbitrary title/price entry.
+    const adminHubOrderAddItemPOST = async (req, res) => {
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const productId = String(req.body?.product_id || '').trim()
+      const quantity = Math.max(1, Math.min(999, Number(req.body?.quantity || 1) | 0))
+      if (!productId) return res.status(400).json({ message: 'product_id required' })
+      const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
+      const isSuperuser = !!req.sellerUser?.is_superuser
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const pr = await client.query(
+          `SELECT id::text AS id, title, handle, sku, price_cents, seller_id, metadata
+           FROM admin_hub_products WHERE id::text = $1`,
+          [productId],
+        )
+        const product = pr.rows[0]
+        if (!product) { await client.end(); return res.status(404).json({ message: 'Product not found' }) }
+
+        const ownerSellerId = String(product.seller_id || '').trim()
+        let effectiveSellerId = ownerSellerId && ownerSellerId !== 'default' ? ownerSellerId : ''
+        let unitPriceCents = Number(product.price_cents || 0)
+
+        if (!isSuperuser) {
+          if (!callerSellerId) { await client.end(); return res.status(403).json({ message: 'Seller context required' }) }
+          const lr = await client.query(
+            `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id::text = $1 AND seller_id = $2`,
+            [productId, callerSellerId],
+          )
+          const listing = lr.rows[0]
+          const isOwnProduct = effectiveSellerId === callerSellerId
+          if (!isOwnProduct && !listing) {
+            await client.end()
+            return res.status(403).json({ message: 'You are not allowed to sell this product' })
+          }
+          effectiveSellerId = callerSellerId
+          if (listing && listing.price_cents != null) unitPriceCents = Number(listing.price_cents)
+        }
+
+        const meta = product.metadata && typeof product.metadata === 'object' ? product.metadata : {}
+        const thumbnail = meta.thumbnail || null
+
+        await client.query(
+          `INSERT INTO store_order_items (order_id, product_id, title, quantity, unit_price_cents, product_handle, thumbnail, seller_id)
+           VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, productId, product.title || '', quantity, unitPriceCents, product.handle || null, thumbnail, effectiveSellerId || null],
+        )
+
+        // Keep store_orders.subtotal_cents/total_cents in sync so invoices/PDFs and list views
+        // reflect the new line — mirrors the shipping/discount math used at order creation.
+        const orderRow = await client.query(
+          `SELECT shipping_cents, discount_cents FROM store_orders WHERE id = $1::uuid`,
+          [id],
+        )
+        if (orderRow.rows[0]) {
+          const allItems = await client.query(`SELECT unit_price_cents, quantity FROM store_order_items WHERE order_id = $1`, [id])
+          const newSubtotal = allItems.rows.reduce((sum, r) => sum + Number(r.unit_price_cents || 0) * Number(r.quantity || 1), 0)
+          const newTotal = newSubtotal + Number(orderRow.rows[0].shipping_cents || 0) - Number(orderRow.rows[0].discount_cents || 0)
+          await client.query(
+            `UPDATE store_orders SET subtotal_cents = $1, total_cents = $2, updated_at = now() WHERE id = $3::uuid`,
+            [newSubtotal, newTotal, id],
+          )
+        }
+
+        const oRes = await client.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
+        const row = oRes.rows && oRes.rows[0]
+        const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
+        let items = await enrichOrderItemRows(client, iRes.rows || [])
+        items = filterItemsForSeller(items, callerSellerId, { isSuperuser, orderSellerId: row.seller_id })
+        const sellerSubtotal = itemsSubtotalCents(items)
+        await client.end()
+        res.json({
+          order: {
+            ...row,
+            subtotal_cents: !isSuperuser && callerSellerId ? sellerSubtotal : row.subtotal_cents,
+            total_cents: !isSuperuser && callerSellerId ? sellerSubtotal : resolveOrderPaidTotalCents(row),
+            seller_items_subtotal_cents: sellerSubtotal,
+            order_number: row.order_number ? Number(row.order_number) : null,
+            items,
+          },
+        })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const adminHubOrderDELETE = async (req, res) => {
       if (!req.sellerUser?.is_superuser) {
         return res.status(403).json({ message: 'Superuser access required' })
@@ -835,6 +928,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
     })
   router.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
   router.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
+  router.post('/admin-hub/v1/orders/:id/items', adminHubOrderAddItemPOST)
   router.delete('/admin-hub/v1/orders/:id', adminHubOrderDELETE)
   router.get('/admin-hub/v1/live-visitors', requireSuperuser, adminHubLiveVisitorsGET)
 

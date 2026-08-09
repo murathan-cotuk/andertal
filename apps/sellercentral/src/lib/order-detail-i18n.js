@@ -30,5 +30,11 @@ export function getOrderDetailCopy(locale) {
     sameAsShipping: t("Same as shipping address", "Teslimat adresiyle ayni", "Identique a l'adresse de livraison", "Igual que la direccion de envio", "Uguale all'indirizzo di spedizione", "gleich wie Lieferadresse"),
     summary: t("Summary", "Ozet", "Resume", "Resumen", "Riepilogo", "Zusammenfassung"),
     dangerText: t("This action cannot be undone.", "Bu islem geri alinamaz.", "Cette action est irreversible.", "Esta accion no se puede deshacer.", "Questa azione non puo essere annullata.", "Diese Aktion kann nicht ruckgangig gemacht werden."),
+    addProduct: t("Add product", "Urun ekle", "Ajouter un produit", "Anadir producto", "Aggiungi prodotto", "Produkt hinzufugen"),
+    addProductSearchPlaceholder: t("Search by title, SKU or EAN…", "Baslik, SKU veya EAN ile ara…", "Rechercher par titre, SKU ou EAN…", "Buscar por titulo, SKU o EAN…", "Cerca per titolo, SKU o EAN…", "Nach Titel, SKU oder EAN suchen…"),
+    qty: t("Qty", "Adet", "Qte", "Cant.", "Qta", "Menge"),
+    add: t("Add", "Ekle", "Ajouter", "Anadir", "Aggiungi", "Hinzufugen"),
+    addProductFailed: t("Could not add product", "Urun eklenemedi", "Impossible d'ajouter le produit", "No se pudo anadir el producto", "Impossibile aggiungere il prodotto", "Produkt konnte nicht hinzugefugt werden"),
+    selectProductFirst: t("Select a product first", "Once bir urun secin", "Selectionnez d'abord un produit", "Seleccione primero un producto", "Seleziona prima un prodotto", "Wahlen Sie zuerst ein Produkt"),
   };
 }
