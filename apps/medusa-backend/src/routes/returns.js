@@ -114,7 +114,8 @@ const adminHubReturnsGET = async (req, res) => {
       params.push(sellerId)
       const n = params.length
       where = `WHERE (
-        EXISTS (
+        NULLIF(TRIM(COALESCE(r.seller_id, '')), '') = $${n}
+        OR EXISTS (
           SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
             NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
             OR (
@@ -165,11 +166,14 @@ const adminHubReturnPATCH = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   const id = (req.params.id || '').trim()
   const { status, notes, refund_amount_cents, refund_status, refund_note } = req.body || {}
+  const allowedStatus = new Set(['offen', 'genehmigt', 'abgelehnt', 'eingegangen', 'abgeschlossen'])
   const sets = []; const params = []
   if (status) {
+    if (!allowedStatus.has(status)) return res.status(400).json({ message: 'Invalid status' })
     params.push(status); sets.push(`status = $${params.length}`)
     if (status === 'genehmigt') { sets.push('approved_at = now()') }
     if (status === 'abgelehnt') { sets.push('rejected_at = now()') }
+    if (status === 'eingegangen') { sets.push('received_at = now()') }
   }
   if (notes !== undefined) { params.push(notes); sets.push(`notes = $${params.length}`) }
   if (refund_amount_cents !== undefined) { params.push(refund_amount_cents); sets.push(`refund_amount_cents = $${params.length}`) }
@@ -183,6 +187,25 @@ const adminHubReturnPATCH = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
+    const isSuperuser = req.sellerUser?.is_superuser === true
+    const jwtSellerId = String(req.sellerUser?.seller_id || '').trim()
+    if (!isSuperuser) {
+      if (!jwtSellerId) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+      const own = await client.query(
+        `SELECT r.id FROM store_returns r
+         LEFT JOIN store_orders o ON o.id = r.order_id
+         WHERE r.id = $1::uuid AND (
+           NULLIF(TRIM(COALESCE(r.seller_id, '')), '') = $2
+           OR (o.seller_id = $2 AND o.seller_id IS DISTINCT FROM 'default')
+           OR EXISTS (
+             SELECT 1 FROM store_order_items oi
+             WHERE oi.order_id = r.order_id AND NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $2
+           )
+         )`,
+        [id, jwtSellerId],
+      )
+      if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+    }
     await client.query(`UPDATE store_returns SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
     if (status === 'genehmigt') {
       await client.query(
@@ -330,6 +353,76 @@ ${row.notes ? `<p style="color:#6b7280;font-size:13px">${row.notes}</p>` : ''}
   }
 }
 
+// GET/PATCH /admin-hub/v1/return-settings — seller return address (used for customer_ships emails)
+const adminHubReturnSettingsGET = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  const isSuperuser = req.sellerUser?.is_superuser === true
+  const sellerId = isSuperuser
+    ? String(req.query.seller_id || req.sellerUser?.seller_id || 'default').trim()
+    : String(req.sellerUser?.seller_id || '').trim()
+  if (!sellerId) return res.status(403).json({ message: 'Forbidden' })
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(
+      `SELECT return_address FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+      [sellerId],
+    )
+    await client.end()
+    const addr = r.rows[0]?.return_address && typeof r.rows[0].return_address === 'object'
+      ? r.rows[0].return_address
+      : {}
+    res.json({ return_address: {
+      name: String(addr.name || ''),
+      street: String(addr.street || ''),
+      zip: String(addr.zip || ''),
+      city: String(addr.city || ''),
+      country: String(addr.country || 'DE'),
+    } })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
+const adminHubReturnSettingsPATCH = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  const isSuperuser = req.sellerUser?.is_superuser === true
+  const sellerId = isSuperuser
+    ? String(req.body?.seller_id || req.sellerUser?.seller_id || 'default').trim()
+    : String(req.sellerUser?.seller_id || '').trim()
+  if (!sellerId) return res.status(403).json({ message: 'Forbidden' })
+  const raw = req.body?.return_address && typeof req.body.return_address === 'object' ? req.body.return_address : {}
+  const return_address = {
+    name: String(raw.name || '').trim(),
+    street: String(raw.street || '').trim(),
+    zip: String(raw.zip || '').trim(),
+    city: String(raw.city || '').trim(),
+    country: String(raw.country || 'DE').trim().toUpperCase().slice(0, 2) || 'DE',
+  }
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    await client.query(
+      `INSERT INTO admin_hub_seller_settings (seller_id, return_address, updated_at)
+       VALUES ($1, $2::jsonb, now())
+       ON CONFLICT (seller_id) DO UPDATE SET
+         return_address = $2::jsonb,
+         updated_at = now()`,
+      [sellerId, JSON.stringify(return_address)],
+    )
+    await client.end()
+    res.json({ return_address })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
 module.exports = function createReturnsRouter() {
   const router = Router()
 
@@ -340,6 +433,8 @@ module.exports = function createReturnsRouter() {
   router.post('/admin-hub/v1/returns', adminHubReturnsPOST)
   router.patch('/admin-hub/v1/returns/:id', adminHubReturnPATCH)
   router.post('/admin-hub/v1/returns/:id/send-label', adminHubReturnSendLabelPOST)
+  router.get('/admin-hub/v1/return-settings', adminHubReturnSettingsGET)
+  router.patch('/admin-hub/v1/return-settings', adminHubReturnSettingsPATCH)
 
   return router
 }

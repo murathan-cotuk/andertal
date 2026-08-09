@@ -5,10 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button, InlineStack, BlockStack } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { fmtMoney } from "@/lib/locale-text";
-import { getShipStrings, fmtShipDate } from "@/lib/ship-i18n";
+import { getShipStrings } from "@/lib/ship-i18n";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import ShipLabelModal, { carrierBadge } from "@/components/orders/ShipLabelModal";
-import { buildShipLieferscheinHtml } from "@/lib/ship-print-html";
 import { detectCarrierFromTrackingNumber } from "@/lib/carrier-detect";
 
 export default function VersandPage() {
@@ -312,15 +311,38 @@ export default function VersandPage() {
     setSaving(false);
   };
 
-  const handlePrintLieferscheinAll = () => {
-    const dateStr = fmtShipDate(locale);
-    const inner = buildShipLieferscheinHtml(orders, resolveOrderCarrierName, trackings, dateStr, locale);
-    const win = window.open("", "_blank", "width=900,height=700");
-    if (!win) return;
-    win.document.write(
-      `<!DOCTYPE html><html><head><title>${s.deliveryNote}</title><style>body{margin:20px}@media print{body{margin:0}}</style></head><body>${inner}<script>window.onload=()=>window.print()<\/script></body></html>`,
-    );
-    win.document.close();
+  const handlePrintLieferscheinAll = async () => {
+    // Print the same backend PDF template as order detail (Rechnung parity), not the old HTML stub.
+    // Open each Lieferschein as an authenticated blob; pass local carrier/tracking when not yet saved.
+    const client = getMedusaAdminClient();
+    const objectUrls = [];
+    try {
+      for (const o of orders) {
+        const carrier = resolveOrderCarrierName(o) || "";
+        const tracking =
+          (trackings[o.id] != null ? String(trackings[o.id]).trim() : "") ||
+          String(o.tracking_number || "").trim();
+        const blob = await client.downloadOrderPdf(o.id, "lieferschein", locale, {
+          carrier: carrier || undefined,
+          tracking: tracking || undefined,
+        });
+        const url = URL.createObjectURL(blob);
+        objectUrls.push(url);
+        const win = window.open(url, "_blank");
+        if (win) {
+          // Best-effort auto-print once the PDF viewer loads
+          try {
+            win.addEventListener?.("load", () => {
+              try { win.print(); } catch { /* ignore */ }
+            });
+          } catch { /* ignore */ }
+        }
+      }
+    } catch {
+      /* ignore — popup blocked or network error */
+    }
+    // Revoke after a delay so the browser has time to load the blobs
+    setTimeout(() => objectUrls.forEach((u) => URL.revokeObjectURL(u)), 60_000);
   };
 
   const progress = orders.length > 0 ? Math.round((currentIndex / orders.length) * 100) : 0;

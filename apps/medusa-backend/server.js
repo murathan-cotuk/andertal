@@ -1152,6 +1152,12 @@ async function start() {
         } catch (e) {
           console.warn('[seed-return-requested-flow]', e?.message || e)
         }
+        try {
+          const { seedReturnRequestedCustomerShipsFlow } = require('./src/seed-return-requested-customer-ships-flow')
+          await seedReturnRequestedCustomerShipsFlow(client)
+        } catch (e) {
+          console.warn('[seed-return-requested-customer-ships-flow]', e?.message || e)
+        }
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_flow_snapshots (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1582,6 +1588,13 @@ async function start() {
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_first_status_id integer`).catch(() => {})
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_charge_status varchar(20) DEFAULT 'pending'`).catch(() => {})
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS label_charged_at timestamp`).catch(() => {})
+        // TASK-13: product-based returns + seller_pays vs customer_ships
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS seller_id varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS return_method varchar(40) DEFAULT 'seller_pays'`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS customer_tracking_number varchar(120)`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS customer_carrier_name varchar(100)`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS customer_tracking_at timestamp`).catch(() => {})
+        await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS received_at timestamp`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS order_status varchar(50) DEFAULT 'offen'`).catch(() => {})
 
         await client.query(`
@@ -1648,6 +1661,8 @@ async function start() {
   );
 `).catch(() => {})
         await client.query(`ALTER TABLE store_shipping_groups ADD COLUMN IF NOT EXISTS seller_id varchar(255) DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE store_shipping_groups ADD COLUMN IF NOT EXISTS return_method varchar(40) DEFAULT 'seller_pays'`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS return_address jsonb DEFAULT '{}'::jsonb`).catch(() => {})
         await client.query(`ALTER TABLE store_order_items ADD COLUMN IF NOT EXISTS product_id text`).catch(() => {})
         // Backfill product_id for old order items that have a product_handle
         await client.query(`

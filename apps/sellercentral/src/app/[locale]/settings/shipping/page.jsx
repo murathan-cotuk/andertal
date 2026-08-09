@@ -159,7 +159,7 @@ function CountryPicker({ selected, onChange, countries, copy }) {
 }
 
 /* ── Shipping groups section ─────────────────────────────────── */
-const EMPTY_GROUP_FORM = { name: "", carrier_id: "", selectedCountries: [], prices: {} };
+const EMPTY_GROUP_FORM = { name: "", carrier_id: "", return_method: "seller_pays", selectedCountries: [], prices: {} };
 
 function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
   const [groups, setGroups] = useState([]);
@@ -194,7 +194,13 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
     for (const p of (g.prices || [])) {
       if (p.price_cents > 0) prices[p.country_code] = String(p.price_cents / 100);
     }
-    setForm({ name: g.name || "", carrier_id: g.carrier_id || "", selectedCountries, prices });
+    setForm({
+      name: g.name || "",
+      carrier_id: g.carrier_id || "",
+      return_method: g.return_method === "customer_ships" ? "customer_ships" : "seller_pays",
+      selectedCountries,
+      prices,
+    });
     setEditingId(g.id);
     setErr("");
     setShowForm(true);
@@ -229,12 +235,22 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
       if (editingId) {
         await client.request(`/admin-hub/v1/shipping-groups/${editingId}`, {
           method: "PATCH",
-          body: JSON.stringify({ name: form.name, carrier_id: form.carrier_id || null, prices: pricesPayload }),
+          body: JSON.stringify({
+            name: form.name,
+            carrier_id: form.carrier_id || null,
+            return_method: form.return_method || "seller_pays",
+            prices: pricesPayload,
+          }),
         });
       } else {
         await client.request("/admin-hub/v1/shipping-groups", {
           method: "POST",
-          body: JSON.stringify({ name: form.name, carrier_id: form.carrier_id || null, prices: pricesPayload }),
+          body: JSON.stringify({
+            name: form.name,
+            carrier_id: form.carrier_id || null,
+            return_method: form.return_method || "seller_pays",
+            prices: pricesPayload,
+          }),
         });
       }
       await loadGroups();
@@ -286,6 +302,9 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
                   <BlockStack gap="200">
                     <Text variant="bodyMd" fontWeight="semibold">{g.name}</Text>
                     {g.carrier_name && <Text variant="bodySm" tone="subdued">{copy.carrierLabel}: {g.carrier_name}</Text>}
+                    <Text variant="bodySm" tone="subdued">
+                      {copy.returnMethodLabel}: {g.return_method === "customer_ships" ? copy.returnMethodCustomerShips : copy.returnMethodSellerPays}
+                    </Text>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2 }}>
                       {(g.prices || []).filter(p => p.price_cents > 0).map((p) => {
                         const country = countries.find((c) => c.code === p.country_code);
@@ -327,6 +346,16 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
                 onChange={(v) => setForm((f) => ({ ...f, carrier_id: v }))}
               />
             </InlineGrid>
+
+            <Select
+              label={copy.returnMethodLabel}
+              options={[
+                { label: copy.returnMethodSellerPays, value: "seller_pays" },
+                { label: copy.returnMethodCustomerShips, value: "customer_ships" },
+              ]}
+              value={form.return_method || "seller_pays"}
+              onChange={(v) => setForm((f) => ({ ...f, return_method: v }))}
+            />
 
             <BlockStack gap="200">
               <Text variant="bodySm" fontWeight="semibold">{copy.selectCountries}</Text>
@@ -382,6 +411,81 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
         </Card>
       )}
     </BlockStack>
+  );
+}
+
+/* ── Return address (seller-level, used for customer_ships emails) ── */
+function ReturnAddressSection({ copy, ui }) {
+  const [addr, setAddr] = useState({ name: "", street: "", zip: "", city: "", country: "DE" });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getMedusaAdminClient().request("/admin-hub/v1/return-settings");
+        if (!cancelled && data?.return_address) {
+          setAddr({
+            name: data.return_address.name || "",
+            street: data.return_address.street || "",
+            zip: data.return_address.zip || "",
+            city: data.return_address.city || "",
+            country: data.return_address.country || "DE",
+          });
+        }
+      } catch (_) { /* ignore */ }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true); setErr(""); setMsg("");
+    try {
+      await getMedusaAdminClient().request("/admin-hub/v1/return-settings", {
+        method: "PATCH",
+        body: JSON.stringify({ return_address: addr }),
+      });
+      setMsg(copy.saved);
+    } catch (e) {
+      setErr(e?.message || copy.saveError);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <BlockStack gap="100">
+          <Text variant="headingMd" as="h2">{copy.returnsTitle}</Text>
+          <Text variant="bodySm" tone="subdued">{copy.returnsSub}</Text>
+        </BlockStack>
+        {loading ? (
+          <Text tone="subdued">{ui.loading}</Text>
+        ) : (
+          <BlockStack gap="300">
+            <Text variant="bodySm" fontWeight="semibold">{copy.returnAddressTitle}</Text>
+            <InlineGrid columns={2} gap="300">
+              <TextField label={copy.returnAddressName} value={addr.name} onChange={(v) => setAddr((a) => ({ ...a, name: v }))} autoComplete="organization" />
+              <TextField label={copy.returnAddressCountry} value={addr.country} onChange={(v) => setAddr((a) => ({ ...a, country: v }))} autoComplete="country" />
+            </InlineGrid>
+            <TextField label={copy.returnAddressStreet} value={addr.street} onChange={(v) => setAddr((a) => ({ ...a, street: v }))} autoComplete="street-address" />
+            <InlineGrid columns={2} gap="300">
+              <TextField label={copy.returnAddressZip} value={addr.zip} onChange={(v) => setAddr((a) => ({ ...a, zip: v }))} autoComplete="postal-code" />
+              <TextField label={copy.returnAddressCity} value={addr.city} onChange={(v) => setAddr((a) => ({ ...a, city: v }))} autoComplete="address-level2" />
+            </InlineGrid>
+            {err && <Banner tone="critical"><p>{err}</p></Banner>}
+            {msg && <Banner tone="success"><p>{msg}</p></Banner>}
+            <InlineStack align="end">
+              <Button variant="primary" onClick={handleSave} loading={saving}>{ui.save}</Button>
+            </InlineStack>
+          </BlockStack>
+        )}
+      </BlockStack>
+    </Card>
   );
 }
 
@@ -853,6 +957,8 @@ export default function ShippingSettingsPage() {
         </div>
 
         <ShippingGroupsSection carriers={carriers} countries={countries} copy={copy} ui={ui} locale={locale} />
+
+        <ReturnAddressSection copy={copy} ui={ui} />
 
         <Card>
           <BlockStack gap="400">

@@ -1656,6 +1656,22 @@ class MedusaAdminClient {
     return resp.blob()
   }
 
+  /**
+   * Fetch an order PDF (invoice / lieferschein / …) as a Blob with Bearer auth.
+   * opts: { carrier?, tracking? } — optional Lieferschein overrides.
+   */
+  async downloadOrderPdf(orderId, kind = 'invoice', locale = 'de', opts = {}) {
+    const base = (typeof getDefaultBaseUrl === 'function' ? getDefaultBaseUrl() : null) || this.baseURL
+    const token = typeof window !== 'undefined' ? (localStorage.getItem('sellerToken') || '') : ''
+    const params = new URLSearchParams({ locale: String(locale || 'de').slice(0, 2).toLowerCase() })
+    if (opts.carrier) params.set('carrier', String(opts.carrier))
+    if (opts.tracking) params.set('tracking', String(opts.tracking))
+    const url = `${base}/admin-hub/v1/orders/${encodeURIComponent(orderId)}/pdf/${encodeURIComponent(kind || 'invoice')}?${params}`
+    const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (!resp.ok) throw new Error(`Order PDF download failed: ${resp.status}`)
+    return resp.blob()
+  }
+
   /** DAC7 — superuser: fetch reportable sellers for a given year */
   async getDac7Report(year) {
     return this.request(`/admin-hub/v1/dac7/report?year=${encodeURIComponent(year)}`)

@@ -146,6 +146,7 @@ const T = {
       order_shipped: "Order shipped (tracking)",
       order_delivered: "Order delivered",
       return_requested: "Return requested",
+      return_requested_customer_ships: "Return requested (customer ships)",
       review_request: "Review request",
       win_back: "Win-back (inactive customer)",
       customer_birthday: "Customer birthday",
@@ -289,6 +290,7 @@ const T = {
       order_shipped: "Bestellung versendet (Tracking)",
       order_delivered: "Bestellung geliefert",
       return_requested: "Retoure angefragt",
+      return_requested_customer_ships: "Retoure angefragt (Kunde versendet)",
       review_request: "Bewertungsanfrage",
       win_back: "Rückgewinnung (inaktiver Kunde)",
       customer_birthday: "Kunden-Geburtstag",
@@ -432,6 +434,7 @@ const T = {
       order_shipped: "Sipariş kargoya verildi (takip)",
       order_delivered: "Sipariş teslim edildi",
       return_requested: "İade talebi oluşturuldu",
+      return_requested_customer_ships: "İade talebi (müşteri gönderir)",
       review_request: "Yorum isteği",
       win_back: "Pasif müşteri (win-back)",
       customer_birthday: "Müşteri doğum günü",
@@ -575,6 +578,7 @@ const T = {
       order_shipped: "Commande expédiée (suivi)",
       order_delivered: "Commande livrée",
       return_requested: "Retour demandé",
+      return_requested_customer_ships: "Retour demandé (client expédie)",
       review_request: "Demande d'avis",
       win_back: "Réactivation (client inactif)",
       customer_birthday: "Anniversaire du client",
@@ -718,6 +722,7 @@ const T = {
       order_shipped: "Ordine spedito (tracking)",
       order_delivered: "Ordine consegnato",
       return_requested: "Reso richiesto",
+      return_requested_customer_ships: "Reso richiesto (cliente spedisce)",
       review_request: "Richiesta recensione",
       win_back: "Riattivazione (cliente inattivo)",
       customer_birthday: "Compleanno del cliente",
@@ -860,6 +865,7 @@ const T = {
       order_shipped: "Pedido enviado (seguimiento)",
       order_delivered: "Pedido entregado",
       return_requested: "Devolución solicitada",
+      return_requested_customer_ships: "Devolución solicitada (cliente envía)",
       review_request: "Solicitud de reseña",
       win_back: "Reactivación (cliente inactivo)",
       customer_birthday: "Cumpleaños del cliente",
@@ -1069,7 +1075,7 @@ export default function FlowsPage() {
     () => Object.entries(t.triggers).map(([value, label]) => ({ label, value })),
     [t],
   );
-  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested", "seller_new_customer_message", "seller_support_ticket_sent", "seller_support_ticket_replied"]), []);
+  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested", "return_requested_customer_ships", "seller_new_customer_message", "seller_support_ticket_sent", "seller_support_ticket_replied"]), []);
 
   const [newAudience, setNewAudience] = useState("customer");
   const [editAudience, setEditAudience] = useState("customer");

@@ -196,20 +196,39 @@ function ActionBtn({ children, onClick, color = "#374151", bg = "#f9fafb", disab
 /* ── Return request modal ── */
 function ReturnModal({ order, onClose, onDone }) {
   const t = useTranslations("order");
+  const orderItems = Array.isArray(order?.items) ? order.items : [];
+  const [selected, setSelected] = useState(() => {
+    const init = {};
+    for (const it of orderItems) {
+      if (orderItems.length === 1) init[String(it.id)] = Number(it.quantity || 1);
+    }
+    return init;
+  });
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  const toggleItem = (id, maxQty) => {
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (next[id]) delete next[id];
+      else next[id] = maxQty;
+      return next;
+    });
+  };
+
   const submit = async () => {
     if (!reason) { setErr(t("reasonRequired")); return; }
+    const items = Object.entries(selected).map(([order_item_id, quantity]) => ({ order_item_id, quantity: Number(quantity) || 1 }));
+    if (!items.length) { setErr(t("selectReturnItems")); return; }
     setBusy(true); setErr("");
     try {
       const token = getToken("customer");
       await getMedusaClient().request(`/store/orders/${order.id}/return-request`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ reason, notes }),
+        body: JSON.stringify({ reason, notes, items }),
       });
       onDone?.();
       onClose();
@@ -219,12 +238,42 @@ function ReturnModal({ order, onClose, onDone }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 440, boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
+      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, maxHeight: "86vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
         <div style={{ padding: "18px 22px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{t("requestReturn")}</h3>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
-        <div style={{ padding: "18px 22px" }}>
+        <div style={{ padding: "18px 22px", overflowY: "auto" }}>
+          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 8, color: "#374151" }}>{t("selectReturnItems")}</label>
+          <div style={{ marginBottom: 14, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+            {orderItems.map((it) => {
+              const id = String(it.id);
+              const maxQty = Number(it.quantity || 1);
+              const checked = selected[id] != null;
+              return (
+                <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: "1px solid #f3f4f6" }}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleItem(id, maxQty)} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{it.title || "—"}</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af" }}>× {maxQty}</div>
+                  </div>
+                  {checked && maxQty > 1 && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={maxQty}
+                      value={selected[id]}
+                      onChange={(e) => {
+                        const v = Math.max(1, Math.min(maxQty, Math.round(Number(e.target.value) || 1)));
+                        setSelected((prev) => ({ ...prev, [id]: v }));
+                      }}
+                      style={{ width: 56, padding: "4px 6px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12 }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
           <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("returnReasonLabel")}</label>
           <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
             <option value="">{t("choosePlaceholder")}</option>
@@ -251,6 +300,65 @@ function ReturnModal({ order, onClose, onDone }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ReturnTrackingForm({ order, activeReturn, onSaved }) {
+  const t = useTranslations("order");
+  const [tracking, setTracking] = useState(() => String(activeReturn?.customer_tracking_number || ""));
+  const [carrier, setCarrier] = useState(() => String(activeReturn?.customer_carrier_name || ""));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const submit = async () => {
+    if (!tracking.trim()) { setErr(t("trackingRequired")); return; }
+    setBusy(true); setErr("");
+    try {
+      const token = getToken("customer");
+      await getMedusaClient().request(`/store/orders/${order.id}/return-tracking`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ tracking_number: tracking.trim(), carrier_name: carrier.trim() || undefined }),
+      });
+      onSaved?.();
+    } catch (e) { setErr(e?.message || t("submitError")); }
+    setBusy(false);
+  };
+
+  if (!activeReturn || activeReturn.return_method !== "customer_ships") return null;
+
+  if (activeReturn.customer_tracking_number) {
+    return (
+      <Card>
+        <CardTitle>{t("returnTrackingHeading")}</CardTitle>
+        <div style={{ fontSize: 13, color: "#374151" }}>
+          {t("returnTrackingSaved")}: <strong>{activeReturn.customer_tracking_number}</strong>
+          {activeReturn.customer_carrier_name ? ` (${activeReturn.customer_carrier_name})` : ""}
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardTitle>{t("returnTrackingHeading")}</CardTitle>
+      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px" }}>{t("returnTrackingHint")}</p>
+      <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("trackingNumberLabel")}</label>
+      <input value={tracking} onChange={(e) => setTracking(e.target.value)}
+        style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
+        placeholder={t("trackingNumberPlaceholder")}
+      />
+      <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("carrierOptionalLabel")}</label>
+      <input value={carrier} onChange={(e) => setCarrier(e.target.value)}
+        style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}
+        placeholder="DHL / Hermes / DPD…"
+      />
+      {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 0 }}>{err}</p>}
+      <button type="button" onClick={submit} disabled={busy}
+        style={{ padding: "8px 16px", background: "#0d9488", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer" }}>
+        {busy ? "…" : t("submitTracking")}
+      </button>
+    </Card>
   );
 }
 
@@ -800,6 +908,12 @@ export default function OrderDetailPage() {
             </div>
           </Card>
         </div>
+
+        {activeReturn?.return_method === "customer_ships" && (
+          <div style={{ marginBottom: 16 }}>
+            <ReturnTrackingForm order={order} activeReturn={activeReturn} onSaved={loadOrder} />
+          </div>
+        )}
 
         {/* Actions */}
         <Card>

@@ -23,6 +23,7 @@ function fmtMoney(cents, locale) {
 const STATUS_COLORS = {
   offen:         { bg: "#fff7ed", color: "#c2410c", dot: "#f97316" },
   genehmigt:     { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e" },
+  eingegangen:   { bg: "#eef2ff", color: "#3730a3", dot: "#6366f1" },
   abgelehnt:     { bg: "#fef2f2", color: "#b91c1c", dot: "#ef4444" },
   abgeschlossen: { bg: "#f3f4f6", color: "#374151", dot: "#9ca3af" },
 };
@@ -331,14 +332,23 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
               {ret.label_sent_at && (
                 <div style={{ fontSize: 11, color: "#6b7280" }}>{c.labelSentOn} {fmtDate(ret.label_sent_at, locale)}</div>
               )}
-              {!ret.refund_status && (
-                <button
-                  onClick={() => setShowRefund(true)}
-                  style={{ width: "100%", marginTop: 8, padding: "10px 0", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
-                >
-                  {c.refundBtn}
-                </button>
-              )}
+              <button
+                onClick={() => handleStatus("eingegangen")}
+                disabled={updating}
+                style={{ width: "100%", marginTop: 8, padding: "10px 0", background: "#eef2ff", color: "#3730a3", border: "1px solid #c7d2fe", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+              >
+                {c.markReceived}
+              </button>
+            </div>
+          )}
+          {ret.status === "eingegangen" && !ret.refund_status && (
+            <div style={{ marginBottom: 20 }}>
+              <button
+                onClick={() => setShowRefund(true)}
+                style={{ width: "100%", padding: "10px 0", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}
+              >
+                {c.refundBtn}
+              </button>
             </div>
           )}
           {ret.status === "abgeschlossen" && !ret.refund_status && (
@@ -361,6 +371,8 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
               [c.orderTotal, fmtMoney(ret.total_cents, locale)],
               [c.created, fmtDate(ret.created_at, locale)],
               [c.approved, fmtDate(ret.approved_at, locale)],
+              [c.returnMethod, ret.return_method === "customer_ships" ? c.methodCustomerShips : c.methodSellerPays],
+              ...(ret.customer_tracking_number ? [[c.customerTracking, `${ret.customer_tracking_number}${ret.customer_carrier_name ? ` (${ret.customer_carrier_name})` : ""}`]] : []),
             ].map(([label, val]) => (
               <div key={label}>
                 <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
@@ -440,7 +452,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{c.changeStatus}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {["offen", "genehmigt", "abgelehnt", "abgeschlossen"].map(s => (
+              {["offen", "genehmigt", "eingegangen", "abgelehnt", "abgeschlossen"].map(s => (
                 <button
                   key={s}
                   onClick={() => handleStatus(s)}
@@ -591,6 +603,7 @@ export default function OrdersReturnsPage() {
     alle: c.filterAll,
     offen: c.filterOpen,
     genehmigt: c.filterApproved,
+    eingegangen: c.filterReceived,
     abgelehnt: c.filterRejected,
     abgeschlossen: c.filterClosed,
   };
@@ -628,7 +641,7 @@ export default function OrdersReturnsPage() {
 
       {/* Filter pills */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {["alle", "offen", "genehmigt", "abgelehnt", "abgeschlossen"].map(s => (
+        {["alle", "offen", "genehmigt", "eingegangen", "abgelehnt", "abgeschlossen"].map(s => (
           <button
             key={s}
             onClick={() => setFilterStatus(s)}

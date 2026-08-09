@@ -43,4 +43,5 @@ const STATUS_LABELS = {
   approved: (loc) => lt(loc, "Approved", "Onaylandı", "Approuvé", "Aprobado", "Approvato", "Genehmigt"),
   abgelehnt: (loc) => lt(loc, "Rejected", "Reddedildi", "Refusé", "Rechazado", "Rifiutato", "Abgelehnt"),
   rejected: (loc) => lt(loc, "Rejected", "Reddedildi", "Refusé", "Rechazado", "Rifiutato", "Abgelehnt"),
+  eingegangen: (loc) => lt(loc, "Received", "Teslim alındı", "Reçu", "Recibido", "Ricevuto", "Eingegangen"),
 };

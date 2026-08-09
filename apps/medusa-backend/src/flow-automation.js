@@ -341,11 +341,68 @@ async function loadOrderContext(client, orderId) {
 
   const prefixParts = storefrontPathPrefixFromShippingCountry(order.country)
   const retRes = await client.query(
-    `SELECT return_number, reason, label_url, label_tracking_number, label_carrier_name
+    `SELECT return_number, reason, label_url, label_tracking_number, label_carrier_name,
+            return_method, seller_id, customer_tracking_number, customer_carrier_name
      FROM store_returns WHERE order_id = $1::uuid ORDER BY created_at DESC LIMIT 1`,
     [orderId],
   )
   const returnInfo = retRes.rows[0] || null
+
+  // Build return address HTML for Model B (customer_ships) emails
+  let returnAddressHtml = ''
+  try {
+    const sid = String(returnInfo?.seller_id || order.seller_id || '').trim()
+    let addr = null
+    if (sid && sid !== 'default') {
+      const ar = await client.query(
+        `SELECT return_address FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+        [sid],
+      )
+      addr = ar.rows[0]?.return_address
+      if (!addr || typeof addr !== 'object' || !String(addr.street || '').trim()) {
+        const su = await client.query(
+          `SELECT store_name, company_name, business_address FROM seller_users WHERE seller_id = $1 LIMIT 1`,
+          [sid],
+        )
+        const u = su.rows[0]
+        const ba = u?.business_address && typeof u.business_address === 'object' ? u.business_address : {}
+        addr = {
+          name: String(u?.company_name || u?.store_name || '').trim(),
+          street: String(ba.street || ba.address_line1 || '').trim(),
+          zip: String(ba.postal_code || ba.zip || '').trim(),
+          city: String(ba.city || '').trim(),
+          country: String(ba.country || 'DE').trim(),
+        }
+      }
+    }
+    if (!addr || !String(addr.street || '').trim()) {
+      const plat = await client.query(
+        `SELECT legal_company_name, legal_street, legal_city, return_address
+           FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
+      )
+      const p = plat.rows[0]
+      const ra = p?.return_address && typeof p.return_address === 'object' ? p.return_address : null
+      addr = ra && String(ra.street || '').trim()
+        ? ra
+        : {
+            name: String(p?.legal_company_name || storeName || 'Andertal').trim(),
+            street: String(p?.legal_street || '').trim(),
+            zip: '',
+            city: String(p?.legal_city || '').trim(),
+            country: 'DE',
+          }
+    }
+    if (addr) {
+      const lines = [
+        String(addr.name || '').trim(),
+        String(addr.street || '').trim(),
+        [String(addr.zip || '').trim(), String(addr.city || '').trim()].filter(Boolean).join(' '),
+        String(addr.country || '').trim(),
+      ].filter(Boolean)
+      returnAddressHtml = lines.map((l) => String(l).replace(/</g, '&lt;')).join('<br/>')
+    }
+  } catch (_) {}
+
   return {
     order,
     items,
@@ -360,6 +417,7 @@ async function loadOrderContext(client, orderId) {
     resolveUrl,
     prefixParts,
     returnInfo,
+    returnAddressHtml,
   }
 }
 
@@ -512,8 +570,9 @@ function buildPlaceholderVars(ctx, triggerKey, customerProfile = null) {
     RETURN_NUMBER: returnInfo?.return_number != null ? String(returnInfo.return_number) : '',
     RETURN_REASON: String(returnInfo?.reason || ''),
     RETURN_LABEL_URL: String(returnInfo?.label_url || ''),
-    RETURN_TRACKING_NUMBER: String(returnInfo?.label_tracking_number || ''),
-    RETURN_CARRIER_NAME: String(returnInfo?.label_carrier_name || ''),
+    RETURN_TRACKING_NUMBER: String(returnInfo?.label_tracking_number || returnInfo?.customer_tracking_number || ''),
+    RETURN_CARRIER_NAME: String(returnInfo?.label_carrier_name || returnInfo?.customer_carrier_name || ''),
+    RETURN_ADDRESS_HTML: String(ctx.returnAddressHtml || ''),
   }
   items.slice(0, 5).forEach((it, i) => {
     const n = i + 1

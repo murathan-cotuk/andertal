@@ -961,6 +961,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       'order_shipped',
       'order_delivered',
       'return_requested',
+      'return_requested_customer_ships',
       'review_request',
       'win_back',
       'customer_birthday',

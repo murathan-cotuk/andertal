@@ -256,6 +256,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       try {
         const PDFDocument = require('pdfkit')
         const { Client } = require('pg')
+        const { resolveCustomerSuppliedDocumentUrl } = require('./order-documents')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const oRes = await client.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
@@ -264,6 +265,14 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           await client.end()
           return res.status(404).json({ message: 'Order not found' })
         }
+        try {
+          const erpUrl = await resolveCustomerSuppliedDocumentUrl(client, id, row.seller_id, 'invoice')
+          if (erpUrl) {
+            await client.end()
+            client = null
+            return res.redirect(302, erpUrl)
+          }
+        } catch (_) {}
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const itemRows = iRes.rows || []
         let sellerInfoHub = null
@@ -321,6 +330,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       try {
         const PDFDocument = require('pdfkit')
         const { Client } = require('pg')
+        const { resolveCustomerSuppliedDocumentUrl } = require('./order-documents')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         const oRes = await client.query('SELECT * FROM store_orders WHERE id = $1::uuid', [id])
@@ -329,10 +339,20 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           await client.end()
           return res.status(404).json({ message: 'Order not found' })
         }
+        try {
+          const erpUrl = await resolveCustomerSuppliedDocumentUrl(client, id, row.seller_id, 'lieferschein')
+          if (erpUrl) {
+            await client.end()
+            client = null
+            return res.redirect(302, erpUrl)
+          }
+        } catch (_) {}
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
         const itemRows = iRes.rows || []
+        let sellerInfoHub = null
         let lieferscheinLogoUrl = ''
         try {
+          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
           const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
           lieferscheinLogoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}
@@ -354,6 +374,9 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
+        // Versand may pass not-yet-saved carrier/tracking as query overrides
+        const carrierOverride = String(req.query?.carrier || '').trim() || null
+        const trackingOverride = String(req.query?.tracking || '').trim() || null
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('lieferschein', on, pdfLocale)}"`)
         const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
@@ -363,8 +386,11 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           itemRows,
           invoiceNumber: on,
           shopName,
+          sellerInfo: sellerInfoHub,
           shopLogoBuffer: lieferscheinLogoBuffer,
           locale: pdfLocale,
+          carrierName: carrierOverride || row.carrier_name || null,
+          trackingNumber: trackingOverride || row.tracking_number || null,
         })
         doc.end()
       } catch (e) {

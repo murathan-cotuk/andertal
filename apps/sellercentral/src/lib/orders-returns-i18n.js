@@ -118,5 +118,11 @@ export function getOrdersReturnsCopy(locale) {
     dhlChargeCharged: t("Charged to seller", "Satıcıdan kesildi", "Facturé au vendeur", "Cobrado al vendedor", "Addebitato al venditore", "Verkäufer belastet"),
     dhlChargeFailed: t("Charge failed", "Ücret kesilemedi", "Échec du prélèvement", "Error al cobrar", "Addebito non riuscito", "Belastung fehlgeschlagen"),
     dhlNotGenerated: t("Not generated (Sendcloud not configured or unavailable)", "Oluşturulmadı (Sendcloud yapılandırılmamış veya erişilemedi)", "Non générée (Sendcloud non configuré ou indisponible)", "No generada (Sendcloud no configurado o no disponible)", "Non generata (Sendcloud non configurato o non disponibile)", "Nicht erstellt (Sendcloud nicht konfiguriert oder nicht erreichbar)"),
+    markReceived: t("✓ Mark package received", "✓ Paket alındı", "✓ Marquer colis reçu", "✓ Marcar paquete recibido", "✓ Segna pacco ricevuto", "✓ Paket eingegangen"),
+    returnMethod: t("Return method", "İade yöntemi", "Méthode de retour", "Método de devolución", "Metodo di reso", "Retourenmethode"),
+    methodSellerPays: t("Seller pays (label)", "Satıcı karşılar (etiket)", "Vendeur paie (étiquette)", "Vendedor paga (etiqueta)", "Venditore paga (etichetta)", "Verkäufer zahlt (Label)"),
+    methodCustomerShips: t("Customer ships", "Müşteri gönderir", "Client expédie", "Cliente envía", "Cliente spedisce", "Kunde versendet"),
+    customerTracking: t("Customer tracking", "Müşteri takip no.", "Suivi client", "Seguimiento cliente", "Tracking cliente", "Kundensendung"),
+    filterReceived: t("Received", "Teslim alındı", "Reçu", "Recibido", "Ricevuto", "Eingegangen"),
   };
 }

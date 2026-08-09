@@ -68,5 +68,16 @@ export function getShippingCopy(locale) {
     countryOverviewLoadError: t("Could not load countries.", "Ülkeler yüklenemedi.", "Impossible de charger les pays.", "No se pudieron cargar los países.", "Impossibile caricare i paesi.", "Länder konnten nicht geladen werden."),
     countryOverviewSaveError: t("Could not save — please try again.", "Kaydedilemedi — lütfen tekrar deneyin.", "Impossible d'enregistrer — veuillez réessayer.", "No se pudo guardar — inténtelo de nuevo.", "Impossibile salvare — riprova.", "Konnte nicht gespeichert werden — bitte erneut versuchen."),
     countryOverviewProductCount: (n) => t(`${n} product${n === 1 ? "" : "s"}`, `${n} ürün`, `${n} produit${n > 1 ? "s" : ""}`, `${n} producto${n === 1 ? "" : "s"}`, `${n} prodott${n === 1 ? "o" : "i"}`, `${n} Produkt${n === 1 ? "" : "e"}`),
+    returnsTitle: t("Returns", "İadeler", "Retours", "Devoluciones", "Resi", "Retouren"),
+    returnsSub: t("Choose who pays for return shipping, and the address customers send parcels to.", "İade kargosunu kimin ödeyeceğini ve müşterilerin göndereceği adresi ayarlayın.", "Choisissez qui paie le retour et l'adresse de renvoi.", "Elija quién paga la devolución y la dirección de retorno.", "Scegli chi paga il reso e l'indirizzo di ritorno.", "Legen Sie fest, wer die Rücksendung zahlt und wohin Kunden senden."),
+    returnMethodLabel: t("Return shipping method", "İade kargo yöntemi", "Méthode d'expédition retour", "Método de envío de devolución", "Metodo spedizione reso", "Retourenversand-Methode"),
+    returnMethodSellerPays: t("Seller pays — generate return label", "Satıcı karşılar — iade etiketi üret", "Vendeur paie — générer l'étiquette", "Vendedor paga — generar etiqueta", "Venditore paga — genera etichetta", "Verkäufer zahlt — Retourenetikett erzeugen"),
+    returnMethodCustomerShips: t("Customer pays — ships themselves", "Müşteri karşılar — kendisi gönderir", "Client paie — expédie lui-même", "Cliente paga — envía él mismo", "Cliente paga — spedisce da solo", "Kunde zahlt — versendet selbst"),
+    returnAddressTitle: t("Return address", "İade adresi", "Adresse de retour", "Dirección de devolución", "Indirizzo di reso", "Rücksendeadresse"),
+    returnAddressName: t("Name / company", "Ad / firma", "Nom / société", "Nombre / empresa", "Nome / azienda", "Name / Firma"),
+    returnAddressStreet: t("Street", "Sokak", "Rue", "Calle", "Via", "Straße"),
+    returnAddressZip: t("Postal code", "Posta kodu", "Code postal", "Código postal", "CAP", "PLZ"),
+    returnAddressCity: t("City", "Şehir", "Ville", "Ciudad", "Città", "Stadt"),
+    returnAddressCountry: t("Country", "Ülke", "Pays", "País", "Paese", "Land"),
   };
 }

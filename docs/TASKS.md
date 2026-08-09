@@ -402,5 +402,32 @@ Meğerse mevcut bir "serbest metin kabul ediliyor" bug'ı değilmiş — sipari�
 Dashboard'a `OnboardingChecklist` bileşeni eklendi. Görev listesinde önerilen bazı örnek maddeler ("Şirket/adres bilgileri", "İade adresi") sistemde ayrı, kontrol edilebilir bir alan olarak karşılık bulmadı (şirket/adres zaten verification akışının parçası; iade adresi diye bir alan hiç yok — TASK-13 henüz kurulmadığı için) — bu yüzden gerçekten var olan ve kontrol edilebilir 4 sinyalle kuruldu: doğrulama/KYB (`approval_status`, zorunlu, atlanamaz), Stripe Connect ödeme kurulumu, en az bir kargo/shipping group, en az bir bağlı carrier. Superuser'da ve her şey tamamlandığında gizli. Atlanan (zorunlu olmayan) maddeler seller_id bazlı localStorage'da tutulup "ertelenenler" şeridinden geri getirilebiliyor.
 
 **Kalan (bu oturumda başlanmadı, büyük kapsamlı):**
-- **TASK-3** (Lieferschein şablon paritesi) — Rechnung şablon sisteminin envanteri çıkarılmadı.
-- **TASK-13** (Retoure uçtan uca) — hâlâ hiç incelenmedi, TASKS.md'nin kendi notuna göre "en büyük görev"; smoke-test + model/UX kararları gerektiriyor.
+- ~~**TASK-3** / **TASK-13**~~ → bir sonraki oturumda tamamlandı (aşağıya bak).
+
+---
+
+## Durum (Cursor — 2026-08-09 devam) — TASK-3 + TASK-13
+
+### TASK-3 — Lieferschein şablon paritesi — TAMAMLANDI (MVP)
+
+**Bulgu:** Ayrı bir Rechnung “şablon editörü” yoktu — zenginlik ortak PDFKit layout (`order-pdf-layout.js`) + logo/yasal alan + i18n. Lieferschein zaten aynı layout’u paylaşıyordu; asıl açıklar `sellerInfo: null`, carrier/tracking eksikliği ve Versand’ın kaba HTML print yolu idi.
+
+**Yapılanlar:**
+- Lieferschein PDF’e seller/sender bloğu + carrier/tracking/ship date (i18n: de/en/tr/fr/es/it)
+- Admin PDF route’ları `document_sources` ERP redirect’i (invoice + lieferschein)
+- Versand toplu Lieferschein: HTML stub yerine authenticated backend PDF (`downloadOrderPdf`), yerel tracking override query ile
+- Bilinçli farklar korundu: fiyat/KDV/ödeme yok (teslimat belgesi)
+
+### TASK-13 — Retoure uçtan uca — MVP TAMAMLANDI
+
+**Model kararları:**
+- Ürün bazlı iade (shop checkbox + qty); multi-seller’da seller başına bir return
+- `return_method` shipping group’ta: `seller_pays` (Sendcloud DHL etiket) | `customer_ships` (takip no formu)
+- Seller return address: `settings/shipping` altında (nav şişirmeden)
+- Status: `offen` → `genehmigt` → `eingegangen` → refund/`abgeschlossen` (veya `abgelehnt`)
+- Flow: mevcut `return_requested` + yeni `return_requested_customer_ships` (seed + `RETURN_ADDRESS_HTML`)
+
+**MVP sınırları:** Stripe otomatik refund yok (mevcut DB mark + bonus reverse); auto-label yalnızca Sendcloud DHL; ERP/WMS return sync yok.
+
+**Happy path A (seller_pays):** Shop ürün seç → talep → etiket + flow mail → müşteri gönderir → seller onay/eingegangen → Erstattung kaydı  
+**Happy path B (customer_ships):** Shop ürün seç → talep → adres maili → müşteri takip no girer → seller görür → eingegangen → Erstattung kaydı

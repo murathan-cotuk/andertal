@@ -192,6 +192,8 @@ function renderRetailOrderDocument(doc, {
   amountDueCents = null,
   footerText = '',
   invoiceNumber = null,
+  carrierName = null,
+  trackingNumber = null,
 }) {
   const hasUnicode = setupDocFonts(doc)
   const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
@@ -230,7 +232,9 @@ function renderRetailOrderDocument(doc, {
   const displayDocNum = kind === 'invoice'
     ? (String(invoiceNumber || '').startsWith('R-') ? String(invoiceNumber) : (rawNum ? `R-${rawNum}` : ''))
     : String(invoiceNumber || '')
-  const shippingDate = row.shipped_at || row.fulfilled_at || null
+  const shipAt = row.shipped_at || row.fulfilled_at || null
+  const carrier = String(carrierName || row.carrier_name || '').trim()
+  const tracking = String(trackingNumber || row.tracking_number || '').trim()
 
   doc.fillColor(ACCENT).font(BOLD).fontSize(22)
     .text(txt(docTitle, hasUnicode), rightColX, headerTop, { width: rightColW, align: 'right' })
@@ -242,7 +246,11 @@ function renderRetailOrderDocument(doc, {
   const metaRows = [
     { label: s.orderNoLabel, value: `#${orderNum}` },
     displayDocNum ? { label: kind === 'invoice' ? s.invoiceNoLabel : s.deliveryNoLabel, value: displayDocNum } : null,
-    { label: s.shippingDateLabel, value: pdfFmtDate(row.created_at, locale) },
+    kind === 'lieferschein'
+      ? { label: s.shipDateLabel || s.shippingDateLabel, value: pdfFmtDate(shipAt || row.created_at, locale) }
+      : { label: s.shippingDateLabel, value: pdfFmtDate(row.created_at, locale) },
+    kind === 'lieferschein' && carrier ? { label: s.carrierLabel, value: carrier } : null,
+    kind === 'lieferschein' && tracking ? { label: s.trackingLabel, value: tracking } : null,
   ].filter(Boolean)
 
   metaRows.forEach(({ label, value }) => {

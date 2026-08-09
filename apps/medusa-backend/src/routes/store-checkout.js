@@ -1840,17 +1840,18 @@ const adminHubShippingGroupsGET = async (req, res) => {
 
 const adminHubShippingGroupPOST = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  const { name, carrier_id, prices } = req.body || {}
+  const { name, carrier_id, prices, return_method } = req.body || {}
   if (!name) return res.status(400).json({ message: 'name required' })
   const callerSellerId = req.sellerUser?.seller_id || null
+  const rm = return_method === 'customer_ships' ? 'customer_ships' : 'seller_pays'
   let client
   try {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
     const r = await client.query(
-      `INSERT INTO store_shipping_groups (name, carrier_id, seller_id) VALUES ($1, $2, $3) RETURNING *`,
-      [name.trim(), carrier_id || null, callerSellerId]
+      `INSERT INTO store_shipping_groups (name, carrier_id, seller_id, return_method) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [name.trim(), carrier_id || null, callerSellerId, rm]
     )
     const group = r.rows[0]
     if (Array.isArray(prices) && prices.length > 0) {
@@ -1875,7 +1876,7 @@ const adminHubShippingGroupPOST = async (req, res) => {
 const adminHubShippingGroupPATCH = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   const id = (req.params.id || '').trim()
-  const { name, carrier_id, prices } = req.body || {}
+  const { name, carrier_id, prices, return_method } = req.body || {}
   const isSuperuser = req.sellerUser?.is_superuser || false
   const callerSellerId = req.sellerUser?.seller_id
   let client
@@ -1888,10 +1889,14 @@ const adminHubShippingGroupPATCH = async (req, res) => {
       const own = await client.query(`SELECT id FROM store_shipping_groups WHERE id=$1::uuid AND seller_id=$2`, [id, callerSellerId])
       if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Nicht erlaubt' }) }
     }
-    if (name !== undefined || carrier_id !== undefined) {
+    if (name !== undefined || carrier_id !== undefined || return_method !== undefined) {
       const sets = []; const vals = []
       if (name !== undefined) { vals.push(name.trim()); sets.push(`name=$${vals.length}`) }
       if (carrier_id !== undefined) { vals.push(carrier_id || null); sets.push(`carrier_id=$${vals.length}`) }
+      if (return_method !== undefined) {
+        const rm = return_method === 'customer_ships' ? 'customer_ships' : 'seller_pays'
+        vals.push(rm); sets.push(`return_method=$${vals.length}`)
+      }
       sets.push(`updated_at=now()`)
       vals.push(id)
       await client.query(`UPDATE store_shipping_groups SET ${sets.join(',')} WHERE id=$${vals.length}::uuid`, vals)
@@ -2702,7 +2707,11 @@ const storeOrdersMeGET = async (req, res) => {
     if (orderIds.length > 0) {
       try {
         const returnsR = await client.query(
-          `SELECT id, order_id, status, reason, notes, return_number, refund_status, refund_amount_cents, label_sent_at, label_url, label_tracking_number, label_carrier_name, created_at FROM store_returns WHERE order_id = ANY($1::uuid[]) ORDER BY created_at DESC`,
+          `SELECT id, order_id, status, reason, notes, return_number, refund_status, refund_amount_cents,
+                  label_sent_at, label_url, label_tracking_number, label_carrier_name, created_at,
+                  return_method, seller_id, items,
+                  customer_tracking_number, customer_carrier_name, customer_tracking_at, received_at
+             FROM store_returns WHERE order_id = ANY($1::uuid[]) ORDER BY created_at DESC`,
           [orderIds]
         )
         for (const r of (returnsR.rows || [])) {
@@ -2766,7 +2775,62 @@ const storeOrdersMeGET = async (req, res) => {
   }
 }
 
-// POST /store/orders/:id/return-request — customer requests a return
+/** Resolve return_method for a seller from their shipping group (or default seller_pays). */
+async function resolveReturnMethodForSeller(client, sellerId, shippingGroupId) {
+  if (shippingGroupId) {
+    try {
+      const r = await client.query(
+        `SELECT return_method FROM store_shipping_groups WHERE id = $1::uuid LIMIT 1`,
+        [shippingGroupId],
+      )
+      const m = String(r.rows[0]?.return_method || '').trim()
+      if (m === 'customer_ships' || m === 'seller_pays') return m
+    } catch (_) {}
+  }
+  if (sellerId) {
+    try {
+      const r = await client.query(
+        `SELECT return_method FROM store_shipping_groups
+          WHERE seller_id = $1 AND return_method IS NOT NULL
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC LIMIT 1`,
+        [sellerId],
+      )
+      const m = String(r.rows[0]?.return_method || '').trim()
+      if (m === 'customer_ships' || m === 'seller_pays') return m
+    } catch (_) {}
+  }
+  return 'seller_pays'
+}
+
+async function resolveShippingGroupIdForItem(client, productId, sellerId) {
+  const pid = String(productId || '').trim()
+  const sid = String(sellerId || '').trim()
+  if (!pid) return null
+  if (sid && sid !== 'default') {
+    try {
+      const lr = await client.query(
+        `SELECT shipping_group_id FROM admin_hub_seller_listings
+          WHERE product_id::text = $1 AND seller_id = $2
+            AND shipping_group_id IS NOT NULL AND TRIM(shipping_group_id) <> ''
+          LIMIT 1`,
+        [pid, sid],
+      )
+      if (lr.rows[0]?.shipping_group_id) return String(lr.rows[0].shipping_group_id)
+    } catch (_) {}
+  }
+  try {
+    const pr = await client.query(
+      `SELECT metadata->>'shipping_group_id' AS sg FROM admin_hub_products WHERE id::text = $1 LIMIT 1`,
+      [pid],
+    )
+    const sg = String(pr.rows[0]?.sg || '').trim()
+    return sg || null
+  } catch (_) {
+    return null
+  }
+}
+
+// POST /store/orders/:id/return-request — customer requests a return (product-based, TASK-13)
 const storeReturnRequestPOST = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   const authHeader = req.headers.authorization || ''
@@ -2781,9 +2845,8 @@ const storeReturnRequestPOST = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    // Verify order belongs to customer
     const orderR = await client.query(
-      `SELECT id, order_number, delivery_status, delivery_date, total_cents FROM store_orders WHERE id = $1::uuid
+      `SELECT id, order_number, delivery_status, delivery_date, total_cents, seller_id FROM store_orders WHERE id = $1::uuid
        AND (
          ($3::uuid IS NOT NULL AND customer_id = $3::uuid)
          OR (email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($2)))
@@ -2792,7 +2855,6 @@ const storeReturnRequestPOST = async (req, res) => {
     )
     if (!orderR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
     const order = orderR.rows[0]
-    // Check 14-day window
     const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null
     if (deliveryDate) {
       const daysSince = (Date.now() - deliveryDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -2801,37 +2863,165 @@ const storeReturnRequestPOST = async (req, res) => {
         return res.status(400).json({ message: 'Rückgabefrist abgelaufen. Rückgabe ist nur innerhalb von 14 Tagen nach Lieferung möglich.' })
       }
     }
-    // Check for existing open return
     const existR = await client.query(
       "SELECT id FROM store_returns WHERE order_id = $1::uuid AND status NOT IN ('abgelehnt','abgeschlossen')",
       [orderId]
     )
     if (existR.rows.length > 0) { await client.end(); return res.status(409).json({ message: 'Es gibt bereits eine offene Retouranfrage für diese Bestellung.' }) }
-    const { reason = '', notes = '', items } = req.body || {}
-    const r = await client.query(
-      `INSERT INTO store_returns (order_id, status, reason, notes, items)
-       VALUES ($1::uuid, 'offen', $2, $3, $4)
-       RETURNING id, return_number, status, created_at`,
-      [orderId, reason, notes||null, items ? JSON.stringify(items) : null]
+
+    const { reason = '', notes = '', items: rawItems } = req.body || {}
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
+      await client.end()
+      return res.status(400).json({ message: 'Bitte wählen Sie mindestens einen Artikel für die Retoure aus.' })
+    }
+
+    const oiRes = await client.query(
+      `SELECT id, product_id, title, quantity, unit_price_cents, seller_id
+         FROM store_order_items WHERE order_id = $1::uuid`,
+      [orderId],
     )
+    const byId = new Map((oiRes.rows || []).map((r) => [String(r.id), r]))
+    const normalized = []
+    for (const raw of rawItems) {
+      const orderItemId = String(raw.order_item_id || raw.id || '').trim()
+      const oi = byId.get(orderItemId)
+      if (!oi) {
+        await client.end()
+        return res.status(400).json({ message: 'Ungültiger Artikel in der Retoure.' })
+      }
+      const qty = Math.max(1, Math.min(Number(oi.quantity) || 1, Math.round(Number(raw.quantity) || Number(oi.quantity) || 1)))
+      if (qty > Number(oi.quantity || 1)) {
+        await client.end()
+        return res.status(400).json({ message: 'Retourmenge überschreitet die bestellte Menge.' })
+      }
+      const sid = String(oi.seller_id || order.seller_id || '').trim() || null
+      normalized.push({
+        order_item_id: oi.id,
+        product_id: oi.product_id || null,
+        title: oi.title || '',
+        quantity: qty,
+        unit_price_cents: Number(oi.unit_price_cents || 0),
+        seller_id: sid,
+      })
+    }
+
+    // Multi-seller: one return per seller (MVP)
+    const bySeller = new Map()
+    for (const it of normalized) {
+      const key = it.seller_id || 'default'
+      if (!bySeller.has(key)) bySeller.set(key, [])
+      bySeller.get(key).push(it)
+    }
+
+    const created = []
+    for (const [sellerKey, sellerItems] of bySeller.entries()) {
+      const sellerId = sellerKey === 'default' ? null : sellerKey
+      const sgId = await resolveShippingGroupIdForItem(client, sellerItems[0].product_id, sellerId)
+      const returnMethod = await resolveReturnMethodForSeller(client, sellerId, sgId)
+      const r = await client.query(
+        `INSERT INTO store_returns (order_id, status, reason, notes, items, seller_id, return_method)
+         VALUES ($1::uuid, 'offen', $2, $3, $4::jsonb, $5, $6)
+         RETURNING id, return_number, status, created_at, return_method, seller_id`,
+        [orderId, reason, notes || null, JSON.stringify(sellerItems), sellerId, returnMethod],
+      )
+      const ret = r.rows[0]
+      created.push(ret)
+
+      if (returnMethod === 'seller_pays') {
+        const labelResult = await createReturnLabelForOrder(client, { returnId: ret.id, orderId }).catch((e) => {
+          console.warn('[return-label] createReturnLabelForOrder threw:', e?.message || e)
+          return { ok: false, reason: e?.message || 'unexpected_error' }
+        })
+        if (!labelResult.ok) {
+          console.warn(`[return-label] order ${orderId}: label not created (${labelResult.reason})`)
+        }
+      }
+    }
+
     await client.query(
       `UPDATE store_orders SET order_status = 'retoure_anfrage', updated_at = now() WHERE id = $1::uuid`,
       [orderId],
     )
-    const ret = r.rows[0]
-    // Best-effort: auto-generate the DHL return label via Sendcloud before notifying anyone,
-    // so the customer's email (and its return_label_pdf attachment) already has it. Never
-    // blocks the response — an unconfigured/failing Sendcloud just leaves label fields empty.
-    const labelResult = await createReturnLabelForOrder(client, { returnId: ret.id, orderId }).catch((e) => {
-      console.warn('[return-label] createReturnLabelForOrder threw:', e?.message || e)
-      return { ok: false, reason: e?.message || 'unexpected_error' }
-    })
-    if (!labelResult.ok) {
-      console.warn(`[return-label] order ${orderId}: label not created (${labelResult.reason})`)
-    }
     await client.end()
-    res.json({ return_request: { ...ret, return_number: ret.return_number ? Number(ret.return_number) : null } })
-    void dispatchOrderFlowEvent('return_requested', orderId)
+    const first = created[0]
+    res.json({
+      return_request: {
+        ...first,
+        return_number: first.return_number ? Number(first.return_number) : null,
+      },
+      returns: created.map((x) => ({
+        ...x,
+        return_number: x.return_number ? Number(x.return_number) : null,
+      })),
+    })
+    // Dispatch per created return's method — if mixed, fire both triggers once each
+    const triggers = new Set(
+      created.map((x) => (x.return_method === 'customer_ships' ? 'return_requested_customer_ships' : 'return_requested')),
+    )
+    for (const tk of triggers) void dispatchOrderFlowEvent(tk, orderId)
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
+// POST /store/orders/:id/return-tracking — customer submits own return tracking (Model B)
+const storeReturnTrackingPOST = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token) return res.status(401).json({ message: 'Unauthorized' })
+  const orderId = (req.params.id || '').trim()
+  if (!orderId) return res.status(400).json({ message: 'order id required' })
+  const payload = verifyCustomerToken(token)
+  if (!payload?.email) return res.status(401).json({ message: 'Invalid token' })
+  const tracking = String(req.body?.tracking_number || '').trim()
+  const carrier = String(req.body?.carrier_name || '').trim() || null
+  if (!tracking) return res.status(400).json({ message: 'tracking_number required' })
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const orderR = await client.query(
+      `SELECT id FROM store_orders WHERE id = $1::uuid
+       AND (
+         ($3::uuid IS NOT NULL AND customer_id = $3::uuid)
+         OR (email IS NOT NULL AND LOWER(TRIM(email)) = LOWER(TRIM($2)))
+       )`,
+      [orderId, payload.email, customerIdForPg(payload)],
+    )
+    if (!orderR.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+    const retR = await client.query(
+      `SELECT id, return_method FROM store_returns
+        WHERE order_id = $1::uuid AND status NOT IN ('abgelehnt','abgeschlossen')
+        ORDER BY created_at DESC LIMIT 1`,
+      [orderId],
+    )
+    const ret = retR.rows[0]
+    if (!ret) { await client.end(); return res.status(404).json({ message: 'No open return' }) }
+    if (ret.return_method !== 'customer_ships') {
+      await client.end()
+      return res.status(400).json({ message: 'Tracking is only required for customer-shipped returns.' })
+    }
+    const upd = await client.query(
+      `UPDATE store_returns SET
+         customer_tracking_number = $1,
+         customer_carrier_name = $2,
+         customer_tracking_at = now(),
+         updated_at = now()
+       WHERE id = $3::uuid
+       RETURNING id, return_number, customer_tracking_number, customer_carrier_name, customer_tracking_at, return_method, status`,
+      [tracking, carrier, ret.id],
+    )
+    await client.end()
+    const row = upd.rows[0]
+    res.json({
+      return: {
+        ...row,
+        return_number: row.return_number ? Number(row.return_number) : null,
+      },
+    })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     res.status(500).json({ message: e?.message || 'Error' })
@@ -3551,6 +3741,7 @@ module.exports = function createStoreCheckoutRouter() {
   router.get('/store/orders/:id', storeOrdersGET)
   router.post('/store/orders/:id/cancel', storeOrdersCancelPOST)
   router.post('/store/orders/:id/return-request', storeReturnRequestPOST)
+  router.post('/store/orders/:id/return-tracking', storeReturnTrackingPOST)
   router.get('/store/orders/:id/invoice', storeOrderInvoicePdfGET)
   router.get('/store/orders/:id/return-retourenschein', storeOrderReturnRetourenscheinGET)
   router.get('/store/orders/:id/return-etikett', storeOrderReturnEtikettGET)

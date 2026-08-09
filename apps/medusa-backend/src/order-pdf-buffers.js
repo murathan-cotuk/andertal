@@ -64,7 +64,17 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   })
 }
 
-function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shopName, shopLogoBuffer, locale = 'de' }) {
+function renderLieferscheinPdfDocument(doc, {
+  row,
+  itemRows,
+  invoiceNumber,
+  shopName,
+  sellerInfo = null,
+  shopLogoBuffer,
+  locale = 'de',
+  carrierName = null,
+  trackingNumber = null,
+}) {
   const s = getOrderPdfStrings(locale)
   const displayNumber = String(invoiceNumber || '')
 
@@ -73,12 +83,14 @@ function renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber, shop
     row,
     itemRows,
     shopName,
-    sellerInfo: null,
+    sellerInfo,
     shopLogoBuffer,
     locale,
     kind: 'lieferschein',
     footerText: s.deliveryFooter,
     invoiceNumber: displayNumber,
+    carrierName,
+    trackingNumber,
   })
 }
 
@@ -226,13 +238,24 @@ async function buildLieferscheinPdfBuffer(pgClient, orderId, locale) {
   const resolvedLocale = locale || resolveDocumentLocaleFromOrderRow(row)
   const iRes = await pgClient.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
   const itemRows = iRes.rows || []
+  const sellerInfo = await _querySellerInfo(pgClient, row.seller_id)
   const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
   const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
   const logoUrl = await pgClient.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
     .then((r) => r.rows?.[0]?.shop_logo_url || '').catch(() => '')
   const shopLogoBuffer = logoUrl ? await _fetchImageBuffer(logoUrl) : null
   const buf = await pdfDocToBuffer((doc) =>
-    renderLieferscheinPdfDocument(doc, { row, itemRows, invoiceNumber: on, shopName, shopLogoBuffer, locale: resolvedLocale }),
+    renderLieferscheinPdfDocument(doc, {
+      row,
+      itemRows,
+      invoiceNumber: on,
+      shopName,
+      sellerInfo,
+      shopLogoBuffer,
+      locale: resolvedLocale,
+      carrierName: row.carrier_name || null,
+      trackingNumber: row.tracking_number || null,
+    }),
   )
   return { filename: getOrderPdfFilename('lieferschein', on, resolvedLocale), content: buf }
 }
