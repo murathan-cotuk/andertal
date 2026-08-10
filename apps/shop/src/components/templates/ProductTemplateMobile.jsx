@@ -498,9 +498,9 @@ const DiscountPill = styled.span`
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  color: #7c2d12;
-  background: #ffedd5;
-  border: 1px solid #fed7aa;
+  color: #9f1239;
+  background: #ffe4e6;
+  border: 1px solid #fecdd3;
   padding: 3px 8px;
   border-radius: 999px;
 `;

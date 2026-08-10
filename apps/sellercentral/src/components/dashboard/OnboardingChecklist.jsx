@@ -59,9 +59,8 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
     let cancelled = false;
     (async () => {
       const client = getMedusaAdminClient();
-      const [account, stripeStatus, shippingGroups, carriers] = await Promise.all([
+      const [account, shippingGroups, carriers] = await Promise.all([
         client.getSellerAccount().catch(() => null),
-        client.stripeConnectStatus().catch(() => null),
         client.request("/admin-hub/v1/shipping-groups").catch(() => null),
         client.getCarriers().catch(() => null),
       ]);
@@ -69,7 +68,6 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
       const seller = account?.sellerUser || account?.user || {};
       setStatus({
         verificationDone: isVerificationDone(seller?.approval_status),
-        paymentDone: !!stripeStatus?.onboarding_complete,
         shippingGroupDone: Array.isArray(shippingGroups?.groups) ? shippingGroups.groups.length > 0 : false,
         carrierDone: Array.isArray(carriers?.carriers) ? carriers.carriers.length > 0 : false,
       });
@@ -88,13 +86,6 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
         label: t("Verify your account", "Hesabınızı doğrulayın", "Vérifiez votre compte", "Verifique su cuenta", "Verifica il tuo account", "Konto verifizieren"),
         sub: t("Required before you can sell", "Satışa başlamadan önce zorunlu", "Requis avant de pouvoir vendre", "Requerido antes de poder vender", "Richiesto prima di poter vendere", "Vor dem Verkaufsstart erforderlich"),
         href: "/settings/verification",
-      },
-      {
-        key: "payment",
-        done: status.paymentDone,
-        label: t("Set up payouts", "Ödeme alma kurulumu", "Configurer les paiements", "Configurar pagos", "Configura i pagamenti", "Auszahlungen einrichten"),
-        sub: t("Connect Stripe so you get paid", "Ödeme alabilmek için Stripe bağlayın", "Connectez Stripe pour être payé", "Conecte Stripe para recibir pagos", "Collega Stripe per ricevere i pagamenti", "Stripe verbinden, um bezahlt zu werden"),
-        href: "/settings/stripe-connect",
       },
       {
         key: "shipping_group",

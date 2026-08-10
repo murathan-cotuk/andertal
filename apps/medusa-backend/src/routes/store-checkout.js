@@ -1986,9 +1986,26 @@ const storeShippingGroupsGET = async (req, res) => {
   }
 }
 
-// GET /admin-hub/v1/country-overview — superuser only. Every country that appears in ANY
-// seller's shipping-group prices, with a count of products currently routed through a shipping
-// group that includes it, and whether a superuser has switched it off.
+// Mirrors apps/sellercentral/src/lib/countries.js ISO_CODES — the same full list "Lieferländer
+// auswählen" (shipping-group country picker) shows, so the superuser overview lists every
+// country that could be picked there, not just ones a seller already happened to price.
+const ALL_SHIPPABLE_COUNTRY_CODES = [
+  'AF', 'AL', 'DZ', 'AD', 'AO', 'AG', 'AR', 'AM', 'AU', 'AT', 'AZ', 'BS', 'BH', 'BD', 'BB', 'BY', 'BE', 'BZ',
+  'BJ', 'BT', 'BO', 'BA', 'BW', 'BR', 'BN', 'BG', 'BF', 'BI', 'CV', 'KH', 'CM', 'CA', 'CF', 'TD', 'CL', 'CN',
+  'CO', 'KM', 'CG', 'CD', 'CR', 'HR', 'CU', 'CY', 'CZ', 'DK', 'DJ', 'DM', 'DO', 'EC', 'EG', 'SV', 'GQ', 'ER',
+  'EE', 'SZ', 'ET', 'FJ', 'FI', 'FR', 'GA', 'GM', 'GE', 'DE', 'GH', 'GR', 'GD', 'GT', 'GN', 'GW', 'GY', 'HT',
+  'HN', 'HU', 'IS', 'IN', 'ID', 'IR', 'IQ', 'IE', 'IL', 'IT', 'JM', 'JP', 'JO', 'KZ', 'KE', 'KI', 'KP', 'KR',
+  'KW', 'KG', 'LA', 'LV', 'LB', 'LS', 'LR', 'LY', 'LI', 'LT', 'LU', 'MG', 'MW', 'MY', 'MV', 'ML', 'MT', 'MH',
+  'MR', 'MU', 'MX', 'FM', 'MD', 'MC', 'MN', 'ME', 'MA', 'MZ', 'MM', 'NA', 'NR', 'NP', 'NL', 'NZ', 'NI', 'NE',
+  'NG', 'MK', 'NO', 'OM', 'PK', 'PW', 'PA', 'PG', 'PY', 'PE', 'PH', 'PL', 'PT', 'QA', 'RO', 'RU', 'RW', 'KN',
+  'LC', 'VC', 'WS', 'SM', 'ST', 'SA', 'SN', 'RS', 'SC', 'SL', 'SG', 'SK', 'SI', 'SB', 'SO', 'ZA', 'SS', 'ES',
+  'LK', 'SD', 'SR', 'SE', 'CH', 'SY', 'TW', 'TJ', 'TZ', 'TH', 'TL', 'TG', 'TO', 'TT', 'TN', 'TR', 'TM', 'TV',
+  'UG', 'UA', 'AE', 'GB', 'US', 'UY', 'UZ', 'VU', 'VE', 'VN', 'YE', 'ZM', 'ZW',
+]
+
+// GET /admin-hub/v1/country-overview — superuser only. Every shippable country (same full list
+// the "Lieferländer auswählen" picker uses), with a count of products currently routed through a
+// shipping group that includes it (0 if none), and whether a superuser has switched it off.
 const adminHubCountryOverviewGET = async (req, res) => {
   if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -2007,25 +2024,31 @@ const adminHubCountryOverviewGET = async (req, res) => {
     const r = await client.query(`
       SELECT
         sp.country_code,
-        COUNT(DISTINCT p.id)::int AS product_count,
-        COALESCE(o.is_enabled, true) AS is_enabled
+        COUNT(DISTINCT p.id)::int AS product_count
       FROM store_shipping_prices sp
       LEFT JOIN admin_hub_products p
         ON p.status = 'published'
         AND p.metadata->>'shipping_group_id' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         AND (p.metadata->>'shipping_group_id')::uuid = sp.group_id
-      LEFT JOIN admin_hub_country_overrides o ON o.country_code = sp.country_code
-      GROUP BY sp.country_code, o.is_enabled
-      ORDER BY sp.country_code ASC
+      GROUP BY sp.country_code
     `)
+    const overridesR = await client.query(`SELECT country_code, is_enabled FROM admin_hub_country_overrides`)
     await client.end()
-    const countries = (r.rows || [])
-      .map((row) => ({
-        country_code: normalizeHubCountryCode(row.country_code),
-        product_count: Number(row.product_count || 0),
-        is_enabled: row.is_enabled !== false,
-      }))
-      .filter((row) => row.country_code)
+    const countByCode = {}
+    for (const row of r.rows || []) {
+      const cc = normalizeHubCountryCode(row.country_code)
+      if (cc) countByCode[cc] = (countByCode[cc] || 0) + Number(row.product_count || 0)
+    }
+    const overrideByCode = {}
+    for (const row of overridesR.rows || []) {
+      const cc = normalizeHubCountryCode(row.country_code)
+      if (cc) overrideByCode[cc] = row.is_enabled !== false
+    }
+    const countries = ALL_SHIPPABLE_COUNTRY_CODES.map((code) => ({
+      country_code: code,
+      product_count: countByCode[code] || 0,
+      is_enabled: overrideByCode[code] !== undefined ? overrideByCode[code] : true,
+    }))
     res.json({ countries })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}

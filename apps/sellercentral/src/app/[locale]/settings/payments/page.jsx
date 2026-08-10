@@ -166,12 +166,11 @@ function SortTh({ label, col, sortCol, sortDir, onSort, style }) {
 }
 
 // ── IBAN Management Section ──────────────────────────────────────────────────
-function IbanSection({ commissionRate }) {
+function IbanSection() {
   const locale = useLocale();
   const txt = getPaymentsCopy(locale);
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
-  const sellerPct = Math.round((1 - (commissionRate ?? DEFAULT_COMMISSION_RATE)) * 100);
 
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
@@ -282,7 +281,7 @@ function IbanSection({ commissionRate }) {
               {[
                 { n: "1", label: txt.step1Label, desc: txt.step1Desc },
                 { n: "2", label: txt.step2Label, desc: txt.step2Desc },
-                { n: "3", label: txt.step3Label(sellerPct), desc: txt.step3Desc },
+                { n: "3", label: txt.step3Label, desc: txt.step3Desc },
               ].map(({ n, label, desc }) => (
                 <div key={n} style={{ background: "#fff", borderRadius: 8, padding: "12px 14px", border: "1px solid #e5e7eb" }}>
                   <InlineStack gap="200" blockAlign="center">
@@ -954,7 +953,7 @@ function SellerPaymentsView() {
               </BlockStack>
             </Card>
             <Box paddingBlockStart="300">
-              <IbanSection commissionRate={commissionRate} />
+              <IbanSection />
             </Box>
 
             <Box paddingBlockStart="300">
