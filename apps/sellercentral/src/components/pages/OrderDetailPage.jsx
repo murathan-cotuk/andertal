@@ -27,6 +27,15 @@ function fmtDate(d, locale) {
   const time = dt.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return `${date} / ${time}`;
 }
+// Item title bakes the variant as a trailing "(...)" at checkout — split it back out so it can
+// render as a smaller, muted note under the title instead of inline in parentheses.
+function splitItemTitle(title) {
+  const s = String(title || "").trim();
+  const m = s.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+  if (!m || !m[1].trim()) return { main: s, note: "" };
+  return { main: m[1].trim(), note: m[2].trim() };
+}
+
 function formatPaymentMethod(pm) {
   const map = {
     visa: "Visa", mastercard: "Mastercard", amex: "American Express",
@@ -342,6 +351,7 @@ export default function OrderDetailPage() {
                     : it.product_handle
                     ? `/${locale}/products?search=${encodeURIComponent(it.product_handle)}`
                     : null;
+                  const { main: itemMain, note: itemNote } = splitItemTitle(it.title);
                   return (
                   <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
                     <td style={{ padding: "10px 0" }}>
@@ -352,11 +362,12 @@ export default function OrderDetailPage() {
                         <div>
                           {productUrl ? (
                             <a href={productUrl} style={{ fontWeight: 500, color: "#111827", textDecoration: "underline", textDecorationColor: "#d1d5db" }}>
-                              {it.title || "—"}
+                              {itemMain || "—"}
                             </a>
                           ) : (
-                            <div style={{ fontWeight: 500 }}>{it.title || "—"}</div>
+                            <div style={{ fontWeight: 500 }}>{itemMain || "—"}</div>
                           )}
+                          {itemNote && <div style={{ fontSize: 11, color: "#9ca3af" }}>{itemNote}</div>}
                           {it.product_handle && <div style={{ fontSize: 11, color: "#9ca3af" }}>{it.product_handle}</div>}
                         </div>
                       </div>

@@ -6,6 +6,15 @@ import { getShipStrings } from "./ship-i18n";
 const resolveCarrierName = (carrierName, order) =>
   typeof carrierName === "function" ? (carrierName(order) || "—") : (carrierName || "—");
 
+// Item title bakes the variant as a trailing "(...)" at checkout — split it back out so it can
+// render as a smaller, muted note under the title instead of inline in parentheses.
+function splitItemTitle(title) {
+  const s = String(title || "").trim();
+  const m = s.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+  if (!m || !m[1].trim()) return { main: s, note: "" };
+  return { main: m[1].trim(), note: m[2].trim() };
+}
+
 export function buildShipLabelsHtml(orders, carrierName, trackings, dateStr, locale = "de") {
   const s = getShipStrings(locale);
   return orders
@@ -48,8 +57,8 @@ export function buildShipLieferscheinHtml(orders, carrierName, trackings, dateSt
           <div>
             <div style="font-size:11px;text-transform:uppercase;color:#666;margin-bottom:4px">${s.shippingInfo}</div>
             <div>${s.date}: ${dateStr}</div>
-            <div>${s.carrier}: ${resolveCarrierName(carrierName, o)}</div>
-            <div>${s.trackingNumber}: ${trackings[o.id] || "—"}</div>
+            ${resolveCarrierName(carrierName, o) !== "—" ? `<div>${s.carrier}: ${resolveCarrierName(carrierName, o)}</div>` : ""}
+            ${trackings[o.id] ? `<div>${s.trackingNumber}: ${trackings[o.id]}</div>` : ""}
           </div>
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -61,10 +70,13 @@ export function buildShipLieferscheinHtml(orders, carrierName, trackings, dateSt
           </thead>
           <tbody>
             ${lineItems(o)
-              .map(
-                (it) =>
-                  `<tr><td style="padding:8px;border:1px solid #ddd">${it.title || "—"}</td><td style="padding:8px;text-align:center;border:1px solid #ddd">${it.quantity}</td></tr>`,
-              )
+              .map((it) => {
+                const { main: itemMain, note: itemNote } = splitItemTitle(it.title);
+                const titleHtml = itemNote
+                  ? `${itemMain || "—"}<br/><span style="font-size:11px;color:#9ca3af;">${itemNote}</span>`
+                  : (itemMain || "—");
+                return `<tr><td style="padding:8px;border:1px solid #ddd">${titleHtml}</td><td style="padding:8px;text-align:center;border:1px solid #ddd">${it.quantity}</td></tr>`;
+              })
               .join("") || `<tr><td colspan="2" style="padding:8px;border:1px solid #ddd;color:#666">${s.noItems}</td></tr>`}
           </tbody>
         </table>

@@ -6,7 +6,7 @@ import {
   Select, Banner, Spinner, Divider, Checkbox,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
+import { getOrderPdfDownloadUrl, downloadAuthenticatedPdf } from "@/lib/order-pdf-url";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
@@ -42,12 +42,22 @@ const DOC_TYPE_KEYS = [
 ];
 
 function DocBtn({ orderId, kind, label, available, locale = "de" }) {
+  const [busy, setBusy] = useState(false);
   if (!available) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
+  const handleClick = async () => {
+    setBusy(true);
+    try {
+      await downloadAuthenticatedPdf(getOrderPdfDownloadUrl(orderId, kind, locale), `${kind}-${orderId}.pdf`);
+    } catch (_) {
+      // Non-critical: user sees no file appear; a retry click is the recovery path.
+    }
+    setBusy(false);
+  };
   return (
-    <a
-      href={getOrderPdfDownloadUrl(orderId, kind, locale)}
-      target="_blank"
-      rel="noreferrer"
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={busy}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -60,12 +70,13 @@ function DocBtn({ orderId, kind, label, available, locale = "de" }) {
         fontSize: 11,
         fontWeight: 500,
         textDecoration: "none",
-        cursor: "pointer",
+        cursor: busy ? "wait" : "pointer",
         whiteSpace: "nowrap",
+        opacity: busy ? 0.6 : 1,
       }}
     >
       ↓ {label}
-    </a>
+    </button>
   );
 }
 
@@ -381,13 +392,13 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
     exportCSV(toExport, "order-documents.csv", ui, locale);
   };
 
-  const handleBulkDownload = () => {
+  const handleBulkDownload = async () => {
     const targets =
       selected.size > 0
         ? filteredOrders.filter((o) => selected.has(o.id))
         : filteredOrders.slice(0, 10);
     for (const o of targets) {
-      window.open(getOrderPdfDownloadUrl(o.id, "invoice", locale), "_blank");
+      await downloadAuthenticatedPdf(getOrderPdfDownloadUrl(o.id, "invoice", locale), `invoice-${o.id}.pdf`).catch(() => {});
     }
   };
 
@@ -643,12 +654,16 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     setSelected(allSel ? new Set() : new Set(allIds));
   };
 
-  const handleBulkDownload = () => {
+  // pdf_url from the backend is a relative /admin-hub/... path (see transactions.js) — needs the
+  // backend origin prefixed before it's fetchable from the sellercentral origin.
+  const absPdfUrl = (u) => (/^https?:\/\//i.test(u) ? u : `${client.baseURL}${u}`);
+
+  const handleBulkDownload = async () => {
     const targets = selected.size > 0
       ? invoices.filter((i) => selected.has(i.id))
       : invoices;
     for (const inv of targets) {
-      if (inv.pdf_url) window.open(inv.pdf_url, "_blank");
+      if (inv.pdf_url) await downloadAuthenticatedPdf(absPdfUrl(inv.pdf_url), `commission-invoice-${inv.id}.pdf`).catch(() => {});
     }
   };
 
@@ -734,10 +749,9 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
         </td>
         <td style={{ padding: "10px 12px", textAlign: "center" }}>
           {inv.pdf_url ? (
-            <a
-              href={inv.pdf_url}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => downloadAuthenticatedPdf(absPdfUrl(inv.pdf_url), `commission-invoice-${inv.id}.pdf`).catch(() => {})}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -750,10 +764,11 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                 fontSize: 12,
                 fontWeight: 500,
                 textDecoration: "none",
+                cursor: "pointer",
               }}
             >
               ↓ PDF
-            </a>
+            </button>
           ) : (
             <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>
           )}

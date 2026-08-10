@@ -26,6 +26,15 @@ function fmtDate(d) {
   return `${date} / ${time}`;
 }
 
+// Item title bakes the variant as a trailing "(...)" at checkout — split it back out so it can
+// render as a smaller, muted note under the title instead of inline in parentheses.
+function splitItemTitle(title) {
+  const s = String(title || "").trim();
+  const m = s.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+  if (!m || !m[1].trim()) return { main: s, note: "" };
+  return { main: m[1].trim(), note: m[2].trim() };
+}
+
 const ORDER_STATUS_OPTIONS = ["offen", "in_bearbeitung", "abgeschlossen", "retoure_anfrage", "retoure", "refunded", "storniert"];
 const PAYMENT_STATUS_OPTIONS = ["offen", "bezahlt", "teil_erstattet", "erstattet"];
 const DELIVERY_STATUS_OPTIONS = ["offen", "versendet", "zugestellt"];
@@ -385,6 +394,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
               {items.map((it, i) => {
                 const itemBrutto = (it.unit_price_cents || 0) * (it.quantity || 1);
                 const itemNetto = vat.rate > 0 ? Math.round(itemBrutto / (1 + vat.rate / 100)) : itemBrutto;
+                const { main: itemMain, note: itemNote } = splitItemTitle(it.title);
                 return (
                   <tr key={i} style={{ borderTop: "1px solid #e5e7eb" }}>
                     <td style={{ padding: "6px 8px" }}>
@@ -392,9 +402,12 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
                         {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4 }} />}
                         <div>
                           {it.product_id ? (
-                            <a href={`/${locale}/products/${it.product_id}`} style={{ color: "#111827", textDecoration: "underline", textDecorationColor: "#d1d5db" }}>{it.title || "—"}</a>
+                            <a href={`/${locale}/products/${it.product_id}`} style={{ color: "#111827", textDecoration: "underline", textDecorationColor: "#d1d5db" }}>{itemMain || "—"}</a>
                           ) : (
-                            <div>{it.title || "—"}</div>
+                            <div>{itemMain || "—"}</div>
+                          )}
+                          {itemNote && (
+                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{itemNote}</div>
                           )}
                           {vat.rate > 0 && (
                             <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>

@@ -484,7 +484,6 @@ function InventoryProductRow({
     closeVariants: l === "tr" ? "Varyasyonları kapat" : l === "de" ? "Variationen schließen" : l === "fr" ? "Fermer les variantes" : l === "es" ? "Cerrar variantes" : l === "it" ? "Chiudi varianti" : "Close variations",
     noVariants: l === "tr" ? "Varyasyon yok" : l === "de" ? "Keine Variationen" : l === "fr" ? "Pas de variantes" : l === "es" ? "Sin variantes" : l === "it" ? "Nessuna variante" : "No variations",
     changeProposed: l === "tr" ? "Değişiklik önerildi" : l === "de" ? "Änderung vorgeschlagen" : l === "fr" ? "Modification proposée" : l === "es" ? "Cambio propuesto" : l === "it" ? "Modifica proposta" : "Change proposed",
-    changeProposedShort: l === "tr" ? "Öneri" : l === "de" ? "Vorschlag" : l === "fr" ? "Proposition" : l === "es" ? "Propuesta" : l === "it" ? "Proposta" : "Proposal",
     activateProduct: l === "tr" ? "Ürünü aktifleştir" : l === "de" ? "Produkt aktivieren" : l === "fr" ? "Activer le produit" : l === "it" ? "Attiva prodotto" : l === "es" ? "Activar producto" : "Activate product",
     deactivateProduct: l === "tr" ? "Ürünü pasifleştir" : l === "de" ? "Produkt deaktivieren" : l === "fr" ? "Désactiver le produit" : l === "it" ? "Disattiva prodotto" : l === "es" ? "Desactivar producto" : "Deactivate product",
   };
@@ -643,34 +642,6 @@ function InventoryProductRow({
             icon={EditPencilIcon}
             accessibilityLabel="Edit product"
           />
-          {pendingCount > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenChangeRequests(product.id);
-              }}
-              title={`${i18n.changeProposed} (${pendingCount})`}
-              style={{
-                width: 44,
-                height: 28,
-                borderRadius: 6,
-                border: '1px solid #dc2626',
-                background: '#fee2e2',
-                color: '#b91c1c',
-                cursor: 'pointer',
-                fontSize: 10,
-                fontWeight: 700,
-                lineHeight: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 0,
-              }}
-            >
-              {i18n.changeProposedShort}
-            </button>
-          )}
           <Box position="relative">
             {pendingCount > 0 && (
               <span
@@ -1755,13 +1726,12 @@ export default function InventoryPage() {
                 </I18nLink>
               </Box>
             ) : null}
-            {changeRequestsModalItems.filter((cr) => String(cr.old_value ?? "").trim() !== String(cr.new_value ?? "").trim()).length === 0 ? (
+            {changeRequestsModalItems.length === 0 ? (
               <Text as="p" tone="subdued">
                 {locale === "en" ? "No pending change proposals." : locale === "tr" ? "Bekleyen değişiklik önerisi yok." : locale === "fr" ? "Aucune proposition de modification en attente." : locale === "es" ? "No hay propuestas de cambio pendientes." : locale === "it" ? "Nessuna proposta di modifica in sospeso." : "Keine ausstehenden Änderungsvorschläge."}
               </Text>
             ) : (
               changeRequestsModalItems
-                .filter((cr) => String(cr.old_value ?? "").trim() !== String(cr.new_value ?? "").trim())
                 .map((cr) => {
                 const field = String(cr.field_name || '');
                 const curLabel = l === "tr" ? "Mevcut değer" : l === "de" ? "Aktueller Wert" : l === "fr" ? "Valeur actuelle" : l === "es" ? "Valor actual" : l === "it" ? "Valore attuale" : "Current value";

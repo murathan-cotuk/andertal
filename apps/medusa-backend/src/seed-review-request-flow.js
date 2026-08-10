@@ -39,7 +39,7 @@ ${stars()}
 <p style="margin:0 0 16px;">Your order <strong>#{ORDER_NUMBER}</strong> was delivered a little while ago — we hope you're enjoying it!</p>
 ${productCard('{PRODUCT_NAME}', '{PRODUCT_IMAGE_HTML}')}
 <p style="margin:0 0 16px;">Would you take a minute to share your experience? Your review helps other customers make better decisions — and takes less than a minute.</p>
-${cta('{PRODUCT_URL}', 'Write a review')}
+${cta('{REVIEW_URL}', 'Write a review')}
 <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Not happy with something? Reply to this email or reach us at {SUPPORT_EMAIL} — we're here to help before you leave a rating.</p>`),
     },
     tr: {
@@ -50,7 +50,7 @@ ${stars()}
 <p style="margin:0 0 16px;"><strong>#{ORDER_NUMBER}</strong> numaralı siparişiniz bir süre önce teslim edildi — umarız beğenmişsinizdir!</p>
 ${productCard('{PRODUCT_NAME}', '{PRODUCT_IMAGE_HTML}')}
 <p style="margin:0 0 16px;">Deneyiminizi bizimle paylaşmak için bir dakikanızı ayırır mısınız? Değerlendirmeniz diğer müşterilerin daha iyi karar vermesine yardımcı olur — ve bir dakikadan az sürer.</p>
-${cta('{PRODUCT_URL}', 'Değerlendirme yaz')}
+${cta('{REVIEW_URL}', 'Değerlendirme yaz')}
 <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Bir sorun mu var? Bu e-postayı yanıtlayın veya {SUPPORT_EMAIL} adresinden bize ulaşın — puan vermeden önce yardımcı olmak isteriz.</p>`),
     },
     fr: {
@@ -61,7 +61,7 @@ ${stars()}
 <p style="margin:0 0 16px;">Votre commande <strong>#{ORDER_NUMBER}</strong> a été livrée il y a peu de temps — nous espérons qu'elle vous plaît !</p>
 ${productCard('{PRODUCT_NAME}', '{PRODUCT_IMAGE_HTML}')}
 <p style="margin:0 0 16px;">Pourriez-vous prendre une minute pour partager votre expérience ? Votre avis aide d'autres clients à mieux choisir — et prend moins d'une minute.</p>
-${cta('{PRODUCT_URL}', 'Laisser un avis')}
+${cta('{REVIEW_URL}', 'Laisser un avis')}
 <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Un souci avec votre commande ? Répondez à cet e-mail ou contactez-nous à {SUPPORT_EMAIL} — nous sommes là pour vous aider avant que vous ne laissiez une note.</p>`),
     },
     it: {
@@ -72,7 +72,7 @@ ${stars()}
 <p style="margin:0 0 16px;">Il tuo ordine <strong>#{ORDER_NUMBER}</strong> è stato consegnato qualche giorno fa — speriamo che ti piaccia!</p>
 ${productCard('{PRODUCT_NAME}', '{PRODUCT_IMAGE_HTML}')}
 <p style="margin:0 0 16px;">Potresti dedicare un minuto a condividere la tua esperienza? La tua recensione aiuta altri clienti a scegliere meglio — e richiede meno di un minuto.</p>
-${cta('{PRODUCT_URL}', 'Scrivi una recensione')}
+${cta('{REVIEW_URL}', 'Scrivi una recensione')}
 <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">C'è qualcosa che non va? Rispondi a questa email o scrivi a {SUPPORT_EMAIL} — siamo qui per aiutarti prima che tu lasci una valutazione.</p>`),
     },
     es: {
@@ -83,7 +83,7 @@ ${stars()}
 <p style="margin:0 0 16px;">Tu pedido <strong>#{ORDER_NUMBER}</strong> se entregó hace un tiempo — ¡esperamos que lo estés disfrutando!</p>
 ${productCard('{PRODUCT_NAME}', '{PRODUCT_IMAGE_HTML}')}
 <p style="margin:0 0 16px;">¿Podrías dedicar un minuto a compartir tu experiencia? Tu opinión ayuda a otros clientes a decidir mejor — y lleva menos de un minuto.</p>
-${cta('{PRODUCT_URL}', 'Escribir una reseña')}
+${cta('{REVIEW_URL}', 'Escribir una reseña')}
 <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">¿Algo no fue como esperabas? Responde a este correo o escríbenos a {SUPPORT_EMAIL} — estamos aquí para ayudarte antes de que dejes una valoración.</p>`),
     },
     de: {
@@ -94,7 +94,7 @@ ${stars()}
 <p style="margin:0 0 16px;">deine Bestellung <strong>#{ORDER_NUMBER}</strong> wurde vor Kurzem geliefert — wir hoffen, sie gefällt dir!</p>
 ${productCard('{PRODUCT_NAME}', '{PRODUCT_IMAGE_HTML}')}
 <p style="margin:0 0 16px;">Hättest du eine Minute Zeit, deine Erfahrung zu teilen? Deine Bewertung hilft anderen Kund:innen bei der Entscheidung — und dauert weniger als eine Minute.</p>
-${cta('{PRODUCT_URL}', 'Bewertung schreiben')}
+${cta('{REVIEW_URL}', 'Bewertung schreiben')}
 <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Etwas stimmt nicht? Antworte einfach auf diese E-Mail oder schreib uns an {SUPPORT_EMAIL} — wir helfen dir gerne, bevor du bewertest.</p>`),
     },
   },

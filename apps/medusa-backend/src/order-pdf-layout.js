@@ -84,6 +84,15 @@ function txt(s, hasUnicode) {
   return hasUnicode ? String(s) : pdfDeLatin(s)
 }
 
+/** store_order_items.title bakes the variant as a trailing "(...)" at checkout (store-checkout.js) —
+ * split it back out so it can render as a smaller, muted note line instead of inline in the title. */
+function splitItemTitle(title) {
+  const s = String(title || '').trim()
+  const m = s.match(/^(.*?)\s*\(([^()]+)\)\s*$/)
+  if (!m || !m[1].trim()) return { main: s, note: '' }
+  return { main: m[1].trim(), note: m[2].trim() }
+}
+
 // ─── Page metrics ─────────────────────────────────────────────────────────────
 function pageMetrics(doc) {
   const left = doc.page.margins.left
@@ -203,7 +212,7 @@ function renderRetailOrderDocument(doc, {
 
   // ── Logo centered ──────────────────────────────────────────────────────────
   const LOGO_Y = 36
-  const LOGO_H = 48
+  const LOGO_H = 30
   if (shopLogoBuffer) {
     try {
       doc.image(shopLogoBuffer, left, LOGO_Y, { fit: [contentWidth, LOGO_H], align: 'center', valign: 'center' })
@@ -240,7 +249,9 @@ function renderRetailOrderDocument(doc, {
     .text(txt(docTitle, hasUnicode), rightColX, headerTop, { width: rightColW, align: 'right' })
 
   let rightY = doc.y + 10
-  const metaLabelW = Math.round(rightColW * 0.54)
+  // Narrower label column than the 54/46 split used elsewhere — long DHL/Hermes tracking
+  // numbers were wrapping onto a second line in the ~46%-wide value column.
+  const metaLabelW = Math.round(rightColW * 0.42)
   const metaValW = rightColW - metaLabelW
 
   const metaRows = [
@@ -351,9 +362,12 @@ function renderRetailOrderDocument(doc, {
     const qty = Number(it.quantity || 1)
     const unit = Number(it.unit_price_cents || 0)
     const lineTotal = unit * qty
-    const title = txt(it.title || s.itemFallback, hasUnicode)
+    const { main: titleMain, note: titleNote } = splitItemTitle(it.title || s.itemFallback)
+    const title = txt(titleMain, hasUnicode)
+    const note = txt(titleNote, hasUnicode)
     const titleH = doc.heightOfString(title, { width: descW - 12 })
-    const rowH = Math.max(22, titleH + 10)
+    const noteH = note ? doc.fontSize(7.5).heightOfString(note, { width: descW - 12 }) : 0
+    const rowH = Math.max(22, titleH + (note ? noteH + 2 : 0) + 10)
 
     if (doc.y + rowH > doc.page.height - doc.page.margins.bottom - 160) {
       doc.addPage()
@@ -365,6 +379,10 @@ function renderRetailOrderDocument(doc, {
 
     doc.font(BOLD).fontSize(9.5).fillColor('#111827')
       .text(title, left + 8, rowY + 5, { width: descW - 12 })
+    if (note) {
+      doc.font(REG).fontSize(7.5).fillColor(MUTED)
+        .text(note, left + 8, rowY + 5 + titleH + 2, { width: descW - 12 })
+    }
     doc.font(REG).fontSize(9.5).fillColor('#111827')
       .text(String(qty), qtyX, rowY + 5, { width: qtyW, align: 'right' })
 

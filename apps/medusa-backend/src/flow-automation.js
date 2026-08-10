@@ -83,6 +83,15 @@ function formatEuro(cents) {
   return `${(n / 100).toFixed(2).replace('.', ',')} €`
 }
 
+/** store_order_items.title bakes the variant as a trailing "(...)" at checkout (store-checkout.js) —
+ * split it back out so it can render as a smaller, muted note instead of inline in the title. */
+function splitItemTitle(title) {
+  const s = String(title || '').trim()
+  const m = s.match(/^(.*?)\s*\(([^()]+)\)\s*$/)
+  if (!m || !m[1].trim()) return { main: s, note: '' }
+  return { main: m[1].trim(), note: m[2].trim() }
+}
+
 /** Carrier tracking page URL when carrier + number are known (same heuristics as storefront orders page). */
 function trackingUrlFromCarrier(carrierRaw, numberRaw) {
   const number = String(numberRaw || '').trim()
@@ -331,9 +340,12 @@ async function loadOrderContext(client, orderId) {
         const imgTag = imgSrc ? `<img src="${imgSrc}" alt="" width="48" height="48" style="object-fit:cover;border-radius:4px;display:block;" />` : ''
         const qty = Number(it.quantity || 1)
         const price = formatEuro(it.unit_price_cents)
-        const title = String(it.title || '').trim()
+        const { main: titleMain, note: titleNote } = splitItemTitle(it.title)
+        const titleHtml = titleNote
+          ? `${titleMain}<br/><span style="font-size:11px;color:#9ca3af;">${titleNote}</span>`
+          : titleMain
         return `<tr><td style="padding:6px 10px 6px 0;vertical-align:top;width:56px;">${imgTag}</td>` +
-          `<td style="padding:6px 0;vertical-align:top;">${title}</td>` +
+          `<td style="padding:6px 0;vertical-align:top;">${titleHtml}</td>` +
           `<td style="padding:6px 0 6px 10px;vertical-align:top;white-space:nowrap;text-align:right;">${qty}× ${price}</td></tr>`
       }).join('\n') +
       `\n</table>`
