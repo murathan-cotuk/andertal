@@ -8,11 +8,15 @@ export function toSalesScore(metadata) {
 
 export function isBestsellerMetadata(metadata) {
   if (!metadata || typeof metadata !== "object") return false;
-  return (
+  if (
     metadata.is_bestseller === true ||
     metadata.is_bestseller === "true" ||
     String(metadata.badge || "").toLowerCase().trim() === "bestseller"
-  );
+  ) {
+    return true;
+  }
+  // Same threshold as store-products getBestsellerProductIds (score >= 1).
+  return toSalesScore(metadata) > 0;
 }
 
 /**

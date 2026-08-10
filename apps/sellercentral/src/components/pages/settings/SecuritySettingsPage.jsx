@@ -64,8 +64,13 @@ function DevicesCard({ locale }) {
   useEffect(() => { load(); }, [load]);
 
   const localLogout = () => {
-    ["sellerLoggedIn", "sellerEmail", "sellerId", "storeName", "sellerToken", "sellerIsSuperuser", "sellerPermissions", "sellerApprovalStatus"]
+    ["sellerLoggedIn", "sellerEmail", "sellerId", "storeName", "sellerToken", "sellerIsSuperuser", "sellerPermissions", "sellerApprovalStatus", "andertal_su_auth_backup"]
       .forEach((k) => localStorage.removeItem(k));
+    try {
+      sessionStorage.removeItem("andertal_seller_impersonation_v1");
+    } catch {
+      /* ignore */
+    }
     fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
     router.push("/login");
   };

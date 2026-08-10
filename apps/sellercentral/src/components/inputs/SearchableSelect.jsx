@@ -40,9 +40,18 @@ export default function SearchableSelect({
       ? sortedOptions
       : sortedOptions.filter((o) =>
           String(o.label || "").toLowerCase().includes(needle) ||
-          String(o.sublabel || "").toLowerCase().includes(needle),
+          String(o.sublabel || "").toLowerCase().includes(needle) ||
+          String(o.value || "").toLowerCase().includes(needle),
         );
-    return base.slice(0, 200).map((o) => ({ value: String(o.value), label: o.sublabel ? `${o.label} — ${o.sublabel}` : o.label }));
+    const capped = base.slice(0, 200);
+    // Keep the current selection visible even if it fell outside the first 200.
+    if (selected && !capped.some((o) => String(o.value) === String(selected.value))) {
+      capped.unshift(selected);
+    }
+    return capped.map((o) => ({
+      value: String(o.value),
+      label: o.sublabel ? `${o.label} — ${o.sublabel}` : o.label,
+    }));
   }, [sortedOptions, input, selected]);
 
   const handleSelect = useCallback((chosen) => {

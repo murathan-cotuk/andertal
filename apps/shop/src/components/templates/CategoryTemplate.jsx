@@ -852,37 +852,43 @@ function parseCategoryMetadata(category) {
   return m && typeof m === "object" ? m : {};
 }
 
-function findCategoryNodeBySlug(nodes, slug) {
+function findCategoryNodeBySlug(nodes, slug, seen = new WeakSet()) {
   const norm = String(slug || "").replace(/^\//, "");
   for (const n of nodes || []) {
-    if (!n) continue;
+    if (!n || typeof n !== "object") continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
     const s = String(n.slug || n.handle || "").replace(/^\//, "");
     if (s === norm) return n;
-    const child = findCategoryNodeBySlug(n.children, slug);
+    const child = findCategoryNodeBySlug(n.children, slug, seen);
     if (child) return child;
   }
   return null;
 }
 
-function findCategoryNodeById(nodes, id) {
+function findCategoryNodeById(nodes, id, seen = new WeakSet()) {
   const nid = String(id || "");
   for (const n of nodes || []) {
-    if (!n) continue;
+    if (!n || typeof n !== "object") continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
     if (String(n.id) === nid) return n;
-    const child = findCategoryNodeById(n.children, id);
+    const child = findCategoryNodeById(n.children, id, seen);
     if (child) return child;
   }
   return null;
 }
 
 /** Returns ancestor nodes (root → direct parent) for a given slug, or null if not found. */
-function findAncestors(nodes, slug, path = []) {
+function findAncestors(nodes, slug, path = [], seen = new WeakSet()) {
   const norm = String(slug || "").replace(/^\//, "");
   for (const n of nodes || []) {
-    if (!n) continue;
+    if (!n || typeof n !== "object") continue;
+    if (seen.has(n)) continue;
+    seen.add(n);
     const s = String(n.slug || n.handle || "").replace(/^\//, "");
     if (s === norm) return path;
-    const found = findAncestors(n.children || [], slug, [...path, n]);
+    const found = findAncestors(n.children || [], slug, [...path, n], seen);
     if (found !== null) return found;
   }
   return null;
@@ -1365,10 +1371,11 @@ export default function CategoryTemplate() {
                       <FilterGroupBody $open={!!openFilterGroups[key]}>
                         {vals.map((val) => {
                           const on = (filters[key] || []).includes(val);
+                          const label = val == null || typeof val === "object" ? String(val ?? "") : String(val);
                           return (
-                            <CheckRow key={val} $on={on}>
+                            <CheckRow key={label} $on={on}>
                               <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={14} />
-                              {val}
+                              {label}
                             </CheckRow>
                           );
                         })}

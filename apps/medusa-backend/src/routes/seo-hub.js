@@ -12,7 +12,7 @@ const {
   DESC_IDEAL,
 } = require('../seo-hub-core')
 
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SHOP_PUBLIC_URL || 'https://andertal.de').replace(/\/+$/, '')
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SHOP_PUBLIC_URL || 'https://www.andertal.com').replace(/\/+$/, '')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -40,9 +40,10 @@ const scoreFromIssues = (issues) => {
 
 const buildPublicHints = (type, row) => {
   const handle = row.handle || row.slug || ''
+  // Shop canonical routes: categories/collections/products live at /{slug} (not /category/...).
   const pathMap = {
-    products: handle ? `produkt/${handle}` : '',
-    categories: handle ? `category/${handle}` : '',
+    products: handle ? handle : '',
+    categories: handle ? handle : '',
     collections: handle ? handle : '',
     pages: handle ? `pages/${handle}` : '',
     blogs: handle ? `pages/${handle}` : '',

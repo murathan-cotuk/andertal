@@ -771,6 +771,12 @@ export default function PolarisLayout({ children }) {
     localStorage.removeItem("sellerIsSuperuser");
     localStorage.removeItem("sellerPermissions");
     localStorage.removeItem("sellerApprovalStatus");
+    try {
+      sessionStorage.removeItem("andertal_seller_impersonation_v1");
+    } catch {
+      /* ignore */
+    }
+    localStorage.removeItem("andertal_su_auth_backup");
     // Clear httpOnly session cookie
     await fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
     router.push("/login");

@@ -84,8 +84,8 @@ async function productsByIds(client, ids, limit) {
   if (!ids.length) return []
   // Must include variants + full row so ProductCard can resolve first-variant cover images
   // (parent umbrella rows often have no own media). Map through the same storefront mapper
-  // as /store/products so carousels/cards get thumbnail + variants[].images.
-  const { mapAdminHubToStoreProduct } = require('./store-products')
+  // as /store/products so carousels/cards get thumbnail + variants[].images + is_bestseller.
+  const { mapAdminHubToStoreProduct, applyBestsellerFlagsToMappedProduct } = require('./store-products')
   const r = await client.query(
     `SELECT id, title, handle, sku, description, status, seller_id, collection_id,
             price_cents, inventory, metadata, variants, created_at, updated_at
@@ -95,11 +95,16 @@ async function productsByIds(client, ids, limit) {
   )
   // Preserve caller's ordering (ANY() doesn't guarantee it)
   const byId = new Map(r.rows.map((p) => [String(p.id), p]))
-  return ids
-    .map((id) => byId.get(String(id)))
-    .filter(Boolean)
-    .slice(0, limit)
-    .map((p) => mapAdminHubToStoreProduct(p, 'DE'))
+  const out = []
+  for (const id of ids) {
+    const p = byId.get(String(id))
+    if (!p) continue
+    const mapped = mapAdminHubToStoreProduct(p, 'DE')
+    await applyBestsellerFlagsToMappedProduct(mapped, p.id)
+    out.push(mapped)
+    if (out.length >= limit) break
+  }
+  return out
 }
 
 const SALES_SCORE_SQL = `COALESCE((metadata->>'sold_last_month')::int, 0)`

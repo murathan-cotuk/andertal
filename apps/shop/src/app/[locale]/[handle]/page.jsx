@@ -9,7 +9,7 @@ import ProductTemplateMobile from "@/components/templates/ProductTemplateMobile"
 import { ProductGrid } from "@/components/ProductGrid";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useShopStyles } from "@/context/ShopStylesContext";
@@ -737,7 +737,7 @@ const Desc = styled.div`
 /* ─────────────────────────────────────────────────────────── *
  *  Page
  * ─────────────────────────────────────────────────────────── */
-export default function CollectionPage() {
+function CollectionPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1481,5 +1481,14 @@ export default function CollectionPage() {
       </Main>
       <Footer />
     </PageWrap>
+  );
+}
+
+/** useSearchParams requires a Suspense boundary (same pattern as search/nachrichten). */
+export default function HandlePage() {
+  return (
+    <Suspense fallback={null}>
+      <CollectionPage />
+    </Suspense>
   );
 }

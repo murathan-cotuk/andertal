@@ -24,6 +24,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
+import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
 import { categoryDisplayName } from "@/lib/category-locale";
 
@@ -424,7 +425,16 @@ export default function ContentCategoriesPage() {
   };
 
   const tree = buildTree(categories);
-  const parentOptions = [{ label: "— None (top level) —", value: "" }, ...categories.filter((c) => !editId || c.id !== editId).map((c) => ({ label: categoryDisplayName(c, locale), value: c.id }))];
+  const parentOptions = [
+    { label: "— None (top level) —", value: "" },
+    ...categories
+      .filter((c) => !editId || c.id !== editId)
+      .map((c) => ({
+        label: categoryDisplayName(c, locale),
+        value: String(c.id),
+        sublabel: c.slug ? `/${c.slug}` : undefined,
+      })),
+  ];
 
 
   return (
@@ -606,11 +616,13 @@ export default function ContentCategoriesPage() {
       >
         <Modal.Section>
           <BlockStack gap="400">
-            <Select
+            <SearchableSelect
               label="Parent category (subcategory)"
               options={parentOptions}
-              value={form.parent_id}
+              value={form.parent_id || ""}
               onChange={(value) => setForm((prev) => ({ ...prev, parent_id: value }))}
+              emptyLabel="— None (top level) —"
+              placeholder="Search parent category…"
             />
             <TextField
               label="Name"

@@ -158,6 +158,19 @@ const getBestsellerProductIds = async () => {
   return ids
 }
 
+/** Stamp listing/detail product with is_bestseller + sales_count from the shared cache. */
+const applyBestsellerFlagsToMappedProduct = async (mapped, productId) => {
+  if (!mapped || !productId) return mapped
+  const pid = String(productId).trim()
+  const bsIds = await getBestsellerProductIds()
+  const score = bestsellerCache.scoresById?.get(pid) || 0
+  const meta = { ...(mapped.metadata || {}) }
+  if (score > 0) meta.sales_count = score
+  if (bsIds.has(pid)) meta.is_bestseller = true
+  mapped.metadata = meta
+  return mapped
+}
+
 const normalizeStoreEan = (raw) => {
   if (raw == null || raw === '') return ''
   const d = String(raw).replace(/\D/g, '')
@@ -745,9 +758,9 @@ const storeProductsFromAdminHubGET = async (req, res) => {
       if (!meta.category_id) meta.category_id = primary
       mapped.metadata = meta
     }
-    const bestsellerIds = await getBestsellerProductIds()
     const badgeCtx = await buildProductBadgeContext()
-    let products = list.map((p) => {
+    let products = []
+    for (const p of list) {
       const mapped = mapAdminHubToStoreProduct(p, query.country || 'DE')
       mergeCategoryIdsFromCollections(p, mapped)
       const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
@@ -760,10 +773,10 @@ const storeProductsFromAdminHubGET = async (req, res) => {
         const b = brandsById[brandId]
         mapped.metadata = { ...(mapped.metadata || {}), brand_name: b.name, brand_logo: b.logo_image || null, brand_handle: b.handle || null }
       }
-      if (bestsellerIds.has(String(p.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+      await applyBestsellerFlagsToMappedProduct(mapped, p.id)
       resolveCustomBadgesForProduct(p.id, mapped, badgeCtx)
-      return mapped
-    })
+      products.push(mapped)
+    }
     if (categorySlugFilter) {
       if (!allowedCategoryIds || allowedCategoryIds.size === 0) {
         products = []
@@ -881,9 +894,9 @@ module.exports = function createStoreProductsRouter() {
       const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim() || 'default').filter(Boolean))]
       const storeNamesBySeller = {}
       await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
-      const bestsellerIds = await getBestsellerProductIds()
       const badgeCtx = await buildProductBadgeContext()
-      const products = list.map((p) => {
+      const products = []
+      for (const p of list) {
         const mapped = mapAdminHubToStoreProduct(p, (req.query && req.query.country) || 'DE')
         const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
         if (!existingSeller && p.seller_id && storeNamesBySeller[(p.seller_id || 'default').toString().trim()]) {
@@ -891,10 +904,10 @@ module.exports = function createStoreProductsRouter() {
           mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
         }
         mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
-        if (bestsellerIds.has(String(p.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+        await applyBestsellerFlagsToMappedProduct(mapped, p.id)
         resolveCustomBadgesForProduct(p.id, mapped, badgeCtx)
-        return mapped
-      })
+        products.push(mapped)
+      }
       res.json({ brand, products, count: products.length })
     } catch (e) {
       console.error('Store brands GET:', e)
@@ -911,6 +924,7 @@ module.exports.extractEanFromHubProductRow = extractEanFromHubProductRow
 module.exports.normalizeStoreEan = normalizeStoreEan
 module.exports.parseVariantsArray = parseVariantsArray
 module.exports.getBestsellerProductIds = getBestsellerProductIds
+module.exports.applyBestsellerFlagsToMappedProduct = applyBestsellerFlagsToMappedProduct
 module.exports.isUuidLike = isUuidLike
 module.exports.getAdminHubCollectionIdByHandle = getAdminHubCollectionIdByHandle
 module.exports.storeProductCategoryIds = storeProductCategoryIds

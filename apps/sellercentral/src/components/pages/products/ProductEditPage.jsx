@@ -40,7 +40,7 @@ import { encodeVariantPathKey } from "@/lib/variant-path-key";
 import { ChangeRequestFieldBadge } from "@/components/ChangeRequestFieldBadge";
 import {
   fieldNameDisplayLabel,
-  formatChangeRequestValuePreview,
+  formatChangeRequestValueForDisplay,
 } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 import {
@@ -448,6 +448,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [newCatalogMetaSaving, setNewCatalogMetaSaving] = useState(false);
   const [newCatalogMetaErr, setNewCatalogMetaErr] = useState("");
   const [pendingChangeRequests, setPendingChangeRequests] = useState([]);
+  const [changeRequestsModalOpen, setChangeRequestsModalOpen] = useState(false);
   const [changeRequestActionId, setChangeRequestActionId] = useState("");
   const [fileUploading, setFileUploading] = useState(false);
   const [addingFile, setAddingFile] = useState(false);
@@ -520,6 +521,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     }
     refetchPendingChangeRequests(product.id);
   }, [isNew, product?.id, refetchPendingChangeRequests]);
+
+  useEffect(() => {
+    if (pendingChangeRequests.length === 0) setChangeRequestsModalOpen(false);
+  }, [pendingChangeRequests.length]);
 
   const approveChangeRequest = useCallback(async (requestId) => {
     if (!requestId || !product?.id) return;
@@ -2074,44 +2079,93 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       {!isNew && pendingChangeRequests.length > 0 && (
         <Box paddingBlockEnd="200">
           <Banner tone="warning">
-            <BlockStack gap="300">
+            <InlineStack gap="300" align="space-between" blockAlign="center" wrap>
               <Text as="p" variant="bodySm">
-                {locale === "tr" ? "Onay bekleyen alan değişiklikleri var. İlgili alanların yanındaki kırmızı işarete tıklayarak mevcut ve önerilen değerleri görebilirsiniz." : locale === "fr" ? "Modifications de champ en attente : cliquez sur le marqueur rouge à côté d'un champ pour voir les valeurs actuelles et proposées." : locale === "es" ? "Cambios de campo pendientes: haz clic en el marcador rojo junto a un campo para ver los valores actuales y propuestos." : locale === "it" ? "Modifiche di campo in sospeso: clicca sul marcatore rosso accanto a un campo per vedere i valori attuali e proposti." : locale === "de" ? "Ausstehende Feldänderungen: Klicken Sie auf das rote Symbol neben dem Feld für aktuelle und vorgeschlagene Werte." : "Pending field changes: click the red marker beside a field to see current and proposed values."}
+                {locale === "tr"
+                  ? `Değişiklik önerisi var (${pendingChangeRequests.length} alan).`
+                  : locale === "fr"
+                    ? `Modifications proposées (${pendingChangeRequests.length} champs).`
+                    : locale === "es"
+                      ? `Cambios propuestos (${pendingChangeRequests.length} campos).`
+                      : locale === "it"
+                        ? `Modifiche proposte (${pendingChangeRequests.length} campi).`
+                        : locale === "de"
+                          ? `Änderungsvorschläge vorhanden (${pendingChangeRequests.length} Felder).`
+                          : `Pending change suggestions (${pendingChangeRequests.length} fields).`}
               </Text>
               {isSuperuser && (
-                <BlockStack gap="200">
-                  {pendingChangeRequests.map((cr) => {
-                    const busy = changeRequestActionId === String(cr.id);
-                    return (
-                      <InlineStack key={cr.id} gap="300" align="space-between" blockAlign="center" wrap>
-                        <BlockStack gap="050">
-                          <Text as="p" variant="bodySm">
-                            <strong>{fieldNameDisplayLabel(cr.field_name, locale)}:</strong>{" "}
-                            {formatChangeRequestValuePreview(cr.new_value, 80)}
-                          </Text>
-                          <Text as="p" variant="bodyXs" tone="subdued">
-                            {`${locale === "tr" ? "Satıcı" : locale === "fr" ? "Vendeur" : locale === "es" ? "Vendedor" : locale === "it" ? "Venditore" : locale === "de" ? "Verkäufer" : "Seller"}: ${changeRequestSellerLabel(cr)}`}
-                          </Text>
-                        </BlockStack>
-                        <InlineStack gap="200">
-                          <Button size="slim" tone="success" onClick={() => approveChangeRequest(cr.id)} loading={busy} disabled={busy}>
-                            {locale === "tr" ? "Onayla" : locale === "fr" ? "Approuver" : locale === "es" ? "Aprobar" : locale === "it" ? "Approva" : locale === "de" ? "Freigeben" : "Approve"}
-                          </Button>
-                          <Button size="slim" onClick={() => editAndApproveChangeRequest(cr)} disabled={busy}>
-                            {locale === "tr" ? "Düzelt + Onayla" : locale === "fr" ? "Modifier + Approuver" : locale === "es" ? "Editar + Aprobar" : locale === "it" ? "Modifica + Approva" : locale === "de" ? "Bearbeiten + Freigeben" : "Edit + Approve"}
-                          </Button>
-                          <Button size="slim" tone="critical" variant="secondary" onClick={() => rejectChangeRequest(cr.id)} loading={busy} disabled={busy}>
-                            {locale === "tr" ? "Reddet" : locale === "fr" ? "Rejeter" : locale === "es" ? "Rechazar" : locale === "it" ? "Rifiuta" : locale === "de" ? "Ablehnen" : "Reject"}
-                          </Button>
-                        </InlineStack>
-                      </InlineStack>
-                    );
-                  })}
-                </BlockStack>
+                <Button size="slim" onClick={() => setChangeRequestsModalOpen(true)}>
+                  {locale === "tr" ? "Değişiklik önerisi var" : locale === "fr" ? "Voir les modifications" : locale === "es" ? "Ver cambios" : locale === "it" ? "Vedi modifiche" : locale === "de" ? "Änderungen ansehen" : "Review changes"}
+                </Button>
               )}
-            </BlockStack>
+            </InlineStack>
           </Banner>
         </Box>
+      )}
+
+      {isSuperuser && (
+        <Modal
+          open={changeRequestsModalOpen}
+          onClose={() => setChangeRequestsModalOpen(false)}
+          title={locale === "tr" ? "Onay bekleyen alan değişiklikleri" : locale === "fr" ? "Modifications de champ en attente" : locale === "es" ? "Cambios de campo pendientes" : locale === "it" ? "Modifiche di campo in sospeso" : locale === "de" ? "Ausstehende Feldänderungen" : "Pending field changes"}
+          size="large"
+        >
+          <Modal.Section>
+            <BlockStack gap="400">
+              {pendingChangeRequests.map((cr, idx) => {
+                const busy = changeRequestActionId === String(cr.id);
+                return (
+                  <React.Fragment key={cr.id}>
+                    {idx > 0 && <Divider />}
+                    <BlockStack gap="200">
+                      <InlineStack gap="300" align="space-between" blockAlign="center" wrap>
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                          {fieldNameDisplayLabel(cr.field_name, locale)}
+                        </Text>
+                        <Text as="p" variant="bodyXs" tone="subdued">
+                          {`${locale === "tr" ? "Satıcı" : locale === "fr" ? "Vendeur" : locale === "es" ? "Vendedor" : locale === "it" ? "Venditore" : locale === "de" ? "Verkäufer" : "Seller"}: ${changeRequestSellerLabel(cr)}`}
+                        </Text>
+                      </InlineStack>
+                      <InlineStack gap="400" wrap align="start">
+                        <Box minWidth="240px" maxWidth="480px">
+                          <BlockStack gap="100">
+                            <Text as="p" variant="bodyXs" tone="subdued">
+                              {locale === "tr" ? "Mevcut değer" : locale === "fr" ? "Valeur actuelle" : locale === "es" ? "Valor actual" : locale === "it" ? "Valore attuale" : locale === "de" ? "Aktueller Wert" : "Current value"}
+                            </Text>
+                            <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                              {formatChangeRequestValueForDisplay(cr.old_value)}
+                            </div>
+                          </BlockStack>
+                        </Box>
+                        <Box minWidth="240px" maxWidth="480px">
+                          <BlockStack gap="100">
+                            <Text as="p" variant="bodyXs" tone="subdued">
+                              {locale === "tr" ? "Önerilen değer" : locale === "fr" ? "Valeur proposée" : locale === "es" ? "Valor propuesto" : locale === "it" ? "Valore proposto" : locale === "de" ? "Vorgeschlagener Wert" : "Proposed value"}
+                            </Text>
+                            <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", fontWeight: 600 }}>
+                              {formatChangeRequestValueForDisplay(cr.new_value)}
+                            </div>
+                          </BlockStack>
+                        </Box>
+                      </InlineStack>
+                      <InlineStack gap="200">
+                        <Button size="slim" tone="success" onClick={() => approveChangeRequest(cr.id)} loading={busy} disabled={busy}>
+                          {locale === "tr" ? "Onayla" : locale === "fr" ? "Approuver" : locale === "es" ? "Aprobar" : locale === "it" ? "Approva" : locale === "de" ? "Freigeben" : "Approve"}
+                        </Button>
+                        <Button size="slim" onClick={() => editAndApproveChangeRequest(cr)} disabled={busy}>
+                          {locale === "tr" ? "Düzelt + Onayla" : locale === "fr" ? "Modifier + Approuver" : locale === "es" ? "Editar + Aprobar" : locale === "it" ? "Modifica + Approva" : locale === "de" ? "Bearbeiten + Freigeben" : "Edit + Approve"}
+                        </Button>
+                        <Button size="slim" tone="critical" variant="secondary" onClick={() => rejectChangeRequest(cr.id)} loading={busy} disabled={busy}>
+                          {locale === "tr" ? "Reddet" : locale === "fr" ? "Rejeter" : locale === "es" ? "Rechazar" : locale === "it" ? "Rifiuta" : locale === "de" ? "Ablehnen" : "Reject"}
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
+                  </React.Fragment>
+                );
+              })}
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
       )}
 
       {!isNew && isSuperuser && sellerListings.length > 0 && (

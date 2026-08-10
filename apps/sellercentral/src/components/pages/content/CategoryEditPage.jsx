@@ -6,12 +6,13 @@ import { Link } from "@/i18n/navigation";
 import {
   Page, Layout, Card, Text, TextField, BlockStack, InlineStack,
   Box, Banner, Button, Divider, Checkbox, Badge, Thumbnail,
-  InlineGrid, Select,
+  InlineGrid,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { titleToHandle } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
 import { getCategoryEditCopy } from "@/lib/category-edit-i18n";
 import { categoryDisplayName, categoryNameForEditForm, normalizeCategoryLocale } from "@/lib/category-locale";
@@ -375,7 +376,11 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
 
   const parentOptions = [
     { label: c.noParent, value: "" },
-    ...allCategories.map((cat) => ({ label: categoryDisplayName(cat, locale), value: String(cat.id) })),
+    ...allCategories.map((cat) => ({
+      label: categoryDisplayName(cat, locale),
+      value: String(cat.id),
+      sublabel: cat.slug ? `/${cat.slug}` : undefined,
+    })),
   ];
 
   const categoryTreeRows = (() => {
@@ -473,11 +478,13 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                     )}
                   </div>
                 </BlockStack>
-                <Select
+                <SearchableSelect
                   label={c.parentCategory}
                   options={parentOptions}
                   value={form.parent_id || ""}
                   onChange={(v) => setForm((p) => ({ ...p, parent_id: v }))}
+                  emptyLabel={c.noParent}
+                  placeholder={c.parentCategory}
                 />
               </BlockStack>
             </Card>
