@@ -707,6 +707,7 @@ export default function SearchTemplate() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
+  const [metafieldDefinitions, setMetafieldDefinitions] = useState({});
   const [mobileDrawerTab, setMobileDrawerTab] = useState("categories");
   const bodyRef = useRef(null);
 
@@ -719,6 +720,17 @@ export default function SearchTemplate() {
       document.body.style.overflow = prev;
     };
   }, [panelOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-metafield-definitions", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setMetafieldDefinitions(data?.definitions || {});
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let c = true;
@@ -1181,7 +1193,7 @@ export default function SearchTemplate() {
                       Object.entries(facets).map(([key, vals]) => (
                         <FilterGroup key={key}>
                           <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                            <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                            <FilterGroupHeading className="shop-typo-sidebar-nav">{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
                             <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                           </FilterGroupTitle>
                           <FilterGroupBody $open={!!openFilterGroups[key]}>
@@ -1189,8 +1201,8 @@ export default function SearchTemplate() {
                               const on = (filters[key] || []).includes(val);
                               return (
                                 <CheckRow key={val} $on={on}>
-                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
-                                  {formatFacetOptionLabel(key, val, categorySlugToName)}
+                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={10} />
+                                  {formatFacetOptionLabel(key, val, categorySlugToName, locale, metafieldDefinitions)}
                                 </CheckRow>
                               );
                             })}
@@ -1321,7 +1333,7 @@ export default function SearchTemplate() {
                             $active={activeMobileFilterGroup === key}
                             onClick={() => setActiveMobileFilterGroup(key)}
                           >
-                            {getFacetGroupTitle(key)}
+                            {getFacetGroupTitle(key, locale, metafieldDefinitions)}
                             {cnt > 0 && (
                               <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>
                                 {cnt} ausgewählt
@@ -1343,7 +1355,7 @@ export default function SearchTemplate() {
                                 $on={on}
                                 onClick={() => toggle(activeMobileFilterGroup, val)}
                               >
-                                {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName)}
+                                {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName, locale, metafieldDefinitions)}
                               </MobileFilterPill>
                             );
                           })}
@@ -1368,7 +1380,7 @@ export default function SearchTemplate() {
                 {Object.entries(filters).flatMap(([k, vals]) =>
                   (vals || []).map((v) => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                      {formatFacetOptionLabel(k, v, categorySlugToName)}
+                      {formatFacetOptionLabel(k, v, categorySlugToName, locale, metafieldDefinitions)}
                       {" "}×
                     </Chip>
                   )))}

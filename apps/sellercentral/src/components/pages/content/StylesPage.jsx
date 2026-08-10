@@ -450,7 +450,25 @@ function FontFamilyDropdown({ label, valueName, families, loading, onSelect, pre
   );
 }
 
-function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading, onLevelChange }) {
+const FONT_WEIGHT_OPTIONS = [
+  { label: "Thin (100)", value: "100" },
+  { label: "Extra Light (200)", value: "200" },
+  { label: "Light (300)", value: "300" },
+  { label: "Regular (400)", value: "400" },
+  { label: "Medium (500)", value: "500" },
+  { label: "Semibold (600)", value: "600" },
+  { label: "Bold (700)", value: "700" },
+  { label: "Extra Bold (800)", value: "800" },
+  { label: "Black (900)", value: "900" },
+];
+
+const FONT_STYLE_OPTIONS = [
+  { label: "Normal", value: "normal" },
+  { label: "Italic", value: "italic" },
+  { label: "Oblique", value: "oblique" },
+];
+
+function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading, onLevelChange, hideMargin = false }) {
   const b = typo[levelKey] || {};
   const valueName = googleNameFromFontStack(b.font_family || "");
   return (
@@ -484,6 +502,18 @@ function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading
           onChange={(v) => onLevelChange(levelKey, "font_size", v)}
           autoComplete="off"
         />
+        <Select
+          label="Font weight"
+          options={FONT_WEIGHT_OPTIONS}
+          value={b.font_weight || "400"}
+          onChange={(v) => onLevelChange(levelKey, "font_weight", v)}
+        />
+        <Select
+          label="Font style"
+          options={FONT_STYLE_OPTIONS}
+          value={b.font_style || "normal"}
+          onChange={(v) => onLevelChange(levelKey, "font_style", v)}
+        />
         <ColorField label="Color" value={b.color} onChange={(v) => onLevelChange(levelKey, "color", v)} />
         <TextField
           label="Letter spacing"
@@ -497,6 +527,24 @@ function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading
           onChange={(v) => onLevelChange(levelKey, "line_height", v)}
           autoComplete="off"
         />
+        {!hideMargin && (
+          <>
+            <TextField
+              label="Margin top"
+              value={b.margin_top || ""}
+              onChange={(v) => onLevelChange(levelKey, "margin_top", v)}
+              autoComplete="off"
+              helpText="e.g. 0.5em, 16px"
+            />
+            <TextField
+              label="Margin bottom"
+              value={b.margin_bottom || ""}
+              onChange={(v) => onLevelChange(levelKey, "margin_bottom", v)}
+              autoComplete="off"
+              helpText="e.g. 0.5em, 16px"
+            />
+          </>
+        )}
         <div style={{ gridColumn: "1 / -1" }}>
           <TextField
             label="Custom font-family (CSS, optional)"
@@ -1929,6 +1977,7 @@ export default function StylesPage() {
                 families={googleFontList || []}
                 familiesLoading={googleFontsLoading}
                 onLevelChange={updateTypoLevel}
+                hideMargin
               />
               <Divider />
               <button
@@ -1999,7 +2048,7 @@ export default function StylesPage() {
                   />
                   <Divider />
                   <TypographyLevelRow
-                    heading={locale === "de" ? "Sidebar-Navigation (Filter-Seitenleiste)" : locale === "tr" ? "Sidebar Navigasyonu (Filtre kenar çubuğu)" : "Sidebar Navigation (filter sidebar)"}
+                    heading={locale === "de" ? "Sidebar-Navigation / Filtergruppen-Titel (Filter-Seitenleiste)" : locale === "tr" ? "Sidebar Navigasyonu / Filtre grup başlıkları" : "Sidebar Navigation / filter group titles"}
                     levelKey="sidebar_nav"
                     typo={styles.typography}
                     families={googleFontList || []}

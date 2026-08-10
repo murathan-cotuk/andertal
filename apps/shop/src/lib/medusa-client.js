@@ -280,6 +280,13 @@ class MedusaClient {
     return res
   }
 
+  /** Catalog metafield definitions (facet labels / value i18n). */
+  async getMetafieldDefinitions() {
+    const res = await this.request('/store/metafield-definitions')
+    if (res?.__error) return { definitions: {} }
+    return { definitions: res?.definitions || {} }
+  }
+
   /**
    * Single collection by handle (for collection page). 404 if not found.
    */

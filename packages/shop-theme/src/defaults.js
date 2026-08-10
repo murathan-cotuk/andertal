@@ -18,6 +18,8 @@ const TYPO_LEVEL = (overrides = {}) => ({
   letter_spacing: "0",
   line_height: "1.5",
   font_family: "",
+  margin_top: "0",
+  margin_bottom: "0",
   ...overrides,
 });
 
@@ -127,6 +129,8 @@ export const DEFAULT_SHOP_STYLES = {
       color: "#111827",
       letter_spacing: "-0.02em",
       line_height: "1.15",
+      margin_top: "0.67em",
+      margin_bottom: "0.67em",
     }),
     h2: TYPO_LEVEL({
       font_size: "clamp(22px,3.5vw,36px)",
@@ -134,22 +138,30 @@ export const DEFAULT_SHOP_STYLES = {
       color: "#111827",
       letter_spacing: "-0.01em",
       line_height: "1.2",
+      margin_top: "0.83em",
+      margin_bottom: "0.83em",
     }),
     h3: TYPO_LEVEL({
       font_size: "clamp(1.15rem,2.4vw,1.65rem)",
       font_weight: "700",
       line_height: "1.25",
       letter_spacing: "-0.01em",
+      margin_top: "1em",
+      margin_bottom: "1em",
     }),
     h4: TYPO_LEVEL({
       font_size: "clamp(1.05rem,1.8vw,1.2rem)",
       font_weight: "600",
       line_height: "1.3",
+      margin_top: "1.33em",
+      margin_bottom: "1.33em",
     }),
     h5: TYPO_LEVEL({
       font_size: "1rem",
       font_weight: "600",
       line_height: "1.35",
+      margin_top: "1.67em",
+      margin_bottom: "1.67em",
     }),
     /** Produktseite: Titel in der Buybox (semantisch oft h1, visuell eigenes Profil) */
     product_title: TYPO_LEVEL({
@@ -164,6 +176,8 @@ export const DEFAULT_SHOP_STYLES = {
       font_weight: "700",
       line_height: "1.2",
       letter_spacing: "-0.02em",
+      margin_top: "0.67em",
+      margin_bottom: "0.67em",
     }),
     /** Kategorien-Dropdown / Mega-Menü Einträge (nicht Second-Nav-Leiste) */
     menu_catalog: TYPO_LEVEL({
@@ -171,6 +185,14 @@ export const DEFAULT_SHOP_STYLES = {
       font_weight: "500",
       line_height: "1.35",
       color: "#374151",
+    }),
+    /** Filter-Seitenleiste Gruppen-Titel (Facetten) */
+    sidebar_nav: TYPO_LEVEL({
+      font_size: "13px",
+      font_weight: "700",
+      line_height: "1.3",
+      letter_spacing: "0.02em",
+      color: "#111827",
     }),
   },
   scrollUpButton: {
@@ -212,6 +234,7 @@ export const DEFAULT_SHOP_STYLES = {
     richtext_align: "left",   // "left" | "center"
     richtext_max_width: "700px",
     content_padding_x: "32px",
+    filter_checkbox_size: 10,
   },
   /** Kategorie-Template (shop/category/[slug]) görünüm ayarları */
   category_template: {
@@ -223,6 +246,7 @@ export const DEFAULT_SHOP_STYLES = {
     richtext_align: "left",
     richtext_max_width: "700px",
     content_padding_x: "32px",
+    filter_checkbox_size: 10,
   },
   buttons: {
     add_to_cart: {

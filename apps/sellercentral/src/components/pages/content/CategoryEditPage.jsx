@@ -571,7 +571,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                           {p.status && (
                             <Badge tone={p.status === "published" ? "success" : "attention"}>
-                              {statusLabel(locale, p.status)}
+                              {productStatusLabel(locale, p.status)}
                             </Badge>
                           )}
                           <Button

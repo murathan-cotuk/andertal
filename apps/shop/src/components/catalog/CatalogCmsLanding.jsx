@@ -16,10 +16,15 @@ function lt(page, field, locale) {
 
 /**
  * CMS + landing shell for catalog hubs (bestsellers, sales, neuheiten, brands).
- * Renders page title as H1, then Sellercentral landing containers.
- * Children render below the landing (e.g. category carousels / brand directory).
+ * Renders Sellercentral landing containers when present, then children
+ * (e.g. category carousels / brand directory).
  */
-export default function CatalogCmsLanding({ slug, fallbackTitle, children = null }) {
+export default function CatalogCmsLanding({
+  slug,
+  fallbackTitle,
+  children = null,
+  showTitleWhenNoContainers = true,
+}) {
   const locale = useLocale()
   const [page, setPage] = useState(null)
   const [hasContainers, setHasContainers] = useState(false)
@@ -74,13 +79,14 @@ export default function CatalogCmsLanding({ slug, fallbackTitle, children = null
     <div className="min-h-screen flex flex-col" style={{ background: '#fafafa' }}>
       <ShopHeader />
       <main className="flex-1">
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 24px 8px', boxSizing: 'border-box' }}>
-          <h1 className="shop-typo-catalog-title" style={{ margin: 0 }}>{title}</h1>
-        </div>
         {hasContainers && page?.id ? (
           <SectionErrorBoundary>
             <LandingContainers pageId={page.id} />
           </SectionErrorBoundary>
+        ) : showTitleWhenNoContainers ? (
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 24px 8px', boxSizing: 'border-box' }}>
+            <h1 className="shop-typo-catalog-title" style={{ margin: 0 }}>{title}</h1>
+          </div>
         ) : null}
         {children}
       </main>

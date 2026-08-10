@@ -14,6 +14,7 @@ import {
   filterProductsByFacets,
   applyCatalogSort,
   getFacetGroupTitle,
+  formatFacetOptionLabel,
   isDiscountedProduct,
 } from "@/lib/catalog-listing";
 import { normCatId } from "@/lib/category-product-ids";
@@ -907,6 +908,7 @@ export default function CategoryTemplate() {
   const marketPrefixVal = useMarketPrefix();
   const shopStyles = useShopStyles();
   const tmpl = shopStyles?.category_template || {};
+  const filterCheckboxSize = Math.min(24, Math.max(8, Number(tmpl.filter_checkbox_size) || 10));
 
   const [category, setCategory] = useState(null);
   const [products, setProducts] = useState([]);
@@ -925,6 +927,7 @@ export default function CategoryTemplate() {
   const [openFilterGroups, setOpenFilterGroups] = useState({});
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
   const [mobileDrawerTab, setMobileDrawerTab] = useState("categories");
+  const [metafieldDefinitions, setMetafieldDefinitions] = useState({});
 
   const bodyRef = useRef(null);
 
@@ -952,6 +955,17 @@ export default function CategoryTemplate() {
       document.body.style.overflow = prev;
     };
   }, [panelOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-metafield-definitions", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setMetafieldDefinitions(data?.definitions || {});
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!slug) return;
@@ -1365,16 +1379,16 @@ export default function CategoryTemplate() {
                   Object.entries(facets).map(([key, vals]) => (
                     <FilterGroup key={key}>
                       <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                        <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                        <FilterGroupHeading className="shop-typo-sidebar-nav">{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
                         <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                       </FilterGroupTitle>
                       <FilterGroupBody $open={!!openFilterGroups[key]}>
                         {vals.map((val) => {
                           const on = (filters[key] || []).includes(val);
-                          const label = val == null || typeof val === "object" ? String(val ?? "") : String(val);
+                          const label = formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions);
                           return (
                             <CheckRow key={label} $on={on}>
-                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={14} />
+                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={filterCheckboxSize} />
                               {label}
                             </CheckRow>
                           );
@@ -1516,7 +1530,7 @@ export default function CategoryTemplate() {
                         const cnt = (filters[key] || []).length;
                         return (
                           <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
-                            {getFacetGroupTitle(key)}
+                            {getFacetGroupTitle(key, locale, metafieldDefinitions)}
                             {cnt > 0 ? (
                               <span style={{ display: "block", fontSize: 10, color: "#0f766e", fontWeight: 800, marginTop: 4 }}>{cnt} {tCommon("active")}</span>
                             ) : null}
@@ -1529,14 +1543,14 @@ export default function CategoryTemplate() {
                     <MobileFilterRightScroll>
                       {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
                         <>
-                          <MobileFilterRightHead>{getFacetGroupTitle(activeMobileFilterGroup)}</MobileFilterRightHead>
+                          <MobileFilterRightHead>{getFacetGroupTitle(activeMobileFilterGroup, locale, metafieldDefinitions)}</MobileFilterRightHead>
                           <MobileFilterRightHint>{tCommon("filterHint")}</MobileFilterRightHint>
                           <MobileFilterPillGrid>
                             {facets[activeMobileFilterGroup].map((val) => {
                               const on = (filters[activeMobileFilterGroup] || []).includes(val);
                               return (
                                 <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
-                                  {val}
+                                  {formatFacetOptionLabel(activeMobileFilterGroup, val, null, locale, metafieldDefinitions)}
                                 </MobileFilterPill>
                               );
                             })}
@@ -1563,7 +1577,7 @@ export default function CategoryTemplate() {
               {Object.entries(filters).flatMap(([k, vals]) =>
                 (vals || []).map((v) => (
                   <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                    {v} ×
+                    {formatFacetOptionLabel(k, v, null, locale, metafieldDefinitions)} ×
                   </Chip>
                 )),
               )}

@@ -111,6 +111,9 @@ const storeCategoriesGET = async (req, res) => {
           banner_image_url: resolveUploadUrl(rawBanner) || null,
           has_collection: category.has_collection,
           collection_id: collectionId || null,
+          seo_title: category.seo_title || null,
+          seo_description: category.seo_description || null,
+          metadata: meta,
         }
         return res.json({ category: cat, categories: [cat], count: 1 })
       }
@@ -136,6 +139,9 @@ const storeCategoriesGET = async (req, res) => {
         banner_image_url: resolveUploadUrl(rawBanner) || null,
         has_collection: category.has_collection,
         collection_id: category.has_collection && meta.collection_id ? meta.collection_id : null,
+        seo_title: category.seo_title || null,
+        seo_description: category.seo_description || null,
+        metadata: meta,
       }
       return res.json({ category: cat, categories: [cat], count: 1 })
     }

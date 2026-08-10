@@ -114,6 +114,7 @@ export function collectTypographyGoogleFamilies(typography) {
     "product_title",
     "catalog_title",
     "menu_catalog",
+    "sidebar_nav",
   ]) {
     const level = typography[key];
     const stack = (level?.font_family || "").trim();

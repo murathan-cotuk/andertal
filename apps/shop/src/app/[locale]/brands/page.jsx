@@ -2,22 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import ShopHeader from "@/components/ShopHeader";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
-import Footer from "@/components/Footer";
+import CatalogCmsLanding from "@/components/catalog/CatalogCmsLanding";
 import { BrandCard } from "@/components/BrandCard";
 import { useLocale } from "next-intl";
-
-const PageWrap = styled.div`
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #fafafa;
-`;
-
-const Main = styled.main`
-  flex: 1;
-`;
 
 const Container = styled.div`
   max-width: 1440px;
@@ -29,10 +17,6 @@ const Container = styled.div`
   @media (max-width: 767px) {
     padding: 18px 16px 56px;
   }
-`;
-
-const Title = styled.h1`
-  margin: 0 0 16px;
 `;
 
 const ToolBar = styled.div`
@@ -188,70 +172,65 @@ export default function BrandsPage() {
   }, [brands, search, letter, sort]);
 
   return (
-    <PageWrap>
-      <ShopHeader />
-      <Main>
-        <Container>
-          <Title className="shop-typo-catalog-title">{copy.title}</Title>
-          {loading ? <GlobalPageLoader /> : null}
-          {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-          {!loading && !error && brands.length > 0 ? (
-            <>
-              <ToolBar>
-                <SearchInput
-                  type="search"
-                  placeholder={copy.searchPlaceholder}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  aria-label={copy.searchPlaceholder}
-                />
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <ResultCount>{visibleBrands.length}</ResultCount>
-                  <SortSelect value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
-                    <option value="newest">{copy.sortNewest}</option>
-                    <option value="name_asc">{copy.sortNameAsc}</option>
-                    <option value="name_desc">{copy.sortNameDesc}</option>
-                  </SortSelect>
-                </div>
-              </ToolBar>
-              <AlphaBar>
-                <AlphaBtn type="button" $active={!letter} onClick={() => setLetter("")}>
-                  {locale === "de" ? "Alle" : locale === "tr" ? "Tumu" : "All"}
-                </AlphaBtn>
-                {ALPHABET.map((ch) => {
-                  const has = availableLetters.has(ch);
-                  return (
-                    <AlphaBtn
-                      key={ch}
-                      type="button"
-                      $active={letter === ch}
-                      disabled={!has}
-                      style={!has ? { opacity: 0.3, cursor: "default" } : undefined}
-                      onClick={() => has && setLetter(letter === ch ? "" : ch)}
-                    >
-                      {ch}
-                    </AlphaBtn>
-                  );
-                })}
-              </AlphaBar>
-              {visibleBrands.length ? (
-                <Grid>
-                  {visibleBrands.map((brand) => (
-                    <BrandCard key={brand.id || brand.handle} brand={brand} ctaLabel={copy.cta} />
-                  ))}
-                </Grid>
-              ) : (
-                <p style={{ color: "#6b7280" }}>{copy.noMatch}</p>
-              )}
-            </>
-          ) : null}
-          {!loading && !error && brands.length === 0 ? (
-            <p style={{ color: "#6b7280" }}>{copy.empty}</p>
-          ) : null}
-        </Container>
-      </Main>
-      <Footer />
-    </PageWrap>
+    <CatalogCmsLanding slug="brands" fallbackTitle={copy.title} showTitleWhenNoContainers>
+      <Container>
+        {loading ? <GlobalPageLoader /> : null}
+        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+        {!loading && !error && brands.length > 0 ? (
+          <>
+            <ToolBar>
+              <SearchInput
+                type="search"
+                placeholder={copy.searchPlaceholder}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label={copy.searchPlaceholder}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <ResultCount>{visibleBrands.length}</ResultCount>
+                <SortSelect value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+                  <option value="newest">{copy.sortNewest}</option>
+                  <option value="name_asc">{copy.sortNameAsc}</option>
+                  <option value="name_desc">{copy.sortNameDesc}</option>
+                </SortSelect>
+              </div>
+            </ToolBar>
+            <AlphaBar>
+              <AlphaBtn type="button" $active={!letter} onClick={() => setLetter("")}>
+                {locale === "de" ? "Alle" : locale === "tr" ? "Tumu" : "All"}
+              </AlphaBtn>
+              {ALPHABET.map((ch) => {
+                const has = availableLetters.has(ch);
+                return (
+                  <AlphaBtn
+                    key={ch}
+                    type="button"
+                    $active={letter === ch}
+                    disabled={!has}
+                    style={!has ? { opacity: 0.3, cursor: "default" } : undefined}
+                    onClick={() => has && setLetter(letter === ch ? "" : ch)}
+                  >
+                    {ch}
+                  </AlphaBtn>
+                );
+              })}
+            </AlphaBar>
+            {visibleBrands.length ? (
+              <Grid>
+                {visibleBrands.map((brand) => (
+                  <BrandCard key={brand.id || brand.handle} brand={brand} ctaLabel={copy.cta} />
+                ))}
+              </Grid>
+            ) : (
+              <p style={{ color: "#6b7280" }}>{copy.noMatch}</p>
+            )}
+          </>
+        ) : null}
+        {!loading && !error && brands.length === 0 ? (
+          <p style={{ color: "#6b7280" }}>{copy.empty}</p>
+        ) : null}
+      </Container>
+    </CatalogCmsLanding>
   );
 }
 

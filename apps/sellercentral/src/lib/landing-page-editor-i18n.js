@@ -139,6 +139,45 @@ export function getLandingEditorCopy(locale) {
     apiPagesHeading: x("—— API ——", "—— API ——", "—— API ——", "—— API ——", "—— API ——", "—— API ——"),
     apiBestsellerLabel: x("Bestsellers (/bestsellers)", "Çok satanlar (/bestsellers)", "Meilleures ventes (/bestsellers)", "Más vendidos (/bestsellers)", "Più venduti (/bestsellers)", "Bestseller (/bestsellers)"),
     apiSaleLabel: x("Sale (/sales)", "İndirim (/sales)", "Soldes (/sales)", "Rebajas (/sales)", "Saldi (/sales)", "Sale (/sales)"),
+    apiBrandsLabel: x("Brands (/brands)", "Markalar (/brands)", "Marques (/brands)", "Marcas (/brands)", "Brand (/brands)", "Marken (/brands)"),
+    apiNeuheitenLabel: x("New in (/neuheiten)", "Yenilikler (/neuheiten)", "Nouveautés (/neuheiten)", "Novedades (/neuheiten)", "Novità (/neuheiten)", "Neuheiten (/neuheiten)"),
+    apiContainersHint: x(
+      "Containers for this API page are stored on the matching CMS page and appear below. You can also select that CMS page under CMS pages.",
+      "Bu API sayfasının konteynerleri eşleşen CMS sayfasında saklanır ve aşağıda görünür. CMS sayfaları altından da seçebilirsiniz.",
+      "Les conteneurs de cette page API sont sur la page CMS correspondante (ci-dessous).",
+      "Los contenedores de esta página API están en la página CMS correspondiente (abajo).",
+      "I contenitori di questa pagina API sono sulla pagina CMS corrispondente (sotto).",
+      "Container für diese API-Seite liegen auf der zugehörigen CMS-Seite und erscheinen unten. Du kannst sie auch unter CMS-Seiten auswählen."
+    ),
+    tabFilterBar: x("Filter bar", "Filtre çubuğu", "Barre de filtres", "Barra de filtros", "Barra filtri", "Filterleiste"),
+    filterBarTemplateTitle: x("Product filter sidebar", "Ürün filtre kenar çubuğu", "Barre latérale de filtres", "Barra lateral de filtros", "Sidebar filtri prodotto", "Produkt-Filter-Seitenleiste"),
+    filterBarTemplateHelp: x(
+      "Controls the checkbox filter sidebar on category and collection pages. Facets update from the products shown on that page. Title typography: Styles → Catalog navigation → Sidebar navigation.",
+      "Kategori ve koleksiyon sayfalarındaki onay kutulu filtre kenar çubuğunu yönetir. Filtreler sayfadaki ürünlere göre güncellenir. Başlık tipografisi: Stiller → Katalog navigasyonu → Sidebar navigasyonu.",
+      "Contrôle la barre latérale à cases sur catégories/collections. Typo des titres : Styles → Navigation catalogue → Sidebar.",
+      "Controla la barra lateral con casillas en categorías/colecciones. Tipografía: Estilos → Navegación catálogo → Sidebar.",
+      "Controlla la sidebar con checkbox su categorie/collezioni. Tipografia titoli: Stili → Navigazione catalogo → Sidebar.",
+      "Steuert die Checkbox-Filter-Seitenleiste auf Kategorie- und Kollektionsseiten. Facetten aktualisieren sich anhand der Produkte auf der Seite. Titel-Typografie: Stile → Katalog-Navigation → Sidebar-Navigation."
+    ),
+    filterCheckboxSize: x("Filter checkbox size (px)", "Filtre onay kutusu boyutu (px)", "Taille des cases (px)", "Tamaño de casillas (px)", "Dimensione checkbox (px)", "Filter-Checkbox-Größe (px)"),
+    filterCheckboxSizeHelp: x("Default 10. Used on category and collection filter sidebars.", "Varsayılan 10. Kategori ve koleksiyon filtre kenar çubuklarında kullanılır.", "Défaut 10.", "Predeterminado 10.", "Predefinito 10.", "Standard 10. Gilt für Kategorie- und Kollektions-Filterleisten."),
+    showProductFilterBar: x("Show product filter sidebar on this page", "Bu sayfada ürün filtre kenar çubuğunu göster", "Afficher la barre de filtres produits", "Mostrar barra de filtros de producto", "Mostra sidebar filtri prodotto", "Produkt-Filterleiste auf dieser Seite anzeigen"),
+    showProductFilterBarHelp: x(
+      "When enabled, listing templates for this page can show the product facet filter. Facets are built from products currently listed.",
+      "Açıkken bu sayfanın liste şablonları ürün facet filtresini gösterebilir. Facetler listedeki ürünlerden üretilir.",
+      "Si activé, les listes peuvent afficher les facettes produit.",
+      "Si está activo, las listas pueden mostrar facetas de producto.",
+      "Se attivo, le liste possono mostrare le faccette prodotto.",
+      "Wenn aktiv, können Listing-Templates auf dieser Seite die Produkt-Facetten-Filterleiste zeigen. Facetten kommen aus den aktuell gelisteten Produkten."
+    ),
+    stylesSidebarNavHint: x(
+      "Change filter group title fonts in: Content → Styles → Catalog navigation → Sidebar navigation (filter sidebar).",
+      "Filtre grup başlık fontları: İçerik → Stiller → Katalog navigasyonu → Sidebar navigasyonu.",
+      "Polices des titres de filtre : Contenu → Styles → Navigation catalogue → Sidebar.",
+      "Fuentes de títulos de filtro: Contenido → Estilos → Navegación catálogo → Sidebar.",
+      "Font titoli filtro: Contenuti → Stili → Navigazione catalogo → Sidebar.",
+      "Schrift der Filtergruppen-Titel: Inhalte → Stile → Katalog-Navigation → Sidebar-Navigation (Filter-Seitenleiste)."
+    ),
     defaultPage: x("Page", "Sayfa", "Page", "Página", "Pagina", "Seite"),
     defaultPost: x("Post", "Yazı", "Article", "Entrada", "Articolo", "Beitrag"),
     loading: x("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Laden…"),

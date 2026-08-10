@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import ShopHeader from "@/components/ShopHeader";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
-import Footer from "@/components/Footer";
+import CatalogCmsLanding from "@/components/catalog/CatalogCmsLanding";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
@@ -12,17 +11,6 @@ import { useLocale } from "next-intl";
 import { isDiscountedProduct } from "@/lib/catalog-listing";
 import { getLocalizedCategory } from "@/lib/format";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
-
-const PageWrap = styled.div`
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #f5f5f5;
-`;
-
-const Main = styled.main`
-  flex: 1;
-`;
 
 /* ── Two-column layout ───────────────────────────────── */
 const Inner = styled.div`
@@ -127,29 +115,6 @@ const ContentCol = styled.div`
   @media (max-width: 960px) {
     padding: 4px 0 40px;
   }
-`;
-
-const PageHeader = styled.div`
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 12px 8px 4px;
-
-  @media (max-width: 960px) {
-    padding: 10px 16px 4px;
-  }
-`;
-
-const PageTitle = styled.h1`
-  margin: 0;
-  font-size: clamp(17px, 2vw, 22px);
-  font-weight: 700;
-  color: #111;
-`;
-
-const ProductCount = styled.span`
-  font-size: 13px;
-  color: #6b7280;
 `;
 
 /* ── Section (one per category) ─────────────────────── */
@@ -314,7 +279,6 @@ export default function SalesPage() {
   const scorer = SORT_SCORERS[sortMode] || productPerfScore;
 
   const titleOverride = pickI18n(pageSettings?.title_i18n, l)?.title || "";
-  const subtitleOverride = pickI18n(pageSettings?.subtitle_i18n, l)?.subtitle || "";
   const pageTitle = titleOverride || copy.title;
 
   const rows = useMemo(() => {
@@ -378,96 +342,81 @@ export default function SalesPage() {
     return () => observer.disconnect();
   }, [rows]);
 
-  const totalCount = rows.reduce((s, r) => s + r.products.length, 0);
   const showContent = !loading && !error;
 
   return (
-    <PageWrap>
-      <ShopHeader />
-      <Main>
-        {/* Mobile category pills */}
+    <CatalogCmsLanding slug="sales" fallbackTitle={pageTitle} showTitleWhenNoContainers>
+      {/* Mobile category pills */}
+      {showContent && rows.length > 0 && (
+        <MobilePills>
+          {rows.map(({ category }) => {
+            const catName = getLocalizedCategory(category, locale).name || category.name || "";
+            return (
+              <Pill key={category.id} href={`#cat-${category.id}`}>{catName}</Pill>
+            );
+          })}
+        </MobilePills>
+      )}
+
+      <Inner>
+        {/* Left sidebar */}
         {showContent && rows.length > 0 && (
-          <MobilePills>
-            {rows.map(({ category }) => {
-              const catName = getLocalizedCategory(category, locale).name || category.name || "";
-              return (
-                <Pill key={category.id} href={`#cat-${category.id}`}>{catName}</Pill>
-              );
-            })}
-          </MobilePills>
+          <Sidebar>
+            <SidebarTitle>{pageTitle}</SidebarTitle>
+            <SidebarList>
+              {rows.map(({ category }) => {
+                const catName = getLocalizedCategory(category, locale).name || category.name || "";
+                const id = `cat-${category.id}`;
+                return (
+                  <li key={id}>
+                    <SidebarItem href={`#${id}`} $active={activeId === id}>
+                      {catName}
+                    </SidebarItem>
+                  </li>
+                );
+              })}
+            </SidebarList>
+          </Sidebar>
         )}
 
-        <Inner>
-          {/* Left sidebar */}
-          {showContent && rows.length > 0 && (
-            <Sidebar>
-              <SidebarTitle>{pageTitle}</SidebarTitle>
-              <SidebarList>
-                {rows.map(({ category }) => {
-                  const catName = getLocalizedCategory(category, locale).name || category.name || "";
-                  const id = `cat-${category.id}`;
-                  return (
-                    <li key={id}>
-                      <SidebarItem href={`#${id}`} $active={activeId === id}>
-                        {catName}
-                      </SidebarItem>
-                    </li>
-                  );
-                })}
-              </SidebarList>
-            </Sidebar>
+        {/* Main content */}
+        <ContentCol>
+          {loading ? (
+            <GlobalPageLoader />
+          ) : error ? (
+            <p style={{ color: "#b91c1c", padding: "16px" }}>{error}</p>
+          ) : rows.length === 0 ? (
+            <p style={{ color: "#6b7280", padding: "16px" }}>{copy.empty}</p>
+          ) : (
+            rows.map(({ category, products: list }) => {
+              const catName = getLocalizedCategory(category, locale).name || category.name || category.slug || "";
+              const catSlug = String(category.slug || category.handle || "").replace(/^\//, "");
+              return (
+                <Section key={category.id} id={`cat-${category.id}`}>
+                  <SectionHeader>
+                    <SectionTitle>{catName}</SectionTitle>
+                    {catSlug && (
+                      <SeeAll href={`/${catSlug}?sale=1`}>{copy.seeAll} →</SeeAll>
+                    )}
+                  </SectionHeader>
+                  <Carousel
+                    contained={false}
+                    navOnSides
+                    itemWidth={CARD_WIDTH}
+                    gap={CARD_GAP}
+                    showFade={false}
+                    ariaLabel={catName}
+                  >
+                    {list.map((p) => (
+                      <ProductCard key={p.id} product={p} plainImage />
+                    ))}
+                  </Carousel>
+                </Section>
+              );
+            })
           )}
-
-          {/* Main content */}
-          <ContentCol>
-            {loading ? (
-              <GlobalPageLoader />
-            ) : error ? (
-              <p style={{ color: "#b91c1c", padding: "16px" }}>{error}</p>
-            ) : rows.length === 0 ? (
-              <p style={{ color: "#6b7280", padding: "16px" }}>{copy.empty}</p>
-            ) : (
-              <>
-                <PageHeader>
-                  <PageTitle>{pageTitle}</PageTitle>
-                  {totalCount > 0 && <ProductCount>{totalCount}</ProductCount>}
-                </PageHeader>
-                {subtitleOverride && (
-                  <p style={{ margin: "0 8px 8px", fontSize: 13, color: "#6b7280" }}>{subtitleOverride}</p>
-                )}
-
-                {rows.map(({ category, products: list }) => {
-                  const catName = getLocalizedCategory(category, locale).name || category.name || category.slug || "";
-                  const catSlug = String(category.slug || category.handle || "").replace(/^\//, "");
-                  return (
-                    <Section key={category.id} id={`cat-${category.id}`}>
-                      <SectionHeader>
-                        <SectionTitle>{catName}</SectionTitle>
-                        {catSlug && (
-                          <SeeAll href={`/${catSlug}?sale=1`}>{copy.seeAll} →</SeeAll>
-                        )}
-                      </SectionHeader>
-                      <Carousel
-                        contained={false}
-                        navOnSides
-                        itemWidth={CARD_WIDTH}
-                        gap={CARD_GAP}
-                        showFade={false}
-                        ariaLabel={catName}
-                      >
-                        {list.map((p) => (
-                          <ProductCard key={p.id} product={p} plainImage />
-                        ))}
-                      </Carousel>
-                    </Section>
-                  );
-                })}
-              </>
-            )}
-          </ContentCol>
-        </Inner>
-      </Main>
-      <Footer />
-    </PageWrap>
+        </ContentCol>
+      </Inner>
+    </CatalogCmsLanding>
   );
 }

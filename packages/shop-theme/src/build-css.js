@@ -157,6 +157,7 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   const pt = typo.product_title || {};
   const ct = typo.catalog_title || {};
   const mc = typo.menu_catalog || {};
+  const sn = typo.sidebar_nav || {};
   const v = (level, prop, fall) => {
     const val = level[prop];
     return val !== undefined && val !== "" ? val : fall;
@@ -215,6 +216,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --h1-ls:           ${v(h(1), "letter_spacing", "-0.02em")};
   --h1-lh:           ${v(h(1), "line_height", "1.15")};
   --h1-ff:           ${levelFontFamily(typo, "h1")};
+  --h1-mt:           ${v(h(1), "margin_top", "0.67em")};
+  --h1-mb:           ${v(h(1), "margin_bottom", "0.67em")};
   --h2-fs:           ${v(h(2), "font_size", "clamp(22px,3.5vw,36px)")};
   --h2-fw:           ${v(h(2), "font_weight", "700")};
   --h2-style:        ${v(h(2), "font_style", "normal")};
@@ -222,6 +225,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --h2-ls:           ${v(h(2), "letter_spacing", "-0.01em")};
   --h2-lh:           ${v(h(2), "line_height", "1.2")};
   --h2-ff:           ${levelFontFamily(typo, "h2")};
+  --h2-mt:           ${v(h(2), "margin_top", "0.83em")};
+  --h2-mb:           ${v(h(2), "margin_bottom", "0.83em")};
   --h3-fs:           ${v(h(3), "font_size", "1.25rem")};
   --h3-fw:           ${v(h(3), "font_weight", "700")};
   --h3-style:        ${v(h(3), "font_style", "normal")};
@@ -229,6 +234,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --h3-ls:           ${v(h(3), "letter_spacing", "-0.01em")};
   --h3-lh:           ${v(h(3), "line_height", "1.25")};
   --h3-ff:           ${levelFontFamily(typo, "h3")};
+  --h3-mt:           ${v(h(3), "margin_top", "1em")};
+  --h3-mb:           ${v(h(3), "margin_bottom", "1em")};
   --h4-fs:           ${v(h(4), "font_size", "1.125rem")};
   --h4-fw:           ${v(h(4), "font_weight", "600")};
   --h4-style:        ${v(h(4), "font_style", "normal")};
@@ -236,6 +243,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --h4-ls:           ${v(h(4), "letter_spacing", "0")};
   --h4-lh:           ${v(h(4), "line_height", "1.3")};
   --h4-ff:           ${levelFontFamily(typo, "h4")};
+  --h4-mt:           ${v(h(4), "margin_top", "1.33em")};
+  --h4-mb:           ${v(h(4), "margin_bottom", "1.33em")};
   --h5-fs:           ${v(h(5), "font_size", "1rem")};
   --h5-fw:           ${v(h(5), "font_weight", "600")};
   --h5-style:        ${v(h(5), "font_style", "normal")};
@@ -243,6 +252,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --h5-ls:           ${v(h(5), "letter_spacing", "0")};
   --h5-lh:           ${v(h(5), "line_height", "1.35")};
   --h5-ff:           ${levelFontFamily(typo, "h5")};
+  --h5-mt:           ${v(h(5), "margin_top", "1.67em")};
+  --h5-mb:           ${v(h(5), "margin_bottom", "1.67em")};
   --product-title-fs:    ${v(pt, "font_size", "clamp(1.25rem, 2.5vw, 1.75rem)")};
   --product-title-fw:    ${v(pt, "font_weight", "700")};
   --product-title-style: ${v(pt, "font_style", "normal")};
@@ -250,6 +261,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --product-title-ls:    ${v(pt, "letter_spacing", "-0.02em")};
   --product-title-lh:    ${v(pt, "line_height", "1.3")};
   --product-title-ff:    ${levelFontFamily(typo, "product_title")};
+  --product-title-mt:    ${v(pt, "margin_top", "0")};
+  --product-title-mb:    ${v(pt, "margin_bottom", "0")};
   --catalog-title-fs:    ${v(ct, "font_size", "clamp(1.125rem, 2.8vw, 2rem)")};
   --catalog-title-fw:    ${v(ct, "font_weight", "700")};
   --catalog-title-style: ${v(ct, "font_style", "normal")};
@@ -257,6 +270,8 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --catalog-title-ls:    ${v(ct, "letter_spacing", "-0.02em")};
   --catalog-title-lh:    ${v(ct, "line_height", "1.2")};
   --catalog-title-ff:    ${levelFontFamily(typo, "catalog_title")};
+  --catalog-title-mt:    ${v(ct, "margin_top", "0.67em")};
+  --catalog-title-mb:    ${v(ct, "margin_bottom", "0.67em")};
   --menu-catalog-fs:     ${v(mc, "font_size", "15px")};
   --menu-catalog-fw:     ${v(mc, "font_weight", "500")};
   --menu-catalog-style:  ${v(mc, "font_style", "normal")};
@@ -264,6 +279,17 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --menu-catalog-ls:     ${v(mc, "letter_spacing", "0")};
   --menu-catalog-lh:     ${v(mc, "line_height", "1.35")};
   --menu-catalog-ff:     ${levelFontFamily(typo, "menu_catalog")};
+  --menu-catalog-mt:     ${v(mc, "margin_top", "0")};
+  --menu-catalog-mb:     ${v(mc, "margin_bottom", "0")};
+  --sidebar-nav-fs:      ${v(sn, "font_size", "13px")};
+  --sidebar-nav-fw:      ${v(sn, "font_weight", "700")};
+  --sidebar-nav-style:   ${v(sn, "font_style", "normal")};
+  --sidebar-nav-color:   ${v(sn, "color", "#111827")};
+  --sidebar-nav-ls:      ${v(sn, "letter_spacing", "0.02em")};
+  --sidebar-nav-lh:      ${v(sn, "line_height", "1.3")};
+  --sidebar-nav-ff:      ${levelFontFamily(typo, "sidebar_nav")};
+  --sidebar-nav-mt:      ${v(sn, "margin_top", "0")};
+  --sidebar-nav-mb:      ${v(sn, "margin_bottom", "0")};
   --scroll-up-bg:    ${scrollUp.bg_color};
   --scroll-up-icon:  ${scrollUp.icon_color};
   --scroll-up-r:     ${scrollUp.border_radius};
@@ -317,6 +343,8 @@ h1 {
   color: var(--h1-color);
   letter-spacing: var(--h1-ls);
   line-height: var(--h1-lh);
+  margin-top: var(--h1-mt);
+  margin-bottom: var(--h1-mb);
 }
 h2 {
   font-family: var(--h2-ff);
@@ -326,6 +354,8 @@ h2 {
   color: var(--h2-color);
   letter-spacing: var(--h2-ls);
   line-height: var(--h2-lh);
+  margin-top: var(--h2-mt);
+  margin-bottom: var(--h2-mb);
 }
 h3 {
   font-family: var(--h3-ff);
@@ -335,6 +365,8 @@ h3 {
   color: var(--h3-color);
   letter-spacing: var(--h3-ls);
   line-height: var(--h3-lh);
+  margin-top: var(--h3-mt);
+  margin-bottom: var(--h3-mb);
 }
 h4 {
   font-family: var(--h4-ff);
@@ -344,6 +376,8 @@ h4 {
   color: var(--h4-color);
   letter-spacing: var(--h4-ls);
   line-height: var(--h4-lh);
+  margin-top: var(--h4-mt);
+  margin-bottom: var(--h4-mb);
 }
 h5 {
   font-family: var(--h5-ff);
@@ -353,6 +387,8 @@ h5 {
   color: var(--h5-color);
   letter-spacing: var(--h5-ls);
   line-height: var(--h5-lh);
+  margin-top: var(--h5-mt);
+  margin-bottom: var(--h5-mb);
 }
 /* Katalog / PDP: eigene Rollen, unabhängig von Fließtext-Überschriften (h1–h5) */
 .shop-typo-product-title {
@@ -363,7 +399,8 @@ h5 {
   color: var(--product-title-color);
   letter-spacing: var(--product-title-ls);
   line-height: var(--product-title-lh);
-  margin: 0;
+  margin-top: var(--product-title-mt);
+  margin-bottom: var(--product-title-mb);
 }
 .shop-typo-catalog-title {
   font-family: var(--catalog-title-ff);
@@ -373,6 +410,8 @@ h5 {
   color: var(--catalog-title-color);
   letter-spacing: var(--catalog-title-ls);
   line-height: var(--catalog-title-lh);
+  margin-top: var(--catalog-title-mt);
+  margin-bottom: var(--catalog-title-mb);
 }
 .shop-typo-catalog-title--on-dark {
   color: #fff !important;
@@ -386,6 +425,19 @@ h5 {
   color: var(--menu-catalog-color);
   letter-spacing: var(--menu-catalog-ls);
   line-height: var(--menu-catalog-lh);
+  margin-top: var(--menu-catalog-mt);
+  margin-bottom: var(--menu-catalog-mb);
+}
+.shop-typo-sidebar-nav {
+  font-family: var(--sidebar-nav-ff);
+  font-size: var(--sidebar-nav-fs);
+  font-weight: var(--sidebar-nav-fw);
+  font-style: var(--sidebar-nav-style);
+  color: var(--sidebar-nav-color);
+  letter-spacing: var(--sidebar-nav-ls);
+  line-height: var(--sidebar-nav-lh);
+  margin-top: var(--sidebar-nav-mt);
+  margin-bottom: var(--sidebar-nav-mb);
 }
 .topbar {
   background: var(--topbar-bg) !important;

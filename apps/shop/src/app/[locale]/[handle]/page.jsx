@@ -3,6 +3,7 @@
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import LandingContainers from "@/components/landing/LandingContainers";
+import BecomeSellerLanding, { BECOME_SELLER_PAGE_SLUGS } from "@/components/landing/BecomeSellerLanding";
 import CategoryTemplate from "@/components/templates/CategoryTemplate";
 import ProductTemplate from "@/components/templates/ProductTemplate";
 import ProductTemplateMobile from "@/components/templates/ProductTemplateMobile";
@@ -27,6 +28,8 @@ import {
   isDiscountedProduct,
   isRecentProduct,
   productSalesScore,
+  getFacetGroupTitle,
+  formatFacetOptionLabel,
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
@@ -753,7 +756,6 @@ function CollectionPage() {
   const [collection,  setCollection]  = useState(null);
   const [cmsPage,     setCmsPage]     = useState(null);
   const [cmsPageCategoryLinks, setCmsPageCategoryLinks] = useState([]);
-  const [cmsHasContainers, setCmsHasContainers] = useState(false);
   const [products,    setProducts]    = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
@@ -772,6 +774,7 @@ function CollectionPage() {
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
   const [linkedCategoryId, setLinkedCategoryId] = useState(null);
+  const [metafieldDefinitions, setMetafieldDefinitions] = useState({});
 
   const bodyRef = useRef(null);
 
@@ -944,7 +947,6 @@ function CollectionPage() {
   useEffect(() => {
     if (!cmsPage?.id) {
       setCmsPageCategoryLinks([]);
-      setCmsHasContainers(false);
       return;
     }
     let cancelled = false;
@@ -953,7 +955,6 @@ function CollectionPage() {
       .then(async (data) => {
         if (cancelled) return;
         const containers = Array.isArray(data?.containers) ? data.containers : [];
-        setCmsHasContainers(containers.length > 0);
         const seen = new Set();
         const candidates = [];
         for (const c of containers) {
@@ -979,10 +980,7 @@ function CollectionPage() {
         setCmsPageCategoryLinks(withCounts.filter((l) => l.hasProducts));
       })
       .catch(() => {
-        if (!cancelled) {
-          setCmsPageCategoryLinks([]);
-          setCmsHasContainers(false);
-        }
+        if (!cancelled) setCmsPageCategoryLinks([]);
       });
     return () => { cancelled = true; };
   }, [cmsPage?.id]);
@@ -995,6 +993,17 @@ function CollectionPage() {
     if (!el) { el = document.createElement("link"); el.rel = "canonical"; document.head.appendChild(el); }
     el.href = `${SITE_URL}${prefix}/${collection.handle}`;
   }, [locale, collection?.handle, marketPrefixVal]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-metafield-definitions", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setMetafieldDefinitions(data?.definitions || {});
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const facets = buildFacetsFromProducts(products);
 
@@ -1089,10 +1098,21 @@ function CollectionPage() {
 
   if (cmsPage) {
     const localizedBody = localizedCmsField(cmsPage, "body", locale);
-    const pageBody = (
+    const isBecomeSeller = BECOME_SELLER_PAGE_SLUGS.has(
+      String(cmsPage.slug || handle || "").toLowerCase(),
+    );
+    const pageBody = isBecomeSeller ? (
+      <>
+        <BecomeSellerLanding />
+        {localizedBody ? (
+          <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}
+            dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
+        ) : null}
+      </>
+    ) : (
       <>
         <LandingContainers pageId={String(cmsPage.id)} />
-        {!cmsHasContainers && localizedBody ? (
+        {localizedBody ? (
           <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}
             dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
         ) : null}
@@ -1329,12 +1349,7 @@ function CollectionPage() {
                 {Object.entries(facets).map(([key, vals]) => (
                   <FilterGroup key={key}>
                     <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                      <FilterGroupHeading>{({
-                        brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
-                        material: "Material", size: "Größe", groesse: "Größe",
-                        typ: "Typ", style: "Style", gender: "Gender",
-                        age_group: "Altersgruppe", season: "Saison",
-                      })[key] ?? key.replace(/_/g, " ")}</FilterGroupHeading>
+                      <FilterGroupHeading className="shop-typo-sidebar-nav">{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
                       <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                     </FilterGroupTitle>
                     <FilterGroupBody $open={!!openFilterGroups[key]}>
@@ -1342,8 +1357,8 @@ function CollectionPage() {
                         const on = (filters[key] || []).includes(val);
                         return (
                           <CheckRow key={val} $on={on}>
-                            <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={14} />
-                            {val}
+                            <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={10} />
+                            {formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions)}
                           </CheckRow>
                         );
                       })}
@@ -1360,12 +1375,7 @@ function CollectionPage() {
                 <MobileFilterLeft>
                   {Object.entries(facets).map(([key]) => {
                     const cnt = (filters[key] || []).length;
-                    const label = ({
-                      brand_name: "Marke", farbe: "Farbe", colour: "Colour", color: "Color",
-                      material: "Material", size: "Größe", groesse: "Größe",
-                      typ: "Typ", style: "Style", gender: "Gender",
-                      age_group: "Altersgruppe", season: "Saison",
-                    })[key] ?? key.replace(/_/g, " ");
+                    const label = getFacetGroupTitle(key, locale, metafieldDefinitions);
                     return (
                       <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
                         {label}
@@ -1381,7 +1391,7 @@ function CollectionPage() {
                         const on = (filters[activeMobileFilterGroup] || []).includes(val);
                         return (
                           <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
-                            {val}
+                            {formatFacetOptionLabel(activeMobileFilterGroup, val, null, locale, metafieldDefinitions)}
                           </MobileFilterPill>
                         );
                       })}
@@ -1404,7 +1414,7 @@ function CollectionPage() {
                 {Object.entries(filters).flatMap(([k, vals]) =>
                   (vals || []).map(v => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                      {v} ×
+                      {formatFacetOptionLabel(k, v, null, locale, metafieldDefinitions)} ×
                     </Chip>
                   ))
                 )}

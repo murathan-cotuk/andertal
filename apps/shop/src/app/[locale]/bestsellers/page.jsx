@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import ShopHeader from "@/components/ShopHeader";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
-import Footer from "@/components/Footer";
+import CatalogCmsLanding from "@/components/catalog/CatalogCmsLanding";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
@@ -12,35 +11,6 @@ import { useLocale } from "next-intl";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { getLocalizedCategory } from "@/lib/format";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
-
-const PageWrap = styled.div`
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #fafafa;
-`;
-
-const Main = styled.main`
-  flex: 1;
-`;
-
-const Intro = styled.section`
-  padding: 28px 24px 16px;
-
-  @media (max-width: 767px) {
-    padding: 20px 16px 12px;
-  }
-`;
-
-const IntroTitle = styled.h1`
-  margin: 0 0 6px;
-`;
-
-const IntroText = styled.p`
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-`;
 
 const FilterBar = styled.div`
   display: flex;
@@ -263,77 +233,68 @@ export default function BestsellersPage() {
   };
 
   return (
-    <PageWrap>
-      <ShopHeader />
-      <Main>
-        <Intro>
-          <IntroTitle className="shop-typo-catalog-title">{pageTitle}</IntroTitle>
-          <IntroText>{pageText}</IntroText>
-        </Intro>
+    <CatalogCmsLanding slug="bestsellers" fallbackTitle={pageTitle} showTitleWhenNoContainers>
+      {/* Horizontal category filter chips */}
+      {!loading && !error && filterCollections.length > 0 && (
+        <FilterBar>
+          <FilterChip
+            $active={selectedCollections.size === 0}
+            onClick={() => setSelectedCollections(new Set())}
+          >
+            {copy.all}
+          </FilterChip>
+          {filterCollections.map((c) => {
+            const key = String(c.id);
+            const catName = getLocalizedCategory(c, locale).name || c.name || c.slug || "";
+            return (
+              <FilterChip
+                key={key}
+                $active={selectedCollections.has(key)}
+                onClick={() => toggleCollection(key)}
+              >
+                {catName}
+              </FilterChip>
+            );
+          })}
+        </FilterBar>
+      )}
 
-        {/* Horizontal category filter chips */}
-        {!loading && !error && filterCollections.length > 0 && (
-          <FilterBar>
-            <FilterChip
-              $active={selectedCollections.size === 0}
-              onClick={() => setSelectedCollections(new Set())}
-            >
-              {copy.all}
-            </FilterChip>
-            {filterCollections.map((c) => {
-              const key = String(c.id);
-              const catName = getLocalizedCategory(c, locale).name || c.name || c.slug || "";
-              return (
-                <FilterChip
-                  key={key}
-                  $active={selectedCollections.has(key)}
-                  onClick={() => toggleCollection(key)}
-                >
-                  {catName}
-                </FilterChip>
-              );
-            })}
-          </FilterBar>
-        )}
+      {loading ? <GlobalPageLoader /> : null}
+      {error ? <p style={{ color: "#b91c1c", padding: "0 24px" }}>{error}</p> : null}
+      {!loading && !error && rows.length === 0 ? (
+        <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
+      ) : null}
 
-        {loading ? <GlobalPageLoader /> : null}
-        {error ? <p style={{ color: "#b91c1c", padding: "0 24px" }}>{error}</p> : null}
-        {!loading && !error && rows.length === 0 ? (
-          <p style={{ color: "#6b7280", padding: "0 24px" }}>{copy.empty}</p>
-        ) : null}
-
-        {!loading && !error && visibleRows.map(({ collection, products: list }) => {
-          const catName = getLocalizedCategory(collection, locale).name || collection.name || collection.slug || "";
-          const catSlug = String(collection.slug || collection.handle || "").replace(/^\//, "");
-          return (
-            <div key={collection.id} style={{ padding: "8px 24px 28px" }}>
-              <div style={{ width: "100%", maxWidth: 1700, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
-                <Carousel
-                  contained={false}
-                  navOnSides
-                  gap={12}
-                  visibleCount={itemsPerRow}
-                  showFade={false}
-                  ariaLabel={catName || "Bestsellers category"}
-                  header={(
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
-                      <h2 className="shop-typo-h2" style={{ margin: 0 }}>
-                        {catName}
-                      </h2>
-                      {catSlug && <SeeAll href={`/${catSlug}?bestseller=1`}>{copy.seeAll} →</SeeAll>}
-                    </div>
-                  )}
-                >
-                  {list.map((p) => (
-                    <ProductCard key={p.id} product={p} plainImage isBestseller />
-                  ))}
-                </Carousel>
-              </div>
+      {!loading && !error && visibleRows.map(({ collection, products: list }) => {
+        const catName = getLocalizedCategory(collection, locale).name || collection.name || collection.slug || "";
+        const catSlug = String(collection.slug || collection.handle || "").replace(/^\//, "");
+        return (
+          <div key={collection.id} style={{ padding: "8px 24px 28px" }}>
+            <div style={{ width: "100%", maxWidth: 1700, boxSizing: "border-box", minWidth: 0, marginLeft: "auto", marginRight: "auto" }}>
+              <Carousel
+                contained={false}
+                navOnSides
+                gap={12}
+                visibleCount={itemsPerRow}
+                showFade={false}
+                ariaLabel={catName || "Bestsellers category"}
+                header={(
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, flexWrap: "wrap" }}>
+                    <h2 className="shop-typo-h2" style={{ margin: 0 }}>
+                      {catName}
+                    </h2>
+                    {catSlug && <SeeAll href={`/${catSlug}?bestseller=1`}>{copy.seeAll} →</SeeAll>}
+                  </div>
+                )}
+              >
+                {list.map((p) => (
+                  <ProductCard key={p.id} product={p} plainImage isBestseller />
+                ))}
+              </Carousel>
             </div>
-          );
-        })}
-      </Main>
-      <Footer />
-    </PageWrap>
+          </div>
+        );
+      })}
+    </CatalogCmsLanding>
   );
 }

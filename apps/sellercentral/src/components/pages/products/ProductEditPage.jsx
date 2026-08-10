@@ -156,7 +156,30 @@ const DEFAULT_DUPLICATE_OPTIONS = {
 };
 
 /** Katalog-Metafeld-UI: Kategorie-Zuordnung läuft über Category-Feld, nicht über dieses Dropdown */
-const EXCLUDED_CATALOG_METAFIELD_KEYS = new Set(["category_ids", "category_slug"]);
+const EXCLUDED_CATALOG_METAFIELD_KEYS = new Set([
+  "category_ids",
+  "category_slug",
+  "sales_count",
+  "salescount",
+  "sold",
+  "sold_count",
+  "sold_last_month",
+  "master_total_variants",
+  "master_total_variant",
+  "total_variants",
+  "variant_count",
+  "variants_count",
+]);
+
+function resolveMetaDefLabel(def, key, uiLocale) {
+  const loc = String(uiLocale || "de").slice(0, 2).toLowerCase();
+  if (loc && loc !== "de") {
+    const translated = def?.label_i18n?.[loc]?.label;
+    if (translated != null && String(translated).trim()) return String(translated).trim();
+  }
+  if (def?.label != null && String(def.label).trim()) return String(def.label).trim();
+  return key;
+}
 
 function filterMetaDefsForCatalog(definitions) {
   if (!definitions || typeof definitions !== "object") return {};
@@ -3347,7 +3370,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             <BlockStack gap="300">
                               <BlockStack gap="050">
                                 <InlineStack gap="200" blockAlign="center" wrap={false}>
-                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{def.label}</Text>
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{resolveMetaDefLabel(def, defKey, locale)}</Text>
                                   <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName={`metadata.${defKey}`} />
                                 </InlineStack>
                                 <Text as="p" variant="bodySm" tone="subdued">
@@ -3471,7 +3494,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                   <ActionList
                                     actionRole="menu"
                                     items={hiddenMetaDefKeys.map((k) => {
-                                      const label = String(metaDefs[k]?.label || k).trim() || k;
+                                      const label = resolveMetaDefLabel(metaDefs[k], k, locale);
                                       return {
                                         content: label,
                                         helpText: label !== k ? k : undefined,

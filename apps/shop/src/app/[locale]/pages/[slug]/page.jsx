@@ -9,6 +9,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import LandingContainers from "@/components/landing/LandingContainers";
+import BecomeSellerLanding, { BECOME_SELLER_PAGE_SLUGS } from "@/components/landing/BecomeSellerLanding";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
 
 /** DE lives on the plain field; other locales live under `${field}_i18n[locale][field]`, falling back to DE. */
@@ -96,17 +97,25 @@ export default function CmsPageBySlug() {
   const localizedTitle = lt(page, "title", locale);
   const safeBody = sanitizeHtml(lt(page, "body", locale));
   const hero = page.featured_image ? resolveImageUrl(page.featured_image) : "";
+  const isBecomeSeller = BECOME_SELLER_PAGE_SLUGS.has(String(page.slug || slug || "").toLowerCase());
 
-  if (hasContainers) {
-    // Page content lives in the Sellercentral landing-page container editor
-    // (e.g. hero + support wizard + topic grid + FAQ) instead of the plain `body` field.
+  // Theme-independent seller acquisition landing (TASKS §27) — full custom page, not shop CMS chrome.
+  if (isBecomeSeller) {
     return (
       <div className="min-h-screen flex flex-col">
         <ShopHeader />
         <main className="flex-1">
           <SectionErrorBoundary>
-            <LandingContainers pageId={page.id} />
+            <BecomeSellerLanding />
           </SectionErrorBoundary>
+          {safeBody ? (
+            <div className="container mx-auto px-4 max-w-3xl w-full pb-12">
+              <div
+                className="prose prose-gray max-w-none"
+                dangerouslySetInnerHTML={{ __html: safeBody }}
+              />
+            </div>
+          ) : null}
         </main>
         <Footer />
       </div>
@@ -116,28 +125,35 @@ export default function CmsPageBySlug() {
   return (
     <div className="min-h-screen flex flex-col">
       <ShopHeader />
-      <main
-        className={`flex-1 container mx-auto px-4 max-w-3xl w-full ${hero ? "pb-12" : "py-12"}`}
-        style={hero ? { marginTop: 2 } : { paddingTop: 128 }}
-      >
-        {hero ? (
-          <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">
-            <img
-              src={hero}
-              alt={localizedTitle}
-              className="w-full max-h-[min(42vh,400px)] object-cover block"
-            />
-          </div>
-        ) : null}
-        <h1 className="text-3xl font-semibold text-gray-900 mb-6">{localizedTitle}</h1>
-        {safeBody ? (
-          <div
-            className="prose prose-gray max-w-none"
-            dangerouslySetInnerHTML={{ __html: safeBody }}
-          />
-        ) : (
-          <p className="text-gray-500">No content.</p>
+      <main className="flex-1">
+        {hasContainers && (
+          <SectionErrorBoundary>
+            <LandingContainers pageId={page.id} />
+          </SectionErrorBoundary>
         )}
+        <div
+          className={`container mx-auto px-4 max-w-3xl w-full ${hero ? "pb-12" : "py-12"}`}
+          style={hero ? { marginTop: 2 } : (hasContainers ? undefined : { paddingTop: 128 })}
+        >
+          {hero ? (
+            <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">
+              <img
+                src={hero}
+                alt={localizedTitle}
+                className="w-full max-h-[min(42vh,400px)] object-cover block"
+              />
+            </div>
+          ) : null}
+          <h1>{localizedTitle}</h1>
+          {safeBody ? (
+            <div
+              className="prose prose-gray max-w-none"
+              dangerouslySetInnerHTML={{ __html: safeBody }}
+            />
+          ) : hasContainers ? null : (
+            <p className="text-gray-500">No content.</p>
+          )}
+        </div>
       </main>
       <Footer />
     </div>

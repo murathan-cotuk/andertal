@@ -605,6 +605,7 @@ export default function BrandPage() {
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
   const [categorySlugToName, setCategorySlugToName] = useState(() => new Map());
   const [categoryTree, setCategoryTree] = useState([]);
+  const [metafieldDefinitions, setMetafieldDefinitions] = useState({});
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
@@ -660,6 +661,17 @@ export default function BrandPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/store-metafield-definitions", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setMetafieldDefinitions(data?.definitions || {});
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   const facets = useMemo(() => buildFacetsFromProducts(products), [products]);
@@ -928,16 +940,16 @@ export default function BrandPage() {
                       {Object.entries(facets).map(([key, vals]) => (
                         <FilterGroup key={key}>
                           <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                            <FilterGroupHeading>{getFacetGroupTitle(key)}</FilterGroupHeading>
+                            <FilterGroupHeading className="shop-typo-sidebar-nav">{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
                             <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                           </FilterGroupTitle>
                           <FilterGroupBody $open={!!openFilterGroups[key]}>
                             {vals.map((val) => {
                               const on = (filters[key] || []).includes(val);
-                              const label = formatFacetOptionLabel(key, val, categorySlugToName);
+                              const label = formatFacetOptionLabel(key, val, categorySlugToName, locale, metafieldDefinitions);
                               return (
                                 <CheckRow key={val} $on={on}>
-                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={18} />
+                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={10} />
                                   {label}
                                 </CheckRow>
                               );
@@ -972,7 +984,7 @@ export default function BrandPage() {
                     const cnt = (filters[key] || []).length;
                     return (
                       <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
-                        {getFacetGroupTitle(key)}
+                        {getFacetGroupTitle(key, locale, metafieldDefinitions)}
                         {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
                       </MobileFilterLeftBtn>
                     );
@@ -1001,7 +1013,7 @@ export default function BrandPage() {
                         const on = (filters[activeMobileFilterGroup] || []).includes(val);
                         return (
                           <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
-                            {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName)}
+                            {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName, locale, metafieldDefinitions)}
                           </MobileFilterPill>
                         );
                       })}
@@ -1027,7 +1039,7 @@ export default function BrandPage() {
                 {Object.entries(filters).flatMap(([k, vals]) =>
                   (vals || []).map((v) => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                      {formatFacetOptionLabel(k, v, categorySlugToName)} ×
+                      {formatFacetOptionLabel(k, v, categorySlugToName, locale, metafieldDefinitions)} ×
                     </Chip>
                   ))
                 )}

@@ -32,6 +32,20 @@ const parseMeta = (row) => {
   return { metadata, ...metadata }
 }
 
+// Categories/collections/pages/blogs always render the entity's own name/title as a
+// standalone <h1> in the storefront template (see CategoryTemplate.jsx, pages/[slug]/page.jsx)
+// — that heading lives outside the analyzed content field entirely, so a raw scan of the
+// content HTML alone would always under-count by exactly one. Products are excluded: their
+// title is likewise a separate template <h1>, but the description editor's own H1 tags are
+// auto-demoted to H2 on save (see demoteH1ToH2 / product_no_h1), so description content is
+// expected to contribute zero h1 either way.
+const withTemplateTitleH1 = (analysis) => ({
+  ...analysis,
+  headings: { ...analysis.headings, h1: (analysis.headings.h1 || 0) + 1 },
+  headingTotal: analysis.headingTotal + 1,
+  hasH1: true,
+})
+
 const scoreFromIssues = (issues) => {
   if (!issues.length) return 'good'
   if (issues.some((i) => i.severity === 'error')) return 'poor'
@@ -113,7 +127,7 @@ async function listCategories(client, { q, limit, offset }) {
   }
   params.push(limit, offset)
   const r = await client.query(
-    `SELECT id, name, slug, seo_title, seo_description, metadata, updated_at,
+    `SELECT id, name, slug, seo_title, seo_description, long_content, metadata, updated_at,
             COUNT(*) OVER()::int AS total
        FROM admin_hub_categories ${where}
       ORDER BY name ASC
@@ -139,7 +153,7 @@ async function listCategories(client, { q, limit, offset }) {
         meta_keywords: keywords,
         evaluation,
         score: scoreFromIssues(evaluation.issues),
-        analysis: analyzeHtml(meta.richtext || ''),
+        analysis: withTemplateTitleH1(analyzeHtml(row.long_content || meta.richtext || '')),
         ...buildPublicHints('categories', { handle: row.slug }),
       }
     }),
@@ -181,7 +195,7 @@ async function listCollections(client, { q, limit, offset }) {
         meta_keywords: keywords,
         evaluation,
         score: scoreFromIssues(evaluation.issues),
-        analysis: analyzeHtml(meta.richtext || ''),
+        analysis: withTemplateTitleH1(analyzeHtml(meta.richtext || '')),
         ...buildPublicHints('collections', row),
       }
     }),
@@ -224,7 +238,7 @@ async function listPages(client, { q, limit, offset, blogOnly }) {
         meta_keywords: keywords,
         evaluation,
         score: scoreFromIssues(evaluation.issues),
-        analysis: analyzeHtml(row.body || ''),
+        analysis: withTemplateTitleH1(analyzeHtml(row.body || '')),
         ...buildPublicHints(type, { handle: row.slug }),
       }
     }),
@@ -264,7 +278,7 @@ async function getEntity(client, type, id) {
   }
   if (type === 'categories') {
     const r = await client.query(
-      `SELECT id, name, slug, seo_title, seo_description, metadata, updated_at FROM admin_hub_categories WHERE id = $1`,
+      `SELECT id, name, slug, seo_title, seo_description, long_content, metadata, updated_at FROM admin_hub_categories WHERE id = $1`,
       [id],
     )
     if (!r.rows[0]) return null
@@ -274,19 +288,20 @@ async function getEntity(client, type, id) {
     const description = row.seo_description || meta.meta_description || ''
     const keywords = meta.keywords || meta.meta_keywords || ''
     const evaluation = evaluateMeta({ title, description, keywords, entityType: 'categories' })
+    const contentHtml = row.long_content || meta.richtext || ''
     return {
       id: row.id,
       type: 'categories',
       label: row.name,
       handle: row.slug,
       updated_at: row.updated_at,
-      content_html: meta.richtext || '',
+      content_html: contentHtml,
       meta_title: title,
       meta_description: description,
       meta_keywords: keywords,
       evaluation,
       score: scoreFromIssues(evaluation.issues),
-      analysis: analyzeHtml(meta.richtext || ''),
+      analysis: withTemplateTitleH1(analyzeHtml(contentHtml)),
       rules: { title: TITLE_IDEAL, description: DESC_IDEAL, strict: true },
       ...buildPublicHints('categories', { handle: row.slug }),
     }
@@ -315,7 +330,7 @@ async function getEntity(client, type, id) {
       meta_keywords: keywords,
       evaluation,
       score: scoreFromIssues(evaluation.issues),
-      analysis: analyzeHtml(meta.richtext || ''),
+      analysis: withTemplateTitleH1(analyzeHtml(meta.richtext || '')),
       rules: { title: TITLE_IDEAL, description: DESC_IDEAL },
       ...buildPublicHints('collections', row),
     }
@@ -349,7 +364,7 @@ async function getEntity(client, type, id) {
       meta_keywords: keywords,
       evaluation,
       score: scoreFromIssues(evaluation.issues),
-      analysis: analyzeHtml(row.body || ''),
+      analysis: withTemplateTitleH1(analyzeHtml(row.body || '')),
       rules: { title: TITLE_IDEAL, description: DESC_IDEAL },
       ...buildPublicHints(entityType, { handle: row.slug }),
     }

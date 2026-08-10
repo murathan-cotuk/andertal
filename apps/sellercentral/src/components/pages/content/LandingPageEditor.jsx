@@ -236,6 +236,7 @@ function normalizeLandingPageSettings(raw) {
     ...s,
     show_submenu_left: s.show_submenu_left === true,
     show_filter_bar: s.show_filter_bar !== false,
+    show_product_filter_bar: s.show_product_filter_bar === true,
     second_nav_desktop_classic: s.second_nav_desktop_classic === true,
     page_padding_top: s.page_padding_top || "",
     popup: normalizePopupConfig(s.popup),
@@ -3099,6 +3100,7 @@ const TEMPLATE_DEFAULTS = {
     richtext_align: "left",
     richtext_max_width: "700px",
     content_padding_x: "32px",
+    filter_checkbox_size: 10,
   },
   category_template: {
     banner_style: "strip",
@@ -3109,8 +3111,31 @@ const TEMPLATE_DEFAULTS = {
     richtext_align: "left",
     richtext_max_width: "700px",
     content_padding_x: "32px",
+    filter_checkbox_size: 10,
   },
 };
+
+/** API dropdown values → CMS page slugs (containers live on CMS Seiten). */
+const API_CMS_SLUG = {
+  "api:bestsellers": "bestsellers",
+  "api:sales": "sales",
+  "api:brands": "brands",
+  "api:neuheiten": "new-in",
+};
+
+const CATALOG_CMS_SLUG_ORDER = ["bestsellers", "sales", "new-in", "brands"];
+
+function sortCmsPagesForSelect(list) {
+  const rank = (slug) => {
+    const i = CATALOG_CMS_SLUG_ORDER.indexOf(String(slug || ""));
+    return i === -1 ? 1000 : i;
+  };
+  return [...list].sort((a, b) => {
+    const d = rank(a.slug) - rank(b.slug);
+    if (d !== 0) return d;
+    return String(a.title || "").localeCompare(String(b.title || ""));
+  });
+}
 
 // ── Popup Editor ─────────────────────────────────────────────────────────────
 function PopupDeviceEditor({ config, onChange }) {
@@ -3391,19 +3416,33 @@ export default function LandingPageEditor() {
   const [categorySettings, setCategorySettings] = useState({ show_submenu_left: false });
 
   useEffect(() => {
-    Promise.all([
-      client.getPages({ limit: 200 }).catch(() => ({ pages: [] })),
-      client.getAdminHubCategories().catch(() => ({ categories: [] })),
-    ])
-      .then(([r, catRes]) => {
-        const list = Array.isArray(r?.pages) ? r.pages : [];
-        setPages(list);
-        const tree = catRes?.tree || catRes?.categories || [];
-        const flat = flattenCategoriesForSelect(Array.isArray(tree) ? tree : []);
-        setCategoryRows(flat);
-      })
-      .catch((e) => setErr(copy.loadPagesError + ": " + (e?.message || copy.saveError)));
-  }, [client]);
+    let cancelled = false;
+    const load = () =>
+      Promise.all([
+        client.getPages({ limit: 200 }),
+        client.getAdminHubCategories().catch(() => ({ categories: [] })),
+      ])
+        .then(([r, catRes]) => {
+          if (cancelled) return;
+          const list = Array.isArray(r?.pages) ? r.pages : [];
+          setPages(list);
+          const tree = catRes?.tree || catRes?.categories || [];
+          const flat = flattenCategoriesForSelect(Array.isArray(tree) ? tree : []);
+          setCategoryRows(flat);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          setPages([]);
+          setErr(copy.loadPagesError + ": " + (e?.message || copy.saveError));
+        });
+    load();
+    // Retry once shortly after mount — token/localStorage can race on first paint.
+    const t = setTimeout(load, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [client, copy.loadPagesError, copy.saveError]);
 
   const loadContainers = useCallback(async (pageId) => {
     if (!pageId) return;
@@ -3432,9 +3471,25 @@ export default function LandingPageEditor() {
   }, [client]);
 
   useEffect(() => {
-    if (selectedPageId && !String(selectedPageId).startsWith("api:")) loadContainers(selectedPageId);
-    else setContainers([]);
-  }, [selectedPageId, loadContainers]);
+    if (!selectedPageId) return;
+    if (String(selectedPageId).startsWith("api:")) {
+      const slug = API_CMS_SLUG[selectedPageId];
+      const hit = pages.find((p) => String(p.slug) === slug);
+      if (hit?.id) loadContainers(String(hit.id));
+      else setContainers([]);
+      return;
+    }
+    loadContainers(selectedPageId);
+  }, [selectedPageId, pages, loadContainers]);
+
+  const resolveSavePageId = useCallback(() => {
+    if (String(selectedPageId).startsWith("api:")) {
+      const slug = API_CMS_SLUG[selectedPageId];
+      const hit = pages.find((p) => String(p.slug) === slug);
+      return hit?.id ? String(hit.id) : null;
+    }
+    return selectedPageId;
+  }, [selectedPageId, pages]);
 
   const handleSave = useCallback(async () => {
     if (!selectedPageId) return;
@@ -3451,7 +3506,9 @@ export default function LandingPageEditor() {
         const cid = String(selectedPageId).slice(4);
         await client.saveLandingPageCategoryContainers(cid, { containers, settings: categorySettings });
       } else {
-        await client.saveLandingPageContainers(selectedPageId, { containers, settings: categorySettings });
+        const pageId = resolveSavePageId();
+        if (!pageId) throw new Error(copy.loadContainersError);
+        await client.saveLandingPageContainers(pageId, { containers, settings: categorySettings });
       }
       setSaved(true);
       setIsDirty(false);
@@ -3460,12 +3517,13 @@ export default function LandingPageEditor() {
       setErr(e?.message || copy.saveError);
     }
     setSaving(false);
-  }, [selectedPageId, containers, categorySettings, client]);
+  }, [selectedPageId, containers, categorySettings, client, resolveSavePageId, copy.loadContainersError, copy.saveError]);
 
   const handleDiscard = useCallback(async () => {
     setIsDirty(false);
-    if (selectedPageId) await loadContainers(selectedPageId);
-  }, [selectedPageId, loadContainers]);
+    const pageId = resolveSavePageId();
+    if (pageId) await loadContainers(pageId);
+  }, [resolveSavePageId, loadContainers]);
 
   // Wire up top-bar Save/Discard buttons via UnsavedChanges context
   useEffect(() => {
@@ -3609,7 +3667,7 @@ export default function LandingPageEditor() {
   };
 
   const typeInfo = (type) => containerTypes.find((t) => t.type === type) || { label: type };
-  const cmsPages  = pages.filter((p) => p.page_type !== "blog");
+  const cmsPages  = sortCmsPagesForSelect(pages.filter((p) => p.page_type !== "blog"));
   const blogPosts = pages.filter((p) => p.page_type === "blog");
   const pageOptions = [
     { label: copy.selectPlaceholder, value: "" },
@@ -3625,14 +3683,29 @@ export default function LandingPageEditor() {
     { label: copy.apiPagesHeading, value: API_HEADING, disabled: true },
     { label: copy.apiBestsellerLabel, value: "api:bestsellers" },
     { label: copy.apiSaleLabel, value: "api:sales" },
+    { label: copy.apiNeuheitenLabel, value: "api:neuheiten" },
+    { label: copy.apiBrandsLabel, value: "api:brands" },
   ];
   const isCategorySelection = String(selectedPageId).startsWith("cat:");
   const isApiSelection = String(selectedPageId).startsWith("api:");
+  const apiHasSettings = selectedPageId === "api:bestsellers" || selectedPageId === "api:sales";
+  const linkedCmsForApi = isApiSelection
+    ? pages.find((p) => String(p.slug) === API_CMS_SLUG[selectedPageId])
+    : null;
+  const showContainerEditor = selectedPageId && (!isApiSelection || !!linkedCmsForApi);
   const editorTabs = [
     { id: "containers", content: copy.tabContainers },
     { id: "category", content: copy.tabCategory },
+    { id: "filter", content: copy.tabFilterBar },
     { id: "popup", content: copy.tabPopup },
   ];
+
+  const apiPageLabel =
+    selectedPageId === "api:bestsellers" ? copy.apiBestsellerLabel
+      : selectedPageId === "api:sales" ? copy.apiSaleLabel
+        : selectedPageId === "api:neuheiten" ? copy.apiNeuheitenLabel
+          : selectedPageId === "api:brands" ? copy.apiBrandsLabel
+            : copy.apiBestsellerLabel;
 
   const mainTabs = [
     { id: "seiten", content: copy.tabPages },
@@ -3689,18 +3762,33 @@ export default function LandingPageEditor() {
           </Card>
         </Layout.Section>}
 
-        {mainTab === 0 && selectedPageId && isApiSelection && (
+        {mainTab === 0 && selectedPageId && isApiSelection && apiHasSettings && (
           <Layout.Section>
             <Card>
               <ApiPageSettingsPanel
                 slug={String(selectedPageId).slice(4)}
-                pageLabel={String(selectedPageId) === "api:bestsellers" ? copy.apiBestsellerLabel : copy.apiSaleLabel}
+                pageLabel={apiPageLabel}
               />
             </Card>
           </Layout.Section>
         )}
 
-        {mainTab === 0 && selectedPageId && !isApiSelection && (
+        {mainTab === 0 && selectedPageId && isApiSelection && (
+          <Layout.Section>
+            <Banner tone="info">
+              <p>{copy.apiContainersHint}</p>
+              {linkedCmsForApi ? (
+                <p style={{ marginTop: 8 }}>
+                  CMS: <strong>{linkedCmsForApi.title}</strong> (/{linkedCmsForApi.slug})
+                </p>
+              ) : (
+                <p style={{ marginTop: 8 }}>{copy.noCmsPages}</p>
+              )}
+            </Banner>
+          </Layout.Section>
+        )}
+
+        {mainTab === 0 && showContainerEditor && (
           <Layout.Section>
             <Card>
               <PolarisTabs tabs={editorTabs} selected={activeTab} onSelect={setActiveTab}>
@@ -3754,6 +3842,24 @@ export default function LandingPageEditor() {
                   )}
 
                   {activeTab === 2 && (
+                    <BlockStack gap="400">
+                      <Text as="p" variant="bodySm" tone="subdued">{copy.filterBarTemplateHelp}</Text>
+                      <Checkbox
+                        label={copy.showProductFilterBar}
+                        helpText={copy.showProductFilterBarHelp}
+                        checked={categorySettings.show_product_filter_bar === true}
+                        onChange={(checked) => {
+                          setCategorySettings((prev) => ({ ...prev, show_product_filter_bar: checked }));
+                          setIsDirty(true);
+                        }}
+                      />
+                      <Banner tone="info">
+                        <p>{copy.stylesSidebarNavHint}</p>
+                      </Banner>
+                    </BlockStack>
+                  )}
+
+                  {activeTab === 3 && (
                     <PopupEditor
                       settings={categorySettings}
                       onChange={(partial) => {
@@ -3889,17 +3995,71 @@ export default function LandingPageEditor() {
                   tabs={[
                     { id: "t-desktop", content: copy.desktop },
                     { id: "t-mobil", content: copy.mobile },
+                    { id: "t-filter", content: copy.tabFilterBar },
                   ]}
                   selected={templateDeviceTab}
                   onSelect={setTemplateDeviceTab}
                 />
                 <Box paddingBlockStart="300">
                   <Text as="p" variant="bodySm" tone="subdued">
-                    {templateDeviceTab === 0 ? copy.templateDesktopHint : copy.templateMobileHint}
+                    {templateDeviceTab === 0
+                      ? copy.templateDesktopHint
+                      : templateDeviceTab === 1
+                        ? copy.templateMobileHint
+                        : copy.filterBarTemplateHelp}
                   </Text>
                 </Box>
               </Card>
             </Layout.Section>
+
+            {templateDeviceTab === 2 && (
+              <Layout.Section>
+                <Card>
+                  <BlockStack gap="400">
+                    <BlockStack gap="100">
+                      <Text as="h2" variant="headingMd">{copy.filterBarTemplateTitle}</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">{copy.filterBarTemplateHelp}</Text>
+                    </BlockStack>
+                    <Divider />
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                      <Select
+                        label={copy.filterSidebar}
+                        options={copy.sidebarShowHideOptions()}
+                        value={tmpl.category_template.show_sidebar === false ? "false" : "true"}
+                        onChange={(v) => {
+                          updateTmpl("category_template", "show_sidebar", v === "true");
+                          updateTmpl("collection_template", "show_sidebar", v === "true");
+                        }}
+                      />
+                      <TextField
+                        label={copy.filterCheckboxSize}
+                        type="number"
+                        min={8}
+                        max={24}
+                        value={String(tmpl.category_template.filter_checkbox_size ?? 10)}
+                        onChange={(v) => {
+                          const n = Math.min(24, Math.max(8, parseInt(v, 10) || 10));
+                          updateTmpl("category_template", "filter_checkbox_size", n);
+                          updateTmpl("collection_template", "filter_checkbox_size", n);
+                        }}
+                        autoComplete="off"
+                        helpText={copy.filterCheckboxSizeHelp}
+                      />
+                      <TextField
+                        label={copy.sidebarWidth}
+                        value={tmpl.category_template.sidebar_width}
+                        onChange={(v) => updateTmpl("category_template", "sidebar_width", v)}
+                        autoComplete="off"
+                        helpText={copy.sidebarWidthHelpCategory}
+                      />
+                    </div>
+                    <Banner tone="info">
+                      <p>{copy.stylesSidebarNavHint}</p>
+                    </Banner>
+                  </BlockStack>
+                </Card>
+              </Layout.Section>
+            )}
 
             {templateDeviceTab === 0 && (
             <>

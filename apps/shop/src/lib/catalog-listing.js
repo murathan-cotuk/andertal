@@ -14,7 +14,7 @@ export const SORT_OPTIONS = [
 
 export const PER_PAGE = 24;
 
-/** Display titles for normalized facet keys (matches CategoryTemplate / brand listing). */
+/** Display titles for normalized facet keys (matches CategoryTemplate / brand listing). DE defaults. */
 const FACET_GROUP_TITLE_OVERRIDES = {
   brand_name: "Marke",
   category_slug: "Category",
@@ -32,9 +32,23 @@ const FACET_GROUP_TITLE_OVERRIDES = {
   season: "Saison",
 };
 
-export function getFacetGroupTitle(key) {
+/**
+ * Resolve metafield / facet group title for a locale.
+ * definitions: { [key]: { label, label_i18n?: { [loc]: { label } } } }
+ */
+export function getFacetGroupTitle(key, locale = "de", definitions = null) {
   const k = String(key || "").trim();
-  return FACET_GROUP_TITLE_OVERRIDES[k] ?? k.replace(/_/g, " ");
+  const nk = normalizeFacetKey(k) || k;
+  const def = definitions && (definitions[nk] || definitions[k]);
+  if (def) {
+    const loc = String(locale || "de").slice(0, 2).toLowerCase();
+    if (loc && loc !== "de") {
+      const translated = def.label_i18n?.[loc]?.label;
+      if (translated != null && String(translated).trim()) return String(translated).trim();
+    }
+    if (def.label != null && String(def.label).trim()) return String(def.label).trim();
+  }
+  return FACET_GROUP_TITLE_OVERRIDES[nk] ?? FACET_GROUP_TITLE_OVERRIDES[k] ?? k.replace(/_/g, " ");
 }
 
 /** Walk /store/categories tree → Map(slug lower → display name). */
@@ -115,24 +129,38 @@ export function deriveCategoriesFromProducts(products, categoryTree) {
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
-/** Sidebar / chip label: category facet values show category name, not slug. */
-export function formatFacetOptionLabel(facetKey, rawValue, categorySlugToName) {
+/**
+ * Sidebar / chip label: category facet values show category name, not slug.
+ * Metafield values use catalog definitions (canonical value → locale label).
+ */
+export function formatFacetOptionLabel(facetKey, rawValue, categorySlugToName, locale = "de", definitions = null) {
   const k = String(facetKey || "")
     .trim()
     .toLowerCase();
+  const raw = rawValue == null ? "" : String(rawValue);
   if ((k === "category_slug" || k === "category") && categorySlugToName instanceof Map && categorySlugToName.size > 0) {
-    const slug = String(rawValue || "")
-      .replace(/^\//, "")
-      .trim()
-      .toLowerCase();
+    const slug = raw.replace(/^\//, "").trim().toLowerCase();
     return categorySlugToName.get(slug) || rawValue;
+  }
+  const nk = normalizeFacetKey(facetKey);
+  const def = definitions && (definitions[nk] || definitions[facetKey]);
+  if (def && raw) {
+    const loc = String(locale || "de").slice(0, 2).toLowerCase();
+    if (loc && loc !== "de") {
+      const map = def.values_i18n?.[loc];
+      if (map && typeof map === "object") {
+        const hit = map[raw] ?? map[raw.trim()];
+        if (hit != null && String(hit).trim()) return String(hit).trim();
+      }
+    }
   }
   return rawValue;
 }
 
 export const FACET_SKIP = new Set([
   "media", "image_url", "image", "thumbnail",
-  "review_count", "review_avg", "sold_last_month",
+  "review_count", "review_avg", "sold_last_month", "sold", "sales_count", "salescount",
+  "master_total_variants", "master_total_variant", "total_variants", "variant_count", "variants_count",
   "rabattpreis_cents", "uvp_cents", "price_cents", "compare_at_price_cents", "sale_price_cents",
   "is_new", "badge", "sale",
   "ean", "sku",
@@ -153,6 +181,7 @@ export const FACET_SKIP = new Set([
   "eu_origin_status", "eu_origin_verified_at", "eu_origin_country",
   "wee_number", "wee", "weee", "weee_number", "eprel_number", "eprel", "eprel_id", "eprel_registration_number", "description",
   "is_bestseller", "category_slug", "category", "prices",
+  "view_count", "views", "custom_badges",
 ]);
 
 export function normalizeFacetKey(key) {
@@ -161,6 +190,10 @@ export function normalizeFacetKey(key) {
   if (["farbe", "color", "colour", "farben"].includes(raw)) return "farbe";
   if (["groesse", "größe", "size", "sizes"].includes(raw)) return "groesse";
   if (["material", "materials", "stoff"].includes(raw)) return "material";
+  if (["sales_count", "salescount", "sold", "sold_count"].includes(raw)) return "sales_count";
+  if (["master_total_variants", "master_total_variant", "total_variants", "variant_count", "variants_count"].includes(raw)) {
+    return "master_total_variants";
+  }
   return raw;
 }
 

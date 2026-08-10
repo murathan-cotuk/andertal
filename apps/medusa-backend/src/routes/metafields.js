@@ -57,6 +57,8 @@ async function dbQ(sql, params = []) {
       key varchar(120) PRIMARY KEY,
       label varchar(255),
       values JSONB NOT NULL DEFAULT '[]',
+      label_i18n JSONB,
+      values_i18n JSONB,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )`,
     `CREATE TABLE IF NOT EXISTS admin_hub_metafield_pending (
@@ -73,6 +75,8 @@ async function dbQ(sql, params = []) {
   for (const sql of tables) {
     dbQ(sql).catch(() => {})
   }
+  dbQ('ALTER TABLE admin_hub_metafield_definitions ADD COLUMN IF NOT EXISTS label_i18n jsonb').catch(() => {})
+  dbQ('ALTER TABLE admin_hub_metafield_definitions ADD COLUMN IF NOT EXISTS values_i18n jsonb').catch(() => {})
 })()
 
 const normalizeMetaKey = (raw) =>
@@ -101,19 +105,40 @@ const SYSTEM_KEYS = new Set([
   'dimensions', 'dimensions_length', 'dimensions_width', 'dimensions_height', 'weight', 'weight_grams',
   'unit_type', 'unit_value', 'unit_reference', 'shipping_info', 'versand', 'rabattpreis_cents',
   'uvp_cents', 'price_cents', 'compare_at_price_cents', 'sale_price_cents', 'review_count',
-  'review_avg', 'sold_last_month', 'is_new', 'badge', 'sale',
+  'review_avg', 'sold_last_month', 'sold', 'sales_count', 'salescount', 'sold_count',
+  'master_total_variants', 'master_total_variant', 'total_variants', 'variant_count', 'variants_count',
+  'is_new', 'badge', 'sale', 'is_bestseller', 'view_count', 'views', 'prices', 'custom_badges',
   'eu_origin_provider', 'eu_origin_registry_id', 'eu_origin_document_url', 'eu_origin_status',
   'eu_origin_verified_at', 'eu_origin_country',
 ])
+
+const parseI18nObject = (raw) => {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  return raw
+}
+
+const metafieldI18nJsonbOrNull = (raw) => {
+  const obj = parseI18nObject(raw)
+  if (!obj || Object.keys(obj).length === 0) return null
+  return JSON.stringify(obj)
+}
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 const metafieldDefinitionsGET = async (req, res) => {
   try {
-    const storedRes = await dbQ('SELECT key, label, values FROM admin_hub_metafield_definitions ORDER BY key')
+    const storedRes = await dbQ(
+      'SELECT key, label, values, label_i18n, values_i18n FROM admin_hub_metafield_definitions ORDER BY key'
+    )
     const stored = {}
     for (const row of storedRes.rows) {
-      stored[row.key] = { label: row.label || row.key, values: Array.isArray(row.values) ? row.values : [] }
+      if (SYSTEM_KEYS.has(row.key) || String(row.key || '').startsWith('_')) continue
+      stored[row.key] = {
+        label: row.label || row.key,
+        values: Array.isArray(row.values) ? row.values : [],
+        label_i18n: parseI18nObject(row.label_i18n),
+        values_i18n: parseI18nObject(row.values_i18n),
+      }
     }
 
     const prodRes = await dbQ('SELECT metadata FROM admin_hub_products WHERE metadata IS NOT NULL')
@@ -142,10 +167,16 @@ const metafieldDefinitionsGET = async (req, res) => {
     const allKeys = new Set([...Object.keys(stored), ...Object.keys(fromProducts)])
     const definitions = {}
     for (const key of allKeys) {
+      if (SYSTEM_KEYS.has(key) || key.startsWith('_')) continue
       const storedVals = new Set(stored[key]?.values || [])
       const prodVals = fromProducts[key] || new Set()
       const merged = [...new Set([...storedVals, ...prodVals])].sort()
-      definitions[key] = { label: stored[key]?.label || key, values: merged }
+      definitions[key] = {
+        label: stored[key]?.label || key,
+        values: merged,
+        label_i18n: stored[key]?.label_i18n || null,
+        values_i18n: stored[key]?.values_i18n || null,
+      }
     }
 
     res.json({ definitions })
@@ -155,20 +186,58 @@ const metafieldDefinitionsGET = async (req, res) => {
   }
 }
 
+/** Public storefront catalog facet labels (no product scrape — stored defs only). */
+const storeMetafieldDefinitionsGET = async (req, res) => {
+  try {
+    const storedRes = await dbQ(
+      'SELECT key, label, values, label_i18n, values_i18n FROM admin_hub_metafield_definitions ORDER BY key'
+    )
+    const definitions = {}
+    for (const row of storedRes.rows) {
+      if (SYSTEM_KEYS.has(row.key) || String(row.key || '').startsWith('_')) continue
+      definitions[row.key] = {
+        label: row.label || row.key,
+        values: Array.isArray(row.values) ? row.values : [],
+        label_i18n: parseI18nObject(row.label_i18n),
+        values_i18n: parseI18nObject(row.values_i18n),
+      }
+    }
+    res.json({ definitions })
+  } catch (err) {
+    console.error('store metafield-definitions GET:', err)
+    res.status(500).json({ error: err.message })
+  }
+}
+
 const metafieldDefinitionsPUT = async (req, res) => {
   try {
     const key = (req.params.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
     if (!key) return res.status(400).json({ error: 'key required' })
-    const { label, values } = req.body || {}
+    if (SYSTEM_KEYS.has(key)) return res.status(400).json({ error: 'system key not allowed' })
+    const { label, values, label_i18n, values_i18n } = req.body || {}
     const safeValues = (Array.isArray(values) ? values : []).map((v) => String(v).trim()).filter(Boolean)
     const safeLabel = (label || key).toString().trim()
+    const labelI18nJson = metafieldI18nJsonbOrNull(label_i18n)
+    const valuesI18nJson = metafieldI18nJsonbOrNull(values_i18n)
     await dbQ(
-      `INSERT INTO admin_hub_metafield_definitions (key, label, values, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (key) DO UPDATE SET label = $2, values = $3, updated_at = NOW()`,
-      [key, safeLabel, JSON.stringify(safeValues)]
+      `INSERT INTO admin_hub_metafield_definitions (key, label, values, label_i18n, values_i18n, updated_at)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, NOW())
+       ON CONFLICT (key) DO UPDATE SET
+         label = $2,
+         values = $3::jsonb,
+         label_i18n = $4::jsonb,
+         values_i18n = $5::jsonb,
+         updated_at = NOW()`,
+      [key, safeLabel, JSON.stringify(safeValues), labelI18nJson, valuesI18nJson]
     )
-    res.json({ ok: true, key, label: safeLabel, values: safeValues })
+    res.json({
+      ok: true,
+      key,
+      label: safeLabel,
+      values: safeValues,
+      label_i18n: parseI18nObject(label_i18n),
+      values_i18n: parseI18nObject(values_i18n),
+    })
   } catch (err) {
     console.error('metafield-definitions PUT:', err)
     res.status(500).json({ error: err.message })
@@ -335,6 +404,7 @@ module.exports = function createMetafieldsRouter() {
   const router = Router()
 
   router.get('/admin-hub/metafield-definitions', metafieldDefinitionsGET)
+  router.get('/store/metafield-definitions', storeMetafieldDefinitionsGET)
   router.get('/admin-hub/metafield-definitions/pending', requireSuperuser, metafieldPendingGET)
   router.put('/admin-hub/metafield-definitions/:key', requireSuperuser, metafieldDefinitionsPUT)
   router.delete('/admin-hub/metafield-definitions/:key', requireSuperuser, metafieldDefinitionsDELETE)
