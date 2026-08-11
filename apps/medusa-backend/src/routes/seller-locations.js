@@ -54,13 +54,16 @@ module.exports = function createSellerLocationsRouter() {
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const { name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary } = req.body || {}
+        const { name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary, is_shipping_from, is_returns_to, is_billing } = req.body || {}
         if (!name) { await client.end(); return res.status(400).json({ message: 'Name erforderlich' }) }
         if (is_primary) await client.query('UPDATE seller_locations SET is_primary = false WHERE seller_id = $1', [sellerId])
+        if (is_shipping_from) await client.query('UPDATE seller_locations SET is_shipping_from = false WHERE seller_id = $1', [sellerId])
+        if (is_returns_to) await client.query('UPDATE seller_locations SET is_returns_to = false WHERE seller_id = $1', [sellerId])
+        if (is_billing) await client.query('UPDATE seller_locations SET is_billing = false WHERE seller_id = $1', [sellerId])
         const r = await client.query(
-          `INSERT INTO seller_locations (seller_id, name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-          [sellerId, name, type || 'warehouse', address_line1 || null, address_line2 || null, city || null, postal_code || null, country || 'Deutschland', phone || null, email || null, is_primary ? true : false]
+          `INSERT INTO seller_locations (seller_id, name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary, is_shipping_from, is_returns_to, is_billing)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+          [sellerId, name, type || 'warehouse', address_line1 || null, address_line2 || null, city || null, postal_code || null, country || 'Deutschland', phone || null, email || null, is_primary ? true : false, is_shipping_from ? true : false, is_returns_to ? true : false, is_billing ? true : false]
         )
         await client.end()
         res.json({ location: r.rows[0] })
@@ -80,8 +83,11 @@ module.exports = function createSellerLocationsRouter() {
         await client.connect()
         const chk = await client.query('SELECT id FROM seller_locations WHERE id = $1::uuid AND seller_id = $2 LIMIT 1', [id, sellerId])
         if (!chk.rows.length) { await client.end(); return res.status(404).json({ message: 'Not found' }) }
-        const { name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary, is_active } = req.body || {}
+        const { name, type, address_line1, address_line2, city, postal_code, country, phone, email, is_primary, is_active, is_shipping_from, is_returns_to, is_billing } = req.body || {}
         if (is_primary) await client.query('UPDATE seller_locations SET is_primary = false WHERE seller_id = $1', [sellerId])
+        if (is_shipping_from) await client.query('UPDATE seller_locations SET is_shipping_from = false WHERE seller_id = $1', [sellerId])
+        if (is_returns_to) await client.query('UPDATE seller_locations SET is_returns_to = false WHERE seller_id = $1', [sellerId])
+        if (is_billing) await client.query('UPDATE seller_locations SET is_billing = false WHERE seller_id = $1', [sellerId])
         const sets = []; const params = []
         const add = (col, val) => { if (val !== undefined) { params.push(val); sets.push(`${col} = $${params.length}`) } }
         add('name', name); add('type', type); add('address_line1', address_line1); add('address_line2', address_line2)
@@ -89,6 +95,9 @@ module.exports = function createSellerLocationsRouter() {
         add('phone', phone); add('email', email)
         if (is_primary !== undefined) { params.push(is_primary ? true : false); sets.push(`is_primary = $${params.length}`) }
         if (is_active !== undefined) { params.push(is_active ? true : false); sets.push(`is_active = $${params.length}`) }
+        if (is_shipping_from !== undefined) { params.push(is_shipping_from ? true : false); sets.push(`is_shipping_from = $${params.length}`) }
+        if (is_returns_to !== undefined) { params.push(is_returns_to ? true : false); sets.push(`is_returns_to = $${params.length}`) }
+        if (is_billing !== undefined) { params.push(is_billing ? true : false); sets.push(`is_billing = $${params.length}`) }
         if (!sets.length) { await client.end(); return res.status(400).json({ message: 'Nothing to update' }) }
         sets.push('updated_at = now()')
         params.push(id)

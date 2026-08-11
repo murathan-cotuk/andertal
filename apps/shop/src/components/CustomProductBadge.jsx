@@ -33,18 +33,42 @@ function visualStyle(b) {
   };
 }
 
-/** Single superuser-configured text badge, absolutely positioned over a product image. */
-export default function CustomProductBadge({ badge, stackIndex = 0 }) {
-  if (!badge || !badge.label) return null;
+// Same _i18n[locale][field]-style convention as landing containers, but badges store
+// their per-locale overrides under `i18n` (not `_i18n`) — DE always falls back to the
+// root label/image_url columns.
+function bt(badge, field, locale) {
+  if (!locale || locale === "de") return badge?.[field] ?? "";
+  return badge?.i18n?.[locale]?.[field] ?? badge?.[field] ?? "";
+}
+
+/** Single superuser-configured badge (text or image), absolutely positioned over a product image. */
+export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
+  if (!badge) return null;
+  if (badge.badge_type === "image") {
+    const imageUrl = bt(badge, "image_url", locale);
+    if (!imageUrl) return null;
+    return (
+      <div style={positionStyle(badge, stackIndex)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={bt(badge, "label", locale) || ""}
+          style={{ display: "block", maxWidth: 80, maxHeight: 80, boxShadow: "0 1px 4px rgba(0, 0, 0, 0.16)" }}
+        />
+      </div>
+    );
+  }
+  const label = bt(badge, "label", locale);
+  if (!label) return null;
   return (
     <div style={positionStyle(badge, stackIndex)}>
-      <span style={visualStyle(badge)}>{badge.label}</span>
+      <span style={visualStyle(badge)}>{label}</span>
     </div>
   );
 }
 
 /** Renders every custom badge resolved for a product (product.metadata.custom_badges). */
-export function CustomProductBadges({ badges }) {
+export function CustomProductBadges({ badges, locale }) {
   if (!Array.isArray(badges) || badges.length === 0) return null;
   const seenAtPosition = {};
   return (
@@ -52,7 +76,7 @@ export function CustomProductBadges({ badges }) {
       {badges.map((b) => {
         const stackIndex = seenAtPosition[b.position] || 0;
         seenAtPosition[b.position] = stackIndex + 1;
-        return <CustomProductBadge key={b.id} badge={b} stackIndex={stackIndex} />;
+        return <CustomProductBadge key={b.id} badge={b} stackIndex={stackIndex} locale={locale} />;
       })}
     </>
   );

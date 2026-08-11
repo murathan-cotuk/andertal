@@ -381,6 +381,61 @@ function changeRequestSellerLabel(cr) {
   );
 }
 
+/** Small (i) info icon — hover/focus shows a tooltip that lingers ~3s after the pointer leaves before fading, instead of vanishing instantly. */
+function InfoIconTooltip({ text }) {
+  const [visible, setVisible] = useState(false);
+  const hideTimerRef = useRef(null);
+
+  const show = () => {
+    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null; }
+    setVisible(true);
+  };
+  const scheduleHide = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setVisible(false), 3000);
+  };
+
+  useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
+
+  if (!text) return null;
+
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <span
+        onMouseEnter={show}
+        onMouseLeave={scheduleHide}
+        onFocus={show}
+        onBlur={scheduleHide}
+        tabIndex={0}
+        role="button"
+        aria-label="Info"
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 16, height: 16, borderRadius: "50%",
+          border: "1px solid #9ca3af", color: "#6b7280",
+          fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0,
+        }}
+      >
+        i
+      </span>
+      <span
+        style={{
+          position: "absolute", bottom: "calc(100% + 6px)", left: 0,
+          background: "#111827", color: "#fff", fontSize: 12, lineHeight: 1.4,
+          padding: "6px 10px", borderRadius: 6, whiteSpace: "nowrap",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.18)", zIndex: 50,
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(4px)",
+          pointerEvents: "none",
+          transition: "opacity 0.25s ease, transform 0.25s ease",
+        }}
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [] }) {
   const router = useRouter();
   const locale = useLocale();
@@ -429,7 +484,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     const p = initialProduct ?? (isNew ? getEmptyProduct() : null);
     return p ? productSnapshot(localizeProductForEditing(p, locale)) : null;
   });
-  const [expandedVariantIndex, setExpandedVariantIndex] = useState(null);
+  // Set of open row indices — multiple variants can be expanded at once (see "Expand all" toggle).
+  const [expandedVariantIndices, setExpandedVariantIndices] = useState(() => new Set());
   const dragGroupIdx = useRef(null);
   const [eanLookupState, setEanLookupState] = useState(null); // null | "loading" | "found" | "not_found"
   const [eanMatchedOn, setEanMatchedOn] = useState("parent"); // "parent" | "variant" — which EAN the lookup matched on
@@ -1029,11 +1085,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const cpBruttoCents = countryPriceData.brutto_cents != null
     ? Number(countryPriceData.brutto_cents)
     : (editingCountry === "DE" && product?.price != null ? Math.round(Number(product.price) * 100) : null);
-  const cpNettoCents = countryPriceData.netto_cents != null
-    ? Number(countryPriceData.netto_cents)
-    : (cpBruttoCents != null && currentCountryConf.vatRate > 0
-        ? Math.round(cpBruttoCents / (1 + currentCountryConf.vatRate / 100))
-        : cpBruttoCents);
   const cpLinked = countryPriceData.linked !== false;
   const cpUvpCents = countryPriceData.uvp_cents != null ? Number(countryPriceData.uvp_cents) : (editingCountry === "DE" && meta.uvp_cents != null ? Number(meta.uvp_cents) : null);
   const cpSaleCents = countryPriceData.sale_cents != null ? Number(countryPriceData.sale_cents) : (editingCountry === "DE" && meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null);
@@ -1083,19 +1134,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         if (b != null) extra.price = b / 100;
       }
       return { ...prev, ...extra, metadata: m };
-    });
-  }, [editingCountry]);
-
-  const toggleCountryPriceLock = useCallback(() => {
-    setProduct((prev) => {
-      if (!prev) return prev;
-      const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
-      const prices = { ...(m.prices || {}) };
-      const cp = { ...(prices[editingCountry] || {}) };
-      cp.linked = cp.linked === false ? true : false;
-      prices[editingCountry] = cp;
-      m.prices = prices;
-      return { ...prev, metadata: m };
     });
   }, [editingCountry]);
 
@@ -1531,9 +1569,18 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     () =>
       Object.keys(metaDefs)
         .filter((k) => !metaDefKeysWithValues.has(k) && !extraVisibleMetaDefKeys[k])
-        .sort((a, b) => a.localeCompare(b)),
-    [metaDefs, metaDefKeysWithValues, extraVisibleMetaDefKeys],
+        .sort((a, b) => resolveMetaDefLabel(metaDefs[a], a, locale).localeCompare(resolveMetaDefLabel(metaDefs[b], b, locale))),
+    [metaDefs, metaDefKeysWithValues, extraVisibleMetaDefKeys, locale],
   );
+  const [addMetaDefSearch, setAddMetaDefSearch] = useState("");
+  const visibleHiddenMetaDefKeys = useMemo(() => {
+    const q = addMetaDefSearch.trim().toLowerCase();
+    if (!q) return hiddenMetaDefKeys;
+    return hiddenMetaDefKeys.filter((k) => {
+      const label = resolveMetaDefLabel(metaDefs[k], k, locale).toLowerCase();
+      return label.includes(q) || k.toLowerCase().includes(q);
+    });
+  }, [hiddenMetaDefKeys, addMetaDefSearch, metaDefs, locale]);
 
   if (!product && !isNew) {
     return (
@@ -2053,6 +2100,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         /* ── Variation engine — Matrix cards ── */
         .vm-card { border: 1px solid var(--p-color-border); border-radius: 10px; margin-bottom: 8px; background: var(--p-color-bg-surface); overflow: hidden; transition: box-shadow .12s; }
         .vm-card:last-child { margin-bottom: 0; }
+        .vm-card.is-open { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
         .vm-card-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background .1s; user-select: none; min-height: 52px; }
         .vm-card-header:hover { background: var(--p-color-bg-surface-hover, rgba(0,0,0,.02)); }
         .vm-thumb { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid var(--p-color-border); display: block; flex-shrink: 0; }
@@ -2060,16 +2108,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vm-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--p-color-bg-surface-secondary); border: 1px solid var(--p-color-border); border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 500; color: var(--p-color-text); white-space: nowrap; }
         .vm-stat { font-size: 12px; color: var(--p-color-text-subdued); white-space: nowrap; }
         .vm-stat strong { color: var(--p-color-text); font-weight: 600; }
-        .vm-card-body { border-top: 1px solid var(--p-color-border-subdued); padding: 20px 18px; background: var(--p-color-bg-surface-secondary, #fafafa); display: flex; flex-direction: column; gap: 18px; }
+        .vm-card-body { border-top: 1px solid var(--p-color-border-subdued); padding: 24px; background: var(--p-color-bg-surface-secondary, #fafafa); display: flex; flex-direction: column; gap: 22px; }
         .vm-sub-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--p-color-text-subdued); margin-bottom: 8px; }
         .vm-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         .vm-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .vm-img-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-        .vm-img-item { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
-        .vm-img-item img { width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--p-color-border); display: block; }
-        .vm-img-del { position: absolute; top: -5px; right: -5px; width: 18px; height: 18px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+        .vm-img-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .vm-img-item { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
+        .vm-img-item img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--p-color-border); display: block; }
+        .vm-img-del { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
         .vm-img-del:hover { background: rgba(200,0,0,.8); }
-        .vm-img-add { width: 52px; height: 52px; border-radius: 6px; border: 2px dashed var(--p-color-border); background: transparent; cursor: pointer; font-size: 20px; color: var(--p-color-text-subdued); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color .12s, color .12s; }
+        .vm-img-add { width: 84px; height: 84px; border-radius: 8px; border: 2px dashed var(--p-color-border); background: transparent; cursor: pointer; font-size: 24px; color: var(--p-color-text-subdued); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color .12s, color .12s; }
         .vm-img-add:hover { border-color: var(--p-color-border-hover); color: var(--p-color-text); }
         .vm-expand-toggle { margin-left: auto; font-size: 11px; color: var(--p-color-text-subdued); flex-shrink: 0; transition: transform .2s; }
         .vm-card.is-open .vm-expand-toggle { transform: rotate(180deg); }
@@ -2334,26 +2382,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               )}
 
               <ProductSectionRule />
-              {isSuperuser && (
-                <>
-                  <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.badge" />}>
-                    {locale === "en" ? "Product badge" : locale === "tr" ? "Ürün etiketi" : locale === "fr" ? "Badge produit" : locale === "es" ? "Etiqueta de producto" : locale === "it" ? "Etichetta prodotto" : "Produkt-Etikett"}
-                  </ProductSectionHeading>
-                  <Select
-                    label={locale === "en" ? "Badge / Label" : locale === "tr" ? "Rozet / Etiket" : locale === "fr" ? "Badge / Étiquette" : locale === "es" ? "Badge / Etiqueta" : locale === "it" ? "Badge / Etichetta" : "Badge / Etikett"}
-                    labelHidden
-                    options={[
-                      { label: locale === "en" ? "No badge" : locale === "tr" ? "Etiket yok" : locale === "fr" ? "Aucun badge" : locale === "es" ? "Sin etiqueta" : locale === "it" ? "Nessun badge" : "Kein Etikett", value: "" },
-                      { label: "⭐ Bestseller", value: "bestseller" },
-                      { label: locale === "en" ? "🆕 New" : locale === "tr" ? "🆕 Yeni" : locale === "fr" ? "🆕 Nouveau" : locale === "es" ? "🆕 Nuevo" : locale === "it" ? "🆕 Nuovo" : "🆕 Neu", value: "new" },
-                      { label: "🔥 Sale", value: "sale" },
-                    ]}
-                    value={getMeta(product, "badge") || ""}
-                    onChange={(v) => updateMeta("badge", v || null)}
-                  />
-                  <ProductSectionRule />
-                </>
-              )}
 
               <Box padding="400" background="bg-surface-secondary" borderRadius="300" borderWidth="025" borderColor="border">
                 <BlockStack gap="300">
@@ -2390,6 +2418,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   <div>
                     <BlockStack gap="400">
                       <Divider />
+                      {variantGroups.length > 0 ? (
+                        <Banner tone="info">
+                          {locale === "en" ? "This product has variations — category, brand and shipping group are now set per variant (each variant is its own product). Open a variant below to edit them." : locale === "tr" ? "Bu ürünün varyasyonları var — kategori, marka ve kargo grubu artık varyant başına ayarlanıyor (her varyant kendi ürünüdür). Düzenlemek için aşağıdan bir varyant açın." : locale === "fr" ? "Ce produit a des variations — catégorie, marque et groupe d'expédition sont désormais définis par variante (chaque variante est son propre produit). Ouvrez une variante ci-dessous pour les modifier." : locale === "es" ? "Este producto tiene variaciones — categoría, marca y grupo de envío ahora se definen por variante (cada variante es su propio producto). Abre una variante abajo para editarlos." : locale === "it" ? "Questo prodotto ha variazioni — categoria, marca e gruppo di spedizione sono ora impostati per variante (ogni variante è un proprio prodotto). Apri una variante qui sotto per modificarli." : "Dieses Produkt hat Variationen — Kategorie, Marke und Versandgruppe werden jetzt pro Variante gesetzt (jede Variante ist ihr eigenes Produkt). Öffne unten eine Variante, um sie zu bearbeiten."}
+                        </Banner>
+                      ) : (
                       <InlineStack gap="500" wrap>
                         <Box minWidth="240px" flex="1">
                           <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}</Text>
@@ -2440,6 +2473,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                           />
                         </Box>
                       </InlineStack>
+                      )}
 
                       {isSuperuser && (
                         <>
@@ -2803,70 +2837,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 {currentCountryConf.label} · {currentCountryConf.currency} · {currentCountryConf.taxLabel} {currentCountryConf.vatRate}%
               </Text>
 
-              {/* Netto / Brutto with lock — currency shown beside field (Polaris prefix + controlled value breaks multi-char typing).
-                  Netto entry + the link toggle are superuser-only: sellers only ever enter the gross (Brutto)
-                  price shown in the shop, and Netto keeps being computed/stored automatically from it (as long
-                  as this country's price stays "linked", which is the default and can't be changed by a seller
-                  since they no longer see the toggle). Nothing about the underlying data/calc was removed. */}
+              {/* Sellers only ever see/enter the gross (Brutto) price shown in the shop — Netto keeps
+                  being computed/stored automatically from it internally (metadata.prices[country]),
+                  it's just never rendered as an editable field. */}
               <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
-                {isSuperuser && (
-                <Box minWidth="130px" flex="1">
-                  <div className="product-edit-label">{locale === "en" ? `Net (excl. ${currentCountryConf.taxLabel})` : locale === "tr" ? `Net (${currentCountryConf.taxLabel} hariç)` : locale === "fr" ? `Net (hors ${currentCountryConf.taxLabel})` : locale === "es" ? `Neto (excl. ${currentCountryConf.taxLabel})` : locale === "it" ? `Netto (escl. ${currentCountryConf.taxLabel})` : `Netto (exkl. ${currentCountryConf.taxLabel})`}</div>
-                  <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
-                    <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 14, fontWeight: 600, color: "var(--p-color-text-subdued)", minWidth: "1.25em" }} aria-hidden>{currentCountryConf.symbol}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <TextField
-                        label="Netto"
-                        labelHidden
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={
-                          (() => {
-                            const dk = `${editingCountry}_netto_cents`;
-                            return Object.prototype.hasOwnProperty.call(countryPriceDrafts, dk)
-                              ? countryPriceDrafts[dk]
-                              : cpNettoCents != null
-                                ? (cpNettoCents / 100).toFixed(2)
-                                : "";
-                          })()
-                        }
-                        onChange={(v) => {
-                          const dk = `${editingCountry}_netto_cents`;
-                          const clean = sanitizePriceDraftString(v);
-                          setCountryPriceDrafts((prev) => {
-                            const next = { ...prev, [dk]: clean };
-                            countryPriceDraftsRef.current = next;
-                            return next;
-                          });
-                        }}
-                        onBlur={(e) => {
-                          const dk = `${editingCountry}_netto_cents`;
-                          const clearBrutto = cpLinked ? `${editingCountry}_brutto_cents` : null;
-                          commitCountryPriceDraft(dk, "netto_cents", clearBrutto, e.currentTarget.value);
-                        }}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                </Box>
-                )}
-                {isSuperuser && (
-                <div style={{ paddingBottom: 8 }}>
-                  <button
-                    type="button"
-                    onClick={toggleCountryPriceLock}
-                    title={cpLinked ? (locale === "en" ? "Unlink net and gross" : locale === "tr" ? "Net ve brüt bağlantısını kes" : locale === "fr" ? "Dissocier net et brut" : locale === "es" ? "Desconectar neto y bruto" : locale === "it" ? "Scollega netto e lordo" : "Netto und Brutto entkoppeln") : (locale === "en" ? "Link net and gross" : locale === "tr" ? "Net ve brütü bağla" : locale === "fr" ? "Associer net et brut" : locale === "es" ? "Conectar neto y bruto" : locale === "it" ? "Collega netto e lordo" : "Netto und Brutto koppeln")}
-                    style={{
-                      width: 32, height: 32, borderRadius: 6, border: "1px solid #d1d5db",
-                      background: cpLinked ? "#f0fdf4" : "#fafafa", cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
-                    }}
-                  >
-                    {cpLinked ? "🔒" : "🔓"}
-                  </button>
-                </div>
-                )}
                 <Box minWidth="130px" flex="1">
                   <div className="product-edit-label">{locale === "en" ? `Gross (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "tr" ? `Brüt (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} dahil)` : locale === "fr" ? `Brut (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} incl.)` : locale === "es" ? `Bruto (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "it" ? `Lordo (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : `Brutto (inkl. ${currentCountryConf.taxLabel} ${currentCountryConf.vatRate > 0 ? currentCountryConf.vatRate + "%" : ""})`}</div>
                   <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
@@ -3136,17 +3110,29 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     Add at least one option to each group to generate combinations.
                   </div>
                 );
+                const allOpen = matrixRows.length > 0 && matrixRows.every((_, vi) => expandedVariantIndices.has(vi));
                 return (
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
                       <Text as="p" variant="bodySm" fontWeight="semibold">
                         Variation Matrix — {matrixRows.length} {matrixRows.length === 1 ? "variant" : "variants"}
                       </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">Click a variant to edit details</Text>
+                      <Button
+                        size="slim"
+                        onClick={() => {
+                          setExpandedVariantIndices(
+                            allOpen ? new Set() : new Set(matrixRows.map((_, vi) => vi))
+                          );
+                        }}
+                      >
+                        {allOpen
+                          ? (locale === "en" ? "Collapse all" : locale === "tr" ? "Tümünü daralt" : locale === "fr" ? "Tout réduire" : locale === "es" ? "Contraer todo" : locale === "it" ? "Comprimi tutto" : "Alle einklappen")
+                          : (locale === "en" ? "Expand all" : locale === "tr" ? "Tümünü genişlet" : locale === "fr" ? "Tout développer" : locale === "es" ? "Expandir todo" : locale === "it" ? "Espandi tutto" : "Alle ausklappen")}
+                      </Button>
                     </div>
                     <div>
                       {matrixRows.map((v, vi) => {
-                        const isOpen = expandedVariantIndex === vi;
+                        const isOpen = expandedVariantIndices.has(vi);
                         const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
                         // Images added via the full Variant Edit page (Open →) are saved to
                         // image_url (de) / image_urls[locale], a separate field from this
@@ -3174,7 +3160,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             {/* Card header — click to expand */}
                             <div
                               className="vm-card-header"
-                              onClick={() => setExpandedVariantIndex(isOpen ? null : vi)}
+                              onClick={() => {
+                                setExpandedVariantIndices((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(vi)) next.delete(vi);
+                                  else next.add(vi);
+                                  return next;
+                                });
+                              }}
                             >
                               {/* Thumbnail */}
                               {thumbUrl
@@ -3371,11 +3364,18 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               <BlockStack gap="050">
                                 <InlineStack gap="200" blockAlign="center" wrap={false}>
                                   <Text as="p" variant="bodyMd" fontWeight="semibold">{resolveMetaDefLabel(def, defKey, locale)}</Text>
+                                  <InfoIconTooltip
+                                    text={
+                                      locale === "en" ? `Internal key: ${defKey}` :
+                                      locale === "tr" ? `Teknik anahtar: ${defKey}` :
+                                      locale === "fr" ? `Clé interne : ${defKey}` :
+                                      locale === "es" ? `Clave interna: ${defKey}` :
+                                      locale === "it" ? `Chiave interna: ${defKey}` :
+                                      `Interner Schlüssel: ${defKey}`
+                                    }
+                                  />
                                   <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName={`metadata.${defKey}`} />
                                 </InlineStack>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  Key: <span style={{ fontFamily: "ui-monospace, monospace", fontSize: "12px" }}>{defKey}</span>
-                                </Text>
                               </BlockStack>
                               {selected.length > 0 && (
                                 <InlineStack gap="200" wrap>
@@ -3456,7 +3456,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             active={addMetaDefPopoverOpen}
                             preferredPosition="below"
                             preferredAlignment="left"
-                            onClose={() => setAddMetaDefPopoverOpen(false)}
+                            onClose={() => { setAddMetaDefPopoverOpen(false); setAddMetaDefSearch(""); }}
                             activator={
                               <Button size="slim" variant="secondary" onClick={() => setAddMetaDefPopoverOpen((o) => !o)}>
                                 + {locale === "en" ? "Add metafield" : locale === "tr" ? "Metafield ekle" : locale === "fr" ? "Ajouter un métachamp" : locale === "es" ? "Agregar metacampo" : locale === "it" ? "Aggiungi metacampo" : "Metafeld hinzufügen"}
@@ -3480,6 +3480,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                     {locale === "en" ? "Choose a field from the catalog. It will appear below as its own row for editing." : locale === "tr" ? "Katalogdan bir alan seçin. Aşağıda düzenleme için kendi satırı olarak görünecektir." : locale === "fr" ? "Choisissez un champ du catalogue. Il apparaîtra ci-dessous comme une ligne à part pour l'édition." : locale === "es" ? "Elige un campo del catálogo. Aparecerá abajo como su propia fila para edición." : locale === "it" ? "Scegli un campo dal catalogo. Apparirà sotto come riga propria per la modifica." : "Wähle ein Feld aus dem Katalog. Es erscheint darunter als eigene Zeile zum Bearbeiten."}
                                   </Text>
                                 </BlockStack>
+                                <TextField
+                                  label={locale === "en" ? "Search" : locale === "tr" ? "Ara" : locale === "fr" ? "Rechercher" : locale === "es" ? "Buscar" : locale === "it" ? "Cerca" : "Suchen"}
+                                  labelHidden
+                                  autoComplete="off"
+                                  value={addMetaDefSearch}
+                                  onChange={setAddMetaDefSearch}
+                                  placeholder={locale === "en" ? "Search fields…" : locale === "tr" ? "Alanlarda ara…" : locale === "fr" ? "Rechercher des champs…" : locale === "es" ? "Buscar campos…" : locale === "it" ? "Cerca campi…" : "Felder durchsuchen…"}
+                                  autoFocus
+                                />
                                 <div
                                   style={{
                                     maxHeight: 360,
@@ -3491,20 +3500,28 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                     background: "var(--p-color-bg-surface-secondary)",
                                   }}
                                 >
-                                  <ActionList
-                                    actionRole="menu"
-                                    items={hiddenMetaDefKeys.map((k) => {
-                                      const label = resolveMetaDefLabel(metaDefs[k], k, locale);
-                                      return {
-                                        content: label,
-                                        helpText: label !== k ? k : undefined,
-                                        onAction: () => {
-                                          setExtraVisibleMetaDefKeys((p) => ({ ...p, [k]: true }));
-                                          setAddMetaDefPopoverOpen(false);
-                                        },
-                                      };
-                                    })}
-                                  />
+                                  {visibleHiddenMetaDefKeys.length === 0 ? (
+                                    <Box padding="400">
+                                      <Text variant="bodySm" tone="subdued">
+                                        {locale === "en" ? "No matching fields." : locale === "tr" ? "Eşleşen alan yok." : locale === "fr" ? "Aucun champ correspondant." : locale === "es" ? "No hay campos coincidentes." : locale === "it" ? "Nessun campo corrispondente." : "Keine passenden Felder."}
+                                      </Text>
+                                    </Box>
+                                  ) : (
+                                    <ActionList
+                                      actionRole="menu"
+                                      items={visibleHiddenMetaDefKeys.map((k) => {
+                                        const label = resolveMetaDefLabel(metaDefs[k], k, locale);
+                                        return {
+                                          content: label,
+                                          onAction: () => {
+                                            setExtraVisibleMetaDefKeys((p) => ({ ...p, [k]: true }));
+                                            setAddMetaDefPopoverOpen(false);
+                                            setAddMetaDefSearch("");
+                                          },
+                                        };
+                                      })}
+                                    />
+                                  )}
                                 </div>
                               </BlockStack>
                             </Box>
@@ -3695,10 +3712,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 ) : null}
               </InlineStack>
 
+              {isSuperuser && (
+              <>
               <ProductSectionRule />
               <ProductSectionHeading>SEO</ProductSectionHeading>
-              {isSuperuser ? (
-                <div>
+              <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "var(--p-color-text-subdued)", marginBottom: 4 }}>
                     URL-Handle (Shop){locale !== "de" ? " — this language" : " — canonical (German)"}
                   </div>
@@ -3757,8 +3775,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       <span> (empty uses DE handle)</span>
                     ) : null}
                   </div>
-                </div>
-              ) : null}
+              </div>
               <TextField
                 label={
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
@@ -3795,6 +3812,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 placeholder="keyword1, keyword2"
                 autoComplete="off"
               />
+              </>
+              )}
             </BlockStack>
             </div>
           </Card>

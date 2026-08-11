@@ -45,7 +45,7 @@ import { isEuOriginVerified } from "@andertal/shop-theme";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { useStoreCampaignDiscount } from "@/hooks/useStoreCampaignDiscount";
-import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap } from "@/lib/product-price";
+import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap, resolveProductSaleCents } from "@/lib/product-price";
 
 const Container = styled.div`
   max-width: 100%;
@@ -1275,8 +1275,8 @@ export default function ProductTemplate() {
   const uvpCents = uvpCountryCents != null
     ? uvpCountryCents
     : (variant?.compare_at_price_cents != null ? Number(variant.compare_at_price_cents) : (meta.uvp_cents != null ? Number(meta.uvp_cents) : null));
-  const saleCents = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null;
-  const hasSale = saleCents != null && saleCents > 0 && priceCents > 0;
+  const saleCents = resolveProductSaleCents(product, variant, countryCode, marketCountry);
+  const hasSale = saleCents != null && saleCents > 0 && priceCents > 0 && saleCents < priceCents;
   const displayCents = hasSale ? saleCents : priceCents;
   const discountPercent = hasSale && priceCents > 0 && saleCents < priceCents
     ? Math.round(((priceCents - saleCents) / priceCents) * 100)

@@ -133,6 +133,7 @@ export function mergeLoadedShopStyles(loaded = {}) {
     mobileChrome: { ...DEFAULT_SHOP_STYLES.mobileChrome, ...(loaded.mobileChrome || {}) },
     collection_template: { ...DEFAULT_SHOP_STYLES.collection_template, ...(loaded.collection_template || {}) },
     category_template: { ...DEFAULT_SHOP_STYLES.category_template, ...(loaded.category_template || {}) },
+    cms_page_template: { ...DEFAULT_SHOP_STYLES.cms_page_template, ...(loaded.cms_page_template || {}) },
     buttons: mergeButtonCatalog(DEFAULT_SHOP_STYLES.buttons, loaded.buttons || {}),
     made_in_europe_badge: mergeMadeInEuropeBadge(
       loaded.made_in_europe_badge || DEFAULT_SHOP_STYLES.made_in_europe_badge,

@@ -350,6 +350,24 @@ const validateRequiredGpsrMetadata = (meta) => {
 }
 
 /**
+ * Each variant is its own product for compliance purposes (docs/HUKUKI.md) — when a product
+ * has real variants, GPSR fields are checked per variant instead of on the shared parent
+ * metadata, since sellercentral now collects hersteller/hersteller_information/
+ * verantwortliche_person_information on each variant individually.
+ */
+const validateRequiredGpsrForProduct = (metadataObj, variantsArr) => {
+  const realVariants = Array.isArray(variantsArr) ? variantsArr.filter((v) => Array.isArray(v?.option_values) && v.option_values.length > 0) : []
+  if (realVariants.length === 0) return validateRequiredGpsrMetadata(metadataObj || {})
+  const failing = []
+  for (const v of realVariants) {
+    const check = validateRequiredGpsrMetadata(v && typeof v.metadata === 'object' ? v.metadata : {})
+    if (!check.ok) failing.push(Array.isArray(v.option_values) ? v.option_values.join(' / ') : (v.title || v.sku || '—'))
+  }
+  if (failing.length === 0) return { ok: true }
+  return { ok: false, message: `GPSR required fields missing for variant(s): ${failing.join(', ')}` }
+}
+
+/**
  * Brand authorization publish gate (docs/BRAND.md Faz 4/2).
  * Only enforced when the product is being PUBLISHED and carries a brand_id.
  * Draft/archived products are never blocked so sellers can keep working.
@@ -413,10 +431,10 @@ const createAdminHubProductDb = async (body) => {
     const price = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
     const inventory = parseInt(body.inventory, 10) || 0
     const metaObj = body.metadata && typeof body.metadata === 'object' ? normalizeProductMetadata(body.metadata) : null
-    const gpsrValidation = validateRequiredGpsrMetadata(metaObj || {})
+    const variantsArr = body.variants && Array.isArray(body.variants) ? body.variants : null
+    const gpsrValidation = validateRequiredGpsrForProduct(metaObj || {}, variantsArr)
     if (!gpsrValidation.ok) { await client.end(); return { __error: gpsrValidation.message || 'GPSR validation failed' } }
     const metadata = metaObj ? JSON.stringify(metaObj) : null
-    const variantsArr = body.variants && Array.isArray(body.variants) ? body.variants : null
     const variants = variantsArr ? JSON.stringify(variantsArr) : null
     const eanValidation = await validateProductEansDb(client, metaObj && metaObj.ean, collectVariantEans(variantsArr || []), null)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
@@ -521,13 +539,13 @@ const updateAdminHubProductDb = async (id, body) => {
       bodyKeys.every((k) => k === 'metadata' || k === 'collection_id') &&
       metadataKeysInBody.every((k) => k === 'collection_ids')
     const skipComplianceGates = onlyVariantPatch || onlyCollectionPatch
-    if (!skipComplianceGates) {
-      const gpsrValidation = validateRequiredGpsrMetadata(metadataObj || {})
-      if (!gpsrValidation.ok) { await client.end(); return { __error: gpsrValidation.message || 'GPSR validation failed' } }
-    }
     const nextVariantsArr = body.variants !== undefined
       ? (Array.isArray(body.variants) ? body.variants : [])
       : (Array.isArray(existing.variants) ? existing.variants : [])
+    if (!skipComplianceGates) {
+      const gpsrValidation = validateRequiredGpsrForProduct(metadataObj || {}, nextVariantsArr)
+      if (!gpsrValidation.ok) { await client.end(); return { __error: gpsrValidation.message || 'GPSR validation failed' } }
+    }
     const eanValidation = await validateProductEansDb(client, metadataObj && metadataObj.ean, collectVariantEans(nextVariantsArr), uuid)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
     if (!skipComplianceGates) {

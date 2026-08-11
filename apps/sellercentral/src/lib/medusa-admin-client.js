@@ -240,13 +240,14 @@ class MedusaAdminClient {
   }
 
   /** POST /admin-hub/products/:id/eu-origin/verify — Phase 1: manual superuser or stub provider queue */
-  async verifyEuOrigin(productId, { manual = false, provider = null, pendingQueueId = null } = {}) {
+  async verifyEuOrigin(productId, { manual = false, provider = null, pendingQueueId = null, variantOptionValues = null } = {}) {
     return this.request(`/admin-hub/products/${encodeURIComponent(productId)}/eu-origin/verify`, {
       method: 'POST',
       body: JSON.stringify({
         manual,
         provider,
         pending_queue_id: pendingQueueId,
+        ...(Array.isArray(variantOptionValues) ? { variant_option_values: variantOptionValues } : {}),
       }),
     });
   }

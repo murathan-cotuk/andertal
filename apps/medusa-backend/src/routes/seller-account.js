@@ -216,7 +216,11 @@ module.exports = function createSellerAccountRouter({
             store_name: row.store_name,
             seller_id: row.seller_id,
             is_superuser: row.is_superuser === true,
+            is_team_member: row.sub_of_seller_id != null && String(row.sub_of_seller_id).trim() !== '',
             approval_status: row.approval_status || 'registered',
+            first_name: row.first_name,
+            last_name: row.last_name,
+            created_at: row.created_at,
             commission_rate: row.commission_rate != null ? parseFloat(row.commission_rate) : 0.12,
           },
         })

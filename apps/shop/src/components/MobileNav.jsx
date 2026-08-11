@@ -325,6 +325,7 @@ export default function MobileNav({ layout = "fixed" }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTarget, setDrawerTarget] = useState("menu"); // "menu" | "account"
   const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [isMobileNavViewport, setIsMobileNavViewport] = useState(false);
   const drawerRef = useRef(null);
@@ -349,11 +350,17 @@ export default function MobileNav({ layout = "fixed" }) {
     return () => mq.removeEventListener("change", go);
   }, []);
 
-  /* Fetch data once */
+  /* Fetch data once — tracked with a loading flag so the "Menu" drawer's Kategorien section
+   * can show a placeholder instead of silently disappearing while this is in flight (it used
+   * to vanish entirely on categories.length === 0, leaving just the login/register block for
+   * a logged-out visitor who opened the drawer before this fetch settled). */
   useEffect(() => {
+    let cancelled = false;
+    setCategoriesLoading(true);
     fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`)
       .then((r) => r.json())
       .then((d) => {
+        if (cancelled) return;
         const tree = d?.tree || [];
         const roots = tree
           .filter((n) => n && !n.parent_id && n.has_products !== false && n.slug)
@@ -369,7 +376,9 @@ export default function MobileNav({ layout = "fixed" }) {
           .sort((a, b) => a.label.localeCompare(b.label));
         setCategories(roots);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setCategoriesLoading(false); });
+    return () => { cancelled = true; };
   }, [locale]);
 
   /* Close drawer on route change */
@@ -471,6 +480,18 @@ export default function MobileNav({ layout = "fixed" }) {
 
         {/* Drawer scrollable body: categories first, Mein Konto at bottom (no CMS “Menü” / no Service) */}
         <div ref={drawerBodyRef} style={css.drawerBody}>
+          {categoriesLoading && categories.length === 0 && (
+            <>
+              <div style={css.sectionLabel}>{t("categories")}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "4px 16px 12px" }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} style={{ height: 36, borderRadius: 8, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+                ))}
+              </div>
+              <div style={css.divider} />
+            </>
+          )}
+
           {categories.length > 0 && (
             <>
               <div style={css.sectionLabel}>{t("categories")}</div>

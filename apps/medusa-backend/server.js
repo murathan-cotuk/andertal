@@ -1296,6 +1296,10 @@ async function start() {
           );
           CREATE INDEX IF NOT EXISTS idx_seller_locations_seller_id ON seller_locations(seller_id);
         `).catch(() => {})
+        // Address purpose tags — independent of is_primary, one location can hold several at once.
+        await client.query(`ALTER TABLE seller_locations ADD COLUMN IF NOT EXISTS is_shipping_from boolean NOT NULL DEFAULT false;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_locations ADD COLUMN IF NOT EXISTS is_returns_to boolean NOT NULL DEFAULT false;`).catch(() => {})
+        await client.query(`ALTER TABLE seller_locations ADD COLUMN IF NOT EXISTS is_billing boolean NOT NULL DEFAULT false;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS phone varchar(100) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS website varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS documents jsonb DEFAULT NULL;`).catch(() => {})
@@ -1776,6 +1780,12 @@ async function start() {
             updated_at timestamptz DEFAULT now()
           );
         `).catch(() => {})
+        // Per-locale badge content: text-vs-image mode, a DE-default image, and an i18n blob
+        // ({en: {label, image_url}, tr: {...}, ...}) — same _i18n[locale][field] convention
+        // used by landing containers, falls back to the root label/image_url for DE.
+        await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS badge_type text NOT NULL DEFAULT 'text';`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS image_url text;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS i18n jsonb;`).catch(() => {})
         // Seller campaigns (Aktionen/Kampagnen)
         await client.query(`
           CREATE TABLE IF NOT EXISTS seller_campaigns (

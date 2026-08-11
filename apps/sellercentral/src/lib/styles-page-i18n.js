@@ -426,5 +426,26 @@ export function getStylesPageCopy(locale) {
       "Farben, Buttons und visuelle Stile deines Shops"
     ),
     stylesSaved: t("Styles saved.", "Stiller kaydedildi.", "Styles enregistrés.", "Estilos guardados.", "Stili salvati.", "Stile gespeichert."),
+
+    // ── CMS pages ────────────────────────────────────────────────────────────
+    cmsPagesTitle: t("Layout: CMS pages", "Layout: CMS sayfaları", "Mise en page : pages CMS", "Diseño: páginas CMS", "Layout: pagine CMS", "Layout: CMS-Seiten"),
+    cmsPagesSubtitle: t(
+      "Spacing below the header on Content → Pages (title / body).",
+      "Content → Pages sayfalarında header altı boşluk (başlık / gövde).",
+      "Espacement sous le header sur Contenu → Pages (titre / corps).",
+      "Espaciado bajo el header en Contenido → Páginas (título / cuerpo).",
+      "Spaziatura sotto l'header in Contenuto → Pagine (titolo / corpo).",
+      "Abstand unter dem Header auf Content → Seiten (Titel / Inhalt)."
+    ),
+    cmsPaddingTop: t("Top padding (px)", "Üst boşluk (px)", "Marge haute (px)", "Padding superior (px)", "Padding superiore (px)", "Abstand oben (px)"),
+    cmsPaddingTopHelp: t(
+      "Extra space between header and page title. Default 0. Header height is already reserved separately.",
+      "Header ile sayfa başlığı arası ekstra boşluk. Varsayılan 0. Header yüksekliği ayrıca ayrılır.",
+      "Espace supplémentaire entre le header et le titre. Défaut 0. La hauteur du header est déjà réservée.",
+      "Espacio extra entre el header y el título. Predeterminado 0. La altura del header ya está reservada.",
+      "Spazio extra tra header e titolo. Predefinito 0. L'altezza dell'header è già riservata.",
+      "Extra-Abstand zwischen Header und Seitentitel. Standard 0. Die Header-Höhe ist separat reserviert."
+    ),
+    cmsPaddingBottom: t("Bottom padding (px)", "Alt boşluk (px)", "Marge basse (px)", "Padding inferior (px)", "Padding inferiore (px)", "Abstand unten (px)"),
   };
 }

@@ -9,13 +9,20 @@ const pgDbClient = () => {
 
 const ALLOWED_POSITIONS = new Set(['top-left', 'top-right', 'bottom-left', 'bottom-right'])
 const ALLOWED_TARGET_TYPES = new Set(['product', 'group', 'api'])
-const ALLOWED_API_RULES = new Set(['bestseller', 'bestseller_category', 'sale', 'new'])
+// "bestseller" (global, single top-N catalog-wide) was removed — "bestseller_category" is now
+// the only bestseller rule and auto-covers every category's own top seller (see
+// getCategoryTopSellerIds in store-products.js), no per-rule category picker needed anymore.
+const ALLOWED_API_RULES = new Set(['bestseller_category', 'sale', 'new'])
+const ALLOWED_BADGE_TYPES = new Set(['text', 'image'])
 
 const normalizeBadgeInput = (body) => {
   const b = body || {}
   const position = ALLOWED_POSITIONS.has(b.position) ? b.position : 'top-left'
   const target_type = ALLOWED_TARGET_TYPES.has(b.target_type) ? b.target_type : 'product'
   const api_rule = ALLOWED_API_RULES.has(b.api_rule) ? b.api_rule : null
+  // i18n: { [locale]: { label?, image_url? } } — same _i18n[locale][field] convention as
+  // landing containers; DE always lives on the root label/image_url columns.
+  const i18n = b.i18n && typeof b.i18n === 'object' && !Array.isArray(b.i18n) ? b.i18n : null
   return {
     label: (b.label || '').toString().trim(),
     position,
@@ -33,6 +40,9 @@ const normalizeBadgeInput = (body) => {
     api_rule: target_type === 'api' ? api_rule : null,
     api_category_id: target_type === 'api' && api_rule === 'bestseller_category' ? (b.api_category_id || null) : null,
     active: b.active !== false,
+    badge_type: ALLOWED_BADGE_TYPES.has(b.badge_type) ? b.badge_type : 'text',
+    image_url: (b.image_url || '').toString().trim() || null,
+    i18n,
   }
 }
 
@@ -54,9 +64,9 @@ module.exports = function createProductBadgesRouter({ requireSuperuser }) {
       await c.connect()
       const r = await c.query(
         `INSERT INTO admin_hub_product_badges
-          (label, position, bg_color, text_color, font_size, border_width, border_color, border_radius, offset_x, offset_y, target_type, product_id, group_id, api_rule, api_category_id, active)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
-        [b.label, b.position, b.bg_color, b.text_color, b.font_size, b.border_width, b.border_color, b.border_radius, b.offset_x, b.offset_y, b.target_type, b.product_id, b.group_id, b.api_rule, b.api_category_id, b.active]
+          (label, position, bg_color, text_color, font_size, border_width, border_color, border_radius, offset_x, offset_y, target_type, product_id, group_id, api_rule, api_category_id, active, badge_type, image_url, i18n)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`,
+        [b.label, b.position, b.bg_color, b.text_color, b.font_size, b.border_width, b.border_color, b.border_radius, b.offset_x, b.offset_y, b.target_type, b.product_id, b.group_id, b.api_rule, b.api_category_id, b.active, b.badge_type, b.image_url, b.i18n ? JSON.stringify(b.i18n) : null]
       )
       await c.end(); res.status(201).json({ badge: r.rows[0] })
     } catch (e) { try { await c.end() } catch (_) {}; res.status(500).json({ message: e?.message }) }
@@ -72,9 +82,10 @@ module.exports = function createProductBadgesRouter({ requireSuperuser }) {
       const r = await c.query(
         `UPDATE admin_hub_product_badges SET
           label=$1, position=$2, bg_color=$3, text_color=$4, font_size=$5, border_width=$6, border_color=$7, border_radius=$8,
-          offset_x=$9, offset_y=$10, target_type=$11, product_id=$12, group_id=$13, api_rule=$14, api_category_id=$15, active=$16, updated_at=now()
-         WHERE id=$17 RETURNING *`,
-        [b.label, b.position, b.bg_color, b.text_color, b.font_size, b.border_width, b.border_color, b.border_radius, b.offset_x, b.offset_y, b.target_type, b.product_id, b.group_id, b.api_rule, b.api_category_id, b.active, req.params.id]
+          offset_x=$9, offset_y=$10, target_type=$11, product_id=$12, group_id=$13, api_rule=$14, api_category_id=$15, active=$16,
+          badge_type=$17, image_url=$18, i18n=$19, updated_at=now()
+         WHERE id=$20 RETURNING *`,
+        [b.label, b.position, b.bg_color, b.text_color, b.font_size, b.border_width, b.border_color, b.border_radius, b.offset_x, b.offset_y, b.target_type, b.product_id, b.group_id, b.api_rule, b.api_category_id, b.active, b.badge_type, b.image_url, b.i18n ? JSON.stringify(b.i18n) : null, req.params.id]
       )
       await c.end(); res.json({ badge: r.rows[0] })
     } catch (e) { try { await c.end() } catch (_) {}; res.status(500).json({ message: e?.message }) }

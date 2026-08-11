@@ -20,9 +20,9 @@ import BestsellerBadge from "@/components/BestsellerBadge";
 import { SaleBadgeImageCorner } from "@/components/SaleBadge";
 import { CustomProductBadges } from "@/components/CustomProductBadge";
 import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
-import { isBestsellerMetadata } from "@/lib/bestseller";
+import { isBestsellerMetadata, isNewMetadata } from "@/lib/bestseller";
 import { isEuOriginVerified } from "@andertal/shop-theme";
-import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
+import { getBruttoCentsFromPricesMap, resolveProductSaleCents } from "@/lib/product-price";
 import styled, { css } from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── *
@@ -523,20 +523,14 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           : (parentCountryPrice != null
               ? parentCountryPrice
               : (product.price != null ? Math.round(Number(product.price) * 100) : 0)));
-  const _deSaleCents = product.metadata?.prices?.DE?.sale_cents != null
-    ? Number(product.metadata.prices.DE.sale_cents)
-    : null;
-  const _legacySaleCents = product.metadata?.rabattpreis_cents != null
-    ? Number(product.metadata.rabattpreis_cents)
-    : null;
-  const saleCents = _deSaleCents ?? _legacySaleCents;
+  const saleCents = resolveProductSaleCents(product, variant, countryCode, marketCountry);
   const hasSale = saleCents != null && saleCents > 0 && saleCents < priceCents;
 
   /* Flags */
   const isNew =
     product.metadata?.is_new === true ||
     product.metadata?.is_new === "true" ||
-    product.metadata?.badge === "new";
+    isNewMetadata(product.metadata, product.created_at);
   const publishDate = product.metadata?.publish_date ? new Date(product.metadata.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const isBestseller = isBestsellerProp !== undefined ? isBestsellerProp : isBestsellerMetadata(product.metadata || {});
@@ -992,7 +986,7 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
     : (variant?.prices?.[0]?.amount != null ? Number(variant.prices[0].amount)
     : (parentCountryPrice != null ? parentCountryPrice
     : (product.price != null ? Math.round(Number(product.price) * 100) : 0)));
-  const saleCents = product.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
+  const saleCents = resolveProductSaleCents(product, variant, countryCode, marketCountry);
   const hasSale = saleCents != null && saleCents > 0 && saleCents < priceCents;
 
   const meta = product.metadata || {};

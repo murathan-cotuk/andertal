@@ -48,7 +48,22 @@ function registerEuOriginRoutes(httpApp, deps) {
       const dbQ = getDbQ()
       if (!dbQ) return res.status(503).json({ message: 'Database not configured' })
 
-      const existingMeta = product.metadata && typeof product.metadata === 'object' ? product.metadata : {}
+      // Each variant is its own product for compliance purposes — when the caller passes
+      // variant_option_values, verify/update that variant's own metadata instead of the
+      // parent's, leaving every sibling variant and the parent's own metadata untouched.
+      const variantOptionValues = Array.isArray(req.body?.variant_option_values) ? req.body.variant_option_values : null
+      let variantIndex = -1
+      if (variantOptionValues) {
+        const key = JSON.stringify(variantOptionValues)
+        const variants = Array.isArray(product.variants) ? product.variants : []
+        variantIndex = variants.findIndex((v) => Array.isArray(v?.option_values) && JSON.stringify(v.option_values) === key)
+        if (variantIndex < 0) return res.status(404).json({ message: 'Variant not found' })
+      }
+
+      const existingMeta = variantIndex >= 0
+        ? (product.variants[variantIndex].metadata && typeof product.variants[variantIndex].metadata === 'object' ? product.variants[variantIndex].metadata : {})
+        : (product.metadata && typeof product.metadata === 'object' ? product.metadata : {})
+
       const result = await verifyEuOriginForProduct({
         dbQ,
         productId: product.id,
@@ -58,11 +73,22 @@ function registerEuOriginRoutes(httpApp, deps) {
         verifiedBy: sellerId,
         providerId: req.body?.provider || existingMeta.eu_origin_provider,
         pendingQueueId: req.body?.pending_queue_id || null,
+        variantLabel: variantIndex >= 0 ? `variant: ${variantOptionValues.join(' / ')}` : null,
       })
 
-      const updated = await updateAdminHubProductDb(product.id, { metadata: result.metadata })
+      let updated
+      if (variantIndex >= 0) {
+        const nextVariants = product.variants.map((v, i) => (i === variantIndex ? { ...v, metadata: result.metadata } : v))
+        updated = await updateAdminHubProductDb(product.id, { variants: nextVariants })
+      } else {
+        updated = await updateAdminHubProductDb(product.id, { metadata: result.metadata })
+      }
       if (!updated) return res.status(500).json({ message: 'Failed to update product' })
       if (updated.__error) return res.status(400).json({ message: updated.__error })
+
+      const updatedVariantMeta = variantIndex >= 0 && Array.isArray(updated.variants)
+        ? (updated.variants[variantIndex]?.metadata || {})
+        : null
 
       res.json({
         ok: result.ok,
@@ -72,7 +98,7 @@ function registerEuOriginRoutes(httpApp, deps) {
         provider: result.provider,
         message: result.message,
         product: updated,
-        eu_origin: pickEuOriginFields(updated.metadata),
+        eu_origin: pickEuOriginFields(updatedVariantMeta || updated.metadata),
       })
     } catch (err) {
       res.status(500).json({ message: err?.message || 'Internal server error' })

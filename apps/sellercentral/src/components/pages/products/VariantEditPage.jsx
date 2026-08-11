@@ -21,6 +21,8 @@ import { ProductIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import ComplianceFieldsSection from "@/components/products/ComplianceFieldsSection";
 import { decodeVariantPathKey, findVariantIndexByOptionKey } from "@/lib/variant-path-key";
 import {
   ProductSectionHeading,
@@ -28,6 +30,16 @@ import {
   PRODUCT_SECTION_STYLES,
 } from "@/components/products/ProductSection";
 import { lt } from "@/lib/locale-text";
+import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
+
+/** Same shape as ProductEditPage's getMeta/updateMeta, but reads/writes the VARIANT's own
+ * metadata — each variant is its own product for category/brand/shipping/compliance/EU-origin,
+ * the parent product is just the collection that groups the variants together. */
+function getMeta(obj, key, fallback = "") {
+  const m = obj?.metadata;
+  if (!m || typeof m !== "object") return fallback;
+  return m[key] != null && m[key] !== "" ? String(m[key]) : fallback;
+}
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -55,6 +67,21 @@ function descriptionVisualToHtml(html) {
   if (!s) return "";
   if (/<(p|div|h[1-6]|ul|ol|li)\b/i.test(s)) return s;
   return `<p>${s}</p>`;
+}
+
+function categoryLineageIdsFromFlatList(flatCategories, categoryId) {
+  if (!categoryId || !Array.isArray(flatCategories) || flatCategories.length === 0) return [];
+  const byId = new Map(flatCategories.map((c) => [String(c.id), c]));
+  const out = [];
+  let cur = byId.get(String(categoryId));
+  const seen = new Set();
+  while (cur && !seen.has(String(cur.id))) {
+    seen.add(String(cur.id));
+    out.push(String(cur.id));
+    const pid = cur.parent_id != null ? String(cur.parent_id) : "";
+    cur = pid && byId.has(pid) ? byId.get(pid) : null;
+  }
+  return out;
 }
 
 function variantImageUrlForLocale(row, loc) {
@@ -124,6 +151,33 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   const descEditorRef = useRef(null);
   const [priceInputs, setPriceInputs] = useState({});
   const priceInputsRef = useRef({});
+  const [isSuperuser, setIsSuperuser] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [shippingGroupsList, setShippingGroupsList] = useState([]);
+  const [euOriginVerifying, setEuOriginVerifying] = useState(false);
+  const [euOriginNotice, setEuOriginNotice] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      client.getAdminHubCategories().then((r) => r.categories || []).catch(() => []),
+      client.getBrands().then((r) => r.brands || []).catch(() => []),
+      client.request("/admin-hub/v1/shipping-groups").then((r) => r?.groups || []).catch(() => []),
+    ]).then(([categoriesList, brandsList, shippingList]) => {
+      if (!cancelled) {
+        setCategories(categoriesList);
+        setBrands(brandsList);
+        setShippingGroupsList(shippingList);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [client]);
 
   const [baselineSnapshot, setBaselineSnapshot] = useState(() =>
     initialProduct ? JSON.stringify(normalizeForCompareProduct(initialProduct)) : null,
@@ -354,6 +408,66 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
     });
   };
 
+  const updateVariantCategoryWithParents = useCallback((categoryId) => {
+    const selected = String(categoryId || "").trim();
+    patchVariant((cur) => {
+      const m = { ...(cur.metadata && typeof cur.metadata === "object" ? cur.metadata : {}) };
+      if (!selected) {
+        delete m.category_id;
+        delete m.admin_category_id;
+        delete m.category_ids;
+        delete m.category_slug;
+        return { ...cur, metadata: m };
+      }
+      const byId = new Map((categories || []).map((c) => [String(c.id), c]));
+      const catNode = byId.get(selected);
+      const lineage = categoryLineageIdsFromFlatList(categories, selected);
+      m.category_id = selected;
+      m.admin_category_id = selected;
+      m.category_ids = lineage.length > 0 ? lineage : [selected];
+      if (catNode?.slug) m.category_slug = String(catNode.slug).replace(/^\//, "");
+      return { ...cur, metadata: m };
+    });
+  }, [categories, patchVariant]);
+
+  const handleVerifyEuOriginVariant = useCallback(async (manual) => {
+    if (!product?.id || !v?.option_values) return;
+    setEuOriginVerifying(true);
+    setEuOriginNotice("");
+    try {
+      const res = await client.verifyEuOrigin(product.id, {
+        manual: Boolean(manual),
+        provider: vm.eu_origin_provider || "stub",
+        variantOptionValues: v.option_values,
+      });
+      if (res?.product) setProduct(res.product);
+      const st = res?.eu_origin?.eu_origin_status || res?.status;
+      if (st === EU_ORIGIN_STATUS.VERIFIED) {
+        setEuOriginNotice(t(
+          "EU origin verified — badge appears in shop after saving.",
+          "AB kökeni doğrulandı — kayıt sonrası mağazada rozet görünür.",
+          "Origine UE vérifiée — le badge apparaît dans la boutique après enregistrement.",
+          "Origen UE verificado — el badge aparece en la tienda tras guardar.",
+          "Origine UE verificata — il badge appare nel negozio dopo il salvataggio.",
+          "EU-Herkunft verifiziert — Badge erscheint im Shop nach Speichern.",
+        ));
+      } else {
+        setEuOriginNotice(res?.message || t(
+          "Verification pending (queue / superuser).",
+          "Doğrulama beklemede (kuyruk / süper kullanıcı).",
+          "Vérification en attente (file d'attente / superuser).",
+          "Verificación pendiente (cola / superusuario).",
+          "Verifica in sospeso (coda / superuser).",
+          "Prüfung ausstehend (Warteschlange / Superuser).",
+        ));
+      }
+    } catch (e) {
+      setEuOriginNotice(e?.message || t("Verification failed.", "Doğrulama başarısız.", "Échec de la vérification.", "Error en la verificación.", "Verifica fallita.", "Verifizierung fehlgeschlagen"));
+    } finally {
+      setEuOriginVerifying(false);
+    }
+  }, [product?.id, v?.option_values, vm.eu_origin_provider, client, t]);
+
   const removeVariantMedia = (index) => {
     const next = variantMediaUrls.filter((_, i) => i !== index);
     if (locale === "de") updateVariantMeta("media", next.length ? next : undefined);
@@ -506,6 +620,165 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
                   />
                 </Box>
+              </InlineStack>
+
+              <ProductSectionRule />
+
+              <ProductSectionHeading>
+                {locale === "en" ? "Shop assignment (this variant)" : locale === "tr" ? "Mağaza ataması (bu varyant)" : locale === "fr" ? "Attribution boutique (cette variante)" : locale === "es" ? "Asignación de tienda (esta variante)" : locale === "it" ? "Assegnazione negozio (questa variante)" : "Shop-Zuordnung (diese Variante)"}
+              </ProductSectionHeading>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {locale === "en" ? "Each variant is its own product — category, brand and shipping group are set per variant, not shared with siblings." : locale === "tr" ? "Her varyant kendi ürünüdür — kategori, marka ve kargo grubu varyant başına ayarlanır, kardeş varyantlarla paylaşılmaz." : locale === "fr" ? "Chaque variante est son propre produit — catégorie, marque et groupe d'expédition sont définis par variante, non partagés." : locale === "es" ? "Cada variante es su propio producto — categoría, marca y grupo de envío se definen por variante, no compartidos." : locale === "it" ? "Ogni variante è un proprio prodotto — categoria, marca e gruppo di spedizione sono impostati per variante, non condivisi." : "Jede Variante ist ihr eigenes Produkt — Kategorie, Marke und Versandgruppe werden pro Variante gesetzt, nicht mit Geschwistern geteilt."}
+              </Text>
+              <InlineStack gap="300" wrap>
+                <Box minWidth="240px" flex="1">
+                  <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}</Text>
+                  <Box paddingBlockStart="150">
+                    <CategoryDrilldownSelect
+                      label={locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}
+                      labelHidden
+                      categories={categories || []}
+                      value={getMeta(v, "category_id")}
+                      onChange={updateVariantCategoryWithParents}
+                      placeholder={locale === "en" ? "Select category" : locale === "tr" ? "Kategori seç" : locale === "fr" ? "Choisir une catégorie" : locale === "es" ? "Seleccionar categoría" : locale === "it" ? "Seleziona categoria" : "Kategorie wählen"}
+                    />
+                  </Box>
+                </Box>
+                <Box minWidth="240px" flex="1">
+                  <Select
+                    label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
+                    options={[
+                      { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" },
+                      ...(brands || [])
+                        .filter((b) => (b.status || "active") === "active" || b.id === getMeta(v, "brand_id"))
+                        .map((b) => {
+                          const pending = (b.status || "active") !== "active";
+                          const pendingSuffix = pending
+                            ? ` (${locale === "en" ? "pending authorization" : locale === "tr" ? "onay bekliyor" : locale === "fr" ? "autorisation en attente" : locale === "es" ? "autorización pendiente" : locale === "it" ? "autorizzazione in attesa" : "Autorisierung ausstehend"})`
+                            : "";
+                          return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
+                        }),
+                    ]}
+                    value={getMeta(v, "brand_id") || ""}
+                    onChange={(val) => updateVariantMeta("brand_id", val || undefined)}
+                  />
+                </Box>
+                <Box minWidth="240px" flex="1">
+                  <Select
+                    label={locale === "en" ? "Shipping group" : locale === "tr" ? "Kargo grubu" : locale === "fr" ? "Groupe d'expédition" : locale === "es" ? "Grupo de envío" : locale === "it" ? "Gruppo di spedizione" : "Versandgruppe"}
+                    options={[
+                      { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucun —" : locale === "es" ? "— Ninguno —" : locale === "it" ? "— Nessuno —" : "— Keine —", value: "" },
+                      ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
+                    ]}
+                    value={vm.shipping_group_id ?? ""}
+                    onChange={(val) => updateVariantMeta("shipping_group_id", val || undefined)}
+                  />
+                </Box>
+              </InlineStack>
+
+              <ProductSectionRule />
+
+              <ProductSectionHeading>
+                {locale === "en" ? "Compliance / manufacturer (this variant)" : locale === "tr" ? "Uyumluluk / üretici (bu varyant)" : locale === "fr" ? "Conformité / fabricant (cette variante)" : locale === "es" ? "Cumplimiento / fabricante (esta variante)" : locale === "it" ? "Conformità / produttore (questa variante)" : "Compliance / Hersteller (diese Variante)"}
+              </ProductSectionHeading>
+              <TextField
+                label="Hersteller"
+                value={getMeta(v, "hersteller")}
+                onChange={(val) => updateVariantMeta("hersteller", val || undefined)}
+                placeholder="Hersteller"
+                autoComplete="off"
+              />
+              <TextField
+                label="Hersteller-Information"
+                value={getMeta(v, "hersteller_information")}
+                onChange={(val) => updateVariantMeta("hersteller_information", val || undefined)}
+                placeholder="Hersteller-Information"
+                multiline={2}
+                autoComplete="off"
+              />
+              <TextField
+                label="Verantwortliche Person (EU)"
+                value={getMeta(v, "verantwortliche_person_information")}
+                onChange={(val) => updateVariantMeta("verantwortliche_person_information", val || undefined)}
+                placeholder="Verantwortliche Person Information"
+                multiline={2}
+                autoComplete="off"
+              />
+              <ComplianceFieldsSection
+                client={client}
+                categoryId={getMeta(v, "category_id")}
+                marketplace="DE"
+                locale={locale}
+                product={v}
+                getMeta={getMeta}
+                updateMeta={updateVariantMeta}
+              />
+
+              <ProductSectionRule />
+              <ProductSectionHeading>
+                {locale === "en" ? "Made in Europe (this variant, optional)" : locale === "tr" ? "Made in Europe (bu varyant, isteğe bağlı)" : locale === "fr" ? "Made in Europe (cette variante, optionnel)" : locale === "es" ? "Made in Europe (esta variante, opcional)" : locale === "it" ? "Made in Europe (questa variante, opzionale)" : "Made in Europe (diese Variante, optional)"}
+              </ProductSectionHeading>
+              {euOriginNotice ? (
+                <Banner tone="info" onDismiss={() => setEuOriginNotice("")}>{euOriginNotice}</Banner>
+              ) : null}
+              <TextField
+                label={locale === "en" ? "Country of origin (EU)" : locale === "tr" ? "Menşe ülke (AB)" : locale === "fr" ? "Pays d'origine (UE)" : locale === "es" ? "País de origen (UE)" : locale === "it" ? "Paese di origine (UE)" : "Herkunftsland (EU)"}
+                value={vm.eu_origin_country ?? ""}
+                onChange={(val) => updateVariantMeta("eu_origin_country", val || undefined)}
+                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
+                autoComplete="off"
+              />
+              <TextField
+                label="Registry-ID"
+                value={vm.eu_origin_registry_id ?? ""}
+                onChange={(val) => updateVariantMeta("eu_origin_registry_id", val || undefined)}
+                placeholder={locale === "en" ? "EU registry / certificate number" : locale === "tr" ? "AB kayıt / sertifika numarası" : locale === "fr" ? "Registre UE / numéro de certificat" : locale === "es" ? "Registro UE / número de certificado" : locale === "it" ? "Registro UE / numero di certificato" : "EU-Registry / Zertifikatsnummer"}
+                autoComplete="off"
+              />
+              <TextField
+                label="Nachweisdokument (URL)"
+                value={vm.eu_origin_document_url ?? ""}
+                onChange={(val) => updateVariantMeta("eu_origin_document_url", val || undefined)}
+                placeholder="https://…"
+                autoComplete="off"
+              />
+              <Select
+                label={locale === "en" ? "Registry provider" : locale === "tr" ? "Registry sağlayıcısı" : locale === "fr" ? "Fournisseur de registre" : locale === "es" ? "Proveedor de registro" : locale === "it" ? "Provider registro" : "Registry-Provider"}
+                options={[
+                  { label: locale === "en" ? "Stub (manual check)" : locale === "tr" ? "Stub (manuel kontrol)" : locale === "fr" ? "Stub (vérification manuelle)" : locale === "es" ? "Stub (verificación manual)" : locale === "it" ? "Stub (verifica manuale)" : "Stub (manuelle Prüfung)", value: "stub" },
+                ]}
+                value={vm.eu_origin_provider || "stub"}
+                onChange={(val) => updateVariantMeta("eu_origin_provider", val || "stub")}
+              />
+              <TextField
+                label="Status"
+                value={vm.eu_origin_status || "—"}
+                readOnly
+                autoComplete="off"
+                helpText={
+                  vm.eu_origin_verified_at
+                    ? `${locale === "en" ? "Verified at:" : locale === "tr" ? "Doğrulandı:" : locale === "fr" ? "Vérifié le :" : locale === "es" ? "Verificado el:" : locale === "it" ? "Verificato il:" : "Verifiziert am:"} ${vm.eu_origin_verified_at}`
+                    : (locale === "en" ? "Only backend/superuser sets \"verified\"." : locale === "tr" ? "Yalnızca backend/süper kullanıcı \"doğrulandı\" olarak ayarlar." : locale === "fr" ? "Seul le backend/superuser définit \"vérifié\"." : locale === "es" ? "Solo backend/superusuario establece \"verificado\"." : locale === "it" ? "Solo backend/superuser imposta \"verificato\"." : 'Nur Backend/Superuser setzt „verified".')
+                }
+              />
+              <InlineStack gap="200">
+                <Button
+                  onClick={() => handleVerifyEuOriginVariant(false)}
+                  loading={euOriginVerifying}
+                  disabled={!product?.id || euOriginVerifying}
+                >
+                  {locale === "en" ? "Check registry (stub)" : locale === "tr" ? "Registry kontrol et (stub)" : locale === "fr" ? "Vérifier le registre (stub)" : locale === "es" ? "Verificar registro (stub)" : locale === "it" ? "Controlla registro (stub)" : "Registry prüfen (Stub)"}
+                </Button>
+                {isSuperuser ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleVerifyEuOriginVariant(true)}
+                    loading={euOriginVerifying}
+                    disabled={!product?.id || euOriginVerifying}
+                  >
+                    {locale === "en" ? "Verify manually" : locale === "tr" ? "Manuel doğrula" : locale === "fr" ? "Vérifier manuellement" : locale === "es" ? "Verificar manualmente" : locale === "it" ? "Verifica manualmente" : "Manuell verifizieren"}
+                  </Button>
+                ) : null}
               </InlineStack>
 
               <ProductSectionRule />

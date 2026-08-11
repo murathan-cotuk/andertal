@@ -36,3 +36,29 @@ export function getSaleCentsFromPricesMap(prices, countryCode, marketCountry) {
   const n = Number(entry.sale_cents);
   return Number.isFinite(n) ? n : null;
 }
+
+/**
+ * Sale / Rabattpreis: variant prices map → product prices map → legacy rabattpreis_cents.
+ * Matches ProductCard so PDP and listing show the same discounted price.
+ */
+export function resolveProductSaleCents(product, variant, countryCode, marketCountry) {
+  const vm = variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {};
+  const pm = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+  const fromVariantMap = getSaleCentsFromPricesMap(
+    vm.prices && typeof vm.prices === "object" ? vm.prices : {},
+    countryCode,
+    marketCountry,
+  );
+  if (fromVariantMap != null && fromVariantMap > 0) return fromVariantMap;
+  const fromProductMap = getSaleCentsFromPricesMap(
+    pm.prices && typeof pm.prices === "object" ? pm.prices : {},
+    countryCode,
+    marketCountry,
+  );
+  if (fromProductMap != null && fromProductMap > 0) return fromProductMap;
+  const legacyVariant = vm.rabattpreis_cents != null ? Number(vm.rabattpreis_cents) : null;
+  if (legacyVariant != null && Number.isFinite(legacyVariant) && legacyVariant > 0) return legacyVariant;
+  const legacyProduct = pm.rabattpreis_cents != null ? Number(pm.rabattpreis_cents) : null;
+  if (legacyProduct != null && Number.isFinite(legacyProduct) && legacyProduct > 0) return legacyProduct;
+  return null;
+}

@@ -111,6 +111,7 @@ const CONTAINER_PADDING_DEFAULTS = {
   banner_cta: "32px 48px 40px 48px",
   collection_carousel: "32px 24px 32px 24px",
   bestseller_carousel: "32px 24px 32px 24px",
+  category_sidebar: "0px 0px 0px 0px",
   seller_carousel: "32px 24px 32px 24px",
   collections_carousel: "32px 24px 32px 24px",
   content_mosaic: "32px 24px 32px 24px",
@@ -309,7 +310,9 @@ function newContainer(type) {
     case "collection_carousel":
       return { ...base, title: "", collection_id: "", collection_handle: "", product_captions: "", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
     case "bestseller_carousel":
-      return { ...base, title: "", category_slug: "", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
+      return { ...base, title: "", category_slug: "", mode: "bestseller", items_per_row: 4, items_per_row_mobile: 2, gap: 16, mobile_layout: "row", mobile_grid_rows: 2, mobile_grid_cols: 2, padding: "32px 24px", content_layout: "full" };
+    case "category_sidebar":
+      return { ...base, title: "" };
     case "seller_carousel":
       return { ...base, title: "", limit: 20, items_per_row: 4, items_per_row_mobile: 2, gap: 16, padding: "32px 24px", content_layout: "full" };
     case "collections_carousel":
@@ -1590,6 +1593,16 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
   return (
     <BlockStack gap="400">
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <Select
+        label={c.carouselModeLabel}
+        options={[
+          { label: c.carouselModeBestseller, value: "bestseller" },
+          { label: c.carouselModeSale, value: "sale" },
+        ]}
+        value={container.mode === "sale" ? "sale" : "bestseller"}
+        onChange={(v) => onChange({ ...container, mode: v })}
+        helpText={container.mode === "sale" ? c.carouselModeSaleHelp : c.carouselModeBestsellerHelp}
+      />
       <div>
         <CategoryDrilldownSelect
           label={c.category}
@@ -1647,6 +1660,16 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
           </div>
         </>
       )}
+    </BlockStack>
+  );
+}
+
+function CategorySidebarEditor({ container, onChange, editLang = "de" }) {
+  const c = useLandingCopy();
+  return (
+    <BlockStack gap="400">
+      <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <Text as="p" variant="bodySm" tone="subdued">{c.categorySidebarHelp}</Text>
     </BlockStack>
   );
 }
@@ -3058,6 +3081,7 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "banner_cta":           editor = <BannerCtaEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "collection_carousel":  editor = <CollectionCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "bestseller_carousel":  editor = <BestsellerCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
+    case "category_sidebar":     editor = <CategorySidebarEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "seller_carousel":      editor = <SellerCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "collections_carousel": editor = <CollectionsCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "accordion":            editor = <AccordionEditor container={container} onChange={onChange} editLang={editLang} />; break;

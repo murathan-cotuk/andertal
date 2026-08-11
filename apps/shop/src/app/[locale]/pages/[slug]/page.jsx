@@ -11,6 +11,7 @@ import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import LandingContainers from "@/components/landing/LandingContainers";
 import BecomeSellerLanding, { BECOME_SELLER_PAGE_SLUGS } from "@/components/landing/BecomeSellerLanding";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
+import { useShopStyles } from "@/context/ShopStylesContext";
 
 /** DE lives on the plain field; other locales live under `${field}_i18n[locale][field]`, falling back to DE. */
 function lt(page, field, locale) {
@@ -27,10 +28,22 @@ function sanitizeHtml(html) {
     .replace(/\s+on\w+\s*=\s*[^\s>]+/gi, "");
 }
 
+function cmsPagePadding(tmpl) {
+  const t = tmpl && typeof tmpl === "object" ? tmpl : {};
+  const top = Number(t.padding_top);
+  const bottom = Number(t.padding_bottom);
+  return {
+    paddingTop: Number.isFinite(top) ? Math.max(0, top) : 0,
+    paddingBottom: Number.isFinite(bottom) ? Math.max(0, bottom) : 48,
+  };
+}
+
 export default function CmsPageBySlug() {
   const params = useParams();
   const locale = useLocale();
   const slug = params?.slug != null ? String(params.slug) : undefined;
+  const shopStyles = useShopStyles();
+  const pagePad = cmsPagePadding(shopStyles?.cms_page_template);
 
   const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -132,8 +145,11 @@ export default function CmsPageBySlug() {
           </SectionErrorBoundary>
         )}
         <div
-          className={`container mx-auto px-4 max-w-3xl w-full ${hero ? "pb-12" : "py-12"}`}
-          style={hero ? { marginTop: 2 } : (hasContainers ? undefined : { paddingTop: 128 })}
+          className="container mx-auto px-4 max-w-3xl w-full"
+          style={{
+            paddingTop: hero ? 8 : pagePad.paddingTop,
+            paddingBottom: pagePad.paddingBottom,
+          }}
         >
           {hero ? (
             <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">

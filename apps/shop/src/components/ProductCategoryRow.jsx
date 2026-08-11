@@ -15,7 +15,7 @@ import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-pr
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import BestsellerBadge from "@/components/BestsellerBadge";
 import { SaleBadgeImageCorner } from "@/components/SaleBadge";
-import { isBestsellerMetadata } from "@/lib/bestseller";
+import { isBestsellerMetadata, isNewMetadata } from "@/lib/bestseller";
 import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
 import { StarRating } from "@/components/ProductCard";
 import styled from "styled-components";
@@ -311,7 +311,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
   const isNew =
     product.metadata?.is_new === true ||
     product.metadata?.is_new === "true" ||
-    product.metadata?.badge === "new";
+    isNewMetadata(product.metadata, product.created_at);
   const publishDate = product.metadata?.publish_date ? new Date(product.metadata.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
   const isBestseller = isBestsellerMetadata(product.metadata || {});

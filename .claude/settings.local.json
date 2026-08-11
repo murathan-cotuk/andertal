@@ -244,7 +244,8 @@
       "Bash(pkill -f \"next dev -p 3911\")",
       "Bash(pkill -f \"next dev -p 3912\")",
       "mcp__ide__getDiagnostics",
-      "PowerShell(npx eslint src/components/pages/products/ProductEditPage.jsx --max-warnings=0 2>&1 | Select-Object -Last 150)"
+      "PowerShell(npx eslint src/components/pages/products/ProductEditPage.jsx --max-warnings=0 2>&1 | Select-Object -Last 150)",
+      "Bash(xargs -I{} basename {})"
     ]
   }
 }

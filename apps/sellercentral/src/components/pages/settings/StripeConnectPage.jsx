@@ -22,18 +22,24 @@ export default function StripeConnectPage() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState(null);
   // null → { connected, onboarding_complete, stripe_account_id, commission_rate }
+  const [isSuperuser, setIsSuperuser] = useState(null); // null = unknown yet, true/false once read
 
   const justConnected = searchParams?.get("connected") === "true";
   const needsRefresh  = searchParams?.get("refresh") === "true";
 
   useEffect(() => {
-    fetchStatus();
+    if (typeof window === "undefined") return;
+    setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
+
+  useEffect(() => {
+    if (isSuperuser) fetchStatus();
+  }, [isSuperuser]);
 
   // If Stripe redirected back with ?connected=true, re-fetch status (Stripe might have updated)
   useEffect(() => {
-    if (justConnected || needsRefresh) fetchStatus();
-  }, [justConnected, needsRefresh]);
+    if (isSuperuser && (justConnected || needsRefresh)) fetchStatus();
+  }, [isSuperuser, justConnected, needsRefresh]);
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -120,6 +126,32 @@ export default function StripeConnectPage() {
     labelPlatformFee: t("Platform fee", "Platform ücreti", "Frais de plateforme", "Tarifa de plataforma", "Commissione di piattaforma", "Plattformgebühr"),
     labelPlatformFeeSub: t("incl. Stripe fees", "Stripe ücretleri dahil", "frais Stripe inclus", "incl. tarifas de Stripe", "incl. commissioni Stripe", "inkl. Stripe-Gebühren"),
   };
+
+  if (isSuperuser === null) {
+    return (
+      <Card><Text as="p" tone="subdued">{ui.loading}</Text></Card>
+    );
+  }
+
+  if (!isSuperuser) {
+    return (
+      <Card>
+        <BlockStack gap="200">
+          <Text as="h2" variant="headingMd">{copy.headerTitle}</Text>
+          <Banner tone="info">
+            {t(
+              "Sellers don't manage Stripe directly — payouts are handled automatically by Andertal. This page is for platform administrators only.",
+              "Satıcılar Stripe'ı doğrudan yönetmez — ödemeler Andertal tarafından otomatik olarak yapılır. Bu sayfa yalnızca platform yöneticileri içindir.",
+              "Les vendeurs ne gèrent pas Stripe directement — les versements sont traités automatiquement par Andertal. Cette page est réservée aux administrateurs de la plateforme.",
+              "Los vendedores no gestionan Stripe directamente — los pagos los procesa Andertal automáticamente. Esta página es solo para administradores de la plataforma.",
+              "I venditori non gestiscono Stripe direttamente — i pagamenti sono elaborati automaticamente da Andertal. Questa pagina è solo per gli amministratori della piattaforma.",
+              "Verkäufer verwalten Stripe nicht direkt — Auszahlungen erfolgen automatisch über Andertal. Diese Seite ist nur für Plattform-Administratoren.",
+            )}
+          </Banner>
+        </BlockStack>
+      </Card>
+    );
+  }
 
   return (
     <BlockStack gap="400">

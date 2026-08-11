@@ -307,7 +307,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
               padding: "16px 18px",
               background: "#fff",
               borderRadius: 8,
-              border: "2px solid #e5e7eb",
+              border: "1px solid #e5e7eb",
               fontSize: 13,
               boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
             }}
@@ -331,7 +331,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
                   maxWidth: 360,
                   padding: "10px 12px",
                   borderRadius: 8,
-                  border: "2px solid #e5e7eb",
+                  border: "1px solid #e5e7eb",
                   fontFamily: "ui-monospace, monospace",
                   fontSize: 13,
                 }}
@@ -378,7 +378,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
               <div style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>{ui.noTrackingYet}</div>
             )}
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, background: "#fff", borderRadius: 8, overflow: "hidden", border: "2px solid #e5e7eb" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb" }}>
             <thead>
               <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <th style={{ textAlign: "left", padding: "4px 8px" }}>{ui.product}</th>
@@ -399,7 +399,28 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
                   <tr key={i} style={{ borderTop: "1px solid #e5e7eb" }}>
                     <td style={{ padding: "6px 8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4 }} />}
+                        <div
+                          style={{
+                            width: 40, height: 40, flexShrink: 0, borderRadius: 6, overflow: "hidden",
+                            background: "#f4f4f5", border: "1px solid #e5e7eb",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          {it.thumbnail ? (
+                            <img
+                              src={it.thumbnail}
+                              alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              onError={(e) => { e.currentTarget.style.display = "none"; }}
+                            />
+                          ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c1c1c6" strokeWidth="1.6" aria-hidden>
+                              <rect x="3" y="3" width="18" height="18" rx="3" />
+                              <circle cx="9" cy="9" r="1.6" fill="#c1c1c6" stroke="none" />
+                              <path d="M21 15l-5-5-9 9" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
                         <div>
                           {it.product_id ? (
                             <a href={`/${locale}/products/${it.product_id}`} style={{ color: "#111827", textDecoration: "underline", textDecorationColor: "#d1d5db" }}>{itemMain || "—"}</a>
@@ -777,7 +798,6 @@ export default function OrdersPage() {
   const [mySellerId, setMySellerId] = useState("");
   const [sellerLabelById, setSellerLabelById] = useState({});
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
-  const [sellerSectionOpen, setSellerSectionOpen] = useState({});
   const [sellerGroupSort, setSellerGroupSort] = useState("created_at_desc");
   const [colWidths, setColWidths] = useState(() => COL_DEFS.map(c => c.defaultWidth));
   const [hiddenCols, setHiddenCols] = useState(new Set());
@@ -1379,35 +1399,27 @@ export default function OrdersPage() {
                 ) : (
                   filteredSellerOrderGroups.flatMap(({ sellerId, items }) => {
                     const label = sellerLabelById[sellerId] || sellerId;
-                    const open = sellerSectionOpen[sellerId] !== false;
                     const headerRow = (
                       <tr key={`h-${sellerId}`}>
                         <SellerGroupHeader colSpan={visibleColCount}>
-                          <button
-                            type="button"
-                            onClick={() => setSellerSectionOpen((prev) => ({ ...prev, [sellerId]: !open }))}
+                          <div
                             style={{
                               width: "100%",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "space-between",
                               padding: "12px 20px",
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              font: "inherit",
-                              textAlign: "left",
                             }}
                           >
                             <span style={{ fontWeight: 600, fontSize: 15, color: "#111827" }}>{label}</span>
                             <span style={{ fontSize: 13, color: "#6b7280" }}>
-                              {open ? "▾" : "▸"} {items.length} {ui.orders}
+                              {items.length} {ui.orders}
                             </span>
-                          </button>
+                          </div>
                         </SellerGroupHeader>
                       </tr>
                     );
-                    return open ? [headerRow, ...renderOrderRows(items)] : [headerRow];
+                    return [headerRow, ...renderOrderRows(items)];
                   })
                 )}
               </>

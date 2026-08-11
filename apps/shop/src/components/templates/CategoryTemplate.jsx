@@ -187,21 +187,22 @@ const SortBarLeft = styled.div`
 const FilterBtn = styled.button`
   display: none;
   align-items: center;
-  gap: 7px;
-  padding: 12px 0;
+  gap: 5px;
+  padding: 5px 0;
   background: none;
   border: none;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: ${(p) => (p.$active ? "#111" : "#666")};
   cursor: pointer;
   transition: color 0.12s;
-  border-bottom: 2px solid ${(p) => (p.$active ? "#111" : "transparent")};
+  border-bottom: 1.5px solid ${(p) => (p.$active ? "#111" : "transparent")};
   margin-bottom: -1px;
+  line-height: 1.2;
 
-  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.8; }
   &:hover { color: #111; }
 
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
@@ -594,15 +595,10 @@ const FilterGroupTitle = styled.button`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
+  gap: 8px;
+  padding: 10px 0;
   background: none;
   border: none;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #111;
   cursor: pointer;
   text-align: left;
 `;
@@ -610,7 +606,6 @@ const FilterGroupTitle = styled.button`
 const FilterGroupHeading = styled.h4`
   margin: 0;
   padding: 0;
-  font: inherit;
   flex: 1;
   min-width: 0;
   text-align: left;
@@ -622,11 +617,21 @@ const FilterGroupBody = styled.div`
 `;
 
 const FilterChevron = styled.span`
-  font-size: 14px;
-  line-height: 1;
-  color: #666;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #9ca3af;
   transform: rotate(${(p) => (p.$open ? "180deg" : "0deg")});
   transition: transform 0.18s ease;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    display: block;
+  }
 `;
 
 const CheckRow = styled.label`
@@ -670,21 +675,21 @@ const SubcategoryGroup = styled.div`
   margin-bottom: 0;
 `;
 
-const SubcategoryLink = styled(Link)`
+const SubcategoryLink = styled(Link).attrs({ className: "shop-typo-sidebar-nav" })`
   display: block;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: ${(p) => (p.$active ? "#111827" : "#4b5563")};
-  font-weight: ${(p) => (p.$active ? 600 : 400)};
+  padding: 5px 8px;
   text-decoration: none;
   border-radius: 6px;
   background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   transition: background 0.12s, color 0.12s;
+  /* font from .shop-typo-sidebar-nav (Sellercentral → Styles → Sidebar-Navigation) */
+  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111827)" : "#4b5563")};
+  font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-nav-fw, 400)")};
 
   &:hover {
     background: #e5e7eb;
-    color: #111827;
+    color: var(--sidebar-nav-color, #111827);
   }
 `;
 
@@ -1249,7 +1254,7 @@ export default function CategoryTemplate() {
                   <circle cx="11" cy="6" r="1.5" fill="#111" stroke="none" />
                   <circle cx="5" cy="10" r="1.5" fill="#111" stroke="none" />
                 </svg>
-                Navigation {activeCount > 0 ? `(${activeCount})` : ""}
+                {tCommon("categories")}{activeCount > 0 ? ` (${activeCount})` : ""}
               </FilterBtn>
             )}
             {/* Breadcrumb — desktop only */}
@@ -1379,8 +1384,12 @@ export default function CategoryTemplate() {
                   Object.entries(facets).map(([key, vals]) => (
                     <FilterGroup key={key}>
                       <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                        <FilterGroupHeading className="shop-typo-sidebar-nav">{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
-                        <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
+                        <FilterGroupHeading>{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
+                        <FilterChevron $open={!!openFilterGroups[key]} aria-hidden>
+                          <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </FilterChevron>
                       </FilterGroupTitle>
                       <FilterGroupBody $open={!!openFilterGroups[key]}>
                         {vals.map((val) => {

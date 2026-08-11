@@ -7,6 +7,7 @@ import { useLandingChrome } from "@/context/LandingChromeContext";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { toSalesScore } from "@/lib/bestseller";
+import { isDiscountedProduct, getProductBasePriceCents } from "@/lib/catalog-listing";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
@@ -1089,11 +1090,22 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
 }
 
 // ── Bestseller Carousel ───────────────────────────────────────────────────────
+/** How much a discounted product is discounted, 0-1 — used to sort "sale" mode carousels. */
+function discountPct(product) {
+  const meta = product?.metadata || {};
+  const dePrice = meta.prices?.DE;
+  const base = dePrice?.brutto_cents != null ? Number(dePrice.brutto_cents) : getProductBasePriceCents(product);
+  const sale = dePrice?.sale_cents != null ? Number(dePrice.sale_cents) : (meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null);
+  if (!base || sale == null || sale <= 0 || sale >= base) return 0;
+  return 1 - sale / base;
+}
+
 function BestsellerCarousel({ container, locale = "de" }) {
   const [products, setProducts] = useState(undefined);
   const isNarrow = useIsNarrow(1023);
   const baseGap = container.gap != null ? Number(container.gap) : 10;
   const gap = Number.isNaN(baseGap) ? 10 : baseGap;
+  const mode = container.mode === "sale" ? "sale" : "bestseller";
 
   useEffect(() => {
     if (!container.category_slug) { setProducts([]); return; }
@@ -1101,11 +1113,15 @@ function BestsellerCarousel({ container, locale = "de" }) {
       .then((r) => r.json())
       .then((d) => {
         const all = Array.isArray(d?.products) ? d.products : [];
-        all.sort((a, b) => toSalesScore(b.metadata) - toSalesScore(a.metadata));
-        setProducts(all);
+        if (mode === "sale") {
+          setProducts(all.filter(isDiscountedProduct).sort((a, b) => discountPct(b) - discountPct(a)));
+        } else {
+          all.sort((a, b) => toSalesScore(b.metadata) - toSalesScore(a.metadata));
+          setProducts(all);
+        }
       })
       .catch(() => setProducts([]));
-  }, [container.category_slug]);
+  }, [container.category_slug, mode]);
 
   if (products === undefined) {
     return (
@@ -1121,12 +1137,15 @@ function BestsellerCarousel({ container, locale = "de" }) {
 
   if (!products.length) return null;
 
-  const categoryUrl = container.category_slug ? `/${container.category_slug}?sort=bestseller` : null;
+  const categoryUrl = container.category_slug
+    ? (mode === "sale" ? `/${container.category_slug}` : `/${container.category_slug}?sort=bestseller`)
+    : null;
 
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
-  const renderItem = (product, i) => (
-    <ProductCard product={product} plainImage isBestseller rank={i + 1} hideBestsellerBadge />
-  );
+  const renderItem = (product, i) =>
+    mode === "sale"
+      ? <ProductCard product={product} plainImage />
+      : <ProductCard product={product} plainImage isBestseller rank={i + 1} hideBestsellerBadge />;
 
   if (isNarrow && isGrid) {
     return (
@@ -2643,6 +2662,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
 export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
+  const [sidebarCategoryLinks, setSidebarCategoryLinks] = useState([]);
   const { setLandingHeaderFilterBar, setSecondNavDesktopClassic } = useLandingChrome();
   const isNarrow = useIsNarrow(1023);
   const isTablet = useIsTablet();
@@ -2748,6 +2768,37 @@ export default function LandingContainers({ pageId, categoryId }) {
     return () => { cancelled = true; };
   }, [containers]);
 
+  // Category sidebar — auto-derived from this page's own "Category carousel" (bestseller_carousel)
+  // containers, scoped to categories that currently have products. Same source/precedent as the
+  // desktop sidebar in apps/shop/src/app/[locale]/[handle]/page.jsx (lines ~943-986), generalized
+  // here into a real container type so any page can opt in via a "category_sidebar" container.
+  const hasSidebarContainer = Array.isArray(containers) && containers.some((c) => c?.type === "category_sidebar" && c?.visible !== false);
+  useEffect(() => {
+    if (!hasSidebarContainer) { setSidebarCategoryLinks([]); return; }
+    let cancelled = false;
+    const seen = new Set();
+    const candidates = [];
+    for (const c of containers) {
+      if (c?.type !== "bestseller_carousel" || c?.visible === false) continue;
+      const slug = String(c.category_slug || "").trim();
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      candidates.push({ slug, title: (lt(c, "title", locale) || "").trim() || slug });
+    }
+    if (!candidates.length) { setSidebarCategoryLinks([]); return; }
+    Promise.all(
+      candidates.map((l) =>
+        fetch(`/api/store-products?category=${encodeURIComponent(l.slug)}&limit=1`, { cache: "no-store" })
+          .then((r) => r.json())
+          .then((d) => ({ ...l, hasProducts: Array.isArray(d?.products) && d.products.length > 0 }))
+          .catch(() => ({ ...l, hasProducts: false }))
+      )
+    ).then((withCounts) => {
+      if (!cancelled) setSidebarCategoryLinks(withCounts.filter((l) => l.hasProducts));
+    });
+    return () => { cancelled = true; };
+  }, [hasSidebarContainer, containers, locale]);
+
   // Don't block render — show layout immediately, data-dependent components show skeleton
   if (!containers) return null;
   if (containers.length === 0) return null;
@@ -2765,9 +2816,58 @@ export default function LandingContainers({ pageId, categoryId }) {
     return null;
   })();
 
-  return (
+  const mainContainers = containers.filter((c) => c.type !== "category_sidebar");
+  const stack = (
     <div>
-      {containers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, locale, firstVisibleId }))}
+      {mainContainers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, locale, firstVisibleId }))}
+    </div>
+  );
+
+  const showSidebar = hasSidebarContainer && sidebarCategoryLinks.length > 0;
+  if (!showSidebar) return stack;
+
+  const categoriesLabel = locale === "en" ? "Categories" : locale === "tr" ? "Kategoriler" : locale === "fr" ? "Catégories" : locale === "es" ? "Categorías" : locale === "it" ? "Categorie" : "Kategorien";
+
+  if (isNarrow) {
+    return (
+      <div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "10px 16px", borderBottom: "1px solid #eee", WebkitOverflowScrolling: "touch" }}>
+          {sidebarCategoryLinks.map((l) => (
+            <Link
+              key={l.slug}
+              href={`/${l.slug}`}
+              style={{ flexShrink: 0, padding: "6px 14px", borderRadius: 999, background: "#f4f4f2", fontSize: 13, fontWeight: 600, color: "#111", textDecoration: "none", whiteSpace: "nowrap" }}
+            >
+              {l.title}
+            </Link>
+          ))}
+        </div>
+        {stack}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", maxWidth: 1440, margin: "0 auto" }}>
+      <div style={{ width: 220, flexShrink: 0, padding: "32px 16px 32px 24px" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#999", marginBottom: 10 }}>
+          {categoriesLabel}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {sidebarCategoryLinks.map((l) => (
+            <Link
+              key={l.slug}
+              href={`/${l.slug}`}
+              style={{ padding: "8px 10px", borderRadius: 8, fontSize: 14, color: "#333", textDecoration: "none" }}
+            >
+              {l.title}
+            </Link>
+          ))}
+        </div>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {stack}
+      </div>
     </div>
   );
 }

@@ -15,6 +15,7 @@ async function verifyEuOriginForProduct({
   verifiedBy = null,
   providerId = null,
   pendingQueueId = null,
+  variantLabel = null,
 }) {
   const fields = pickEuOriginFields(existingMeta)
 
@@ -53,7 +54,9 @@ async function verifyEuOriginForProduct({
     productId,
     sellerId: verifiedBy,
     meta: existingMeta,
-    note: lookup.message || 'Awaiting manual review',
+    note: variantLabel
+      ? `[${variantLabel}] ${lookup.message || 'Awaiting manual review'}`
+      : (lookup.message || 'Awaiting manual review'),
   })
 
   const pendingMeta = {

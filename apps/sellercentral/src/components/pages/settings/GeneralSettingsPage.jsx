@@ -31,20 +31,13 @@ export default function GeneralSettingsPage() {
   const t = useTranslations("locale");
   const [formData, setFormData] = useState({
     storeName: "",
-    email: "",
     phone: "",
-    address: "",
-    city: "",
-    country: "",
-    postalCode: "",
-    description: "",
     companyName: "",
     taxId: "",
     vatId: "",
     lucidNumber: "",
     eprDocumentUrl: "",
     website: "",
-    iban: "",
     businessStreet: "",
     businessCity: "",
     businessPostalCode: "",
@@ -111,7 +104,6 @@ export default function GeneralSettingsPage() {
           setFormData((prev) => ({
             ...prev,
             storeName: data.store_name || "",
-            email: typeof window !== "undefined" ? (localStorage.getItem("sellerEmail") || "") : "",
             phone: sellerUser.phone || "",
             companyName: sellerUser.company_name || "",
             taxId: sellerUser.tax_id || "",
@@ -119,7 +111,6 @@ export default function GeneralSettingsPage() {
             lucidNumber: sellerUser.lucid_number || "",
             eprDocumentUrl: sellerUser.epr_document_url || "",
             website: sellerUser.website || "",
-            iban: sellerUser.iban || "",
             businessStreet: businessAddress.street || "",
             businessCity: businessAddress.city || "",
             businessPostalCode: businessAddress.postal_code || "",
@@ -136,7 +127,6 @@ export default function GeneralSettingsPage() {
           setFormData((prev) => ({
             ...prev,
             storeName: typeof window !== "undefined" ? (localStorage.getItem("storeName") || "") : "",
-            email: typeof window !== "undefined" ? (localStorage.getItem("sellerEmail") || "") : "",
           }));
         }
       } finally {
@@ -178,7 +168,6 @@ export default function GeneralSettingsPage() {
           country: formData.warehouseCountry.trim() || "",
         },
       });
-      await client.updateSellerIban(formData.iban.trim() || null);
       const newName = formData.storeName.trim();
       if (typeof window !== "undefined" && newName) {
         localStorage.setItem("storeName", newName);
@@ -299,68 +288,12 @@ export default function GeneralSettingsPage() {
               helpText="Shown as Verkäufer on product pages in the shop. Stored in the database."
             />
             <TextField
-              label="Email"
-              type="email"
-              value={formData.email}
-              onChange={(v) => setFormData((p) => ({ ...p, email: v }))}
-              placeholder="you@example.com"
-              autoComplete="email"
-            />
-            <TextField
               label="Phone"
               type="tel"
               value={formData.phone}
               onChange={(v) => setFormData((p) => ({ ...p, phone: v }))}
               placeholder="+49 …"
               autoComplete="tel"
-            />
-            <Divider />
-            <Text as="h2" variant="headingMd">
-              Address
-            </Text>
-            <TextField
-              label="Address"
-              value={formData.address}
-              onChange={(v) => setFormData((p) => ({ ...p, address: v }))}
-              placeholder="Street and number"
-              autoComplete="street-address"
-            />
-            <InlineStack gap="300" blockAlign="start">
-              <Box minWidth="140px">
-                <TextField
-                  label="City"
-                  value={formData.city}
-                  onChange={(v) => setFormData((p) => ({ ...p, city: v }))}
-                  placeholder="City"
-                  autoComplete="address-level2"
-                />
-              </Box>
-              <Box minWidth="140px">
-                <TextField
-                  label="Postal code"
-                  value={formData.postalCode}
-                  onChange={(v) => setFormData((p) => ({ ...p, postalCode: v }))}
-                  placeholder="PLZ"
-                  autoComplete="postal-code"
-                />
-              </Box>
-              <Box minWidth="140px">
-                <TextField
-                  label="Country"
-                  value={formData.country}
-                  onChange={(v) => setFormData((p) => ({ ...p, country: v }))}
-                  placeholder="Country"
-                  autoComplete="country-name"
-                />
-              </Box>
-            </InlineStack>
-            <TextField
-              label="Store description"
-              value={formData.description}
-              onChange={(v) => setFormData((p) => ({ ...p, description: v }))}
-              placeholder="Tell us about your store…"
-              multiline={3}
-              autoComplete="off"
             />
             <Divider />
             <Text as="h2" variant="headingMd">Company details & documents</Text>
@@ -389,15 +322,14 @@ export default function GeneralSettingsPage() {
                   helpText="z.B. DE123456789"
                 />
               </Box>
-              <Box minWidth="180px">
-                <TextField
-                  label="IBAN (optional)"
-                  value={formData.iban}
-                  onChange={(v) => setFormData((p) => ({ ...p, iban: v }))}
-                  autoComplete="off"
-                />
-              </Box>
             </InlineStack>
+            <Text as="p" tone="subdued" variant="bodySm">
+              {locale === "de"
+                ? "IBAN und Bankverbindung werden unter Einstellungen → Zahlungen verwaltet."
+                : locale === "tr"
+                ? "IBAN ve banka bilgileri Ayarlar → Ödemeler altında yönetilir."
+                : "IBAN and bank details are managed under Settings → Payments."}
+            </Text>
             <Divider />
             <Text as="h3" variant="headingSm">
               {locale === "de" ? "Verpackungsgesetz (LUCID / EPR)" : locale === "tr" ? "Ambalaj Geri Dönüşüm (LUCID / EPR)" : "Packaging Recycling (LUCID / EPR)"}

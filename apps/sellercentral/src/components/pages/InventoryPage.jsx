@@ -370,17 +370,27 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
 
   return (
     <div style={{ marginTop: 0, borderTop: EXCEL_BORDER, background: "#fff" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 2fr 140px 150px 1.2fr", gap: 0, marginBottom: 0, background: "#f8fafc", borderBottom: EXCEL_BORDER, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 56px 2fr 140px 150px 1.2fr", gap: 0, marginBottom: 0, background: "#f8fafc", borderBottom: EXCEL_BORDER, alignItems: "center" }}>
         <div />
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.select}</div>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.status}</div>
+        <div style={{ borderRight: EXCEL_BORDER, padding: "8px 6px" }} />
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 8px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.details}</div>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.inventory}</div>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.price}</div>
         <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 8px", textAlign: "center" }}>{i18n.variations}</div>
       </div>
-      {drafts.map((d, idx) => (
-        <div key={idx} style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 2fr 140px 150px 1.2fr", gap: 0, alignItems: "center", borderBottom: idx === drafts.length - 1 ? "none" : EXCEL_BORDER, background: idx % 2 === 0 ? "#fff" : "#fcfdff" }}>
+      {drafts.map((d, idx) => {
+        const vRow = matrixVariants[idx] || {};
+        const vMedia = vRow.metadata?.media;
+        const vRawThumb =
+          (Array.isArray(vMedia) && vMedia[0] ? (typeof vMedia[0] === "string" ? vMedia[0] : vMedia[0]?.url || null) : null) ||
+          vRow.image_urls?.[locale] ||
+          vRow.image_url ||
+          null;
+        const vThumbUrl = vRawThumb ? resolveImageUrl(vRawThumb) : null;
+        return (
+        <div key={idx} style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 56px 2fr 140px 150px 1.2fr", gap: 0, alignItems: "center", borderBottom: idx === drafts.length - 1 ? "none" : EXCEL_BORDER, background: idx % 2 === 0 ? "#fff" : "#fcfdff" }}>
           <div style={{ textAlign: "center", color: "#9ca3af", padding: "8px 4px", borderRight: EXCEL_BORDER }}>↳</div>
           <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}><CustomCheckbox checked={false} onChange={() => {}} size={18} /></div>
           <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}>
@@ -392,6 +402,30 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
                 </span>
               );
             })()}
+          </div>
+          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
+            <div
+              style={{
+                width: 40, height: 40, flexShrink: 0, borderRadius: 6, overflow: "hidden",
+                background: "#f4f4f5", border: "1px solid #e5e7eb",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              {vThumbUrl ? (
+                <img
+                  src={vThumbUrl}
+                  alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c1c1c6" strokeWidth="1.6" aria-hidden>
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="9" cy="9" r="1.6" fill="#c1c1c6" stroke="none" />
+                  <path d="M21 15l-5-5-9 9" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </div>
           </div>
           <div style={{ minWidth: 0, padding: "8px 8px", borderRight: EXCEL_BORDER }}>
             <a
@@ -439,7 +473,8 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
             {getVariantLabel(matrixVariants[idx], locale) || "—"}
           </div>
         </div>
-      ))}
+        );
+      })}
       <div style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 12, padding: "8px 6px", borderTop: "1px solid #e5e7eb", background: "#fff" }}>
         <Button type="button" onClick={save} loading={saving} variant="primary">
           {saving ? i18n.saving : i18n.save}
@@ -561,7 +596,11 @@ function InventoryProductRow({
   const hasVariants = Array.isArray(product.variants) && product.variants.filter((v) => Array.isArray(v.option_values) && v.option_values.length > 0).length > 0;
   const pendingCount = Array.isArray(pendingChangeRequests) ? pendingChangeRequests.length : 0;
   return (
-    <div style={{ background: "#fff", borderBottom: EXCEL_BORDER }}>
+    <div
+      style={{ background: "#fff", borderBottom: EXCEL_BORDER, transition: "background-color .1s" }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "#fafafa"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+    >
       <div style={{ display: "grid", gridTemplateColumns: INVENTORY_ROW_GRID, gap: 0, alignItems: "center" }}>
         <button
           type="button"
@@ -606,19 +645,52 @@ function InventoryProductRow({
             })()}
           </div>
           <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
-          <Box minWidth="56px" width="56px" minHeight="56px" height="56px" background="bg-fill-secondary" borderRadius="200" overflow="hidden">
-            {thumbUrl ? <img src={thumbUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} /> : null}
-          </Box>
+          <div
+            style={{
+              width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: "hidden",
+              background: "#f4f4f5", border: "1px solid #e5e7eb",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            {thumbUrl ? (
+              <img
+                src={thumbUrl}
+                alt={getLocalizedTitle(product, locale)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
+              />
+            ) : null}
+            <div
+              style={{
+                display: thumbUrl ? "none" : "flex",
+                width: "100%", height: "100%", alignItems: "center", justifyContent: "center",
+                color: "#c1c1c6",
+              }}
+              aria-hidden
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <circle cx="9" cy="9" r="1.6" fill="currentColor" stroke="none" />
+                <path d="M21 15l-5-5-9 9" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </div>
           </div>
           <div style={{ minWidth: 0, padding: "8px 8px", borderRight: EXCEL_BORDER }}>
             <a
               href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
               target="_blank"
               rel="noreferrer"
-              style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-              title={getLocalizedTitle(product, locale)}
+              style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden" }}
+              title={`${getLocalizedTitle(product, locale)} — ${lt(locale, "opens in shop, new tab", "mağazada açılır, yeni sekme", "s'ouvre dans la boutique, nouvel onglet", "se abre en la tienda, pestaña nueva", "si apre nel negozio, nuova scheda", "öffnet im Shop, neuer Tab")}`}
+              onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
             >
-              {getLocalizedTitle(product, locale)}
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{getLocalizedTitle(product, locale)}</span>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.2" style={{ flexShrink: 0 }} aria-hidden>
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M15 3h6v6M10 14 21 3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </a>
             <button
               type="button"

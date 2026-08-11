@@ -7,7 +7,7 @@ import { CustomProductBadges } from "@/components/CustomProductBadge";
 /**
  * Bestseller (top-left) + Sale (top-right) + superuser-configured custom badges over product images on PDP.
  */
-export default function ProductImageBadges({ isBestseller, hasSale, isComingSoon, saleLabel = "Sale", customBadges }) {
+export default function ProductImageBadges({ isBestseller, hasSale, isComingSoon, saleLabel = "Sale", customBadges, locale }) {
   const badges = Array.isArray(customBadges) ? customBadges : [];
   if (isComingSoon || (!isBestseller && !hasSale && badges.length === 0)) return null;
   // A custom badge in the same corner as a built-in one takes priority to avoid overlap.
@@ -29,7 +29,7 @@ export default function ProductImageBadges({ isBestseller, hasSale, isComingSoon
         </div>
       )}
       {hasSale && !hasCustomTopRight && <SaleBadgeImageCorner>{saleLabel}</SaleBadgeImageCorner>}
-      <CustomProductBadges badges={badges} />
+      <CustomProductBadges badges={badges} locale={locale} />
     </>
   );
 }

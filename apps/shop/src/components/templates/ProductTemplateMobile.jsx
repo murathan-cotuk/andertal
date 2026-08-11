@@ -21,7 +21,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { useStoreCampaignDiscount } from "@/hooks/useStoreCampaignDiscount";
-import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap } from "@/lib/product-price";
+import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap, resolveProductSaleCents } from "@/lib/product-price";
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
@@ -1326,8 +1326,8 @@ export default function ProductTemplateMobile() {
   const uvpCents = uvpCountryCents != null
     ? uvpCountryCents
     : (variant?.compare_at_price_cents != null ? Number(variant.compare_at_price_cents) : (meta.uvp_cents != null ? Number(meta.uvp_cents) : null));
-  const saleCents = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null;
-  const hasSale = saleCents != null && saleCents > 0 && priceCents > 0;
+  const saleCents = resolveProductSaleCents(product, variant, countryCode, marketCountry);
+  const hasSale = saleCents != null && saleCents > 0 && priceCents > 0 && saleCents < priceCents;
   const displayCents = hasSale ? saleCents : priceCents;
   const discountPercent = hasSale && priceCents > 0 && saleCents < priceCents
     ? Math.round(((priceCents - saleCents) / priceCents) * 100)

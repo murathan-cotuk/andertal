@@ -156,7 +156,7 @@ export default function SettingsLayout({ children }) {
                 {group.items.map((item) => {
                   const active = isActive(item.href);
                   const isSU = item.superuserOnly;
-                  const accentColor = isSU ? "#7c3aed" : "#008060";
+                  const accentColor = isSU ? "#dc2626" : "#008060";
                   return (
                     <Link key={item.href} href={item.href} style={{ textDecoration: "none", display: "block" }}>
                       <div style={{
@@ -164,7 +164,7 @@ export default function SettingsLayout({ children }) {
                         padding: "9px 20px 9px 16px",
                         margin: "2px 8px",
                         borderRadius: 8,
-                        background: active ? (isSU ? "rgba(124,58,237,0.08)" : "rgba(0,128,96,0.08)") : "transparent",
+                        background: active ? (isSU ? "rgba(220,38,38,0.08)" : "rgba(0,128,96,0.08)") : "transparent",
                         borderLeft: active ? `3px solid ${accentColor}` : "3px solid transparent",
                         transition: "all 0.15s ease",
                         cursor: "pointer",
@@ -175,21 +175,21 @@ export default function SettingsLayout({ children }) {
                         {/* Icon */}
                         <div style={{
                           width: 30, height: 30, borderRadius: 7, flexShrink: 0,
-                          background: active ? (isSU ? "rgba(124,58,237,0.12)" : "rgba(0,128,96,0.1)") : "#f1f5f9",
+                          background: active ? (isSU ? "rgba(220,38,38,0.12)" : "rgba(0,128,96,0.1)") : (isSU ? "rgba(220,38,38,0.08)" : "#f1f5f9"),
                           display: "flex", alignItems: "center", justifyContent: "center",
                           transition: "all 0.15s",
                         }}>
                           <Icon
                             d={ICONS[item.icon] || ICONS.general}
                             size={14}
-                            color={active ? accentColor : "#64748b"}
+                            color={active ? accentColor : (isSU ? "#dc2626" : "#64748b")}
                           />
                         </div>
                         {/* Label */}
                         <span style={{
                           fontSize: 13,
                           fontWeight: active ? 600 : 400,
-                          color: active ? (isSU ? "#5b21b6" : "#065f46") : "#374151",
+                          color: active ? (isSU ? "#991b1b" : "#065f46") : (isSU ? "#dc2626" : "#374151"),
                           flex: 1,
                           letterSpacing: active ? "-0.01em" : "normal",
                         }}>

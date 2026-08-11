@@ -1101,11 +1101,22 @@ function CollectionPage() {
     const isBecomeSeller = BECOME_SELLER_PAGE_SLUGS.has(
       String(cmsPage.slug || handle || "").toLowerCase(),
     );
+    const cmsTmpl = shopStyles?.cms_page_template || {};
+    const cmsPadTop = Math.max(0, Number(cmsTmpl.padding_top) || 0);
+    const cmsPadBottom = Math.max(0, Number.isFinite(Number(cmsTmpl.padding_bottom)) ? Number(cmsTmpl.padding_bottom) : 48);
+    const cmsBodyStyle = {
+      maxWidth: 800,
+      margin: "0 auto",
+      paddingTop: cmsPadTop,
+      paddingBottom: cmsPadBottom,
+      paddingLeft: 24,
+      paddingRight: 24,
+    };
     const pageBody = isBecomeSeller ? (
       <>
         <BecomeSellerLanding />
         {localizedBody ? (
-          <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}
+          <div style={cmsBodyStyle}
             dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
         ) : null}
       </>
@@ -1113,7 +1124,7 @@ function CollectionPage() {
       <>
         <LandingContainers pageId={String(cmsPage.id)} />
         {localizedBody ? (
-          <div style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}
+          <div style={cmsBodyStyle}
             dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
         ) : null}
       </>
@@ -1121,7 +1132,7 @@ function CollectionPage() {
     return (
       <PageWrap>
         <ShopHeader />
-        <Main style={{ paddingTop: HEADER_H }}>
+        <Main>
           {cmsPageCategoryLinks.length > 0 && (
             <CmsPageMobilePills>
               {cmsPageCategoryLinks.map((l) => (

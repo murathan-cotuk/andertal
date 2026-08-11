@@ -442,6 +442,8 @@ export default function SecuritySettingsPage() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const loadAccount = useCallback(async () => {
     setLoading(true);
@@ -613,18 +615,28 @@ export default function SecuritySettingsPage() {
               />
               <TextField
                 label={locale === "en" ? "New password" : locale === "tr" ? "Yeni şifre" : "Neues Passwort"}
-                type="password"
+                type={showNewPw ? "text" : "password"}
                 value={newPw}
                 onChange={setNewPw}
                 autoComplete="new-password"
                 helpText={locale === "en" ? "At least 8 characters, one letter and one number" : locale === "tr" ? "En az 8 karakter, bir harf ve bir rakam" : "Mindestens 8 Zeichen, ein Buchstabe und eine Zahl"}
+                suffix={
+                  <Button variant="plain" size="slim" onClick={() => setShowNewPw((v) => !v)}>
+                    {showNewPw ? (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Verbergen") : (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen")}
+                  </Button>
+                }
               />
               <TextField
                 label={locale === "en" ? "Confirm new password" : locale === "tr" ? "Yeni şifreyi onayla" : "Neues Passwort bestätigen"}
-                type="password"
+                type={showConfirmPw ? "text" : "password"}
                 value={confirmPw}
                 onChange={setConfirmPw}
                 autoComplete="new-password"
+                suffix={
+                  <Button variant="plain" size="slim" onClick={() => setShowConfirmPw((v) => !v)}>
+                    {showConfirmPw ? (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Verbergen") : (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen")}
+                  </Button>
+                }
               />
               <InlineStack gap="300">
                 <Button variant="primary" submit loading={saving}>

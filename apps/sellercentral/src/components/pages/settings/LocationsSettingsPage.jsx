@@ -39,6 +39,7 @@ const TYPE_COLORS = { warehouse: "#0070f3", store: "#10b981", office: "#f59e0b",
 const getEmpty = (locale) => ({
   name: "", type: "warehouse", address_line1: "", address_line2: "",
   city: "", postal_code: "", country: defaultCountryName(locale), phone: "", email: "", is_primary: false,
+  is_shipping_from: false, is_returns_to: false, is_billing: false,
 });
 
 function LocationModal({ location, onSave, onClose, locale, ui }) {
@@ -141,6 +142,36 @@ function LocationModal({ location, onSave, onClose, locale, ui }) {
               checked={!!form.is_primary}
               onChange={set("is_primary")}
             />
+            <BlockStack gap="150">
+              <Text as="p" variant="bodySm" fontWeight="semibold">
+                {t("Used as address for", "Şu amaçla kullanılan adres", "Utilisée comme adresse pour", "Usada como dirección para", "Usata come indirizzo per", "Verwendet als Adresse für")}
+              </Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                {t(
+                  "Optional — each purpose is held by exactly one location; picking it here moves it off any other location.",
+                  "Opsiyonel — her amaç yalnızca bir konuma ait olur; burada seçmek onu diğer konumdan kaldırır.",
+                  "Facultatif — chaque usage n'est attribué qu'à un seul emplacement ; le sélectionner ici le retire de tout autre emplacement.",
+                  "Opcional: cada uso pertenece exactamente a una ubicación; seleccionarlo aquí lo quita de cualquier otra ubicación.",
+                  "Facoltativo: ogni scopo appartiene a una sola posizione; selezionarlo qui lo rimuove da qualsiasi altra posizione.",
+                  "Optional — jeder Zweck gehört genau einem Standort; die Auswahl hier entfernt ihn von jedem anderen Standort.",
+                )}
+              </Text>
+              <Checkbox
+                label={t("Ships from here (default sender address for orders)", "Buradan gönderilir (siparişler için varsayılan gönderici adresi)", "Expédié d'ici (adresse d'expéditeur par défaut des commandes)", "Se envía desde aquí (dirección de remitente predeterminada de los pedidos)", "Spedito da qui (indirizzo mittente predefinito degli ordini)", "Versand von hier (Standard-Absenderadresse für Bestellungen)")}
+                checked={!!form.is_shipping_from}
+                onChange={set("is_shipping_from")}
+              />
+              <Checkbox
+                label={t("Returns go here", "İadeler buraya gelir", "Les retours arrivent ici", "Las devoluciones llegan aquí", "I resi arrivano qui", "Retouren gehen hierhin")}
+                checked={!!form.is_returns_to}
+                onChange={set("is_returns_to")}
+              />
+              <Checkbox
+                label={t("Billing address", "Fatura adresi", "Adresse de facturation", "Dirección de facturación", "Indirizzo di fatturazione", "Rechnungsadresse")}
+                checked={!!form.is_billing}
+                onChange={set("is_billing")}
+              />
+            </BlockStack>
           </BlockStack>
         </div>
         <div style={{ padding: "14px 22px 18px", borderTop: "1px solid #e5e7eb", display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -181,6 +212,24 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
                 display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600,
                 background: "#d1fae5", color: "#065f46",
               }}>{t("Primary", "Birincil", "Principal", "Principal", "Principale", "Primär")}</span>
+            )}
+            {loc.is_shipping_from && (
+              <span style={{
+                display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600,
+                background: "#dbeafe", color: "#1e40af",
+              }}>{t("Ships from", "Gönderim", "Expédition", "Envío", "Spedizione", "Versand")}</span>
+            )}
+            {loc.is_returns_to && (
+              <span style={{
+                display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600,
+                background: "#fef3c7", color: "#92400e",
+              }}>{t("Returns", "İadeler", "Retours", "Devoluciones", "Resi", "Retouren")}</span>
+            )}
+            {loc.is_billing && (
+              <span style={{
+                display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600,
+                background: "#ede9fe", color: "#5b21b6",
+              }}>{t("Billing", "Fatura", "Facturation", "Facturación", "Fatturazione", "Rechnung")}</span>
             )}
             {!loc.is_active && (
               <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#f3f4f6", color: "#9ca3af" }}>{ui.inactive}</span>

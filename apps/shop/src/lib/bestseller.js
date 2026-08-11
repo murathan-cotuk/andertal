@@ -6,15 +6,24 @@ export function toSalesScore(metadata) {
   return Number.isFinite(sold) && sold > 0 ? sold : 0;
 }
 
+export const NEW_BADGE_WINDOW_DAYS = 15;
+
+/** "Neu" badge — active for NEW_BADGE_WINDOW_DAYS days after a product's publish date
+ * (falls back to its creation date). Algorithmic only, no manual override. */
+export function isNewMetadata(metadata, createdAt) {
+  const raw = metadata?.publish_date || createdAt;
+  if (!raw) return false;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return false;
+  const ageMs = Date.now() - d.getTime();
+  return ageMs >= 0 && ageMs <= NEW_BADGE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+}
+
 export function isBestsellerMetadata(metadata) {
   if (!metadata || typeof metadata !== "object") return false;
-  if (
-    metadata.is_bestseller === true ||
-    metadata.is_bestseller === "true" ||
-    String(metadata.badge || "").toLowerCase().trim() === "bestseller"
-  ) {
-    return true;
-  }
+  // Algorithmic only — no manual "badge" override. is_bestseller is stamped server-side
+  // from real sales data (see applyBestsellerFlagsToMappedProduct in store-products.js).
+  if (metadata.is_bestseller === true || metadata.is_bestseller === "true") return true;
   // Same threshold as store-products getBestsellerProductIds (score >= 1).
   return toSalesScore(metadata) > 0;
 }

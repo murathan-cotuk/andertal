@@ -248,6 +248,14 @@ export const DEFAULT_SHOP_STYLES = {
     content_padding_x: "32px",
     filter_checkbox_size: 10,
   },
+  /**
+   * CMS Seiten (Content → Pages / shop /pages/:slug und Handle-Routen).
+   * padding_top = Extra-Abstand unter dem Header (Header-Spacer ist separat). Default 0.
+   */
+  cms_page_template: {
+    padding_top: 0,
+    padding_bottom: 48,
+  },
   buttons: {
     add_to_cart: {
       label: "Add to Cart Button",

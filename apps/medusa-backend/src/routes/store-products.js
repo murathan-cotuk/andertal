@@ -466,38 +466,41 @@ const storeProductCategoryIds = (p) => {
 }
 
 // ── Product Badges (superuser-managed text badges: Sale, Bestseller, etc.) ────
-const categoryBestsellerCache = new Map() // categoryId -> { expiresAt, ids }
-const CATEGORY_BESTSELLER_LIMIT = 5
 
-const getTopSellingProductIdsByCategory = async (categoryId) => {
-  const catId = (categoryId || '').toString().trim().toLowerCase()
-  if (!catId) return new Set()
+let categoryTopSellerCache = { expiresAt: 0, topIdSet: new Set() }
+
+/** No admin category-picker needed — the single top-selling product within EACH of its own
+ * categories, catalog-wide. Backs the "bestseller_category" Product Badge rule: one active
+ * rule, and every category's own #1 seller gets the badge (not top-5, no per-category rule
+ * duplication). */
+const getCategoryTopSellerIds = async () => {
   const now = Date.now()
-  const cached = categoryBestsellerCache.get(catId)
-  if (cached && cached.expiresAt > now) return cached.ids
+  if (categoryTopSellerCache.expiresAt > now) return categoryTopSellerCache.topIdSet
   await getBestsellerProductIds() // ensures bestsellerCache.scoresById is populated/fresh
   const scoresById = bestsellerCache.scoresById || new Map()
-  let ids = new Set()
+  const bestByCategory = new Map() // categoryId -> [productId, score]
   const client = getProductsDbClient()
   if (client) {
     try {
       await client.connect()
       const res = await client.query('SELECT id, metadata FROM admin_hub_products WHERE metadata IS NOT NULL')
-      const scored = []
       for (const row of res.rows) {
-        const catIds = storeProductCategoryIds({ metadata: row.metadata })
-        if (!catIds.includes(catId)) continue
         const pid = String(row.id).trim()
         const score = scoresById.get(pid) || 0
-        if (score > 0) scored.push([pid, score])
+        if (score <= 0) continue
+        const catIds = storeProductCategoryIds({ metadata: row.metadata })
+        for (const catId of catIds) {
+          const key = String(catId).toLowerCase()
+          const cur = bestByCategory.get(key)
+          if (!cur || score > cur[1]) bestByCategory.set(key, [pid, score])
+        }
       }
-      scored.sort((a, b) => b[1] - a[1])
-      ids = new Set(scored.slice(0, CATEGORY_BESTSELLER_LIMIT).map(([id]) => id))
       await client.end()
     } catch (_) { try { await client.end() } catch (__) {} }
   }
-  categoryBestsellerCache.set(catId, { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids })
-  return ids
+  const topIdSet = new Set([...bestByCategory.values()].map(([pid]) => pid))
+  categoryTopSellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, topIdSet }
+  return topIdSet
 }
 
 let productBadgesCache = { expiresAt: 0, badges: [] }
@@ -547,24 +550,29 @@ const hasSaleFromMapped = (mapped) => {
   return saleCents != null && saleCents > 0 && saleCents < priceCents
 }
 
+// "Neu" is active for this many days after a product's publish date (falls back to its
+// creation date) — algorithmic only, kept in sync with apps/shop/src/lib/bestseller.js's
+// NEW_BADGE_WINDOW_DAYS. No manual metadata.badge override anymore.
+const NEW_BADGE_WINDOW_DAYS = 15
+
 const isNewFromMapped = (mapped) => {
   const meta = mapped?.metadata || {}
-  return meta.is_new === true || meta.is_new === 'true' || meta.badge === 'new'
+  if (meta.is_new === true || meta.is_new === 'true') return true
+  const raw = meta.publish_date || mapped?.created_at
+  if (!raw) return false
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return false
+  const ageMs = Date.now() - d.getTime()
+  return ageMs >= 0 && ageMs <= NEW_BADGE_WINDOW_DAYS * 24 * 60 * 60 * 1000
 }
 
 const buildProductBadgeContext = async () => {
   const badges = await getActiveProductBadges()
   const groupIds = badges.filter((b) => b.target_type === 'group' && b.group_id).map((b) => b.group_id)
   const groupProductIdsByGroup = await getGroupProductIdSets(groupIds)
-  const bestsellerIds = await getBestsellerProductIds()
-  const categoryIds = [...new Set(
-    badges.filter((b) => b.target_type === 'api' && b.api_rule === 'bestseller_category' && b.api_category_id).map((b) => b.api_category_id)
-  )]
-  const categoryTopIdsByCategory = new Map()
-  await Promise.all(categoryIds.map(async (cid) => {
-    categoryTopIdsByCategory.set(String(cid).toLowerCase(), await getTopSellingProductIdsByCategory(cid))
-  }))
-  return { badges, groupProductIdsByGroup, bestsellerIds, categoryTopIdsByCategory }
+  const needsCategoryTopSellers = badges.some((b) => b.target_type === 'api' && b.api_rule === 'bestseller_category')
+  const categoryTopSellerIds = needsCategoryTopSellers ? await getCategoryTopSellerIds() : new Set()
+  return { badges, groupProductIdsByGroup, categoryTopSellerIds }
 }
 
 const badgeToPayload = (b) => ({
@@ -579,6 +587,9 @@ const badgeToPayload = (b) => ({
   border_radius: b.border_radius,
   offset_x: b.offset_x,
   offset_y: b.offset_y,
+  badge_type: b.badge_type,
+  image_url: b.image_url,
+  i18n: b.i18n,
 })
 
 const resolveCustomBadgesForProduct = (productId, mapped, ctx) => {
@@ -589,8 +600,7 @@ const resolveCustomBadgesForProduct = (productId, mapped, ctx) => {
     if (b.target_type === 'product') hit = String(b.product_id) === pid
     else if (b.target_type === 'group') hit = !!ctx.groupProductIdsByGroup.get(String(b.group_id))?.has(pid)
     else if (b.target_type === 'api') {
-      if (b.api_rule === 'bestseller') hit = ctx.bestsellerIds.has(pid)
-      else if (b.api_rule === 'bestseller_category') hit = !!ctx.categoryTopIdsByCategory.get(String(b.api_category_id || '').toLowerCase())?.has(pid)
+      if (b.api_rule === 'bestseller_category') hit = ctx.categoryTopSellerIds.has(pid)
       else if (b.api_rule === 'sale') hit = hasSaleFromMapped(mapped)
       else if (b.api_rule === 'new') hit = isNewFromMapped(mapped)
     }
