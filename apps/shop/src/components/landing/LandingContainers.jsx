@@ -12,6 +12,7 @@ import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
 import SupportLanding from "@/components/support/SupportLanding";
+import BecomeSellerLanding from "@/components/landing/BecomeSellerLanding";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
 
@@ -2696,6 +2697,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
 // ── Main export ───────────────────────────────────────────────────────────────
 export default function LandingContainers({ pageId, categoryId }) {
   const [containers, setContainers] = useState(null);
+  const [landingSettings, setLandingSettings] = useState({});
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
   const [sidebarCategoryLinks, setSidebarCategoryLinks] = useState([]);
   const { setLandingHeaderFilterBar, setSecondNavDesktopClassic } = useLandingChrome();
@@ -2711,6 +2713,7 @@ export default function LandingContainers({ pageId, categoryId }) {
       endpoint = `/store/landing-page/${encodeURIComponent(pageId)}`;
     }
     setContainers(null);
+    setLandingSettings({});
     getMedusaClient()
       .request(endpoint, { cache: "no-store" })
       .then((data) => {
@@ -2731,6 +2734,7 @@ export default function LandingContainers({ pageId, categoryId }) {
         const showBar = data?.settings?.show_filter_bar !== false;
         setLandingHeaderFilterBar(showBar);
         setSecondNavDesktopClassic(data?.settings?.second_nav_desktop_classic === true);
+        setLandingSettings(data?.settings && typeof data.settings === "object" ? data.settings : {});
         if (Array.isArray(data?.containers)) setContainers(data.containers);
         else setContainers([]);
       })
@@ -2837,6 +2841,23 @@ export default function LandingContainers({ pageId, categoryId }) {
   // Don't block render — show layout immediately, data-dependent components show skeleton
   if (!containers) return null;
   if (containers.length === 0) return null;
+
+  const deviceContainers = containers.filter((c) => {
+    if (!c?.visible) return false;
+    const v = c.visible_on || "desktop";
+    if (v === "tablet") return isTablet;
+    if (v === "desktop") return !isNarrow && !isTablet;
+    if (v === "mobile") return isNarrow && !isTablet;
+    if (v === "both") return !isTablet;
+    return true;
+  });
+
+  const layoutFlag = String(landingSettings?.become_seller_layout || "");
+  const layoutVersion = Number((layoutFlag.match(/^become_seller_v(\d+)/i) || [])[1] || 0);
+  // Visual template (stats strip, accordions, mosaic) from v3+; older layouts stay generic until reseeded.
+  if (layoutVersion >= 3) {
+    return <BecomeSellerLanding containers={deviceContainers} />;
+  }
 
   // First container that will actually render on the current device (for header gradient)
   const firstVisibleId = (() => {
