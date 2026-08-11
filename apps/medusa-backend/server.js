@@ -1786,6 +1786,24 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS badge_type text NOT NULL DEFAULT 'text';`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS image_url text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS i18n jsonb;`).catch(() => {})
+        try {
+          const { seedDefaultProductBadges } = require('./src/product-badges-seed')
+          const seedRes = await seedDefaultProductBadges(client)
+          if (seedRes?.inserted) {
+            console.log(`[seed-product-badges] inserted ${seedRes.inserted} default api badge(s)`)
+          }
+        } catch (e) {
+          console.warn('[seed-product-badges]', e?.message || e)
+        }
+        try {
+          const { ensureBecomeSellerLanding } = require('./src/become-seller-landing-seed')
+          const bs = await ensureBecomeSellerLanding(client)
+          if (bs?.seeded) {
+            console.log(`[seed-become-seller] page=${bs.pageId} containers=${bs.added}${bs.created ? ' (page created)' : ''}`)
+          }
+        } catch (e) {
+          console.warn('[seed-become-seller]', e?.message || e)
+        }
         // Seller campaigns (Aktionen/Kampagnen)
         await client.query(`
           CREATE TABLE IF NOT EXISTS seller_campaigns (
@@ -2028,7 +2046,7 @@ async function start() {
     // seller-auth.js's module.exports IS createSellerAuthRouter itself (static props attached to the function) —
     // destructuring createSellerAuthRouter as a property of the require() result gave `undefined`.
     const createSellerAuthRouter = require('./src/routes/seller-auth')
-    const { requireSellerAuth, requireSuperuser, verifySellerToken, signSellerToken, validatePasswordStrength, encryptTotp, decryptTotp, hashSellerPassword, verifySellerPassword, getSellerDbClient } = createSellerAuthRouter
+    const { requireSellerAuth, requireSuperuser, verifySellerToken, signSellerToken, createSellerSession, validatePasswordStrength, encryptTotp, decryptTotp, hashSellerPassword, verifySellerPassword, getSellerDbClient } = createSellerAuthRouter
     // ── Auth gatekeeper for /admin-hub (S1.3) ─────────────────────────────
     // Default-deny on every /admin-hub/* request: must carry a valid seller
     // bearer token via requireSellerAuth (see ~line 5630) UNLESS the path
@@ -2590,7 +2608,7 @@ async function start() {
 
     // --- Seller Management (superuser: list/detail/update/approve/impersonate + own company-info): extracted to src/routes/sellers.js ---
     const createSellersRouter = require('./src/routes/sellers')
-    httpApp.use('/', createSellersRouter({ getSellerDbClient, signSellerToken }))
+    httpApp.use('/', createSellersRouter({ getSellerDbClient, signSellerToken, createSellerSession }))
 
     // --- DAC7 / § 12 PStTG Reporting (superuser: preview + XML export): extracted to src/routes/dac7.js ---
     const createDac7Router = require('./src/routes/dac7')

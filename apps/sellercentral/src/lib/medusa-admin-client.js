@@ -72,6 +72,8 @@ class MedusaAdminClient {
         err.originalMessage = rawMsg;
         err.statusCode = response.status;
         err.code = errorBody?.code || null;
+        err.evaluation = errorBody?.evaluation || null;
+        err.body = errorBody;
         throw err;
       }
 
@@ -86,6 +88,8 @@ class MedusaAdminClient {
       out.originalMessage = rawFriendly;
       out.statusCode = error?.statusCode;
       out.code = error?.code || null;
+      out.evaluation = error?.evaluation || null;
+      out.body = error?.body || null;
       out.cause = error;
       if (error?.statusCode === 404 || error?.statusCode === 503 || isNetworkError) {
         console.warn(`Medusa Admin API (${endpoint}):`, error?.message || error?.statusCode);
@@ -231,6 +235,22 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}/variants`, {
       method: 'PATCH',
       body: JSON.stringify({ variants }),
+    });
+  }
+
+  /**
+   * POST /admin-hub/v1/products/combine-as-variants
+   * Fold standalone products into one parent's variants[]; archives absorbed rows as merged.
+   */
+  async combineProductsAsVariants({ parentId, productIds, optionName, optionValues } = {}) {
+    return this.request('/admin-hub/v1/products/combine-as-variants', {
+      method: 'POST',
+      body: JSON.stringify({
+        parent_id: parentId,
+        product_ids: productIds,
+        option_name: optionName,
+        option_values: optionValues || {},
+      }),
     });
   }
 

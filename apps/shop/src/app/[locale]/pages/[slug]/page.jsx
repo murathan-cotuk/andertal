@@ -9,7 +9,6 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import LandingContainers from "@/components/landing/LandingContainers";
-import BecomeSellerLanding, { BECOME_SELLER_PAGE_SLUGS } from "@/components/landing/BecomeSellerLanding";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
 import { useShopStyles } from "@/context/ShopStylesContext";
 
@@ -110,48 +109,26 @@ export default function CmsPageBySlug() {
   const localizedTitle = lt(page, "title", locale);
   const safeBody = sanitizeHtml(lt(page, "body", locale));
   const hero = page.featured_image ? resolveImageUrl(page.featured_image) : "";
-  const isBecomeSeller = BECOME_SELLER_PAGE_SLUGS.has(String(page.slug || slug || "").toLowerCase());
 
-  // Theme-independent seller acquisition landing (TASKS §27) — full custom page, not shop CMS chrome.
-  if (isBecomeSeller) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <ShopHeader />
-        <main className="flex-1">
-          <SectionErrorBoundary>
-            <BecomeSellerLanding />
-          </SectionErrorBoundary>
-          {safeBody ? (
-            <div className="container mx-auto px-4 max-w-3xl w-full pb-12">
-              <div
-                className="prose prose-gray max-w-none"
-                dangerouslySetInnerHTML={{ __html: safeBody }}
-              />
-            </div>
-          ) : null}
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
+  // Landing containers (Sellercentral) are the page body when present — avoid a second
+  // CMS chrome title/hero fighting the first container (e.g. Verkäufer werden hero).
   return (
     <div className="min-h-screen flex flex-col">
       <ShopHeader />
       <main className="flex-1">
-        {hasContainers && (
+        {hasContainers ? (
           <SectionErrorBoundary>
             <LandingContainers pageId={page.id} />
           </SectionErrorBoundary>
-        )}
+        ) : null}
         <div
           className="container mx-auto px-4 max-w-3xl w-full"
           style={{
-            paddingTop: hero ? 8 : pagePad.paddingTop,
+            paddingTop: hasContainers ? Math.max(24, pagePad.paddingTop) : (hero ? 8 : pagePad.paddingTop),
             paddingBottom: pagePad.paddingBottom,
           }}
         >
-          {hero ? (
+          {!hasContainers && hero ? (
             <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">
               <img
                 src={hero}
@@ -160,7 +137,7 @@ export default function CmsPageBySlug() {
               />
             </div>
           ) : null}
-          <h1>{localizedTitle}</h1>
+          {!hasContainers ? <h1>{localizedTitle}</h1> : null}
           {safeBody ? (
             <div
               className="prose prose-gray max-w-none"

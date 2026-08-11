@@ -114,15 +114,44 @@ export async function generateMetadata({ params }) {
   if (entity.kind === "category") {
     const c = entity.category;
     const m = c.metadata && typeof c.metadata === "object" ? c.metadata : {};
+    const seoLoc =
+      locale && locale !== "de" && m.seo_i18n && typeof m.seo_i18n === "object"
+        ? m.seo_i18n[locale]
+        : null;
     const title =
-      (c.seo_title || m.meta_title || c.name || c.slug || handle).toString().trim() ||
-      "Andertal";
+      (
+        (seoLoc && (seoLoc.meta_title || seoLoc.title)) ||
+        c.seo_title ||
+        m.meta_title ||
+        c.name ||
+        c.slug ||
+        handle
+      )
+        .toString()
+        .trim() || "Andertal";
     const description =
-      (c.seo_description || m.meta_description || "").toString().trim() || undefined;
+      (
+        (seoLoc && (seoLoc.meta_description || seoLoc.description)) ||
+        c.seo_description ||
+        m.meta_description ||
+        ""
+      )
+        .toString()
+        .trim() || undefined;
+    const keywords =
+      (
+        (seoLoc && (seoLoc.meta_keywords || seoLoc.keywords)) ||
+        m.keywords ||
+        m.meta_keywords ||
+        ""
+      )
+        .toString()
+        .trim() || undefined;
     const slug = c.slug || handle;
     return buildPageMetadata({
       title,
       description,
+      keywords,
       market,
       locale,
       path: slug,

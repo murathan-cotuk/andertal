@@ -1,4 +1,5 @@
 import { lt } from "@/lib/locale-text";
+import { CONTAINER_TYPE_GROUP } from "@/lib/landing-container-catalog";
 
 function t(locale, en, tr, fr, es, it, de) {
   return lt(locale, en, tr, fr, es, it, de);
@@ -108,7 +109,12 @@ export function getContainerTypes(locale) {
       description: t(loc, "Categorized, ordered Q&A with optional self-service links", "Opsiyonel self servis bağlantılarıyla kategorili ve sıralı SSS", "Questions classées avec liens libre-service facultatifs", "Preguntas por categoría con enlaces opcionales", "Domande per categoria con link self-service", "Kategorisierte Fragen mit optionalen Self-Service-Links"),
     },
   };
-  return Object.entries(types).map(([type, { label, description }]) => ({ type, label, description }));
+  return Object.entries(types).map(([type, { label, description }]) => ({
+    type,
+    label,
+    description,
+    group: CONTAINER_TYPE_GROUP[type] || "content",
+  }));
 }
 
 /** Full UI copy for LandingPageEditor and sub-editors */
@@ -189,6 +195,14 @@ export function getLandingEditorCopy(locale) {
     addContainer: x("Add container", "Konteyner ekle", "Ajouter un conteneur", "Añadir contenedor", "Aggiungi contenitore", "Container hinzufügen"),
     addContainerShort: x("+ Add container", "+ Konteyner ekle", "+ Ajouter conteneur", "+ Añadir contenedor", "+ Aggiungi contenitore", "+ Container hinzufügen"),
     selectContainer: x("Choose container", "Konteyner seç", "Choisir un conteneur", "Elegir contenedor", "Scegli contenitore", "Container auswählen"),
+    containerGroupsHint: x(
+      "Grouped by purpose — the mini preview shows the approximate shop layout",
+      "Amaca göre gruplandı — küçük önizleme shop’taki yaklaşık düzeni gösterir",
+      "Groupés par usage — l’aperçu montre la mise en page approximative",
+      "Agrupados por uso — la vista previa muestra el diseño aproximado",
+      "Raggruppati per uso — l’anteprima mostra il layout approssimativo",
+      "Nach Zweck gruppiert — die Vorschau zeigt das ungefähre Shop-Layout"
+    ),
     choose: x("Choose", "Seç", "Choisir", "Elegir", "Scegli", "Auswählen"),
     visible: x("Visible", "Görünür", "Visible", "Visible", "Visibile", "Sichtbar"),
     hidden: x("Hidden", "Gizli", "Masqué", "Oculto", "Nascosto", "Versteckt"),

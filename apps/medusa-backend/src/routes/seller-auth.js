@@ -351,7 +351,10 @@ const sellerAuthRegisterPOST = async (req, res) => {
       const parentRow = await client.query(`SELECT store_name FROM seller_users WHERE seller_id = $1 LIMIT 1`, [user.sub_of_seller_id]).catch(() => ({ rows: [] }))
       displayStoreName = parentRow.rows[0]?.store_name || ''
     }
-    const sessionId = await createSellerSession(client, { userId: user.id, sellerId: effectiveSellerId, req }).catch(() => null)
+    const sessionId = await createSellerSession(client, { userId: user.id, sellerId: effectiveSellerId, req }).catch((e) => {
+      console.error('createSellerSession (register) failed:', e?.message || e)
+      return null
+    })
     await client.end()
     const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName, sid: sessionId || undefined })
     res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName } })
@@ -417,7 +420,10 @@ const sellerAuthLoginPOST = async (req, res) => {
       const ss = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [effectiveSellerId])
       displayStoreName = (ss.rows[0]?.store_name || '').trim()
     }
-    const sessionId = await createSellerSession(client, { userId: user.id, sellerId: effectiveSellerId, req }).catch(() => null)
+    const sessionId = await createSellerSession(client, { userId: user.id, sellerId: effectiveSellerId, req }).catch((e) => {
+      console.error('createSellerSession (login) failed:', e?.message || e)
+      return null
+    })
     await client.end()
     const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, sid: sessionId || undefined })
     res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, permissions: user.permissions || null } })
@@ -701,7 +707,13 @@ const sellerSessionsGET = async (req, res) => {
       last_seen_at: row.last_seen_at,
       is_current: row.id === req.sellerSessionId,
     }))
-    res.json({ sessions, current_session_id: req.sellerSessionId })
+    res.json({
+      sessions,
+      current_session_id: req.sellerSessionId || null,
+      // False when JWT has no `sid` (legacy token / silent create failure / old impersonation).
+      // UI can tell "re-login required" apart from a truly empty device list.
+      session_tracking: Boolean(req.sellerSessionId),
+    })
   } catch (err) {
     try { await client.end() } catch (_) {}
     res.status(500).json({ message: err?.message || 'Error' })
@@ -788,6 +800,7 @@ module.exports.requireSellerAuth = requireSellerAuth
 module.exports.requireSuperuser = requireSuperuser
 module.exports.verifySellerToken = verifySellerToken
 module.exports.signSellerToken = signSellerToken
+module.exports.createSellerSession = createSellerSession
 module.exports.validatePasswordStrength = validatePasswordStrength
 module.exports.encryptTotp = encryptTotp
 module.exports.decryptTotp = decryptTotp

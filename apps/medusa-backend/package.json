@@ -20,6 +20,7 @@
     "db:pages": "node scripts/list-pages-in-db.js",
     "db:support-cases": "node scripts/setup-support-cases.js",
     "db:seed-customer-support": "node scripts/setup-customer-support-landing.js",
+    "db:seed-become-seller": "node scripts/setup-become-seller-landing.js",
     "postinstall": "node scripts/patch-link-modules.js",
     "patch": "node scripts/patch-link-modules.js",
     "test:eu-origin": "node --test src/eu-origin/metadata.test.js",

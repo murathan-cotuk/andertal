@@ -45,6 +45,7 @@ function formatSessionDate(d, locale) {
 function DevicesCard({ locale }) {
   const router = useRouter();
   const [sessions, setSessions] = useState(null); // null = loading
+  const [sessionTracking, setSessionTracking] = useState(true);
   const [err, setErr] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [revokingAll, setRevokingAll] = useState(false);
@@ -55,8 +56,10 @@ function DevicesCard({ locale }) {
     try {
       const d = await getMedusaAdminClient().getSellerSessions();
       setSessions(Array.isArray(d?.sessions) ? d.sessions : []);
+      setSessionTracking(d?.session_tracking !== false);
     } catch (e) {
       setSessions([]);
+      setSessionTracking(true);
       setErr(e?.message || t("Could not load devices.", "Cihazlar yüklenemedi.", "Geräte konnten nicht geladen werden."));
     }
   }, []);
@@ -103,6 +106,18 @@ function DevicesCard({ locale }) {
     setRevokingAll(false);
   };
 
+  const emptyHint = !sessionTracking
+    ? t(
+        "This login is not device-tracked yet. Sign out and sign in once — then this device will appear here.",
+        "Bu oturum henüz cihaz olarak izlenmiyor. Bir kez çıkış yapıp tekrar giriş yapın — cihazınız burada görünecek.",
+        "Diese Anmeldung wird noch nicht als Gerät erfasst. Melden Sie sich einmal ab und wieder an — danach erscheint dieses Gerät hier.",
+      )
+    : t(
+        "No other tracked devices right now.",
+        "Şu anda başka takip edilen cihaz yok.",
+        "Derzeit keine weiteren erfassten Geräte.",
+      );
+
   return (
     <Card>
       <BlockStack gap="400">
@@ -130,16 +145,18 @@ function DevicesCard({ locale }) {
           </Banner>
         ) : null}
 
+        {!sessionTracking && sessions !== null ? (
+          <Banner tone="warning">
+            <Text as="p">{emptyHint}</Text>
+          </Banner>
+        ) : null}
+
         {sessions === null ? (
           <Text as="p" tone="subdued">{t("Loading…", "Yükleniyor…", "Wird geladen…")}</Text>
         ) : sessions.length === 0 ? (
-          <Text as="p" tone="subdued">
-            {t(
-              "No tracked devices yet — you'll appear here after your next login.",
-              "Henüz takip edilen bir cihaz yok — bir sonraki girişinizde burada görüneceksiniz.",
-              "Noch keine erfassten Geräte — nach Ihrer nächsten Anmeldung erscheinen Sie hier.",
-            )}
-          </Text>
+          sessionTracking ? (
+            <Text as="p" tone="subdued">{emptyHint}</Text>
+          ) : null
         ) : (
           <BlockStack gap="200">
             {sessions.map((s) => (

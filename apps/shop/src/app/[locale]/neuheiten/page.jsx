@@ -289,7 +289,7 @@ export default function NeuheitenPage() {
   const showContent = !loading && !error;
 
   return (
-    <CatalogCmsLanding slug="new-in" fallbackTitle={copy.title} showTitleWhenNoContainers>
+    <CatalogCmsLanding slug="new-in" fallbackTitle={copy.title} showTitleWhenNoContainers preferNativeCatalog>
       {/* Mobile category pills */}
       {showContent && rows.length > 0 && (
         <MobilePills>

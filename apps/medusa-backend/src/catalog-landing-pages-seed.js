@@ -11,7 +11,8 @@
 
 const { randomUUID } = require('crypto')
 
-const LAYOUT_VERSION = 'catalog_hub_v1'
+const LAYOUT_VERSION = 'catalog_hub_v2'
+const NATIVE_LAYOUT_VERSION = 'native_catalog_v1'
 const LANGUAGES = ['en', 'tr', 'fr', 'es', 'it']
 
 const DEVICE_PRESETS = {
@@ -100,6 +101,7 @@ const CATALOG_PAGES = [
       ),
     ),
     algorithm: 'bestsellers',
+    nativeCatalog: true,
     rowTitles: value(
       'Top-Produkte insgesamt',
       'Top products overall',
@@ -161,6 +163,7 @@ const CATALOG_PAGES = [
       ),
     ),
     algorithm: 'on_sale',
+    nativeCatalog: true,
     rowTitles: value(
       'Aktuelle Angebote',
       'Current deals',
@@ -222,6 +225,7 @@ const CATALOG_PAGES = [
       ),
     ),
     algorithm: 'new_arrivals',
+    nativeCatalog: true,
     rowTitles: value(
       'Frisch eingetroffen',
       'Just arrived',
@@ -452,6 +456,10 @@ const buildNewsletter = (visibleOn, preset) => localize({
 })
 
 const buildDeviceContainers = (pageDef, visibleOn) => {
+  // Bestsellers / Sales / Neuheiten keep their native shop templates (sidebar +
+  // per-category carousels). Empty CMS stacks stop catalog_hub containers from
+  // painting on top of that UI (TASKS §8). Brands still get the CMS intro stack.
+  if (pageDef.nativeCatalog) return []
   const preset = DEVICE_PRESETS[visibleOn] || DEVICE_PRESETS.desktop
   const list = [buildIntroTextBlock(pageDef, visibleOn, preset)]
   if (pageDef.slug === 'brands') {
@@ -522,7 +530,8 @@ async function upsertCatalogPage(client, pageDef, opts = {}) {
     ? await client.query('SELECT settings FROM admin_hub_landing_pages WHERE page_id = $1', [pageIdEarly])
     : { rows: [] }
   const layoutPeek = landingPeek.rows[0]?.settings?.catalog_landing_layout || ''
-  const willMigrate = force || createdPage || !landingPeek.rows[0] || layoutPeek !== LAYOUT_VERSION
+  const targetLayoutPeek = pageDef.nativeCatalog ? NATIVE_LAYOUT_VERSION : LAYOUT_VERSION
+  const willMigrate = force || createdPage || !landingPeek.rows[0] || layoutPeek !== targetLayoutPeek
 
   if (!dryRun && pageResult.rows[0] && (force || opts.refreshContent || willMigrate)) {
     const pageId = pageResult.rows[0].id
@@ -552,7 +561,8 @@ async function upsertCatalogPage(client, pageDef, opts = {}) {
     ? { ...landingResult.rows[0].settings }
     : {}
   const currentLayout = settings.catalog_landing_layout || ''
-  const needsMigrate = force || createdPage || !landingResult.rows[0] || currentLayout !== LAYOUT_VERSION
+  const targetLayout = pageDef.nativeCatalog ? NATIVE_LAYOUT_VERSION : LAYOUT_VERSION
+  const needsMigrate = force || createdPage || !landingResult.rows[0] || currentLayout !== targetLayout
 
   if (dryRun) {
     return {
@@ -561,7 +571,7 @@ async function upsertCatalogPage(client, pageDef, opts = {}) {
       wouldCreate: createdPage,
       wouldMigrate: needsMigrate,
       currentLayout,
-      targetLayout: LAYOUT_VERSION,
+      targetLayout,
       added: needsMigrate ? buildPageContainers(pageDef).length : 0,
     }
   }
@@ -570,9 +580,13 @@ async function upsertCatalogPage(client, pageDef, opts = {}) {
     return { slug, created: false, migrated: false, added: existing.length, layout: currentLayout, pageId }
   }
 
-  const custom = existing.filter((c) => c && !CATALOG_STACK_TYPES.has(c.type))
+  const custom = pageDef.nativeCatalog
+    ? []
+    : existing.filter((c) => c && !CATALOG_STACK_TYPES.has(c.type))
   const nextContainers = [...buildPageContainers(pageDef), ...custom]
-  settings.catalog_landing_layout = LAYOUT_VERSION
+  settings.catalog_landing_layout = targetLayout
+  // Clear accidental opt-in so preferNativeCatalog pages stay on the shop template
+  if (pageDef.nativeCatalog) delete settings.catalog_use_containers
 
   if (!landingResult.rows[0]) {
     await client.query(
@@ -594,7 +608,7 @@ async function upsertCatalogPage(client, pageDef, opts = {}) {
     created: createdPage,
     migrated: true,
     added: nextContainers.length,
-    layout: LAYOUT_VERSION,
+    layout: targetLayout,
     pageId,
   }
 }
@@ -627,6 +641,7 @@ async function ensureCatalogLandingPages(client, opts = {}) {
 
 module.exports = {
   LAYOUT_VERSION,
+  NATIVE_LAYOUT_VERSION,
   CATALOG_PAGES,
   DEVICE_PRESETS,
   buildPageContainers,

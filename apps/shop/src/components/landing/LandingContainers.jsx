@@ -281,9 +281,27 @@ function HeroBanner({ container, locale = "de" }) {
   const scrollRef = useRef(null);
   const userScrolling = useRef(false);
 
-  const slides = (container.slides || []).filter((s) => localizedAsset(s, "image", locale) || (s.video_url && String(s.video_url).trim()));
-  const height = container.height || "500px";
-  const mobileHeight = container.mobile_height || "200px";
+  const slidesRaw = Array.isArray(container.slides) ? container.slides : [];
+  let slides = slidesRaw.filter((s) => localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale) || (s.video_url && String(s.video_url).trim()));
+  // Flat hero fields (image_url + title on the container) — used by become-seller seed and older rows.
+  if (!slides.length) {
+    const flatImage = lt(container, "image", locale) || lt(container, "image_url", locale) || container.image_url || container.image || "";
+    if (flatImage || lt(container, "title", locale) || lt(container, "subtitle", locale)) {
+      slides = [{
+        image: flatImage,
+        title: container.title || "",
+        subtitle: container.subtitle || "",
+        btn_text: container.btn_text || "",
+        btn_url: container.btn_url || "",
+        overlay: container.overlay_opacity != null ? Number(container.overlay_opacity) : 0.45,
+        text_color: container.text_color || "#ffffff",
+        text_position: container.text_position || "center",
+        _i18n: container._i18n || undefined,
+      }];
+    }
+  }
+  const height = container.height || container.min_height || "500px";
+  const mobileHeight = container.mobile_height || (container.min_height && String(container.min_height).includes("vh") ? "70vh" : "200px");
   const mobilePadding = container.mobile_padding || "0px";
   const mobileRadius = container.mobile_radius ? `${container.mobile_radius}px` : "0px";
 
@@ -386,7 +404,10 @@ function HeroBanner({ container, locale = "de" }) {
                   {videoSrc ? (
                     <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
                   ) : (
-                    <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
+                    <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
+                  )}
+                  {(Number(s.overlay) > 0 || Number(s.overlay_opacity) > 0) && (
+                    <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${Math.min(1, Number(s.overlay) || Number(s.overlay_opacity) || 0)})`, pointerEvents: "none" }} />
                   )}
                   <Overlay s={s} mobile />
                 </>
@@ -416,9 +437,16 @@ function HeroBanner({ container, locale = "de" }) {
         <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
           {slides.map((s, i) => {
             const videoSrc = s.video_url ? resolveUrl(s.video_url) : "";
-            const mediaEl = videoSrc
-              ? <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
-              : <img src={resolveUrl(lt(s, "image", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
+            const mediaEl = (
+              <>
+                {videoSrc
+                  ? <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
+                  : <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                {(Number(s.overlay) > 0 || Number(s.overlay_opacity) > 0) && (
+                  <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${Math.min(1, Number(s.overlay) || Number(s.overlay_opacity) || 0)})`, pointerEvents: "none" }} />
+                )}
+              </>
+            );
             const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease", pointerEvents: i === current ? "auto" : "none" };
             return s.btn_url
               ? <a key={i} href={s.btn_url} style={{ ...wrapStyle, display: "block" }}>{mediaEl}</a>
@@ -605,8 +633,15 @@ function VideoBlock({ container, locale = "de" }) {
 
 // ── Image + Text ──────────────────────────────────────────────────────────────
 function ImageText({ container, locale = "de" }) {
-  const imageLeft = container.image_side !== "right";
-  const imgSrc = resolveUrl(lt(container, "image", locale));
+  const imageLeft = container.image_side !== "right" && container.image_position !== "right";
+  // Editor stores `image`; some seeds/legacy rows use `image_url`.
+  const imgSrc = resolveUrl(
+    lt(container, "image", locale) ||
+      lt(container, "image_url", locale) ||
+      container.image_url ||
+      container.image ||
+      "",
+  );
   const videoSrc = container.video_url ? resolveUrl(container.video_url) : "";
   const textAlign = container.text_align || "left";
   const title = lt(container, "title", locale);

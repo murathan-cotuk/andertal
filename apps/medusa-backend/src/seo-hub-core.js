@@ -76,7 +76,8 @@ const evaluateMeta = ({ title, description, keywords, entityType }) => {
   else if (titleEval.status !== 'ok') {
     issues.push({
       field: 'title',
-      severity: strictCategory || titleEval.status === 'error' ? 'error' : 'warn',
+      // Length outside ideal is advisory — only missing title blocks category save (shop needs a value).
+      severity: titleEval.status === 'error' && !strictCategory ? 'error' : 'warn',
       message: `Meta title should be ${TITLE_IDEAL.min}–${TITLE_IDEAL.max} characters (now ${titleEval.length})`,
     })
   }
@@ -84,14 +85,14 @@ const evaluateMeta = ({ title, description, keywords, entityType }) => {
   else if (descEval.status !== 'ok') {
     issues.push({
       field: 'description',
-      severity: strictCategory || descEval.status === 'error' ? 'error' : 'warn',
+      severity: descEval.status === 'error' && !strictCategory ? 'error' : 'warn',
       message: `Meta description should be ${DESC_IDEAL.min}–${DESC_IDEAL.max} characters (now ${descEval.length})`,
     })
   }
   if (keywordsEval.status === 'missing') {
     issues.push({
       field: 'keywords',
-      severity: strictCategory ? 'error' : 'warn',
+      severity: 'warn',
       message: 'Keywords should be set (comma-separated)',
     })
   }

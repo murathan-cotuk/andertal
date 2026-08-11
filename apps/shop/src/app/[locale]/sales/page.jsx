@@ -345,7 +345,7 @@ export default function SalesPage() {
   const showContent = !loading && !error;
 
   return (
-    <CatalogCmsLanding slug="sales" fallbackTitle={pageTitle} showTitleWhenNoContainers>
+    <CatalogCmsLanding slug="sales" fallbackTitle={pageTitle} showTitleWhenNoContainers preferNativeCatalog>
       {/* Mobile category pills */}
       {showContent && rows.length > 0 && (
         <MobilePills>

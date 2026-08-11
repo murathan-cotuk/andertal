@@ -141,6 +141,7 @@ function absoluteImageUrl(url) {
 export function buildPageMetadata({
   title,
   description,
+  keywords,
   market,
   locale,
   path,
@@ -163,10 +164,17 @@ export function buildPageMetadata({
     .filter(Boolean)
     .slice(0, 6)
     .map((url) => ({ url, alt: titleText }));
+  const kw =
+    typeof keywords === "string"
+      ? keywords.split(/[,;]+/).map((s) => s.trim()).filter(Boolean)
+      : Array.isArray(keywords)
+        ? keywords.map((s) => String(s || "").trim()).filter(Boolean)
+        : [];
 
   return {
     title,
     description: description || undefined,
+    keywords: kw.length ? kw : undefined,
     alternates: {
       canonical,
       languages: languageAlternates(mkt, pathForLocale || path || ""),

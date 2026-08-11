@@ -3,11 +3,13 @@
 const assert = require('assert')
 const {
   LAYOUT_VERSION,
+  NATIVE_LAYOUT_VERSION,
   CATALOG_PAGES,
   buildPageContainers,
 } = require('./catalog-landing-pages-seed')
 
-assert.strictEqual(LAYOUT_VERSION, 'catalog_hub_v1')
+assert.strictEqual(LAYOUT_VERSION, 'catalog_hub_v2')
+assert.strictEqual(NATIVE_LAYOUT_VERSION, 'native_catalog_v1')
 assert.strictEqual(CATALOG_PAGES.length, 4)
 assert.deepStrictEqual(
   CATALOG_PAGES.map((p) => p.slug).sort(),
@@ -25,20 +27,23 @@ for (const page of CATALOG_PAGES) {
   }
 
   const containers = buildPageContainers(page)
-  // 3 devices × (intro + rows/features + newsletter) — brands has feature+seller instead of 2 product rows
+
+  if (page.nativeCatalog) {
+    // Shop templates own the UI — CMS stack must stay empty (TASKS §8).
+    assert.strictEqual(containers.length, 0, `${page.slug} native catalog must have 0 containers`)
+    continue
+  }
+
+  // Brands: 3 devices × (intro + feature_grid + seller_carousel + newsletter)
   assert.ok(containers.length >= 9, `${page.slug} expected >=9 containers, got ${containers.length}`)
   const devices = new Set(containers.map((c) => c.visible_on))
   assert.deepStrictEqual([...devices].sort(), ['desktop', 'mobile', 'tablet'])
   assert.ok(containers.every((c) => c.id && c.type && c.visible === true))
   assert.ok(containers.some((c) => c.type === 'text_block'))
   assert.ok(containers.some((c) => c.type === 'newsletter'))
-  if (page.slug === 'brands') {
-    assert.ok(containers.some((c) => c.type === 'feature_grid'))
-    assert.ok(containers.some((c) => c.type === 'seller_carousel'))
-  } else {
-    assert.ok(containers.some((c) => c.type === 'personalized_product_row' && c.algorithm === page.algorithm))
-  }
-  // Intro text_block has empty title (page H1 is separate) and localized body
+  assert.ok(containers.some((c) => c.type === 'feature_grid'))
+  assert.ok(containers.some((c) => c.type === 'seller_carousel'))
+
   const intro = containers.find((c) => c.type === 'text_block' && c.visible_on === 'desktop')
   assert.ok(intro)
   assert.strictEqual(intro.title, '')

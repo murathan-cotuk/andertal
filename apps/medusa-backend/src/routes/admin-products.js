@@ -231,7 +231,7 @@ const collectVariantEans = (variants) => {
   return out
 }
 
-const validateProductEansDb = async (client, parentEan, variantEans, excludeProductId) => {
+const validateProductEansDb = async (client, parentEan, variantEans, excludeProductIdOrIds) => {
   const values = []
   const seen = new Set()
   const p = normalizeEanValue(parentEan)
@@ -244,11 +244,16 @@ const validateProductEansDb = async (client, parentEan, variantEans, excludeProd
     seen.add(e); values.push(e)
   }
   if (!values.length) return { ok: true }
-  const sql = 'SELECT id, sku, metadata, variants FROM admin_hub_products ' + (excludeProductId ? 'WHERE id <> $1' : '')
-  const params = excludeProductId ? [excludeProductId] : []
-  const res = await client.query(sql, params)
+  const excludeIds = new Set(
+    (Array.isArray(excludeProductIdOrIds) ? excludeProductIdOrIds : [excludeProductIdOrIds])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean)
+  )
+  const res = await client.query('SELECT id, sku, metadata, variants, status FROM admin_hub_products')
   const dbEans = new Set()
   for (const row of (res.rows || [])) {
+    if (excludeIds.has(String(row.id))) continue
+    if (String(row.status || '') === 'merged') continue
     const pm = row && row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
     const pe = normalizeEanValue(pm.ean)
     if (pe) dbEans.add(pe)
@@ -1505,6 +1510,183 @@ module.exports = function createAdminProductsRouter() {
   // Repair for rows already broken by the callerSellerId-forced-to-null bug (fixed above,
   // see adminHubProductsPOST): only ever allowed on a currently-unowned row, so it can assign
   // a missing owner but can never reassign one that already exists.
+  // Fold N standalone products into one parent's variants[] (TASK 22).
+  // Soft-archives absorbed rows (status=merged) — never hard-deletes.
+  router.post('/admin-hub/v1/products/combine-as-variants', async (req, res) => {
+    const { buildCombineAsVariantsPlan } = require('../combine-as-variants-core')
+    const parentId = String(req.body?.parent_id || '').trim()
+    const productIds = Array.isArray(req.body?.product_ids)
+      ? [...new Set(req.body.product_ids.map((id) => String(id || '').trim()).filter(Boolean))]
+      : []
+    const optionName = String(req.body?.option_name || '').trim()
+    const optionValues =
+      req.body?.option_values && typeof req.body.option_values === 'object' && !Array.isArray(req.body.option_values)
+        ? req.body.option_values
+        : {}
+
+    if (!parentId) return res.status(400).json({ message: 'parent_id required' })
+    if (!productIds.includes(parentId)) productIds.unshift(parentId)
+    if (productIds.length < 2) return res.status(400).json({ message: 'At least 2 product_ids required' })
+
+    const isSuperuser = req.sellerUser?.is_superuser === true
+    const callerSellerId = req.sellerUser?.seller_id ? String(req.sellerUser.seller_id).trim() : null
+    if (!isSuperuser && !callerSellerId) return res.status(403).json({ message: 'Forbidden' })
+
+    const client = getProductsDbClient()
+    if (!client) return res.status(503).json({ message: 'Database not configured' })
+
+    try {
+      await client.connect()
+      await client.query('BEGIN')
+
+      const loaded = []
+      for (const id of productIds) {
+        const r = await client.query(
+          `SELECT id, title, handle, sku, description, status, seller_id, collection_id,
+                  price_cents, inventory, metadata, variants, created_at, updated_at
+           FROM admin_hub_products WHERE id = $1 FOR UPDATE`,
+          [id]
+        )
+        if (!r.rows[0]) {
+          await client.query('ROLLBACK')
+          return res.status(404).json({ message: `Product not found: ${id}` })
+        }
+        loaded.push(r.rows[0])
+      }
+
+      if (!isSuperuser) {
+        for (const p of loaded) {
+          const owner = String(p.seller_id || (p.metadata && p.metadata.seller_id) || '').trim()
+          if (owner && owner !== callerSellerId) {
+            await client.query('ROLLBACK')
+            return res.status(403).json({ message: `Not allowed to combine product: ${p.title || p.id}` })
+          }
+        }
+      }
+
+      const plan = buildCombineAsVariantsPlan({
+        parentId,
+        products: loaded,
+        optionName,
+        optionValues,
+      })
+      if (!plan.ok) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ message: plan.message })
+      }
+
+      const parentRow = loaded.find((p) => String(p.id) === plan.parentId)
+      const parentMeta =
+        parentRow.metadata && typeof parentRow.metadata === 'object' ? { ...parentRow.metadata } : {}
+      Object.assign(parentMeta, plan.parent_metadata_patch)
+      if (plan.parent_metadata_patch.ean === null) delete parentMeta.ean
+
+      const eanValidation = await validateProductEansDb(
+        client,
+        parentMeta.ean,
+        collectVariantEans(plan.variants),
+        [plan.parentId, ...plan.source_ids_to_archive]
+      )
+      if (!eanValidation.ok) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ message: eanValidation.message })
+      }
+
+      // Clear parent-level SKU when folding the parent's own sellable into a variant —
+      // SKU lives on the variant now.
+      const nextSku = plan.convertParentSelf ? null : parentRow.sku
+      const invSum = plan.variants.reduce((s, v) => s + (Number(v.inventory) || 0), 0)
+      const firstPrice = Number(plan.variants[0]?.price_cents) || Number(parentRow.price_cents) || 0
+
+      await client.query(
+        `UPDATE admin_hub_products
+         SET sku = $1,
+             price_cents = $2,
+             inventory = $3,
+             metadata = $4::jsonb,
+             variants = $5::jsonb,
+             updated_at = now()
+         WHERE id = $6`,
+        [
+          nextSku,
+          firstPrice,
+          invSum,
+          JSON.stringify(parentMeta),
+          JSON.stringify(plan.variants),
+          plan.parentId,
+        ]
+      )
+
+      for (const sourceId of plan.source_ids_to_archive) {
+        // Listings / wishlist / change-requests → parent (same pattern as duplicate-ean merge)
+        await client.query(
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku)
+           SELECT $1, seller_id, price_cents, inventory, status, sku FROM admin_hub_seller_listings
+           WHERE product_id = $2
+           ON CONFLICT (product_id, seller_id) DO NOTHING`,
+          [plan.parentId, sourceId]
+        )
+        await client.query(
+          `DELETE FROM admin_hub_seller_listings sl
+           WHERE sl.product_id = $1
+             AND EXISTS (SELECT 1 FROM admin_hub_seller_listings m WHERE m.product_id = $2 AND m.seller_id = sl.seller_id)`,
+          [sourceId, plan.parentId]
+        )
+        await client.query('UPDATE admin_hub_seller_listings SET product_id = $1 WHERE product_id = $2', [
+          plan.parentId,
+          sourceId,
+        ])
+        await client.query(
+          'UPDATE admin_hub_product_change_requests SET product_id = $1 WHERE product_id = $2',
+          [plan.parentId, sourceId]
+        )
+        try {
+          await client.query('UPDATE admin_hub_eu_origin_pending SET product_id = $1 WHERE product_id = $2', [
+            plan.parentId,
+            sourceId,
+          ])
+        } catch (_) { /* table may not exist in older envs */ }
+        try {
+          await client.query(
+            `DELETE FROM store_customer_wishlist w
+             WHERE w.product_id = $1
+               AND EXISTS (SELECT 1 FROM store_customer_wishlist m WHERE m.product_id = $2 AND m.customer_id = w.customer_id)`,
+            [sourceId, plan.parentId]
+          )
+          await client.query('UPDATE store_customer_wishlist SET product_id = $1 WHERE product_id = $2', [
+            plan.parentId,
+            sourceId,
+          ])
+        } catch (_) { /* wishlist table may not exist */ }
+
+        await client.query(
+          `UPDATE admin_hub_products
+           SET status = 'merged',
+               metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('merged_into_id', $1::text),
+               updated_at = now()
+           WHERE id = $2`,
+          [plan.parentId, sourceId]
+        )
+      }
+
+      await client.query('COMMIT')
+      const product = await getAdminHubProductByIdOrHandleDb(plan.parentId)
+      res.json({
+        combined: true,
+        parent_id: plan.parentId,
+        archived_ids: plan.source_ids_to_archive,
+        variant_count: plan.variants.length,
+        product,
+      })
+    } catch (err) {
+      try { await client.query('ROLLBACK') } catch (_) {}
+      console.error('combine-as-variants error:', err)
+      res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    } finally {
+      try { await client.end() } catch (_) {}
+    }
+  })
+
   router.post('/admin-hub/v1/products/:id/claim-owner', requireSuperuser, async (req, res) => {
     const productId = String(req.params.id || '').trim()
     const sellerId = String(req.body?.seller_id || req.sellerUser?.seller_id || '').trim()

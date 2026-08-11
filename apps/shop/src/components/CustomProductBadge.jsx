@@ -49,7 +49,6 @@ export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
     if (!imageUrl) return null;
     return (
       <div style={positionStyle(badge, stackIndex)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
           alt={bt(badge, "label", locale) || ""}

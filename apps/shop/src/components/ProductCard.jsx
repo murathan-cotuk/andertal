@@ -634,7 +634,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           {shippingUnavailable && !isComingSoon && <Badge $sold>{tp("notAvailable")}</Badge>}
           {outOfStock && !isComingSoon && <Badge $sold>{tp("outOfStock")}</Badge>}
         </Badges>
-        <CustomProductBadges badges={product?.metadata?.custom_badges} />
+        <CustomProductBadges badges={product?.metadata?.custom_badges} locale={locale} />
         {product?.id && (
           <WishlistHeartWrap
             onClick={(e) => e.stopPropagation()}
@@ -1039,7 +1039,7 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
           {hasSale && !isComingSoon && (
             <SaleBadgeImageCorner inset={6}>{tp("sale")}</SaleBadgeImageCorner>
           )}
-          <CustomProductBadges badges={product?.metadata?.custom_badges} />
+          <CustomProductBadges badges={product?.metadata?.custom_badges} locale={locale} />
         </ListImgWrap>
       </Link>
       <ListBody>

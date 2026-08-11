@@ -31,6 +31,10 @@ import { getNewContainerSeed } from "@/lib/landing-page-editor-i18n";
 import { createContext, useContext } from "react";
 import { getLandingEditorCopy, getContainerTypes } from "@/lib/landing-page-editor-i18n";
 import ApiPageSettingsPanel from "@/components/pages/content/ApiPageSettingsPanel";
+import {
+  ContainerTypePreview,
+} from "@/components/pages/content/ContainerTypePreview";
+import { groupContainerTypes, groupLabel } from "@/lib/landing-container-catalog";
 
 const LandingCopyContext = createContext(null);
 function useLandingCopy() {
@@ -3368,6 +3372,10 @@ export default function LandingPageEditor() {
   const uiLocale = useLocale();
   const copy = useMemo(() => getLandingEditorCopy(uiLocale), [uiLocale]);
   const containerTypes = useMemo(() => getContainerTypesFromLocale(uiLocale), [uiLocale]);
+  const containerTypeGroups = useMemo(
+    () => groupContainerTypes(containerTypes, uiLocale),
+    [containerTypes, uiLocale]
+  );
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
 
@@ -3954,16 +3962,23 @@ export default function LandingPageEditor() {
                             const vis = c.visible_on || "desktop";
                             const isLegacyBoth = vis === "both";
                             const last = idx === filteredSeitenContainers.length - 1;
+                            const gLabel = groupLabel(info.group || "content", uiLocale);
                             return (
                               <Card key={c.id}>
                                 <BlockStack gap="0">
                                   <Box paddingBlockEnd={isExpanded ? "400" : "0"}>
                                     <InlineStack align="space-between" blockAlign="center" gap="300">
-                                      <InlineStack gap="300" blockAlign="center" wrap>
-                                        <Text as="h3" variant="headingSm">{info.label}</Text>
-                                        <Badge tone={c.visible ? "success" : undefined}>{c.visible ? copy.visible : copy.hidden}</Badge>
-                                        {isLegacyBoth && <Badge tone="info">{copy.legacyBoth}</Badge>}
-                                        <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
+                                      <InlineStack gap="300" blockAlign="center" wrap={false}>
+                                        <ContainerTypePreview type={c.type} label={info.label} />
+                                        <BlockStack gap="100">
+                                          <InlineStack gap="200" blockAlign="center" wrap>
+                                            <Text as="h3" variant="headingSm">{info.label}</Text>
+                                            <Badge>{gLabel}</Badge>
+                                            <Badge tone={c.visible ? "success" : undefined}>{c.visible ? copy.visible : copy.hidden}</Badge>
+                                            {isLegacyBoth && <Badge tone="info">{copy.legacyBoth}</Badge>}
+                                            <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
+                                          </InlineStack>
+                                        </BlockStack>
                                       </InlineStack>
                                       <InlineStack gap="200" blockAlign="center">
                                         <Button size="slim" onClick={() => { updateContainer(c.id, { ...c, visible: !c.visible }); }}>{c.visible ? copy.hide : copy.show}</Button>
@@ -4260,23 +4275,54 @@ export default function LandingPageEditor() {
           </>
         )}
 
-        <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title={copy.selectContainer}>
+        <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)} title={copy.selectContainer} size="large">
           <Modal.Section>
-            <BlockStack gap="300">
-              {containerTypes.map((t) => (
-                <Box key={t.type} padding="400" borderWidth="025" borderColor="border" borderRadius="200" background="bg-surface">
-                  <InlineStack align="space-between" blockAlign="center" gap="300" wrap={false}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <BlockStack gap="100">
-                        <Text as="p" variant="bodyMd" fontWeight="semibold">{t.label}</Text>
-                        <Text as="p" variant="bodySm" tone="subdued">{t.description}</Text>
-                      </BlockStack>
-                    </div>
-                    <div style={{ flexShrink: 0 }}>
-                      <Button variant="primary" size="slim" onClick={() => addContainer(t.type)}>{copy.choose}</Button>
-                    </div>
-                  </InlineStack>
-                </Box>
+            <BlockStack gap="500">
+              <Text as="p" variant="bodySm" tone="subdued">
+                {copy.containerGroupsHint}
+              </Text>
+              {containerTypeGroups.map((group) => (
+                <BlockStack key={group.id} gap="300">
+                  <Text as="h3" variant="headingSm">{group.label}</Text>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: 12,
+                    }}
+                  >
+                    {group.items.map((t) => (
+                      <div
+                        key={t.type}
+                        style={{
+                          border: "1px solid var(--p-color-border, #e1e3e5)",
+                          borderRadius: 10,
+                          background: "var(--p-color-bg-surface, #fff)",
+                          padding: 12,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
+                          minHeight: 148,
+                        }}
+                      >
+                        <InlineStack gap="300" blockAlign="start" wrap={false}>
+                          <ContainerTypePreview type={t.type} label={t.label} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <BlockStack gap="100">
+                              <Text as="p" variant="bodyMd" fontWeight="semibold">{t.label}</Text>
+                              <Text as="p" variant="bodySm" tone="subdued">{t.description}</Text>
+                            </BlockStack>
+                          </div>
+                        </InlineStack>
+                        <div style={{ marginTop: "auto" }}>
+                          <Button variant="primary" size="slim" fullWidth onClick={() => addContainer(t.type)}>
+                            {copy.choose}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </BlockStack>
               ))}
             </BlockStack>
           </Modal.Section>

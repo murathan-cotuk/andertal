@@ -9,7 +9,7 @@ const getDbClient = () => {
   return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
 }
 
-module.exports = function createSellersRouter({ getSellerDbClient, signSellerToken }) {
+module.exports = function createSellersRouter({ getSellerDbClient, signSellerToken, createSellerSession }) {
     // ── SELLER MANAGEMENT (superuser) ─────────────────────────────────────────
     const SELLER_SELECT = `
       id, email, store_name, seller_id, is_superuser, created_at, updated_at,
@@ -369,8 +369,9 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
     const adminHubSellerImpersonatePOST = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const { id } = req.params
+      const c = getSellerDbClient()
+      if (!c) return res.status(503).json({ message: 'Database not configured' })
       try {
-        const c = getSellerDbClient()
         await c.connect()
         const r = await c.query(
           `SELECT su.id, su.email, su.seller_id, su.is_superuser, ss.store_name
@@ -380,12 +381,35 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
            LIMIT 1`,
           [id]
         )
-        await c.end()
-        if (!r.rows.length) return res.status(404).json({ message: 'Seller not found' })
+        if (!r.rows.length) {
+          await c.end()
+          return res.status(404).json({ message: 'Seller not found' })
+        }
         const u = r.rows[0]
-        const token = signSellerToken({ id: u.id, email: u.email, seller_id: u.seller_id, is_superuser: u.is_superuser, store_name: u.store_name || '' })
+        let sessionId = null
+        if (typeof createSellerSession === 'function') {
+          sessionId = await createSellerSession(c, {
+            userId: u.id,
+            sellerId: u.seller_id,
+            req,
+          }).catch((e) => {
+            console.error('createSellerSession (impersonate) failed:', e?.message || e)
+            return null
+          })
+        }
+        await c.end()
+        const token = signSellerToken({
+          id: u.id,
+          email: u.email,
+          seller_id: u.seller_id,
+          is_superuser: u.is_superuser,
+          store_name: u.store_name || '',
+          sid: sessionId || undefined,
+          impersonated: true,
+        })
         res.json({ token, seller: { id: u.id, email: u.email, seller_id: u.seller_id, store_name: u.store_name || '', is_superuser: u.is_superuser } })
       } catch (e) {
+        try { await c.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     }

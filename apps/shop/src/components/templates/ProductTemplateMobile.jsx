@@ -1655,7 +1655,7 @@ export default function ProductTemplateMobile() {
               </MobileGallerySlide>
             ))}
           </MobileGalleryTrack>
-          <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} customBadges={meta.custom_badges} />
+          <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} customBadges={meta.custom_badges} locale={locale} />
           {/* Wishlist + Share — bottom-right */}
           {product?.id && (
             <GalleryActionRow
@@ -1787,7 +1787,7 @@ export default function ProductTemplateMobile() {
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
               <MainImage src={mainImage} alt={displayTitle} />
             </MainImageWrap>
-            <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} customBadges={meta.custom_badges} />
+            <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} customBadges={meta.custom_badges} locale={locale} />
             {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             {product?.id && (
               <GalleryActionRow

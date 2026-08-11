@@ -3,7 +3,6 @@
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import LandingContainers from "@/components/landing/LandingContainers";
-import BecomeSellerLanding, { BECOME_SELLER_PAGE_SLUGS } from "@/components/landing/BecomeSellerLanding";
 import CategoryTemplate from "@/components/templates/CategoryTemplate";
 import ProductTemplate from "@/components/templates/ProductTemplate";
 import ProductTemplateMobile from "@/components/templates/ProductTemplateMobile";
@@ -1098,9 +1097,6 @@ function CollectionPage() {
 
   if (cmsPage) {
     const localizedBody = localizedCmsField(cmsPage, "body", locale);
-    const isBecomeSeller = BECOME_SELLER_PAGE_SLUGS.has(
-      String(cmsPage.slug || handle || "").toLowerCase(),
-    );
     const cmsTmpl = shopStyles?.cms_page_template || {};
     const cmsPadTop = Math.max(0, Number(cmsTmpl.padding_top) || 0);
     const cmsPadBottom = Math.max(0, Number.isFinite(Number(cmsTmpl.padding_bottom)) ? Number(cmsTmpl.padding_bottom) : 48);
@@ -1112,15 +1108,7 @@ function CollectionPage() {
       paddingLeft: 24,
       paddingRight: 24,
     };
-    const pageBody = isBecomeSeller ? (
-      <>
-        <BecomeSellerLanding />
-        {localizedBody ? (
-          <div style={cmsBodyStyle}
-            dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
-        ) : null}
-      </>
-    ) : (
+    const pageBody = (
       <>
         <LandingContainers pageId={String(cmsPage.id)} />
         {localizedBody ? (

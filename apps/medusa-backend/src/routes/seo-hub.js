@@ -52,9 +52,11 @@ const scoreFromIssues = (issues) => {
   return 'needs_work'
 }
 
-const buildPublicHints = (type, row) => {
+const buildPublicHints = (type, row, locale = 'de') => {
   const handle = row.handle || row.slug || ''
-  // Shop canonical routes: categories/collections/products live at /{slug} (not /category/...).
+  // Shop routes are /{market}/{locale}/{slug} (see apps/shop/src/lib/seo.js publicPath).
+  const loc = ['de', 'en', 'tr', 'fr', 'es', 'it'].includes(locale) ? locale : 'de'
+  const market = 'de'
   const pathMap = {
     products: handle ? handle : '',
     categories: handle ? handle : '',
@@ -63,15 +65,33 @@ const buildPublicHints = (type, row) => {
     blogs: handle ? `pages/${handle}` : '',
   }
   const path = pathMap[type] || ''
-  const url = path ? `${SITE_URL}/de/de/${path}` : ''
+  const url = path ? `${SITE_URL}/${market}/${loc}/${path}` : ''
   return {
     url,
     canonical: url,
     robots: 'index,follow',
-    lang: 'de',
+    lang: loc,
     author: 'Andertal',
     publisher: 'Andertal',
   }
+}
+
+/** Template pages always render entity name as <h1> outside CMS HTML (and often only after hydration). */
+const applyTemplateH1 = (analysis, type) => {
+  if (!analysis) return analysis
+  // Products: storefront title is H1; description H1s are demoted on save — count template as the single H1.
+  if (type === 'products') {
+    return {
+      ...analysis,
+      headings: { ...analysis.headings, h1: 1 },
+      headingTotal: (analysis.headingTotal || 0) - (analysis.headings?.h1 || 0) + 1,
+      hasH1: true,
+    }
+  }
+  if (type === 'categories' || type === 'collections' || type === 'pages' || type === 'blogs') {
+    return withTemplateTitleH1(analysis)
+  }
+  return analysis
 }
 
 async function listProducts(client, { q, limit, offset }) {
@@ -127,7 +147,7 @@ async function listCategories(client, { q, limit, offset }) {
   }
   params.push(limit, offset)
   const r = await client.query(
-    `SELECT id, name, slug, seo_title, seo_description, long_content, metadata, updated_at,
+    `SELECT id, name, slug, parent_id, seo_title, seo_description, long_content, metadata, updated_at,
             COUNT(*) OVER()::int AS total
        FROM admin_hub_categories ${where}
       ORDER BY name ASC
@@ -147,13 +167,14 @@ async function listCategories(client, { q, limit, offset }) {
         type: 'categories',
         label: row.name,
         handle: row.slug,
+        parent_id: row.parent_id || null,
         updated_at: row.updated_at,
         meta_title: title,
         meta_description: description,
         meta_keywords: keywords,
         evaluation,
         score: scoreFromIssues(evaluation.issues),
-        analysis: withTemplateTitleH1(analyzeHtml(row.long_content || meta.richtext || '')),
+        analysis: applyTemplateH1(analyzeHtml(row.long_content || meta.richtext || ''), 'categories'),
         ...buildPublicHints('categories', { handle: row.slug }),
       }
     }),
@@ -195,7 +216,7 @@ async function listCollections(client, { q, limit, offset }) {
         meta_keywords: keywords,
         evaluation,
         score: scoreFromIssues(evaluation.issues),
-        analysis: withTemplateTitleH1(analyzeHtml(meta.richtext || '')),
+        analysis: applyTemplateH1(analyzeHtml(meta.richtext || ''), 'collections'),
         ...buildPublicHints('collections', row),
       }
     }),
@@ -238,7 +259,7 @@ async function listPages(client, { q, limit, offset, blogOnly }) {
         meta_keywords: keywords,
         evaluation,
         score: scoreFromIssues(evaluation.issues),
-        analysis: withTemplateTitleH1(analyzeHtml(row.body || '')),
+        analysis: applyTemplateH1(analyzeHtml(row.body || ''), type),
         ...buildPublicHints(type, { handle: row.slug }),
       }
     }),
@@ -271,14 +292,14 @@ async function getEntity(client, type, id) {
       meta_keywords: keywords,
       evaluation,
       score: scoreFromIssues(evaluation.issues),
-      analysis: analyzeHtml(row.description || ''),
+      analysis: applyTemplateH1(analyzeHtml(row.description || ''), 'products'),
       rules: { title: TITLE_IDEAL, description: DESC_IDEAL },
       ...buildPublicHints('products', row),
     }
   }
   if (type === 'categories') {
     const r = await client.query(
-      `SELECT id, name, slug, seo_title, seo_description, long_content, metadata, updated_at FROM admin_hub_categories WHERE id = $1`,
+      `SELECT id, name, slug, parent_id, seo_title, seo_description, long_content, metadata, updated_at FROM admin_hub_categories WHERE id = $1`,
       [id],
     )
     if (!r.rows[0]) return null
@@ -287,6 +308,7 @@ async function getEntity(client, type, id) {
     const title = row.seo_title || meta.meta_title || ''
     const description = row.seo_description || meta.meta_description || ''
     const keywords = meta.keywords || meta.meta_keywords || ''
+    const seoI18n = meta.seo_i18n && typeof meta.seo_i18n === 'object' ? meta.seo_i18n : {}
     const evaluation = evaluateMeta({ title, description, keywords, entityType: 'categories' })
     const contentHtml = row.long_content || meta.richtext || ''
     return {
@@ -294,14 +316,16 @@ async function getEntity(client, type, id) {
       type: 'categories',
       label: row.name,
       handle: row.slug,
+      parent_id: row.parent_id || null,
       updated_at: row.updated_at,
       content_html: contentHtml,
       meta_title: title,
       meta_description: description,
       meta_keywords: keywords,
+      seo_i18n: seoI18n,
       evaluation,
       score: scoreFromIssues(evaluation.issues),
-      analysis: withTemplateTitleH1(analyzeHtml(contentHtml)),
+      analysis: applyTemplateH1(analyzeHtml(contentHtml), 'categories'),
       rules: { title: TITLE_IDEAL, description: DESC_IDEAL, strict: true },
       ...buildPublicHints('categories', { handle: row.slug }),
     }
@@ -330,14 +354,15 @@ async function getEntity(client, type, id) {
       meta_keywords: keywords,
       evaluation,
       score: scoreFromIssues(evaluation.issues),
-      analysis: withTemplateTitleH1(analyzeHtml(meta.richtext || '')),
+      analysis: applyTemplateH1(analyzeHtml(meta.richtext || ''), 'collections'),
       rules: { title: TITLE_IDEAL, description: DESC_IDEAL },
       ...buildPublicHints('collections', row),
     }
   }
   if (type === 'pages' || type === 'blogs') {
     const r = await client.query(
-      `SELECT id, title, slug, body, status, page_type, meta_title, meta_description, meta_keywords, updated_at
+      `SELECT id, title, slug, body, status, page_type, meta_title, meta_description, meta_keywords,
+              meta_title_i18n, meta_description_i18n, updated_at
          FROM admin_hub_pages WHERE id = $1`,
       [id],
     )
@@ -362,9 +387,11 @@ async function getEntity(client, type, id) {
       meta_title: title,
       meta_description: description,
       meta_keywords: keywords,
+      meta_title_i18n: row.meta_title_i18n && typeof row.meta_title_i18n === 'object' ? row.meta_title_i18n : {},
+      meta_description_i18n: row.meta_description_i18n && typeof row.meta_description_i18n === 'object' ? row.meta_description_i18n : {},
       evaluation,
       score: scoreFromIssues(evaluation.issues),
-      analysis: withTemplateTitleH1(analyzeHtml(row.body || '')),
+      analysis: applyTemplateH1(analyzeHtml(row.body || ''), entityType),
       rules: { title: TITLE_IDEAL, description: DESC_IDEAL },
       ...buildPublicHints(entityType, { handle: row.slug }),
     }
@@ -376,77 +403,167 @@ async function patchEntity(client, type, id, body) {
   const metaTitle = body.meta_title !== undefined ? String(body.meta_title || '').trim() : undefined
   const metaDescription = body.meta_description !== undefined ? String(body.meta_description || '').trim() : undefined
   const metaKeywords = body.meta_keywords !== undefined ? String(body.meta_keywords || '').trim() : undefined
+  const locale = String(body.locale || 'de').toLowerCase()
+  const isDe = !locale || locale === 'de'
+  const nextHandle = body.handle !== undefined ? String(body.handle || '').trim().replace(/^\/+/, '') : undefined
 
   if (type === 'products') {
-    const r = await client.query(`SELECT metadata FROM admin_hub_products WHERE id = $1`, [id])
+    const r = await client.query(`SELECT metadata, handle FROM admin_hub_products WHERE id = $1`, [id])
     if (!r.rows[0]) return { error: 404 }
     const metadata = { ...(r.rows[0].metadata && typeof r.rows[0].metadata === 'object' ? r.rows[0].metadata : {}) }
-    if (metaTitle !== undefined) metadata.seo_meta_title = metaTitle
-    if (metaDescription !== undefined) metadata.seo_meta_description = metaDescription
-    if (metaKeywords !== undefined) metadata.seo_keywords = metaKeywords
-    await client.query(`UPDATE admin_hub_products SET metadata = $1, updated_at = now() WHERE id = $2`, [JSON.stringify(metadata), id])
+    if (isDe) {
+      if (metaTitle !== undefined) metadata.seo_meta_title = metaTitle
+      if (metaDescription !== undefined) metadata.seo_meta_description = metaDescription
+      if (metaKeywords !== undefined) metadata.seo_keywords = metaKeywords
+    } else {
+      const seoI18n = { ...(metadata.seo_i18n && typeof metadata.seo_i18n === 'object' ? metadata.seo_i18n : {}) }
+      const loc = { ...(seoI18n[locale] || {}) }
+      if (metaTitle !== undefined) loc.meta_title = metaTitle
+      if (metaDescription !== undefined) loc.meta_description = metaDescription
+      if (metaKeywords !== undefined) loc.meta_keywords = metaKeywords
+      seoI18n[locale] = loc
+      metadata.seo_i18n = seoI18n
+    }
+    if (nextHandle !== undefined && nextHandle && nextHandle !== r.rows[0].handle) {
+      const clash = await client.query(`SELECT id FROM admin_hub_products WHERE handle = $1 AND id <> $2 LIMIT 1`, [nextHandle, id])
+      if (clash.rows[0]) return { error: 400, message: 'Handle already in use' }
+      await client.query(`UPDATE admin_hub_products SET handle = $1, metadata = $2, updated_at = now() WHERE id = $3`, [nextHandle, JSON.stringify(metadata), id])
+    } else {
+      await client.query(`UPDATE admin_hub_products SET metadata = $1, updated_at = now() WHERE id = $2`, [JSON.stringify(metadata), id])
+    }
     return { ok: true }
   }
 
   if (type === 'categories') {
-    const r = await client.query(`SELECT seo_title, seo_description, metadata FROM admin_hub_categories WHERE id = $1`, [id])
+    const r = await client.query(`SELECT seo_title, seo_description, metadata, slug FROM admin_hub_categories WHERE id = $1`, [id])
     if (!r.rows[0]) return { error: 404 }
     const metadata = { ...(r.rows[0].metadata && typeof r.rows[0].metadata === 'object' ? r.rows[0].metadata : {}) }
-    const nextTitle = metaTitle !== undefined ? metaTitle : (r.rows[0].seo_title || metadata.meta_title || '')
-    const nextDesc = metaDescription !== undefined ? metaDescription : (r.rows[0].seo_description || metadata.meta_description || '')
-    const nextKw = metaKeywords !== undefined ? metaKeywords : (metadata.keywords || metadata.meta_keywords || '')
+    let nextTitle = r.rows[0].seo_title || metadata.meta_title || ''
+    let nextDesc = r.rows[0].seo_description || metadata.meta_description || ''
+    let nextKw = metadata.keywords || metadata.meta_keywords || ''
+
+    if (isDe) {
+      if (metaTitle !== undefined) nextTitle = metaTitle
+      if (metaDescription !== undefined) nextDesc = metaDescription
+      if (metaKeywords !== undefined) nextKw = metaKeywords
+      if (metaTitle !== undefined) metadata.meta_title = metaTitle
+      if (metaDescription !== undefined) metadata.meta_description = metaDescription
+      if (metaKeywords !== undefined) {
+        metadata.keywords = metaKeywords
+        metadata.meta_keywords = metaKeywords
+      }
+    } else {
+      const seoI18n = { ...(metadata.seo_i18n && typeof metadata.seo_i18n === 'object' ? metadata.seo_i18n : {}) }
+      const loc = { ...(seoI18n[locale] || {}) }
+      if (metaTitle !== undefined) loc.meta_title = metaTitle
+      if (metaDescription !== undefined) loc.meta_description = metaDescription
+      if (metaKeywords !== undefined) loc.meta_keywords = metaKeywords
+      seoI18n[locale] = loc
+      metadata.seo_i18n = seoI18n
+      // Evaluate against DE canonical for save gate
+      nextTitle = r.rows[0].seo_title || metadata.meta_title || ''
+      nextDesc = r.rows[0].seo_description || metadata.meta_description || ''
+      nextKw = metadata.keywords || metadata.meta_keywords || ''
+    }
+
     const evaluation = evaluateMeta({ title: nextTitle, description: nextDesc, keywords: nextKw, entityType: 'categories' })
     if (evaluation.issues.some((i) => i.severity === 'error')) {
-      return { error: 400, message: 'Category SEO rules not met', evaluation }
+      return { error: 400, message: evaluation.issues.find((i) => i.severity === 'error')?.message || 'Category SEO rules not met', evaluation }
     }
-    if (metaTitle !== undefined) {
-      metadata.meta_title = metaTitle
+
+    let slug = r.rows[0].slug
+    if (nextHandle !== undefined && nextHandle && nextHandle !== slug) {
+      const clash = await client.query(`SELECT id FROM admin_hub_categories WHERE slug = $1 AND id <> $2 LIMIT 1`, [nextHandle, id])
+      if (clash.rows[0]) return { error: 400, message: 'Slug already in use' }
+      slug = nextHandle
     }
-    if (metaDescription !== undefined) {
-      metadata.meta_description = metaDescription
-    }
-    if (metaKeywords !== undefined) {
-      metadata.keywords = metaKeywords
-      metadata.meta_keywords = metaKeywords
-    }
+
     await client.query(
-      `UPDATE admin_hub_categories SET seo_title = COALESCE($1, seo_title), seo_description = COALESCE($2, seo_description), metadata = $3, updated_at = now() WHERE id = $4`,
-      [metaTitle !== undefined ? metaTitle : null, metaDescription !== undefined ? metaDescription : null, JSON.stringify(metadata), id],
+      `UPDATE admin_hub_categories SET
+         seo_title = $1, seo_description = $2, metadata = $3, slug = $4, updated_at = now()
+       WHERE id = $5`,
+      [nextTitle || null, nextDesc || null, JSON.stringify(metadata), slug, id],
     )
     return { ok: true, evaluation }
   }
 
   if (type === 'collections') {
-    const r = await client.query(`SELECT metadata FROM admin_hub_collections WHERE id = $1`, [id])
+    const r = await client.query(`SELECT metadata, handle FROM admin_hub_collections WHERE id = $1`, [id])
     if (!r.rows[0]) return { error: 404 }
     const metadata = { ...(r.rows[0].metadata && typeof r.rows[0].metadata === 'object' ? r.rows[0].metadata : {}) }
-    if (metaTitle !== undefined) metadata.meta_title = metaTitle
-    if (metaDescription !== undefined) metadata.meta_description = metaDescription
-    if (metaKeywords !== undefined) metadata.keywords = metaKeywords
-    await client.query(`UPDATE admin_hub_collections SET metadata = $1, updated_at = now() WHERE id = $2`, [JSON.stringify(metadata), id])
+    if (isDe) {
+      if (metaTitle !== undefined) metadata.meta_title = metaTitle
+      if (metaDescription !== undefined) metadata.meta_description = metaDescription
+      if (metaKeywords !== undefined) metadata.keywords = metaKeywords
+    } else {
+      const seoI18n = { ...(metadata.seo_i18n && typeof metadata.seo_i18n === 'object' ? metadata.seo_i18n : {}) }
+      const loc = { ...(seoI18n[locale] || {}) }
+      if (metaTitle !== undefined) loc.meta_title = metaTitle
+      if (metaDescription !== undefined) loc.meta_description = metaDescription
+      if (metaKeywords !== undefined) loc.meta_keywords = metaKeywords
+      seoI18n[locale] = loc
+      metadata.seo_i18n = seoI18n
+    }
+    if (nextHandle !== undefined && nextHandle && nextHandle !== r.rows[0].handle) {
+      const clash = await client.query(`SELECT id FROM admin_hub_collections WHERE handle = $1 AND id <> $2 LIMIT 1`, [nextHandle, id])
+      if (clash.rows[0]) return { error: 400, message: 'Handle already in use' }
+      await client.query(`UPDATE admin_hub_collections SET handle = $1, metadata = $2, updated_at = now() WHERE id = $3`, [nextHandle, JSON.stringify(metadata), id])
+    } else {
+      await client.query(`UPDATE admin_hub_collections SET metadata = $1, updated_at = now() WHERE id = $2`, [JSON.stringify(metadata), id])
+    }
     return { ok: true }
   }
 
   if (type === 'pages' || type === 'blogs') {
-    const r = await client.query(`SELECT id, page_type FROM admin_hub_pages WHERE id = $1`, [id])
+    const r = await client.query(
+      `SELECT id, page_type, slug, meta_title, meta_description, meta_keywords, meta_title_i18n, meta_description_i18n
+         FROM admin_hub_pages WHERE id = $1`,
+      [id],
+    )
     if (!r.rows[0]) return { error: 404 }
     const isBlog = r.rows[0].page_type === 'blog'
     if (type === 'blogs' && !isBlog) return { error: 404 }
     if (type === 'pages' && isBlog) return { error: 404 }
-    await client.query(
-      `UPDATE admin_hub_pages SET
-         meta_title = COALESCE($1, meta_title),
-         meta_description = COALESCE($2, meta_description),
-         meta_keywords = COALESCE($3, meta_keywords),
-         updated_at = now()
-       WHERE id = $4`,
-      [
-        metaTitle !== undefined ? metaTitle : null,
-        metaDescription !== undefined ? metaDescription : null,
-        metaKeywords !== undefined ? metaKeywords : null,
-        id,
-      ],
-    )
+
+    let slug = r.rows[0].slug
+    if (nextHandle !== undefined && nextHandle && nextHandle !== slug) {
+      const clash = await client.query(`SELECT id FROM admin_hub_pages WHERE slug = $1 AND id <> $2 LIMIT 1`, [nextHandle, id])
+      if (clash.rows[0]) return { error: 400, message: 'Slug already in use' }
+      slug = nextHandle
+    }
+
+    if (isDe) {
+      await client.query(
+        `UPDATE admin_hub_pages SET
+           meta_title = COALESCE($1, meta_title),
+           meta_description = COALESCE($2, meta_description),
+           meta_keywords = COALESCE($3, meta_keywords),
+           slug = $4,
+           updated_at = now()
+         WHERE id = $5`,
+        [
+          metaTitle !== undefined ? metaTitle : null,
+          metaDescription !== undefined ? metaDescription : null,
+          metaKeywords !== undefined ? metaKeywords : null,
+          slug,
+          id,
+        ],
+      )
+    } else {
+      const titleI18n = { ...(r.rows[0].meta_title_i18n && typeof r.rows[0].meta_title_i18n === 'object' ? r.rows[0].meta_title_i18n : {}) }
+      const descI18n = { ...(r.rows[0].meta_description_i18n && typeof r.rows[0].meta_description_i18n === 'object' ? r.rows[0].meta_description_i18n : {}) }
+      if (metaTitle !== undefined) titleI18n[locale] = { ...(titleI18n[locale] || {}), meta_title: metaTitle, title: metaTitle }
+      if (metaDescription !== undefined) descI18n[locale] = { ...(descI18n[locale] || {}), meta_description: metaDescription, description: metaDescription }
+      await client.query(
+        `UPDATE admin_hub_pages SET
+           meta_title_i18n = $1::jsonb,
+           meta_description_i18n = $2::jsonb,
+           slug = $3,
+           updated_at = now()
+         WHERE id = $4`,
+        [JSON.stringify(titleI18n), JSON.stringify(descI18n), slug, id],
+      )
+    }
     return { ok: true }
   }
   return { error: 400, message: 'Unknown type' }
@@ -539,7 +656,7 @@ function createSeoHubRouter() {
     const description = String(req.body?.meta_description || '')
     const keywords = String(req.body?.meta_keywords || '')
     const entityType = normalizeEntityType(req.body?.type) || 'pages'
-    const analysis = analyzeHtml(html)
+    const analysis = applyTemplateH1(analyzeHtml(html), entityType)
     const evaluation = evaluateMeta({ title, description, keywords, entityType })
     let live = null
     const targetUrl = String(req.body?.url || '').trim()
@@ -557,7 +674,8 @@ function createSeoHubRouter() {
         live = {
           status: response.status,
           finalUrl: response.url,
-          analysis: analyzeHtml(text),
+          // Client-rendered template H1 is often missing from raw HTML — apply the same bump.
+          analysis: applyTemplateH1(analyzeHtml(text), entityType),
           titleTag: (text.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1]?.replace(/\s+/g, ' ').trim() || '',
           metaDescription: (text.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) || [])[1] || '',
           canonical: (text.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']*)["']/i) || [])[1] || '',

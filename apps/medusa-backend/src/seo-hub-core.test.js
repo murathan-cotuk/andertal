@@ -23,8 +23,11 @@ assert.strictEqual(analysis.links, 1)
 assert.strictEqual(analysis.hasH1, true)
 
 const catBad = evaluateMeta({ title: 'short', description: 'short', keywords: '', entityType: 'categories' })
-assert.ok(catBad.issues.some((i) => i.field === 'title' && i.severity === 'error'))
-assert.ok(catBad.issues.some((i) => i.field === 'keywords' && i.severity === 'error'))
+assert.ok(catBad.issues.some((i) => i.field === 'title' && i.severity === 'warn'))
+assert.ok(catBad.issues.some((i) => i.field === 'keywords' && i.severity === 'warn'))
+const catMissing = evaluateMeta({ title: '', description: '', keywords: '', entityType: 'categories' })
+assert.ok(catMissing.issues.some((i) => i.field === 'title' && i.severity === 'error'))
+assert.ok(catMissing.issues.some((i) => i.field === 'description' && i.severity === 'error'))
 
 const goodTitle = 'A'.repeat(TITLE_IDEAL.min)
 const goodDesc = 'B'.repeat(DESC_IDEAL.min)

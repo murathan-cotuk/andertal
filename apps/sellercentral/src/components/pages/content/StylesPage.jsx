@@ -78,6 +78,7 @@ import { NumericTextField, NumericInput } from "@/components/NumericTextField";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 import { getStylesPageCopy } from "@/lib/styles-page-i18n";
+import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 
 function normalizeHexForColorInput(val) {
   if (!val || typeof val !== "string") return "#ffffff";
@@ -849,6 +850,9 @@ function badgeVisualStyle(b) {
 function emptyBadgeForm() {
   return {
     label: "",
+    badge_type: "text",
+    image_url: "",
+    i18n: {},
     position: "top-left",
     bg_color: "#e53935",
     text_color: "#ffffff",
@@ -867,6 +871,17 @@ function emptyBadgeForm() {
   };
 }
 
+function setBadgeI18nField(i18nObj, lang, field, value) {
+  const next = { ...(i18nObj || {}) };
+  const langObj = { ...(next[lang] || {}) };
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) delete langObj[field];
+  else langObj[field] = trimmed;
+  if (Object.keys(langObj).length === 0) delete next[lang];
+  else next[lang] = langObj;
+  return next;
+}
+
 function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPickerTarget, ui }) {
   const [badges, setBadges] = useState([]);
   const [loadingBadges, setLoadingBadges] = useState(true);
@@ -878,6 +893,10 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
   const [form, setForm] = useState(emptyBadgeForm());
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const [editLang, setEditLang] = useState("de");
+  const [badgeImagePickerOpen, setBadgeImagePickerOpen] = useState(false);
+  const langOptions = getLandingEditorCopy(locale).shopContentLangOptions();
+  const isDe = !editLang || editLang === "de";
 
   const loadBadges = useCallback(async () => {
     setLoadingBadges(true);
@@ -909,29 +928,70 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyBadgeForm());
+    setEditLang("de");
     setErrMsg("");
     setModalOpen(true);
   };
 
   const openEdit = (b) => {
     setEditingId(b.id);
-    setForm({ ...emptyBadgeForm(), ...b, product_id: b.product_id || "", group_id: b.group_id || "", api_category_id: b.api_category_id || "" });
+    setForm({
+      ...emptyBadgeForm(),
+      ...b,
+      product_id: b.product_id || "",
+      group_id: b.group_id || "",
+      api_category_id: b.api_category_id || "",
+      badge_type: b.badge_type === "image" ? "image" : "text",
+      image_url: b.image_url || "",
+      i18n: b.i18n && typeof b.i18n === "object" ? b.i18n : {},
+    });
+    setEditLang("de");
     setErrMsg("");
     setModalOpen(true);
   };
 
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
+  const displayedLabel = isDe ? (form.label || "") : (form.i18n?.[editLang]?.label || "");
+  const displayedImageUrl = isDe ? (form.image_url || "") : (form.i18n?.[editLang]?.image_url || "");
+
+  const setDisplayedLabel = (v) => {
+    if (isDe) {
+      setField("label", v);
+      return;
+    }
+    setForm((prev) => ({ ...prev, i18n: setBadgeI18nField(prev.i18n, editLang, "label", v) }));
+  };
+
+  const setDisplayedImageUrl = (v) => {
+    if (isDe) {
+      setField("image_url", v);
+      return;
+    }
+    setForm((prev) => ({ ...prev, i18n: setBadgeI18nField(prev.i18n, editLang, "image_url", v) }));
+  };
+
   const handleSubmit = async () => {
-    if (!form.label.trim()) {
+    if (form.badge_type === "image") {
+      if (!(form.image_url || "").trim()) {
+        setErrMsg(locale === "de" ? "Badge-Bild ist erforderlich." : locale === "tr" ? "Badge görseli gerekli." : "Badge image is required.");
+        return;
+      }
+    } else if (!form.label.trim()) {
       setErrMsg(locale === "de" ? "Badge-Text ist erforderlich." : locale === "tr" ? "Badge metni gerekli." : locale === "fr" ? "Le texte du badge est requis." : locale === "es" ? "El texto de la insignia es obligatorio." : locale === "it" ? "Il testo del badge è obbligatorio." : "Badge text is required.");
       return;
     }
     setSaving(true);
     setErrMsg("");
     try {
-      if (editingId) await client.updateProductBadge(editingId, form);
-      else await client.createProductBadge(form);
+      const payload = {
+        ...form,
+        label: (form.label || "").trim() || (form.badge_type === "image" ? "Badge" : ""),
+        image_url: (form.image_url || "").trim() || null,
+        i18n: form.i18n && Object.keys(form.i18n).length ? form.i18n : null,
+      };
+      if (editingId) await client.updateProductBadge(editingId, payload);
+      else await client.createProductBadge(payload);
       setModalOpen(false);
       await loadBadges();
     } catch (e) {
@@ -966,6 +1026,10 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
   const targetTypeSelectOptions = ["product", "group", "api"].map((t) => ({ label: targetTypeLabel(locale, t), value: t }));
   const apiRuleSelectOptions = ["bestseller_category", "sale", "new"].map((r) => ({ label: apiRuleLabel(locale, r), value: r }));
   const groupSelectOptions = [{ label: "—", value: "" }, ...groups.map((g) => ({ label: g.name, value: g.id }))];
+  const badgeTypeOptions = [
+    { label: locale === "de" ? "Text" : locale === "tr" ? "Metin" : "Text", value: "text" },
+    { label: locale === "de" ? "Bild" : locale === "tr" ? "Görsel" : "Image", value: "image" },
+  ];
 
   const t = {
     addBadge: locale === "de" ? "+ Badge hinzufügen" : locale === "tr" ? "+ Badge ekle" : locale === "fr" ? "+ Ajouter un badge" : locale === "es" ? "+ Añadir insignia" : locale === "it" ? "+ Aggiungi badge" : "+ Add badge",
@@ -980,6 +1044,15 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
     save: locale === "de" ? "Speichern" : locale === "tr" ? "Kaydet" : locale === "fr" ? "Enregistrer" : locale === "es" ? "Guardar" : locale === "it" ? "Salva" : "Save",
     cancel: locale === "de" ? "Abbrechen" : locale === "tr" ? "İptal" : locale === "fr" ? "Annuler" : locale === "es" ? "Cancelar" : locale === "it" ? "Annulla" : "Cancel",
     badgeText: locale === "de" ? "Badge-Text" : locale === "tr" ? "Badge metni" : locale === "fr" ? "Texte du badge" : locale === "es" ? "Texto de la insignia" : locale === "it" ? "Testo del badge" : "Badge text",
+    badgeType: locale === "de" ? "Badge-Typ" : locale === "tr" ? "Badge tipi" : "Badge type",
+    badgeImage: locale === "de" ? "Badge-Bild" : locale === "tr" ? "Badge görseli" : "Badge image",
+    shopLang: locale === "de" ? "Shop-Inhaltssprache" : locale === "tr" ? "Shop içerik dili" : "Shop content language",
+    shopLangHelp: locale === "de"
+      ? "DE = Standard. Andere Sprachen: Text/Bild-Übersetzung für den Shop."
+      : locale === "tr"
+        ? "DE = varsayılan. Diğer diller: shop’ta görünen metin/görsel çevirisi."
+        : "DE = default. Other languages: text/image translation shown in the shop.",
+    fromMedia: locale === "de" ? "Aus Medien" : locale === "tr" ? "Medyadan seç" : "From media",
     position: locale === "de" ? "Position" : locale === "tr" ? "Konum" : locale === "fr" ? "Position" : locale === "es" ? "Posición" : locale === "it" ? "Posizione" : "Position",
     style: locale === "de" ? "Stil" : locale === "tr" ? "Stil" : locale === "fr" ? "Style" : locale === "es" ? "Estilo" : locale === "it" ? "Stile" : "Style",
     bgColor: locale === "de" ? "Hintergrundfarbe" : locale === "tr" ? "Arka plan rengi" : locale === "fr" ? "Couleur de fond" : locale === "es" ? "Color de fondo" : locale === "it" ? "Colore di sfondo" : "Background color",
@@ -1000,7 +1073,7 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
   return (
     <BlockStack gap="400">
       <Text as="p" tone="subdued">
-        {locale === "de" ? "Beliebig viele Text-Badges (z. B. „Sale“, „Bestseller“) auf Produktbildern — Position, Stil und Ziel (Produkt / Produktgruppe / API-Regel) frei wählbar." : locale === "tr" ? "Ürün görsellerinde istediğiniz kadar metin badge'i (ör. \"Sale\", \"Bestseller\") — konum, stil ve hedef (ürün / ürün grubu / API kuralı) serbestçe seçilebilir." : locale === "fr" ? "Un nombre illimité de badges texte (ex. « Sale », « Bestseller ») sur les images produits — position, style et cible (produit / groupe / règle API) entièrement paramétrables." : locale === "es" ? "Tantas insignias de texto como quieras (p. ej. «Sale», «Bestseller») sobre las imágenes de producto — posición, estilo y objetivo (producto / grupo / regla API) totalmente configurables." : locale === "it" ? "Tutti i badge di testo che vuoi (es. \"Sale\", \"Bestseller\") sulle immagini prodotto — posizione, stile e target (prodotto / gruppo / regola API) completamente configurabili." : "As many text badges as you like (e.g. \"Sale\", \"Bestseller\") on product images — position, style and target (product / group / API rule) are all configurable."}
+        {locale === "de" ? "Beliebig viele Text- oder Bild-Badges auf Produktbildern — Position, Stil, Ziel und Sprache frei wählbar." : locale === "tr" ? "Ürün görsellerinde metin veya görsel badge’ler — konum, stil, hedef ve dil serbestçe seçilebilir." : "Text or image badges on product images — position, style, target and language are configurable."}
       </Text>
 
       <Divider />
@@ -1212,7 +1285,11 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
           {badges.map((b) => (
             <div key={b.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 12px", borderBottom: "1px solid #f4f5f7" }}>
               <InlineStack gap="300" blockAlign="center">
-                <span style={{ ...badgeVisualStyle(b), position: "relative" }}>{b.label}</span>
+                {b.badge_type === "image" && (b.image_url || "").trim() ? (
+                  <img src={b.image_url} alt={b.label || ""} style={{ maxWidth: 48, maxHeight: 48, objectFit: "contain" }} />
+                ) : (
+                  <span style={{ ...badgeVisualStyle(b), position: "relative" }}>{b.label}</span>
+                )}
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{posLabel(locale, b.position)}</div>
                   <div style={{ fontSize: 12, color: "#6d7175" }}>{targetSummary(b)}</div>
@@ -1234,31 +1311,85 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
           <Modal.Section>
             <BlockStack gap="400">
               {errMsg && <Banner tone="critical">{errMsg}</Banner>}
+              <Select label={t.shopLang} options={langOptions} value={editLang} onChange={setEditLang} helpText={t.shopLangHelp} />
               <InlineStack gap="400" wrap={false}>
                 <div style={{ flex: 1 }}>
-                  <TextField label={t.badgeText} value={form.label} onChange={(v) => setField("label", v)} autoComplete="off" placeholder="Sale" />
+                  <Select label={t.badgeType} options={badgeTypeOptions} value={form.badge_type || "text"} onChange={(v) => setField("badge_type", v)} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <Select label={t.position} options={positionSelectOptions} value={form.position} onChange={(v) => setField("position", v)} />
                 </div>
               </InlineStack>
 
+              {form.badge_type === "image" ? (
+                <BlockStack gap="200">
+                  <TextField
+                    label={t.badgeImage}
+                    value={displayedImageUrl}
+                    onChange={setDisplayedImageUrl}
+                    placeholder={isDe ? "https://…" : (form.image_url || "https://…")}
+                    autoComplete="off"
+                    helpText={!isDe ? (form.image_url || "") : undefined}
+                  />
+                  <InlineStack gap="200">
+                    <Button size="slim" onClick={() => setBadgeImagePickerOpen(true)}>{t.fromMedia}</Button>
+                    {displayedImageUrl ? (
+                      <Button size="slim" tone="critical" variant="plain" onClick={() => setDisplayedImageUrl("")}>{ui?.remove || "Remove"}</Button>
+                    ) : null}
+                  </InlineStack>
+                  <TextField
+                    label={t.badgeText}
+                    value={displayedLabel}
+                    onChange={setDisplayedLabel}
+                    autoComplete="off"
+                    placeholder={isDe ? "Alt text" : (form.label || "Alt text")}
+                    helpText={locale === "de" ? "Optional: Alt-Text / Name" : locale === "tr" ? "İsteğe bağlı: alt metin / ad" : "Optional: alt text / name"}
+                  />
+                </BlockStack>
+              ) : (
+                <TextField
+                  label={t.badgeText}
+                  value={displayedLabel}
+                  onChange={setDisplayedLabel}
+                  autoComplete="off"
+                  placeholder={isDe ? "Sale" : (form.label || "Sale")}
+                  helpText={!isDe ? (form.label || undefined) : undefined}
+                />
+              )}
+
               <Text as="h3" variant="headingSm">{t.preview}</Text>
               <div style={{ position: "relative", width: 160, height: 160, background: "#e9eaeb", borderRadius: 8, border: "1px solid #d3d5d8" }}>
-                <div style={{ ...badgePositionStyle(form), ...badgeVisualStyle(form) }}>{form.label || "Badge"}</div>
+                {form.badge_type === "image" && (displayedImageUrl || form.image_url) ? (
+                  <div style={badgePositionStyle(form)}>
+                    <img src={displayedImageUrl || form.image_url} alt="" style={{ maxWidth: 72, maxHeight: 72, objectFit: "contain" }} />
+                  </div>
+                ) : (
+                  <div style={{ ...badgePositionStyle(form), ...badgeVisualStyle(form) }}>{displayedLabel || form.label || "Badge"}</div>
+                )}
               </div>
 
-              <Text as="h3" variant="headingSm">{t.style}</Text>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-                <ColorField label={t.bgColor} value={form.bg_color} onChange={(v) => setField("bg_color", v)} />
-                <ColorField label={t.textColor} value={form.text_color} onChange={(v) => setField("text_color", v)} />
-                <ColorField label={t.borderColor} value={form.border_color} onChange={(v) => setField("border_color", v)} />
-                <NumericTextField label={t.borderWidth} value={form.border_width} min={0} max={10} fallback={0} onChange={(n) => setField("border_width", n)} />
-                <NumericTextField label={t.borderRadius} value={form.border_radius} min={0} max={100} fallback={4} onChange={(n) => setField("border_radius", n)} />
-                <NumericTextField label={t.fontSize} value={form.font_size} min={8} max={48} fallback={12} onChange={(n) => setField("font_size", n)} />
-                <NumericTextField label={t.offsetX} value={form.offset_x} min={0} max={200} fallback={8} onChange={(n) => setField("offset_x", n)} />
-                <NumericTextField label={t.offsetY} value={form.offset_y} min={0} max={200} fallback={8} onChange={(n) => setField("offset_y", n)} />
-              </div>
+              {form.badge_type !== "image" && (
+                <>
+                  <Text as="h3" variant="headingSm">{t.style}</Text>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                    <ColorField label={t.bgColor} value={form.bg_color} onChange={(v) => setField("bg_color", v)} />
+                    <ColorField label={t.textColor} value={form.text_color} onChange={(v) => setField("text_color", v)} />
+                    <ColorField label={t.borderColor} value={form.border_color} onChange={(v) => setField("border_color", v)} />
+                    <NumericTextField label={t.borderWidth} value={form.border_width} min={0} max={10} fallback={0} onChange={(n) => setField("border_width", n)} />
+                    <NumericTextField label={t.borderRadius} value={form.border_radius} min={0} max={100} fallback={4} onChange={(n) => setField("border_radius", n)} />
+                    <NumericTextField label={t.fontSize} value={form.font_size} min={8} max={48} fallback={12} onChange={(n) => setField("font_size", n)} />
+                    <NumericTextField label={t.offsetX} value={form.offset_x} min={0} max={200} fallback={8} onChange={(n) => setField("offset_x", n)} />
+                    <NumericTextField label={t.offsetY} value={form.offset_y} min={0} max={200} fallback={8} onChange={(n) => setField("offset_y", n)} />
+                  </div>
+                </>
+              )}
+
+              {form.badge_type === "image" && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                  <NumericTextField label={t.offsetX} value={form.offset_x} min={0} max={200} fallback={8} onChange={(n) => setField("offset_x", n)} />
+                  <NumericTextField label={t.offsetY} value={form.offset_y} min={0} max={200} fallback={8} onChange={(n) => setField("offset_y", n)} />
+                </div>
+              )}
 
               <Divider />
               <Text as="h3" variant="headingSm">{t.target}</Text>
@@ -1296,6 +1427,17 @@ function ProductBadgesCard({ locale, client, styles, setStyles, setBrandingPicke
           </Modal.Section>
         </Modal>
       )}
+
+      <MediaPickerModal
+        open={badgeImagePickerOpen}
+        onClose={() => setBadgeImagePickerOpen(false)}
+        onSelect={(urls) => {
+          const first = Array.isArray(urls) ? urls[0] : urls;
+          if (first) setDisplayedImageUrl(String(first));
+          setBadgeImagePickerOpen(false);
+        }}
+        title={t.badgeImage}
+      />
     </BlockStack>
   );
 }

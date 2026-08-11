@@ -6,7 +6,19 @@ import { useLocale } from "next-intl";
 import { statusLabel } from "@/lib/status-labels";
 import styled from "styled-components";
 import { Card } from "@andertal/ui";
-import { Button, InlineStack } from "@shopify/polaris";
+import {
+  Button,
+  InlineStack,
+  BlockStack,
+  Text,
+  TextField,
+  Select,
+  Popover,
+  ActionList,
+  Modal,
+  Banner,
+} from "@shopify/polaris";
+import { MenuHorizontalIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
@@ -532,63 +544,70 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
 
 function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, bottom: "auto", right: 0, openUp: false });
   const router = useRouter();
   const params = useParams();
   const locale = params?.locale || "de";
-  const ref = React.useRef(null);
-  const btnRef = React.useRef(null);
-  const menuRef = React.useRef(null);
+  const ui = getUI(locale);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (ref.current && ref.current.contains(e.target)) return;
-      if (menuRef.current && menuRef.current.contains(e.target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  const handleToggle = (e) => {
-    e.stopPropagation();
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const openUp = spaceBelow < 220;
-      setPos({
-        top: openUp ? "auto" : rect.bottom + 4,
-        bottom: openUp ? (window.innerHeight - rect.top + 4) : "auto",
-        right: window.innerWidth - rect.right,
-      });
-    }
-    setOpen(o => !o);
-  };
+  const items = [
+    {
+      content: ui.viewDetails,
+      onAction: () => {
+        setOpen(false);
+        router.push(`/${locale}/orders/${order.id}`);
+      },
+    },
+    {
+      content: ui.ship,
+      onAction: () => {
+        setOpen(false);
+        onVersenden?.();
+      },
+    },
+    {
+      content: ui.cancelOrder,
+      destructive: true,
+      onAction: () => {
+        setOpen(false);
+        onUpdate(order.id, { order_status: "storniert" });
+      },
+    },
+    ...(isSuperuser
+      ? [
+          {
+            content: ui.deleteOrder,
+            destructive: true,
+            onAction: async () => {
+              setOpen(false);
+              if (await confirmDelete(ui.deleteOrder + "?")) onDelete(order.id);
+            },
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }} onMouseDown={e => e.stopPropagation()}>
-      <button ref={btnRef} onClick={handleToggle} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontSize: 16, color: "#6b7280" }}>⋯</button>
-      {open && (
-        <div ref={menuRef} style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 12px rgba(0,0,0,.1)", zIndex: 9999, minWidth: 170, overflow: "hidden" }}>
-          {(() => {
-            const _ui = getUI(locale);
-            return [
-              { label: _ui.viewDetails, action: () => { router.push(`/${locale}/orders/${order.id}`); setOpen(false); } },
-              { label: _ui.ship, action: () => { onVersenden?.(); setOpen(false); } },
-              { label: _ui.cancelOrder, action: () => { onUpdate(order.id, { order_status: "storniert" }); setOpen(false); }, danger: true },
-              ...(isSuperuser ? [{ label: _ui.deleteOrder, action: async () => { if (await confirmDelete(_ui.deleteOrder + "?")) { onDelete(order.id); } setOpen(false); }, danger: true }] : []),
-            ];
-          })().map((item, i, arr) => (
-            <button key={i} onClick={item.action} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 16px", background: "none", border: "none", fontSize: 13, cursor: "pointer", color: item.danger ? "#b91c1c" : "#111827", borderBottom: i < arr.length - 1 ? "1px solid #f3f4f6" : "none" }}
-              onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}
-            >
-              {item.icon ? <span style={{ marginRight: 6 }}>{item.icon}</span> : null}{item.label}
-            </button>
-          ))}
-        </div>
-      )}
+    <div
+      style={{ display: "inline-block" }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <Popover
+        active={open}
+        preferredAlignment="right"
+        autofocusTarget="first-node"
+        onClose={() => setOpen(false)}
+        activator={
+          <Button
+            size="slim"
+            icon={MenuHorizontalIcon}
+            onClick={() => setOpen((o) => !o)}
+            accessibilityLabel={ui.actions || "Actions"}
+          />
+        }
+      >
+        <ActionList items={items} />
+      </Popover>
     </div>
   );
 }
@@ -608,149 +627,334 @@ function ManualOrderModal({ onClose, onCreated, locale = "de" }) {
   const [err, setErr] = useState("");
   const ui = getUI(locale);
 
-  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const setItem = (i, k, v) => setForm(f => {
-    const items = [...f.items];
-    items[i] = { ...items[i], [k]: v };
-    return { ...f, items };
-  });
-  const addItem = () => setForm(f => ({ ...f, items: [...f.items, { title: "", quantity: 1, unit_price_cents: "" }] }));
-  const removeItem = (i) => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
+  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setItem = (i, k, v) =>
+    setForm((f) => {
+      const items = [...f.items];
+      items[i] = { ...items[i], [k]: v };
+      return { ...f, items };
+    });
+  const addItem = () =>
+    setForm((f) => ({
+      ...f,
+      items: [...f.items, { title: "", quantity: 1, unit_price_cents: "" }],
+    }));
+  const removeItem = (i) =>
+    setForm((f) => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }));
 
-  const itemsTotal = form.items.reduce((s, it) => s + (Number(it.unit_price_cents||0) * Number(it.quantity||1)), 0);
-  const total = itemsTotal + Number(form.shipping_cents||0) - Number(form.discount_cents||0);
+  const itemsTotal = form.items.reduce(
+    (s, it) => s + Number(it.unit_price_cents || 0) * Number(it.quantity || 1),
+    0
+  );
+  const total =
+    itemsTotal + Number(form.shipping_cents || 0) - Number(form.discount_cents || 0);
 
   const handleSave = async () => {
-    if (!form.email) { setErr(ui.email + " required"); return; }
-    setSaving(true); setErr("");
+    if (!form.email) {
+      setErr(ui.email + " required");
+      return;
+    }
+    setSaving(true);
+    setErr("");
     try {
       const client = getMedusaAdminClient();
       const payload = {
         ...form,
-        items: form.items.filter(it => it.title),
-        shipping_cents: Number(form.shipping_cents||0),
-        discount_cents: Number(form.discount_cents||0),
+        items: form.items.filter((it) => it.title),
+        shipping_cents: Number(form.shipping_cents || 0),
+        discount_cents: Number(form.discount_cents || 0),
       };
       await client.createOrder(payload);
       onCreated();
       onClose();
-    } catch (e) { setErr(e?.message || ui.error); }
+    } catch (e) {
+      setErr(e?.message || ui.error);
+    }
     setSaving(false);
   };
 
-  const inp = { padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" };
-  const lbl = { fontSize: 12, color: "#374151", fontWeight: 500, display: "block", marginBottom: 3 };
+  const orderStatusOptions = ["offen", "in_bearbeitung", "abgeschlossen", "storniert"].map(
+    (s) => ({ label: statusLabel(locale, s), value: s })
+  );
+  const paymentStatusOptions = ["offen", "bezahlt", "teil_erstattet", "erstattet"].map(
+    (s) => ({ label: statusLabel(locale, s), value: s })
+  );
+  const deliveryStatusOptions = ["offen", "versendet", "zugestellt"].map((s) => ({
+    label: statusLabel(locale, s),
+    value: s,
+  }));
+  const currencyOptions = ["EUR", "CHF", "USD", "GBP", "TRY"].map((c) => ({
+    label: c,
+    value: c,
+  }));
+
+  const money = (cents) =>
+    (Number(cents) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 });
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 12, width: 640, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        <div style={{ padding: "18px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "#fff", zIndex: 1 }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{ui.manualOrder}</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
-        </div>
-        <div style={{ padding: 24 }}>
-          {/* Customer */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#111827", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{ui.customerData}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div style={{ gridColumn: "1/-1" }}><label style={lbl}>{ui.email} *</label><input style={inp} value={form.email} onChange={e => setF("email", e.target.value)} /></div>
-              <div><label style={lbl}>{ui.firstName}</label><input style={inp} value={form.first_name} onChange={e => setF("first_name", e.target.value)} /></div>
-              <div><label style={lbl}>{ui.lastName}</label><input style={inp} value={form.last_name} onChange={e => setF("last_name", e.target.value)} /></div>
-              <div><label style={lbl}>{ui.phone}</label><input style={inp} value={form.phone} onChange={e => setF("phone", e.target.value)} /></div>
-              <div><label style={lbl}>{ui.country}</label><input style={inp} value={form.country} onChange={e => setF("country", e.target.value)} placeholder="DE" /></div>
-              <div style={{ gridColumn: "1/-1" }}><label style={lbl}>{ui.street}</label><input style={inp} value={form.address_line1} onChange={e => setF("address_line1", e.target.value)} /></div>
-              <div><label style={lbl}>{ui.postalCode}</label><input style={inp} value={form.zip_code} onChange={e => setF("zip_code", e.target.value)} /></div>
-              <div><label style={lbl}>{ui.city}</label><input style={inp} value={form.city} onChange={e => setF("city", e.target.value)} /></div>
-            </div>
-          </div>
+    <Modal
+      open
+      onClose={onClose}
+      title={ui.manualOrder}
+      size="large"
+      primaryAction={{
+        content: ui.createOrder,
+        onAction: handleSave,
+        loading: saving,
+      }}
+      secondaryActions={[{ content: ui.cancel, onAction: onClose }]}
+    >
+      <Modal.Section>
+        <BlockStack gap="400">
+          {err ? <Banner tone="critical">{err}</Banner> : null}
 
-          {/* Items */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#111827", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>{ui.items}</div>
-            {form.items.map((it, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 80px 110px 32px", gap: 8, marginBottom: 8, alignItems: "end" }}>
-                <div><label style={{ ...lbl, visibility: i > 0 ? "hidden" : "visible" }}>{ui.itemName}</label><input style={inp} value={it.title} onChange={e => setItem(i, "title", e.target.value)} /></div>
-                <div><label style={{ ...lbl, visibility: i > 0 ? "hidden" : "visible" }}>{ui.itemQty}</label><input style={inp} type="number" min="1" value={it.quantity} onChange={e => setItem(i, "quantity", e.target.value)} /></div>
-                <div><label style={{ ...lbl, visibility: i > 0 ? "hidden" : "visible" }}>{ui.itemPrice}</label><input style={inp} type="number" value={it.unit_price_cents} onChange={e => setItem(i, "unit_price_cents", e.target.value)} placeholder="1990" /></div>
-                <button onClick={() => removeItem(i)} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 5, cursor: "pointer", color: "#9ca3af", height: 34 }}>×</button>
-              </div>
-            ))}
-            <Button variant="plain" onClick={addItem}>
-              {ui.addItem}
-            </Button>
-          </div>
-
-          {/* Costs */}
-          <div style={{ marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div><label style={lbl}>{ui.shippingCents}</label><input style={inp} type="number" value={form.shipping_cents} onChange={e => setF("shipping_cents", e.target.value)} placeholder="0" /></div>
-            <div><label style={lbl}>{ui.discountCents}</label><input style={inp} type="number" value={form.discount_cents} onChange={e => setF("discount_cents", e.target.value)} placeholder="0" /></div>
-          </div>
-
-          {/* Status */}
-          <div style={{ marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={lbl}>{ui.orderStatusLabel}</label>
-              <select style={inp} value={form.order_status} onChange={e => setF("order_status", e.target.value)}>
-                {["offen","in_bearbeitung","abgeschlossen","storniert"].map(s => <option key={s} value={s}>{statusLabel(locale, s)}</option>)}
-              </select>
+          <Text as="h3" variant="headingSm">
+            {ui.customerData}
+          </Text>
+          <TextField
+            label={`${ui.email} *`}
+            value={form.email}
+            onChange={(v) => setF("email", v)}
+            autoComplete="email"
+          />
+          <InlineStack gap="300" wrap>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <TextField
+                label={ui.firstName}
+                value={form.first_name}
+                onChange={(v) => setF("first_name", v)}
+                autoComplete="given-name"
+              />
             </div>
-            <div>
-              <label style={lbl}>{ui.paymentStatusLabel}</label>
-              <select style={inp} value={form.payment_status} onChange={e => setF("payment_status", e.target.value)}>
-                {["offen","bezahlt","teil_erstattet","erstattet"].map(s => <option key={s} value={s}>{statusLabel(locale, s)}</option>)}
-              </select>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <TextField
+                label={ui.lastName}
+                value={form.last_name}
+                onChange={(v) => setF("last_name", v)}
+                autoComplete="family-name"
+              />
             </div>
-            <div>
-              <label style={lbl}>{ui.deliveryStatusLabel}</label>
-              <select style={inp} value={form.delivery_status} onChange={e => setF("delivery_status", e.target.value)}>
-                {["offen","versendet","zugestellt"].map(s => <option key={s} value={s}>{statusLabel(locale, s)}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div><label style={lbl}>{ui.paymentMethod}</label><input style={inp} value={form.payment_method} onChange={e => setF("payment_method", e.target.value)} /></div>
-            <div><label style={lbl}>{ui.currency}</label>
-              <select style={inp} value={form.currency} onChange={e => setF("currency", e.target.value)}>
-                {["EUR","CHF","USD","GBP","TRY"].map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 16 }}><label style={lbl}>{ui.notes}</label><textarea style={{ ...inp, height: 60, resize: "vertical" }} value={form.notes} onChange={e => setF("notes", e.target.value)} /></div>
-
-          {/* Summary */}
-          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: "12px 16px", fontSize: 13 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", color: "#6b7280", marginBottom: 4 }}>
-              <span>{ui.summarySubtotal}</span><span>{(itemsTotal/100).toLocaleString("de-DE", {minimumFractionDigits:2})} {form.currency}</span>
-            </div>
-            {Number(form.shipping_cents||0) > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#6b7280", marginBottom: 4 }}>
-                <span>{ui.summaryShipping}</span><span>+{(Number(form.shipping_cents)/100).toLocaleString("de-DE", {minimumFractionDigits:2})} {form.currency}</span>
-              </div>
-            )}
-            {Number(form.discount_cents||0) > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", color: "#059669", marginBottom: 4 }}>
-                <span>{ui.summaryDiscount}</span><span>−{(Number(form.discount_cents)/100).toLocaleString("de-DE", {minimumFractionDigits:2})} {form.currency}</span>
-              </div>
-            )}
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, borderTop: "1px solid #e5e7eb", paddingTop: 8, marginTop: 4 }}>
-              <span>{ui.summaryTotal}</span><span>{(total/100).toLocaleString("de-DE", {minimumFractionDigits:2})} {form.currency}</span>
-            </div>
-          </div>
-        </div>
-
-        {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
-        <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", position: "sticky", bottom: 0, background: "#fff" }}>
-          <InlineStack gap="200">
-            <Button onClick={onClose}>{ui.cancel}</Button>
-            <Button variant="primary" onClick={handleSave} disabled={saving} loading={saving}>
-              {ui.createOrder}
-            </Button>
           </InlineStack>
-        </div>
-      </div>
-    </div>
+          <InlineStack gap="300" wrap>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <TextField
+                label={ui.phone}
+                value={form.phone}
+                onChange={(v) => setF("phone", v)}
+                autoComplete="tel"
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <TextField
+                label={ui.country}
+                value={form.country}
+                onChange={(v) => setF("country", v)}
+                placeholder="DE"
+                autoComplete="country"
+              />
+            </div>
+          </InlineStack>
+          <TextField
+            label={ui.street}
+            value={form.address_line1}
+            onChange={(v) => setF("address_line1", v)}
+            autoComplete="street-address"
+          />
+          <InlineStack gap="300" wrap>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <TextField
+                label={ui.postalCode}
+                value={form.zip_code}
+                onChange={(v) => setF("zip_code", v)}
+                autoComplete="postal-code"
+              />
+            </div>
+            <div style={{ flex: 2, minWidth: 180 }}>
+              <TextField
+                label={ui.city}
+                value={form.city}
+                onChange={(v) => setF("city", v)}
+                autoComplete="address-level2"
+              />
+            </div>
+          </InlineStack>
+
+          <Text as="h3" variant="headingSm">
+            {ui.items}
+          </Text>
+          {form.items.map((it, i) => (
+            <InlineStack key={i} gap="200" wrap blockAlign="end">
+              <div style={{ flex: 2, minWidth: 160 }}>
+                <TextField
+                  label={i === 0 ? ui.itemName : ""}
+                  labelHidden={i > 0}
+                  value={it.title}
+                  onChange={(v) => setItem(i, "title", v)}
+                  autoComplete="off"
+                />
+              </div>
+              <div style={{ width: 88 }}>
+                <TextField
+                  label={i === 0 ? ui.itemQty : ""}
+                  labelHidden={i > 0}
+                  type="number"
+                  min={1}
+                  value={String(it.quantity)}
+                  onChange={(v) => setItem(i, "quantity", v)}
+                  autoComplete="off"
+                />
+              </div>
+              <div style={{ width: 120 }}>
+                <TextField
+                  label={i === 0 ? ui.itemPrice : ""}
+                  labelHidden={i > 0}
+                  type="number"
+                  value={String(it.unit_price_cents)}
+                  onChange={(v) => setItem(i, "unit_price_cents", v)}
+                  placeholder="1990"
+                  autoComplete="off"
+                />
+              </div>
+              <Button
+                size="slim"
+                tone="critical"
+                onClick={() => removeItem(i)}
+                accessibilityLabel="Remove item"
+              >
+                ×
+              </Button>
+            </InlineStack>
+          ))}
+          <Button variant="plain" onClick={addItem}>
+            {ui.addItem}
+          </Button>
+
+          <InlineStack gap="300" wrap>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <TextField
+                label={ui.shippingCents}
+                type="number"
+                value={String(form.shipping_cents)}
+                onChange={(v) => setF("shipping_cents", v)}
+                placeholder="0"
+                autoComplete="off"
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <TextField
+                label={ui.discountCents}
+                type="number"
+                value={String(form.discount_cents)}
+                onChange={(v) => setF("discount_cents", v)}
+                placeholder="0"
+                autoComplete="off"
+              />
+            </div>
+          </InlineStack>
+
+          <InlineStack gap="300" wrap>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <Select
+                label={ui.orderStatusLabel}
+                options={orderStatusOptions}
+                value={form.order_status}
+                onChange={(v) => setF("order_status", v)}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <Select
+                label={ui.paymentStatusLabel}
+                options={paymentStatusOptions}
+                value={form.payment_status}
+                onChange={(v) => setF("payment_status", v)}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 140 }}>
+              <Select
+                label={ui.deliveryStatusLabel}
+                options={deliveryStatusOptions}
+                value={form.delivery_status}
+                onChange={(v) => setF("delivery_status", v)}
+              />
+            </div>
+          </InlineStack>
+
+          <InlineStack gap="300" wrap>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <TextField
+                label={ui.paymentMethod}
+                value={form.payment_method}
+                onChange={(v) => setF("payment_method", v)}
+                autoComplete="off"
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <Select
+                label={ui.currency}
+                options={currencyOptions}
+                value={form.currency}
+                onChange={(v) => setF("currency", v)}
+              />
+            </div>
+          </InlineStack>
+
+          <TextField
+            label={ui.notes}
+            value={form.notes}
+            onChange={(v) => setF("notes", v)}
+            multiline={3}
+            autoComplete="off"
+          />
+
+          <div
+            style={{
+              background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+              borderRadius: 8,
+              padding: "12px 16px",
+            }}
+          >
+            <BlockStack gap="100">
+              <InlineStack align="space-between">
+                <Text as="span" tone="subdued">
+                  {ui.summarySubtotal}
+                </Text>
+                <Text as="span" tone="subdued">
+                  {money(itemsTotal)} {form.currency}
+                </Text>
+              </InlineStack>
+              {Number(form.shipping_cents || 0) > 0 ? (
+                <InlineStack align="space-between">
+                  <Text as="span" tone="subdued">
+                    {ui.summaryShipping}
+                  </Text>
+                  <Text as="span" tone="subdued">
+                    +{money(form.shipping_cents)} {form.currency}
+                  </Text>
+                </InlineStack>
+              ) : null}
+              {Number(form.discount_cents || 0) > 0 ? (
+                <InlineStack align="space-between">
+                  <Text as="span" tone="success">
+                    {ui.summaryDiscount}
+                  </Text>
+                  <Text as="span" tone="success">
+                    −{money(form.discount_cents)} {form.currency}
+                  </Text>
+                </InlineStack>
+              ) : null}
+              <InlineStack align="space-between">
+                <Text as="span" fontWeight="semibold">
+                  {ui.summaryTotal}
+                </Text>
+                <Text as="span" fontWeight="semibold">
+                  {money(total)} {form.currency}
+                </Text>
+              </InlineStack>
+            </BlockStack>
+          </div>
+        </BlockStack>
+      </Modal.Section>
+    </Modal>
   );
 }
 

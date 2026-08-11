@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
+import { useLocale } from "next-intl";
 
 const ENTITY_TYPES = [
   { id: "products", label: "Products" },
@@ -54,7 +56,112 @@ function StatChip({ label, value, warn }) {
   );
 }
 
+function buildCategoryTree(flat) {
+  const byId = new Map();
+  for (const item of flat || []) {
+    if (!item?.id) continue;
+    byId.set(item.id, { ...item, children: [] });
+  }
+  const roots = [];
+  for (const node of byId.values()) {
+    if (node.parent_id && byId.has(node.parent_id)) byId.get(node.parent_id).children.push(node);
+    else roots.push(node);
+  }
+  const sortDeep = (arr) => {
+    arr.sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity: "base" }));
+    arr.forEach((n) => n.children?.length && sortDeep(n.children));
+  };
+  sortDeep(roots);
+  return roots;
+}
+
+function filterTree(nodes, q) {
+  const needle = String(q || "").trim().toLowerCase();
+  if (!needle) return nodes;
+  const walk = (list) => {
+    const out = [];
+    for (const n of list) {
+      const kids = walk(n.children || []);
+      const hit =
+        String(n.label || "").toLowerCase().includes(needle) ||
+        String(n.handle || "").toLowerCase().includes(needle);
+      if (hit || kids.length) out.push({ ...n, children: kids });
+    }
+    return out;
+  };
+  return walk(nodes);
+}
+
+function CategoryTreeList({ nodes, depth, selectedId, onSelect }) {
+  return nodes.map((node) => (
+    <div key={node.id}>
+      <button
+        type="button"
+        onClick={() => onSelect(node.id)}
+        style={{
+          display: "block",
+          width: "100%",
+          textAlign: "left",
+          padding: `10px 14px 10px ${14 + depth * 14}px`,
+          border: "none",
+          borderBottom: "1px solid #f1f5f9",
+          background: selectedId === node.id ? "#f8fafc" : "#fff",
+          cursor: "pointer",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+          <div style={{ fontSize: 13, fontWeight: depth === 0 ? 650 : 500, color: "#0f172a" }}>{node.label}</div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[node.score] || "#64748b", textTransform: "uppercase" }}>
+            {node.score === "needs_work" ? "warn" : node.score}
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
+          /{node.handle || "—"}
+        </div>
+        <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {node.meta_title || "No meta title"}
+        </div>
+      </button>
+      {node.children?.length ? (
+        <CategoryTreeList nodes={node.children} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
+      ) : null}
+    </div>
+  ));
+}
+
+function draftFromEntity(e, lang) {
+  if (!e) return { meta_title: "", meta_description: "", meta_keywords: "", handle: "" };
+  const isDe = !lang || lang === "de";
+  if (isDe) {
+    return {
+      meta_title: e.meta_title || "",
+      meta_description: e.meta_description || "",
+      meta_keywords: e.meta_keywords || "",
+      handle: e.handle || "",
+    };
+  }
+  if (e.type === "pages" || e.type === "blogs") {
+    const t = e.meta_title_i18n?.[lang];
+    const d = e.meta_description_i18n?.[lang];
+    return {
+      meta_title: (t && (t.meta_title || t.title)) || "",
+      meta_description: (d && (d.meta_description || d.description)) || "",
+      meta_keywords: e.meta_keywords || "",
+      handle: e.handle || "",
+    };
+  }
+  const loc = e.seo_i18n?.[lang] || {};
+  return {
+    meta_title: loc.meta_title || "",
+    meta_description: loc.meta_description || "",
+    meta_keywords: loc.meta_keywords || "",
+    handle: e.handle || "",
+  };
+}
+
 export default function SeoHubPage() {
+  const uiLocale = useLocale();
+  const langOptions = useMemo(() => getLandingEditorCopy(uiLocale).shopContentLangOptions(), [uiLocale]);
   const [type, setType] = useState("products");
   const [q, setQ] = useState("");
   const [items, setItems] = useState([]);
@@ -64,14 +171,16 @@ export default function SeoHubPage() {
   const [err, setErr] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [entity, setEntity] = useState(null);
-  const [draft, setDraft] = useState({ meta_title: "", meta_description: "", meta_keywords: "" });
+  const [draft, setDraft] = useState({ meta_title: "", meta_description: "", meta_keywords: "", handle: "" });
+  const [editLang, setEditLang] = useState("de");
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [liveUrl, setLiveUrl] = useState("");
   const [liveResult, setLiveResult] = useState(null);
   const [rules, setRules] = useState(null);
   const [autoMsg, setAutoMsg] = useState("");
-  const limit = 40;
+  const isCategories = type === "categories";
+  const limit = isCategories ? 500 : 40;
 
   const client = useMemo(() => getMedusaAdminClient(), []);
 
@@ -79,7 +188,7 @@ export default function SeoHubPage() {
     setLoading(true);
     setErr("");
     try {
-      const data = await client.getSeoEntities({ type, q, limit, offset });
+      const data = await client.getSeoEntities({ type, q: isCategories ? "" : q, limit, offset: isCategories ? 0 : offset });
       setItems(Array.isArray(data?.items) ? data.items : []);
       setTotal(typeof data?.total === "number" ? data.total : 0);
       if (data?.rules) setRules(data.rules);
@@ -89,7 +198,7 @@ export default function SeoHubPage() {
       setTotal(0);
     }
     setLoading(false);
-  }, [client, type, q, offset]);
+  }, [client, type, q, offset, limit, isCategories]);
 
   useEffect(() => {
     client.getSeoRules().then(setRules).catch(() => {});
@@ -99,11 +208,22 @@ export default function SeoHubPage() {
     setSelectedId(null);
     setEntity(null);
     setOffset(0);
+    setEditLang("de");
   }, [type]);
 
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  useEffect(() => {
+    if (!entity) return;
+    setDraft(draftFromEntity(entity, editLang));
+  }, [editLang, entity]);
+
+  const categoryTree = useMemo(() => {
+    if (!isCategories) return [];
+    return filterTree(buildCategoryTree(items), q);
+  }, [isCategories, items, q]);
 
   const openEntity = async (id) => {
     setSelectedId(id);
@@ -112,11 +232,7 @@ export default function SeoHubPage() {
       const data = await client.getSeoEntity(type, id);
       const e = data?.entity;
       setEntity(e || null);
-      setDraft({
-        meta_title: e?.meta_title || "",
-        meta_description: e?.meta_description || "",
-        meta_keywords: e?.meta_keywords || "",
-      });
+      setDraft(draftFromEntity(e, editLang));
       setLiveUrl(e?.url || "");
     } catch (e) {
       setErr(e?.message || "Failed to load entity");
@@ -128,11 +244,22 @@ export default function SeoHubPage() {
     setSaving(true);
     setErr("");
     try {
-      const data = await client.patchSeoEntity(type, selectedId, draft);
+      const payload = {
+        meta_title: draft.meta_title,
+        meta_description: draft.meta_description,
+        meta_keywords: draft.meta_keywords,
+        locale: editLang,
+        handle: draft.handle,
+      };
+      const data = await client.patchSeoEntity(type, selectedId, payload);
       setEntity(data?.entity || null);
+      if (data?.entity?.url) setLiveUrl(data.entity.url);
       await loadList();
     } catch (e) {
-      setErr(e?.message || "Save failed");
+      const detail = Array.isArray(e?.evaluation?.issues)
+        ? e.evaluation.issues.map((i) => i.message).filter(Boolean).join(" · ")
+        : "";
+      setErr(detail || e?.message || "Save failed");
     }
     setSaving(false);
   };
@@ -152,6 +279,7 @@ export default function SeoHubPage() {
       if (entity) {
         setEntity({
           ...entity,
+          // Backend now applies template H1 — keep evaluation from analyze, preserve analysis.
           analysis: data.analysis || entity.analysis,
           evaluation: data.evaluation || entity.evaluation,
         });
@@ -176,7 +304,6 @@ export default function SeoHubPage() {
   };
 
   const evalLive = useMemo(() => {
-    if (!entity?.evaluation && !draft) return null;
     const titleLen = draft.meta_title.length;
     const descLen = draft.meta_description.length;
     const titleIdeal = rules?.title || { min: 50, max: 65 };
@@ -191,10 +318,11 @@ export default function SeoHubPage() {
       description: { length: descLen, status: descStatus, idealMin: descIdeal.min, idealMax: descIdeal.max },
       keywords: { status: kwStatus, count: draft.meta_keywords.split(/[,;]+/).map((s) => s.trim()).filter(Boolean).length },
     };
-  }, [draft, entity, rules]);
+  }, [draft, rules]);
 
   const analysis = entity?.analysis || { headings: {}, images: 0, links: 0, imagesWithoutAlt: 0 };
   const headings = analysis.headings || {};
+  const shopUrl = liveUrl || entity?.url || "";
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "8px 4px 40px" }}>
@@ -202,7 +330,7 @@ export default function SeoHubPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 750, color: "#0f172a" }}>SEO Hub</h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: "#64748b", maxWidth: 560 }}>
-            Meta title, description and keywords for every page type — synced with product/category editors. Categories require 50–65 / 150–300 characters.
+            Meta title, description and keywords per shop language. Categories use a nested tree. Open the live shop page to verify the browser tab title.
           </p>
         </div>
         {type === "products" ? (
@@ -253,7 +381,7 @@ export default function SeoHubPage() {
             <input
               value={q}
               onChange={(e) => { setOffset(0); setQ(e.target.value); }}
-              placeholder="Search title / handle…"
+              placeholder={isCategories ? "Search tree…" : "Search title / handle…"}
               style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
             />
             <div style={{ fontSize: 12, color: "#94a3b8" }}>{total} items</div>
@@ -261,6 +389,12 @@ export default function SeoHubPage() {
           <div style={{ maxHeight: "70vh", overflow: "auto" }}>
             {loading ? (
               <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Loading…</div>
+            ) : isCategories ? (
+              categoryTree.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No items</div>
+              ) : (
+                <CategoryTreeList nodes={categoryTree} depth={0} selectedId={selectedId} onSelect={openEntity} />
+              )
             ) : items.length === 0 ? (
               <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No items</div>
             ) : (
@@ -296,14 +430,16 @@ export default function SeoHubPage() {
               ))
             )}
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", padding: 10, borderTop: "1px solid #e2e8f0" }}>
-            <button type="button" disabled={offset <= 0} onClick={() => setOffset(Math.max(0, offset - limit))} style={{ fontSize: 12, cursor: offset <= 0 ? "default" : "pointer" }}>
-              ← Prev
-            </button>
-            <button type="button" disabled={offset + limit >= total} onClick={() => setOffset(offset + limit)} style={{ fontSize: 12, cursor: offset + limit >= total ? "default" : "pointer" }}>
-              Next →
-            </button>
-          </div>
+          {!isCategories ? (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: 10, borderTop: "1px solid #e2e8f0" }}>
+              <button type="button" disabled={offset <= 0} onClick={() => setOffset(Math.max(0, offset - limit))} style={{ fontSize: 12, cursor: offset <= 0 ? "default" : "pointer" }}>
+                ← Prev
+              </button>
+              <button type="button" disabled={offset + limit >= total} onClick={() => setOffset(offset + limit)} style={{ fontSize: 12, cursor: offset + limit >= total ? "default" : "pointer" }}>
+                Next →
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -319,28 +455,74 @@ export default function SeoHubPage() {
                     <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: "#94a3b8", textTransform: "uppercase" }}>{entity.type}</div>
                     <h2 style={{ margin: "4px 0 0", fontSize: 18, color: "#0f172a" }}>{entity.label}</h2>
                   </div>
-                  <button
-                    type="button"
-                    onClick={save}
-                    disabled={saving}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: "#0f172a",
-                      color: "#fff",
-                      fontWeight: 650,
-                      fontSize: 13,
-                      cursor: saving ? "wait" : "pointer",
-                    }}
-                  >
-                    {saving ? "Saving…" : "Save SEO"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {shopUrl ? (
+                      <a
+                        href={shopUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 8,
+                          border: "1px solid #cbd5e1",
+                          background: "#fff",
+                          fontWeight: 650,
+                          fontSize: 13,
+                          textDecoration: "none",
+                          color: "#0f172a",
+                        }}
+                      >
+                        Open in shop ↗
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={save}
+                      disabled={saving}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "#0f172a",
+                        color: "#fff",
+                        fontWeight: 650,
+                        fontSize: 13,
+                        cursor: saving ? "wait" : "pointer",
+                      }}
+                    >
+                      {saving ? "Saving…" : "Save SEO"}
+                    </button>
+                  </div>
                 </div>
+
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 12 }}>
+                  Shop content language
+                  <select
+                    value={editLang}
+                    onChange={(e) => setEditLang(e.target.value)}
+                    style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                  >
+                    {langOptions.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <span style={{ display: "block", marginTop: 6, fontWeight: 400, color: "#94a3b8" }}>
+                    DE = default columns. Other languages store translations (pages: meta_*_i18n, categories/products/collections: metadata.seo_i18n).
+                  </span>
+                </label>
+
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 12 }}>
+                  URL slug / handle
+                  <input
+                    value={draft.handle}
+                    onChange={(e) => setDraft((d) => ({ ...d, handle: e.target.value.replace(/^\//, "") }))}
+                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, fontFamily: "ui-monospace, monospace" }}
+                  />
+                </label>
 
                 {type === "categories" ? (
                   <div style={{ marginBottom: 12, padding: "8px 10px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, fontSize: 12, color: "#92400e" }}>
-                    Category rule: meta title <strong>50–65</strong> chars, description <strong>150–300</strong>, keywords required. Save is blocked if rules fail.
+                    Ideal lengths: title <strong>50–65</strong>, description <strong>150–300</strong>. Missing title/description still blocks save; length is a warning.
                   </div>
                 ) : null}
 
@@ -349,6 +531,7 @@ export default function SeoHubPage() {
                   <input
                     value={draft.meta_title}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_title: e.target.value }))}
+                    placeholder={editLang === "de" ? "" : (entity.meta_title || "")}
                     style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
                   />
                 </label>
@@ -366,6 +549,7 @@ export default function SeoHubPage() {
                     value={draft.meta_description}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_description: e.target.value }))}
                     rows={4}
+                    placeholder={editLang === "de" ? "" : (entity.meta_description || "")}
                     style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, resize: "vertical" }}
                   />
                 </label>
@@ -378,7 +562,7 @@ export default function SeoHubPage() {
                 />
 
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
-                  Keywords {evalLive?.keywords?.status === "missing" ? <span style={{ color: "#b91c1c" }}>(missing)</span> : <span style={{ color: "#15803d" }}>({evalLive?.keywords?.count || 0})</span>}
+                  Keywords {evalLive?.keywords?.status === "missing" ? <span style={{ color: "#b45309" }}>(recommended)</span> : <span style={{ color: "#15803d" }}>({evalLive?.keywords?.count || 0})</span>}
                   <input
                     value={draft.meta_keywords}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_keywords: e.target.value }))}
@@ -411,9 +595,13 @@ export default function SeoHubPage() {
                   <StatChip label="Links" value={analysis.links || 0} />
                 </div>
 
-                {type === "products" && (headings.h1 || 0) > 0 ? (
+                <div style={{ marginBottom: 12, padding: "8px 10px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, fontSize: 12, color: "#075985" }}>
+                  H1 counts include the storefront template title (category/product/page name). Raw CMS HTML alone often has 0 H1 because the heading is rendered by the React template.
+                </div>
+
+                {type === "products" && (headings.h1 || 0) > 1 ? (
                   <div style={{ marginBottom: 12, padding: "8px 10px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 12, color: "#991b1b" }}>
-                    Product description contains H1. On save, H1 tags are automatically converted to H2.
+                    Product description contains extra H1 tags. On save, description H1 tags are converted to H2.
                   </div>
                 ) : null}
 

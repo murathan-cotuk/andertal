@@ -1,18 +1,24 @@
 'use strict'
 
 /**
- * Seed + remote push for CMS page slug `verkaeufer-werden`.
- * Shop renders a dedicated BecomeSellerLanding React page for this slug;
- * these 13 containers keep the Sellercentral landing-page editor in sync
- * (structure / CTA URLs) so editors see the intended sections.
+ * Seed + ensure for CMS page slug `verkaeufer-werden`.
+ * Shop renders these containers via LandingContainers (no hardcoded React page).
+ * Edit content in Sellercentral → Content → Landing pages.
+ *
+ * If the page or its landing containers are missing, `ensureBecomeSellerLanding`
+ * creates them (boot + CLI) — never leave the shop on bare title/body for this slug.
  *
  * Usage:
  *   SELLER_TOKEN=... node scripts/push-become-seller-landing-remote.js
+ *   DATABASE_URL=... node scripts/setup-become-seller-landing.js
+ *   DATABASE_URL=... node scripts/setup-become-seller-landing.js --force
  */
 
 const { randomUUID } = require('crypto')
 
-const LAYOUT_VERSION = 'become_seller_v1'
+const LAYOUT_VERSION = 'become_seller_v2'
+const PAGE_SLUG = 'verkaeufer-werden'
+const PAGE_ID = '3b968ab9-6aac-43fd-a3a6-4329cd5b4d4a'
 const REGISTER = {
   de: 'https://sellercentral.andertal.com/de/register',
   en: 'https://sellercentral.andertal.com/en/register',
@@ -42,24 +48,38 @@ function becomeSellerContainers(visibleOn = 'desktop') {
   const ctaUrl = REGISTER.de
 
   return [
-    // 1 Hero
+    // 1 Hero — editor shape: slides[].image (+ overlay)
     localize({
       id: randomUUID(), type: 'hero_banner', visible: true, visible_on: visibleOn,
-      padding: '0px', content_layout: 'full', image_url: HERO_IMG,
-      overlay_opacity: 0.55, text_color: '#f7f4ee', btn_url: ctaUrl,
-      min_height: visibleOn === 'mobile' ? '78vh' : '88vh',
-    }, {
-      title: value('Verkaufe dort, wo Europa einkauft.', 'Sell where Europe shops.', 'Avrupa’nın alışveriş yaptığı yerde sat.', 'Vendez là où l’Europe achète.', 'Vende donde compra Europa.', 'Vendi dove compra l’Europa.'),
-      subtitle: value(
-        'Eröffne deinen Shop auf dem Andertal Marketplace — klare Tools, EU-weite Reichweite und Sellercentral.',
-        'Open your store on the Andertal Marketplace — clear tools, EU-wide reach, and Sellercentral.',
-        'Andertal Marketplace’te mağazanı aç — net araçlar ve AB erişimi.',
-        'Ouvrez votre boutique sur Andertal — outils clairs et portée UE.',
-        'Abre tu tienda en Andertal — herramientas claras y alcance UE.',
-        'Apri il tuo shop su Andertal — strumenti chiari e portata UE.',
-      ),
-      btn_text: value('Jetzt Verkäufer werden', 'Become a seller', 'Satıcı ol', 'Devenir vendeur', 'Hazte vendedor', 'Diventa venditore'),
-    }),
+      padding: '0px', content_layout: 'full',
+      height: visibleOn === 'mobile' ? '78vh' : '88vh',
+      mobile_height: '70vh',
+      autoplay: false,
+      slides: [
+        localize({
+          image: HERO_IMG,
+          overlay: 0.55,
+          text_color: '#f7f4ee',
+          text_position: 'center',
+          btn_url: ctaUrl,
+          btn_bg: '#b08d3a',
+          btn_color: '#0d1f1a',
+          btn_border: 'none',
+          btn_radius: 8,
+        }, {
+          title: value('Verkaufe dort, wo Europa einkauft.', 'Sell where Europe shops.', 'Avrupa’nın alışveriş yaptığı yerde sat.', 'Vendez là où l’Europe achète.', 'Vende donde compra Europa.', 'Vendi dove compra l’Europa.'),
+          subtitle: value(
+            'Eröffne deinen Shop auf dem Andertal Marketplace — klare Tools, EU-weite Reichweite und Sellercentral.',
+            'Open your store on the Andertal Marketplace — clear tools, EU-wide reach, and Sellercentral.',
+            'Andertal Marketplace’te mağazanı aç — net araçlar ve AB erişimi.',
+            'Ouvrez votre boutique sur Andertal — outils clairs et portée UE.',
+            'Abre tu tienda en Andertal — herramientas claras y alcance UE.',
+            'Apri il tuo shop su Andertal — strumenti chiari e portata UE.',
+          ),
+          btn_text: value('Jetzt Verkäufer werden', 'Become a seller', 'Satıcı ol', 'Devenir vendeur', 'Hazte vendedor', 'Diventa venditore'),
+        }),
+      ],
+    }, {}),
 
     // 2 Mid CTA
     localize({
@@ -87,10 +107,10 @@ function becomeSellerContainers(visibleOn = 'desktop') {
       subtitle: value('Mehr als ein Shop. Ein europäischer Verkaufskanal.', 'More than a shop. A European sales channel.', 'Mağazadan fazlası. Avrupa satış kanalı.', 'Plus qu’une boutique. Un canal européen.', 'Más que una tienda. Un canal europeo.', 'Più di uno shop. Un canale europeo.'),
     }),
 
-    // 4 Image + text
+    // 4 Image + text — editor fields: image + image_side
     localize({
       id: randomUUID(), type: 'image_text', visible: true, visible_on: visibleOn, padding: pad,
-      image_url: EU_IMG, image_position: 'right', btn_url: ctaUrl,
+      image: EU_IMG, image_side: 'right', btn_url: ctaUrl,
     }, {
       title: value('Europa ist dein Schaufenster.', 'Europe is your storefront.', 'Avrupa vitrinin.', 'L’Europe est votre vitrine.', 'Europa es tu escaparate.', 'L’Europa è la tua vetrina.'),
       body: value('Liste einmal und verkaufe in einem kuratierten Marketplace.', 'List once and sell in a curated marketplace.', 'Bir kez listele, kurateli marketplace’te sat.', 'Listez une fois, vendez sur un marketplace.', 'Lista una vez y vende en el marketplace.', 'Elenca una volta e vendi nel marketplace.'),
@@ -178,7 +198,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
     // 11 Image text tools
     localize({
       id: randomUUID(), type: 'image_text', visible: true, visible_on: visibleOn, padding: pad,
-      image_url: TOOLS_IMG, image_position: 'left', btn_url: ctaUrl,
+      image: TOOLS_IMG, image_side: 'left', btn_url: ctaUrl,
     }, {
       title: value('Alles, was du täglich brauchst — an einem Ort.', 'Everything you need daily — in one place.', 'Günlük ihtiyacın olan her şey — tek yerde.', 'Tout le quotidien — au même endroit.', 'Todo lo diario — en un solo lugar.', 'Tutto il quotidiano — in un solo posto.'),
       body: value('Katalog, Bestellungen, Analytics, Inhalte und Einstellungen.', 'Catalog, orders, analytics, content, and settings.', 'Katalog, sipariş, analitik, içerik ve ayarlar.', 'Catalogue, commandes, analytics, contenu et réglages.', 'Catálogo, pedidos, analítica, contenido y ajustes.', 'Catalogo, ordini, analytics, contenuti e impostazioni.'),
@@ -225,10 +245,158 @@ function becomeSellerContainers(visibleOn = 'desktop') {
   }))
 }
 
+/** Full device stack written into admin_hub_landing_pages.containers */
+function becomeSellerLandingContainers() {
+  return ['desktop', 'tablet', 'mobile'].flatMap((visibleOn) => becomeSellerContainers(visibleOn))
+}
+
+/**
+ * Ensures page `verkaeufer-werden` + landing containers exist.
+ * - Missing page → create published page
+ * - Missing landing row OR empty containers → seed full stack
+ * - Existing non-empty containers → leave alone (unless force)
+ *
+ * @returns {{ created: boolean, seeded: boolean, added: number, pageId?: string, skipped?: boolean }}
+ */
+async function ensureBecomeSellerLanding(client, opts = {}) {
+  const dryRun = !!opts.dryRun
+  const force = !!opts.force
+  if (!client || typeof client.query !== 'function') {
+    return { created: false, seeded: false, added: 0 }
+  }
+
+  await client.query('BEGIN')
+  try {
+    const columns = await client.query(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = 'admin_hub_pages'
+         AND column_name IN ('slug', 'handle')`
+    )
+    const pageColumns = new Set((columns.rows || []).map((row) => row.column_name))
+    if (!pageColumns.has('slug')) throw new Error('admin_hub_pages.slug is required')
+
+    const predicates = [`regexp_replace(slug, '^/+', '') = $1`]
+    if (pageColumns.has('handle')) predicates.push(`regexp_replace(handle, '^/+', '') = $1`)
+
+    let pageResult = await client.query(
+      `SELECT id, slug FROM admin_hub_pages
+       WHERE ${predicates.join(' OR ')}
+       ORDER BY updated_at DESC LIMIT 1`,
+      [PAGE_SLUG]
+    )
+
+    // Prefer known production id when slug lookup misses but row still exists
+    if (!pageResult.rows[0] && PAGE_ID) {
+      pageResult = await client.query(
+        `SELECT id, slug FROM admin_hub_pages WHERE id::text = $1 LIMIT 1`,
+        [PAGE_ID]
+      )
+    }
+
+    let createdPage = false
+    if (!pageResult.rows[0]) {
+      createdPage = true
+      if (dryRun) {
+        await client.query('ROLLBACK')
+        return {
+          created: false,
+          seeded: false,
+          added: 0,
+          wouldCreate: true,
+          wouldSeed: true,
+        }
+      }
+      pageResult = await client.query(
+        `INSERT INTO admin_hub_pages (title, slug, body, status, page_type)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id, slug`,
+        ['Verkäufer werden', PAGE_SLUG, '', 'published', 'page']
+      )
+    }
+
+    const pageId = String(pageResult.rows[0].id)
+    const landingResult = await client.query(
+      'SELECT containers, settings FROM admin_hub_landing_pages WHERE page_id = $1 FOR UPDATE',
+      [pageId]
+    )
+    const existing = Array.isArray(landingResult.rows[0]?.containers)
+      ? landingResult.rows[0].containers
+      : []
+    const settings =
+      landingResult.rows[0]?.settings && typeof landingResult.rows[0].settings === 'object'
+        ? { ...landingResult.rows[0].settings }
+        : {}
+    const currentLayout = settings.become_seller_layout || ''
+    const needsSeed =
+      force ||
+      createdPage ||
+      !landingResult.rows[0] ||
+      existing.length === 0
+
+    if (dryRun) {
+      await client.query('ROLLBACK')
+      return {
+        created: false,
+        seeded: false,
+        added: 0,
+        pageId,
+        wouldCreate: createdPage,
+        wouldSeed: needsSeed,
+        currentLayout: currentLayout || '(none)',
+        targetLayout: LAYOUT_VERSION,
+        existingCount: existing.length,
+      }
+    }
+
+    if (!needsSeed) {
+      await client.query('ROLLBACK')
+      return {
+        created: false,
+        seeded: false,
+        added: existing.length,
+        pageId,
+        skipped: true,
+        layout: currentLayout || LAYOUT_VERSION,
+      }
+    }
+
+    const nextContainers = becomeSellerLandingContainers()
+    settings.become_seller_layout = LAYOUT_VERSION
+
+    if (landingResult.rows[0]) {
+      await client.query(
+        `UPDATE admin_hub_landing_pages
+            SET containers = $2::jsonb, settings = $3::jsonb, updated_at = NOW()
+          WHERE page_id = $1`,
+        [pageId, JSON.stringify(nextContainers), JSON.stringify(settings)]
+      )
+    } else {
+      await client.query(
+        `INSERT INTO admin_hub_landing_pages (page_id, containers, settings, updated_at)
+         VALUES ($1, $2::jsonb, $3::jsonb, NOW())`,
+        [pageId, JSON.stringify(nextContainers), JSON.stringify(settings)]
+      )
+    }
+
+    await client.query('COMMIT')
+    return {
+      created: createdPage,
+      seeded: true,
+      added: nextContainers.length,
+      pageId,
+      layout: LAYOUT_VERSION,
+    }
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw error
+  }
+}
+
 module.exports = {
   LAYOUT_VERSION,
-  PAGE_SLUG: 'verkaeufer-werden',
-  PAGE_ID: '3b968ab9-6aac-43fd-a3a6-4329cd5b4d4a',
+  PAGE_SLUG,
+  PAGE_ID,
   becomeSellerContainers,
+  becomeSellerLandingContainers,
+  ensureBecomeSellerLanding,
   REGISTER,
 }

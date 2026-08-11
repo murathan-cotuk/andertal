@@ -12,6 +12,7 @@ const {
   CATALOG_PAGES,
   buildPageContainers,
   LAYOUT_VERSION,
+  NATIVE_LAYOUT_VERSION,
 } = require('../src/catalog-landing-pages-seed')
 
 const API_BASE = (process.env.API_BASE || 'https://api.andertal.com').replace(/\/+$/, '')
@@ -115,10 +116,12 @@ async function ensurePage(pageDef) {
 
 async function pushLanding(pageId, pageDef, existingSettings) {
   const containers = buildPageContainers(pageDef)
+  const layout = pageDef.nativeCatalog ? NATIVE_LAYOUT_VERSION : LAYOUT_VERSION
   const settings = {
     ...(existingSettings && typeof existingSettings === 'object' ? existingSettings : {}),
-    catalog_landing_layout: LAYOUT_VERSION,
+    catalog_landing_layout: layout,
   }
+  if (pageDef.nativeCatalog) delete settings.catalog_use_containers
   return req(`/admin-hub/landing-page/${encodeURIComponent(pageId)}`, {
     method: 'PUT',
     body: JSON.stringify({ containers, settings }),
@@ -150,8 +153,9 @@ async function main() {
 
     const saved = await pushLanding(pageId, pageDef, existingSettings)
     const after = Array.isArray(saved.containers) ? saved.containers : []
-    console.log(`landing ${beforeCount} → ${after.length} containers; layout=${LAYOUT_VERSION}`)
-    console.log(after.map((c) => `${c.visible_on}:${c.type}`).join(', '))
+    const layout = pageDef.nativeCatalog ? NATIVE_LAYOUT_VERSION : LAYOUT_VERSION
+    console.log(`landing ${beforeCount} → ${after.length} containers; layout=${layout}`)
+    console.log(after.length ? after.map((c) => `${c.visible_on}:${c.type}`).join(', ') : '(empty — native shop template)')
   }
 
   console.log('\nDone.')

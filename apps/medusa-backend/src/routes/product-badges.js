@@ -59,7 +59,12 @@ module.exports = function createProductBadgesRouter({ requireSuperuser }) {
 
   router.post('/admin-hub/v1/product-badges', requireSuperuser, async (req, res) => {
     const b = normalizeBadgeInput(req.body)
-    if (!b.label) return res.status(400).json({ message: 'label required' })
+    if (b.badge_type === 'image') {
+      if (!b.image_url) return res.status(400).json({ message: 'image_url required' })
+      if (!b.label) b.label = 'Badge'
+    } else if (!b.label) {
+      return res.status(400).json({ message: 'label required' })
+    }
     const c = pgDbClient(); try {
       await c.connect()
       const r = await c.query(
@@ -74,7 +79,12 @@ module.exports = function createProductBadgesRouter({ requireSuperuser }) {
 
   router.put('/admin-hub/v1/product-badges/:id', requireSuperuser, async (req, res) => {
     const b = normalizeBadgeInput(req.body)
-    if (!b.label) return res.status(400).json({ message: 'label required' })
+    if (b.badge_type === 'image') {
+      if (!b.image_url) return res.status(400).json({ message: 'image_url required' })
+      if (!b.label) b.label = 'Badge'
+    } else if (!b.label) {
+      return res.status(400).json({ message: 'label required' })
+    }
     const c = pgDbClient(); try {
       await c.connect()
       const exist = await c.query(`SELECT id FROM admin_hub_product_badges WHERE id = $1`, [req.params.id])

@@ -233,7 +233,7 @@ export default function BestsellersPage() {
   };
 
   return (
-    <CatalogCmsLanding slug="bestsellers" fallbackTitle={pageTitle} showTitleWhenNoContainers>
+    <CatalogCmsLanding slug="bestsellers" fallbackTitle={pageTitle} showTitleWhenNoContainers preferNativeCatalog>
       {/* Horizontal category filter chips */}
       {!loading && !error && filterCollections.length > 0 && (
         <FilterBar>

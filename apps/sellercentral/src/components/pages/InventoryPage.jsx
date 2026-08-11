@@ -888,6 +888,11 @@ export default function InventoryPage() {
   const [duplicateFullProduct, setDuplicateFullProduct] = useState(null);
   const [duplicateOptions, setDuplicateOptions] = useState(DEFAULT_DUPLICATE_OPTIONS);
   const [duplicateSaving, setDuplicateSaving] = useState(false);
+  const [combineModalOpen, setCombineModalOpen] = useState(false);
+  const [combineParentId, setCombineParentId] = useState("");
+  const [combineOptionName, setCombineOptionName] = useState("Variante");
+  const [combineLabels, setCombineLabels] = useState({});
+  const [combineSaving, setCombineSaving] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [eanDuplicateGroups, setEanDuplicateGroups] = useState([]);
   const [eanDuplicatesModalOpen, setEanDuplicatesModalOpen] = useState(false);
@@ -1192,7 +1197,12 @@ export default function InventoryPage() {
   }, [duplicateModalOpen, duplicateSourceId]);
 
   const productMatchesFilters = useCallback((product) => {
-    const statusOk = statusFilter === "all" ? true : String(product?.status || "draft").toLowerCase() === statusFilter;
+    const st = String(product?.status || "draft").toLowerCase();
+    // Soft-archived combine/EAN-merge rows stay out of the default inventory list.
+    const statusOk =
+      statusFilter === "all"
+        ? st !== "merged"
+        : st === statusFilter;
     if (!statusOk) return false;
     const q = String(productSearch || "").trim().toLowerCase();
     const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
@@ -1368,6 +1378,60 @@ export default function InventoryPage() {
     setDuplicateModalOpen(false);
     setDuplicateSourceId(null);
     setDuplicateFullProduct(null);
+  };
+
+  const openCombineModal = () => {
+    if (selectedIds.length < 2) return;
+    const first = selectedIds[0];
+    setCombineParentId(first);
+    setCombineOptionName(
+      locale === "en"
+        ? "Variant"
+        : locale === "tr"
+          ? "Varyant"
+          : locale === "fr"
+            ? "Variante"
+            : locale === "es"
+              ? "Variante"
+              : locale === "it"
+                ? "Variante"
+                : "Variante"
+    );
+    const labels = {};
+    for (const id of selectedIds) {
+      const prod = products.find((p) => p.id === id);
+      labels[id] = getLocalizedTitle(prod, locale) || id;
+    }
+    setCombineLabels(labels);
+    setCombineModalOpen(true);
+  };
+
+  const closeCombineModal = () => {
+    setCombineModalOpen(false);
+    setCombineSaving(false);
+  };
+
+  const runCombineAsVariants = async () => {
+    if (!combineParentId || selectedIds.length < 2) return;
+    setCombineSaving(true);
+    setError(null);
+    try {
+      const res = await medusaClient.combineProductsAsVariants({
+        parentId: combineParentId,
+        productIds: selectedIds,
+        optionName: combineOptionName,
+        optionValues: combineLabels,
+      });
+      closeCombineModal();
+      setSelectedIds([]);
+      const data = await medusaClient.getAdminHubProducts();
+      setProducts(data.products || []);
+      const parent = res?.parent_id || combineParentId;
+      router.push(`/products/${parent}`);
+    } catch (e) {
+      setError(userError(e, locale, "Failed to combine products"));
+      setCombineSaving(false);
+    }
   };
 
   const runDuplicate = async () => {
@@ -1553,18 +1617,35 @@ export default function InventoryPage() {
                       {ownProducts.length} {locale === "en" ? (ownProducts.length === 1 ? "product" : "products") : locale === "tr" ? "ürün" : locale === "fr" ? "produit(s)" : locale === "es" ? "producto(s)" : locale === "it" ? "prodotto/i" : (ownProducts.length === 1 ? "Produkt" : "Produkte")}
                     </Text>
                     {selectedIds.length > 0 && (
-                      <Button
-                        variant="primary"
-                        onClick={() => {
-                          const firstId = selectedIds[0];
-                          if (firstId) {
-                            const prod = products.find((p) => p.id === firstId);
-                            router.push(`/products/${prod?.id || firstId}`);
-                          }
-                        }}
-                      >
-                        {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
-                      </Button>
+                      <InlineStack gap="200">
+                        {selectedIds.length >= 2 && (
+                          <Button onClick={openCombineModal}>
+                            {locale === "en"
+                              ? `Combine as variants (${selectedIds.length})`
+                              : locale === "tr"
+                                ? `Varyant olarak birleştir (${selectedIds.length})`
+                                : locale === "fr"
+                                  ? `Fusionner en variantes (${selectedIds.length})`
+                                  : locale === "es"
+                                    ? `Combinar como variantes (${selectedIds.length})`
+                                    : locale === "it"
+                                      ? `Unisci come varianti (${selectedIds.length})`
+                                      : `Als Varianten zusammenführen (${selectedIds.length})`}
+                          </Button>
+                        )}
+                        <Button
+                          variant="primary"
+                          onClick={() => {
+                            const firstId = selectedIds[0];
+                            if (firstId) {
+                              const prod = products.find((p) => p.id === firstId);
+                              router.push(`/products/${prod?.id || firstId}`);
+                            }
+                          }}
+                        >
+                          {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
+                        </Button>
+                      </InlineStack>
                     )}
                   </InlineStack>
                 </InlineStack>
@@ -1624,15 +1705,32 @@ export default function InventoryPage() {
                       </Text>
                     </BlockStack>
                     {selectedIds.length > 0 && (
-                      <Button
-                        variant="primary"
-                        onClick={() => {
-                          const firstId = selectedIds[0];
-                          if (firstId) router.push(`/products/${products.find((p) => p.id === firstId)?.id || firstId}`);
-                        }}
-                      >
-                        {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
-                      </Button>
+                      <InlineStack gap="200">
+                        {selectedIds.length >= 2 && (
+                          <Button onClick={openCombineModal}>
+                            {locale === "en"
+                              ? `Combine as variants (${selectedIds.length})`
+                              : locale === "tr"
+                                ? `Varyant olarak birleştir (${selectedIds.length})`
+                                : locale === "fr"
+                                  ? `Fusionner en variantes (${selectedIds.length})`
+                                  : locale === "es"
+                                    ? `Combinar como variantes (${selectedIds.length})`
+                                    : locale === "it"
+                                      ? `Unisci come varianti (${selectedIds.length})`
+                                      : `Als Varianten zusammenführen (${selectedIds.length})`}
+                          </Button>
+                        )}
+                        <Button
+                          variant="primary"
+                          onClick={() => {
+                            const firstId = selectedIds[0];
+                            if (firstId) router.push(`/products/${products.find((p) => p.id === firstId)?.id || firstId}`);
+                          }}
+                        >
+                          {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
+                        </Button>
+                      </InlineStack>
                     )}
                   </InlineStack>
                   <Divider />
@@ -1707,6 +1805,119 @@ export default function InventoryPage() {
           )}
         </Layout.Section>
       </Layout>
+
+      <Modal
+        open={combineModalOpen}
+        onClose={closeCombineModal}
+        title={
+          locale === "en"
+            ? "Combine as variants"
+            : locale === "tr"
+              ? "Varyant olarak birleştir"
+              : locale === "fr"
+                ? "Fusionner en variantes"
+                : locale === "es"
+                  ? "Combinar como variantes"
+                  : locale === "it"
+                    ? "Unisci come varianti"
+                    : "Als Varianten zusammenführen"
+        }
+        primaryAction={{
+          content:
+            locale === "en"
+              ? "Combine"
+              : locale === "tr"
+                ? "Birleştir"
+                : locale === "fr"
+                  ? "Fusionner"
+                  : locale === "es"
+                    ? "Combinar"
+                    : locale === "it"
+                      ? "Unisci"
+                      : "Zusammenführen",
+          onAction: runCombineAsVariants,
+          loading: combineSaving,
+          disabled: !combineParentId || selectedIds.length < 2,
+        }}
+        secondaryActions={[{ content: ui.cancel, onAction: closeCombineModal }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" tone="subdued">
+              {locale === "en"
+                ? "Selected products become variants under one parent. Absorbed products are archived (not deleted). Orders keep their history."
+                : locale === "tr"
+                  ? "Seçilen ürünler tek bir parent altında varyant olur. Diğer ürünler arşivlenir (silinmez). Sipariş geçmişi korunur."
+                  : locale === "de"
+                    ? "Ausgewählte Produkte werden Varianten unter einem Parent. Übernommene Produkte werden archiviert (nicht gelöscht). Bestellhistorie bleibt erhalten."
+                    : "Selected products become variants under one parent. Absorbed products are archived."}
+            </Text>
+            <Select
+              label={
+                locale === "en"
+                  ? "Parent product"
+                  : locale === "tr"
+                    ? "Ana ürün"
+                    : locale === "de"
+                      ? "Elternprodukt"
+                      : "Parent product"
+              }
+              options={selectedIds.map((id) => {
+                const prod = products.find((p) => p.id === id);
+                return { label: getLocalizedTitle(prod, locale) || id, value: id };
+              })}
+              value={combineParentId}
+              onChange={setCombineParentId}
+            />
+            <TextField
+              label={
+                locale === "en"
+                  ? "Option name"
+                  : locale === "tr"
+                    ? "Seçenek adı"
+                    : locale === "de"
+                      ? "Optionsname"
+                      : "Option name"
+              }
+              value={combineOptionName}
+              onChange={setCombineOptionName}
+              autoComplete="off"
+              helpText={
+                locale === "en"
+                  ? 'e.g. Color, Size'
+                  : locale === "tr"
+                    ? "örn. Renk, Beden"
+                    : locale === "de"
+                      ? "z. B. Farbe, Größe"
+                      : "e.g. Color, Size"
+              }
+            />
+            <BlockStack gap="200">
+              <Text as="h3" variant="headingSm">
+                {locale === "en"
+                  ? "Variant labels"
+                  : locale === "tr"
+                    ? "Varyant etiketleri"
+                    : locale === "de"
+                      ? "Variantenbezeichnungen"
+                      : "Variant labels"}
+              </Text>
+              {selectedIds.map((id) => {
+                const prod = products.find((p) => p.id === id);
+                return (
+                  <TextField
+                    key={id}
+                    label={getLocalizedTitle(prod, locale) || id}
+                    value={combineLabels[id] || ""}
+                    onChange={(v) => setCombineLabels((prev) => ({ ...prev, [id]: v }))}
+                    autoComplete="off"
+                  />
+                );
+              })}
+            </BlockStack>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={duplicateModalOpen}
