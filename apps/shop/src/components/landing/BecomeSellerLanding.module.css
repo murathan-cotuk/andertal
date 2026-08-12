@@ -127,12 +127,18 @@
 /* ── 1 Hero ── */
 .hero {
   position: relative;
-  min-height: min(100svh, 820px);
+  min-height: var(--hero-min-height, min(100svh, 820px));
   display: flex;
   align-items: flex-end;
   padding: 0;
   color: #f7f4ee;
   overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .hero {
+    min-height: var(--hero-min-height-mobile, 70vh);
+  }
 }
 
 .heroMedia {
@@ -408,11 +414,11 @@
 /* ── Accordions ── */
 .accList {
   margin-top: 2rem;
-  border-top: 1px solid var(--bs-line);
+  border-top: 1px solid var(--acc-border, var(--bs-line));
 }
 
 .accItem {
-  border-bottom: 1px solid var(--bs-line);
+  border-bottom: 1px solid var(--acc-border, var(--bs-line));
 }
 
 .accBtn {
@@ -468,22 +474,22 @@
 
 .accPanelInner p {
   margin: 0 0 1.25rem;
-  color: var(--bs-muted);
+  color: var(--acc-panel-color, var(--bs-muted));
   line-height: 1.65;
   max-width: 42rem;
   font-size: 0.98rem;
 }
 
 .darkBand .accList {
-  border-color: rgba(244, 241, 234, 0.18);
+  border-color: var(--acc-border-dark, rgba(244, 241, 234, 0.18));
 }
 
 .darkBand .accItem {
-  border-color: rgba(244, 241, 234, 0.18);
+  border-color: var(--acc-border-dark, rgba(244, 241, 234, 0.18));
 }
 
 .darkBand .accPanelInner p {
-  color: rgba(244, 241, 234, 0.72);
+  color: var(--acc-panel-color-dark, rgba(244, 241, 234, 0.72));
 }
 
 /* ── Tabs ── */

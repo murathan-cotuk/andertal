@@ -253,7 +253,7 @@ function newContainer(type) {
   const base = { id, type, visible: true };
   switch (type) {
     case "hero_banner":
-      return { ...base, slides: [{ image: "", title: "", subtitle: "", btn_text: "", btn_url: "", overlay: 0, text_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", content_padding: "32px 48px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }], height: "500px", autoplay: true, delay: 4000, padding: "0px 0px 0px 0px", content_layout: "full" };
+      return { ...base, brand_mark: "", slides: [{ image: "", title: "", subtitle: "", btn_text: "", btn_url: "", btn2_text: "", btn2_url: "", btn2_variant: "ghost", overlay: 0, text_color: "#ffffff", title_color: "#ffffff", subtitle_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", title_font: "system", subtitle_font: "system", content_padding: "32px 48px", btn_variant: "andertal_orange", btn_bg: "#ff971c", btn_color: "#fff", btn_hover_bg: "#e8860f", btn_hover_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }], height: "500px", mobile_height: "70vh", autoplay: true, delay: 4000, padding: "0px 0px 0px 0px", content_layout: "full" };
     case "text_block":
       return { ...base, title: "", body: "", btn_text: "", btn_url: "", align: "center", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "image_text":
@@ -390,8 +390,11 @@ function newContainer(type) {
     case "feature_grid":
       return {
         ...base,
+        variant: "cards",
+        eyebrow: "",
         title: "",
         subtitle: "",
+        lead: "",
         title_align: "center",
         cols: 3,
         card_style: "bordered",
@@ -546,7 +549,7 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
     onChange({ ...container, slides });
   };
   const addSlide = () => {
-    onChange({ ...container, slides: [...(container.slides || []), { image: "", title: "", subtitle: "", btn_text: "", btn_url: "", overlay: 0, text_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", content_padding: "32px 48px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }] });
+    onChange({ ...container, slides: [...(container.slides || []), { image: "", title: "", subtitle: "", btn_text: "", btn_url: "", btn2_text: "", btn2_url: "", btn2_variant: "ghost", overlay: 0, text_color: "#ffffff", title_color: "#ffffff", subtitle_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", title_font: "system", subtitle_font: "system", content_padding: "32px 48px", btn_variant: "andertal_orange", btn_bg: "#ff971c", btn_color: "#fff", btn_hover_bg: "#e8860f", btn_hover_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }] });
   };
   const removeSlide = (idx) => {
     onChange({ ...container, slides: (container.slides || []).filter((_, i) => i !== idx) });
@@ -577,12 +580,16 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
                 <TextField label={c.height} value={container.height || "500px"} onChange={(v) => onChange({ ...container, height: v })} helpText={c.egPx} autoComplete="off" />
               </div>
               <div style={{ flex: 1 }}>
+                <TextField label={c.mobileHeight} value={container.mobile_height || "70vh"} onChange={(v) => onChange({ ...container, mobile_height: v })} helpText={c.egPx} autoComplete="off" />
+              </div>
+              <div style={{ flex: 1 }}>
                 <Select label={c.autoplay} options={c.autoplayOptions()} value={container.autoplay !== false ? "true" : "false"} onChange={(v) => onChange({ ...container, autoplay: v === "true" })} />
               </div>
               <div style={{ flex: 1 }}>
                 <TextField label={c.delayMs} type="number" value={String(container.delay || 4000)} onChange={(v) => onChange({ ...container, delay: Number(v) || 4000 })} autoComplete="off" />
               </div>
             </InlineStack>
+            <TextField label={c.brandMark} value={gi(container, "brand_mark", editLang)} onChange={(v) => onChange(si(container, "brand_mark", editLang, v))} helpText={c.brandMarkHelp} autoComplete="off" />
             <Text as="p" variant="bodySm" tone="subdued">{c.paddingHint}</Text>
           </BlockStack>
         </BlockStack>
@@ -651,10 +658,22 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
                 <Select label={c.textPosition} options={c.textPositionOptions()} value={slide.text_position || "center"} onChange={(v) => updateSlide(idx, "text_position", v)} />
               </div>
               <div style={{ flex: 1 }}>
-                <ColorField label={c.textColor} value={slide.text_color || "#ffffff"} onChange={(v) => updateSlide(idx, "text_color", v)} />
+                <ColorField label={c.titleColor} value={slide.title_color || slide.text_color || "#ffffff"} onChange={(v) => updateSlide(idx, "title_color", v)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <ColorField label={c.subtitleColor} value={slide.subtitle_color || slide.text_color || "#ffffff"} onChange={(v) => updateSlide(idx, "subtitle_color", v)} />
               </div>
               <div style={{ flex: 1 }}>
                 <TextField label={c.overlay} type="number" value={String(slide.overlay ?? 0)} onChange={(v) => updateSlide(idx, "overlay", Math.min(100, Math.max(0, Number(v))))} autoComplete="off" helpText={c.overlayHelp} />
+              </div>
+            </InlineStack>
+
+            <InlineStack gap="400" wrap={false}>
+              <div style={{ flex: 1 }}>
+                <Select label={c.titleFont} options={c.fontFamilyOptions()} value={slide.title_font || "system"} onChange={(v) => updateSlide(idx, "title_font", v)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Select label={c.subtitleFont} options={c.fontFamilyOptions()} value={slide.subtitle_font || "system"} onChange={(v) => updateSlide(idx, "subtitle_font", v)} />
               </div>
             </InlineStack>
 
@@ -672,16 +691,39 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
 
             <InlineStack gap="400" wrap={false}>
               <div style={{ flex: 1 }}>
+                <Select label={c.buttonStyle} options={c.buttonVariantOptions()} value={slide.btn_variant || "andertal_orange"} onChange={(v) => updateSlide(idx, "btn_variant", v)} />
+              </div>
+              <div style={{ flex: 1 }}>
                 <ColorField label={c.buttonBg} value={slide.btn_bg || "#ff971c"} onChange={(v) => updateSlide(idx, "btn_bg", v)} />
               </div>
               <div style={{ flex: 1 }}>
                 <ColorField label={c.buttonTextColor} value={slide.btn_color || "#ffffff"} onChange={(v) => updateSlide(idx, "btn_color", v)} />
+              </div>
+            </InlineStack>
+            <InlineStack gap="400" wrap={false}>
+              <div style={{ flex: 1 }}>
+                <ColorField label={c.buttonHoverBg} value={slide.btn_hover_bg || "#e8860f"} onChange={(v) => updateSlide(idx, "btn_hover_bg", v)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <ColorField label={c.buttonHoverColor} value={slide.btn_hover_color || "#ffffff"} onChange={(v) => updateSlide(idx, "btn_hover_color", v)} />
               </div>
               <div style={{ flex: 1 }}>
                 <TextField label={c.buttonBorder} value={slide.btn_border || "2px solid #000"} onChange={(v) => updateSlide(idx, "btn_border", v)} autoComplete="off" helpText={c.egNone} />
               </div>
               <div style={{ flex: 1 }}>
                 <TextField label={c.buttonRadius} value={String(slide.btn_radius ?? 8)} onChange={(v) => updateSlide(idx, "btn_radius", Number(v) || 0)} autoComplete="off" helpText={c.pxUnit} />
+              </div>
+            </InlineStack>
+
+            <InlineStack gap="400" wrap={false}>
+              <div style={{ flex: 1 }}>
+                <TextField label={c.secondaryButtonText} value={slide.btn2_text || ""} onChange={(v) => updateSlide(idx, "btn2_text", v)} autoComplete="off" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <TextField label={c.secondaryButtonUrl} value={slide.btn2_url || ""} onChange={(v) => updateSlide(idx, "btn2_url", v)} autoComplete="off" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Select label={c.secondaryButtonStyle} options={c.buttonVariantOptions()} value={slide.btn2_variant || "ghost"} onChange={(v) => updateSlide(idx, "btn2_variant", v)} />
               </div>
             </InlineStack>
           </BlockStack>
@@ -773,8 +815,35 @@ function ImageTextEditor({ container, onChange, editLang = "de" }) {
         )}
       </BlockStack>
       <Select label={c.imageSide} options={c.imageSideOptions()} value={container.image_side || "left"} onChange={(v) => onChange({ ...container, image_side: v })} />
+      <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" helpText={c.optional} />
       <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 1 }}>
+          <Select
+            label={c.titleFont}
+            options={c.fontFamilyOptions()}
+            value={container.title_font || "serif"}
+            onChange={(v) => onChange({ ...container, title_font: v })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <Select
+            label={c.subtitleFont}
+            options={c.fontFamilyOptions()}
+            value={container.subtitle_font || "sans"}
+            onChange={(v) => onChange({ ...container, subtitle_font: v })}
+          />
+        </div>
+      </InlineStack>
       <RichTextEditor label={c.text} value={gi(container, "body", editLang)} onChange={(v) => onChange(si(container, "body", editLang, v))} placeholder={c.enterText} minHeight="130px" />
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 1 }}>
+          <ColorField label={c.titleColor} value={container.title_color || container.text_color || "#111827"} onChange={(v) => onChange({ ...container, title_color: v })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <ColorField label={c.subtitleColor} value={container.subtitle_color || container.text_color || "#111827"} onChange={(v) => onChange({ ...container, subtitle_color: v })} />
+        </div>
+      </InlineStack>
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <TextField label={c.buttonText} value={gi(container, "btn_text", editLang)} onChange={(v) => onChange(si(container, "btn_text", editLang, v))} autoComplete="off" />
@@ -806,6 +875,30 @@ function ImageTextEditor({ container, onChange, editLang = "de" }) {
         </div>
         <div style={{ flex: 1 }}>
           <TextField label={c.buttonRadius} value={String(container.btn_radius ?? 8)} onChange={(v) => onChange({ ...container, btn_radius: Number(v) || 0 })} autoComplete="off" />
+        </div>
+      </InlineStack>
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 1 }}>
+          <Select
+            label={c.buttonStyle}
+            options={c.buttonVariantOptions()}
+            value={container.btn_variant || "andertal_orange"}
+            onChange={(v) => onChange({ ...container, btn_variant: v })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <ColorField
+            label={c.buttonHoverBg}
+            value={container.btn_hover_bg || container.btn_bg || "#e8860f"}
+            onChange={(v) => onChange({ ...container, btn_hover_bg: v })}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <ColorField
+            label={c.buttonHoverColor}
+            value={container.btn_hover_color || container.btn_color || "#ffffff"}
+            onChange={(v) => onChange({ ...container, btn_hover_color: v })}
+          />
         </div>
       </InlineStack>
     </BlockStack>
@@ -999,7 +1092,25 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
             {c.contentMosaicIntro}
           </Text>
           <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+          <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" />
           <ColorField label={c.backgroundColor} value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} />
+          <div style={EDITOR_FIELD_GRID}>
+            <ColorField
+              label={c.textColor}
+              value={container.text_color || "#111827"}
+              onChange={(v) => onChange({ ...container, text_color: v })}
+            />
+            <ColorField
+              label={c.titleColor}
+              value={container.title_color || container.text_color || "#111827"}
+              onChange={(v) => onChange({ ...container, title_color: v })}
+            />
+            <ColorField
+              label={c.subtitleColor}
+              value={container.subtitle_color || container.text_color || "#6b7280"}
+              onChange={(v) => onChange({ ...container, subtitle_color: v })}
+            />
+          </div>
           <Select
             label={c.content}
             options={c.contentMosaicSourceOptions()}
@@ -1432,6 +1543,61 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
             </div>
           )}
       </Card>
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">CTA button</Text>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <TextField
+                label={c.buttonText}
+                value={gi(container, "btn_text", editLang)}
+                onChange={(v) => onChange(si(container, "btn_text", editLang, v))}
+                autoComplete="off"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <TextField
+                label={c.buttonUrl}
+                value={container.btn_url || ""}
+                onChange={(v) => onChange({ ...container, btn_url: v })}
+                autoComplete="off"
+              />
+            </div>
+          </InlineStack>
+
+          <Select
+            label={c.buttonStyle}
+            options={c.buttonVariantOptions()}
+            value={container.btn_variant || "seller_brass"}
+            onChange={(v) => onChange({ ...container, btn_variant: v })}
+          />
+
+          <div style={EDITOR_FIELD_GRID}>
+            <ColorField label={c.buttonBg} value={container.btn_bg || "#ff971c"} onChange={(v) => onChange({ ...container, btn_bg: v })} />
+            <ColorField label={c.buttonTextColor} value={container.btn_color || "#fff"} onChange={(v) => onChange({ ...container, btn_color: v })} />
+          </div>
+          <div style={EDITOR_FIELD_GRID}>
+            <ColorField label={c.buttonHoverBg} value={container.btn_hover_bg || container.btn_bg || "#e8860f"} onChange={(v) => onChange({ ...container, btn_hover_bg: v })} />
+            <ColorField label={c.buttonHoverColor} value={container.btn_hover_color || container.btn_color || "#fff"} onChange={(v) => onChange({ ...container, btn_hover_color: v })} />
+          </div>
+          <div style={EDITOR_FIELD_GRID}>
+            <TextField
+              label={`${c.buttonBorder} (CSS)`}
+              value={container.btn_border || "2px solid #000"}
+              onChange={(v) => onChange({ ...container, btn_border: v })}
+              autoComplete="off"
+              helpText={c.egNone}
+            />
+            <TextField
+              label={c.buttonRadius}
+              value={String(container.btn_radius ?? 8)}
+              onChange={(v) => onChange({ ...container, btn_radius: Number(v) || 0 })}
+              autoComplete="off"
+              helpText={c.pxUnit}
+            />
+          </div>
+        </BlockStack>
+      </Card>
     </BlockStack>
   );
 }
@@ -1443,6 +1609,7 @@ function BannerCtaEditor({ container, onChange, editLang = "de" }) {
     <BlockStack gap="400">
       <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <TextField label={c.subtitle} value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} autoComplete="off" />
+      <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" />
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <TextField label={c.buttonText} value={gi(container, "btn_text", editLang)} onChange={(v) => onChange(si(container, "btn_text", editLang, v))} autoComplete="off" />
@@ -1925,6 +2092,74 @@ function AccordionEditor({ container, onChange, editLang = "de" }) {
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.accordionSettings}</Text>
           <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+          <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" helpText={c.optional} />
+          <Select label={c.layoutVariant} options={c.accordionThemeOptions()} value={container.variant || container.theme || "light"} onChange={(v) => onChange({ ...container, variant: v, theme: v })} />
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}><TextField label={c.buttonText} value={gi(container, "btn_text", editLang)} onChange={(v) => onChange(si(container, "btn_text", editLang, v))} autoComplete="off" /></div>
+            <div style={{ flex: 1 }}><TextField label={c.buttonUrl} value={container.btn_url || ""} onChange={(v) => onChange({ ...container, btn_url: v })} autoComplete="off" /></div>
+          </InlineStack>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <Select
+                label={c.buttonStyle}
+                options={c.buttonVariantOptions()}
+                value={container.btn_variant || "seller_brass"}
+                onChange={(v) => onChange({ ...container, btn_variant: v })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <ColorField
+                label={c.buttonBg}
+                value={container.btn_bg || "#ff971c"}
+                onChange={(v) => onChange({ ...container, btn_bg: v })}
+              />
+            </div>
+          </InlineStack>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <ColorField
+                label={c.buttonTextColor}
+                value={container.btn_color || "#fff"}
+                onChange={(v) => onChange({ ...container, btn_color: v })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <ColorField
+                label={c.buttonHoverBg}
+                value={container.btn_hover_bg || container.btn_bg || "#e8860f"}
+                onChange={(v) => onChange({ ...container, btn_hover_bg: v })}
+              />
+            </div>
+          </InlineStack>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <ColorField
+                label={c.buttonHoverColor}
+                value={container.btn_hover_color || container.btn_color || "#fff"}
+                onChange={(v) => onChange({ ...container, btn_hover_color: v })}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <TextField
+                label={`${c.buttonBorder} (CSS)`}
+                value={container.btn_border || "2px solid #000"}
+                onChange={(v) => onChange({ ...container, btn_border: v })}
+                autoComplete="off"
+                helpText={c.egNone}
+              />
+            </div>
+          </InlineStack>
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <TextField
+                label={c.buttonRadius}
+                value={String(container.btn_radius ?? 8)}
+                onChange={(v) => onChange({ ...container, btn_radius: Number(v) || 0 })}
+                autoComplete="off"
+                helpText={c.pxUnit}
+              />
+            </div>
+          </InlineStack>
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}><ColorField label={c.backgroundColor} value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
             <div style={{ flex: 1 }}><ColorField label={c.textColor} value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
@@ -2336,9 +2571,17 @@ function FeatureGridEditor({ container, onChange, editLang = "de" }) {
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.featureGridSettings}</Text>
-          <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
-          <TextField label={`${c.subtitle} ${c.optional}`} value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} multiline={2} autoComplete="off" />
+          <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" helpText={c.featureGridTitleHelp} />
+          <TextField label={`${c.subtitle} ${c.optional}`} value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} multiline={2} autoComplete="off" helpText={c.featureGridSubtitleHelp} />
+          <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" helpText={c.optional} />
+          <TextField label={c.leadText} value={gi(container, "lead", editLang)} onChange={(v) => onChange(si(container, "lead", editLang, v))} multiline={2} autoComplete="off" helpText={c.optional} />
           <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label={c.layoutVariant}
+              options={c.featureGridVariantOptions()}
+              value={container.variant || "cards"}
+              onChange={(v) => onChange({ ...container, variant: v })}
+            />
             <Select
               label={c.titleAlign}
               options={c.titleAlignOptions()}

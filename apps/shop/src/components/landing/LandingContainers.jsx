@@ -33,6 +33,15 @@ function resolveUrl(url) {
   return `${BACKEND_URL}/uploads/${url}`;
 }
 
+/** Sellercentral hero slides store overlay as 0–100; older rows may use 0–1. */
+function slideOverlayOpacity(slide) {
+  const raw = slide?.overlay ?? slide?.overlay_opacity;
+  if (raw == null || raw === "") return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(1, n > 1 ? n / 100 : n);
+}
+
 function parsePaddingParts(val) {
   const parts = (val || "0px").trim().split(/\s+/);
   if (parts.length === 1) return [parts[0], parts[0], parts[0], parts[0]];
@@ -358,9 +367,37 @@ function HeroBanner({ container, locale = "de" }) {
     const ps = getPositionStyle(s.text_position || "center");
     return (
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: mobile ? "14px" : (s.content_padding || "32px 48px"), pointerEvents: "none", ...ps }}>
-        {title && <h2 style={{ fontSize: mobile ? "clamp(14px,5vw,26px)" : (s.title_size || "clamp(24px,4vw,56px)"), fontWeight: 900, color: s.text_color || "#fff", margin: 0, lineHeight: 1.15, marginBottom: subtitle ? 6 : (btnText ? 10 : 0) }}>{title}</h2>}
+        {title && <h2 style={{ fontSize: mobile ? "clamp(14px,5vw,26px)" : (s.title_size || "clamp(24px,4vw,56px)"), fontWeight: 900, color: s.title_color || s.text_color || "#fff", margin: 0, lineHeight: 1.15, marginBottom: subtitle ? 6 : (btnText ? 10 : 0), fontFamily: s.title_font ? undefined : undefined }}>{title}</h2>}
         {subtitle && <p style={{ fontSize: mobile ? "clamp(11px,3vw,15px)" : (s.subtitle_size || "clamp(14px,2vw,22px)"), color: s.subtitle_color || s.text_color || "#fff", margin: btnText ? "0 0 10px" : 0, maxWidth: 600 }}>{subtitle}</p>}
-        {btnText && <a href={s.btn_url || "#"} style={{ pointerEvents: "auto", display: "inline-block", padding: mobile ? "7px 16px" : (s.btn_padding || "12px 28px"), background: s.btn_bg || "#ff971c", color: s.btn_color || "#fff", border: s.btn_border || "2px solid #000", borderRadius: s.btn_radius || 8, fontWeight: 800, fontSize: mobile ? 12 : 15, textDecoration: "none", boxShadow: "0 3px 0 2px #000", alignSelf: btnAlignSelf(ps.justifyContent) }}>{btnText}</a>}
+        {btnText && (
+          <a
+            href={s.btn_url || "#"}
+            style={{
+              pointerEvents: "auto",
+              display: "inline-block",
+              padding: mobile ? "7px 16px" : (s.btn_padding || "12px 28px"),
+              background: s.btn_bg || "#ff971c",
+              color: s.btn_color || "#fff",
+              border: s.btn_border || "2px solid #000",
+              borderRadius: s.btn_radius || 8,
+              fontWeight: 800,
+              fontSize: mobile ? 12 : 15,
+              textDecoration: "none",
+              boxShadow: s.btn_variant === "flat" ? "none" : "0 3px 0 2px #000",
+              alignSelf: btnAlignSelf(ps.justifyContent),
+            }}
+            onMouseEnter={(e) => {
+              if (s.btn_hover_bg) e.currentTarget.style.background = s.btn_hover_bg;
+              if (s.btn_hover_color) e.currentTarget.style.color = s.btn_hover_color;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = s.btn_bg || "#ff971c";
+              e.currentTarget.style.color = s.btn_color || "#fff";
+            }}
+          >
+            {btnText}
+          </a>
+        )}
       </div>
     );
   }
@@ -407,8 +444,8 @@ function HeroBanner({ container, locale = "de" }) {
                   ) : (
                     <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
                   )}
-                  {(Number(s.overlay) > 0 || Number(s.overlay_opacity) > 0) && (
-                    <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${Math.min(1, Number(s.overlay) || Number(s.overlay_opacity) || 0)})`, pointerEvents: "none" }} />
+                  {(slideOverlayOpacity(s) > 0) && (
+                    <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${slideOverlayOpacity(s)})`, pointerEvents: "none" }} />
                   )}
                   <Overlay s={s} mobile />
                 </>
@@ -443,8 +480,8 @@ function HeroBanner({ container, locale = "de" }) {
                 {videoSrc
                   ? <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
                   : <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                {(Number(s.overlay) > 0 || Number(s.overlay_opacity) > 0) && (
-                  <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${Math.min(1, Number(s.overlay) || Number(s.overlay_opacity) || 0)})`, pointerEvents: "none" }} />
+                {(slideOverlayOpacity(s) > 0) && (
+                  <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${slideOverlayOpacity(s)})`, pointerEvents: "none" }} />
                 )}
               </>
             );
@@ -2280,8 +2317,8 @@ function FeatureGrid({ container, locale = "de" }) {
               {lt(item, "title", locale) && (
                 <div style={{ fontSize: "1.0625rem", fontWeight: 700, color: text_color, margin: 0 }}>{lt(item, "title", locale)}</div>
               )}
-              {lt(item, "body", locale) && (
-                <div style={{ fontSize: "0.9375rem", color: text_color, opacity: 0.72, lineHeight: 1.6, margin: 0 }}>{lt(item, "body", locale)}</div>
+              {(lt(item, "body", locale) || lt(item, "description", locale)) && (
+                <div style={{ fontSize: "0.9375rem", color: text_color, opacity: 0.72, lineHeight: 1.6, margin: 0 }}>{lt(item, "body", locale) || lt(item, "description", locale)}</div>
               )}
             </div>
           ))}

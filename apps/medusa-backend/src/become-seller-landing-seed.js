@@ -17,7 +17,7 @@
 
 const { randomUUID } = require('crypto')
 
-const LAYOUT_VERSION = 'become_seller_v3'
+const LAYOUT_VERSION = 'become_seller_v4'
 const PAGE_SLUG = 'verkaeufer-werden'
 const PAGE_ID = '3b968ab9-6aac-43fd-a3a6-4329cd5b4d4a'
 const REGISTER = {
@@ -57,6 +57,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
       padding: '0px', content_layout: 'full',
       height: visibleOn === 'mobile' ? '78vh' : '88vh',
       mobile_height: '70vh',
+      brand_mark: 'Andertal',
       autoplay: false,
       slides: [
         localize({
@@ -80,6 +81,10 @@ function becomeSellerContainers(visibleOn = 'desktop') {
             'Apri il tuo shop su Andertal — strumenti chiari, portata UE e Sellercentral.',
           ),
           btn_text: value('Jetzt Verkäufer werden', 'Become a seller', 'Satıcı ol', 'Devenir vendeur', 'Hazte vendedor', 'Diventa venditore'),
+          btn2_text: value('So funktioniert’s', 'See how it works', 'Nasıl çalışır', 'Comment ça marche', 'Cómo funciona', 'Come funziona'),
+          btn2_url: '#how',
+          btn2_variant: 'ghost',
+          btn_variant: 'seller_brass',
         }),
       ],
     }, {}),
@@ -87,31 +92,35 @@ function becomeSellerContainers(visibleOn = 'desktop') {
     // 2 Stats — side-by-side infographics under hero
     localize({
       id: randomUUID(), type: 'feature_grid', visible: true, visible_on: visibleOn, padding: pad,
+      variant: 'stats_strip',
       items: [
-        localize({}, { title: value('EU', 'EU', 'AB', 'UE', 'UE', 'UE'), description: value('Märkte mit einer Registrierung', 'Markets with one registration', 'Tek kayıtla pazarlar', 'Marchés avec une inscription', 'Mercados con un registro', 'Mercati con una registrazione') }),
-        localize({}, { title: value('0 €', '€0', '0 €', '0 €', '0 €', '0 €'), description: value('Startgebühr für deinen Shop', 'Store opening fee', 'Mağaza açılış ücreti', 'Frais d’ouverture', 'Cuota de apertura', 'Costo di apertura') }),
-        localize({}, { title: value('14 Tage', '14 days', '14 gün', '14 jours', '14 días', '14 giorni'), description: value('Auszahlungslogik nach Lieferung', 'Payout logic after delivery', 'Teslimat sonrası ödeme mantığı', 'Logique de paiement après livraison', 'Lógica de pago tras entrega', 'Logica di pagamento dopo consegna') }),
-        localize({}, { title: value('24/7', '24/7', '24/7', '24/7', '24/7', '24/7'), description: value('Sellercentral & Bestellfluss', 'Sellercentral & order flow', 'Sellercentral & sipariş akışı', 'Sellercentral & flux commandes', 'Sellercentral y flujo de pedidos', 'Sellercentral e flusso ordini') }),
+        localize({}, { title: value('EU', 'EU', 'AB', 'UE', 'UE', 'UE'), body: value('Märkte mit einer Registrierung', 'Markets with one registration', 'Tek kayıtla pazarlar', 'Marchés avec une inscription', 'Mercados con un registro', 'Mercati con una registrazione') }),
+        localize({}, { title: value('0 €', '€0', '0 €', '0 €', '0 €', '0 €'), body: value('Startgebühr für deinen Shop', 'Store opening fee', 'Mağaza açılış ücreti', 'Frais d’ouverture', 'Cuota de apertura', 'Costo di apertura') }),
+        localize({}, { title: value('14 Tage', '14 days', '14 gün', '14 jours', '14 días', '14 giorni'), body: value('Auszahlungslogik nach Lieferung', 'Payout logic after delivery', 'Teslimat sonrası ödeme mantığı', 'Logique de paiement après livraison', 'Lógica de pago tras entrega', 'Logica di pagamento dopo consegna') }),
+        localize({}, { title: value('24/7', '24/7', '24/7', '24/7', '24/7', '24/7'), body: value('Sellercentral & Bestellfluss', 'Sellercentral & order flow', 'Sellercentral & sipariş akışı', 'Sellercentral & flux commandes', 'Sellercentral y flujo de pedidos', 'Sellercentral e flusso ordini') }),
       ],
     }, {
-      title: value('Highlights', 'Highlights', 'Öne çıkanlar', 'Points clés', 'Destacados', 'Highlight'),
-      subtitle: value('Zahlen & Fakten auf einen Blick', 'Numbers at a glance', 'Rakamlar bir bakışta', 'Chiffres en un coup d’œil', 'Cifras de un vistazo', 'Numeri a colpo d’occhio'),
+      title: value('', '', '', '', '', ''),
+      subtitle: value('', '', '', '', '', ''),
     }),
 
     // 3 Why / features
     localize({
       id: randomUUID(), type: 'feature_grid', visible: true, visible_on: visibleOn, padding: pad,
+      variant: 'cards',
       items: [
-        localize({ icon: '1' }, { title: value('Eigene Storefront', 'Your storefront', 'Kendi vitrinin', 'Vitrine', 'Escaparate', 'Vetrina'), description: value('Markenpräsenz im Marketplace — Produkte, Markenseite und Bewertungen an einem Ort.', 'Brand presence inside the marketplace — products, brand page, and reviews in one place.', 'Marketplace’te marka varlığı — ürün, marka sayfası ve yorumlar bir arada.', 'Présence marque dans le marketplace — produits, page marque et avis.', 'Presencia de marca en el marketplace — productos, página y reseñas.', 'Presenza brand nel marketplace — prodotti, pagina brand e recensioni.') }),
-        localize({ icon: '2' }, { title: value('EU-weite Kunden', 'EU customers', 'AB müşterileri', 'Clients UE', 'Clientes UE', 'Clienti UE'), description: value('Erreiche Käufer in mehreren Ländern, ohne für jeden Markt einen eigenen Shop zu betreiben.', 'Reach buyers across countries without running a separate shop for each market.', 'Her pazar için ayrı mağaza olmadan ülkeler arası alıcılara ulaş.', 'Touchez des acheteurs dans plusieurs pays sans boutique séparée.', 'Llega a compradores en varios países sin una tienda por mercado.', 'Raggiungi acquirenti in più paesi senza uno shop per mercato.') }),
-        localize({ icon: '3' }, { title: value('Sellercentral', 'Sellercentral', 'Sellercentral', 'Sellercentral', 'Sellercentral', 'Sellercentral'), description: value('Bestellungen, Lager, Versand, Inhalte und Analytics in einem ruhigen Workspace.', 'Orders, inventory, shipping, content, and analytics in one calm workspace.', 'Sipariş, stok, kargo, içerik ve analitik tek sakin çalışma alanında.', 'Commandes, stock, expédition, contenu et analytics dans un espace calme.', 'Pedidos, stock, envío, contenido y analítica en un espacio claro.', 'Ordini, stock, spedizione, contenuti e analytics in un workspace calmo.') }),
-        localize({ icon: '4' }, { title: value('Klare Gebühren', 'Clear fees', 'Net ücretler', 'Frais clairs', 'Tarifas claras', 'Commissioni chiare'), description: value('Transparente Marketplace-Logik — du weißt, was nach Verkauf und Lieferung bleibt.', 'Transparent marketplace economics — you know what remains after sale and delivery.', 'Şeffaf marketplace ekonomisi — satış ve teslimattan sonra ne kaldığını bilirsin.', 'Économie marketplace lisible — vous savez ce qui reste après vente et livraison.', 'Economía del marketplace legible — sabes qué queda tras venta y entrega.', 'Economia marketplace leggibile — sai cosa resta dopo vendita e consegna.') }),
-        localize({ icon: '5' }, { title: value('Wachstumsflächen', 'Growth surfaces', 'Büyüme alanları', 'Surfaces de croissance', 'Superficies de crecimiento', 'Superfici di crescita'), description: value('Kategorien, Collections, Badges und Marketing-Platzierungen für Sichtbarkeit.', 'Categories, collections, badges, and marketing placements that create visibility.', 'Kategori, koleksiyon, rozet ve pazarlama yerleşimleri ile görünürlük.', 'Catégories, collections, badges et emplacements marketing pour la visibilité.', 'Categorías, colecciones, badges y placements de marketing.', 'Categorie, collection, badge e placement marketing.') }),
-        localize({ icon: '6' }, { title: value('Support-Struktur', 'Support structure', 'Destek yapısı', 'Structure support', 'Estructura de soporte', 'Struttura support'), description: value('Retouren- und Fallprozesse, damit Kundenanliegen nicht nur in deinem Posteingang leben.', 'Returns and case flows so customer issues don’t live only in your inbox.', 'İade ve vaka süreçleri — müşteri sorunları yalnızca gelen kutunda yaşamasın.', 'Retours et tickets pour que les cas ne restent pas seulement dans votre boîte mail.', 'Devoluciones y casos para que no vivan solo en tu bandeja.', 'Resi e casi così non restano solo nella tua inbox.') }),
+        localize({ icon: '1' }, { title: value('Eigene Storefront', 'Your storefront', 'Kendi vitrinin', 'Vitrine', 'Escaparate', 'Vetrina'), body: value('Markenpräsenz im Marketplace — Produkte, Markenseite und Bewertungen an einem Ort.', 'Brand presence inside the marketplace — products, brand page, and reviews in one place.', 'Marketplace’te marka varlığı — ürün, marka sayfası ve yorumlar bir arada.', 'Présence marque dans le marketplace — produits, page marque et avis.', 'Presencia de marca en el marketplace — productos, página y reseñas.', 'Presenza brand nel marketplace — prodotti, pagina brand e recensioni.') }),
+        localize({ icon: '2' }, { title: value('EU-weite Kunden', 'EU customers', 'AB müşterileri', 'Clients UE', 'Clientes UE', 'Clienti UE'), body: value('Erreiche Käufer in mehreren Ländern, ohne für jeden Markt einen eigenen Shop zu betreiben.', 'Reach buyers across countries without running a separate shop for each market.', 'Her pazar için ayrı mağaza olmadan ülkeler arası alıcılara ulaş.', 'Touchez des acheteurs dans plusieurs pays sans boutique séparée.', 'Llega a compradores en varios países sin una tienda por mercado.', 'Raggiungi acquirenti in più paesi senza uno shop per mercato.') }),
+        localize({ icon: '3' }, { title: value('Sellercentral', 'Sellercentral', 'Sellercentral', 'Sellercentral', 'Sellercentral', 'Sellercentral'), body: value('Bestellungen, Lager, Versand, Inhalte und Analytics in einem ruhigen Workspace.', 'Orders, inventory, shipping, content, and analytics in one calm workspace.', 'Sipariş, stok, kargo, içerik ve analitik tek sakin çalışma alanında.', 'Commandes, stock, expédition, contenu et analytics dans un espace calme.', 'Pedidos, stock, envío, contenido y analítica en un espacio claro.', 'Ordini, stock, spedizione, contenuti e analytics in un workspace calmo.') }),
+        localize({ icon: '4' }, { title: value('Klare Gebühren', 'Clear fees', 'Net ücretler', 'Frais clairs', 'Tarifas claras', 'Commissioni chiare'), body: value('Transparente Marketplace-Logik — du weißt, was nach Verkauf und Lieferung bleibt.', 'Transparent marketplace economics — you know what remains after sale and delivery.', 'Şeffaf marketplace ekonomisi — satış ve teslimattan sonra ne kaldığını bilirsin.', 'Économie marketplace lisible — vous savez ce qui reste après vente et livraison.', 'Economía del marketplace legible — sabes qué queda tras venta y entrega.', 'Economia marketplace leggibile — sai cosa resta dopo vendita e consegna.') }),
+        localize({ icon: '5' }, { title: value('Wachstumsflächen', 'Growth surfaces', 'Büyüme alanları', 'Surfaces de croissance', 'Superficies de crecimiento', 'Superfici di crescita'), body: value('Kategorien, Collections, Badges und Marketing-Platzierungen für Sichtbarkeit.', 'Categories, collections, badges, and marketing placements that create visibility.', 'Kategori, koleksiyon, rozet ve pazarlama yerleşimleri ile görünürlük.', 'Catégories, collections, badges et emplacements marketing pour la visibilité.', 'Categorías, colecciones, badges y placements de marketing.', 'Categorie, collection, badge e placement marketing.') }),
+        localize({ icon: '6' }, { title: value('Support-Struktur', 'Support structure', 'Destek yapısı', 'Structure support', 'Estructura de soporte', 'Struttura support'), body: value('Retouren- und Fallprozesse, damit Kundenanliegen nicht nur in deinem Posteingang leben.', 'Returns and case flows so customer issues don’t live only in your inbox.', 'İade ve vaka süreçleri — müşteri sorunları yalnızca gelen kutunda yaşamasın.', 'Retours et tickets pour que les cas ne restent pas seulement dans votre boîte mail.', 'Devoluciones y casos para que no vivan solo en tu bandeja.', 'Resi e casi così non restano solo nella tua inbox.') }),
       ],
     }, {
+      eyebrow: value('Warum Andertal', 'Why Andertal', 'Neden Andertal', 'Pourquoi Andertal', 'Por qué Andertal', 'Perché Andertal'),
       title: value('Warum Andertal', 'Why Andertal', 'Neden Andertal', 'Pourquoi Andertal', 'Por qué Andertal', 'Perché Andertal'),
       subtitle: value('Mehr als ein Shop. Ein europäischer Verkaufskanal.', 'More than a shop. A European sales channel.', 'Mağazadan fazlası. Avrupa satış kanalı.', 'Plus qu’une boutique. Un canal européen.', 'Más que una tienda. Un canal europeo.', 'Più di uno shop. Un canale europeo.'),
+      lead: value('Wir bauen den Marketplace, damit du Produkte listen, bestellen und auszahlen kannst — ohne Technik-Chaos.', 'We run the marketplace so you can list, fulfill, and get paid — without rebuilding commerce from scratch.', 'Marketplace’i kuruyoruz; sen ürün listele, sipariş al, ödeme al — teknik kaos olmadan.', 'Nous faisons le marketplace pour que vous listiez, expédiez et soyez payé.', 'Gestionamos el marketplace para que listes, envíes y cobres.', 'Gestiamo il marketplace così elenchi, evadi e incassi.'),
     }),
 
     // 4 Reach split
@@ -119,6 +128,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
       id: randomUUID(), type: 'image_text', visible: true, visible_on: visibleOn, padding: pad,
       image: EU_IMG, image_side: 'right', btn_url: ctaUrl,
     }, {
+      eyebrow: value('Reichweite', 'Reichweite', 'Reichweite', 'Reichweite', 'Reichweite', 'Reichweite'),
       title: value('Europa ist dein Lagerregal — und dein Schaufenster.', 'Europe is your shelf — and your storefront.', 'Avrupa rafın — ve vitrinin.', 'L’Europe est votre étagère — et votre vitrine.', 'Europa es tu estantería — y tu escaparate.', 'L’Europa è il tuo scaffale — e la tua vetrina.'),
       body: value(
         'Andertal verbindet unabhängige Verkäufer mit Käufern, die Qualität und Herkunft schätzen. Du listest einmal und verkaufst in einem kuratierten Marketplace.',
@@ -135,6 +145,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
     localize({
       id: randomUUID(), type: 'text_block', visible: true, visible_on: visibleOn, padding: pad,
     }, {
+      eyebrow: value('In 4 Schritten', 'In 4 Schritten', 'In 4 Schritten', 'In 4 Schritten', 'In 4 Schritten', 'In 4 Schritten'),
       title: value('Vom Konto zum ersten Verkauf.', 'From account to first sale.', 'Hesaptan ilk satışa.', 'Du compte à la première vente.', 'De la cuenta a la primera venta.', 'Dall’account alla prima vendita.'),
       body: value(
         '<ol><li><strong>Registrieren</strong> — Lege dein Verkäuferkonto in Sellercentral an — wenige Minuten, klare Angaben.</li><li><strong>Shop vorbereiten</strong> — Markeninfos, Standorte, Versandländer und Zahlungsdaten hinterlegen.</li><li><strong>Produkte listen</strong> — Varianten, Preise, Medien und Compliance-Felder pflegen — einzeln oder im Bulk.</li><li><strong>Verkaufen &amp; ausliefern</strong> — Bestellungen annehmen, versenden, Trackings setzen — Auszahlung folgt dem Prozess.</li></ol>',
@@ -148,7 +159,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
 
     // 6 Deep accordion
     localize({
-      id: randomUUID(), type: 'accordion', visible: true, visible_on: visibleOn, padding: pad,
+      id: randomUUID(), type: 'accordion', visible: true, visible_on: visibleOn, padding: pad, variant: 'dark',
       items: [
         localize({}, { question: value('Warum nicht nur einen eigenen Webshop?', 'Why not only my own webshop?', 'Neden sadece kendi mağazam?', 'Pourquoi pas seulement ma boutique?', '¿Por qué no solo mi tienda?', 'Perché non solo il mio shop?'), answer: value('Ein eigener Shop braucht Traffic. Andertal bringt Marketplace-Nachfrage, Kategorie-Sichtbarkeit und gemeinsame Infrastruktur — du konzentrierst dich auf Produkt und Fulfillment.', 'Your own shop needs traffic. Andertal brings marketplace demand, category visibility, and shared infrastructure — you focus on product and fulfillment.', 'Kendi mağaza trafik ister. Andertal talep, kategori görünürlüğü ve ortak altyapı getirir.', 'Votre boutique a besoin de trafic. Andertal apporte demande marketplace, visibilité et infrastructure.', 'Tu tienda necesita tráfico. Andertal aporta demanda, visibilidad e infraestructura.', 'Il tuo shop ha bisogno di traffico. Andertal porta domanda, visibilità e infrastruttura.') }),
         localize({}, { question: value('Behalte ich Kontrolle über Marke und Preise?', 'Do I keep control of brand and prices?', 'Marka ve fiyat kontrolü bende mi?', 'Est-ce que je garde marque et prix?', '¿Mantengo marca y precios?', 'Mantengo brand e prezzi?'), answer: value('Ja. Du steuerst Katalog, Preise, Lager und Versandregeln. Der Marketplace liefert die Bühne und die Bestellpipeline.', 'Yes. You control catalog, prices, stock, and shipping rules. The marketplace provides the stage and order pipeline.', 'Evet. Katalog, fiyat, stok ve kargo kuralları sende. Marketplace sahne ve sipariş hattını sağlar.', 'Oui. Vous pilotez catalogue, prix, stock et règles d’expédition. Le marketplace apporte la scène et le pipeline.', 'Sí. Controlas catálogo, precios, stock y envío. El marketplace da el escenario y el pipeline.', 'Sì. Controlli catalogo, prezzi, stock e spedizione. Il marketplace dà il palco e la pipeline.') }),
@@ -157,6 +168,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
         localize({}, { question: value('Was passiert nach der Bestellung?', 'What happens after an order?', 'Siparişten sonra ne olur?', 'Que se passe-t-il après une commande?', '¿Qué pasa tras un pedido?', 'Cosa succede dopo un ordine?'), answer: value('Du siehst die Order in Sellercentral, erzeugst Lieferschein/Label-Flows nach Setup und aktualisierst den Versandstatus für den Kunden.', 'You see the order in Sellercentral, create packing/label flows per setup, and update shipping status for the customer.', 'Siparişi Sellercentral’de görür, etiket/sevkiyat akışını kullanır ve takip durumunu güncellersin.', 'Vous voyez la commande dans Sellercentral, générez les flux d’expédition et mettez à jour le statut.', 'Ves el pedido en Sellercentral, generas envío/etiqueta y actualizas el estado.', 'Vedi l’ordine in Sellercentral, generi flussi di spedizione e aggiorni lo stato.') }),
       ],
     }, {
+      eyebrow: value('Im Detail', 'Im Detail', 'Im Detail', 'Im Detail', 'Im Detail', 'Im Detail'),
       title: value('Was dich bei Andertal wirklich weiterbringt.', 'What actually moves the needle at Andertal.', 'Andertal’de seni gerçekten ileri taşıyanlar.', 'Ce qui fait vraiment avancer sur Andertal.', 'Lo que realmente impulsa en Andertal.', 'Cosa ti fa davvero avanzare su Andertal.'),
     }),
 
@@ -169,6 +181,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
         localize({}, { label: value('Händler', 'Retailer', 'Satıcı', 'Revendeur', 'Comercio', 'Retailer'), title: value('Händler mit Sortiment', 'Merchant with assortment', 'Çeşitli satıcı', 'Revendeur avec assortiment', 'Comercio con surtido', 'Retailer con assortimento'), content: value('Skaliere Varianten, Lager und Mehrländer-Versand. Bulk-Uploads und Vorlagen halten Tempo.', 'Scale variants, stock, and multi-country shipping. Bulk uploads and templates keep the pace.', 'Varyant, stok ve çok ülke kargoyu ölçekle. Toplu yükleme ve şablonlar tempo tutar.', 'Scalez variantes, stock et expédition multi-pays avec imports bulk.', 'Escala variantes, stock y envío multi-país con cargas masivas.', 'Scala varianti, stock e spedizione multi-paese con upload bulk.') }),
       ],
     }, {
+      eyebrow: value('Seller-Profile', 'Seller-Profile', 'Seller-Profile', 'Seller-Profile', 'Seller-Profile', 'Seller-Profile'),
       title: value('Egal ob Marke, Manufaktur oder Händler.', 'Whether brand, maker, or merchant.', 'İster marka, ister üretici, ister satıcı.', 'Marque, atelier ou revendeur.', 'Marca, maker o comercio.', 'Brand, maker o merchant.'),
     }),
 
@@ -181,20 +194,26 @@ function becomeSellerContainers(visibleOn = 'desktop') {
         localize({}, { quote: value('Wir wollten EU-weit verkaufen, ohne fünf Shops zu pflegen. Andertal war der logische Schritt.', 'We wanted EU reach without five shops. Andertal was the logical step.', 'Beş mağaza yönetmeden AB’de satmak istedik. Andertal mantıklı adımdı.', 'Vendre en UE sans cinq boutiques. Andertal était l’étape logique.', 'Vender en la UE sin cinco tiendas. Andertal fue el paso lógico.', 'Vendere in UE senza cinque shop. Andertal era il passo logico.'), name: value('Sofia K.', 'Sofia K.', 'Sofia K.', 'Sofia K.', 'Sofia K.', 'Sofia K.'), role: value('Beauty & Care', 'Beauty & Care', 'Beauty & Care', 'Beauty & Care', 'Beauty & Care', 'Beauty & Care') }),
       ],
     }, {
+      eyebrow: value('Stimmen', 'Stimmen', 'Stimmen', 'Stimmen', 'Stimmen', 'Stimmen'),
       title: value('Seller, die den Kanal ernst nehmen.', 'Sellers who take the channel seriously.', 'Kanalı ciddiye alan satıcılar.', 'Des vendeurs qui prennent le canal au sérieux.', 'Vendedores que se toman el canal en serio.', 'Seller che prendono sul serio il canale.'),
     }),
 
     // 9 Fees grid
     localize({
       id: randomUUID(), type: 'feature_grid', visible: true, visible_on: visibleOn, padding: pad,
+      variant: 'price_cards',
+      btn_url: ctaUrl,
+      btn_text: value('Jetzt Verkäufer werden', 'Become a seller', 'Satıcı ol', 'Devenir vendeur', 'Hazte vendedor', 'Diventa venditore'),
       items: [
-        localize({ icon: '0 €' }, { title: value('Shop eröffnen', 'Open a store', 'Mağaza aç', 'Ouvrir une boutique', 'Abrir tienda', 'Apri uno shop'), description: value('Registrierung und Start ohne Eintrittsgebühr.', 'Registration and start with no entry fee.', 'Kayıt ve başlangıç giriş ücreti olmadan.', 'Inscription et démarrage sans frais d’entrée.', 'Registro e inicio sin cuota de entrada.', 'Registrazione e avvio senza fee d’ingresso.') }),
-        localize({ icon: 'Anteil' }, { title: value('pro Verkauf', 'per sale', 'satış başına', 'par vente', 'por venta', 'per vendita'), description: value('Marketplace-Gebühr erst, wenn Umsatz entsteht.', 'Marketplace fee only when revenue happens.', 'Marketplace ücreti yalnızca ciro oluşunca.', 'Frais marketplace seulement quand il y a du CA.', 'Comisión solo cuando hay ventas.', 'Fee marketplace solo quando c’è fatturato.') }),
-        localize({ icon: 'Rhythmus' }, { title: value('Auszahlung', 'Payout', 'Ödeme', 'Paiement', 'Pago', 'Pagamento'), description: value('Nach Lieferung und klarer Freigabelogik.', 'After delivery and clear release logic.', 'Teslimat ve net serbest bırakma mantığından sonra.', 'Après livraison et logique de libération claire.', 'Tras entrega y lógica de liberación clara.', 'Dopo consegna e logica di sblocco chiara.') }),
+        localize({ icon: '0 €' }, { title: value('Shop eröffnen', 'Open a store', 'Mağaza aç', 'Ouvrir une boutique', 'Abrir tienda', 'Apri uno shop'), body: value('Registrierung und Start ohne Eintrittsgebühr.', 'Registration and start with no entry fee.', 'Kayıt ve başlangıç giriş ücreti olmadan.', 'Inscription et démarrage sans frais d’entrée.', 'Registro e inicio sin cuota de entrada.', 'Registrazione e avvio senza fee d’ingresso.') }),
+        localize({ icon: 'Anteil' }, { title: value('pro Verkauf', 'per sale', 'satış başına', 'par vente', 'por venta', 'per vendita'), body: value('Marketplace-Gebühr erst, wenn Umsatz entsteht.', 'Marketplace fee only when revenue happens.', 'Marketplace ücreti yalnızca ciro oluşunca.', 'Frais marketplace seulement quand il y a du CA.', 'Comisión solo cuando hay ventas.', 'Fee marketplace solo quando c’è fatturato.') }),
+        localize({ icon: 'Rhythmus' }, { title: value('Auszahlung', 'Payout', 'Ödeme', 'Paiement', 'Pago', 'Pagamento'), body: value('Nach Lieferung und klarer Freigabelogik.', 'After delivery and clear release logic.', 'Teslimat ve net serbest bırakma mantığından sonra.', 'Après livraison et logique de libération claire.', 'Tras entrega y lógica de liberación clara.', 'Dopo consegna e logica di sblocco chiara.') }),
       ],
     }, {
-      title: value('Du verkaufst. Die Logik bleibt nachvollziehbar.', 'You sell. The logic stays readable.', 'Sen satarsın. Mantık okunabilir kalır.', 'Vous vendez. La logique reste lisible.', 'Tú vendes. La lógica sigue legible.', 'Tu vendi. La logica resta leggibile.'),
-      subtitle: value('Keine Startgebühr fürs Eröffnen. Marketplace-Anteil und Auszahlungsrhythmus sind so gedacht, dass du planen kannst.', 'No opening fee. Marketplace share and payout rhythm are built so you can plan.', 'Açılış ücreti yok. Marketplace payı ve ödeme ritmi planlanabilir.', 'Pas de frais d’ouverture. Part et rythme de paiement pensés pour planifier.', 'Sin cuota de apertura. Comisión y ritmo de pago pensados para planificar.', 'Nessun costo di apertura. Quota e ritmo di pagamento pensati per pianificare.'),
+      eyebrow: value('Transparenz', 'Transparency', 'Şeffaflık', 'Transparence', 'Transparencia', 'Trasparenza'),
+      title: value('Transparenz', 'Transparency', 'Şeffaflık', 'Transparence', 'Transparencia', 'Trasparenza'),
+      subtitle: value('Du verkaufst. Die Logik bleibt nachvollziehbar.', 'You sell. The logic stays readable.', 'Sen satarsın. Mantık okunabilir kalır.', 'Vous vendez. La logique reste lisible.', 'Tú vendes. La lógica sigue legible.', 'Tu vendi. La logica resta leggibile.'),
+      lead: value('Keine Startgebühr fürs Eröffnen. Marketplace-Anteil und Auszahlungsrhythmus sind so gedacht, dass du planen kannst.', 'No opening fee. Marketplace share and payout rhythm are built so you can plan.', 'Açılış ücreti yok. Marketplace payı ve ödeme ritmi planlanabilir.', 'Pas de frais d’ouverture. Part et rythme de paiement pensés pour planifier.', 'Sin cuota de apertura. Comisión y ritmo de pago pensados para planificar.', 'Nessun costo di apertura. Quota e ritmo di pagamento pensati per pianificare.'),
     }),
 
     // 10 FAQ accordion
@@ -209,6 +228,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
         localize({}, { question: value('Was, wenn ich Hilfe brauche?', 'What if I need help?', 'Yardım lazım olursa?', 'Et si j’ai besoin d’aide?', '¿Y si necesito ayuda?', 'E se mi serve aiuto?'), answer: value('Über Support-Prozesse und Sellercentral-Dokumentation kommst du an die nächsten Schritte — inklusive Fallbearbeitung für Kundenanliegen.', 'Support processes and Sellercentral docs get you to the next steps — including case handling for customer issues.', 'Destek süreçleri ve Sellercentral dokümanları sonraki adımları gösterir.', 'Support et documentation Sellercentral pour les prochaines étapes.', 'Soporte y docs de Sellercentral para los siguientes pasos.', 'Supporto e docs Sellercentral per i prossimi passi.') }),
       ],
     }, {
+      eyebrow: value('FAQ', 'FAQ', 'FAQ', 'FAQ', 'FAQ', 'FAQ'),
       title: value('Häufige Fragen vor der Registrierung.', 'Common questions before you register.', 'Kayıt öncesi sık sorulanlar.', 'Questions fréquentes avant inscription.', 'Preguntas frecuentes antes de registrarte.', 'Domande frequenti prima della registrazione.'),
     }),
 
@@ -224,6 +244,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
       btn_url: ctaUrl,
     }, {
       title: value('Alles, was du täglich brauchst — an einem Ort.', 'Everything you need daily — in one place.', 'Günlük ihtiyacın olan her şey — tek yerde.', 'Tout le quotidien — au même endroit.', 'Todo lo diario — en un solo lugar.', 'Tutto il quotidiano — in un solo posto.'),
+      eyebrow: value('Werkzeuge', 'Werkzeuge', 'Werkzeuge', 'Werkzeuge', 'Werkzeuge', 'Werkzeuge'),
       subtitle: value('Katalog, Bestellungen, Analytics, Inhalte und Einstellungen. Weniger Tab-Chaos, mehr Verkaufsflow.', 'Catalog, orders, analytics, content, and settings. Less tab chaos, more sales flow.', 'Katalog, sipariş, analitik, içerik ve ayarlar. Daha az sekme karmaşası, daha çok satış akışı.', 'Catalogue, commandes, analytics, contenu et réglages.', 'Catálogo, pedidos, analítica, contenido y ajustes.', 'Catalogo, ordini, analytics, contenuti e impostazioni.'),
       btn_text: value('Jetzt Verkäufer werden', 'Become a seller', 'Satıcı ol', 'Devenir vendeur', 'Hazte vendedor', 'Diventa venditore'),
     }),
@@ -240,6 +261,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
         localize({}, { question: value('Darf ich Team-Zugänge anlegen?', 'Can I create team access?', 'Takım erişimi açabilir miyim?', 'Puis-je créer des accès équipe?', '¿Puedo crear accesos de equipo?', 'Posso creare accessi team?'), answer: value('Rollen und Berechtigungen im Sellercentral erlauben Zusammenarbeit, ohne alles über ein Login zu teilen.', 'Roles and permissions in Sellercentral allow collaboration without sharing one login.', 'Sellercentral’de roller ve izinler — tek login paylaşmadan işbirliği.', 'Rôles et permissions dans Sellercentral pour collaborer sans un seul login.', 'Roles y permisos en Sellercentral para colaborar sin un solo login.', 'Ruoli e permessi in Sellercentral per collaborare senza un solo login.') }),
       ],
     }, {
+      eyebrow: value('Onboarding & Betrieb', 'Onboarding & ops', 'Kurulum & operasyon', 'Onboarding & ops', 'Onboarding y ops', 'Onboarding e ops'),
       title: value('Noch Fragen zu Start, Versand und Compliance?', 'More questions on start, shipping, and compliance?', 'Başlangıç, kargo ve uyumluluk hakkında sorular?', 'Encore des questions sur démarrage, expédition et conformité?', '¿Más preguntas sobre inicio, envío y cumplimiento?', 'Altre domande su avvio, spedizione e conformità?'),
     }),
 
@@ -248,6 +270,14 @@ function becomeSellerContainers(visibleOn = 'desktop') {
       id: randomUUID(), type: 'banner_cta', visible: true, visible_on: visibleOn,
       padding: pad, bg_color: '#0d1f1a', text_color: '#f4f1ea', btn_url: REGISTER.en,
     }, {
+      eyebrow: value(
+        'Weiter zur Registrierung in Sellercentral',
+        'Continue to registration in Sellercentral',
+        'Sellercentral’da kayıta devam et',
+        'Continuer vers l’inscription sur Sellercentral',
+        'Continúa al registro en Sellercentral',
+        'Continua alla registrazione su Sellercentral',
+      ),
       title: value('Bereit, auf Andertal zu verkaufen?', 'Ready to sell on Andertal?', 'Andertal’de satmaya hazır mısın?', 'Prêt à vendre sur Andertal?', '¿Listo para vender en Andertal?', 'Pronto a vendere su Andertal?'),
       subtitle: value('Registriere dich jetzt. Richte deinen Shop ein. Liste dein erstes Produkt — und starte dort, wo Europa einkauft.', 'Register now. Set up your shop. List your first product — and start where Europe shops.', 'Şimdi kaydol. Mağazanı kur. İlk ürününü listele — Avrupa’nın alışveriş yaptığı yerde başla.', 'Inscrivez-vous. Configurez. Listez votre premier produit.', 'Regístrate. Configura. Publica tu primer producto.', 'Registrati. Configura. Elenca il primo prodotto.'),
       btn_text: value('Jetzt Verkäufer werden', 'Become a seller now', 'Şimdi satıcı ol', 'Devenir vendeur maintenant', 'Hazte vendedor ahora', 'Diventa venditore ora'),
