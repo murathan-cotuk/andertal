@@ -216,9 +216,14 @@ export default function MediaPickerModal({
 
   const canApply = selected.size > 0 || urlInput.trim().startsWith("http");
 
+  // Only mount the Polaris Modal while open. A permanently-mounted Modal keeps an
+  // earlier portal node; when opened from inside another Modal (e.g. Badge
+  // bearbeiten) that portal stays behind the first Modal at the same z-index.
+  if (!open) return null;
+
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title={resolvedTitle}
       size="large"

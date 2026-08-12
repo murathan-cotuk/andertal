@@ -5,13 +5,15 @@ import { useRouter } from "@/i18n/navigation";
 import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
-// TASK-14 — real onboarding checklist for a newly registered seller. Verification/KYB is the
-// only hard-required item (Stripe Connect, shipping and carrier setup are what a seller actually
-// needs configured before they can take & fulfil an order, so those are the "real steps" the
-// TASKS.md brief asked for instead of guessed placeholder items).
 function isVerificationDone(approvalStatus) {
   const s = String(approvalStatus || "").toLowerCase();
   return s === "approved" || s === "active";
+}
+
+function locationPurposeDone(locations, key) {
+  return (locations || []).some(
+    (l) => l?.[key] && String(l.address_line1 || "").trim(),
+  );
 }
 
 function skippedStorageKey(sellerId) {
@@ -44,7 +46,7 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
     locale === "en" ? en : locale === "tr" ? tr : locale === "fr" ? fr : locale === "es" ? es : locale === "it" ? it : de;
 
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState(null); // { verificationDone, paymentDone, shippingGroupDone, carrierDone }
+  const [status, setStatus] = useState(null);
   const [sellerId, setSellerId] = useState("");
   const [skipped, setSkipped] = useState(new Set());
 
@@ -59,17 +61,26 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
     let cancelled = false;
     (async () => {
       const client = getMedusaAdminClient();
-      const [account, shippingGroups, carriers] = await Promise.all([
+      const [account, shippingGroups, carriers, locationsRes, cardRes] = await Promise.all([
         client.getSellerAccount().catch(() => null),
         client.request("/admin-hub/v1/shipping-groups").catch(() => null),
         client.getCarriers().catch(() => null),
+        client.request("/admin-hub/v1/seller/locations").catch(() => null),
+        client.getSellerCard().catch(() => null),
       ]);
       if (cancelled) return;
       const seller = account?.sellerUser || account?.user || {};
+      const locations = locationsRes?.locations || [];
+      const iban = String(seller?.iban || "").replace(/\s+/g, "");
       setStatus({
         verificationDone: isVerificationDone(seller?.approval_status),
         shippingGroupDone: Array.isArray(shippingGroups?.groups) ? shippingGroups.groups.length > 0 : false,
         carrierDone: Array.isArray(carriers?.carriers) ? carriers.carriers.length > 0 : false,
+        shippingFromDone: locationPurposeDone(locations, "is_shipping_from"),
+        returnsDone: locationPurposeDone(locations, "is_returns_to"),
+        billingDone: locationPurposeDone(locations, "is_billing"),
+        cardDone: !!cardRes?.has_card,
+        ibanDone: iban.length >= 15,
       });
       setLoading(false);
     })();
@@ -86,6 +97,46 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
         label: t("Verify your account", "Hesabınızı doğrulayın", "Vérifiez votre compte", "Verifique su cuenta", "Verifica il tuo account", "Konto verifizieren"),
         sub: t("Required before you can sell", "Satışa başlamadan önce zorunlu", "Requis avant de pouvoir vendre", "Requerido antes de poder vender", "Richiesto prima di poter vendere", "Vor dem Verkaufsstart erforderlich"),
         href: "/settings/verification",
+      },
+      {
+        key: "locations_shipping",
+        required: true,
+        done: status.shippingFromDone,
+        label: t("Set warehouse / shipping address", "Depo / gönderim adresini ayarlayın", "Définir l'adresse d'entrepôt / expédition", "Configurar dirección de almacén / envío", "Imposta indirizzo magazzino / spedizione", "Lager- / Versandadresse hinterlegen"),
+        sub: t("Required — Settings → Locations", "Zorunlu — Ayarlar → Konumlar", "Obligatoire — Paramètres → Emplacements", "Obligatorio — Ajustes → Ubicaciones", "Obbligatorio — Impostazioni → Posizioni", "Pflicht — Einstellungen → Standorte"),
+        href: "/settings/locations",
+      },
+      {
+        key: "locations_returns",
+        required: true,
+        done: status.returnsDone,
+        label: t("Set returns address", "İade adresini ayarlayın", "Définir l'adresse de retour", "Configurar dirección de devoluciones", "Imposta indirizzo resi", "Retourenadresse hinterlegen"),
+        sub: t("Required — used for return labels & emails", "Zorunlu — iade etiketleri ve e-postalar için", "Obligatoire — étiquettes et e-mails de retour", "Obligatorio — etiquetas y correos de devolución", "Obbligatorio — etichette ed email di reso", "Pflicht — für Retourenlabels & E-Mails"),
+        href: "/settings/locations",
+      },
+      {
+        key: "locations_billing",
+        required: true,
+        done: status.billingDone,
+        label: t("Set billing address", "Fatura adresini ayarlayın", "Définir l'adresse de facturation", "Configurar dirección de facturación", "Imposta indirizzo di fatturazione", "Rechnungsadresse hinterlegen"),
+        sub: t("Required — Settings → Locations", "Zorunlu — Ayarlar → Konumlar", "Obligatoire — Paramètres → Emplacements", "Obligatorio — Ajustes → Ubicaciones", "Obbligatorio — Impostazioni → Posizioni", "Pflicht — Einstellungen → Standorte"),
+        href: "/settings/locations",
+      },
+      {
+        key: "card",
+        required: true,
+        done: status.cardDone,
+        label: t("Add credit card for fees", "Ücretler için kredi kartı ekleyin", "Ajouter une carte pour les frais", "Añadir tarjeta para tasas", "Aggiungi carta per le commissioni", "Kreditkarte für Gebühren hinterlegen"),
+        sub: t("Required — platform fees (Gebühren)", "Zorunlu — platform ücretleri (Gebühren)", "Obligatoire — frais plateforme (Gebühren)", "Obligatorio — tasas de plataforma (Gebühren)", "Obbligatorio — commissioni piattaforma (Gebühren)", "Pflicht — Plattformgebühren"),
+        href: "/settings/payments",
+      },
+      {
+        key: "iban",
+        required: true,
+        done: status.ibanDone,
+        label: t("Add IBAN for payouts", "Ödeme için IBAN ekleyin", "Ajouter un IBAN pour les versements", "Añadir IBAN para pagos", "Aggiungi IBAN per i pagamenti", "IBAN für Auszahlungen hinterlegen"),
+        sub: t("Required — Auszahlung", "Zorunlu — Auszahlung", "Obligatoire — Auszahlung", "Obligatorio — Auszahlung", "Obbligatorio — Auszahlung", "Pflicht — Auszahlung"),
+        href: "/settings/payments",
       },
       {
         key: "shipping_group",
@@ -135,7 +186,14 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
             <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 6, border: "2px solid #d1d5db" }} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{it.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                  {it.label}
+                  {it.required ? (
+                    <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#b45309", textTransform: "uppercase" }}>
+                      {t("Required", "Zorunlu", "Obligatoire", "Obligatorio", "Obbligatorio", "Pflicht")}
+                    </span>
+                  ) : null}
+                </div>
                 <div style={{ fontSize: 12, color: "#9ca3af" }}>{it.sub}</div>
               </div>
             </div>

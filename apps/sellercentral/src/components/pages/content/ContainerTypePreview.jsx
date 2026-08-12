@@ -102,6 +102,7 @@ export function ContainerTypePreview({ type, label }) {
     case "image_carousel":
     case "collection_carousel":
     case "bestseller_carousel":
+    case "brands_directory":
     case "seller_carousel":
     case "collections_carousel":
     case "blog_carousel":

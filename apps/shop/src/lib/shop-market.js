@@ -14,6 +14,23 @@ export const SHOP_CURRENCIES = ["eur", "gbp", "chf", "usd", "try"];
 
 const LOCALE_SET = new Set(SHOP_LOCALES);
 
+/**
+ * Resolve enabled shop UI locales from settings payload.
+ * null / empty / invalid → all SHOP_LOCALES (backward compatible).
+ */
+export function resolveEnabledShopLocales(raw) {
+  if (!Array.isArray(raw) || !raw.length) return [...SHOP_LOCALES];
+  const enabled = SHOP_LOCALES.filter((c) =>
+    raw.map((x) => String(x || "").toLowerCase()).includes(c),
+  );
+  return enabled.length ? enabled : [...SHOP_LOCALES];
+}
+
+export function isShopLocaleEnabled(locale, enabledList) {
+  const list = resolveEnabledShopLocales(enabledList);
+  return list.includes(String(locale || "").toLowerCase());
+}
+
 export const DEFAULT_MARKET = "de";
 export const DEFAULT_CURRENCY = "eur";
 

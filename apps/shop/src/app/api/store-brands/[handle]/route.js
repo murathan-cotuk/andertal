@@ -11,13 +11,15 @@ export async function GET(request, context) {
     const base = getBackendUrl();
     const res = await fetch(`${base}/store/brands/${encodeURIComponent(handle)}`, {
       headers: { "Content-Type": "application/json" },
-      cache: "no-store",
+      next: { revalidate: 300 },
     });
     if (!res.ok) {
       return NextResponse.json({ message: "Brand not found" }, { status: res.status });
     }
     const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+    });
   } catch {
     return NextResponse.json({ message: "Internal server error" }, { status: 500 });
   }

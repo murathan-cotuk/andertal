@@ -18,7 +18,7 @@ function stripHandleSuffix(handle) {
 async function fetchFromBackend(base, handle) {
   const res = await fetch(`${base}/store/products/${encodeURIComponent(handle)}`, {
     headers: { "Content-Type": "application/json" },
-    cache: "no-store",
+    next: { revalidate: 30 },
   });
   return res;
 }
@@ -49,14 +49,16 @@ export async function GET(request, context) {
     const product = data?.product || null;
     const sid = String(product?.seller_id || "").trim();
     if (sid && sid !== "default") {
-      const approvedRes = await fetch(`${base}/store/approved-seller-ids`, { cache: "no-store" }).catch(() => null);
+      const approvedRes = await fetch(`${base}/store/approved-seller-ids`, { next: { revalidate: 300 } }).catch(() => null);
       const approvedData = approvedRes && approvedRes.ok ? await approvedRes.json().catch(() => ({ seller_ids: [] })) : { seller_ids: [] };
       const approved = new Set((approvedData?.seller_ids || []).map((s) => String(s || "").trim()).filter(Boolean));
       if (!approved.has(sid)) {
         return NextResponse.json({ product: null }, { status: 404 });
       }
     }
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" },
+    });
   } catch {
     return NextResponse.json({ product: null }, { status: 500 });
   }

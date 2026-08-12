@@ -94,22 +94,104 @@ const applyTemplateH1 = (analysis, type) => {
   return analysis
 }
 
-async function listProducts(client, { q, limit, offset }) {
+/** SQL fragments matching evaluateMeta + scoreFromIssues for products (soft/ideal length rules). */
+const PRODUCT_SEO_LEN = {
+  title: `length(trim(coalesce(metadata->>'seo_meta_title', '')))`,
+  desc: `length(trim(coalesce(metadata->>'seo_meta_description', '')))`,
+  kw: `length(trim(coalesce(metadata->>'seo_keywords', '')))`,
+}
+const PRODUCT_SEO_IS_POOR = `(${PRODUCT_SEO_LEN.title} = 0 OR ${PRODUCT_SEO_LEN.desc} = 0 OR ${PRODUCT_SEO_LEN.title} < 30 OR ${PRODUCT_SEO_LEN.title} > 70 OR ${PRODUCT_SEO_LEN.desc} < 70 OR ${PRODUCT_SEO_LEN.desc} > 320)`
+const PRODUCT_SEO_IS_GOOD = `(${PRODUCT_SEO_LEN.title} BETWEEN 50 AND 65 AND ${PRODUCT_SEO_LEN.desc} BETWEEN 150 AND 300 AND ${PRODUCT_SEO_LEN.kw} > 0)`
+const PRODUCT_SEO_SCORE_RANK = `CASE WHEN ${PRODUCT_SEO_IS_POOR} THEN 0 WHEN ${PRODUCT_SEO_IS_GOOD} THEN 2 ELSE 1 END`
+
+function normalizeProductScoreFilter(raw) {
+  const s = String(raw || '').trim().toLowerCase()
+  if (s === 'warn' || s === 'needs_work') return 'needs_work'
+  if (s === 'poor' || s === 'good') return s
+  return ''
+}
+
+function productOrderBy(sort) {
+  const key = String(sort || '').trim().toLowerCase()
+  switch (key) {
+    case 'updated_asc':
+      return 'updated_at ASC NULLS LAST, title ASC'
+    case 'title_asc':
+      return 'title ASC NULLS LAST'
+    case 'title_desc':
+      return 'title DESC NULLS LAST'
+    case 'handle_asc':
+      return 'handle ASC NULLS LAST'
+    case 'handle_desc':
+      return 'handle DESC NULLS LAST'
+    case 'score_asc':
+      // poor → warn → good
+      return `${PRODUCT_SEO_SCORE_RANK} ASC, updated_at DESC NULLS LAST, title ASC`
+    case 'score_desc':
+      // good → warn → poor
+      return `${PRODUCT_SEO_SCORE_RANK} DESC, updated_at DESC NULLS LAST, title ASC`
+    case 'updated_desc':
+    default:
+      return 'updated_at DESC NULLS LAST, title ASC'
+  }
+}
+
+async function listProducts(client, { q, limit, offset, sellerId, categoryId, score, sort }) {
   const params = []
   let where = 'WHERE 1=1'
   if (q) {
     params.push(`%${q}%`)
     where += ` AND (title ILIKE $${params.length} OR handle ILIKE $${params.length})`
   }
+  if (sellerId) {
+    params.push(String(sellerId))
+    where += ` AND seller_id = $${params.length}`
+  }
+  if (categoryId) {
+    params.push(String(categoryId))
+    where += ` AND (
+      metadata->'category_ids' ? $${params.length}
+      OR metadata->>'category_id' = $${params.length}
+      OR metadata->>'admin_category_id' = $${params.length}
+    )`
+  }
+  const scoreFilter = normalizeProductScoreFilter(score)
+  if (scoreFilter === 'poor') {
+    where += ` AND ${PRODUCT_SEO_IS_POOR}`
+  } else if (scoreFilter === 'good') {
+    where += ` AND ${PRODUCT_SEO_IS_GOOD}`
+  } else if (scoreFilter === 'needs_work') {
+    where += ` AND NOT ${PRODUCT_SEO_IS_POOR} AND NOT ${PRODUCT_SEO_IS_GOOD}`
+  }
+  const orderBy = productOrderBy(sort)
   params.push(limit, offset)
   const r = await client.query(
-    `SELECT id, title, handle, description, status, metadata, updated_at,
+    `SELECT id, title, handle, description, status, metadata, updated_at, seller_id,
             COUNT(*) OVER()::int AS total
        FROM admin_hub_products ${where}
-      ORDER BY updated_at DESC NULLS LAST, title ASC
+      ORDER BY ${orderBy}
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   )
+  // Resolve seller labels in one query
+  const sellerIds = [...new Set(r.rows.map((row) => row.seller_id).filter(Boolean))]
+  const sellerLabelById = {}
+  if (sellerIds.length) {
+    try {
+      const sr = await client.query(
+        `SELECT DISTINCT ON (seller_id) seller_id, store_name, email
+           FROM seller_users
+          WHERE seller_id = ANY($1::text[]) AND sub_of_seller_id IS NULL
+          ORDER BY seller_id, created_at ASC`,
+        [sellerIds],
+      )
+      for (const s of sr.rows) {
+        sellerLabelById[s.seller_id] = s.store_name || s.email || s.seller_id
+      }
+    } catch (_) {
+      /* seller_users may be unavailable in some envs */
+    }
+  }
   return {
     total: r.rows[0]?.total || 0,
     items: r.rows.map((row) => {
@@ -125,6 +207,8 @@ async function listProducts(client, { q, limit, offset }) {
         label: row.title,
         handle: row.handle,
         status: row.status,
+        seller_id: row.seller_id || null,
+        seller_label: row.seller_id ? (sellerLabelById[row.seller_id] || row.seller_id) : null,
         updated_at: row.updated_at,
         meta_title: title,
         meta_description: description,
@@ -150,7 +234,9 @@ async function listCategories(client, { q, limit, offset }) {
     `SELECT id, name, slug, parent_id, seo_title, seo_description, long_content, metadata, updated_at,
             COUNT(*) OVER()::int AS total
        FROM admin_hub_categories ${where}
-      ORDER BY name ASC
+      ORDER BY
+        CASE WHEN parent_id IS NULL OR TRIM(COALESCE(parent_id::text, '')) = '' THEN 0 ELSE 1 END,
+        name ASC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   )
@@ -162,12 +248,13 @@ async function listCategories(client, { q, limit, offset }) {
       const description = row.seo_description || meta.meta_description || ''
       const keywords = meta.keywords || meta.meta_keywords || ''
       const evaluation = evaluateMeta({ title, description, keywords, entityType: 'categories' })
+      const parentRaw = row.parent_id != null ? String(row.parent_id).trim() : ''
       return {
-        id: row.id,
+        id: String(row.id),
         type: 'categories',
         label: row.name,
         handle: row.slug,
-        parent_id: row.parent_id || null,
+        parent_id: parentRaw || null,
         updated_at: row.updated_at,
         meta_title: title,
         meta_description: description,
@@ -586,15 +673,30 @@ function createSeoHubRouter() {
     const type = normalizeEntityType(req.query.type)
     if (!type) return res.status(400).json({ message: 'type required: products|categories|collections|pages|blogs' })
     const q = String(req.query.q || '').trim()
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200)
+    // Categories need the full set for parent→child tree building (product picker style).
+    const maxLimit = type === 'categories' ? 5000 : 200
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), maxLimit)
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0)
+    const sellerId = String(req.query.seller_id || '').trim()
+    const categoryId = String(req.query.category_id || '').trim()
+    const score = String(req.query.score || '').trim()
+    const sort = String(req.query.sort || '').trim()
     const client = getDbClient()
     if (!client) return res.status(503).json({ message: 'Database not configured' })
     try {
       await client.connect()
       let result
-      if (type === 'products') result = await listProducts(client, { q, limit, offset })
-      else if (type === 'categories') result = await listCategories(client, { q, limit, offset })
+      if (type === 'products') {
+        result = await listProducts(client, {
+          q,
+          limit,
+          offset,
+          sellerId: sellerId || '',
+          categoryId: categoryId || '',
+          score,
+          sort,
+        })
+      } else if (type === 'categories') result = await listCategories(client, { q, limit, offset })
       else if (type === 'collections') result = await listCollections(client, { q, limit, offset })
       else if (type === 'pages') result = await listPages(client, { q, limit, offset, blogOnly: false })
       else result = await listPages(client, { q, limit, offset, blogOnly: true })

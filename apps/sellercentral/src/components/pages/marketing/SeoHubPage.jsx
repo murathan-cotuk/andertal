@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 import { useLocale } from "next-intl";
+import { Link } from "@/i18n/navigation";
+import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 
 const ENTITY_TYPES = [
   { id: "products", label: "Products" },
@@ -18,6 +20,54 @@ const SCORE_COLOR = {
   needs_work: "#b45309",
   poor: "#b91c1c",
 };
+
+const PRODUCT_SCORE_FILTERS = [
+  { id: "", label: "All SEO status" },
+  { id: "poor", label: "Poor" },
+  { id: "needs_work", label: "Warn" },
+  { id: "good", label: "Good" },
+];
+
+const PRODUCT_SORT_OPTIONS = [
+  { id: "updated_desc", label: "Updated (newest)" },
+  { id: "updated_asc", label: "Updated (oldest)" },
+  { id: "title_asc", label: "Title A–Z" },
+  { id: "title_desc", label: "Title Z–A" },
+  { id: "score_asc", label: "SEO: poor → good" },
+  { id: "score_desc", label: "SEO: good → poor" },
+  { id: "handle_asc", label: "Handle A–Z" },
+];
+
+const filterSelectStyle = {
+  display: "block",
+  width: "100%",
+  marginTop: 4,
+  padding: "7px 10px",
+  borderRadius: 8,
+  border: "1px solid #cbd5e1",
+  fontSize: 12,
+  background: "#fff",
+};
+
+/** Sellercentral edit path for an SEO entity (locale prefix added by next-intl Link). */
+function sellercentralEditPath(entity) {
+  if (!entity?.id || !entity?.type) return "";
+  const id = encodeURIComponent(String(entity.id));
+  switch (entity.type) {
+    case "products":
+      return `/products/${id}`;
+    case "categories":
+      return `/content/categories/${id}`;
+    case "collections":
+      return `/products/collections/${id}`;
+    case "pages":
+      return `/content/pages?edit=${id}`;
+    case "blogs":
+      return `/content/blog-posts?edit=${id}`;
+    default:
+      return "";
+  }
+}
 
 function LengthBar({ label, value, idealMin, idealMax, status }) {
   const len = String(value || "").length;
@@ -60,7 +110,13 @@ function buildCategoryTree(flat) {
   const byId = new Map();
   for (const item of flat || []) {
     if (!item?.id) continue;
-    byId.set(item.id, { ...item, children: [] });
+    const id = String(item.id);
+    byId.set(id, {
+      ...item,
+      id,
+      parent_id: item.parent_id != null && String(item.parent_id).trim() ? String(item.parent_id) : null,
+      children: [],
+    });
   }
   const roots = [];
   for (const node of byId.values()) {
@@ -75,58 +131,214 @@ function buildCategoryTree(flat) {
   return roots;
 }
 
-function filterTree(nodes, q) {
-  const needle = String(q || "").trim().toLowerCase();
-  if (!needle) return nodes;
-  const walk = (list) => {
-    const out = [];
-    for (const n of list) {
-      const kids = walk(n.children || []);
-      const hit =
-        String(n.label || "").toLowerCase().includes(needle) ||
-        String(n.handle || "").toLowerCase().includes(needle);
-      if (hit || kids.length) out.push({ ...n, children: kids });
-    }
-    return out;
-  };
-  return walk(nodes);
-}
+/** Product-picker style: drill parent → sub → sub, with search (breadcrumbs). */
+function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange }) {
+  const tree = useMemo(() => buildCategoryTree(items), [items]);
+  const byId = useMemo(() => {
+    const map = new Map();
+    const walk = (nodes) => {
+      for (const n of nodes) {
+        map.set(n.id, n);
+        if (n.children?.length) walk(n.children);
+      }
+    };
+    walk(tree);
+    return map;
+  }, [tree]);
 
-function CategoryTreeList({ nodes, depth, selectedId, onSelect }) {
-  return nodes.map((node) => (
-    <div key={node.id}>
-      <button
-        type="button"
-        onClick={() => onSelect(node.id)}
-        style={{
-          display: "block",
-          width: "100%",
-          textAlign: "left",
-          padding: `10px 14px 10px ${14 + depth * 14}px`,
-          border: "none",
-          borderBottom: "1px solid #f1f5f9",
-          background: selectedId === node.id ? "#f8fafc" : "#fff",
-          cursor: "pointer",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-          <div style={{ fontSize: 13, fontWeight: depth === 0 ? 650 : 500, color: "#0f172a" }}>{node.label}</div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[node.score] || "#64748b", textTransform: "uppercase" }}>
-            {node.score === "needs_work" ? "warn" : node.score}
-          </span>
-        </div>
-        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
-          /{node.handle || "—"}
-        </div>
-        <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {node.meta_title || "No meta title"}
-        </div>
-      </button>
-      {node.children?.length ? (
-        <CategoryTreeList nodes={node.children} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
-      ) : null}
+  const [pathIds, setPathIds] = useState([]);
+
+  useEffect(() => {
+    setPathIds([]);
+  }, [items]);
+
+  const buildPathIds = (id) => {
+    if (!id || !byId.has(id)) return [];
+    const rev = [];
+    let cur = byId.get(id);
+    while (cur) {
+      rev.push(cur.id);
+      cur = cur.parent_id ? byId.get(cur.parent_id) : null;
+    }
+    return rev.reverse();
+  };
+
+  const currentNodes = useMemo(() => {
+    if (!pathIds.length) return tree;
+    const last = byId.get(pathIds[pathIds.length - 1]);
+    return last?.children || [];
+  }, [pathIds, byId, tree]);
+
+  const searchResults = useMemo(() => {
+    const q = String(search || "").trim().toLowerCase();
+    if (!q) return [];
+    const rows = [];
+    for (const n of byId.values()) {
+      const hay = `${n.label || ""} ${n.handle || ""}`.toLowerCase();
+      if (!hay.includes(q)) continue;
+      const breadcrumb = buildPathIds(n.id)
+        .map((pid) => byId.get(pid)?.label || pid)
+        .join(" › ");
+      rows.push({
+        id: n.id,
+        label: n.label,
+        handle: n.handle,
+        breadcrumb,
+        score: n.score,
+        meta_title: n.meta_title,
+      });
+    }
+    rows.sort((a, b) => a.breadcrumb.localeCompare(b.breadcrumb, undefined, { sensitivity: "base" }));
+    return rows.slice(0, 150);
+  }, [search, byId]);
+
+  const selectNode = (id) => {
+    onSelect?.(id);
+    setPathIds(buildPathIds(id));
+  };
+
+  const drillInto = (e, node) => {
+    e.stopPropagation();
+    if (!node.children?.length) return;
+    setPathIds(buildPathIds(node.id));
+  };
+
+  const q = String(search || "").trim();
+
+  return (
+    <div>
+      <div style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0" }}>
+        <input
+          value={search}
+          onChange={(e) => onSearchChange?.(e.target.value)}
+          placeholder="Search categories…"
+          style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+        />
+        {!q && pathIds.length > 0 ? (
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => setPathIds((prev) => prev.slice(0, -1))}
+              style={{ border: "none", background: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontWeight: 600 }}
+            >
+              ← Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setPathIds([])}
+              style={{ border: "none", background: "none", color: "#64748b", cursor: "pointer", fontSize: 12, padding: 0 }}
+            >
+              Root
+            </button>
+            <span style={{ fontSize: 12, color: "#64748b" }}>
+              {pathIds.map((id) => byId.get(id)?.label || id).join(" › ")}
+            </span>
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ maxHeight: "62vh", overflow: "auto" }}>
+        {q ? (
+          searchResults.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No match</div>
+          ) : (
+            searchResults.map((row) => (
+              <button
+                key={row.id}
+                type="button"
+                onClick={() => selectNode(row.id)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "10px 14px",
+                  border: "none",
+                  borderBottom: "1px solid #f1f5f9",
+                  background: selectedId === row.id ? "#eff6ff" : "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>{row.breadcrumb}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 650, color: "#0f172a" }}>{row.label}</div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[row.score] || "#64748b", textTransform: "uppercase" }}>
+                    {row.score === "needs_work" ? "warn" : row.score}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
+                  /{row.handle || "—"}
+                </div>
+              </button>
+            ))
+          )
+        ) : currentNodes.length === 0 ? (
+          <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No categories</div>
+        ) : (
+          currentNodes.map((node) => {
+            const hasKids = Array.isArray(node.children) && node.children.length > 0;
+            return (
+              <div
+                key={node.id}
+                style={{
+                  display: "flex",
+                  alignItems: "stretch",
+                  borderBottom: "1px solid #f1f5f9",
+                  background: selectedId === node.id ? "#eff6ff" : "#fff",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => selectNode(node.id)}
+                  style={{
+                    flex: 1,
+                    textAlign: "left",
+                    padding: "10px 14px",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    minWidth: 0,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
+                    <div style={{ fontSize: 13, fontWeight: pathIds.length === 0 ? 650 : 500, color: "#0f172a" }}>{node.label}</div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[node.score] || "#64748b", textTransform: "uppercase" }}>
+                      {node.score === "needs_work" ? "warn" : node.score}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
+                    /{node.handle || "—"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {node.meta_title || "No meta title"}
+                    {hasKids ? ` · ${node.children.length} sub` : ""}
+                  </div>
+                </button>
+                {hasKids ? (
+                  <button
+                    type="button"
+                    title="Open subcategories"
+                    onClick={(e) => drillInto(e, node)}
+                    style={{
+                      width: 44,
+                      border: "none",
+                      borderLeft: "1px solid #f1f5f9",
+                      background: "transparent",
+                      cursor: "pointer",
+                      color: "#475569",
+                      fontSize: 18,
+                      fontWeight: 600,
+                    }}
+                  >
+                    ›
+                  </button>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
-  ));
+  );
 }
 
 function draftFromEntity(e, lang) {
@@ -179,8 +391,15 @@ export default function SeoHubPage() {
   const [liveResult, setLiveResult] = useState(null);
   const [rules, setRules] = useState(null);
   const [autoMsg, setAutoMsg] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [scoreFilter, setScoreFilter] = useState("");
+  const [sort, setSort] = useState("updated_desc");
+  const [sellers, setSellers] = useState([]);
+  const [categories, setCategories] = useState([]);
   const isCategories = type === "categories";
-  const limit = isCategories ? 500 : 40;
+  const isProducts = type === "products";
+  const limit = isCategories ? 5000 : 40;
 
   const client = useMemo(() => getMedusaAdminClient(), []);
 
@@ -188,7 +407,20 @@ export default function SeoHubPage() {
     setLoading(true);
     setErr("");
     try {
-      const data = await client.getSeoEntities({ type, q: isCategories ? "" : q, limit, offset: isCategories ? 0 : offset });
+      const data = await client.getSeoEntities({
+        type,
+        q: isCategories ? "" : q,
+        limit,
+        offset: isCategories ? 0 : offset,
+        ...(isProducts
+          ? {
+              seller_id: sellerId || undefined,
+              category_id: categoryId || undefined,
+              score: scoreFilter || undefined,
+              sort: sort || undefined,
+            }
+          : {}),
+      });
       setItems(Array.isArray(data?.items) ? data.items : []);
       setTotal(typeof data?.total === "number" ? data.total : 0);
       if (data?.rules) setRules(data.rules);
@@ -198,16 +430,55 @@ export default function SeoHubPage() {
       setTotal(0);
     }
     setLoading(false);
-  }, [client, type, q, offset, limit, isCategories]);
+  }, [client, type, q, offset, limit, isCategories, isProducts, sellerId, categoryId, scoreFilter, sort]);
 
   useEffect(() => {
     client.getSeoRules().then(setRules).catch(() => {});
   }, [client]);
 
   useEffect(() => {
+    if (!isProducts) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [sellersRes, catsRes] = await Promise.all([
+          client.getSellers().catch(() => ({ sellers: [] })),
+          client.getAdminHubCategories({ all: true, locale: uiLocale }).catch(() => ({ categories: [] })),
+        ]);
+        if (cancelled) return;
+        const list = Array.isArray(sellersRes?.sellers) ? sellersRes.sellers : [];
+        setSellers(
+          list
+            .filter((s) => s?.seller_id)
+            .sort((a, b) =>
+              String(a.store_name || a.email || "").localeCompare(String(b.store_name || b.email || ""), undefined, {
+                sensitivity: "base",
+              }),
+            ),
+        );
+        const rawCats = Array.isArray(catsRes?.categories) ? catsRes.categories : [];
+        setCategories(rawCats);
+      } catch (_) {
+        if (!cancelled) {
+          setSellers([]);
+          setCategories([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [client, isProducts, uiLocale]);
+
+  useEffect(() => {
     setSelectedId(null);
     setEntity(null);
     setOffset(0);
+    setQ("");
+    setSellerId("");
+    setCategoryId("");
+    setScoreFilter("");
+    setSort("updated_desc");
     setEditLang("de");
   }, [type]);
 
@@ -219,11 +490,6 @@ export default function SeoHubPage() {
     if (!entity) return;
     setDraft(draftFromEntity(entity, editLang));
   }, [editLang, entity]);
-
-  const categoryTree = useMemo(() => {
-    if (!isCategories) return [];
-    return filterTree(buildCategoryTree(items), q);
-  }, [isCategories, items, q]);
 
   const openEntity = async (id) => {
     setSelectedId(id);
@@ -323,6 +589,7 @@ export default function SeoHubPage() {
   const analysis = entity?.analysis || { headings: {}, images: 0, links: 0, imagesWithoutAlt: 0 };
   const headings = analysis.headings || {};
   const shopUrl = liveUrl || entity?.url || "";
+  const sellercentralUrl = sellercentralEditPath(entity);
 
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "8px 4px 40px" }}>
@@ -378,24 +645,86 @@ export default function SeoHubPage() {
                 ))}
               </select>
             </label>
-            <input
-              value={q}
-              onChange={(e) => { setOffset(0); setQ(e.target.value); }}
-              placeholder={isCategories ? "Search tree…" : "Search title / handle…"}
-              style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
-            />
+            {!isCategories ? (
+              <input
+                value={q}
+                onChange={(e) => { setOffset(0); setQ(e.target.value); }}
+                placeholder="Search title / handle…"
+                style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+              />
+            ) : null}
+            {isProducts ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                  Seller
+                  <select
+                    value={sellerId}
+                    onChange={(e) => { setOffset(0); setSellerId(e.target.value); }}
+                    style={filterSelectStyle}
+                  >
+                    <option value="">All sellers</option>
+                    {sellers.map((s) => (
+                      <option key={s.seller_id} value={s.seller_id}>
+                        {s.store_name || s.email || s.seller_id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                  SEO status
+                  <select
+                    value={scoreFilter}
+                    onChange={(e) => { setOffset(0); setScoreFilter(e.target.value); }}
+                    style={filterSelectStyle}
+                  >
+                    {PRODUCT_SCORE_FILTERS.map((opt) => (
+                      <option key={opt.id || "all"} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                  Category
+                  <div style={{ marginTop: 4 }}>
+                    <CategoryDrilldownSelect
+                      labelHidden
+                      label="Category"
+                      categories={categories}
+                      value={categoryId}
+                      onChange={(id) => { setOffset(0); setCategoryId(id || ""); }}
+                      placeholder="All categories"
+                      noneLabel="All categories"
+                    />
+                  </div>
+                </div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                  Sort
+                  <select
+                    value={sort}
+                    onChange={(e) => { setOffset(0); setSort(e.target.value); }}
+                    style={filterSelectStyle}
+                  >
+                    {PRODUCT_SORT_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
             <div style={{ fontSize: 12, color: "#94a3b8" }}>{total} items</div>
           </div>
+          {loading ? (
+            <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Loading…</div>
+          ) : isCategories ? (
+            <CategorySeoNav
+              items={items}
+              selectedId={selectedId}
+              onSelect={openEntity}
+              search={q}
+              onSearchChange={(v) => { setOffset(0); setQ(v); }}
+            />
+          ) : (
           <div style={{ maxHeight: "70vh", overflow: "auto" }}>
-            {loading ? (
-              <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Loading…</div>
-            ) : isCategories ? (
-              categoryTree.length === 0 ? (
-                <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No items</div>
-              ) : (
-                <CategoryTreeList nodes={categoryTree} depth={0} selectedId={selectedId} onSelect={openEntity} />
-              )
-            ) : items.length === 0 ? (
+            {items.length === 0 ? (
               <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No items</div>
             ) : (
               items.map((item) => (
@@ -422,6 +751,7 @@ export default function SeoHubPage() {
                   </div>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
                     /{item.handle || "—"}
+                    {item.seller_label ? ` · ${item.seller_label}` : ""}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {item.meta_title || "No meta title"}
@@ -430,6 +760,7 @@ export default function SeoHubPage() {
               ))
             )}
           </div>
+          )}
           {!isCategories ? (
             <div style={{ display: "flex", justifyContent: "space-between", padding: 10, borderTop: "1px solid #e2e8f0" }}>
               <button type="button" disabled={offset <= 0} onClick={() => setOffset(Math.max(0, offset - limit))} style={{ fontSize: 12, cursor: offset <= 0 ? "default" : "pointer" }}>
@@ -474,6 +805,23 @@ export default function SeoHubPage() {
                       >
                         Open in shop ↗
                       </a>
+                    ) : null}
+                    {sellercentralUrl ? (
+                      <Link
+                        href={sellercentralUrl}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 8,
+                          border: "1px solid #cbd5e1",
+                          background: "#fff",
+                          fontWeight: 650,
+                          fontSize: 13,
+                          textDecoration: "none",
+                          color: "#0f172a",
+                        }}
+                      >
+                        Open in Sellercentral
+                      </Link>
                     ) : null}
                     <button
                       type="button"

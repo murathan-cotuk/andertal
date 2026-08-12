@@ -282,9 +282,98 @@ function AddressBlock({ addr }) {
   const a = typeof addr === "string" ? JSON.parse(addr) : addr;
   return (
     <BlockStack gap="050">
-      {a.street && <Text as="p" variant="bodySm">{a.street}</Text>}
-      {(a.zip || a.city) && <Text as="p" variant="bodySm">{[a.zip, a.city].filter(Boolean).join(" ")}</Text>}
+      {(a.street || a.address_line1) && <Text as="p" variant="bodySm">{a.street || a.address_line1}</Text>}
+      {a.address_line2 && <Text as="p" variant="bodySm">{a.address_line2}</Text>}
+      {(a.zip || a.postal_code || a.city) && <Text as="p" variant="bodySm">{[a.postal_code || a.zip, a.city].filter(Boolean).join(" ")}</Text>}
       {a.country && <Text as="p" variant="bodySm">{a.country}</Text>}
+    </BlockStack>
+  );
+}
+
+function SetupCheckRow({ ok, label, missingHint }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", gap: 10,
+      padding: "10px 12px", borderRadius: 8,
+      background: ok ? "#f0fdf4" : "#fff7ed",
+      border: `1px solid ${ok ? "#bbf7d0" : "#fed7aa"}`,
+    }}>
+      <span style={{
+        width: 18, height: 18, borderRadius: 999, flexShrink: 0, marginTop: 1,
+        background: ok ? "#16a34a" : "#ea580c", color: "#fff",
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 700,
+      }}>{ok ? "✓" : "!"}</span>
+      <div style={{ minWidth: 0 }}>
+        <Text as="p" variant="bodySm" fontWeight="semibold">{label}</Text>
+        {!ok && missingHint ? (
+          <Text as="p" tone="subdued" variant="bodySm">{missingHint}</Text>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function RequiredSetupChecklist({ seller, locale }) {
+  const setup = seller?.setup || {};
+  const t = (en, tr, fr, es, it, de) =>
+    locale === "en" ? en : locale === "tr" ? tr : locale === "fr" ? fr : locale === "es" ? es : locale === "it" ? it : de;
+  const items = [
+    {
+      ok: !!setup.has_shipping_from,
+      label: t("Warehouse / shipping address (Locations)", "Depo / gönderim adresi (Konumlar)", "Adresse entrepôt / expédition (Emplacements)", "Dirección almacén / envío (Ubicaciones)", "Indirizzo magazzino / spedizione (Posizioni)", "Lager- / Versandadresse (Standorte)"),
+      missing: t("Missing — seller must set shipping purpose on a location with street.", "Eksik — satıcı bir konumda gönderim amacını sokak adresiyle işaretlemeli.", "Manquant — définir l'expédition sur un emplacement avec rue.", "Falta — marcar envío en una ubicación con calle.", "Mancante — impostare spedizione su una posizione con via.", "Fehlt — Versandzweck an einem Standort mit Straße setzen."),
+    },
+    {
+      ok: !!setup.has_returns_to,
+      label: t("Returns address (Locations)", "İade adresi (Konumlar)", "Adresse de retour (Emplacements)", "Dirección de devoluciones (Ubicaciones)", "Indirizzo resi (Posizioni)", "Retourenadresse (Standorte)"),
+      missing: t("Missing — required. Source of truth is Settings → Locations.", "Eksik — zorunlu. Kaynak: Ayarlar → Konumlar.", "Manquant — obligatoire. Source : Paramètres → Emplacements.", "Falta — obligatorio. Fuente: Ajustes → Ubicaciones.", "Mancante — obbligatorio. Fonte: Impostazioni → Posizioni.", "Fehlt — Pflicht. Quelle: Einstellungen → Standorte."),
+    },
+    {
+      ok: !!setup.has_billing,
+      label: t("Billing address (Locations)", "Fatura adresi (Konumlar)", "Adresse de facturation (Emplacements)", "Dirección de facturación (Ubicaciones)", "Indirizzo di fatturazione (Posizioni)", "Rechnungsadresse (Standorte)"),
+      missing: t("Missing — required on Locations.", "Eksik — Konumlar’da zorunlu.", "Manquant — obligatoire dans Emplacements.", "Falta — obligatorio en Ubicaciones.", "Mancante — obbligatorio in Posizioni.", "Fehlt — Pflicht unter Standorte."),
+    },
+    {
+      ok: !!setup.has_card,
+      label: t("Credit card for fees (Gebühren)", "Ücretler için kredi kartı (Gebühren)", "Carte pour frais (Gebühren)", "Tarjeta para tasas (Gebühren)", "Carta per commissioni (Gebühren)", "Kreditkarte für Gebühren"),
+      missing: t("No card on file.", "Kayıtlı kart yok.", "Aucune carte enregistrée.", "No hay tarjeta registrada.", "Nessuna carta registrata.", "Keine Karte hinterlegt."),
+    },
+    {
+      ok: !!setup.has_iban,
+      label: t("IBAN for payouts (Auszahlung)", "Ödeme için IBAN (Auszahlung)", "IBAN pour versements (Auszahlung)", "IBAN para pagos (Auszahlung)", "IBAN per pagamenti (Auszahlung)", "IBAN für Auszahlungen"),
+      missing: t("No IBAN on file.", "Kayıtlı IBAN yok.", "Aucun IBAN enregistré.", "No hay IBAN registrado.", "Nessun IBAN registrato.", "Keine IBAN hinterlegt."),
+    },
+  ];
+  const missingCount = items.filter((i) => !i.ok).length;
+
+  return (
+    <BlockStack gap="200">
+      <InlineStack align="space-between" blockAlign="center">
+        <Text as="h3" variant="headingSm">
+          {t("Required setup", "Zorunlu kurulum", "Configuration requise", "Configuración requerida", "Configurazione obbligatoria", "Erforderliche Einrichtung")}
+        </Text>
+        <Badge tone={missingCount === 0 ? "success" : "warning"}>
+          {missingCount === 0
+            ? t("Complete", "Tamam", "Complet", "Completo", "Completo", "Vollständig")
+            : t(`${missingCount} missing`, `${missingCount} eksik`, `${missingCount} manquant(s)`, `${missingCount} faltan`, `${missingCount} mancanti`, `${missingCount} fehlen`)}
+        </Badge>
+      </InlineStack>
+      <Text as="p" tone="subdued" variant="bodySm">
+        {t(
+          "Locations (warehouse / returns / billing), credit card for fees, and IBAN for payouts must be set before the seller is fully ready.",
+          "Tam hazır olmadan önce konumlar (depo / iade / fatura), ücret kartı ve ödeme IBAN’ı girilmiş olmalı.",
+          "Emplacements (entrepôt / retours / facturation), carte pour frais et IBAN de versement doivent être renseignés.",
+          "Ubicaciones (almacén / devoluciones / facturación), tarjeta de tasas e IBAN de pago deben estar configurados.",
+          "Posizioni (magazzino / resi / fatturazione), carta per commissioni e IBAN di pagamento devono essere impostati.",
+          "Standorte (Lager / Retoure / Rechnung), Kreditkarte für Gebühren und IBAN für Auszahlungen müssen hinterlegt sein.",
+        )}
+      </Text>
+      <BlockStack gap="150">
+        {items.map((it) => (
+          <SetupCheckRow key={it.label} ok={it.ok} label={it.label} missingHint={it.missing} />
+        ))}
+      </BlockStack>
     </BlockStack>
   );
 }
@@ -974,11 +1063,15 @@ ${"=".repeat(50)}
                     </BlockStack>
                     <BlockStack gap="100">
                       <Text as="h3" variant="headingSm">{locale === "en" ? "Business address" : locale === "tr" ? "İş adresi" : locale === "fr" ? "Adresse professionnelle" : locale === "es" ? "Dirección comercial" : locale === "it" ? "Indirizzo aziendale" : "Geschäftsadresse"}</Text>
-                      <AddressBlock addr={seller.business_address} />
+                      <AddressBlock addr={(seller.setup?.locations || []).find((l) => l.is_billing) || seller.business_address} />
                     </BlockStack>
                     <BlockStack gap="100">
                       <Text as="h3" variant="headingSm">{locale === "en" ? "Warehouse address" : locale === "tr" ? "Depo adresi" : locale === "fr" ? "Adresse entrepôt" : locale === "es" ? "Dirección almacén" : locale === "it" ? "Indirizzo magazzino" : "Lageradresse"}</Text>
-                      <AddressBlock addr={seller.warehouse_address} />
+                      <AddressBlock addr={(seller.setup?.locations || []).find((l) => l.is_shipping_from) || seller.warehouse_address} />
+                    </BlockStack>
+                    <BlockStack gap="100">
+                      <Text as="h3" variant="headingSm">{locale === "en" ? "Returns address" : locale === "tr" ? "İade adresi" : locale === "fr" ? "Adresse de retour" : locale === "es" ? "Dirección de devoluciones" : locale === "it" ? "Indirizzo resi" : "Retourenadresse"}</Text>
+                      <AddressBlock addr={(seller.setup?.locations || []).find((l) => l.is_returns_to) || null} />
                     </BlockStack>
                     <BlockStack gap="100">
                       <InlineStack align="space-between" blockAlign="center">
@@ -1053,6 +1146,8 @@ ${"=".repeat(50)}
                     </BlockStack>
                   </div>
 
+                  <Divider />
+                  <RequiredSetupChecklist seller={seller} locale={locale} />
                   <Divider />
                   <AdminSellerCardSection sellerId={sellerId} />
                 </BlockStack>

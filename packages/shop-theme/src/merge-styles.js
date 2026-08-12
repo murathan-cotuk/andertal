@@ -22,6 +22,7 @@ function cloneTypo(t) {
     catalog_title: { ...t.catalog_title },
     menu_catalog: { ...t.menu_catalog },
     sidebar_nav: { ...t.sidebar_nav },
+    sidebar_submenu: { ...t.sidebar_submenu },
   };
 }
 
@@ -38,6 +39,7 @@ function deepMergeTypography(base, loaded) {
     catalog_title: lct,
     menu_catalog: lmc,
     sidebar_nav: lsn,
+    sidebar_submenu: lss,
     ...restLoaded
   } = loaded;
   const out = {
@@ -53,6 +55,7 @@ function deepMergeTypography(base, loaded) {
     catalog_title: { ...base.typography.catalog_title, ...(lct || {}) },
     menu_catalog: { ...base.typography.menu_catalog, ...(lmc || {}) },
     sidebar_nav: { ...base.typography.sidebar_nav, ...(lsn || {}) },
+    sidebar_submenu: { ...base.typography.sidebar_submenu, ...(lss || {}) },
   };
 
   // Legacy flat keys → nested

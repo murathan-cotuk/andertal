@@ -29,7 +29,7 @@ export function useStoreCampaignDiscount({ productId, variantId, sellerId, baseP
       variant_id: String(variantId),
       seller_id: String(sellerId),
     });
-    fetch(`/api/store-campaign-discount?${qs}`, { cache: "no-store" })
+    fetch(`/api/store-campaign-discount?${qs}`)
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return;

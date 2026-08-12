@@ -25,7 +25,7 @@ import {
   Checkbox,
   Tag,
 } from "@shopify/polaris";
-import { ProductIcon, MenuHorizontalIcon, ViewIcon } from "@shopify/polaris-icons";
+import { ProductIcon, MenuHorizontalIcon, ViewIcon, EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { getUI } from "@/lib/ui-strings";
@@ -33,6 +33,7 @@ import { lt } from "@/lib/locale-text";
 import { titleToHandle, sanitizeSeoHandleInput } from "@/lib/slugify";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import InfoIconTooltip from "@/components/InfoIconTooltip";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import ComplianceFieldsSection from "@/components/products/ComplianceFieldsSection";
 import { routing } from "@/i18n/routing";
@@ -381,61 +382,6 @@ function changeRequestSellerLabel(cr) {
   );
 }
 
-/** Small (i) info icon — hover/focus shows a tooltip that lingers ~3s after the pointer leaves before fading, instead of vanishing instantly. */
-function InfoIconTooltip({ text }) {
-  const [visible, setVisible] = useState(false);
-  const hideTimerRef = useRef(null);
-
-  const show = () => {
-    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null; }
-    setVisible(true);
-  };
-  const scheduleHide = () => {
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    hideTimerRef.current = setTimeout(() => setVisible(false), 3000);
-  };
-
-  useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
-
-  if (!text) return null;
-
-  return (
-    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
-      <span
-        onMouseEnter={show}
-        onMouseLeave={scheduleHide}
-        onFocus={show}
-        onBlur={scheduleHide}
-        tabIndex={0}
-        role="button"
-        aria-label="Info"
-        style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          width: 16, height: 16, borderRadius: "50%",
-          border: "1px solid #9ca3af", color: "#6b7280",
-          fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0,
-        }}
-      >
-        i
-      </span>
-      <span
-        style={{
-          position: "absolute", bottom: "calc(100% + 6px)", left: 0,
-          background: "#111827", color: "#fff", fontSize: 12, lineHeight: 1.4,
-          padding: "6px 10px", borderRadius: 6, whiteSpace: "nowrap",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.18)", zIndex: 50,
-          opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(4px)",
-          pointerEvents: "none",
-          transition: "opacity 0.25s ease, transform 0.25s ease",
-        }}
-      >
-        {text}
-      </span>
-    </span>
-  );
-}
-
 export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [] }) {
   const router = useRouter();
   const locale = useLocale();
@@ -484,8 +430,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     const p = initialProduct ?? (isNew ? getEmptyProduct() : null);
     return p ? productSnapshot(localizeProductForEditing(p, locale)) : null;
   });
-  // Set of open row indices — multiple variants can be expanded at once (see "Expand all" toggle).
-  const [expandedVariantIndices, setExpandedVariantIndices] = useState(() => new Set());
   const dragGroupIdx = useRef(null);
   const [eanLookupState, setEanLookupState] = useState(null); // null | "loading" | "found" | "not_found"
   const [eanMatchedOn, setEanMatchedOn] = useState("parent"); // "parent" | "variant" — which EAN the lookup matched on
@@ -2097,30 +2041,32 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vg-swatch:hover { border-color: var(--p-color-border-hover); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); }
         .vg-swatch-empty { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; border: 1.5px dashed var(--p-color-border); display: inline-flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 11px; cursor: pointer; padding: 0; background: none; appearance: none; }
         .vg-swatch-empty:hover { border-color: var(--p-color-border-info); background: rgba(0,113,227,0.04); }
-        /* ── Variation engine — Matrix cards ── */
-        .vm-card { border: 1px solid var(--p-color-border); border-radius: 10px; margin-bottom: 8px; background: var(--p-color-bg-surface); overflow: hidden; transition: box-shadow .12s; }
+        /* ── Variation engine — Matrix rows (always expanded, full-width) ── */
+        .vm-card { border: 1px solid var(--p-color-border); border-radius: 10px; margin-bottom: 10px; background: var(--p-color-bg-surface-secondary, #f6f6f7); overflow: hidden; }
         .vm-card:last-child { margin-bottom: 0; }
-        .vm-card.is-open { box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
-        .vm-card-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; transition: background .1s; user-select: none; min-height: 52px; }
-        .vm-card-header:hover { background: var(--p-color-bg-surface-hover, rgba(0,0,0,.02)); }
-        .vm-thumb { width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid var(--p-color-border); display: block; flex-shrink: 0; }
-        .vm-thumb-empty { width: 38px; height: 38px; border-radius: 6px; border: 1.5px dashed var(--p-color-border); background: var(--p-color-bg-surface-secondary); display: flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 16px; flex-shrink: 0; }
-        .vm-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--p-color-bg-surface-secondary); border: 1px solid var(--p-color-border); border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 500; color: var(--p-color-text); white-space: nowrap; }
-        .vm-stat { font-size: 12px; color: var(--p-color-text-subdued); white-space: nowrap; }
-        .vm-stat strong { color: var(--p-color-text); font-weight: 600; }
-        .vm-card-body { border-top: 1px solid var(--p-color-border-subdued); padding: 24px; background: var(--p-color-bg-surface-secondary, #fafafa); display: flex; flex-direction: column; gap: 22px; }
+        .vm-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 18px; padding: 14px 16px; }
+        .vm-row-main { display: flex; align-items: flex-start; gap: 12px; flex: 1 1 220px; min-width: 180px; }
+        .vm-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; border: 1px solid var(--p-color-border); display: block; flex-shrink: 0; }
+        .vm-thumb-empty { width: 48px; height: 48px; border-radius: 8px; border: 1.5px dashed var(--p-color-border); background: #fff; display: flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 16px; flex-shrink: 0; }
+        .vm-badge { display: inline-flex; align-items: center; gap: 5px; background: #fff; border: 1px solid var(--p-color-border); border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 500; color: var(--p-color-text); white-space: nowrap; }
+        .vm-field-group { flex: 1 1 200px; min-width: 160px; }
+        .vm-field-group.vm-prices { flex: 1 1 280px; }
+        .vm-field-group.vm-images { flex: 1 1 220px; }
         .vm-sub-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--p-color-text-subdued); margin-bottom: 8px; }
-        .vm-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-        .vm-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .vm-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .vm-img-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .vm-img-item { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
-        .vm-img-item img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--p-color-border); display: block; }
-        .vm-img-del { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+        .vm-img-item { position: relative; width: 56px; height: 56px; flex-shrink: 0; }
+        .vm-img-item img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid var(--p-color-border); display: block; }
+        .vm-img-del { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
         .vm-img-del:hover { background: rgba(200,0,0,.8); }
-        .vm-img-add { width: 84px; height: 84px; border-radius: 8px; border: 2px dashed var(--p-color-border); background: transparent; cursor: pointer; font-size: 24px; color: var(--p-color-text-subdued); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color .12s, color .12s; }
+        .vm-img-add { width: 56px; height: 56px; border-radius: 8px; border: 2px dashed var(--p-color-border); background: #fff; cursor: pointer; font-size: 20px; color: var(--p-color-text-subdued); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color .12s, color .12s; }
         .vm-img-add:hover { border-color: var(--p-color-border-hover); color: var(--p-color-text); }
-        .vm-expand-toggle { margin-left: auto; font-size: 11px; color: var(--p-color-text-subdued); flex-shrink: 0; transition: transform .2s; }
-        .vm-card.is-open .vm-expand-toggle { transform: rotate(180deg); }
+        .vm-edit-btn { flex-shrink: 0; align-self: center; }
+        .variations-fullwidth { margin-top: 16px; width: 100%; }
+        .variations-fullwidth .Polaris-ShadowBevel { width: 100%; }
+        @media (max-width: 900px) {
+          .vm-grid-3 { grid-template-columns: 1fr; }
+        }
         .checkbox-container { cursor: pointer; flex-shrink: 0; }
         .checkbox-container input { display: none; }
         .checkbox-container svg { overflow: visible; display: block; }
@@ -2994,333 +2940,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               <Text as="p" variant="bodySm" tone="subdued">Warehouse split can be set later in metadata.</Text>
 
               <ProductSectionRule />
-
-              {/* ════════════════════════════════════════════════════════
-                  VARIATION ENGINE  (Amazon / eBay style)
-                  1. Define groups + options  →  2. Matrix auto-generates
-                  ════════════════════════════════════════════════════════ */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                <div>
-                  <ProductSectionHeading>Variations</ProductSectionHeading>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Add groups (e.g. Color, Size). Variant combinations are auto-generated.
-                    Option values use one internal key (set on first entry); switch the globe to translate labels per language — shop shows the label for each locale.
-                  </Text>
-                </div>
-                <Button variant="primary" size="slim" onClick={vg_addGroup}>+ Add Group</Button>
-              </div>
-
-              {/* ── Step 1: Group definitions ── */}
-              {variantGroups.length === 0 && (
-                <div style={{ padding: "24px 0", textAlign: "center", color: "var(--p-color-text-subdued)", fontSize: 13 }}>
-                  No variant groups yet. Click <strong>+ Add Group</strong> to start.
-                </div>
-              )}
-
-              <BlockStack gap="300">
-                {variantGroups.map((group, gi) => (
-                  <div
-                    key={gi}
-                    className="vg-group"
-                    draggable
-                    onDragStart={() => { dragGroupIdx.current = gi; }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      const from = dragGroupIdx.current;
-                      dragGroupIdx.current = null;
-                      if (from !== null && from !== gi) vg_moveGroup(from, gi);
-                    }}
-                  >
-                    {/* Group header */}
-                    <div className="vg-group-header">
-                      <span className="vg-drag-handle" title="Drag to reorder">⠿</span>
-                      <span className="vg-group-num">{gi + 1}</span>
-                      <div style={{ flex: 1, maxWidth: 220 }}>
-                        <TextField
-                          label="Group name"
-                          labelHidden
-                          value={getGroupDisplayName(gi)}
-                          onChange={(v) => vg_setGroupName(gi, v)}
-                          placeholder="e.g. Color, Size, Material"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <Text as="span" variant="bodySm" tone="subdued">
-                        {(group.options || []).filter((o) => o.value.trim()).length} option(s)
-                      </Text>
-                      <Button size="slim" variant="plain" tone="critical" onClick={() => vg_removeGroup(gi)}>
-                        Remove
-                      </Button>
-                    </div>
-
-                    {/* Options row */}
-                    <div className="vg-group-body">
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                      {(group.options || []).map((opt, oi) => (
-                        <div key={oi} className="vg-option-chip">
-                          {/* Swatch button — click to open picker */}
-                          <div style={{ position: "relative", flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              className={opt.swatch_image ? "vg-swatch" : "vg-swatch-empty"}
-                              title={opt.swatch_image ? "Swatch görselini değiştir" : "Swatch görseli ekle (shopta renk/desen simgesi)"}
-                              onClick={() => openSwatchPicker(gi, oi)}
-                            >
-                              {opt.swatch_image
-                                ? <img src={resolveMediaUrl(opt.swatch_image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                : <span style={{ fontSize: 10, lineHeight: 1, color: "#6b7280" }}>SW</span>}
-                            </button>
-                            {opt.swatch_image && (
-                              <button
-                                type="button"
-                                style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#de3618", border: "none", color: "#fff", fontSize: 9, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                                onClick={(e) => { e.stopPropagation(); vg_setOption(gi, oi, "swatch_image", ""); }}
-                                title="Remove swatch"
-                              >×</button>
-                            )}
-                          </div>
-                          {/* Value input */}
-                          <input
-                            type="text"
-                            value={getOptionInputValue(opt)}
-                            onChange={(e) => handleOptionDisplayChange(gi, oi, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                vg_addOption(gi);
-                              }
-                            }}
-                            placeholder="Value"
-                          />
-                          <button type="button" className="vg-remove-btn" onClick={() => vg_removeOption(gi, oi)} title="Remove option">×</button>
-                        </div>
-                      ))}
-                      <Button size="slim" variant="plain" onClick={() => vg_addOption(gi)}>+ Add option</Button>
-                    </div>
-                    </div>
-                  </div>
-                ))}
-              </BlockStack>
-
-              {/* ── Step 2: Variation Matrix ── */}
-              {variantGroups.length > 0 && (() => {
-                const matrixRows = (product?.variants || []).filter((v) => Array.isArray(v.option_values));
-                if (matrixRows.length === 0) return (
-                  <div style={{ padding: "12px 16px", background: "var(--p-color-bg-surface-warning, #fffbeb)", borderRadius: 8, fontSize: 13, color: "var(--p-color-text-subdued)" }}>
-                    Add at least one option to each group to generate combinations.
-                  </div>
-                );
-                const allOpen = matrixRows.length > 0 && matrixRows.every((_, vi) => expandedVariantIndices.has(vi));
-                return (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-                      <Text as="p" variant="bodySm" fontWeight="semibold">
-                        Variation Matrix — {matrixRows.length} {matrixRows.length === 1 ? "variant" : "variants"}
-                      </Text>
-                      <Button
-                        size="slim"
-                        onClick={() => {
-                          setExpandedVariantIndices(
-                            allOpen ? new Set() : new Set(matrixRows.map((_, vi) => vi))
-                          );
-                        }}
-                      >
-                        {allOpen
-                          ? (locale === "en" ? "Collapse all" : locale === "tr" ? "Tümünü daralt" : locale === "fr" ? "Tout réduire" : locale === "es" ? "Contraer todo" : locale === "it" ? "Comprimi tutto" : "Alle einklappen")
-                          : (locale === "en" ? "Expand all" : locale === "tr" ? "Tümünü genişlet" : locale === "fr" ? "Tout développer" : locale === "es" ? "Expandir todo" : locale === "it" ? "Espandi tutto" : "Alle ausklappen")}
-                      </Button>
-                    </div>
-                    <div>
-                      {matrixRows.map((v, vi) => {
-                        const isOpen = expandedVariantIndices.has(vi);
-                        const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
-                        // Images added via the full Variant Edit page (Open →) are saved to
-                        // image_url (de) / image_urls[locale], a separate field from this
-                        // matrix's own metadata.media gallery. Fall back to it here so those
-                        // images are visible instead of showing an empty "+" thumbnail.
-                        const localeVariantImg =
-                          String(locale).toLowerCase() === "de"
-                            ? v.image_url || ""
-                            : v.image_urls?.[locale] || v.image_url || "";
-                        const thumbUrl = variantImgs[0]
-                          ? resolveMediaUrl(variantImgs[0])
-                          : localeVariantImg
-                            ? resolveMediaUrl(localeVariantImg)
-                            : null;
-                        const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
-                        const mkDraftKey = (f) => `${vkey}_${f}`;
-                        const priceFields = [
-                          { f: "price",            centsKey: "price_cents",            label: "Price (€)",   placeholder: "0.00" },
-                          { f: "compare_at_price", centsKey: "compare_at_price_cents", label: "UVP (€)",     placeholder: "—"    },
-                          { f: "sale_price",       centsKey: "sale_price_cents",       label: "Sale (€)",    placeholder: "—"    },
-                        ];
-
-                        return (
-                          <div key={vi} className={`vm-card${isOpen ? " is-open" : ""}`}>
-                            {/* Card header — click to expand */}
-                            <div
-                              className="vm-card-header"
-                              onClick={() => {
-                                setExpandedVariantIndices((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(vi)) next.delete(vi);
-                                  else next.add(vi);
-                                  return next;
-                                });
-                              }}
-                            >
-                              {/* Thumbnail */}
-                              {thumbUrl
-                                ? <img src={thumbUrl} alt="" className="vm-thumb" />
-                                : <div className="vm-thumb-empty">+</div>
-                              }
-
-                              {/* Option badges */}
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>
-                                {v.option_values.map((val, oi) => {
-                                  const gOpt = variantGroups[oi];
-                                  const opt = (gOpt?.options || []).find(
-                                    (o) => String(o.value || "").trim().toLowerCase() === String(val || "").trim().toLowerCase()
-                                  );
-                                  const label = opt ? optionDisplayLabel(opt, locale) : val;
-                                  const swatchUrl = opt?.swatch_image;
-                                  return (
-                                    <span key={oi} className="vm-badge">
-                                      {swatchUrl && (
-                                        <span style={{ width: 12, height: 12, borderRadius: "50%", display: "inline-block", backgroundImage: `url(${resolveMediaUrl(swatchUrl)})`, backgroundSize: "cover", border: "1px solid var(--p-color-border)", flexShrink: 0 }} />
-                                      )}
-                                      <span style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginRight: 2 }}>{getGroupDisplayName(oi) || gOpt?.name || `G${oi + 1}`}:</span>
-                                      {label}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Quick stats */}
-                              <div style={{ display: "flex", gap: 16, flexShrink: 0 }}>
-                                {v.price_cents != null && (
-                                  <span className="vm-stat"><strong>€{(Number(v.price_cents) / 100).toFixed(2)}</strong></span>
-                                )}
-                                <span className="vm-stat">Stock: <strong>{v.inventory ?? 0}</strong></span>
-                              </div>
-
-                              {/* Open link (not new) */}
-                              {!isNew && (
-                                <Link
-                                  href={`/products/${idOrHandle}/variants/${encodeVariantPathKey(v.option_values)}`}
-                                  style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text-interactive)", flexShrink: 0, whiteSpace: "nowrap" }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  Open →
-                                </Link>
-                              )}
-
-                              <span className="vm-expand-toggle">▼</span>
-                            </div>
-
-                            {/* Card body — expanded */}
-                            {isOpen && (
-                              <div className="vm-card-body">
-                                {/* Images */}
-                                <div>
-                                  <div className="vm-sub-label">Images</div>
-                                  <div className="vm-img-strip">
-                                    {variantImgs.length === 0 && localeVariantImg && (
-                                      <div className="vm-img-item" title="Added via the full Variant Edit page (Open →) — manage it there">
-                                        <img src={resolveMediaUrl(localeVariantImg)} alt="" />
-                                      </div>
-                                    )}
-                                    {variantImgs.map((imgUrl, imgIdx) => (
-                                      <div key={imgIdx} className="vm-img-item">
-                                        <img src={resolveMediaUrl(imgUrl)} alt="" />
-                                        <button
-                                          type="button"
-                                          className="vm-img-del"
-                                          onClick={() => {
-                                            const next = variantImgs.filter((_, i) => i !== imgIdx);
-                                            updateMatrixVariantMeta(v.option_values, "media", next.length ? next : null);
-                                          }}
-                                        >×</button>
-                                      </div>
-                                    ))}
-                                    {variantImgs.length < 8 && (
-                                      <button
-                                        type="button"
-                                        className="vm-img-add"
-                                        onClick={() => openVariantImgPicker(v.option_values)}
-                                      >+</button>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* SKU / EAN / Stock */}
-                                <div>
-                                  <div className="vm-sub-label">Inventory & Identifiers</div>
-                                  <div className="vm-grid-3">
-                                    <TextField label="SKU" value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" />
-                                    <TextField
-                                      label="EAN / GTIN"
-                                      value={v.ean ?? ""}
-                                      onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)}
-                                      placeholder="EAN"
-                                      autoComplete="off"
-                                      error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
-                                    />
-                                    <TextField label="Stock" type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" />
-                                  </div>
-                                </div>
-
-                                {/* Prices */}
-                                <div>
-                                  <div className="vm-sub-label">Pricing</div>
-                                  <div className="vm-grid-3">
-                                    {priceFields.map(({ f, centsKey, label, placeholder }) => {
-                                      const dk = mkDraftKey(f);
-                                      const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
-                                      const displayVal = isDraft
-                                        ? priceInputs[dk]
-                                        : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
-                                      return (
-                                        <TextField
-                                          key={f}
-                                          label={label}
-                                          value={displayVal}
-                                          placeholder={placeholder}
-                                          autoComplete="off"
-                                          onChange={(val) => {
-                                            const clean = sanitizePriceDraftString(val);
-                                            setPriceInputs((prev) => {
-                                              const next = { ...prev, [dk]: clean };
-                                              priceInputsRef.current = next;
-                                              return next;
-                                            });
-                                          }}
-                                          onBlur={(e) => {
-                                            const raw = sanitizePriceDraftString(e.currentTarget.value);
-                                            updateMatrixVariant(v.option_values, f, raw);
-                                            setPriceInputs((prev) => {
-                                              const next = { ...prev };
-                                              delete next[dk];
-                                              priceInputsRef.current = next;
-                                              return next;
-                                            });
-                                          }}
-                                        />
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <ProductSectionRule />
               <BlockStack gap="400">
                 <BlockStack gap="150">
                   <ProductSectionHeading>{locale === "en" ? "Metafields (catalog)" : locale === "tr" ? "Metafield'lar (katalog)" : locale === "fr" ? "Métachamps (catalogue)" : locale === "es" ? "Metacampos (catálogo)" : locale === "it" ? "Metacampi (catalogo)" : "Metafelder (Katalog)"}</ProductSectionHeading>
@@ -3579,43 +3198,86 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <ProductSectionRule />
               <ProductSectionHeading>{locale === "en" ? "Product safety information (GPSR)" : locale === "tr" ? "Ürün güvenlik bilgileri (GPSR)" : locale === "fr" ? "Informations de sécurité produit (GPSR)" : locale === "es" ? "Información de seguridad del producto (GPSR)" : locale === "it" ? "Informazioni di sicurezza prodotto (GPSR)" : "Produktsicherheitsinformationen (GPSR)"}</ProductSectionHeading>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {locale === "en"
+                  ? "Required by the EU General Product Safety Regulation. Enter the manufacturer and an EU-based responsible person so the shop can show the legally required safety contacts. Tap “i” next to each field for details."
+                  : locale === "tr"
+                    ? "AB Genel Ürün Güvenliği Tüzüğü (GPSR) gereği zorunlu. Mağazada yasal güvenlik iletişimlerinin gösterilmesi için üreticiyi ve AB’de yerleşik sorumlu kişiyi girin. Ayrıntı için her alanın yanındaki “i”ye tıklayın."
+                    : locale === "fr"
+                      ? "Exigé par le règlement UE sur la sécurité générale des produits. Indiquez le fabricant et une personne responsable basée dans l'UE pour afficher les contacts de sécurité légalement requis. Appuyez sur « i » pour les détails."
+                      : locale === "es"
+                        ? "Exigido por el Reglamento UE de seguridad general de los productos. Indica el fabricante y una persona responsable en la UE para mostrar los contactos de seguridad. Pulsa « i » para más detalles."
+                        : locale === "it"
+                          ? "Richiesto dal regolamento UE sulla sicurezza generale dei prodotti. Inserisci il fabbricante e una persona responsabile nell'UE per mostrare i contatti di sicurezza. Tocca « i » per i dettagli."
+                          : "Erforderlich nach der EU-Produktsicherheitsverordnung (GPSR). Tragen Sie Hersteller und eine in der EU ansässige verantwortliche Person ein, damit der Shop die gesetzlich vorgeschriebenen Sicherheitskontakte anzeigen kann. Tippen Sie auf „i“ für Details."}
+              </Text>
               <TextField
                 label={
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Hersteller</span>
+                    <span>{locale === "en" ? "Manufacturer" : locale === "tr" ? "Üretici" : locale === "fr" ? "Fabricant" : locale === "es" ? "Fabricante" : locale === "it" ? "Fabbricante" : "Hersteller"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Name of the company or person that manufactured the product (as on packaging/imprint)."
+                          : locale === "tr" ? "Ürünü üreten şirket veya kişinin adı (ambalaj/künyedeki gibi)."
+                            : locale === "fr" ? "Nom de l'entreprise ou de la personne qui a fabriqué le produit (comme sur l'emballage)."
+                              : locale === "es" ? "Nombre de la empresa o persona que fabricó el producto (como en el envase)."
+                                : locale === "it" ? "Nome dell'azienda o della persona che ha fabbricato il prodotto (come sulla confezione)."
+                                  : "Name des Unternehmens oder der Person, die das Produkt hergestellt hat (wie auf Verpackung/Impressum)."
+                      }
+                    />
                     <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller" />
                   </InlineStack>
                 }
                 requiredIndicator
                 value={meta.hersteller ?? ""}
                 onChange={(v) => updateMeta("hersteller", v || undefined)}
-                placeholder="Hersteller"
+                placeholder={locale === "en" ? "e.g. Acme GmbH" : locale === "tr" ? "örn. Acme GmbH" : "z. B. Acme GmbH"}
                 autoComplete="off"
               />
               <TextField
                 label={
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Hersteller-Informationen</span>
+                    <span>{locale === "en" ? "Manufacturer details" : locale === "tr" ? "Üretici bilgileri" : locale === "fr" ? "Coordonnées du fabricant" : locale === "es" ? "Datos del fabricante" : locale === "it" ? "Dati del fabbricante" : "Herstellerinformationen"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Postal address and contact of the manufacturer (street, postcode, city, country, email and/or phone)."
+                          : locale === "tr" ? "Üreticinin posta adresi ve iletişimi (sokak, posta kodu, şehir, ülke, e-posta ve/veya telefon)."
+                            : locale === "fr" ? "Adresse postale et contact du fabricant (rue, code postal, ville, pays, e-mail et/ou téléphone)."
+                              : locale === "es" ? "Dirección postal y contacto del fabricante (calle, CP, ciudad, país, correo y/o teléfono)."
+                                : locale === "it" ? "Indirizzo postale e contatto del fabbricante (via, CAP, città, paese, e-mail e/o telefono)."
+                                  : "Postanschrift und Kontakt des Herstellers (Straße, PLZ, Ort, Land, E-Mail und/oder Telefon)."
+                      }
+                    />
                     <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller_information" />
                   </InlineStack>
                 }
                 requiredIndicator
                 value={meta.hersteller_information ?? ""}
                 onChange={(v) => updateMeta("hersteller_information", v || undefined)}
-                placeholder="Hersteller-Informationen"
+                placeholder={locale === "en" ? "Street, city, country, email/phone" : locale === "tr" ? "Sokak, şehir, ülke, e-posta/telefon" : "Straße, Ort, Land, E-Mail/Telefon"}
                 multiline={2}
               />
               <TextField
                 label={
                   <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Verantwortliche Person (EU)</span>
+                    <span>{locale === "en" ? "Responsible person (EU)" : locale === "tr" ? "Sorumlu kişi (AB)" : locale === "fr" ? "Personne responsable (UE)" : locale === "es" ? "Persona responsable (UE)" : locale === "it" ? "Persona responsabile (UE)" : "Verantwortliche Person (EU)"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "EU-based contact for product safety (name + address + contact). If the manufacturer is in the EU, this can be the same party."
+                          : locale === "tr" ? "Ürün güvenliği için AB'de yerleşik iletişim (ad + adres + iletişim). Üretici AB'deyse aynı taraf olabilir."
+                            : locale === "fr" ? "Point de contact basé dans l'UE pour la sécurité produit (nom + adresse + contact). Si le fabricant est dans l'UE, ce peut être la même entité."
+                              : locale === "es" ? "Contacto establecido en la UE para seguridad del producto (nombre + dirección + contacto). Si el fabricante está en la UE, puede ser la misma parte."
+                                : locale === "it" ? "Contatto stabilito nell'UE per la sicurezza del prodotto (nome + indirizzo + contatto). Se il fabbricante è nell'UE, può essere la stessa parte."
+                                  : "In der EU ansässige Kontaktstelle für Produktsicherheit (Name + Adresse + Kontakt). Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein."
+                      }
+                    />
                     <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.verantwortliche_person_information" />
                   </InlineStack>
                 }
                 requiredIndicator
                 value={meta.verantwortliche_person_information ?? ""}
                 onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)}
-                placeholder="Verantwortliche Person Information"
+                placeholder={locale === "en" ? "Name, EU address, email/phone" : locale === "tr" ? "Ad, AB adresi, e-posta/telefon" : "Name, EU-Adresse, E-Mail/Telefon"}
                 multiline={2}
               />
 
@@ -3973,6 +3635,283 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           </div>
         </Layout.Section>
       </Layout>
+
+      {/* Variations — full page width white card (always expanded matrix) */}
+      <div className="variations-fullwidth">
+        <Card>
+          <BlockStack gap="400">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <ProductSectionHeading>Variations</ProductSectionHeading>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Add groups (e.g. Color, Size). Variant combinations are auto-generated.
+                  Option values use one internal key (set on first entry); switch the globe to translate labels per language — shop shows the label for each locale.
+                </Text>
+              </div>
+              <Button variant="primary" size="slim" onClick={vg_addGroup}>+ Add Group</Button>
+            </div>
+
+            {variantGroups.length === 0 && (
+              <div style={{ padding: "24px 0", textAlign: "center", color: "var(--p-color-text-subdued)", fontSize: 13 }}>
+                No variant groups yet. Click <strong>+ Add Group</strong> to start.
+              </div>
+            )}
+
+            <BlockStack gap="300">
+              {variantGroups.map((group, gi) => (
+                <div
+                  key={gi}
+                  className="vg-group"
+                  draggable
+                  onDragStart={() => { dragGroupIdx.current = gi; }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    const from = dragGroupIdx.current;
+                    dragGroupIdx.current = null;
+                    if (from !== null && from !== gi) vg_moveGroup(from, gi);
+                  }}
+                >
+                  <div className="vg-group-header">
+                    <span className="vg-drag-handle" title="Drag to reorder">⠿</span>
+                    <span className="vg-group-num">{gi + 1}</span>
+                    <div style={{ flex: 1, maxWidth: 220 }}>
+                      <TextField
+                        label="Group name"
+                        labelHidden
+                        value={getGroupDisplayName(gi)}
+                        onChange={(v) => vg_setGroupName(gi, v)}
+                        placeholder="e.g. Color, Size, Material"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      {(group.options || []).filter((o) => o.value.trim()).length} option(s)
+                    </Text>
+                    <Button size="slim" variant="plain" tone="critical" onClick={() => vg_removeGroup(gi)}>
+                      Remove
+                    </Button>
+                  </div>
+
+                  <div className="vg-group-body">
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                      {(group.options || []).map((opt, oi) => (
+                        <div key={oi} className="vg-option-chip">
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              className={opt.swatch_image ? "vg-swatch" : "vg-swatch-empty"}
+                              title={opt.swatch_image ? "Swatch görselini değiştir" : "Swatch görseli ekle (shopta renk/desen simgesi)"}
+                              onClick={() => openSwatchPicker(gi, oi)}
+                            >
+                              {opt.swatch_image
+                                ? <img src={resolveMediaUrl(opt.swatch_image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                : <span style={{ fontSize: 10, lineHeight: 1, color: "#6b7280" }}>SW</span>}
+                            </button>
+                            {opt.swatch_image && (
+                              <button
+                                type="button"
+                                style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#de3618", border: "none", color: "#fff", fontSize: 9, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                                onClick={(e) => { e.stopPropagation(); vg_setOption(gi, oi, "swatch_image", ""); }}
+                                title="Remove swatch"
+                              >×</button>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={getOptionInputValue(opt)}
+                            onChange={(e) => handleOptionDisplayChange(gi, oi, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                vg_addOption(gi);
+                              }
+                            }}
+                            placeholder="Value"
+                          />
+                          <button type="button" className="vg-remove-btn" onClick={() => vg_removeOption(gi, oi)} title="Remove option">×</button>
+                        </div>
+                      ))}
+                      <Button size="slim" variant="plain" onClick={() => vg_addOption(gi)}>+ Add option</Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </BlockStack>
+
+            {variantGroups.length > 0 && (() => {
+              const matrixRows = (product?.variants || []).filter((v) => Array.isArray(v.option_values));
+              if (matrixRows.length === 0) {
+                return (
+                  <div style={{ padding: "12px 16px", background: "var(--p-color-bg-surface-warning, #fffbeb)", borderRadius: 8, fontSize: 13, color: "var(--p-color-text-subdued)" }}>
+                    Add at least one option to each group to generate combinations.
+                  </div>
+                );
+              }
+              return (
+                <div>
+                  <div style={{ marginBottom: 10 }}>
+                    <Text as="p" variant="bodySm" fontWeight="semibold">
+                      Variation Matrix — {matrixRows.length} {matrixRows.length === 1 ? "variant" : "variants"}
+                    </Text>
+                  </div>
+                  <div>
+                    {matrixRows.map((v, vi) => {
+                      const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
+                      const localeVariantImg =
+                        String(locale).toLowerCase() === "de"
+                          ? v.image_url || ""
+                          : v.image_urls?.[locale] || v.image_url || "";
+                      const thumbUrl = variantImgs[0]
+                        ? resolveMediaUrl(variantImgs[0])
+                        : localeVariantImg
+                          ? resolveMediaUrl(localeVariantImg)
+                          : null;
+                      const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
+                      const mkDraftKey = (f) => `${vkey}_${f}`;
+                      const priceFields = [
+                        { f: "price",            centsKey: "price_cents",            label: "Price (€)",   placeholder: "0.00" },
+                        { f: "compare_at_price", centsKey: "compare_at_price_cents", label: "UVP (€)",     placeholder: "—"    },
+                        { f: "sale_price",       centsKey: "sale_price_cents",       label: "Sale (€)",    placeholder: "—"    },
+                      ];
+
+                      return (
+                        <div key={vi} className="vm-card">
+                          <div className="vm-row">
+                            <div className="vm-row-main">
+                              {thumbUrl
+                                ? <img src={thumbUrl} alt="" className="vm-thumb" />
+                                : <div className="vm-thumb-empty">+</div>
+                              }
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>
+                                {(v.option_values || []).map((val, oi) => {
+                                  const gOpt = variantGroups[oi];
+                                  const opt = (gOpt?.options || []).find(
+                                    (o) => String(o.value || "").trim().toLowerCase() === String(val || "").trim().toLowerCase()
+                                  );
+                                  const label = opt ? optionDisplayLabel(opt, locale) : val;
+                                  const swatchUrl = opt?.swatch_image;
+                                  return (
+                                    <span key={oi} className="vm-badge">
+                                      {swatchUrl && (
+                                        <span style={{ width: 12, height: 12, borderRadius: "50%", display: "inline-block", backgroundImage: `url(${resolveMediaUrl(swatchUrl)})`, backgroundSize: "cover", border: "1px solid var(--p-color-border)", flexShrink: 0 }} />
+                                      )}
+                                      <span style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginRight: 2 }}>{getGroupDisplayName(oi) || gOpt?.name || `G${oi + 1}`}:</span>
+                                      {label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="vm-field-group">
+                              <div className="vm-sub-label">Inventory & Identifiers</div>
+                              <div className="vm-grid-3">
+                                <TextField label="SKU" value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" />
+                                <TextField
+                                  label="EAN / GTIN"
+                                  value={v.ean ?? ""}
+                                  onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)}
+                                  placeholder="EAN"
+                                  autoComplete="off"
+                                  error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
+                                />
+                                <TextField label="Stock" type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" />
+                              </div>
+                            </div>
+
+                            <div className="vm-field-group vm-prices">
+                              <div className="vm-sub-label">Pricing</div>
+                              <div className="vm-grid-3">
+                                {priceFields.map(({ f, centsKey, label, placeholder }) => {
+                                  const dk = mkDraftKey(f);
+                                  const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
+                                  const displayVal = isDraft
+                                    ? priceInputs[dk]
+                                    : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
+                                  return (
+                                    <TextField
+                                      key={f}
+                                      label={label}
+                                      value={displayVal}
+                                      placeholder={placeholder}
+                                      autoComplete="off"
+                                      onChange={(val) => {
+                                        const clean = sanitizePriceDraftString(val);
+                                        setPriceInputs((prev) => {
+                                          const next = { ...prev, [dk]: clean };
+                                          priceInputsRef.current = next;
+                                          return next;
+                                        });
+                                      }}
+                                      onBlur={(e) => {
+                                        const raw = sanitizePriceDraftString(e.currentTarget.value);
+                                        updateMatrixVariant(v.option_values, f, raw);
+                                        setPriceInputs((prev) => {
+                                          const next = { ...prev };
+                                          delete next[dk];
+                                          priceInputsRef.current = next;
+                                          return next;
+                                        });
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div className="vm-field-group vm-images">
+                              <div className="vm-sub-label">Images</div>
+                              <div className="vm-img-strip">
+                                {variantImgs.length === 0 && localeVariantImg && (
+                                  <div className="vm-img-item" title="Added via the full Variant Edit page — manage it there">
+                                    <img src={resolveMediaUrl(localeVariantImg)} alt="" />
+                                  </div>
+                                )}
+                                {variantImgs.map((imgUrl, imgIdx) => (
+                                  <div key={imgIdx} className="vm-img-item">
+                                    <img src={resolveMediaUrl(imgUrl)} alt="" />
+                                    <button
+                                      type="button"
+                                      className="vm-img-del"
+                                      onClick={() => {
+                                        const next = variantImgs.filter((_, i) => i !== imgIdx);
+                                        updateMatrixVariantMeta(v.option_values, "media", next.length ? next : null);
+                                      }}
+                                    >×</button>
+                                  </div>
+                                ))}
+                                {variantImgs.length < 8 && (
+                                  <button
+                                    type="button"
+                                    className="vm-img-add"
+                                    onClick={() => openVariantImgPicker(v.option_values)}
+                                  >+</button>
+                                )}
+                              </div>
+                            </div>
+
+                            {!isNew && (
+                              <div className="vm-edit-btn">
+                                <Button
+                                  size="slim"
+                                  variant="plain"
+                                  icon={EditIcon}
+                                  accessibilityLabel="Edit variant"
+                                  onClick={() => router.push(`/products/${idOrHandle}/variants/${encodeVariantPathKey(v.option_values)}`)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </BlockStack>
+        </Card>
+      </div>
 
       {deleteConfirmOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setDeleteConfirmOpen(false)}>

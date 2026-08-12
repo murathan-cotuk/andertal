@@ -338,19 +338,13 @@ const FilterGroupTitle = styled.button`
   padding: 12px 0;
   background: none;
   border: none;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #111;
   cursor: pointer;
   text-align: left;
 `;
 
-const FilterGroupHeading = styled.h4`
+const FilterGroupHeading = styled.h4.attrs({ className: "shop-typo-sidebar-nav" })`
   margin: 0;
   padding: 0;
-  font: inherit;
   flex: 1;
   min-width: 0;
   text-align: left;
@@ -369,26 +363,29 @@ const FilterChevron = styled.span`
   transition: transform 0.18s ease;
 `;
 
-const CheckRow = styled.label`
+const CheckRow = styled.label.attrs({ className: "shop-typo-sidebar-submenu" })`
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 3px 0;
   cursor: pointer;
-  font-size: 12.5px;
-  color: ${(p) => (p.$on ? "#111" : "#555")};
-  font-weight: ${(p) => (p.$on ? "600" : "400")};
+  color: ${(p) => (p.$on ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
+  font-weight: ${(p) => (p.$on ? 600 : "var(--sidebar-submenu-fw, 400)")};
   transition: color 0.12s;
 
-  input {
-    width: 13px;
-    height: 13px;
-    accent-color: #111;
-    cursor: pointer;
+  & > label {
     flex-shrink: 0;
+    width: 12px;
+    height: 12px;
   }
 
-  &:hover { color: #111; }
+  & > label svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+
+  &:hover { color: var(--sidebar-nav-color, #111827); }
 `;
 
 const ClearAllBtn = styled.button`
@@ -940,7 +937,7 @@ export default function BrandPage() {
                       {Object.entries(facets).map(([key, vals]) => (
                         <FilterGroup key={key}>
                           <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                            <FilterGroupHeading className="shop-typo-sidebar-nav">{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
+                            <FilterGroupHeading>{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
                             <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                           </FilterGroupTitle>
                           <FilterGroupBody $open={!!openFilterGroups[key]}>
@@ -949,7 +946,7 @@ export default function BrandPage() {
                               const label = formatFacetOptionLabel(key, val, categorySlugToName, locale, metafieldDefinitions);
                               return (
                                 <CheckRow key={val} $on={on}>
-                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={10} />
+                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={12} />
                                   {label}
                                 </CheckRow>
                               );

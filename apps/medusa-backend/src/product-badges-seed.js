@@ -9,6 +9,7 @@
  *   - bestseller_category → top seller per category (score > 0)
  *   - sale                → products with a sale price
  *   - new                 → published/created within ~15 days
+ *   - made_in_europe      → verified EU origin (metadata)
  */
 
 const DEFAULT_API_BADGES = [
@@ -52,6 +53,20 @@ const DEFAULT_API_BADGES = [
       fr: { label: 'Nouveau' },
       es: { label: 'Nuevo' },
       it: { label: 'Nuovo' },
+    },
+  },
+  {
+    label: 'Made in Europe',
+    api_rule: 'made_in_europe',
+    position: 'bottom-left',
+    bg_color: '#1e3a5f',
+    text_color: '#ffffff',
+    i18n: {
+      en: { label: 'Made in Europe' },
+      tr: { label: 'Made in Europe' },
+      fr: { label: 'Made in Europe' },
+      es: { label: 'Made in Europe' },
+      it: { label: 'Made in Europe' },
     },
   },
 ]

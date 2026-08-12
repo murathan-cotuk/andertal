@@ -158,6 +158,7 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   const ct = typo.catalog_title || {};
   const mc = typo.menu_catalog || {};
   const sn = typo.sidebar_nav || {};
+  const ss = typo.sidebar_submenu || {};
   const v = (level, prop, fall) => {
     const val = level[prop];
     return val !== undefined && val !== "" ? val : fall;
@@ -290,6 +291,15 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --sidebar-nav-ff:      ${levelFontFamily(typo, "sidebar_nav")};
   --sidebar-nav-mt:      ${v(sn, "margin_top", "0")};
   --sidebar-nav-mb:      ${v(sn, "margin_bottom", "0")};
+  --sidebar-submenu-fs:     ${v(ss, "font_size", "13px")};
+  --sidebar-submenu-fw:     ${v(ss, "font_weight", "400")};
+  --sidebar-submenu-style:  ${v(ss, "font_style", "normal")};
+  --sidebar-submenu-color:  ${v(ss, "color", "#4b5563")};
+  --sidebar-submenu-ls:     ${v(ss, "letter_spacing", "0")};
+  --sidebar-submenu-lh:     ${v(ss, "line_height", "1.35")};
+  --sidebar-submenu-ff:     ${levelFontFamily(typo, "sidebar_submenu")};
+  --sidebar-submenu-mt:     ${v(ss, "margin_top", "0")};
+  --sidebar-submenu-mb:     ${v(ss, "margin_bottom", "0")};
   --scroll-up-bg:    ${scrollUp.bg_color};
   --scroll-up-icon:  ${scrollUp.icon_color};
   --scroll-up-r:     ${scrollUp.border_radius};
@@ -428,16 +438,37 @@ h5 {
   margin-top: var(--menu-catalog-mt);
   margin-bottom: var(--menu-catalog-mb);
 }
-.shop-typo-sidebar-nav {
-  font-family: var(--sidebar-nav-ff);
-  font-size: var(--sidebar-nav-fs);
-  font-weight: var(--sidebar-nav-fw);
-  font-style: var(--sidebar-nav-style);
-  color: var(--sidebar-nav-color);
-  letter-spacing: var(--sidebar-nav-ls);
-  line-height: var(--sidebar-nav-lh);
-  margin-top: var(--sidebar-nav-mt);
-  margin-bottom: var(--sidebar-nav-mb);
+.shop-typo-sidebar-nav,
+h1.shop-typo-sidebar-nav,
+h2.shop-typo-sidebar-nav,
+h3.shop-typo-sidebar-nav,
+h4.shop-typo-sidebar-nav,
+h5.shop-typo-sidebar-nav,
+h6.shop-typo-sidebar-nav {
+  font-family: var(--sidebar-nav-ff) !important;
+  font-size: var(--sidebar-nav-fs) !important;
+  font-weight: var(--sidebar-nav-fw) !important;
+  font-style: var(--sidebar-nav-style) !important;
+  color: var(--sidebar-nav-color) !important;
+  letter-spacing: var(--sidebar-nav-ls) !important;
+  line-height: var(--sidebar-nav-lh) !important;
+  margin-top: var(--sidebar-nav-mt) !important;
+  margin-bottom: var(--sidebar-nav-mb) !important;
+}
+.shop-typo-sidebar-submenu {
+  font-family: var(--sidebar-submenu-ff);
+  font-size: var(--sidebar-submenu-fs);
+  font-weight: var(--sidebar-submenu-fw);
+  font-style: var(--sidebar-submenu-style);
+  color: var(--sidebar-submenu-color);
+  letter-spacing: var(--sidebar-submenu-ls);
+  line-height: var(--sidebar-submenu-lh);
+  margin-top: var(--sidebar-submenu-mt);
+  margin-bottom: var(--sidebar-submenu-mb);
+}
+.shop-typo-sidebar-submenu.is-active {
+  color: var(--sidebar-nav-color, #111827);
+  font-weight: 600;
 }
 .topbar {
   background: var(--topbar-bg) !important;

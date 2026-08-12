@@ -11,7 +11,9 @@ export async function GET() {
     const skipCache = process.env.NODE_ENV === "development";
     const now = Date.now();
     if (!skipCache && locCache.data && locCache.expiresAt > now) {
-      return NextResponse.json(locCache.data);
+      return NextResponse.json(locCache.data, {
+        headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+      });
     }
     const base = getBackendUrl();
     const res = await fetch(`${base}/store/menu-locations`, {
@@ -24,7 +26,10 @@ export async function GET() {
       locCache.data = data;
       locCache.expiresAt = now + LOC_TTL;
     }
-    return NextResponse.json(data);
+    return NextResponse.json(
+      data,
+      skipCache ? undefined : { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
+    );
   } catch (e) {
     return NextResponse.json({ locations: [] }, { status: 200 });
   }

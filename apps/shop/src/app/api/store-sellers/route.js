@@ -9,13 +9,16 @@ export async function GET(req) {
     const limit = url.searchParams.get("limit") || "20";
     const base = getBackendUrl();
     const res = await fetch(`${base}/store/sellers?limit=${encodeURIComponent(limit)}`, {
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
     if (!res.ok) {
       return NextResponse.json({ sellers: [] }, { status: 200 });
     }
     const data = await res.json().catch(() => ({}));
-    return NextResponse.json({ sellers: Array.isArray(data?.sellers) ? data.sellers : [] });
+    return NextResponse.json(
+      { sellers: Array.isArray(data?.sellers) ? data.sellers : [] },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" } },
+    );
   } catch {
     return NextResponse.json({ sellers: [] }, { status: 200 });
   }

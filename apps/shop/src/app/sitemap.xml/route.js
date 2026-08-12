@@ -1,4 +1,4 @@
-﻿import {
+import {
   SEO_DEFAULT_LOCALE,
   SEO_DEFAULT_MARKET,
   SEO_LOCALES,
@@ -6,6 +6,7 @@
   productHandleForLocale,
   publicPath,
 } from "@/lib/seo";
+import { fetchEnabledShopLocales } from "@/lib/enabled-shop-locales";
 
 export const revalidate = 3600;
 
@@ -23,15 +24,17 @@ function escapeXml(value) {
 }
 
 /**
- * pathForLocale(locale) → path without market prefix, e.g. "bestsellers" or "foo-a-12345678"
+ * pathForLocale(locale) ? path without market prefix, e.g. "bestsellers" or "foo-a-12345678"
  */
-function urlEntry(pathForLocale, lastmod, changefreq = "weekly", priority = "0.7") {
+function urlEntry(pathForLocale, lastmod, changefreq = "weekly", priority = "0.7", locales = SEO_LOCALES) {
+  const list = Array.isArray(locales) && locales.length ? locales : SEO_LOCALES;
+  const defaultLocale = list.includes(SEO_DEFAULT_LOCALE) ? SEO_DEFAULT_LOCALE : list[0];
   const defaultPath =
     typeof pathForLocale === "function"
-      ? pathForLocale(SEO_DEFAULT_LOCALE)
+      ? pathForLocale(defaultLocale)
       : pathForLocale;
-  const loc = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, SEO_DEFAULT_LOCALE, defaultPath)}`;
-  const alternates = SEO_LOCALES.map((locale) => {
+  const loc = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, defaultLocale, defaultPath)}`;
+  const alternates = list.map((locale) => {
     const path =
       typeof pathForLocale === "function" ? pathForLocale(locale) : pathForLocale;
     const href = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, locale, path)}`;
@@ -39,9 +42,9 @@ function urlEntry(pathForLocale, lastmod, changefreq = "weekly", priority = "0.7
   }).join("\n");
   const xDefaultPath =
     typeof pathForLocale === "function"
-      ? pathForLocale(SEO_DEFAULT_LOCALE)
+      ? pathForLocale(defaultLocale)
       : pathForLocale;
-  const xDefault = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, SEO_DEFAULT_LOCALE, xDefaultPath)}`;
+  const xDefault = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, defaultLocale, xDefaultPath)}`;
   return `  <url>
     <loc>${escapeXml(loc)}</loc>
     <lastmod>${escapeXml(lastmod)}</lastmod>
@@ -70,45 +73,50 @@ async function fetchAllProducts() {
 export async function GET() {
   const today = new Date().toISOString().split("T")[0];
 
-  const [products, collectionsData, pagesData, brandsData] = await Promise.all([
+  const [products, collectionsData, pagesData, brandsData, enabledLocales] = await Promise.all([
     fetchAllProducts(),
     fetchJSON("/store/collections"),
     fetchJSON("/store/pages?type=page&limit=200"),
     fetchJSON("/store/brands"),
+    fetchEnabledShopLocales(),
   ]);
+
+  const locales = enabledLocales;
+  const entry = (pathForLocale, lastmod, changefreq = "weekly", priority = "0.7") =>
+    urlEntry(pathForLocale, lastmod, changefreq, priority, locales);
 
   const collections = collectionsData?.collections || [];
   const pages = pagesData?.pages || [];
   const brands = brandsData?.brands || [];
 
   const staticUrls = [
-    urlEntry("", today, "daily", "1.0"),
-    urlEntry("bestsellers", today, "daily", "0.8"),
-    urlEntry("neuheiten", today, "daily", "0.8"),
-    urlEntry("sales", today, "daily", "0.8"),
-    urlEntry("brands", today, "weekly", "0.6"),
+    entry("", today, "daily", "1.0"),
+    entry("bestsellers", today, "daily", "0.8"),
+    entry("neuheiten", today, "daily", "0.8"),
+    entry("sales", today, "daily", "0.8"),
+    entry("brands", today, "weekly", "0.6"),
   ];
 
   const productUrls = products
     .filter((p) => p?.handle || p?.id)
     .map((p) =>
-      urlEntry(
+      entry(
         (locale) => productHandleForLocale(p, locale),
         String(p.updated_at || today).split("T")[0],
         "weekly",
         "0.9",
       ),
     )
-    .filter((entry) => entry.includes("<loc>"));
+    .filter((entryXml) => entryXml.includes("<loc>"));
 
   const collectionUrls = collections
     .filter((c) => c?.handle)
-    .map((c) => urlEntry(c.handle, today, "daily", "0.8"));
+    .map((c) => entry(c.handle, today, "daily", "0.8"));
 
   const pageUrls = pages
     .filter((p) => p?.slug)
     .map((p) =>
-      urlEntry(
+      entry(
         `pages/${p.slug}`,
         String(p.updated_at || today).split("T")[0],
         "monthly",
@@ -118,7 +126,7 @@ export async function GET() {
 
   const brandUrls = brands
     .filter((b) => b?.handle)
-    .map((b) => urlEntry(`brand/${b.handle}`, today, "weekly", "0.6"));
+    .map((b) => entry(`brand/${b.handle}`, today, "weekly", "0.6"));
 
   const allUrls = [
     ...staticUrls,

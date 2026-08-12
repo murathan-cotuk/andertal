@@ -13,7 +13,7 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import styled from "styled-components";
 import { motion } from "framer-motion";
-import { useCustomerAuth as useAuth } from "@andertal/lib";
+import { useCustomerAuth as useAuth, getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCart } from "@/context/CartContext";
 import DropdownSearch from "@/components/DropdownSearch";
@@ -46,9 +46,20 @@ import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import { getLocalizedCategory } from "@/lib/format";
+import { resolveImageUrl } from "@/lib/image-url";
 
 /** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
 const SCROLL_UP_DELTA = 6;
+
+/** Seller "Category image" (metadata.image_url) + banner fallback — same as MobileNav */
+function categoryListImageUrl(node) {
+  if (!node) return "";
+  const meta = node.metadata && typeof node.metadata === "object" ? node.metadata : {};
+  const a = meta.image_url || meta.imageUrl;
+  const b = node.banner_image_url || meta.banner_image_url;
+  const raw = a || b || "";
+  return String(raw).trim();
+}
 
 function backdropBlurFromToken(raw) {
   const s = String(raw ?? "").trim();
@@ -635,7 +646,9 @@ const CategoryMegaCol = styled.div`
 `;
 
 const CategoryMegaLink = styled(Link)`
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 7px 12px;
   font-size: 13.5px;
   font-family: ${tokens.fontFamily.sans};
@@ -654,7 +667,31 @@ const CategoryMegaLink = styled(Link)`
     white-space: normal;
     padding: 10px 14px;
     border-radius: 8px;
+    min-height: 56px;
   }
+`;
+
+const CategoryMegaThumb = styled.img`
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #e5e7eb;
+  flex-shrink: 0;
+`;
+
+const CategoryMegaThumbPlaceholder = styled.div`
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  flex-shrink: 0;
+`;
+
+const CategoryMegaLinkLabel = styled.span`
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
 `;
 
 const CategoryMegaBtnLink = styled.button`
@@ -983,6 +1020,7 @@ export default function ShopHeader() {
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const [hoveredMenuItemId, setHoveredMenuItemId] = useState(null);
   const [shopBranding, setShopBranding] = useState({ shop_logo_url: "", shop_favicon_url: "", shop_logo_height: 34, logo_config: null });
+  const [enabledShopLocales, setEnabledShopLocales] = useState(() => SHOP_LOCALES.map((l) => l.code));
   const [logoDeviceKey, setLogoDeviceKey] = useState("desktop");
   // userMenuOpen state removed — now managed by Radix DropdownMenu in UserDropdownPanel
   const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
@@ -1020,6 +1058,26 @@ export default function ShopHeader() {
     window.location.href = `${marketPrefix(countryLower, langLower)}${suffix}`;
   };
 
+  /** Persist UI language on the customer account when logged in, then navigate. */
+  const handleSelectLocale = (langCode) => {
+    setLocaleDropdownOpen(false);
+    const m = marketParsed?.country ?? DEFAULT_MARKET;
+    const cur = defaultCurrencyForMarket(String(m).toLowerCase());
+    const nextLang = String(langCode || "").toLowerCase();
+    const go = () => navigateTriple(m, nextLang, cur);
+    if (isAuthenticated && nextLang) {
+      const token = getToken("customer");
+      if (token) {
+        getMedusaClient()
+          .updateCustomerMe(token, { locale: nextLang })
+          .catch(() => {})
+          .finally(go);
+        return;
+      }
+    }
+    go();
+  };
+
   const handleSelectCountry = (countryCode) => {
     const m = countryCode.toLowerCase();
     const lang = String(locale || routing.defaultLocale || "de").toLowerCase();
@@ -1041,6 +1099,15 @@ export default function ShopHeader() {
             shop_logo_height: d?.shop_logo_height != null ? Number(d.shop_logo_height) : 34,
             logo_config: d?.logo_config || null,
           });
+          const raw = Array.isArray(d?.enabled_shop_locales) ? d.enabled_shop_locales : null;
+          if (raw && raw.length) {
+            const codes = SHOP_LOCALES.map((l) => l.code).filter((c) =>
+              raw.map((x) => String(x || "").toLowerCase()).includes(c),
+            );
+            setEnabledShopLocales(codes.length ? codes : SHOP_LOCALES.map((l) => l.code));
+          } else {
+            setEnabledShopLocales(SHOP_LOCALES.map((l) => l.code));
+          }
         })
         .catch(() => {});
     };
@@ -1158,7 +1225,7 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" })
+    fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`)
       .then((r) => r.json())
       .catch(() => ({ tree: [] }))
       .then((catRes) => {
@@ -1371,17 +1438,43 @@ export default function ShopHeader() {
     if (!Array.isArray(categoryTree) || categoryTree.length === 0) return [];
     return categoryTree
       .filter((n) => n && !n.parent_id && n.has_products !== false)
-      .map((n) => ({
-        key: String(n.id),
-        id: String(n.id),
-        label: getLocalizedCategory(n, locale).name || n.slug || "",
-        slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
-        hasChildren: Array.isArray(n.children) && n.children.some((c) => c && c.has_products !== false),
-        node: n,
-      }))
+      .map((n) => {
+        const imageRaw = categoryListImageUrl(n);
+        return {
+          key: String(n.id),
+          id: String(n.id),
+          label: getLocalizedCategory(n, locale).name || n.slug || "",
+          slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
+          hasChildren: Array.isArray(n.children) && n.children.some((c) => c && c.has_products !== false),
+          imageUrl: imageRaw ? resolveImageUrl(imageRaw) : "",
+          node: n,
+        };
+      })
       .filter((r) => r.slug)
       .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
   }, [categoryTree, locale]);
+
+  /** slug/id → category image for menu-item fallback rows */
+  const categoryImageByRef = useMemo(() => {
+    const map = new Map();
+    const walk = (nodes) => {
+      if (!Array.isArray(nodes)) return;
+      for (const n of nodes) {
+        if (!n) continue;
+        const imageRaw = categoryListImageUrl(n);
+        const imageUrl = imageRaw ? resolveImageUrl(imageRaw) : "";
+        if (imageUrl) {
+          const slug = String(n.slug || n.handle || "").trim().toLowerCase();
+          const id = String(n.id || "").trim().toLowerCase();
+          if (slug) map.set(slug, imageUrl);
+          if (id) map.set(id, imageUrl);
+        }
+        if (n.children?.length) walk(n.children);
+      }
+    };
+    walk(categoryTree);
+    return map;
+  }, [categoryTree]);
 
   // Children of the currently drilled category
   const drillRows = useMemo(() => {
@@ -1415,6 +1508,7 @@ export default function ShopHeader() {
     label: r.label,
     href: `/${r.slug}`,
     hasChildren: r.hasChildren,
+    imageUrl: r.imageUrl || "",
   }));
 
   // Root-level menu items (no parent) for direct link rendering
@@ -1447,16 +1541,23 @@ export default function ShopHeader() {
     () =>
       (mainMenuAllItems || [])
         .filter((i) => !i?.parent_id)
-        .map((item) => ({
-          key: item.id,
-          href: menuItemHref(item),
-          label: item.label,
-          onClick: () => {
-            setMainMenuOpen(false);
-          },
-        }))
+        .map((item) => {
+          const ref = categoryRefFromMenuItem(item);
+          const imageUrl = ref
+            ? categoryImageByRef.get(ref) || categoryImageByRef.get(String(item.link_value || "").trim().toLowerCase()) || ""
+            : "";
+          return {
+            key: item.id,
+            href: menuItemHref(item),
+            label: item.label,
+            imageUrl,
+            onClick: () => {
+              setMainMenuOpen(false);
+            },
+          };
+        })
         .filter((r) => r.href && r.href !== "#"),
-    [mainMenuAllItems],
+    [mainMenuAllItems, categoryImageByRef],
   );
 
   /* Mega menu — children grouped by parent id */
@@ -1718,17 +1819,12 @@ export default function ShopHeader() {
                   </div>
                   <div style={{ flex: 1, padding: "16px 0", minWidth: 0 }}>
                     <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Sprache</div>
-                    {SHOP_LOCALES.map((l) => (
+                    {SHOP_LOCALES.filter((l) => enabledShopLocales.includes(l.code)).map((l) => (
                       <LocaleOption
                         key={l.code}
                         type="button"
                         data-active={locale === l.code ? "true" : "false"}
-                        onClick={() => {
-                          setLocaleDropdownOpen(false);
-                          const m = marketParsed?.country ?? DEFAULT_MARKET;
-                          const cur = defaultCurrencyForMarket(String(m).toLowerCase());
-                          navigateTriple(m, l.code, cur);
-                        }}
+                        onClick={() => handleSelectLocale(l.code)}
                       >
                         <span style={{ fontSize: 20 }}>{l.flag}</span>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{l.label}</div>
@@ -1855,12 +1951,19 @@ export default function ShopHeader() {
                 ) : null}
                 <CategoryMegaInner>
                   {(() => {
+                    const imageForMenuItem = (item) => {
+                      const ref = categoryRefFromMenuItem(item);
+                      if (!ref) return "";
+                      return categoryImageByRef.get(ref) || categoryImageByRef.get(String(item.link_value || "").trim().toLowerCase()) || "";
+                    };
+
                     const primaryRows =
                       !useCategoryTreeForPanel && menuPanelItems.length > 0
                         ? menuPanelItems.map((item) => ({
                             key: item.id,
                             href: menuItemHref(item),
                             label: item.label,
+                            imageUrl: imageForMenuItem(item),
                             onClick: () => {
                               setMainMenuOpen(false);
                             },
@@ -1869,6 +1972,7 @@ export default function ShopHeader() {
                             key: row.key,
                             href: row.href || "#",
                             label: row.label,
+                            imageUrl: row.imageUrl || "",
                             onClick: () => {
                               setMainMenuOpen(false);
                               setDrillCategoryId(null);
@@ -1876,6 +1980,17 @@ export default function ShopHeader() {
                           })).filter((r) => r.href && r.href !== "#");
 
                     const rows = primaryRows.length > 0 ? primaryRows : looseMenuPanelRows;
+
+                    const renderRow = (row) => (
+                      <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
+                        {row.imageUrl ? (
+                          <CategoryMegaThumb src={row.imageUrl} alt="" />
+                        ) : (
+                          <CategoryMegaThumbPlaceholder aria-hidden />
+                        )}
+                        <CategoryMegaLinkLabel>{row.label}</CategoryMegaLinkLabel>
+                      </CategoryMegaLink>
+                    );
 
                     if (rows.length === 0) {
                       return (
@@ -1886,11 +2001,7 @@ export default function ShopHeader() {
                     }
 
                     if (!isNarrowViewport) {
-                      return rows.map((row) => (
-                        <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
-                          {row.label}
-                        </CategoryMegaLink>
-                      ));
+                      return rows.map((row) => renderRow(row));
                     }
 
                     const COLS_MAX = 8;
@@ -1901,11 +2012,7 @@ export default function ShopHeader() {
 
                     return cols.map((col, ci) => (
                       <CategoryMegaCol key={ci}>
-                        {col.map((row) => (
-                          <CategoryMegaLink key={row.key} href={row.href} onClick={row.onClick}>
-                            {row.label}
-                          </CategoryMegaLink>
-                        ))}
+                        {col.map((row) => renderRow(row))}
                       </CategoryMegaCol>
                     ));
                   })()}

@@ -16,12 +16,7 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
-import BestsellerBadge from "@/components/BestsellerBadge";
-import { SaleBadgeImageCorner } from "@/components/SaleBadge";
 import { CustomProductBadges } from "@/components/CustomProductBadge";
-import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
-import { isBestsellerMetadata, isNewMetadata } from "@/lib/bestseller";
-import { isEuOriginVerified } from "@andertal/shop-theme";
 import { getBruttoCentsFromPricesMap, resolveProductSaleCents } from "@/lib/product-price";
 import styled, { css } from "styled-components";
 
@@ -69,7 +64,9 @@ const ImgBlock = styled.div`
     aspect-ratio: 1 / 1;
   }
 
-  img {
+  /* Only product photos — never style Sellercentral badge images */
+  img.img-primary,
+  img.img-secondary {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -87,6 +84,17 @@ const ImgBlock = styled.div`
   }
   img.img-secondary {
     display: none !important;
+  }
+
+  img.product-custom-badge-img {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    padding: 0 !important;
+    object-fit: contain !important;
   }
 `;
 
@@ -417,7 +425,7 @@ const MorePill = styled.button`
  *  Component
  * ─────────────────────────────────────────────────────────── */
 
-export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: isBestsellerProp, rank, hideBestsellerBadge = false }) {
+export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: _isBestsellerProp, rank, hideBestsellerBadge: _hideBestsellerBadge = false }) {
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -527,14 +535,8 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   const hasSale = saleCents != null && saleCents > 0 && saleCents < priceCents;
 
   /* Flags */
-  const isNew =
-    product.metadata?.is_new === true ||
-    product.metadata?.is_new === "true" ||
-    isNewMetadata(product.metadata, product.created_at);
   const publishDate = product.metadata?.publish_date ? new Date(product.metadata.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
-  const isBestseller = isBestsellerProp !== undefined ? isBestsellerProp : isBestsellerMetadata(product.metadata || {});
-  const isEuOrigin = isEuOriginVerified(product.metadata);
   const managesInventory = variant?.manage_inventory === true;
   const inventoryQty = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity;
   const outOfStock = managesInventory && typeof inventoryQty === "number" && inventoryQty <= 0;
@@ -621,16 +623,10 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           </>
         )}
 
-        {/* Badges */}
+        {/* Status + Sellercentral custom badges only (no built-in Sale/Bestseller/New) */}
         <Badges>
-          {isBestseller && !isComingSoon && (
-            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              {!hideBestsellerBadge && <BestsellerBadge />}
-              {rank != null && <RankBadge>#{rank}</RankBadge>}
-            </div>
-          )}
+          {rank != null && !isComingSoon && <RankBadge>#{rank}</RankBadge>}
           {isComingSoon && <Badge $comingSoon>{tp("comingSoon")}</Badge>}
-          {isNew && !hasSale && !isComingSoon && <Badge>New</Badge>}
           {shippingUnavailable && !isComingSoon && <Badge $sold>{tp("notAvailable")}</Badge>}
           {outOfStock && !isComingSoon && <Badge $sold>{tp("outOfStock")}</Badge>}
         </Badges>
@@ -644,10 +640,6 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
           </WishlistHeartWrap>
         )}
-        {hasSale && !isComingSoon && (
-          <SaleBadgeImageCorner>{tp("sale")}</SaleBadgeImageCorner>
-        )}
-        {isEuOrigin && <MadeInEuropeOverlay />}
       </ImgBlock>
 
       <AddToCartBtn
@@ -866,13 +858,22 @@ const ListImgWrap = styled.div`
   overflow: hidden;
   background: #f8f8f8;
   position: relative;
-  img {
+  > a > img,
+  > img:not(.product-custom-badge-img) {
     width: 100%;
     height: 100%;
     object-fit: contain;
     display: block;
     padding: 2px;
     box-sizing: border-box;
+  }
+  img.product-custom-badge-img {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    object-fit: contain !important;
   }
 `;
 
@@ -949,7 +950,7 @@ const ListBadge = styled.span`
   background: ${(p) => p.$sale ? "#e11d48" : p.$gray ? "#9ca3af" : p.$orange ? "#c2410c" : "#15803d"};
 `;
 
-export function ProductListItem({ product, activeFilters = {}, isBestseller: isBestsellerProp }) {
+export function ProductListItem({ product, activeFilters = {}, isBestseller: _isBestsellerProp }) {
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -992,7 +993,6 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
   const meta = product.metadata || {};
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
-  const isBestseller = isBestsellerProp !== undefined ? isBestsellerProp : isBestsellerMetadata(meta);
   const inventoryQty = variant?.inventory_quantity ?? null;
   const outOfStock = variant?.manage_inventory === true && typeof inventoryQty === "number" && inventoryQty <= 0;
   const shippingGroupIdRaw = meta.shipping_group_id;
@@ -1036,9 +1036,6 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
       <Link href={productUrl} style={{ flexShrink: 0, textDecoration: "none" }}>
         <ListImgWrap>
           {imgSrc ? <img src={imgSrc} alt={displayTitle} loading="lazy" /> : null}
-          {hasSale && !isComingSoon && (
-            <SaleBadgeImageCorner inset={6}>{tp("sale")}</SaleBadgeImageCorner>
-          )}
           <CustomProductBadges badges={product?.metadata?.custom_badges} locale={locale} />
         </ListImgWrap>
       </Link>
@@ -1048,7 +1045,6 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: isB
         </Link>
         {reviewCount > 0 && <StarRating average={reviewAvg} count={reviewCount} />}
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: 1 }}>
-          {isBestseller && !isComingSoon && <BestsellerBadge />}
           {isComingSoon && <ListBadge $orange>{tp("comingSoon")}</ListBadge>}
           {outOfStock && !isComingSoon && <ListBadge $gray>{tp("outOfStock")}</ListBadge>}
         </div>

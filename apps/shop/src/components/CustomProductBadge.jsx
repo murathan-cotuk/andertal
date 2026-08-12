@@ -1,31 +1,97 @@
 "use client";
 
-// Two badges sharing the same corner would otherwise render at the exact same absolute
-// coordinates and overlap illegibly — stackIndex nudges each subsequent one down by one
-// badge-height so a superuser can safely assign multiple badges to one product/corner.
-const STACK_GAP_PX = 26;
+/**
+ * Sellercentral Product Badges over a product image.
+ * Sizes and offsets are percentages of the image box so cards and PDP match
+ * across mobile / tablet / desktop. Offset 0 = flush to the chosen corner.
+ */
 
-function positionStyle(b, stackIndex = 0) {
-  const style = { position: "absolute", zIndex: 9, pointerEvents: "none" };
-  const ox = Number(b.offset_x) || 0;
-  const oy = (Number(b.offset_y) || 0) + stackIndex * STACK_GAP_PX;
-  if (b.position === "top-left") { style.top = oy; style.left = ox; }
-  else if (b.position === "top-right") { style.top = oy; style.right = ox; }
-  else if (b.position === "bottom-left") { style.bottom = oy; style.left = ox; }
-  else { style.bottom = oy; style.right = ox; }
+function clampPct(n, fallback, min = 0, max = 100) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(max, Math.max(min, v));
+}
+
+/** Width/height: values ≤100 are %, larger numbers are legacy px → approx %. */
+export function badgeSizePct(raw, fallback = 22) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  if (n <= 100) return clampPct(n, fallback, 1, 100);
+  return clampPct(Math.round((n / 360) * 100), fallback, 8, 45);
+}
+
+/** Corner inset: 0 = flush. Values ≤40 treated as %; larger = legacy px. */
+export function badgeOffsetPct(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (n <= 40) return clampPct(n, 0, 0, 40);
+  return clampPct(Math.round(n / 10), 0, 0, 30);
+}
+
+/** Text size as % of image width (cqw). Legacy px (e.g. 12) → ~3.5cqw. */
+export function badgeFontPct(raw, fallback = 4.5) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  if (n <= 20) return clampPct(n, fallback, 1.5, 20);
+  return clampPct(Math.round((n / 360) * 100 * 10) / 10, fallback, 2, 12);
+}
+
+function bt(badge, field, locale) {
+  if (!locale || locale === "de") return badge?.[field] ?? "";
+  return badge?.i18n?.[locale]?.[field] ?? badge?.[field] ?? "";
+}
+
+function cornerBoxStyle(b, stackIndex = 0) {
+  const style = {
+    position: "absolute",
+    zIndex: 2,
+    pointerEvents: "none",
+    lineHeight: 0,
+    boxSizing: "border-box",
+  };
+  const ox = badgeOffsetPct(b.offset_x);
+  const size = badgeSizePct(b.image_width, 22);
+  const stack = stackIndex > 0 ? stackIndex * (size + 2) : 0;
+  const oy = badgeOffsetPct(b.offset_y) + stack;
+
+  if (b.badge_type === "image") {
+    style.width = `${size}%`;
+    const hRaw = Number(b.image_height);
+    if (Number.isFinite(hRaw) && hRaw > 0) {
+      style.height = `${badgeSizePct(hRaw, size)}%`;
+    }
+  }
+
+  if (b.position === "top-left") {
+    style.top = `${oy}%`;
+    style.left = `${ox}%`;
+  } else if (b.position === "top-right") {
+    style.top = `${oy}%`;
+    style.right = `${ox}%`;
+  } else if (b.position === "bottom-left") {
+    style.bottom = `${oy}%`;
+    style.left = `${ox}%`;
+  } else {
+    style.bottom = `${oy}%`;
+    style.right = `${ox}%`;
+  }
   return style;
 }
 
-function visualStyle(b) {
+function textStyle(b) {
+  const fs = badgeFontPct(b.font_size, 4.5);
+  const br = Number(b.border_radius);
+  const bw = Number(b.border_width);
   return {
+    display: "inline-block",
     background: b.bg_color || "#e53935",
     color: b.text_color || "#ffffff",
-    fontSize: Number(b.font_size) || 12,
-    borderWidth: Number(b.border_width) || 0,
+    fontSize: `${fs}cqw`,
+    borderWidth: Number.isFinite(bw) && bw > 0 ? `${Math.min(bw, 8) * 0.15}cqw` : 0,
     borderStyle: "solid",
     borderColor: b.border_color || "#000000",
-    borderRadius: Number(b.border_radius) || 0,
-    padding: "3px 8px",
+    borderRadius: Number.isFinite(br) ? `${Math.max(0, br) * 0.12}cqw` : "0.2cqw",
+    padding: "0.28em 0.55em",
     fontWeight: 700,
     lineHeight: 1.2,
     whiteSpace: "nowrap",
@@ -33,26 +99,32 @@ function visualStyle(b) {
   };
 }
 
-// Same _i18n[locale][field]-style convention as landing containers, but badges store
-// their per-locale overrides under `i18n` (not `_i18n`) — DE always falls back to the
-// root label/image_url columns.
-function bt(badge, field, locale) {
-  if (!locale || locale === "de") return badge?.[field] ?? "";
-  return badge?.i18n?.[locale]?.[field] ?? badge?.[field] ?? "";
-}
-
-/** Single superuser-configured badge (text or image), absolutely positioned over a product image. */
+/** Single badge absolutely positioned over the product image box. */
 export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
   if (!badge) return null;
   if (badge.badge_type === "image") {
     const imageUrl = bt(badge, "image_url", locale);
     if (!imageUrl) return null;
     return (
-      <div style={positionStyle(badge, stackIndex)}>
+      <div style={cornerBoxStyle(badge, stackIndex)}>
         <img
+          className="product-custom-badge-img"
           src={imageUrl}
           alt={bt(badge, "label", locale) || ""}
-          style={{ display: "block", maxWidth: 80, maxHeight: 80, boxShadow: "0 1px 4px rgba(0, 0, 0, 0.16)" }}
+          style={{
+            display: "block",
+            width: "100%",
+            height: badge.image_height != null && Number(badge.image_height) > 0 ? "100%" : "auto",
+            maxWidth: "none",
+            maxHeight: "none",
+            objectFit: "contain",
+            position: "static",
+            inset: "auto",
+            padding: 0,
+            margin: 0,
+            boxShadow: "0 1px 4px rgba(0, 0, 0, 0.16)",
+          }}
+          draggable={false}
         />
       </div>
     );
@@ -60,23 +132,44 @@ export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
   const label = bt(badge, "label", locale);
   if (!label) return null;
   return (
-    <div style={positionStyle(badge, stackIndex)}>
-      <span style={visualStyle(badge)}>{label}</span>
+    <div style={cornerBoxStyle(badge, stackIndex)}>
+      <span style={textStyle(badge)}>{label}</span>
     </div>
   );
 }
 
-/** Renders every custom badge resolved for a product (product.metadata.custom_badges). */
+/**
+ * Overlay layer: fills the product image container so % / cqw resolve against that box.
+ * Parent must be position:relative (ImgBlock, MainImageWrap, etc.).
+ */
 export function CustomProductBadges({ badges, locale }) {
   if (!Array.isArray(badges) || badges.length === 0) return null;
   const seenAtPosition = {};
   return (
-    <>
+    <div
+      className="product-custom-badges-layer"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 9,
+        pointerEvents: "none",
+        containerType: "size",
+        overflow: "hidden",
+      }}
+      aria-hidden
+    >
       {badges.map((b) => {
         const stackIndex = seenAtPosition[b.position] || 0;
         seenAtPosition[b.position] = stackIndex + 1;
-        return <CustomProductBadge key={b.id} badge={b} stackIndex={stackIndex} locale={locale} />;
+        return (
+          <CustomProductBadge
+            key={b.id || `${b.position}-${stackIndex}-${b.label}`}
+            badge={b}
+            stackIndex={stackIndex}
+            locale={locale}
+          />
+        );
       })}
-    </>
+    </div>
   );
 }

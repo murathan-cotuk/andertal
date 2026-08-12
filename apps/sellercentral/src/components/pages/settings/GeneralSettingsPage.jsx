@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { usePathname } from "@/i18n/navigation";
+import { usePathname, Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { userError } from "@/lib/api-error-messages";
 import {
@@ -20,6 +20,75 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { routing } from "@/i18n/routing";
 import { getUI } from "@/lib/ui-strings";
+
+const ALL_SHOP_LOCALES = [
+  { code: "en", label: "English" },
+  { code: "de", label: "Deutsch" },
+  { code: "fr", label: "Français" },
+  { code: "it", label: "Italiano" },
+  { code: "es", label: "Español" },
+  { code: "tr", label: "Türkçe" },
+];
+
+function LocaleToggle({ on, onChange, disabled, label }) {
+  return (
+    <button
+      type="button"
+      onClick={() => { if (!disabled) onChange(!on); }}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      aria-checked={on}
+      role="switch"
+      style={{
+        width: 46,
+        height: 26,
+        borderRadius: 13,
+        padding: 0,
+        background: on ? "#10b981" : "#d1d5db",
+        border: "none",
+        cursor: disabled ? "not-allowed" : "pointer",
+        position: "relative",
+        transition: "background 0.2s",
+        flexShrink: 0,
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 3,
+          left: on ? 23 : 3,
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          background: "#fff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          transition: "left 0.2s",
+        }}
+      />
+    </button>
+  );
+}
+
+function SectionLabel({ title, subtitle }) {
+  return (
+    <BlockStack gap="100">
+      <Text as="h2" variant="headingMd">{title}</Text>
+      {subtitle ? (
+        <Text as="p" tone="subdued" variant="bodySm">{subtitle}</Text>
+      ) : null}
+    </BlockStack>
+  );
+}
+
+function parseLegalCity(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return { postal: "", city: "" };
+  const m = s.match(/^(\d{4,5})\s+(.+)$/);
+  if (m) return { postal: m[1], city: m[2].trim() };
+  return { postal: "", city: s };
+}
 
 export default function GeneralSettingsPage() {
   const client = getMedusaAdminClient();
@@ -42,10 +111,10 @@ export default function GeneralSettingsPage() {
     businessCity: "",
     businessPostalCode: "",
     businessCountry: "",
-    warehouseStreet: "",
-    warehouseCity: "",
-    warehousePostalCode: "",
-    warehouseCountry: "",
+    representative: "",
+    tradeRegister: "",
+    registerCourt: "",
+    legalEmail: "",
     documents: [],
   });
   const [saved, setSaved] = useState(false);
@@ -54,20 +123,71 @@ export default function GeneralSettingsPage() {
   const [saveError, setSaveError] = useState("");
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
-  const [legalInfo, setLegalInfo] = useState({
-    legal_company_name: "",
-    legal_representative: "",
-    legal_street: "",
-    legal_city: "",
-    legal_trade_register: "",
-    legal_register_court: "",
-    legal_vat_id: "",
-    legal_tax_id: "",
-    legal_email: "",
-  });
-  const [legalSaving, setLegalSaving] = useState(false);
-  const [legalSaved, setLegalSaved] = useState(false);
-  const [legalError, setLegalError] = useState("");
+  const [enabledShopLocales, setEnabledShopLocales] = useState(() => ALL_SHOP_LOCALES.map((l) => l.code));
+  const [localesSaving, setLocalesSaving] = useState(false);
+  const [localesSaved, setLocalesSaved] = useState(false);
+  const [localesError, setLocalesError] = useState("");
+  const [uiLocale, setUiLocale] = useState(locale || "de");
+  const [localeSaving, setLocaleSaving] = useState(false);
+
+  const copy = {
+    pageIntro: locale === "tr"
+      ? "Mağaza adı, şirket ve yasal bilgiler. Adresler (depo / iade / fatura) Ayarlar → Konumlar’da yönetilir."
+      : locale === "en"
+        ? "Store name, company and legal details. Addresses (warehouse / returns / billing) are managed under Settings → Locations."
+        : "Shopname, Firmen- und Rechtsdaten. Adressen (Lager / Retoure / Rechnung) verwalten Sie unter Einstellungen → Standorte.",
+    storeCard: locale === "tr" ? "Mağaza" : locale === "en" ? "Store" : "Shop",
+    storeCardSub: locale === "tr"
+      ? "Shop’ta ürün sayfalarında Verkäufer olarak görünür."
+      : locale === "en"
+        ? "Shown as Verkäufer on product pages in the shop."
+        : "Wird im Shop auf Produktseiten als Verkäufer angezeigt.",
+    companyCard: isSuperuser
+      ? (locale === "tr" ? "Şirket & platform işletmecisi" : locale === "en" ? "Company & platform operator" : "Firma & Plattformbetreiber")
+      : (locale === "tr" ? "Şirket bilgileri" : locale === "en" ? "Company details" : "Firmendaten"),
+    companyCardSub: isSuperuser
+      ? (locale === "tr"
+        ? "Tek form: satıcı hesabı ve platform Impressum / sözleşme PDF’i aynı kaynaktan beslenir."
+        : locale === "en"
+          ? "One form feeds both your seller account and the platform Impressum / seller-agreement PDF."
+          : "Ein Formular speist Konto und Plattform-Impressum / Seller-Agreement-PDF.")
+      : (locale === "tr"
+        ? "Yasal şirket adı, vergi bilgileri ve kayıtlı iş adresi."
+        : locale === "en"
+          ? "Legal company name, tax details and registered business address."
+          : "Rechtlicher Firmenname, Steuerdaten und eingetragene Geschäftsadresse."),
+    identity: locale === "tr" ? "Kimlik" : locale === "en" ? "Identity" : "Identität",
+    address: locale === "tr" ? "Kayıtlı iş adresi" : locale === "en" ? "Registered business address" : "Eingetragene Geschäftsadresse",
+    register: locale === "tr" ? "Ticaret sicili" : locale === "en" ? "Trade register" : "Handelsregister",
+    contact: locale === "tr" ? "İletişim" : locale === "en" ? "Contact" : "Kontakt",
+    compliance: locale === "de" ? "Verpackungsgesetz (LUCID / EPR)" : locale === "tr" ? "Ambalaj Geri Dönüşüm (LUCID / EPR)" : "Packaging Recycling (LUCID / EPR)",
+    complianceSub: locale === "de"
+      ? "Pflichtangabe nach VerpackG. Ohne gültige LUCID-Registrierung keine Listings auf DE-Marktplätzen."
+      : locale === "tr"
+        ? "VerpackG gereği zorunlu. Geçerli LUCID olmadan Almanya’da ürün listelenemez."
+        : "Required under VerpackG. Without valid LUCID you cannot list on DE marketplaces.",
+    docs: locale === "tr" ? "Şirket belgeleri" : locale === "en" ? "Company documents" : "Firmendokumente",
+    docsSub: locale === "tr"
+      ? "Ticaret sicili, vergi belgesi vb. yükleyin."
+      : locale === "en"
+        ? "Upload trade license, tax certificate, registration documents, etc."
+        : "Handelsregister, Steuerbescheinigung, Registrierungsunterlagen usw. hochladen.",
+    locationsNote: locale === "tr"
+      ? "Depo, iade ve fatura adresleri →"
+      : locale === "en"
+        ? "Warehouse, returns and billing addresses →"
+        : "Lager-, Retouren- und Rechnungsadressen →",
+    locationsLink: locale === "tr" ? "Konumlar" : locale === "en" ? "Locations" : "Standorte",
+    managingDirector: locale === "de" ? "Vertreten durch (Geschäftsführer)" : locale === "tr" ? "Yetkili kişi (Geschäftsführer)" : "Managing Director",
+    tradeReg: locale === "de" ? "Handelsregisternummer" : locale === "tr" ? "Ticaret sicil no." : "Trade Register No.",
+    regCourt: locale === "de" ? "Registergericht" : locale === "tr" ? "Sicil mahkemesi" : "Registry Court",
+    legalEmail: locale === "tr" ? "Yasal / Impressum e-posta" : locale === "en" ? "Legal / Impressum email" : "Rechtliche / Impressum-E-Mail",
+    ibanNote: locale === "de"
+      ? "IBAN und Bankverbindung: Einstellungen → Zahlungen."
+      : locale === "tr"
+        ? "IBAN ve banka bilgileri: Ayarlar → Ödemeler."
+        : "IBAN and bank details: Settings → Payments.",
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -76,49 +196,64 @@ export default function GeneralSettingsPage() {
     }, 8000);
     const load = async () => {
       try {
-        const isSu = typeof window !== "undefined" ? localStorage.getItem("sellerIsSuperuser") === "true" : false;
-        if (!cancelled) setIsSuperuser(isSu);
+        const isSuLs = typeof window !== "undefined" ? localStorage.getItem("sellerIsSuperuser") === "true" : false;
         const [data, accountData] = await Promise.all([
           client.getSellerSettings(),
           client.getSellerAccount().catch(() => ({})),
         ]);
-        if (!cancelled) {
-          if (isSu) {
-            const platData = await client.getSellerSettings("default").catch(() => ({}));
-            setLegalInfo({
-              legal_company_name: platData.legal_company_name || "",
-              legal_representative: platData.legal_representative || "",
-              legal_street: platData.legal_street || "",
-              legal_city: platData.legal_city || "",
-              legal_trade_register: platData.legal_trade_register || "",
-              legal_register_court: platData.legal_register_court || "",
-              legal_vat_id: platData.legal_vat_id || "",
-              legal_tax_id: platData.legal_tax_id || "",
-              legal_email: platData.legal_email || "",
-            });
+        const isSu = accountData?.sellerUser?.is_superuser === true || accountData?.is_superuser === true || isSuLs;
+        if (!cancelled) setIsSuperuser(isSu);
+
+        let platData = {};
+        if (isSu) {
+          platData = await client.getSellerSettings("default").catch(() => ({}));
+          const enabled = Array.isArray(platData.enabled_shop_locales) && platData.enabled_shop_locales.length
+            ? platData.enabled_shop_locales.map((c) => String(c).toLowerCase())
+            : ALL_SHOP_LOCALES.map((l) => l.code);
+          if (!cancelled) {
+            setEnabledShopLocales(ALL_SHOP_LOCALES.map((l) => l.code).filter((c) => enabled.includes(c)));
           }
+        }
+
+        if (!cancelled) {
+          const preferred = String(data?.locale || "").toLowerCase();
+          if (routing.locales.includes(preferred)) {
+            setUiLocale(preferred);
+            try { localStorage.setItem("sellerLocale", preferred); } catch (_) {}
+          }
+
           const sellerUser = accountData?.sellerUser || data?.sellerUser || data?.seller || {};
           const businessAddress = sellerUser.business_address || {};
-          const warehouseAddress = sellerUser.warehouse_address || {};
           const documents = Array.isArray(sellerUser.documents) ? sellerUser.documents : [];
+          const legalCityParsed = parseLegalCity(platData.legal_city);
+
+          // One source of truth: prefer platform legal_* when present (superuser), else seller company fields
+          const companyName = (isSu && platData.legal_company_name) || sellerUser.company_name || "";
+          const taxId = (isSu && platData.legal_tax_id) || sellerUser.tax_id || "";
+          const vatId = (isSu && platData.legal_vat_id) || sellerUser.vat_id || "";
+          const businessStreet = (isSu && platData.legal_street) || businessAddress.street || "";
+          const businessPostalCode = (isSu && legalCityParsed.postal) || businessAddress.postal_code || "";
+          const businessCity = (isSu && legalCityParsed.city) || businessAddress.city || "";
+          const businessCountry = businessAddress.country || "";
+
           setFormData((prev) => ({
             ...prev,
             storeName: data.store_name || "",
             phone: sellerUser.phone || "",
-            companyName: sellerUser.company_name || "",
-            taxId: sellerUser.tax_id || "",
-            vatId: sellerUser.vat_id || "",
+            companyName,
+            taxId,
+            vatId,
             lucidNumber: sellerUser.lucid_number || "",
             eprDocumentUrl: sellerUser.epr_document_url || "",
             website: sellerUser.website || "",
-            businessStreet: businessAddress.street || "",
-            businessCity: businessAddress.city || "",
-            businessPostalCode: businessAddress.postal_code || "",
-            businessCountry: businessAddress.country || "",
-            warehouseStreet: warehouseAddress.street || "",
-            warehouseCity: warehouseAddress.city || "",
-            warehousePostalCode: warehouseAddress.postal_code || "",
-            warehouseCountry: warehouseAddress.country || "",
+            businessStreet,
+            businessCity,
+            businessPostalCode,
+            businessCountry,
+            representative: platData.legal_representative || "",
+            tradeRegister: platData.legal_trade_register || "",
+            registerCourt: platData.legal_register_court || "",
+            legalEmail: platData.legal_email || "",
             documents,
           }));
         }
@@ -161,13 +296,25 @@ export default function GeneralSettingsPage() {
           postal_code: formData.businessPostalCode.trim() || "",
           country: formData.businessCountry.trim() || "",
         },
-        warehouse_address: {
-          street: formData.warehouseStreet.trim() || "",
-          city: formData.warehouseCity.trim() || "",
-          postal_code: formData.warehousePostalCode.trim() || "",
-          country: formData.warehouseCountry.trim() || "",
-        },
       });
+
+      // Superuser: same values also become platform Impressum / agreement PDF source
+      if (isSuperuser) {
+        const legalCity = [formData.businessPostalCode.trim(), formData.businessCity.trim()].filter(Boolean).join(" ");
+        await client.updateSellerSettings({
+          seller_id: "default",
+          legal_company_name: formData.companyName.trim() || "",
+          legal_representative: formData.representative.trim() || "",
+          legal_street: formData.businessStreet.trim() || "",
+          legal_city: legalCity,
+          legal_trade_register: formData.tradeRegister.trim() || "",
+          legal_register_court: formData.registerCourt.trim() || "",
+          legal_vat_id: formData.vatId.trim() || "",
+          legal_tax_id: formData.taxId.trim() || "",
+          legal_email: formData.legalEmail.trim() || "",
+        });
+      }
+
       const newName = formData.storeName.trim();
       if (typeof window !== "undefined" && newName) {
         localStorage.setItem("storeName", newName);
@@ -175,24 +322,56 @@ export default function GeneralSettingsPage() {
       }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
-    } catch (e) {
-      setSaveError(userError(e, locale, "Failed to save settings."));
+    } catch (err) {
+      setSaveError(userError(err, locale, "Failed to save settings."));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleLegalSave = async () => {
-    setLegalError("");
-    setLegalSaving(true);
+  const handleLocaleToggle = async (code, nextOn) => {
+    if (!isSuperuser) return;
+    const prev = enabledShopLocales;
+    let next;
+    if (nextOn) {
+      next = ALL_SHOP_LOCALES.map((l) => l.code).filter((c) => c === code || prev.includes(c));
+    } else {
+      next = prev.filter((c) => c !== code);
+      if (!next.length) {
+        setLocalesError(
+          locale === "tr"
+            ? "En az bir dil açık kalmalı."
+            : locale === "en"
+              ? "At least one language must stay enabled."
+              : "Mindestens eine Sprache muss aktiv bleiben.",
+        );
+        return;
+      }
+    }
+    setLocalesError("");
+    setEnabledShopLocales(next);
+    setLocalesSaving(true);
     try {
-      await client.updateSellerSettings({ seller_id: "default", ...legalInfo });
-      setLegalSaved(true);
-      setTimeout(() => setLegalSaved(false), 3000);
-    } catch (e) {
-      setLegalError(e?.message || ui.saveError);
+      await client.updateSellerSettings({ seller_id: "default", enabled_shop_locales: next });
+      setLocalesSaved(true);
+      setTimeout(() => setLocalesSaved(false), 2500);
+      try {
+        const shopOrigin = (typeof window !== "undefined" && window.location?.origin?.includes("localhost"))
+          ? (process.env.NEXT_PUBLIC_SHOP_URL || "http://localhost:3000")
+          : (process.env.NEXT_PUBLIC_SHOP_URL || "");
+        if (shopOrigin) {
+          fetch(`${shopOrigin.replace(/\/$/, "")}/api/store-seller-settings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ seller_id: "default" }),
+          }).catch(() => {});
+        }
+      } catch (_) {}
+    } catch (err) {
+      setEnabledShopLocales(prev);
+      setLocalesError(err?.message || ui.saveError);
     } finally {
-      setLegalSaving(false);
+      setLocalesSaving(false);
     }
   };
 
@@ -220,8 +399,8 @@ export default function GeneralSettingsPage() {
       if (uploaded.length) {
         setFormData((p) => ({ ...p, documents: [...(p.documents || []), ...uploaded] }));
       }
-    } catch (e) {
-      setSaveError(userError(e, locale, "Document upload failed."));
+    } catch (err) {
+      setSaveError(userError(err, locale, "Document upload failed."));
     } finally {
       setUploadingDocs(false);
     }
@@ -231,29 +410,46 @@ export default function GeneralSettingsPage() {
     setFormData((p) => ({ ...p, documents: (p.documents || []).filter((_, i) => i !== idx) }));
   };
 
+  const handleLanguageChange = async (value) => {
+    const next = String(value || "").toLowerCase();
+    if (!routing.locales.includes(next) || next === uiLocale) return;
+    setUiLocale(next);
+    setLocaleSaving(true);
+    setSaveError("");
+    try {
+      await client.updateSellerSettings({ locale: next });
+      try { localStorage.setItem("sellerLocale", next); } catch (_) {}
+      const base =
+        pathWithoutLocale === "/" || !pathWithoutLocale
+          ? "/settings/general"
+          : pathWithoutLocale.startsWith("/")
+            ? pathWithoutLocale
+            : `/${pathWithoutLocale}`;
+      router.push(`/${next}${base}`);
+    } catch (err) {
+      setUiLocale(locale || "de");
+      setSaveError(userError(err, locale, "Could not save language preference."));
+    } finally {
+      setLocaleSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
         <BlockStack gap="200">
-          <Text as="p" tone="subdued">Loading…</Text>
+          <Text as="p" tone="subdued">{ui.loading || "Loading…"}</Text>
         </BlockStack>
       </Card>
     );
   }
 
-  const handleLanguageChange = (value) => {
-    const base = pathWithoutLocale === "/" || !pathWithoutLocale ? "" : pathWithoutLocale.startsWith("/") ? pathWithoutLocale : `/${pathWithoutLocale}`;
-    router.push(`/${value}${base}`);
-  };
-
   return (
     <BlockStack gap="400">
-      <Text as="p" tone="subdued">
-        Store name and contact. Store name is shown as Verkäufer on product pages in the shop.
-      </Text>
+      <Text as="p" tone="subdued">{copy.pageIntro}</Text>
       {saved && (
         <Banner tone="success" onDismiss={() => setSaved(false)}>
-          Settings saved successfully.
+          {ui.savedSuccess || "Settings saved successfully."}
         </Banner>
       )}
       {saveError && (
@@ -261,198 +457,279 @@ export default function GeneralSettingsPage() {
           {saveError}
         </Banner>
       )}
+
       <Card>
         <BlockStack gap="300">
-          <Text as="h2" variant="headingMd">Language</Text>
-          <Text as="p" tone="subdued">Interface language for Sellercentral. Product data can be entered in any language.</Text>
+          <SectionLabel
+            title={locale === "tr" ? "Arayüz dili" : locale === "en" ? "Interface language" : "Sprache der Benutzeroberfläche"}
+            subtitle={locale === "tr"
+              ? "Sellercentral dil tercihi hesabınıza kaydedilir."
+              : locale === "en"
+                ? "Sellercentral language preference is saved to your account."
+                : "Die Sellercentral-Spracheinstellung wird in Ihrem Konto gespeichert."}
+          />
           <Box maxWidth="320px">
             <Select
-              label="Language"
+              label={locale === "tr" ? "Dil" : locale === "en" ? "Language" : "Sprache"}
               labelHidden
               options={routing.locales.map((loc) => ({ label: t(loc), value: loc }))}
-              value={locale}
+              value={uiLocale}
               onChange={handleLanguageChange}
+              disabled={localeSaving}
             />
           </Box>
         </BlockStack>
       </Card>
+
       <form onSubmit={handleSubmit}>
-        <Card>
-          <BlockStack gap="400">
-            <TextField
-              label="Store name"
-              value={formData.storeName}
-              onChange={(v) => setFormData((p) => ({ ...p, storeName: v }))}
-              placeholder="e.g. Mein Shop"
-              autoComplete="off"
-              helpText="Shown as Verkäufer on product pages in the shop. Stored in the database."
-            />
-            <TextField
-              label="Phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(v) => setFormData((p) => ({ ...p, phone: v }))}
-              placeholder="+49 …"
-              autoComplete="tel"
-            />
-            <Divider />
-            <Text as="h2" variant="headingMd">Company details & documents</Text>
-            <TextField
-              label="Company legal name"
-              value={formData.companyName}
-              onChange={(v) => setFormData((p) => ({ ...p, companyName: v }))}
-              placeholder="Legal company name"
-              autoComplete="organization"
-            />
-            <InlineStack gap="300" blockAlign="start">
-              <Box minWidth="180px">
+        <BlockStack gap="400">
+          <Card>
+            <BlockStack gap="400">
+              <SectionLabel title={copy.storeCard} subtitle={copy.storeCardSub} />
+              <TextField
+                label={ui.storeName || "Store name"}
+                value={formData.storeName}
+                onChange={(v) => setFormData((p) => ({ ...p, storeName: v }))}
+                placeholder="e.g. Mein Shop"
+                autoComplete="organization"
+              />
+              <InlineStack gap="300" wrap>
+                <Box minWidth="200px" width="100%">
+                  <TextField
+                    label={ui.phone || "Phone"}
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(v) => setFormData((p) => ({ ...p, phone: v }))}
+                    placeholder="+49 …"
+                    autoComplete="tel"
+                  />
+                </Box>
+                <Box minWidth="200px" width="100%">
+                  <TextField
+                    label="Website"
+                    value={formData.website}
+                    onChange={(v) => setFormData((p) => ({ ...p, website: v }))}
+                    placeholder="https://..."
+                    autoComplete="url"
+                  />
+                </Box>
+              </InlineStack>
+            </BlockStack>
+          </Card>
+
+          <Card>
+            <BlockStack gap="400">
+              <SectionLabel title={copy.companyCard} subtitle={copy.companyCardSub} />
+
+              <Text as="h3" variant="headingSm">{copy.identity}</Text>
+              <TextField
+                label={ui.companyName || "Company legal name"}
+                value={formData.companyName}
+                onChange={(v) => setFormData((p) => ({ ...p, companyName: v }))}
+                placeholder={isSuperuser ? "Andertal GmbH" : "Legal company name"}
+                autoComplete="organization"
+              />
+              {isSuperuser && (
                 <TextField
-                  label="Tax ID"
-                  value={formData.taxId}
-                  onChange={(v) => setFormData((p) => ({ ...p, taxId: v }))}
-                  autoComplete="off"
+                  label={copy.managingDirector}
+                  value={formData.representative}
+                  onChange={(v) => setFormData((p) => ({ ...p, representative: v }))}
+                  placeholder="First Last"
+                  autoComplete="name"
                 />
-              </Box>
-              <Box minWidth="180px">
-                <TextField
-                  label="USt-IdNr. / VAT ID"
-                  value={formData.vatId}
-                  onChange={(v) => setFormData((p) => ({ ...p, vatId: v }))}
-                  autoComplete="off"
-                  helpText="z.B. DE123456789"
-                />
-              </Box>
-            </InlineStack>
-            <Text as="p" tone="subdued" variant="bodySm">
-              {locale === "de"
-                ? "IBAN und Bankverbindung werden unter Einstellungen → Zahlungen verwaltet."
-                : locale === "tr"
-                ? "IBAN ve banka bilgileri Ayarlar → Ödemeler altında yönetilir."
-                : "IBAN and bank details are managed under Settings → Payments."}
-            </Text>
-            <Divider />
-            <Text as="h3" variant="headingSm">
-              {locale === "de" ? "Verpackungsgesetz (LUCID / EPR)" : locale === "tr" ? "Ambalaj Geri Dönüşüm (LUCID / EPR)" : "Packaging Recycling (LUCID / EPR)"}
-            </Text>
-            <Text as="p" tone="subdued" variant="bodySm">
-              {locale === "de"
-                ? "Pflichtangabe nach deutschem Verpackungsgesetz (VerpackG). Ohne gültige LUCID-Registrierung darf kein Produkt über einen deutschen Marktplatz angeboten werden."
-                : locale === "tr"
-                ? "Almanya Ambalaj Kanunu (VerpackG) gereği zorunludur. Geçerli LUCID kaydı olmadan Almanya'daki pazaryerlerinde ürün listeleyemezsiniz."
-                : "Required under the German Packaging Act (VerpackG). Without a valid LUCID registration you may not list products on German marketplaces."}
-            </Text>
-            <InlineStack gap="300" blockAlign="start">
-              <Box minWidth="220px">
+              )}
+              <InlineStack gap="300" wrap>
+                <Box minWidth="180px">
+                  <TextField
+                    label={ui.taxId || "Tax ID"}
+                    value={formData.taxId}
+                    onChange={(v) => setFormData((p) => ({ ...p, taxId: v }))}
+                    autoComplete="off"
+                  />
+                </Box>
+                <Box minWidth="180px">
+                  <TextField
+                    label={ui.vatId || "USt-IdNr. / VAT ID"}
+                    value={formData.vatId}
+                    onChange={(v) => setFormData((p) => ({ ...p, vatId: v }))}
+                    autoComplete="off"
+                    helpText="z.B. DE123456789"
+                  />
+                </Box>
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">{copy.ibanNote}</Text>
+
+              <Divider />
+              <Text as="h3" variant="headingSm">{copy.address}</Text>
+              <TextField
+                label={ui.address || "Street"}
+                value={formData.businessStreet}
+                onChange={(v) => setFormData((p) => ({ ...p, businessStreet: v }))}
+                autoComplete="street-address"
+              />
+              <InlineStack gap="300" wrap>
+                <Box minWidth="120px">
+                  <TextField
+                    label={ui.postalCode || "Postal code"}
+                    value={formData.businessPostalCode}
+                    onChange={(v) => setFormData((p) => ({ ...p, businessPostalCode: v }))}
+                    autoComplete="postal-code"
+                  />
+                </Box>
+                <Box minWidth="160px">
+                  <TextField
+                    label={locale === "de" ? "Stadt" : locale === "tr" ? "Şehir" : "City"}
+                    value={formData.businessCity}
+                    onChange={(v) => setFormData((p) => ({ ...p, businessCity: v }))}
+                    autoComplete="address-level2"
+                  />
+                </Box>
+                <Box minWidth="140px">
+                  <TextField
+                    label={locale === "de" ? "Land" : locale === "tr" ? "Ülke" : "Country"}
+                    value={formData.businessCountry}
+                    onChange={(v) => setFormData((p) => ({ ...p, businessCountry: v }))}
+                    autoComplete="country-name"
+                  />
+                </Box>
+              </InlineStack>
+              <Banner tone="info">
+                <p>
+                  {copy.locationsNote}{" "}
+                  <Link href="/settings/locations" style={{ fontWeight: 600, textDecoration: "underline" }}>
+                    {copy.locationsLink}
+                  </Link>
+                </p>
+              </Banner>
+
+              {isSuperuser && (
+                <>
+                  <Divider />
+                  <Text as="h3" variant="headingSm">{copy.register}</Text>
+                  <InlineStack gap="300" wrap>
+                    <Box minWidth="200px" width="100%">
+                      <TextField
+                        label={copy.tradeReg}
+                        value={formData.tradeRegister}
+                        onChange={(v) => setFormData((p) => ({ ...p, tradeRegister: v }))}
+                        placeholder="HRB XXXXX"
+                        autoComplete="off"
+                      />
+                    </Box>
+                    <Box minWidth="200px" width="100%">
+                      <TextField
+                        label={copy.regCourt}
+                        value={formData.registerCourt}
+                        onChange={(v) => setFormData((p) => ({ ...p, registerCourt: v }))}
+                        placeholder="Amtsgericht Düsseldorf"
+                        autoComplete="off"
+                      />
+                    </Box>
+                  </InlineStack>
+                  <Text as="h3" variant="headingSm">{copy.contact}</Text>
+                  <TextField
+                    label={copy.legalEmail}
+                    value={formData.legalEmail}
+                    onChange={(v) => setFormData((p) => ({ ...p, legalEmail: v }))}
+                    placeholder="info@andertal.com"
+                    autoComplete="email"
+                    type="email"
+                    helpText={ui.adminInfoNote}
+                  />
+                </>
+              )}
+            </BlockStack>
+          </Card>
+
+          <Card>
+            <BlockStack gap="300">
+              <SectionLabel title={copy.compliance} subtitle={copy.complianceSub} />
+              <Box maxWidth="320px">
                 <TextField
                   label={locale === "de" ? "LUCID-Registrierungsnummer" : locale === "tr" ? "LUCID Kayıt Numarası" : "LUCID Registration Number"}
                   value={formData.lucidNumber}
                   onChange={(v) => setFormData((p) => ({ ...p, lucidNumber: v }))}
                   placeholder="DE1234567890123"
                   autoComplete="off"
-                  helpText={locale === "de" ? "Pflichtfeld — z.B. DE1234567890123 (Zentrale Stelle Verpackungsregister)" : locale === "tr" ? "Zorunlu — örn. DE1234567890123" : "Required — e.g. DE1234567890123"}
                 />
               </Box>
-            </InlineStack>
-            <TextField
-              label="Website"
-              value={formData.website}
-              onChange={(v) => setFormData((p) => ({ ...p, website: v }))}
-              placeholder="https://..."
-              autoComplete="url"
-            />
-            <Divider />
-            <Text as="h3" variant="headingSm">Registered business address</Text>
-            <TextField label="Street" value={formData.businessStreet} onChange={(v) => setFormData((p) => ({ ...p, businessStreet: v }))} autoComplete="street-address" />
-            <InlineStack gap="300" blockAlign="start">
-              <Box minWidth="140px"><TextField label="City" value={formData.businessCity} onChange={(v) => setFormData((p) => ({ ...p, businessCity: v }))} autoComplete="address-level2" /></Box>
-              <Box minWidth="140px"><TextField label="Postal code" value={formData.businessPostalCode} onChange={(v) => setFormData((p) => ({ ...p, businessPostalCode: v }))} autoComplete="postal-code" /></Box>
-              <Box minWidth="140px"><TextField label="Country" value={formData.businessCountry} onChange={(v) => setFormData((p) => ({ ...p, businessCountry: v }))} autoComplete="country-name" /></Box>
-            </InlineStack>
-            <Divider />
-            <Text as="h3" variant="headingSm">Warehouse / return address</Text>
-            <TextField label="Street" value={formData.warehouseStreet} onChange={(v) => setFormData((p) => ({ ...p, warehouseStreet: v }))} autoComplete="street-address" />
-            <InlineStack gap="300" blockAlign="start">
-              <Box minWidth="140px"><TextField label="City" value={formData.warehouseCity} onChange={(v) => setFormData((p) => ({ ...p, warehouseCity: v }))} autoComplete="address-level2" /></Box>
-              <Box minWidth="140px"><TextField label="Postal code" value={formData.warehousePostalCode} onChange={(v) => setFormData((p) => ({ ...p, warehousePostalCode: v }))} autoComplete="postal-code" /></Box>
-              <Box minWidth="140px"><TextField label="Country" value={formData.warehouseCountry} onChange={(v) => setFormData((p) => ({ ...p, warehouseCountry: v }))} autoComplete="country-name" /></Box>
-            </InlineStack>
-            <Divider />
-            <Text as="h3" variant="headingSm">Company documents</Text>
-            <Text as="p" tone="subdued">
-              Upload trade license, tax certificate, registration documents, etc. After saving, status can move to document-submitted.
-            </Text>
-            <input
-              type="file"
-              multiple
-              accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-              onChange={(e) => { handleDocumentUpload(e.target.files); e.target.value = ""; }}
-              disabled={uploadingDocs}
-            />
-            {uploadingDocs && <Text as="p" tone="subdued">Uploading documents…</Text>}
-            {(formData.documents || []).length > 0 && (
-              <BlockStack gap="100">
-                {formData.documents.map((doc, idx) => (
-                  <InlineStack key={`${doc.url || doc.name}-${idx}`} align="space-between" blockAlign="center">
-                    <a href={doc.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, textDecoration: "underline" }}>
-                      {doc.name || doc.url}
-                    </a>
-                    <Button size="slim" variant="plain" tone="critical" onClick={() => removeDocument(idx)}>Remove</Button>
-                  </InlineStack>
-                ))}
-              </BlockStack>
-            )}
-            <InlineStack gap="200">
-              <Button submit variant="primary" loading={saving}>
-                Save
-              </Button>
-              <Button onClick={() => setSaved(false)}>Cancel</Button>
-            </InlineStack>
-          </BlockStack>
-        </Card>
+            </BlockStack>
+          </Card>
+
+          <Card>
+            <BlockStack gap="300">
+              <SectionLabel title={copy.docs} subtitle={copy.docsSub} />
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                onChange={(e) => { handleDocumentUpload(e.target.files); e.target.value = ""; }}
+                disabled={uploadingDocs}
+              />
+              {uploadingDocs && <Text as="p" tone="subdued">Uploading documents…</Text>}
+              {(formData.documents || []).length > 0 && (
+                <BlockStack gap="100">
+                  {formData.documents.map((doc, idx) => (
+                    <InlineStack key={`${doc.url || doc.name}-${idx}`} align="space-between" blockAlign="center">
+                      <a href={doc.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, textDecoration: "underline" }}>
+                        {doc.name || doc.url}
+                      </a>
+                      <Button size="slim" variant="plain" tone="critical" onClick={() => removeDocument(idx)}>
+                        {ui.delete || "Remove"}
+                      </Button>
+                    </InlineStack>
+                  ))}
+                </BlockStack>
+              )}
+            </BlockStack>
+          </Card>
+
+          <InlineStack gap="200">
+            <Button submit variant="primary" loading={saving}>
+              {ui.save || "Save"}
+            </Button>
+          </InlineStack>
+        </BlockStack>
       </form>
 
       {isSuperuser && (
         <Card>
           <BlockStack gap="400">
-            <Text variant="headingMd" as="h2">{ui.adminInfo}</Text>
-            <Text variant="bodySm" tone="subdued">
-              {ui.adminInfoNote}
-            </Text>
-            <Divider />
-            <TextField label={ui.companyName} value={legalInfo.legal_company_name}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_company_name: v }))}
-              placeholder="Andertal GmbH" autoComplete="off" />
-            <TextField label={locale === "de" ? "Vertreten durch (Geschäftsführer)" : "Managing Director"} value={legalInfo.legal_representative}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_representative: v }))}
-              placeholder="First Last" autoComplete="off" />
-            <TextField label={ui.address} value={legalInfo.legal_street}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_street: v }))}
-              placeholder="Main St 1" autoComplete="off" />
-            <TextField label={ui.postalCode + " / City"} value={legalInfo.legal_city}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_city: v }))}
-              placeholder="41564 Kaarst" autoComplete="off" />
-            <TextField label={locale === "de" ? "Handelsregisternummer" : "Trade Register No."} value={legalInfo.legal_trade_register}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_trade_register: v }))}
-              placeholder="HRB XXXXX" autoComplete="off" />
-            <TextField label={locale === "de" ? "Registergericht" : "Registry Court"} value={legalInfo.legal_register_court}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_register_court: v }))}
-              placeholder="Amtsgericht Düsseldorf" autoComplete="off" />
-            <TextField label={ui.vatId} value={legalInfo.legal_vat_id}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_vat_id: v }))}
-              placeholder="DE123456789" autoComplete="off" />
-            <TextField label={ui.taxId} value={legalInfo.legal_tax_id}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_tax_id: v }))}
-              placeholder="12/345/67890" autoComplete="off" />
-            <TextField label={ui.email} value={legalInfo.legal_email}
-              onChange={(v) => setLegalInfo((p) => ({ ...p, legal_email: v }))}
-              placeholder="info@andertal.com" autoComplete="off" type="email" />
-            {legalError && <Banner tone="critical"><p>{legalError}</p></Banner>}
-            {legalSaved && <Banner tone="success"><p>{ui.savedSuccess}</p></Banner>}
-            <InlineStack gap="200">
-              <Button variant="primary" loading={legalSaving} onClick={handleLegalSave}>
-                {ui.save}
-              </Button>
-            </InlineStack>
+            <SectionLabel
+              title={locale === "tr" ? "Website dilleri" : locale === "en" ? "Website languages" : "Website-Sprachen"}
+              subtitle={locale === "tr"
+                ? "Shop’ta gösterilecek dilleri aç/kapa."
+                : locale === "en"
+                  ? "Toggle which languages appear on the shop."
+                  : "Sprachen für den Shop ein-/ausschalten."}
+            />
+            <BlockStack gap="300">
+              {ALL_SHOP_LOCALES.map((l) => {
+                const on = enabledShopLocales.includes(l.code);
+                return (
+                  <InlineStack key={l.code} align="space-between" blockAlign="center" wrap={false}>
+                    <Text as="span" variant="bodyMd">
+                      {l.label}{" "}
+                      <Text as="span" tone="subdued" variant="bodySm">
+                        ({l.code.toUpperCase()})
+                      </Text>
+                    </Text>
+                    <LocaleToggle
+                      on={on}
+                      disabled={localesSaving || (on && enabledShopLocales.length <= 1)}
+                      label={`${l.label} ${on ? "on" : "off"}`}
+                      onChange={(v) => handleLocaleToggle(l.code, v)}
+                    />
+                  </InlineStack>
+                );
+              })}
+            </BlockStack>
+            {localesError && <Banner tone="critical"><p>{localesError}</p></Banner>}
+            {localesSaved && !localesError && (
+              <Banner tone="success">
+                <p>{ui.savedSuccess}</p>
+              </Banner>
+            )}
           </BlockStack>
         </Card>
       )}

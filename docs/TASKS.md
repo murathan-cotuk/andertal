@@ -1,21 +1,17 @@
-1) ✅ Yapıldı — Shopta product card ve product sayfasinda üründe indirim var ise yaninda indirim yüzdesinin göründügü bi balon aciliyor. kirmizi olmali o balon.
-2) ✅ Yapıldı — superuser panelimde ürünün yaninda vorschlag var. bastim vorschlaglari sildim. hala oradan gitmedi o vorschlag yazisi ve 3 nokta ismi üstündeki bildirimi.
-3) ✅ Yapıldı — vorschlaglar daha net gösterilebilir. json dosyasi gibi gözüküyor hicbir sey anlamiyorum. hangi bölümü degistirecek, mevcut deger ne, önerdigi deger ne? bu ücünün net bi sekilde yazmasi lazim. ayrica vorschlag yazisinin geldigi yer asiri fazla kötü ya kaydirma yapiyor butonlarda. butonlar kaymamali. kaymamasi icin de vorschlag butonu gelmesin. 3 noktaya bildirim gelsin yalnizca.
-4) ✅ Yapıldı — siparisler bir kutu icinde gösteriliyor. bence öyle olmamali ya dümdüz sayfanin üzerinde liste seklinde olmali. saticiya göre kategorize edilmis ancak her siparis kümesinin basinda satici adi yazabilir. böyle olunca cok sinirlanmis oluyor dropdown vs. 
-5) ✅ Yapıldı — böyle bir email aldim müsteri hesabimin email adresine: "Wie gefällt dir Ecommezzo Test Product DE (MATERIAL: B / SIZE: S)?"
-önceki verdigim siparisten kaynakli bewertung isteme emaili gönderilmis. bu harika!!! simdi kontrol sagliyorum. bu email icinde "Bewertung schreiben" diye bi email var. ona basiyorum. beni direkt bewertung yazabilecegim sayfaya yönlendirmek yerine ürün sayfasina yönlendiriyor. burasi kötü iste. direkt redirect olmasi lazim bestellung sayfasi icinde ilgili bestellungta bewertung butonuna basilmis gibi olmali.
-6) ✅ Yapıldı (veri düzeltmesi, kod hatası değildi) — bazi ürünlerde almanca dil seciliyken ingilizce dil icin girilmis isim gözüküyor. mesela bu: 1234567890121. ancak genel olarak bu fonksiyon dogru. sanirim sorun bu üründe var.
-7) ✅ Yapıldı — Bir Seite olusturdugumuzu ve direkt orada seite sayfasinda icerigine txt ler yazdigimizi düsün. sonra landing-page sayfasina gidip o seite ye containerler falan koyuyoruz. mesela shopta o seiteye gidildiginde önce containerler görünecek. En altta da seite kisminda yazidigmiz metinler gözükecek richtext gibi. bu ayari cok iyi yap.
-8) ✅ Yapıldı — Kök neden: `catalog_hub_v1` CMS stack (text/newsletter/product rows) bestsellers/sales/neuheiten native sidebar+karusel şablonunun üstüne biniyordu. Düzeltme: (1) `CatalogCmsLanding` + `preferNativeCatalog` — CMS yalnızca `category_sidebar`+`bestseller_carousel` / `category_carousels_v1` varken boyanır; aksi halde native template. (2) Seed `native_catalog_v1` ile bu sayfalarda boş container (brands CMS stack’i korunur). Canlı temizlik: `SELLER_TOKEN=… node apps/medusa-backend/scripts/push-catalog-landing-pages-remote.js`. Container tipleri (mode sale/bestseller, category sidebar) editörde hazır. —
-9) ✅ Yapıldı — SEO Hub: dil seçici (DE kök + diğer diller `seo_i18n` / pages `meta_*_i18n`); kategoriler aramalı nested tree; Open in shop; düzenlenebilir slug/handle; Analyze template H1 (client SSR eksikliği) sayıyor; kategori kayıtta yalnızca eksik title/desc engeli (uzunluk uyarı). Shop kategori `generateMetadata` keywords + locale `seo_i18n` okuyor. —
+1) ✅ Yapıldı — Shopta product card ve product sayfasinda üründe indirim var ise yaninda indirim yüzdesinin göründügü bi balon aciliyor. kirmizi olmali o balon. ürün fiyati cizili olacak indirim fiyati kirmizi olacak.
+
+
+7) ✅ Yapıldı (düzeltme 2026-08-12) — Marken `/brands`: CMS `brands_directory` (eski boş `seller_carousel` artık aynı Marken-Raster’ı boyar) = arama + A–Z + 5×10 kart grid. Content→Pages Seiteninhalt (richtext) `CatalogCmsLanding` içinde her zaman container’ların EN ALTINDA.
+
+
 10) ✅ Yapıldı — Lieferscheinda faturada siparisler sayfasinda ve emaillerde ürün isminin yaninda varyasyonlar parantez icinde gözükmesin. yine yaninda alsin ancak daha acik renkli ufak puntoda not seklinde düssün
 11) ✅ Yapıldı — bi sipariste sendungsnummer yok henüz. lieferschein drucken diyorum sendungsnummer cikiyor. sacma :D sendungsnummer tek satira sigmali ve logo tam ortada o kadar büyük görünmemeli evraklarda.
-12) ✅ Yapıldı — Geräte: session create hataları loglanıyor; GET /sessions → session_tracking; UI re-login uyarısı; impersonate artık sid oluşturuyor. Eski JWT’siz oturumlar için bir kez çıkış/giriş gerekir.
-13) ✅ Yapıldı — settings/billing sayfasinda istedigim hicbir evragi indiremiyorum. {"message":"Unauthorized"} diye bi uyari geliyor.
+
+
 14) ✅ Yapıldı — yeni acilan seller hesaplari neden to-do listte bu sayfaya yönlendiriliyor?: settings/stripe-connect sellerlarin stripe ile yapacaklari bir sey yok hatta bir sey yapamamalilar. erisememeliler.
 15) ✅ Yapıldı — sellercentralde settings sayfasinda soldaki menülerden de yalnizca superuser in görebildiklerini kirmizi yap.
 16) ✅ Yapıldı (izolasyon zaten güvenliydi, sadece amaç etiketleri eklendi) — settings/locations sayfasindaki icerikler her seller in kendine özel olacak. baska sellerlar göremeyecek. add location dendiginde ya da mevcut location düzenlenmek istendiginde o adresin ne amacla kullanilacagi secilebilsin. Siparislerin kargolandigi adres, iadelerin gelecegi adres, fatura adresi vs ayri ayri secilebilsin. bir adrese her biri tanimlanabilsin ancak tercihe göre her biri icin ayri bir adres de belirlenebilir.
-17) ⏭️ Atlandı (hangi sayfa olduğu netleşmedi, kullanıcı atlanmasını istedi) — bu sayfanin icerigini netlestir ve bi kilavuz gibi bir sey yaz. nedir hic anlamadim ne yapilmasi lazim ne zaman yapilmasi lazim bilmiyorum
+17) ✅ Yapıldı — DAC7 / § 12 PStTG sayfasına kısa kılavuz eklendi (nedir, kim, ne zaman, adımlar, ne yapmaz) + rapor aracı aynı kaldı.
 18) ✅ Yapıldı — settings/general sayfasinda kendini tekrar eden bölümler var. mesela iki defa adres giriliyor, iki defa sirket bilgileri giriliyor falan. burada da iban yazma kismi var falan. iban baska yerden yaziliyor ama... düzenle burayi.
 19) ✅ Yapıldı — settings/security sayfasinda konto seit kismi bos. doldur. yeni sifre belirleme kisminda yazilanlari gösterme butonu ekle.
 20) ✅ Yapıldı — settings/payments sayfasinda So funktionieren Auszahlungen altinda Auszahlung (88%) yaziyor. 88% neden var? kaldir. kafa karismasin.
@@ -23,8 +19,8 @@
 22) ✅ Yapıldı — pricing/SEO/metafield/varyasyon UX + VariantEditPage alanları + GPSR varyant kilidi tamamdı. Ayrı ürünleri tek parent altında birleştirme: Inventory’de 2+ seç → Combine as variants; POST /admin-hub/v1/products/combine-as-variants (kaynaklar status=merged).
 23) ✅ Yapıldı — Ürün/sipariş küçük resimleri + hover + shop linki tamamlandı. ActionMenu Polaris Popover/ActionList; ManualOrderModal Polaris Modal + TextField/Select.
 24) ✅ Yapıldı — kök neden: login durumuyla ilgisi yoktu (kategori listesinde hiç auth kontrolü yoktu). Kategoriler tek seferlik bir fetch ile geliyor; menüyü sayfa yüklenir yüklenmez açarsan (ya da fetch başarısız olursa) kategori bölümü DOM'dan tamamen kayboluyordu, geriye sadece hesap bölümü (login iken "Mein Konto", logout iken "Anmelden/Registrieren") kalıyordu — bu da login'e bağlıymış gibi görünüyordu. Şimdi fetch tamamlanana kadar kategori bölümü placeholder (shimmer) gösteriyor, kaybolmuyor. Merkzettel notu: gerçek bir guest-wishlist yok, gördüğün şey login'e yönlendirmeden önceki tek karelik "boş liste" anı (FOUC), ayrı bir konu. — mobilde soldan sidebar kategoriler gelsin diye altaki menü butonuna basiyorum ancak anmelden registrieren diyor. orada menü itemler gözükmeliydi. BOZMA BIR SEYI. Login olunca gözüküyor ancak logoutken de göözükmeli. login olmamis biri nasil merkzettel görebiliyor onu tam anlamadim ben :D
-25) ✅ Yapıldı — Kod yolu doğruydu; boşluk varsayılan Product Badges seed’i yoktu. Boot’ta idempotent seed: bestseller_category / sale / new. Algoritmik ★ rozet hâlâ ödenmiş sipariş veya sales skoru (>=1) ister.
-26) ✅ Yapıldı (A + B + C) — Badge sistemi algoritmik + Product Badges merkezi + dil bazlı text/image i18n.
-27) ✅ Yapıldı — Verkäufer werden: 13 CMS container seed + Sellercentral landing editor.
-28) ✅ Yapıldı — Hardcoded BecomeSellerLanding kaldırıldı; shop LandingContainers. Container yoksa title/body’ye düşülmez: ensureBecomeSellerLanding (boot + db:seed-become-seller) sayfa+container seed eder. image/image_url uyumu.
+
+25) Satıcılar için zorunlu: Gebühren (platform ücretleri) için kredi kartı ekleme + Auszahlung (ödeme) için IBAN ekleme. İkisi de mutlaka girilmeli; eksikse onboarding/to-do ve ilgili settings (payments / billing) net uyarmalı, satışa açılmadan tamamlanmış sayılmamalı.
+
+26) settings/shipping’den Retouren adresi bölümü kaldırılacak (kaldırıldı). Retoure / Lager / Fatura adresleri yalnızca settings/locations (Standorte) üzerinden girilir ve zorunludur; locations değerleri esas alınır. Zorunlu kurulum kalemleri (Standorte 3 amaç + kredi kartı + IBAN) seller detay sayfasından kontrol edilebilir olmalı.
 

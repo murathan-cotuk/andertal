@@ -11,7 +11,7 @@
 
 const { randomUUID } = require('crypto')
 
-const LAYOUT_VERSION = 'catalog_hub_v2'
+const LAYOUT_VERSION = 'catalog_hub_v3'
 const NATIVE_LAYOUT_VERSION = 'native_catalog_v1'
 const LANGUAGES = ['en', 'tr', 'fr', 'es', 'it']
 
@@ -286,7 +286,7 @@ const CATALOG_PAGES = [
         '<ul><li>Elenco alfabetico dei brand</li><li>Link diretti alle pagine marca</li><li>Venditori e prodotti affidabili</li></ul>',
       ),
     ),
-    // Brands hub uses feature_grid + seller_carousel instead of product algorithms
+    // Brands hub uses feature_grid + brands_directory instead of product algorithms
     algorithm: null,
     featureCards: [
       {
@@ -334,6 +334,7 @@ const CATALOG_STACK_TYPES = new Set([
   'personalized_product_row',
   'feature_grid',
   'seller_carousel',
+  'brands_directory',
   'newsletter',
   'banner_cta',
 ])
@@ -403,26 +404,26 @@ const buildFeatureGrid = (pageDef, visibleOn, preset) => {
   })
 }
 
-const buildSellerCarousel = (visibleOn, preset) => localize({
+const buildBrandsDirectory = (visibleOn, preset) => localize({
   id: randomUUID(),
-  type: 'seller_carousel',
+  type: 'brands_directory',
   visible: true,
   visible_on: visibleOn,
-  limit: 20,
-  items_per_row: preset.items_per_row,
+  items_per_row: 5,
   items_per_row_mobile: 2,
-  gap: 16,
+  max_rows: 10,
+  gap: 14,
   padding: preset.padding,
   content_layout: 'contained',
   content_max_width: preset.content_max_width,
 }, {
   title: value(
-    'Starke Verkäufer & Markenpartner',
-    'Strong sellers & brand partners',
-    'Güçlü satıcılar ve marka ortakları',
-    'Vendeurs et partenaires marques',
-    'Vendedores y socios de marca',
-    'Venditori e partner di marca',
+    'Alle Marken',
+    'All brands',
+    'Tum markalar',
+    'Toutes les marques',
+    'Todas las marcas',
+    'Tutti i brand',
   ),
 })
 
@@ -464,7 +465,7 @@ const buildDeviceContainers = (pageDef, visibleOn) => {
   const list = [buildIntroTextBlock(pageDef, visibleOn, preset)]
   if (pageDef.slug === 'brands') {
     list.push(buildFeatureGrid(pageDef, visibleOn, preset))
-    list.push(buildSellerCarousel(visibleOn, preset))
+    list.push(buildBrandsDirectory(visibleOn, preset))
   } else {
     list.push(buildProductRow(pageDef.algorithm, pageDef.rowTitles, visibleOn, preset))
     if (pageDef.secondaryAlgorithm) {

@@ -13,9 +13,7 @@ import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
 import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
-import BestsellerBadge from "@/components/BestsellerBadge";
-import { SaleBadgeImageCorner } from "@/components/SaleBadge";
-import { isBestsellerMetadata, isNewMetadata } from "@/lib/bestseller";
+import { CustomProductBadges } from "@/components/CustomProductBadge";
 import { getBruttoCentsFromPricesMap } from "@/lib/product-price";
 import { StarRating } from "@/components/ProductCard";
 import styled from "styled-components";
@@ -59,12 +57,22 @@ const ImgCol = styled.div`
     height: 100%;
     min-height: 120px;
   }
-  img {
+  a img,
+  > img:not(.product-custom-badge-img) {
     width: 100%;
     height: 100%;
     min-height: 120px;
     object-fit: contain;
     display: block;
+  }
+  img.product-custom-badge-img {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    object-fit: contain !important;
   }
   @media (max-width: 400px) {
     flex: 0 0 120px;
@@ -308,13 +316,8 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
     product.metadata?.rabattpreis_cents != null ? Number(product.metadata.rabattpreis_cents) : null;
   const hasSale = saleCents != null && saleCents > 0 && saleCents < priceCents;
 
-  const isNew =
-    product.metadata?.is_new === true ||
-    product.metadata?.is_new === "true" ||
-    isNewMetadata(product.metadata, product.created_at);
   const publishDate = product.metadata?.publish_date ? new Date(product.metadata.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
-  const isBestseller = isBestsellerMetadata(product.metadata || {});
   const managesInventory = variant?.manage_inventory === true;
   const inventoryQty = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity;
   const outOfStock = managesInventory && typeof inventoryQty === "number" && inventoryQty <= 0;
@@ -378,9 +381,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
             <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
           </div>
         ) : null}
-        {hasSale && !isComingSoon && (
-          <SaleBadgeImageCorner inset={6}>{tp("sale")}</SaleBadgeImageCorner>
-        )}
+        <CustomProductBadges badges={product?.metadata?.custom_badges} locale={locale} />
       </ImgCol>
       <Content>
         {productUrl ? <Title href={productUrl}>{displayTitle}</Title> : <span style={{ fontSize: 16, fontWeight: 600 }}>{displayTitle}</span>}
@@ -390,9 +391,7 @@ export function ProductCategoryRow({ product, activeFilters = {} }) {
         </div>
 
         <TagRow>
-          {isBestseller && !isComingSoon && <BestsellerBadge />}
           {isComingSoon && <Tag>{tp("comingSoon")}</Tag>}
-          {isNew && !hasSale && !isComingSoon && <Tag>{tp("new")}</Tag>}
           {lowStockText && !isComingSoon && <Tag $mut>{lowStockText}</Tag>}
           {shippingUnavailable && !isComingSoon && <Tag $mut>{tp("notAvailable")}</Tag>}
           {outOfStock && !isComingSoon && <Tag $mut>{tp("outOfStock")}</Tag>}

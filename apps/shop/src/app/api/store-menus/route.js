@@ -13,7 +13,9 @@ export async function GET(request) {
     const now = Date.now();
     const cached = menusCache.get(locale);
     if (!skipCache && cached && cached.expiresAt > now) {
-      return NextResponse.json(cached.data);
+      return NextResponse.json(cached.data, {
+        headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" },
+      });
     }
     const base = getBackendUrl();
     const qs = locale ? `?locale=${encodeURIComponent(locale)}` : "";
@@ -33,7 +35,10 @@ export async function GET(request) {
     if (!skipCache) {
       menusCache.set(locale, { data, expiresAt: now + MENUS_TTL });
     }
-    return NextResponse.json(data);
+    return NextResponse.json(
+      data,
+      skipCache ? undefined : { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" } },
+    );
   } catch (e) {
     if (process.env.NODE_ENV === "development") {
       console.warn(`[shop/api/store-menus] ${e?.message || e} — backend: ${getBackendUrl()}`);

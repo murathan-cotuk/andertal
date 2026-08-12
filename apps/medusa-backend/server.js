@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Medusa v2 Backend Server
  * dotenv + MedusaAppLoader + app.load() + listen + graceful shutdown.
  * Render: Start Command = node server.js
@@ -1038,6 +1038,7 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_vat_id varchar(100)`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_tax_id varchar(100)`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_email varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS enabled_shop_locales jsonb`).catch(() => {})
         await client.query(`CREATE TABLE IF NOT EXISTS admin_hub_notifications (
           id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
           type varchar(50) NOT NULL,
@@ -1786,6 +1787,8 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS badge_type text NOT NULL DEFAULT 'text';`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS image_url text;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS i18n jsonb;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS image_width int;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS image_height int;`).catch(() => {})
         try {
           const { seedDefaultProductBadges } = require('./src/product-badges-seed')
           const seedRes = await seedDefaultProductBadges(client)

@@ -14,7 +14,10 @@ export async function GET() {
       return NextResponse.json({ definitions: {} }, { status: 200 });
     }
     const data = await res.json();
-    return NextResponse.json({ definitions: data?.definitions || {} });
+    return NextResponse.json(
+      { definitions: data?.definitions || {} },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" } },
+    );
   } catch {
     return NextResponse.json({ definitions: {} }, { status: 200 });
   }

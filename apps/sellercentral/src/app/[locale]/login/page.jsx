@@ -117,6 +117,11 @@ function LoginForm() {
     localStorage.setItem("sellerIsSuperuser", data.user.is_superuser ? "true" : "false");
     localStorage.setItem("sellerPermissions", data.user.permissions ? JSON.stringify(data.user.permissions) : "null");
     localStorage.setItem("sellerLoggedIn", "true");
+    const preferredRaw = String(data?.user?.locale || "").trim().toLowerCase();
+    const preferredLocale = LOCALES.some((l) => l.code === preferredRaw) ? preferredRaw : "";
+    if (preferredLocale) {
+      try { localStorage.setItem("sellerLocale", preferredLocale); } catch (_) {}
+    }
     const sessionRes = await fetch("/api/auth/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -133,6 +138,10 @@ function LoginForm() {
     const next = searchParams?.get("next") || "";
     if (next && next.startsWith("/") && !next.startsWith("//")) {
       window.location.href = next;
+      return;
+    }
+    if (preferredLocale) {
+      router.replace("/dashboard", { locale: preferredLocale });
       return;
     }
     router.push("/dashboard");

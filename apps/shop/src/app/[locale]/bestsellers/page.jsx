@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import CatalogCmsLanding from "@/components/catalog/CatalogCmsLanding";
+import CatalogHubFilterShell from "@/components/catalog/CatalogHubFilterShell";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
@@ -11,6 +12,7 @@ import { useLocale } from "next-intl";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { getLocalizedCategory } from "@/lib/format";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { getMedusaClient } from "@/lib/medusa-client";
 
 const FilterBar = styled.div`
   display: flex;
@@ -130,6 +132,7 @@ export default function BestsellersPage() {
   const [error, setError] = useState("");
   const [selectedCollections, setSelectedCollections] = useState(new Set());
   const [pageSettings, setPageSettings] = useState(null);
+  const [showProductFilterBar, setShowProductFilterBar] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,10 +140,21 @@ export default function BestsellersPage() {
       try {
         setLoading(true);
         setError("");
-        const [catRes, prRes, settingsRes] = await Promise.all([
+        const [catRes, prRes, settingsRes, landingFlag] = await Promise.all([
           fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
           fetch("/api/store-products?limit=1200", { cache: "no-store" }),
           fetch("/api/store-api-page-settings/bestsellers", { cache: "no-store" }).catch(() => null),
+          (async () => {
+            try {
+              const client = getMedusaClient();
+              const page = await client.getPageBySlug("bestsellers");
+              if (!page?.id) return false;
+              const lp = await client.request(`/store/landing-page/${encodeURIComponent(page.id)}`, { cache: "no-store" });
+              return lp?.settings?.show_product_filter_bar === true;
+            } catch {
+              return false;
+            }
+          })(),
         ]);
         const catData = catRes.ok ? await catRes.json() : { tree: [] };
         const prData = prRes.ok ? await prRes.json() : { products: [] };
@@ -149,6 +163,7 @@ export default function BestsellersPage() {
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
           setPageSettings(settingsData || null);
+          setShowProductFilterBar(landingFlag === true);
         }
       } catch (e) {
         if (!cancelled) setError(e?.message || "Error");
@@ -232,10 +247,36 @@ export default function BestsellersPage() {
     });
   };
 
-  return (
-    <CatalogCmsLanding slug="bestsellers" fallbackTitle={pageTitle} showTitleWhenNoContainers preferNativeCatalog>
-      {/* Horizontal category filter chips */}
-      {!loading && !error && filterCollections.length > 0 && (
+  const hubLinks = useMemo(() => {
+    if (!showProductFilterBar) return [];
+    const cats = filterCollections
+      .map((c) => {
+        const slug = String(c.slug || c.handle || "").replace(/^\//, "");
+        if (!slug) return null;
+        return {
+          slug,
+          title: getLocalizedCategory(c, locale).name || c.name || slug,
+          href: `#${slug}`,
+          active: selectedCollections.has(String(c.id)),
+          onClick: () => toggleCollection(String(c.id)),
+        };
+      })
+      .filter(Boolean);
+    return [
+      {
+        slug: "__all__",
+        title: copy.all,
+        href: "#all",
+        active: selectedCollections.size === 0,
+        onClick: () => setSelectedCollections(new Set()),
+      },
+      ...cats,
+    ];
+  }, [showProductFilterBar, filterCollections, locale, selectedCollections, copy.all]);
+
+  const body = (
+    <>
+      {!loading && !error && filterCollections.length > 0 && !showProductFilterBar && (
         <FilterBar>
           <FilterChip
             $active={selectedCollections.size === 0}
@@ -295,6 +336,18 @@ export default function BestsellersPage() {
           </div>
         );
       })}
+    </>
+  );
+
+  return (
+    <CatalogCmsLanding slug="bestsellers" fallbackTitle={pageTitle} showTitleWhenNoContainers preferNativeCatalog>
+      {showProductFilterBar && hubLinks.length > 0 ? (
+        <CatalogHubFilterShell links={hubLinks} locale={locale}>
+          {body}
+        </CatalogHubFilterShell>
+      ) : (
+        body
+      )}
     </CatalogCmsLanding>
   );
 }

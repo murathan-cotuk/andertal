@@ -1,7 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { resolveOrderPaidTotalCents } = require('../order-money')
-const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename, querySellerInfoForInvoice } = require('../order-pdf-buffers')
+const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderRetourenscheinPdfDocument, renderVersandlabelPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename, querySellerInfoForInvoice } = require('../order-pdf-buffers')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
@@ -882,19 +882,59 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
       let client
       try {
+        const PDFDocument = require('pdfkit')
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const r = await client.query('SELECT sendcloud_label_url, tracking_number FROM store_orders WHERE id=$1::uuid', [id])
+        const oRes = await client.query('SELECT * FROM store_orders WHERE id=$1::uuid', [id])
+        const row = oRes.rows?.[0]
+        if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id=$1 ORDER BY created_at', [id])
+        const itemRows = iRes.rows || []
+        let sellerInfoHub = null
+        let logoUrl = ''
+        try {
+          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
+          const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
+          logoUrl = lr.rows?.[0]?.shop_logo_url || ''
+        } catch (_) {}
         await client.end(); client = null
-        const row = r.rows?.[0]
-        if (!row) return res.status(404).json({ message: 'Order not found' })
-        const labelUrl = row.sendcloud_label_url
-        if (!labelUrl) return res.status(404).json({ message: 'Kein Versandlabel für diese Bestellung vorhanden.' })
-        return res.redirect(302, labelUrl)
+        let shopLogoBuffer = null
+        if (logoUrl) {
+          try {
+            shopLogoBuffer = await new Promise((resolve) => {
+              const mod = logoUrl.startsWith('https') ? require('https') : require('http')
+              const reqLogo = mod.get(logoUrl, { timeout: 5000 }, (r) => {
+                if (r.statusCode !== 200) { r.resume(); return resolve(null) }
+                const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => resolve(Buffer.concat(chunks))); r.on('error', () => resolve(null))
+              })
+              reqLogo.on('error', () => resolve(null)); reqLogo.on('timeout', () => { reqLogo.destroy(); resolve(null) })
+            })
+          } catch (_) {}
+        }
+        const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
+        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
+        const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
+        const carrierOverride = String(req.query?.carrier || '').trim() || null
+        const trackingOverride = String(req.query?.tracking || '').trim() || null
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('versandlabel', on, pdfLocale)}"`)
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
+        doc.pipe(res)
+        renderVersandlabelPdfDocument(doc, {
+          row,
+          itemRows,
+          shopName,
+          sellerInfo: sellerInfoHub,
+          shopLogoBuffer,
+          locale: pdfLocale,
+          carrierName: carrierOverride || row.carrier_name || null,
+          trackingNumber: trackingOverride || row.tracking_number || null,
+        })
+        doc.end()
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
-        if (!res.headersSent) res.status(500).json({ message: e?.message || 'Error' })
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
       }
     })
   router.get('/admin-hub/v1/orders/:id/pdf/retoure', async (req, res) => {
@@ -913,39 +953,42 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const rRes = await client.query('SELECT * FROM store_returns WHERE order_id=$1 ORDER BY created_at DESC LIMIT 1', [id])
         const returnRow = rRes.rows?.[0] || null
+        let sellerInfoHub = null
+        let logoUrl = ''
+        try {
+          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
+          const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
+          logoUrl = lr.rows?.[0]?.shop_logo_url || ''
+        } catch (_) {}
         await client.end(); client = null
-        const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
-        const rn = returnRow?.return_number || `R-${on}`
-        res.setHeader('Content-Type', 'application/pdf')
-        res.setHeader('Content-Disposition', `attachment; filename="Retoure-${on}.pdf"`)
-        const doc = new PDFDocument({ margin: 48, size: 'A4' })
-        doc.pipe(res)
-        doc.fontSize(20).fillColor('#111').text(pdfDeLatin('Retourenschein'), { align: 'center' })
-        doc.moveDown(0.4)
-        doc.fontSize(11).fillColor('#374151').text(pdfDeLatin(`Retoure-Nr.: ${rn}   ·   Bestellung: #${on}`), { align: 'center' })
-        doc.moveDown(1.2)
-        const boxTop = doc.y
-        doc.rect(72, boxTop, 450, 60).fill('#f3f4f6')
-        doc.fontSize(10).font('Helvetica-Bold').fillColor('#111827').text(pdfDeLatin('Retoure-Nummer (gut sichtbar aufs Paket kleben)'), 80, boxTop + 8, { width: 434, align: 'center' })
-        doc.fontSize(30).font('Helvetica-Bold').text(rn, 72, boxTop + 18, { width: 450, align: 'center' })
-        doc.y = boxTop + 70
-        doc.font('Helvetica').fontSize(10).fillColor('#374151')
-        doc.moveDown(1)
-        const custName = [row.first_name, row.last_name].filter(Boolean).join(' ')
-        doc.font('Helvetica-Bold').text(pdfDeLatin('Absender (Kunde)'))
-        doc.font('Helvetica')
-        ;[custName, row.address_line1, row.address_line2, [row.postal_code, row.city].filter(Boolean).join(' '), row.country].filter(Boolean).forEach((l) => doc.text(pdfDeLatin(l)))
-        doc.moveDown(0.8)
-        if (returnRow?.items && Array.isArray(returnRow.items)) {
-          doc.font('Helvetica-Bold').text(pdfDeLatin('Zurückgesendete Artikel'))
-          doc.font('Helvetica')
-          returnRow.items.forEach((it) => {
-            doc.text(pdfDeLatin(`- ${it.title || 'Artikel'} (Menge: ${it.quantity || 1})`))
-          })
-          doc.moveDown(0.6)
+        let shopLogoBuffer = null
+        if (logoUrl) {
+          try {
+            shopLogoBuffer = await new Promise((resolve) => {
+              const mod = logoUrl.startsWith('https') ? require('https') : require('http')
+              const reqLogo = mod.get(logoUrl, { timeout: 5000 }, (r) => {
+                if (r.statusCode !== 200) { r.resume(); return resolve(null) }
+                const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => resolve(Buffer.concat(chunks))); r.on('error', () => resolve(null))
+              })
+              reqLogo.on('error', () => resolve(null)); reqLogo.on('timeout', () => { reqLogo.destroy(); resolve(null) })
+            })
+          } catch (_) {}
         }
-        doc.font('Helvetica').fontSize(8.5).fillColor('#6b7280')
-        doc.text(pdfDeLatin('Bitte legen Sie diesen Retourenschein gut sichtbar in das Paket. Vielen Dank!'), { width: 450 })
+        const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
+        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
+        const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('retoure', on, pdfLocale)}"`)
+        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
+        doc.pipe(res)
+        renderRetourenscheinPdfDocument(doc, {
+          row,
+          returnRow,
+          shopName,
+          sellerInfo: sellerInfoHub,
+          shopLogoBuffer,
+          locale: pdfLocale,
+        })
         doc.end()
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}

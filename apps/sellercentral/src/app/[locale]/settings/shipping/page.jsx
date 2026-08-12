@@ -414,81 +414,6 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
   );
 }
 
-/* ── Return address (seller-level, used for customer_ships emails) ── */
-function ReturnAddressSection({ copy, ui }) {
-  const [addr, setAddr] = useState({ name: "", street: "", zip: "", city: "", country: "DE" });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await getMedusaAdminClient().request("/admin-hub/v1/return-settings");
-        if (!cancelled && data?.return_address) {
-          setAddr({
-            name: data.return_address.name || "",
-            street: data.return_address.street || "",
-            zip: data.return_address.zip || "",
-            city: data.return_address.city || "",
-            country: data.return_address.country || "DE",
-          });
-        }
-      } catch (_) { /* ignore */ }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const handleSave = async () => {
-    setSaving(true); setErr(""); setMsg("");
-    try {
-      await getMedusaAdminClient().request("/admin-hub/v1/return-settings", {
-        method: "PATCH",
-        body: JSON.stringify({ return_address: addr }),
-      });
-      setMsg(copy.saved);
-    } catch (e) {
-      setErr(e?.message || copy.saveError);
-    }
-    setSaving(false);
-  };
-
-  return (
-    <Card>
-      <BlockStack gap="400">
-        <BlockStack gap="100">
-          <Text variant="headingMd" as="h2">{copy.returnsTitle}</Text>
-          <Text variant="bodySm" tone="subdued">{copy.returnsSub}</Text>
-        </BlockStack>
-        {loading ? (
-          <Text tone="subdued">{ui.loading}</Text>
-        ) : (
-          <BlockStack gap="300">
-            <Text variant="bodySm" fontWeight="semibold">{copy.returnAddressTitle}</Text>
-            <InlineGrid columns={2} gap="300">
-              <TextField label={copy.returnAddressName} value={addr.name} onChange={(v) => setAddr((a) => ({ ...a, name: v }))} autoComplete="organization" />
-              <TextField label={copy.returnAddressCountry} value={addr.country} onChange={(v) => setAddr((a) => ({ ...a, country: v }))} autoComplete="country" />
-            </InlineGrid>
-            <TextField label={copy.returnAddressStreet} value={addr.street} onChange={(v) => setAddr((a) => ({ ...a, street: v }))} autoComplete="street-address" />
-            <InlineGrid columns={2} gap="300">
-              <TextField label={copy.returnAddressZip} value={addr.zip} onChange={(v) => setAddr((a) => ({ ...a, zip: v }))} autoComplete="postal-code" />
-              <TextField label={copy.returnAddressCity} value={addr.city} onChange={(v) => setAddr((a) => ({ ...a, city: v }))} autoComplete="address-level2" />
-            </InlineGrid>
-            {err && <Banner tone="critical"><p>{err}</p></Banner>}
-            {msg && <Banner tone="success"><p>{msg}</p></Banner>}
-            <InlineStack align="end">
-              <Button variant="primary" onClick={handleSave} loading={saving}>{ui.save}</Button>
-            </InlineStack>
-          </BlockStack>
-        )}
-      </BlockStack>
-    </Card>
-  );
-}
-
 /* ── Carrier modal ───────────────────────────────────────────── */
 const EMPTY_CARRIER_FORM = { name: "", tracking_url_template: "", api_key: "", api_secret: "", is_active: true };
 
@@ -586,7 +511,16 @@ function CountryOverviewSection({ locale, copy }) {
   const [countries, setCountries] = useState(null); // null = loading
   const [err, setErr] = useState("");
   const [pending, setPending] = useState({}); // country_code -> true while PATCH in flight
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | active | inactive
+  const [selected, setSelected] = useState(() => new Set());
   const countryNames = useMemo(() => getCountryList(locale), [locale]);
+  const nameByCode = useMemo(() => {
+    const m = {};
+    for (const n of countryNames) m[n.code] = n.label;
+    return m;
+  }, [countryNames]);
 
   const load = useCallback(() => {
     getMedusaAdminClient()
@@ -597,6 +531,31 @@ function CountryOverviewSection({ locale, copy }) {
   }, [copy.countryOverviewLoadError]);
 
   useEffect(() => { load(); }, [load]);
+
+  const enriched = useMemo(() => {
+    if (!countries) return [];
+    return countries.map((c) => ({
+      ...c,
+      label: nameByCode[c.country_code] || c.country_code,
+    }));
+  }, [countries, nameByCode]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return enriched.filter((c) => {
+      if (statusFilter === "active" && !c.is_enabled) return false;
+      if (statusFilter === "inactive" && c.is_enabled) return false;
+      if (!q) return true;
+      return (
+        c.label.toLowerCase().includes(q) ||
+        String(c.country_code || "").toLowerCase().includes(q)
+      );
+    });
+  }, [enriched, search, statusFilter]);
+
+  const filteredCodes = useMemo(() => filtered.map((c) => c.country_code), [filtered]);
+  const allVisibleSelected = filteredCodes.length > 0 && filteredCodes.every((code) => selected.has(code));
+  const someVisibleSelected = filteredCodes.some((code) => selected.has(code));
 
   const toggle = async (countryCode, nextEnabled) => {
     setPending((p) => ({ ...p, [countryCode]: true }));
@@ -611,6 +570,47 @@ function CountryOverviewSection({ locale, copy }) {
       setCountries((list) => (list || []).map((c) => c.country_code === countryCode ? { ...c, is_enabled: !nextEnabled } : c));
     }
     setPending((p) => { const n = { ...p }; delete n[countryCode]; return n; });
+  };
+
+  const toggleOneSelected = (code) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const code of filteredCodes) next.delete(code);
+      } else {
+        for (const code of filteredCodes) next.add(code);
+      }
+      return next;
+    });
+  };
+
+  const bulkSetEnabled = async (nextEnabled) => {
+    const codes = [...selected];
+    if (!codes.length || bulkBusy) return;
+    setBulkBusy(true);
+    setErr("");
+    const prevSnapshot = countries;
+    setCountries((list) => (list || []).map((c) => (selected.has(c.country_code) ? { ...c, is_enabled: nextEnabled } : c)));
+    try {
+      await getMedusaAdminClient().request("/admin-hub/v1/country-overview", {
+        method: "PATCH",
+        body: JSON.stringify({ country_codes: codes, is_enabled: nextEnabled }),
+      });
+      setSelected(new Set());
+    } catch (e) {
+      setErr(e?.message || copy.countryOverviewSaveError);
+      setCountries(prevSnapshot);
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   if (countries === null) return null;
@@ -628,34 +628,108 @@ function CountryOverviewSection({ locale, copy }) {
         {countries.length === 0 ? (
           <Text tone="subdued">{copy.countryOverviewEmpty}</Text>
         ) : (
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-            {countries.map((c, i) => {
-              const name = countryNames.find((n) => n.code === c.country_code)?.label || c.country_code;
-              return (
-                <div
-                  key={c.country_code}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-                    borderBottom: i < countries.length - 1 ? "1px solid #f3f4f6" : "none",
-                    background: "#fff", opacity: c.is_enabled ? 1 : 0.6,
-                  }}
-                >
-                  <span style={{ minWidth: 200, fontSize: 13, color: "#374151" }}>
-                    <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11, marginRight: 6 }}>{c.country_code}</span>
-                    {name}
-                  </span>
-                  <span style={{ flex: 1, fontSize: 13, color: "#6d7175" }}>
-                    {copy.countryOverviewProductCount(c.product_count)}
-                  </span>
-                  <CountryToggle
-                    checked={c.is_enabled}
-                    disabled={!!pending[c.country_code]}
-                    onChange={(next) => toggle(c.country_code, next)}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <BlockStack gap="300">
+            <InlineStack gap="200" wrap blockAlign="end">
+              <div style={{ flex: "1 1 220px", minWidth: 200, maxWidth: 360 }}>
+                <TextField
+                  label={copy.countryOverviewSearch}
+                  labelHidden
+                  value={search}
+                  onChange={setSearch}
+                  placeholder={copy.countryOverviewSearch}
+                  autoComplete="off"
+                  clearButton
+                  onClearButtonClick={() => setSearch("")}
+                />
+              </div>
+              <InlineStack gap="100">
+                {[
+                  { id: "all", label: copy.countryOverviewFilterAll },
+                  { id: "active", label: copy.countryOverviewFilterActive },
+                  { id: "inactive", label: copy.countryOverviewFilterInactive },
+                ].map((f) => (
+                  <Button
+                    key={f.id}
+                    size="slim"
+                    variant={statusFilter === f.id ? "primary" : "secondary"}
+                    onClick={() => setStatusFilter(f.id)}
+                  >
+                    {f.label}
+                  </Button>
+                ))}
+              </InlineStack>
+            </InlineStack>
+
+            <div style={{
+              display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center",
+              padding: "10px 12px", background: selected.size ? "#f0fdf4" : "#f9fafb",
+              border: `1px solid ${selected.size ? "#bbf7d0" : "#e5e7eb"}`, borderRadius: 8,
+            }}>
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(el) => { if (el) el.indeterminate = !allVisibleSelected && someVisibleSelected; }}
+                  onChange={toggleSelectAllVisible}
+                />
+                {copy.countryOverviewSelectAll}
+              </label>
+              <span style={{ fontSize: 12, color: "#6b7280" }}>
+                {copy.countryOverviewSelected(selected.size)}
+              </span>
+              <div style={{ flex: 1 }} />
+              <Button size="slim" disabled={!selected.size || bulkBusy} onClick={() => setSelected(new Set())}>
+                {copy.countryOverviewClearSelection}
+              </Button>
+              <Button size="slim" variant="primary" disabled={!selected.size || bulkBusy} loading={bulkBusy} onClick={() => bulkSetEnabled(true)}>
+                {copy.countryOverviewBulkActivate}
+              </Button>
+              <Button size="slim" tone="critical" disabled={!selected.size || bulkBusy} loading={bulkBusy} onClick={() => bulkSetEnabled(false)}>
+                {copy.countryOverviewBulkDeactivate}
+              </Button>
+            </div>
+
+            {filtered.length === 0 ? (
+              <Text tone="subdued">{copy.countryOverviewNoSearchResults}</Text>
+            ) : (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", maxHeight: 480, overflowY: "auto" }}>
+                {filtered.map((c, i) => {
+                  const isSelected = selected.has(c.country_code);
+                  return (
+                    <div
+                      key={c.country_code}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                        borderBottom: i < filtered.length - 1 ? "1px solid #f3f4f6" : "none",
+                        background: isSelected ? "#ecfdf5" : "#fff",
+                        opacity: c.is_enabled ? 1 : 0.65,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleOneSelected(c.country_code)}
+                        aria-label={c.label}
+                        style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }}
+                      />
+                      <span style={{ minWidth: 200, fontSize: 13, color: "#374151" }}>
+                        <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11, marginRight: 6 }}>{c.country_code}</span>
+                        {c.label}
+                      </span>
+                      <span style={{ flex: 1, fontSize: 13, color: "#6d7175" }}>
+                        {copy.countryOverviewProductCount(c.product_count)}
+                      </span>
+                      <CountryToggle
+                        checked={c.is_enabled}
+                        disabled={!!pending[c.country_code] || bulkBusy}
+                        onChange={(next) => toggle(c.country_code, next)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </BlockStack>
         )}
       </BlockStack>
     </Card>
@@ -957,8 +1031,6 @@ export default function ShippingSettingsPage() {
         </div>
 
         <ShippingGroupsSection carriers={carriers} countries={countries} copy={copy} ui={ui} locale={locale} />
-
-        <ReturnAddressSection copy={copy} ui={ui} />
 
         <Card>
           <BlockStack gap="400">

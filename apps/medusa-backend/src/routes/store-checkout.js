@@ -8,7 +8,8 @@ const { normalizeHubCountryCode } = require('./seller-settings')
 const { requireSellerAuth, requireSuperuser } = require('./seller-auth')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
-const { renderInvoicePdfDocument, querySellerInfoForInvoice } = require('../order-pdf-buffers')
+const { renderInvoicePdfDocument, renderRetourenscheinPdfDocument, querySellerInfoForInvoice } = require('../order-pdf-buffers')
+const { getOrderPdfFilename } = require('../order-pdf-i18n')
 const { resolveLocaleFromCountry } = require('../locale-from-country')
 const { createReturnLabelForOrder } = require('../return-label')
 
@@ -1401,6 +1402,9 @@ const storeCustomerRegisterPOST = async (req, res) => {
     const country = (body.country || '').trim() || null
     const company_name = (body.company_name || '').trim() || null
     const vat_number = (body.vat_number || '').trim() || null
+    const SHOP_LOCALES = ['en', 'de', 'tr', 'fr', 'it', 'es']
+    const preferredLocaleRaw = String(body.locale || '').trim().toLowerCase()
+    const preferredLocale = SHOP_LOCALES.includes(preferredLocaleRaw) ? preferredLocaleRaw : null
     let r
     if (existingRow) {
       // Guest entry exists — upgrade to registered account
@@ -1408,23 +1412,28 @@ const storeCustomerRegisterPOST = async (req, res) => {
         `UPDATE store_customers SET password_hash=$1, first_name=$2, last_name=$3, phone=$4, account_type=$5,
          gender=$6, birth_date=$7::date, address_line1=$8, address_line2=$9, zip_code=$10, city=$11,
          country=$12, company_name=$13, vat_number=$14,
+         locale = COALESCE($16, locale),
          bonus_points = COALESCE(bonus_points, 0) + ${BONUS_SIGNUP_POINTS}, updated_at=NOW()
          WHERE id=$15
-         RETURNING id, customer_number, email, first_name, last_name, phone, account_type, company_name, created_at`,
+         RETURNING id, customer_number, email, first_name, last_name, phone, account_type, company_name, locale, created_at`,
         [password_hash, first_name, last_name, phone, account_type, gender, birth_date || null,
-         address_line1, address_line2, zip_code, city, country, company_name, vat_number, existingRow.id]
+         address_line1, address_line2, zip_code, city, country, company_name, vat_number, existingRow.id, preferredLocale]
       )
     }
     // UPDATE 0 rows (satır silinmiş / yarış) → INSERT; misafir yokken de INSERT
     if (!existingRow || !r.rows[0]) {
       r = await client.query(
-        `INSERT INTO store_customers (email, password_hash, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, bonus_points)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::date,$9,$10,$11,$12,$13,$14,$15,$16)
-         RETURNING id, customer_number, email, first_name, last_name, phone, account_type, company_name, created_at`,
-        [email, password_hash, first_name, last_name, phone, account_type, gender, birth_date || null, address_line1, address_line2, zip_code, city, country, company_name, vat_number, BONUS_SIGNUP_POINTS]
+        `INSERT INTO store_customers (email, password_hash, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, bonus_points, locale)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::date,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         RETURNING id, customer_number, email, first_name, last_name, phone, account_type, company_name, locale, created_at`,
+        [email, password_hash, first_name, last_name, phone, account_type, gender, birth_date || null, address_line1, address_line2, zip_code, city, country, company_name, vat_number, BONUS_SIGNUP_POINTS, preferredLocale]
       )
     }
-    const customer = { ...r.rows[0], customer_number: r.rows[0].customer_number ? Number(r.rows[0].customer_number) : null }
+    const customer = {
+      ...r.rows[0],
+      customer_number: r.rows[0].customer_number ? Number(r.rows[0].customer_number) : null,
+      locale: r.rows[0].locale || preferredLocale || null,
+    }
     const cid = r.rows[0].id
     try {
       await appendBonusLedger(client, {
@@ -1482,11 +1491,21 @@ const storeCustomerMePATCH = async (req, res) => {
   if (!payload) return res.status(401).json({ message: 'Unauthorized' })
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   const body = req.body || {}
-  const allowed = ['first_name','last_name','phone','account_type','address_line1','address_line2','zip_code','city','country','company_name','vat_number']
+  const allowed = ['first_name','last_name','phone','account_type','address_line1','address_line2','zip_code','city','country','company_name','vat_number','locale']
+  const SHOP_LOCALES = ['en', 'de', 'tr', 'fr', 'it', 'es']
   const sets = []
   const vals = []
   for (const key of allowed) {
-    if (key in body) { vals.push(body[key] || null); sets.push(`${key} = $${vals.length}`) }
+    if (!(key in body)) continue
+    if (key === 'locale') {
+      const loc = String(body.locale || '').trim().toLowerCase()
+      if (!SHOP_LOCALES.includes(loc)) continue
+      vals.push(loc)
+      sets.push(`locale = $${vals.length}`)
+      continue
+    }
+    vals.push(body[key] || null)
+    sets.push(`${key} = $${vals.length}`)
   }
   if (!sets.length) return res.status(400).json({ message: 'Nothing to update' })
   vals.push(payload.id)
@@ -1497,7 +1516,7 @@ const storeCustomerMePATCH = async (req, res) => {
     await client.connect()
     const r = await client.query(
       `UPDATE store_customers SET ${sets.join(', ')}, updated_at=NOW() WHERE id=$${vals.length}::uuid
-       RETURNING id, customer_number, email, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, COALESCE(bonus_points,0) AS bonus_points, created_at`,
+       RETURNING id, customer_number, email, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, locale, COALESCE(bonus_points,0) AS bonus_points, created_at`,
       vals
     )
     await client.end()
@@ -1588,7 +1607,7 @@ const storeAuthTokenPOST = async (req, res) => {
       last_name: row.last_name || null,
       customer_number: row.customer_number != null ? Number(row.customer_number) : null,
     })
-    const customer = { id: row.id, customer_number: row.customer_number ? Number(row.customer_number) : null, email: row.email, first_name: row.first_name, last_name: row.last_name, phone: row.phone, account_type: row.account_type, company_name: row.company_name }
+    const customer = { id: row.id, customer_number: row.customer_number ? Number(row.customer_number) : null, email: row.email, first_name: row.first_name, last_name: row.last_name, phone: row.phone, account_type: row.account_type, company_name: row.company_name, locale: row.locale || null }
     res.json({ customer, token, access_token: token })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
@@ -1609,7 +1628,7 @@ const storeCustomersMeGET = async (req, res) => {
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
     const r = await client.query(
-      'SELECT id, customer_number, email, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, COALESCE(bonus_points,0) AS bonus_points, created_at FROM store_customers WHERE id = $1',
+      'SELECT id, customer_number, email, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, locale, COALESCE(bonus_points,0) AS bonus_points, created_at FROM store_customers WHERE id = $1',
       [payload.id]
     )
     const row = r.rows[0]
@@ -2089,6 +2108,42 @@ const adminHubCountryOverviewPATCH = async (req, res) => {
   }
 }
 
+// PATCH /admin-hub/v1/country-overview — bulk toggle (superuser). Body: { country_codes: [], is_enabled: bool }
+const adminHubCountryOverviewBulkPATCH = async (req, res) => {
+  if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser required' })
+  const rawCodes = Array.isArray(req.body?.country_codes) ? req.body.country_codes : []
+  const codes = [...new Set(rawCodes.map((c) => normalizeHubCountryCode(c)).filter(Boolean))]
+  if (!codes.length) return res.status(400).json({ message: 'country_codes required' })
+  const is_enabled = req.body?.is_enabled !== false
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_hub_country_overrides (
+        country_code text PRIMARY KEY,
+        is_enabled boolean NOT NULL DEFAULT true,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `)
+    for (const countryCode of codes) {
+      await client.query(
+        `INSERT INTO admin_hub_country_overrides (country_code, is_enabled, updated_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (country_code) DO UPDATE SET is_enabled = $2, updated_at = now()`,
+        [countryCode, is_enabled],
+      )
+    }
+    await client.end()
+    res.json({ success: true, country_codes: codes, is_enabled, updated: codes.length })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
 // GET /store/orders/:id/invoice — customer downloads their own invoice as PDF
 const storeOrderInvoicePdfGET = async (req, res) => {
   const orderId = (req.params.id || '').trim()
@@ -2194,41 +2249,43 @@ const storeOrderReturnRetourenscheinGET = async (req, res) => {
     )
     const ret = rRes.rows?.[0]
     if (!ret) { await client.end(); return res.status(404).json({ message: 'Keine genehmigte Retoure' }) }
+    let sellerInfo = null
+    let logoUrl = ''
+    try {
+      sellerInfo = await querySellerInfoForInvoice(client, row.seller_id)
+      const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
+      logoUrl = lr.rows?.[0]?.shop_logo_url || ''
+    } catch (_) {}
     await client.end()
     client = null
-    const rn = ret.return_number != null ? `R-${ret.return_number}` : 'R-—'
-    const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
-    res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `attachment; filename="Retourenschein-${on}.pdf"`)
-    const doc = new PDFDocument({ margin: 48, size: 'A4' })
-    doc.pipe(res)
-    doc.fontSize(20).fillColor('#111').text('Retourenschein', { align: 'center' })
-    doc.moveDown(0.8)
-    doc.fontSize(11).fillColor('#374151').text(`Retoure-Nr.: ${rn}   ·   Bestellung: #${on}`, { align: 'center' })
-    doc.moveDown(1.2)
-    doc.fontSize(10).font('Helvetica-Bold').text('Retoure-Nummer (gut sichtbar aufs Paket kleben)')
-    doc.moveDown(0.4)
-    const boxTop = doc.y
-    doc.lineWidth(2).rect(72, boxTop, 450, 72).stroke('#111827')
-    doc.fontSize(30).font('Helvetica-Bold').text(rn, 72, boxTop + 16, { width: 450, align: 'center' })
-    doc.y = boxTop + 88
-    doc.moveDown(0.5)
-    doc.font('Helvetica').fontSize(10)
-    doc.text(`Erstellt am: ${storeReturnPdfFmtDate(ret.created_at)}`)
-    if (ret.approved_at) doc.text(`Genehmigt am: ${storeReturnPdfFmtDate(ret.approved_at)}`)
-    doc.moveDown(0.6)
-    doc.font('Helvetica-Bold').text('Rückgabegrund')
-    doc.font('Helvetica').text(storeReturnPdfLatin(ret.reason || '—'))
-    if (ret.notes) {
-      doc.moveDown(0.4)
-      doc.font('Helvetica-Bold').text('Anmerkungen')
-      doc.font('Helvetica').text(storeReturnPdfLatin(ret.notes))
+    let shopLogoBuffer = null
+    if (logoUrl) {
+      try {
+        shopLogoBuffer = await new Promise((resolve) => {
+          const mod = logoUrl.startsWith('https') ? require('https') : require('http')
+          const reqLogo = mod.get(logoUrl, { timeout: 5000 }, (r) => {
+            if (r.statusCode !== 200) { r.resume(); return resolve(null) }
+            const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => resolve(Buffer.concat(chunks))); r.on('error', () => resolve(null))
+          })
+          reqLogo.on('error', () => resolve(null)); reqLogo.on('timeout', () => { reqLogo.destroy(); resolve(null) })
+        })
+      } catch (_) {}
     }
-    doc.moveDown(1)
-    doc.fontSize(9).fillColor('#666').text(
-      'Bitte legen Sie diesen Schein dem Paket bei. Ohne sichtbare Retoure-Nummer kann die Zuordnung verzögert werden.',
-      { width: 480 },
-    )
+    const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
+    const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
+    const pdfLocale = 'de'
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('retoure', on, pdfLocale)}"`)
+    const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
+    doc.pipe(res)
+    renderRetourenscheinPdfDocument(doc, {
+      row,
+      returnRow: ret,
+      shopName,
+      sellerInfo,
+      shopLogoBuffer,
+      locale: pdfLocale,
+    })
     doc.end()
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
@@ -3799,6 +3856,7 @@ module.exports = function createStoreCheckoutRouter() {
   router.delete('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupDELETE)
   router.get('/store/shipping-groups', storeShippingGroupsGET)
   router.get('/admin-hub/v1/country-overview', requireSellerAuth, adminHubCountryOverviewGET)
+  router.patch('/admin-hub/v1/country-overview', requireSellerAuth, adminHubCountryOverviewBulkPATCH)
   router.patch('/admin-hub/v1/country-overview/:country_code', requireSellerAuth, adminHubCountryOverviewPATCH)
 
   return router

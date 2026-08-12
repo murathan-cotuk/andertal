@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter, Link, usePathname } from "@/i18n/navigation";
+import { Link, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useMedusaAuth } from "@/hooks/useMedusaAuth";
@@ -9,7 +9,15 @@ import { useCustomerAuth as useAuth, useAuthGuard } from "@andertal/lib";
 import { tokens } from "@/design-system/tokens";
 import { resolveImageUrl } from "@/lib/image-url";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
-import { DEFAULT_CURRENCY, marketPrefix, parseMarketPath } from "@/lib/shop-market";
+import {
+  DEFAULT_CURRENCY,
+  DEFAULT_MARKET,
+  SHOP_LOCALES,
+  marketPrefix,
+  parseMarketPath,
+  restPathFromPathname,
+} from "@/lib/shop-market";
+import { getMedusaClient } from "@/lib/medusa-client";
 
 /* ── Monkey SVG (password‑blind feature) ─────────────────── */
 function MonkeyAvatar({ isBlind }) {
@@ -66,7 +74,6 @@ export default function LoginPage() {
   const [branding, setBranding] = useState({ logo: "", favicon: "", logoHeight: 34 });
   const [isDesktop, setIsDesktop] = useState(false);
   const { login } = useAuth();
-  const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
   const { login: loginMedusa, loading } = useMedusaAuth();
@@ -149,9 +156,32 @@ export default function LoginPage() {
           login(token, result.customer.id);
           // Set session cookie for middleware-level route protection
           document.cookie = `andertal_cauth=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
-          const redirectTo = searchParams.get("redirect") || "/";
-          router.push(redirectTo);
-          router.refresh();
+
+          const preferredRaw = String(result.customer.locale || "").trim().toLowerCase();
+          let preferredLocale = SHOP_LOCALES.includes(preferredRaw) ? preferredRaw : "";
+          // First login with no saved preference → remember current shop language
+          if (!preferredLocale && SHOP_LOCALES.includes(String(locale || "").toLowerCase())) {
+            preferredLocale = String(locale).toLowerCase();
+            getMedusaClient()
+              .updateCustomerMe(token, { locale: preferredLocale })
+              .catch(() => {});
+          }
+
+          const market =
+            parseMarketPath(pathname || "") ||
+            parseMarketPath(typeof window !== "undefined" ? window.location.pathname : "") ||
+            { country: DEFAULT_MARKET, lang: locale || "de" };
+          const targetLang = preferredLocale || market.lang || locale || "de";
+          const redirectRaw = searchParams.get("redirect") || "/";
+          const pathOnly =
+            !redirectRaw || redirectRaw === "/"
+              ? "/"
+              : restPathFromPathname(redirectRaw.startsWith("/") ? redirectRaw : `/${redirectRaw}`);
+          const dest =
+            pathOnly === "/"
+              ? marketPrefix(market.country, targetLang)
+              : `${marketPrefix(market.country, targetLang)}${pathOnly}`;
+          window.location.href = dest;
         } else {
           setError(t("loginFailed"));
         }

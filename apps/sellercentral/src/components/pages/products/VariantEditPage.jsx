@@ -23,6 +23,7 @@ import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import ComplianceFieldsSection from "@/components/products/ComplianceFieldsSection";
+import InfoIconTooltip from "@/components/InfoIconTooltip";
 import { decodeVariantPathKey, findVariantIndexByOptionKey } from "@/lib/variant-path-key";
 import {
   ProductSectionHeading,
@@ -681,26 +682,81 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               <ProductSectionHeading>
                 {locale === "en" ? "Compliance / manufacturer (this variant)" : locale === "tr" ? "Uyumluluk / üretici (bu varyant)" : locale === "fr" ? "Conformité / fabricant (cette variante)" : locale === "es" ? "Cumplimiento / fabricante (esta variante)" : locale === "it" ? "Conformità / produttore (questa variante)" : "Compliance / Hersteller (diese Variante)"}
               </ProductSectionHeading>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {locale === "en"
+                  ? "EU product safety (GPSR). Tap “i” for what to enter in each field."
+                  : locale === "tr"
+                    ? "AB ürün güvenliği (GPSR). Her alana ne yazılacağını “i” ile görün."
+                    : locale === "fr"
+                      ? "Sécurité produit UE (GPSR). Appuyez sur « i » pour savoir quoi saisir."
+                      : locale === "es"
+                        ? "Seguridad de producto UE (GPSR). Pulsa « i » para ver qué indicar."
+                        : locale === "it"
+                          ? "Sicurezza prodotto UE (GPSR). Tocca « i » per sapere cosa inserire."
+                          : "EU-Produktsicherheit (GPSR). Tippen Sie auf „i“, um zu sehen, was einzutragen ist."}
+              </Text>
               <TextField
-                label="Hersteller"
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Manufacturer" : locale === "tr" ? "Üretici" : locale === "fr" ? "Fabricant" : locale === "es" ? "Fabricante" : locale === "it" ? "Fabbricante" : "Hersteller"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Name of the company or person that manufactured the product."
+                          : locale === "tr" ? "Ürünü üreten şirket veya kişinin adı."
+                            : locale === "fr" ? "Nom du fabricant."
+                              : locale === "es" ? "Nombre del fabricante."
+                                : locale === "it" ? "Nome del fabbricante."
+                                  : "Name des Herstellers."
+                      }
+                    />
+                  </InlineStack>
+                }
                 value={getMeta(v, "hersteller")}
                 onChange={(val) => updateVariantMeta("hersteller", val || undefined)}
-                placeholder="Hersteller"
+                placeholder={locale === "en" ? "e.g. Acme GmbH" : "z. B. Acme GmbH"}
                 autoComplete="off"
               />
               <TextField
-                label="Hersteller-Information"
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Manufacturer details" : locale === "tr" ? "Üretici bilgileri" : locale === "fr" ? "Coordonnées du fabricant" : locale === "es" ? "Datos del fabricante" : locale === "it" ? "Dati del fabbricante" : "Herstellerinformationen"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Postal address and contact of the manufacturer."
+                          : locale === "tr" ? "Üreticinin posta adresi ve iletişimi."
+                            : locale === "fr" ? "Adresse et contact du fabricant."
+                              : locale === "es" ? "Dirección y contacto del fabricante."
+                                : locale === "it" ? "Indirizzo e contatto del fabbricante."
+                                  : "Adresse und Kontakt des Herstellers."
+                      }
+                    />
+                  </InlineStack>
+                }
                 value={getMeta(v, "hersteller_information")}
                 onChange={(val) => updateVariantMeta("hersteller_information", val || undefined)}
-                placeholder="Hersteller-Information"
+                placeholder={locale === "en" ? "Street, city, country, email/phone" : "Straße, Ort, Land, E-Mail/Telefon"}
                 multiline={2}
                 autoComplete="off"
               />
               <TextField
-                label="Verantwortliche Person (EU)"
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Responsible person (EU)" : locale === "tr" ? "Sorumlu kişi (AB)" : locale === "fr" ? "Personne responsable (UE)" : locale === "es" ? "Persona responsable (UE)" : locale === "it" ? "Persona responsabile (UE)" : "Verantwortliche Person (EU)"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "EU-based safety contact. If the manufacturer is in the EU, this can be the same party."
+                          : locale === "tr" ? "AB’de yerleşik güvenlik iletişimi. Üretici AB’deyse aynı taraf olabilir."
+                            : locale === "fr" ? "Contact sécurité basé dans l'UE. Si le fabricant est dans l'UE, ce peut être la même entité."
+                              : locale === "es" ? "Contacto de seguridad en la UE. Si el fabricante está en la UE, puede ser la misma parte."
+                                : locale === "it" ? "Contatto di sicurezza nell'UE. Se il fabbricante è nell'UE, può essere la stessa parte."
+                                  : "In der EU ansässige Sicherheitskontaktstelle. Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein."
+                      }
+                    />
+                  </InlineStack>
+                }
                 value={getMeta(v, "verantwortliche_person_information")}
                 onChange={(val) => updateVariantMeta("verantwortliche_person_information", val || undefined)}
-                placeholder="Verantwortliche Person Information"
+                placeholder={locale === "en" ? "Name, EU address, email/phone" : "Name, EU-Adresse, E-Mail/Telefon"}
                 multiline={2}
                 autoComplete="off"
               />

@@ -18,6 +18,7 @@ export const CONTAINER_TYPE_GROUP = {
   bestseller_carousel: "commerce",
   category_sidebar: "commerce",
   seller_carousel: "commerce",
+  brands_directory: "commerce",
   collections_carousel: "commerce",
   single_product: "commerce",
   personalized_product_row: "commerce",

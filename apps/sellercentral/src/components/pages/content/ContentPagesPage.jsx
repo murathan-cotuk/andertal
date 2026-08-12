@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Page,
   Layout,
@@ -100,6 +101,8 @@ export default function ContentPagesPage({ blogOnly = false }) {
   const [sort, setSort] = useState("newest");
   const langOptions = getLandingEditorCopy(locale).shopContentLangOptions();
   const client = getMedusaAdminClient();
+  const searchParams = useSearchParams();
+  const editQueryHandled = useRef(false);
 
   const fetchPages = async () => {
     try {
@@ -122,6 +125,17 @@ export default function ContentPagesPage({ blogOnly = false }) {
   useEffect(() => {
     fetchPages();
   }, [blogOnly, sort]);
+
+  // Deep-link from SEO Hub: /content/pages?edit=<id> or /content/blog-posts?edit=<id>
+  useEffect(() => {
+    if (loading || editQueryHandled.current) return;
+    const editId = (searchParams?.get("edit") || "").trim();
+    if (!editId) return;
+    const page = (pages || []).find((p) => String(p.id) === editId);
+    if (!page) return;
+    editQueryHandled.current = true;
+    openEdit(page);
+  }, [loading, pages, searchParams]);
 
   const openCreate = () => {
     setEditingId(null);

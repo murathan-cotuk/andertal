@@ -366,6 +366,32 @@ const adminHubReturnSettingsGET = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
+    // Prefer dedicated returns location from Settings → Locations
+    const locR = await client.query(
+      `SELECT name, address_line1, address_line2, city, postal_code, country
+         FROM seller_locations
+        WHERE seller_id = $1 AND is_returns_to = true
+        ORDER BY updated_at DESC NULLS LAST
+        LIMIT 1`,
+      [sellerId],
+    ).catch(() => ({ rows: [] }))
+    const loc = locR.rows?.[0]
+    if (loc && String(loc.address_line1 || '').trim()) {
+      await client.end()
+      const countryRaw = String(loc.country || 'DE').trim()
+      const country = /^[a-z]{2}$/i.test(countryRaw)
+        ? countryRaw.toUpperCase()
+        : (/deutschland|germany|almanya/i.test(countryRaw) ? 'DE' : countryRaw.slice(0, 2).toUpperCase() || 'DE')
+      return res.json({
+        return_address: {
+          name: String(loc.name || '').trim(),
+          street: [loc.address_line1, loc.address_line2].filter(Boolean).map((x) => String(x).trim()).join(', '),
+          zip: String(loc.postal_code || '').trim(),
+          city: String(loc.city || '').trim(),
+          country,
+        },
+      })
+    }
     const r = await client.query(
       `SELECT return_address FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
       [sellerId],

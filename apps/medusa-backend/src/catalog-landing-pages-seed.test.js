@@ -8,7 +8,7 @@ const {
   buildPageContainers,
 } = require('./catalog-landing-pages-seed')
 
-assert.strictEqual(LAYOUT_VERSION, 'catalog_hub_v2')
+assert.strictEqual(LAYOUT_VERSION, 'catalog_hub_v3')
 assert.strictEqual(NATIVE_LAYOUT_VERSION, 'native_catalog_v1')
 assert.strictEqual(CATALOG_PAGES.length, 4)
 assert.deepStrictEqual(
@@ -34,7 +34,7 @@ for (const page of CATALOG_PAGES) {
     continue
   }
 
-  // Brands: 3 devices × (intro + feature_grid + seller_carousel + newsletter)
+  // Brands: 3 devices × (intro + feature_grid + brands_directory + newsletter)
   assert.ok(containers.length >= 9, `${page.slug} expected >=9 containers, got ${containers.length}`)
   const devices = new Set(containers.map((c) => c.visible_on))
   assert.deepStrictEqual([...devices].sort(), ['desktop', 'mobile', 'tablet'])
@@ -42,7 +42,8 @@ for (const page of CATALOG_PAGES) {
   assert.ok(containers.some((c) => c.type === 'text_block'))
   assert.ok(containers.some((c) => c.type === 'newsletter'))
   assert.ok(containers.some((c) => c.type === 'feature_grid'))
-  assert.ok(containers.some((c) => c.type === 'seller_carousel'))
+  assert.ok(containers.some((c) => c.type === 'brands_directory'))
+  assert.ok(!containers.some((c) => c.type === 'seller_carousel'))
 
   const intro = containers.find((c) => c.type === 'text_block' && c.visible_on === 'desktop')
   assert.ok(intro)

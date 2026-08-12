@@ -398,6 +398,10 @@ class MedusaAdminClient {
       legal_vat_id: res?.legal_vat_id ?? '',
       legal_tax_id: res?.legal_tax_id ?? '',
       legal_email: res?.legal_email ?? '',
+      enabled_shop_locales: Array.isArray(res?.enabled_shop_locales) ? res.enabled_shop_locales : null,
+      locale: ['en', 'de', 'tr', 'fr', 'it', 'es'].includes(String(res?.locale || '').toLowerCase())
+        ? String(res.locale).toLowerCase()
+        : 'de',
     };
   }
 
@@ -1856,12 +1860,25 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/seo/rules')
   }
 
-  async getSeoEntities({ type, q = '', limit = 40, offset = 0 } = {}) {
+  async getSeoEntities({
+    type,
+    q = '',
+    limit = 40,
+    offset = 0,
+    seller_id = '',
+    category_id = '',
+    score = '',
+    sort = '',
+  } = {}) {
     const params = new URLSearchParams()
     if (type) params.set('type', type)
     if (q) params.set('q', q)
     params.set('limit', String(limit))
     params.set('offset', String(offset))
+    if (seller_id) params.set('seller_id', String(seller_id))
+    if (category_id) params.set('category_id', String(category_id))
+    if (score) params.set('score', String(score))
+    if (sort) params.set('sort', String(sort))
     return this.request(`/admin-hub/v1/seo/entities?${params.toString()}`)
   }
 

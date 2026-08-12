@@ -8,6 +8,8 @@ const { resolveLocaleFromCountry } = require('./locale-from-country')
 const {
   pdfCents,
   renderRetailOrderDocument,
+  renderRetourenscheinDocument,
+  renderVersandlabelDocument,
   renderCommissionInvoiceDocument,
 } = require('./order-pdf-layout')
 
@@ -43,7 +45,7 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   } else {
     totalsLines.push({ label: s.vatExempt, value: '', color: '#64748b', small: true })
   }
-  totalsLines.push({ label: s.grandTotal, value: pdfCents(grandTotal, locale), bold: true })
+  totalsLines.push({ label: s.grandTotal, value: pdfCents(grandTotal, locale) })
 
   const displayNumber = String(invoiceNumber || '').startsWith('R-') ? String(invoiceNumber) : `R-${invoiceNumber}`
 
@@ -76,7 +78,12 @@ function renderLieferscheinPdfDocument(doc, {
   trackingNumber = null,
 }) {
   const s = getOrderPdfStrings(locale)
-  const displayNumber = String(invoiceNumber || '')
+  const raw = String(invoiceNumber || '').trim()
+  const displayNumber = !raw
+    ? ''
+    : raw.startsWith('L-')
+      ? raw
+      : `L-${raw.replace(/^[A-Za-z]+-/, '')}`
 
   renderRetailOrderDocument(doc, {
     docTitle: s.deliveryTitle,
@@ -89,6 +96,48 @@ function renderLieferscheinPdfDocument(doc, {
     kind: 'lieferschein',
     footerText: s.deliveryFooter,
     invoiceNumber: displayNumber,
+    carrierName,
+    trackingNumber,
+  })
+}
+
+function renderRetourenscheinPdfDocument(doc, {
+  row,
+  returnRow = null,
+  shopName,
+  sellerInfo = null,
+  shopLogoBuffer = null,
+  locale = 'de',
+  lineItems = null,
+}) {
+  renderRetourenscheinDocument(doc, {
+    row,
+    returnRow,
+    shopName,
+    sellerInfo,
+    shopLogoBuffer,
+    locale,
+    lineItems,
+  })
+}
+
+function renderVersandlabelPdfDocument(doc, {
+  row,
+  itemRows = [],
+  shopName,
+  sellerInfo = null,
+  shopLogoBuffer = null,
+  locale = 'de',
+  carrierName = null,
+  trackingNumber = null,
+}) {
+  renderVersandlabelDocument(doc, {
+    row,
+    itemRows,
+    shopName,
+    sellerInfo,
+    shopLogoBuffer,
+    locale,
     carrierName,
     trackingNumber,
   })
@@ -344,6 +393,8 @@ module.exports = {
   buildProvisionsfakturPdfBuffer,
   renderInvoicePdfDocument,
   renderLieferscheinPdfDocument,
+  renderRetourenscheinPdfDocument,
+  renderVersandlabelPdfDocument,
   renderProvisionsfakturPdfDocument,
   getOrderPdfFilename,
   querySellerInfoForInvoice: _querySellerInfo,

@@ -20,10 +20,13 @@ export async function GET(request) {
     });
     const res = await fetch(`${base}/store/campaigns/discount?${qs}`, {
       headers: { "Content-Type": "application/json" },
-      cache: "no-store",
+      next: { revalidate: 30 },
     });
     const data = await res.json().catch(() => ({ discount: null }));
-    return NextResponse.json(data, { status: res.ok ? 200 : 200 });
+    return NextResponse.json(data, {
+      status: res.ok ? 200 : 200,
+      headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60" },
+    });
   } catch {
     return NextResponse.json({ discount: null }, { status: 200 });
   }

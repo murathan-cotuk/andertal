@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Text, TextField, Select, Banner, BlockStack } from "@shopify/polaris";
+import { Text, TextField, Select, Banner, BlockStack, InlineStack } from "@shopify/polaris";
 import { ProductSectionHeading, ProductSectionRule } from "@/components/products/ProductSection";
+import InfoIconTooltip from "@/components/InfoIconTooltip";
 
 /** Already rendered by static sections in ProductEditPage (base GPSR + WEEE/EPREL) — never duplicate here. */
 const ALREADY_RENDERED_KEYS = new Set([
@@ -60,11 +61,30 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
   if (extraKeys.length === 0) return null;
 
   const fieldDefs = schema.field_definitions || {};
+  const optionalWord = pickI18n({
+    de: "optional",
+    en: "optional",
+    tr: "isteğe bağlı",
+    fr: "facultatif",
+    es: "opcional",
+    it: "facoltativo",
+  }, locale);
+  const profileTitle =
+    pickI18n(schema.profile_label_i18n, locale) || schema.profile_label || "Compliance";
+
+  const sectionIntro = pickI18n({
+    de: "Felder für diese Produktkategorie (EU-Produktsicherheit). Pflichtfelder müssen ausgefüllt werden; optionale Felder helfen Kunden und Behörden. Tippen Sie auf „i“ für eine kurze Erklärung.",
+    en: "Fields for this product category (EU product safety). Required fields must be filled; optional ones help customers and authorities. Tap “i” for a short explanation.",
+    tr: "Bu ürün kategorisi için alanlar (AB ürün güvenliği). Zorunlu alanlar doldurulmalı; isteğe bağlı alanlar müşteri ve otoritelere yardımcı olur. Kısa açıklama için “i”ye tıklayın.",
+    fr: "Champs pour cette catégorie (sécurité produit UE). Les champs obligatoires doivent être remplis ; les facultatifs aident clients et autorités. Appuyez sur « i » pour une courte explication.",
+    es: "Campos para esta categoría (seguridad de producto UE). Los obligatorios deben rellenarse; los opcionales ayudan a clientes y autoridades. Pulsa « i » para una breve explicación.",
+    it: "Campi per questa categoria (sicurezza prodotto UE). I campi obbligatori vanno compilati; quelli facoltativi aiutano clienti e autorità. Tocca « i » per una breve spiegazione.",
+  }, locale);
 
   return (
     <>
       <ProductSectionRule />
-      <ProductSectionHeading>{schema.profile_label || "Compliance"}</ProductSectionHeading>
+      <ProductSectionHeading>{profileTitle}</ProductSectionHeading>
       {schema.superuser_only ? (
         <Banner tone="warning">
           {locale === "en"
@@ -81,36 +101,33 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
         </Banner>
       ) : null}
       <Text as="p" variant="bodySm" tone="subdued">
-        {locale === "en"
-          ? "Additional fields required for this product category (EU product safety / GPSR)."
-          : locale === "tr"
-            ? "Bu ürün kategorisi için gereken ek alanlar (AB ürün güvenliği / GPSR)."
-            : locale === "fr"
-              ? "Champs supplémentaires requis pour cette catégorie de produit (sécurité produit UE / GPSR)."
-              : locale === "es"
-                ? "Campos adicionales requeridos para esta categoría de producto (seguridad de producto UE / GPSR)."
-                : locale === "it"
-                  ? "Campi aggiuntivi richiesti per questa categoria di prodotto (sicurezza prodotto UE / GPSR)."
-                  : "Zusätzliche Felder für diese Produktkategorie (EU-Produktsicherheit / GPSR)."}
+        {sectionIntro}
       </Text>
       <BlockStack gap="300">
         {extraKeys.map((key) => {
           const def = fieldDefs[key] || { type: "text", label_i18n: {}, help_text_i18n: {} };
-          const label = pickI18n(def.label_i18n, locale) || key;
+          const baseLabel = pickI18n(def.label_i18n, locale) || key;
           const helpText = pickI18n(def.help_text_i18n, locale);
           const isRequired = requiredKeys.includes(key);
+          const label = isRequired ? baseLabel : `${baseLabel} (${optionalWord})`;
           const value = getMeta(product, key) || "";
+
+          const labelNode = (
+            <InlineStack gap="200" blockAlign="center" wrap={false}>
+              <span>{label}</span>
+              <InfoIconTooltip text={helpText} />
+            </InlineStack>
+          );
 
           if (def.type === "select" && Array.isArray(def.options)) {
             return (
               <Select
                 key={key}
-                label={label}
+                label={labelNode}
                 requiredIndicator={isRequired}
                 options={[{ label: "—", value: "" }, ...def.options.map((o) => ({ label: o, value: o }))]}
                 value={value}
                 onChange={(v) => updateMeta(key, v || null)}
-                helpText={helpText || undefined}
               />
             );
           }
@@ -118,15 +135,23 @@ export default function ComplianceFieldsSection({ client, categoryId, marketplac
           return (
             <TextField
               key={key}
-              label={label}
+              label={labelNode}
               requiredIndicator={isRequired}
               value={value}
               onChange={(v) => updateMeta(key, v || null)}
               type={def.type === "number" ? "number" : "text"}
               placeholder={def.type === "file" ? "https://…" : undefined}
-              helpText={helpText || undefined}
               autoComplete="off"
-              multiline={def.type === "text" && (key.endsWith("_list") || key === "ingredients" || key === "nutrition_values") ? 2 : undefined}
+              multiline={
+                def.type === "text" &&
+                (key.endsWith("_list") ||
+                  key === "ingredients" ||
+                  key === "nutrition_values" ||
+                  key === "safety_warnings" ||
+                  key === "recall_procedure")
+                  ? 3
+                  : undefined
+              }
             />
           );
         })}

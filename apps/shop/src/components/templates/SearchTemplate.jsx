@@ -449,20 +449,21 @@ const SubcategoryGroup = styled.div`
   margin-bottom: 0;
 `;
 
-const SubcategoryLink = styled(Link)`
+const SubcategoryLink = styled(Link).attrs((p) => ({
+  className: p.$active ? "shop-typo-sidebar-submenu is-active" : "shop-typo-sidebar-submenu",
+}))`
   display: block;
   padding: 8px 10px;
-  font-size: 13px;
-  color: ${(p) => (p.$active ? "#111827" : "#4b5563")};
-  font-weight: ${(p) => (p.$active ? 600 : 400)};
   text-decoration: none;
   border-radius: 6px;
   background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
   margin-bottom: 2px;
   transition: background 0.12s, color 0.12s;
+  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
+  font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-submenu-fw, 400)")};
   &:hover {
     background: #e5e7eb;
-    color: #111827;
+    color: var(--sidebar-nav-color, #111827);
   }
 `;
 
@@ -479,19 +480,13 @@ const FilterGroupTitle = styled.button`
   padding: 12px 0;
   background: none;
   border: none;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #111;
   cursor: pointer;
   text-align: left;
 `;
 
-const FilterGroupHeading = styled.h4`
+const FilterGroupHeading = styled.h4.attrs({ className: "shop-typo-sidebar-nav" })`
   margin: 0;
   padding: 0;
-  font: inherit;
   flex: 1;
   min-width: 0;
   text-align: left;
@@ -510,24 +505,29 @@ const FilterChevron = styled.span`
   transition: transform 0.18s ease;
 `;
 
-const CheckRow = styled.label`
+const CheckRow = styled.label.attrs({ className: "shop-typo-sidebar-submenu" })`
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 3px 0;
   cursor: pointer;
-  font-size: 12.5px;
-  color: ${(p) => (p.$on ? "#111" : "#555")};
-  font-weight: ${(p) => (p.$on ? "600" : "400")};
+  color: ${(p) => (p.$on ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
+  font-weight: ${(p) => (p.$on ? 600 : "var(--sidebar-submenu-fw, 400)")};
   transition: color 0.12s;
-  input {
-    width: 13px;
-    height: 13px;
-    accent-color: #111;
-    cursor: pointer;
+
+  & > label {
     flex-shrink: 0;
+    width: 12px;
+    height: 12px;
   }
-  &:hover { color: #111; }
+
+  & > label svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+  }
+
+  &:hover { color: var(--sidebar-nav-color, #111827); }
 `;
 
 const ClearAllBtn = styled.button`
@@ -955,7 +955,7 @@ export default function SearchTemplate() {
                 ← {parentCategory.name || parentCategory.slug}
               </SubcategoryLink>
             )}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
+            <div className="shop-typo-sidebar-nav" style={{ marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
               {displayTitle}
             </div>
             <SubcategoryLink href={searchHrefForSub("")} $active={!effectiveCat} onClick={() => { setFilters({}); setPage(1); }}>
@@ -979,7 +979,7 @@ export default function SearchTemplate() {
             >
               ← {parentCategory.name || parentCategory.slug}
             </SubcategoryLink>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: 4 }}>
+            <div className="shop-typo-sidebar-nav" style={{ marginBottom: 4, marginTop: 4 }}>
               {parentCategory.name || parentCategory.slug}
             </div>
             <SubcategoryLink
@@ -1181,7 +1181,7 @@ export default function SearchTemplate() {
                 <SidebarSplit>
                   {renderDesktopNavPane()}
                   <SidebarPane>
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
+                    <div className="shop-typo-sidebar-nav" style={{ marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
                       {tCommon("filter")}
                       {activeCount > 0 && (
                         <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
@@ -1193,7 +1193,7 @@ export default function SearchTemplate() {
                       Object.entries(facets).map(([key, vals]) => (
                         <FilterGroup key={key}>
                           <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                            <FilterGroupHeading className="shop-typo-sidebar-nav">{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
+                            <FilterGroupHeading>{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
                             <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                           </FilterGroupTitle>
                           <FilterGroupBody $open={!!openFilterGroups[key]}>
@@ -1201,7 +1201,7 @@ export default function SearchTemplate() {
                               const on = (filters[key] || []).includes(val);
                               return (
                                 <CheckRow key={val} $on={on}>
-                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={10} />
+                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={12} />
                                   {formatFacetOptionLabel(key, val, categorySlugToName, locale, metafieldDefinitions)}
                                 </CheckRow>
                               );

@@ -1,6 +1,6 @@
-﻿import { NextIntlClientProvider } from "next-intl";
+import { NextIntlClientProvider } from "next-intl";
 import { setRequestLocale } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { routing } from "@/i18n/routing";
 import StyledComponentsRegistry from "../registry";
@@ -13,6 +13,7 @@ import {
   DEFAULT_CURRENCY,
   isValidMarket,
 } from "@/lib/shop-market";
+import { fetchEnabledShopLocales } from "@/lib/enabled-shop-locales";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -23,6 +24,15 @@ export default async function LocaleLayout({ children, params }) {
   if (!routing.locales.includes(locale)) {
     notFound();
   }
+
+  const enabledLocales = await fetchEnabledShopLocales();
+  if (!enabledLocales.includes(locale)) {
+    const fallback = enabledLocales.includes(routing.defaultLocale)
+      ? routing.defaultLocale
+      : enabledLocales[0];
+    redirect(`/${fallback}`);
+  }
+
   setRequestLocale(locale);
 
   const messages = (await import(`../../../messages/${locale}.json`)).default;

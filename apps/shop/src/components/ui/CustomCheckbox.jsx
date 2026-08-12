@@ -3,7 +3,6 @@ import { useId } from "react";
 const PATH_STYLE = {
   fill: "none",
   stroke: "black",
-  strokeWidth: 6,
   strokeLinecap: "round",
   strokeLinejoin: "round",
   transition: "stroke-dasharray 0.5s ease, stroke-dashoffset 0.5s ease",
@@ -24,6 +23,9 @@ export default function CustomCheckbox({
 }) {
   const generatedId = useId();
   const checkboxId = id || generatedId;
+  const px = Math.max(8, Number(size) || 24);
+  // Keep strokes inside the box at small sizes (filters use ~10–14px).
+  const strokeWidth = px <= 14 ? 5 : 6;
 
   return (
     <label
@@ -35,6 +37,10 @@ export default function CustomCheckbox({
         alignItems: "center",
         justifyContent: "center",
         lineHeight: 0,
+        width: px,
+        height: px,
+        flexShrink: 0,
+        overflow: "hidden",
         opacity: disabled ? 0.6 : 1,
         ...style,
       }}
@@ -51,12 +57,20 @@ export default function CustomCheckbox({
         readOnly={readOnly}
         style={{ display: "none" }}
       />
-      <svg viewBox="0 0 64 64" width={size} height={size} style={{ overflow: "visible" }} aria-hidden="true">
+      {/* Padded viewBox so rounded stroke isn’t clipped on the left/top edges */}
+      <svg
+        viewBox="-4 -4 72 72"
+        width={px}
+        height={px}
+        style={{ display: "block", overflow: "hidden", flexShrink: 0 }}
+        aria-hidden="true"
+      >
         <path
           d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16"
           pathLength="575.0541381835938"
           style={{
             ...PATH_STYLE,
+            strokeWidth,
             strokeDasharray: checked ? "70.5096664428711 9999999" : "241 9999999",
             strokeDashoffset: checked ? -262.2723388671875 : 0,
           }}

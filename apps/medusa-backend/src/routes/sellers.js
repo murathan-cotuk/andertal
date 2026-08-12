@@ -160,8 +160,42 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
           payouts = po.rows
         } catch (_) {}
 
+        // Required setup flags (locations / card / IBAN) — for admin review checklist
+        let setup = {
+          has_iban: !!(seller.iban && String(seller.iban).replace(/\s+/g, "").length >= 15),
+          has_card: false,
+          has_shipping_from: false,
+          has_returns_to: false,
+          has_billing: false,
+          locations: [],
+        }
+        try {
+          const cardR = await client.query(
+            `SELECT stripe_payment_method_id FROM seller_users WHERE id = $1`,
+            [id],
+          )
+          setup.has_card = !!(cardR.rows[0]?.stripe_payment_method_id)
+        } catch (_) {}
+        try {
+          const locR = await client.query(
+            `SELECT id, name, type, address_line1, address_line2, city, postal_code, country,
+                    is_shipping_from, is_returns_to, is_billing, is_primary
+               FROM seller_locations
+              WHERE seller_id = $1
+              ORDER BY is_primary DESC, created_at ASC`,
+            [sellerId],
+          )
+          setup.locations = locR.rows || []
+          for (const loc of setup.locations) {
+            const hasStreet = !!(loc.address_line1 && String(loc.address_line1).trim())
+            if (loc.is_shipping_from && hasStreet) setup.has_shipping_from = true
+            if (loc.is_returns_to && hasStreet) setup.has_returns_to = true
+            if (loc.is_billing && hasStreet) setup.has_billing = true
+          }
+        } catch (_) {}
+
         await client.end()
-        res.json({ seller: { ...seller, products_by_category: productsByCategory, monthly_revenue: monthlyRevenue, payout_summary: payoutSummary, payouts } })
+        res.json({ seller: { ...seller, products_by_category: productsByCategory, monthly_revenue: monthlyRevenue, payout_summary: payoutSummary, payouts, setup } })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })

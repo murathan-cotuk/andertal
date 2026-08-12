@@ -13,6 +13,8 @@ import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
 import SupportLanding from "@/components/support/SupportLanding";
 import BecomeSellerLanding from "@/components/landing/BecomeSellerLanding";
+import CatalogHubFilterShell from "@/components/catalog/CatalogHubFilterShell";
+import BrandsDirectoryBlock from "@/components/landing/BrandsDirectoryBlock";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
 
@@ -796,7 +798,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
     const param = container.collection_id
       ? `collection_id=${encodeURIComponent(container.collection_id)}`
       : `collection_handle=${encodeURIComponent(container.collection_handle)}`;
-    fetch(`/api/store-products?${param}&limit=100`, { cache: "no-store" })
+    fetch(`/api/store-products?${param}&limit=100`)
       .then((r) => r.json())
       .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
       .catch(() => setProducts([]));
@@ -804,7 +806,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 
   useEffect(() => {
     if (source !== "collections" || !snapshots.length) return;
-    fetch("/api/store-collections", { cache: "no-store" })
+    fetch("/api/store-collections")
       .then((r) => r.json())
       .then((data) => {
         const all = Array.isArray(data?.collections) ? data.collections : [];
@@ -1086,7 +1088,7 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
     const param = container.collection_id
       ? `collection_id=${encodeURIComponent(container.collection_id)}`
       : `collection_handle=${encodeURIComponent(container.collection_handle)}`;
-    fetch(`/api/store-products?${param}&limit=20`, { cache: "no-store" })
+    fetch(`/api/store-products?${param}&limit=20`)
       .then((r) => r.json())
       .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
       .catch(() => setProducts([]));
@@ -1182,7 +1184,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
 
   useEffect(() => {
     if (!container.category_slug) { setProducts([]); return; }
-    fetch(`/api/store-products?category=${encodeURIComponent(container.category_slug)}&limit=50`, { cache: "no-store" })
+    fetch(`/api/store-products?category=${encodeURIComponent(container.category_slug)}&limit=50`)
       .then((r) => r.json())
       .then((d) => {
         const all = Array.isArray(d?.products) ? d.products : [];
@@ -1370,6 +1372,31 @@ function PersonalizedProductRow({ container, locale = "de" }) {
 }
 
 // ── Seller Carousel ────────────────────────────────────────────────────────────
+function BrandsDirectoryContainer({ container, locale = "de" }) {
+  const title = lt(container, "title", locale);
+  const perRow = container.items_per_row != null ? Number(container.items_per_row) : 5;
+  const perRowMobile = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
+  const maxRows = container.max_rows != null ? Number(container.max_rows) : 10;
+  const gap = container.gap != null ? Number(container.gap) : 14;
+  const padStyle = getContainerPadding(container, "22px 24px 40px");
+  const maxWRaw = normalizeContentMaxWidth(container.content_max_width, 1440);
+  const maxW = parseInt(String(maxWRaw), 10) || 1440;
+  return (
+    <div style={padStyle}>
+      <BrandsDirectoryBlock
+        locale={locale}
+        title={title}
+        perRow={perRow}
+        perRowMobile={perRowMobile}
+        maxRows={maxRows}
+        gap={gap}
+        padding="0"
+        maxWidth={maxW}
+      />
+    </div>
+  );
+}
+
 function SellerCarousel({ container, locale = "de" }) {
   const tp = useTranslations("product");
   const [sellers, setSellers] = useState(undefined);
@@ -1381,7 +1408,7 @@ function SellerCarousel({ container, locale = "de" }) {
   const limit = container.limit != null ? Number(container.limit) : 20;
 
   useEffect(() => {
-    fetch(`/api/store-sellers?limit=${encodeURIComponent(limit)}`, { cache: "no-store" })
+    fetch(`/api/store-sellers?limit=${encodeURIComponent(limit)}`)
       .then((r) => r.json())
       .then((d) => setSellers(Array.isArray(d?.sellers) ? d.sellers : []))
       .catch(() => setSellers([]));
@@ -1463,7 +1490,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
 
   useEffect(() => {
     if (!snapshots.length) return;
-    fetch("/api/store-collections", { cache: "no-store" })
+    fetch("/api/store-collections")
       .then((r) => r.json())
       .then((data) => {
         const all = Array.isArray(data?.collections) ? data.collections : [];
@@ -2703,7 +2730,9 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "banner_cta":           inner = <BannerCta container={c} locale={locale} />; break;
     case "collection_carousel":  inner = <CollectionCarousel container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "bestseller_carousel":  inner = <BestsellerCarousel container={c} locale={locale} />; break;
-    case "seller_carousel":      inner = <SellerCarousel container={c} locale={locale} />; break;
+    case "brands_directory":     inner = <BrandsDirectoryContainer container={c} locale={locale} />; break;
+    // Legacy brands hub seed used seller_carousel for the Marken grid (API never existed).
+    case "seller_carousel":      inner = <BrandsDirectoryContainer container={c} locale={locale} />; break;
     case "content_mosaic":       inner = <ContentMosaic container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
     case "collections_carousel": inner = <CollectionsCarousel container={c} locale={locale} />; break;
     case "accordion":            inner = <Accordion container={c} locale={locale} />; break;
@@ -2815,7 +2844,7 @@ export default function LandingContainers({ pageId, categoryId }) {
               const param = c.collection_id
                 ? `collection_id=${encodeURIComponent(c.collection_id)}`
                 : `collection_handle=${encodeURIComponent(c.collection_handle)}`;
-              const d = await fetch(`/api/store-products?${param}&limit=${limit}`, { cache: "no-store" }).then((r) => r.json());
+              const d = await fetch(`/api/store-products?${param}&limit=${limit}`).then((r) => r.json());
               return [key, Array.isArray(d?.products) ? d.products : []];
             } catch {
               return [key, []];
@@ -2844,13 +2873,14 @@ export default function LandingContainers({ pageId, categoryId }) {
     return () => { cancelled = true; };
   }, [containers]);
 
-  // Category sidebar — auto-derived from this page's own "Category carousel" (bestseller_carousel)
-  // containers, scoped to categories that currently have products. Same source/precedent as the
-  // desktop sidebar in apps/shop/src/app/[locale]/[handle]/page.jsx (lines ~943-986), generalized
-  // here into a real container type so any page can opt in via a "category_sidebar" container.
+  // Category sidebar — from "category_sidebar" container and/or landing setting
+  // show_product_filter_bar (Sellercentral → Filterleiste → Produkt-Filterleiste anzeigen).
+  // Links are auto-derived from this page's bestseller_carousel containers with products.
+  const wantProductFilterBar = landingSettings?.show_product_filter_bar === true;
   const hasSidebarContainer = Array.isArray(containers) && containers.some((c) => c?.type === "category_sidebar" && c?.visible !== false);
+  const shouldLoadSidebarLinks = Array.isArray(containers) && (hasSidebarContainer || wantProductFilterBar);
   useEffect(() => {
-    if (!hasSidebarContainer) { setSidebarCategoryLinks([]); return; }
+    if (!shouldLoadSidebarLinks) { setSidebarCategoryLinks([]); return; }
     let cancelled = false;
     const seen = new Set();
     const candidates = [];
@@ -2864,7 +2894,7 @@ export default function LandingContainers({ pageId, categoryId }) {
     if (!candidates.length) { setSidebarCategoryLinks([]); return; }
     Promise.all(
       candidates.map((l) =>
-        fetch(`/api/store-products?category=${encodeURIComponent(l.slug)}&limit=1`, { cache: "no-store" })
+        fetch(`/api/store-products?category=${encodeURIComponent(l.slug)}&limit=1`)
           .then((r) => r.json())
           .then((d) => ({ ...l, hasProducts: Array.isArray(d?.products) && d.products.length > 0 }))
           .catch(() => ({ ...l, hasProducts: false }))
@@ -2873,7 +2903,7 @@ export default function LandingContainers({ pageId, categoryId }) {
       if (!cancelled) setSidebarCategoryLinks(withCounts.filter((l) => l.hasProducts));
     });
     return () => { cancelled = true; };
-  }, [hasSidebarContainer, containers, locale]);
+  }, [shouldLoadSidebarLinks, containers, locale]);
 
   // Don't block render — show layout immediately, data-dependent components show skeleton
   if (!containers) return null;
@@ -2916,51 +2946,28 @@ export default function LandingContainers({ pageId, categoryId }) {
     </div>
   );
 
-  const showSidebar = hasSidebarContainer && sidebarCategoryLinks.length > 0;
+  const showSidebar = shouldLoadSidebarLinks && sidebarCategoryLinks.length > 0;
   if (!showSidebar) return stack;
 
-  const categoriesLabel = locale === "en" ? "Categories" : locale === "tr" ? "Kategoriler" : locale === "fr" ? "Catégories" : locale === "es" ? "Categorías" : locale === "it" ? "Categorie" : "Kategorien";
-
-  if (isNarrow) {
-    return (
-      <div>
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "10px 16px", borderBottom: "1px solid #eee", WebkitOverflowScrolling: "touch" }}>
-          {sidebarCategoryLinks.map((l) => (
-            <Link
-              key={l.slug}
-              href={`/${l.slug}`}
-              style={{ flexShrink: 0, padding: "6px 14px", borderRadius: 999, background: "#f4f4f2", fontSize: 13, fontWeight: 600, color: "#111", textDecoration: "none", whiteSpace: "nowrap" }}
-            >
-              {l.title}
-            </Link>
-          ))}
-        </div>
-        {stack}
-      </div>
-    );
+  const saleSlugs = new Set();
+  for (const c of containers || []) {
+    if (c?.type === "bestseller_carousel" && c?.visible !== false && c?.mode === "sale") {
+      const s = String(c.category_slug || "").trim();
+      if (s) saleSlugs.add(s);
+    }
   }
+  const links = sidebarCategoryLinks.map((l) => {
+    const slug = String(l.slug).replace(/^\//, "");
+    return {
+      slug,
+      title: l.title,
+      href: saleSlugs.has(l.slug) || saleSlugs.has(slug) ? `/${slug}` : `/${slug}?sort=bestseller`,
+    };
+  });
 
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", maxWidth: 1440, margin: "0 auto" }}>
-      <div style={{ width: 220, flexShrink: 0, padding: "32px 16px 32px 24px" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#999", marginBottom: 10 }}>
-          {categoriesLabel}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {sidebarCategoryLinks.map((l) => (
-            <Link
-              key={l.slug}
-              href={`/${l.slug}`}
-              style={{ padding: "8px 10px", borderRadius: 8, fontSize: 14, color: "#333", textDecoration: "none" }}
-            >
-              {l.title}
-            </Link>
-          ))}
-        </div>
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {stack}
-      </div>
-    </div>
+    <CatalogHubFilterShell links={links} locale={locale}>
+      {stack}
+    </CatalogHubFilterShell>
   );
 }

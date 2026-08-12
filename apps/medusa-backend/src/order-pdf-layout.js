@@ -137,27 +137,6 @@ function resolveSellerDisplayLines(sellerInfo, locale, hasUnicode) {
   return lines.filter(Boolean).map((l) => txt(l, hasUnicode))
 }
 
-/** Returns [singleAddressLine, vatLine|null] for compact single-line seller display */
-function resolveSellerCompact(sellerInfo, locale, hasUnicode) {
-  if (!sellerInfo) return []
-  const s = getOrderPdfStrings(locale)
-  const name =
-    String(sellerInfo.store_name || '').trim() ||
-    String(sellerInfo.company_name || '').trim() ||
-    [sellerInfo.first_name, sellerInfo.last_name].filter(Boolean).join(' ').trim()
-  const addr = sellerInfo.business_address || {}
-  const street = String(addr.street || addr.address_line1 || '').trim()
-  const zip = String(addr.zip || addr.postal_code || '').trim()
-  const city = String(addr.city || '').trim()
-  const parts = [name]
-  if (street) parts.push(street)
-  if (zip || city) parts.push([zip, city].filter(Boolean).join(' '))
-  const line = parts.join(', ')
-  const out = [txt(line, hasUnicode)]
-  if (sellerInfo.vat_id) out.push(txt(`${s.vatIdPrefix}: ${String(sellerInfo.vat_id).trim()}`, hasUnicode))
-  return out.filter(Boolean)
-}
-
 // ─── Draw helpers ─────────────────────────────────────────────────────────────
 function drawHRule(doc, y) {
   const { left, right } = pageMetrics(doc)
@@ -165,24 +144,40 @@ function drawHRule(doc, y) {
 }
 
 function drawLabel(doc, text, x, y, width, hasUnicode) {
-  const font = hasUnicode ? 'PdfBold' : 'Helvetica-Bold'
-  doc.fillColor(MUTED).font(font).fontSize(7).text(txt(text, hasUnicode), x, y, { width, characterSpacing: 0.5 })
-  return doc.y
+  const font = hasUnicode ? 'PdfRegular' : 'Helvetica'
+  doc.fillColor(MUTED).font(font).fontSize(7).text(txt(text, hasUnicode), x, y, {
+    width,
+    characterSpacing: 0.4,
+    lineBreak: false,
+  })
+  return y + 10
 }
 
-function drawLines(doc, lines, x, y, width, { hasUnicode, boldFirst = true, fontSize = 9.5 } = {}) {
+function drawLines(doc, lines, x, y, width, { hasUnicode, boldFirst = false, fontSize = 9 } = {}) {
+  const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
+  const BOLD = hasUnicode ? 'PdfBold' : 'Helvetica-Bold'
   let cy = y
   lines.forEach((line, i) => {
     if (!line) return
     const bold = i === 0 && boldFirst
     doc
-      .font(bold ? (hasUnicode ? 'PdfBold' : 'Helvetica-Bold') : (hasUnicode ? 'PdfRegular' : 'Helvetica'))
-      .fontSize(bold ? 10 : fontSize)
+      .font(bold ? BOLD : REG)
+      .fontSize(fontSize)
       .fillColor('#1a1a2e')
-      .text(txt(line, hasUnicode), x, cy, { width })
-    cy = doc.y + 2
+      .text(txt(line, hasUnicode), x, cy, { width, lineGap: 1 })
+    cy = doc.y + 1
   })
   return cy
+}
+
+/** Same-row label/value without letting PDFKit advance y between cells (avoids overlap). */
+function drawMetaRow(doc, label, value, x, y, labelW, valW, REG) {
+  const lineH = 12
+  doc.fillColor(MUTED).font(REG).fontSize(8.5)
+    .text(label, x, y, { width: labelW, lineBreak: false })
+  doc.fillColor('#1a1a2e').font(REG).fontSize(8.5)
+    .text(value, x + labelW, y, { width: valW, align: 'right', lineBreak: false })
+  return y + lineH
 }
 
 // ─── Retail order document (Rechnung + Lieferschein) ─────────────────────────
@@ -210,82 +205,76 @@ function renderRetailOrderDocument(doc, {
   const s = getOrderPdfStrings(locale)
   const { left, right, contentWidth } = pageMetrics(doc)
 
-  // ── Logo centered ──────────────────────────────────────────────────────────
-  const LOGO_Y = 36
-  const LOGO_H = 30
-  if (shopLogoBuffer) {
-    try {
-      doc.image(shopLogoBuffer, left, LOGO_Y, { fit: [contentWidth, LOGO_H], align: 'center', valign: 'center' })
-    } catch (_) {
-      doc.fillColor(ACCENT).font(BOLD).fontSize(16)
-        .text(txt(shopName || 'Andertal', hasUnicode), left, LOGO_Y, { width: contentWidth, align: 'center' })
-    }
-  } else {
-    doc.fillColor(ACCENT).font(BOLD).fontSize(16)
-      .text(txt(shopName || 'Andertal', hasUnicode), left, LOGO_Y, { width: contentWidth, align: 'center' })
-  }
-
-  // ── Rule below logo ────────────────────────────────────────────────────────
-  const ruleY = LOGO_Y + LOGO_H + 8
-  drawHRule(doc, ruleY)
-
-  // ── Two-column header ──────────────────────────────────────────────────────
-  const headerTop = ruleY + 14
-  const leftColW = Math.round(contentWidth * 0.54)
-  const rightColX = left + leftColW + 20
-  const rightColW = contentWidth - leftColW - 20
-
-  // Right column — document title + meta
   const orderNum = row.order_number != null ? String(row.order_number) : String(row.id || '').slice(0, 8)
   const rawNum = String(invoiceNumber || '').replace(/^[A-Za-z]+-/, '')
-  const displayDocNum = kind === 'invoice'
-    ? (String(invoiceNumber || '').startsWith('R-') ? String(invoiceNumber) : (rawNum ? `R-${rawNum}` : ''))
-    : String(invoiceNumber || '')
+  const displayDocNum = (() => {
+    if (!rawNum && !invoiceNumber) return ''
+    if (kind === 'invoice') {
+      return String(invoiceNumber || '').startsWith('R-') ? String(invoiceNumber) : `R-${rawNum}`
+    }
+    // Lieferschein
+    const raw = String(invoiceNumber || '')
+    if (raw.startsWith('L-')) return raw
+    return rawNum ? `L-${rawNum}` : raw
+  })()
   const shipAt = row.shipped_at || row.fulfilled_at || null
   const carrier = String(carrierName || row.carrier_name || '').trim()
   const tracking = String(trackingNumber || row.tracking_number || '').trim()
 
-  doc.fillColor(ACCENT).font(BOLD).fontSize(22)
-    .text(txt(docTitle, hasUnicode), rightColX, headerTop, { width: rightColW, align: 'right' })
+  // ── Brand row: small logo top-left + document title top-right ───────────────
+  const brandY = 36
+  const LOGO_MAX_W = 108
+  const LOGO_MAX_H = 28
+  let brandBottom = brandY + LOGO_MAX_H
 
-  let rightY = doc.y + 10
-  // Narrower label column than the 54/46 split used elsewhere — long DHL/Hermes tracking
-  // numbers were wrapping onto a second line in the ~46%-wide value column.
-  const metaLabelW = Math.round(rightColW * 0.42)
-  const metaValW = rightColW - metaLabelW
+  if (shopLogoBuffer) {
+    try {
+      doc.image(shopLogoBuffer, left, brandY, { fit: [LOGO_MAX_W, LOGO_MAX_H], align: 'left', valign: 'center' })
+    } catch (_) {
+      doc.fillColor(ACCENT).font(REG).fontSize(12)
+        .text(txt(shopName || 'Andertal', hasUnicode), left, brandY + 6, { width: LOGO_MAX_W, lineBreak: false })
+    }
+  } else {
+    doc.fillColor(ACCENT).font(REG).fontSize(12)
+      .text(txt(shopName || 'Andertal', hasUnicode), left, brandY + 6, { width: LOGO_MAX_W, lineBreak: false })
+  }
 
-  const metaRows = [
-    { label: s.orderNoLabel, value: `#${orderNum}` },
-    displayDocNum ? { label: kind === 'invoice' ? s.invoiceNoLabel : s.deliveryNoLabel, value: displayDocNum } : null,
-    kind === 'lieferschein'
-      ? { label: s.shipDateLabel || s.shippingDateLabel, value: pdfFmtDate(shipAt || row.created_at, locale) }
-      : { label: s.shippingDateLabel, value: pdfFmtDate(row.created_at, locale) },
-    kind === 'lieferschein' && carrier ? { label: s.carrierLabel, value: carrier } : null,
-    kind === 'lieferschein' && tracking ? { label: s.trackingLabel, value: tracking } : null,
-  ].filter(Boolean)
+  doc.fillColor(ACCENT).font(REG).fontSize(14)
+    .text(txt(docTitle, hasUnicode), left + LOGO_MAX_W + 16, brandY + 6, {
+      width: contentWidth - LOGO_MAX_W - 16,
+      align: 'right',
+      lineBreak: false,
+    })
 
-  metaRows.forEach(({ label, value }) => {
-    doc.fillColor(MUTED).font(REG).fontSize(8.5)
-      .text(txt(label, hasUnicode), rightColX, rightY, { width: metaLabelW })
-    doc.fillColor('#1a1a2e').font(BOLD).fontSize(8.5)
-      .text(txt(value, hasUnicode), rightColX + metaLabelW, rightY, { width: metaValW, align: 'right' })
-    rightY = doc.y + 3
-  })
+  const ruleY = brandBottom + 10
+  drawHRule(doc, ruleY)
 
-  // Left column — seller then customer
+  // ── Two-column header: seller/customer | meta ──────────────────────────────
+  const headerTop = ruleY + 12
+  const gap = 24
+  const leftColW = Math.round(contentWidth * 0.55)
+  const rightColX = left + leftColW + gap
+  const rightColW = contentWidth - leftColW - gap
+
   let leftY = headerTop
-
-  const sellerCompact = resolveSellerCompact(sellerInfo, locale, hasUnicode)
-  const senderCompact = sellerCompact.length
-    ? sellerCompact
+  const sellerLines = resolveSellerDisplayLines(sellerInfo, locale, hasUnicode)
+  const senderLines = sellerLines.length
+    ? sellerLines
     : [txt(shopName || 'Andertal', hasUnicode)]
-  const regFont = hasUnicode ? 'PdfRegular' : 'Helvetica'
-  senderCompact.forEach((line) => {
-    doc.fillColor(MUTED).font(regFont).fontSize(7.5)
-      .text(line, left, leftY, { width: leftColW })
-    leftY = doc.y + 1
+
+  doc.fillColor(MUTED).font(REG).fontSize(7)
+    .text(txt(s.sellerLabel || 'Verkäufer', hasUnicode), left, leftY, {
+      width: leftColW,
+      characterSpacing: 0.4,
+      lineBreak: false,
+    })
+  leftY += 10
+  leftY = drawLines(doc, senderLines, left, leftY, leftColW, {
+    hasUnicode,
+    boldFirst: false,
+    fontSize: 8.5,
   })
-  leftY += 8
+  leftY += 10
 
   const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ')
   const shipCountry = getCountryName(row.country || '', locale)
@@ -297,35 +286,67 @@ function renderRetailOrderDocument(doc, {
     shipCountry,
   ].filter(Boolean)
 
-  drawLabel(doc, s.customerLabel, left, leftY, leftColW, hasUnicode)
-  leftY = doc.y + 3
-  leftY = drawLines(doc, addressLines, left, leftY, leftColW, { hasUnicode, boldFirst: true, fontSize: 9.5 })
+  leftY = drawLabel(doc, s.customerLabel, left, leftY, leftColW, hasUnicode)
+  leftY = drawLines(doc, addressLines, left, leftY, leftColW, {
+    hasUnicode,
+    boldFirst: true,
+    fontSize: 9,
+  })
 
-  // Continue below both columns
-  const afterHeader = Math.max(leftY, rightY) + 14
+  let rightY = headerTop
+  const metaLabelW = Math.min(92, Math.round(rightColW * 0.42))
+  const metaValW = rightColW - metaLabelW
+  const metaRows = [
+    { label: s.orderNoLabel, value: `#${orderNum}` },
+    displayDocNum ? { label: kind === 'invoice' ? s.invoiceNoLabel : s.deliveryNoLabel, value: displayDocNum } : null,
+    kind === 'lieferschein'
+      ? { label: s.shipDateLabel || s.shippingDateLabel, value: pdfFmtDate(shipAt || row.created_at, locale) }
+      : { label: s.shippingDateLabel, value: pdfFmtDate(row.created_at, locale) },
+    kind === 'lieferschein' && carrier ? { label: s.carrierLabel, value: carrier } : null,
+    kind === 'lieferschein' && tracking ? { label: s.trackingLabel, value: tracking } : null,
+  ].filter(Boolean)
+
+  metaRows.forEach(({ label, value }) => {
+    rightY = drawMetaRow(
+      doc,
+      txt(label, hasUnicode),
+      txt(value, hasUnicode),
+      rightColX,
+      rightY,
+      metaLabelW,
+      metaValW,
+      REG,
+    )
+  })
+
+  const afterHeader = Math.max(leftY, rightY) + 12
   drawHRule(doc, afterHeader)
 
   // ── Greeting ───────────────────────────────────────────────────────────────
-  const greetingY = afterHeader + 10
+  let y = afterHeader + 10
   const greetingName = customerName || (row.email ? row.email.split('@')[0] : 'Kunde')
-  doc.fillColor('#1a1a2e').font(REG).fontSize(10)
-    .text(txt(s.greetingLine(greetingName), hasUnicode), left, greetingY, { width: contentWidth })
-  doc.font(REG).fontSize(10)
-    .text(txt(kind === 'invoice' ? s.invoiceGreeting : s.deliveryGreeting, hasUnicode), left, doc.y + 1, { width: contentWidth })
+  doc.fillColor('#1a1a2e').font(REG).fontSize(9.5)
+    .text(txt(s.greetingLine(greetingName), hasUnicode), left, y, { width: contentWidth, lineGap: 2 })
+  y = doc.y + 2
+  doc.font(REG).fontSize(9.5)
+    .text(txt(kind === 'invoice' ? s.invoiceGreeting : s.deliveryGreeting, hasUnicode), left, y, {
+      width: contentWidth,
+      lineGap: 2,
+    })
 
-  const tableRuleY = doc.y + 12
+  const tableRuleY = doc.y + 10
   drawHRule(doc, tableRuleY)
 
   // ── Products table ─────────────────────────────────────────────────────────
-  const tableTop = tableRuleY + 6
+  const tableTop = tableRuleY + 8
   const sellerHasVat = !!(sellerInfo && sellerInfo.vat_id && String(sellerInfo.vat_id).trim())
   let descW, qtyW, mwstW, unitW, totalW, qtyX, mwstX, unitX, totalX
 
   if (kind === 'invoice') {
-    descW = Math.round(contentWidth * 0.42)
-    qtyW = 30
+    descW = Math.round(contentWidth * 0.44)
+    qtyW = 32
     mwstW = 40
-    unitW = Math.round(contentWidth * 0.17)
+    unitW = Math.round(contentWidth * 0.16)
     totalW = contentWidth - descW - qtyW - mwstW - unitW
     qtyX = left + descW
     mwstX = qtyX + qtyW
@@ -343,17 +364,17 @@ function renderRetailOrderDocument(doc, {
     totalX = qtyX
   }
 
-  const headerH = 18
+  const headerH = 16
   doc.rect(left, tableTop, contentWidth, headerH).fill(ACCENT)
-  doc.fillColor('#ffffff').font(BOLD).fontSize(7.5)
-  doc.text(txt(s.itemLabel, hasUnicode), left + 8, tableTop + 5, { width: descW - 12 })
-  doc.text(txt(s.qtyLabel, hasUnicode), qtyX, tableTop + 5, { width: qtyW, align: 'right' })
+  doc.fillColor('#ffffff').font(REG).fontSize(7.5)
+  doc.text(txt(s.itemLabel, hasUnicode), left + 8, tableTop + 4, { width: descW - 12, lineBreak: false })
+  doc.text(txt(s.qtyLabel, hasUnicode), qtyX, tableTop + 4, { width: qtyW, align: 'right', lineBreak: false })
   if (kind === 'invoice') {
-    doc.text(txt(s.mwstLabel, hasUnicode), mwstX, tableTop + 5, { width: mwstW, align: 'right' })
-    doc.text(txt(s.unitPriceLabel, hasUnicode), unitX, tableTop + 5, { width: unitW, align: 'right' })
-    doc.text(txt(s.totalLabel, hasUnicode), totalX, tableTop + 5, { width: totalW - 8, align: 'right' })
+    doc.text(txt(s.mwstLabel, hasUnicode), mwstX, tableTop + 4, { width: mwstW, align: 'right', lineBreak: false })
+    doc.text(txt(s.unitPriceLabel, hasUnicode), unitX, tableTop + 4, { width: unitW, align: 'right', lineBreak: false })
+    doc.text(txt(s.totalLabel, hasUnicode), totalX, tableTop + 4, { width: totalW - 8, align: 'right', lineBreak: false })
   }
-  doc.y = tableTop + headerH + 2
+  doc.y = tableTop + headerH
 
   const rows = lineItems.length ? lineItems : itemRows
   const drawRows = rows.length ? rows : [{ title: s.noItems, quantity: 1, unit_price_cents: 0 }]
@@ -365,9 +386,12 @@ function renderRetailOrderDocument(doc, {
     const { main: titleMain, note: titleNote } = splitItemTitle(it.title || s.itemFallback)
     const title = txt(titleMain, hasUnicode)
     const note = txt(titleNote, hasUnicode)
+
+    doc.font(REG).fontSize(9)
     const titleH = doc.heightOfString(title, { width: descW - 12 })
-    const noteH = note ? doc.fontSize(7.5).heightOfString(note, { width: descW - 12 }) : 0
-    const rowH = Math.max(22, titleH + (note ? noteH + 2 : 0) + 10)
+    doc.font(REG).fontSize(7.5)
+    const noteH = note ? doc.heightOfString(note, { width: descW - 12 }) : 0
+    const rowH = Math.max(20, titleH + (note ? noteH + 2 : 0) + 10)
 
     if (doc.y + rowH > doc.page.height - doc.page.margins.bottom - 160) {
       doc.addPage()
@@ -377,19 +401,20 @@ function renderRetailOrderDocument(doc, {
     const rowY = doc.y
     if (idx % 2 === 1) doc.rect(left, rowY, contentWidth, rowH).fill(ROW_ALT)
 
-    doc.font(BOLD).fontSize(9.5).fillColor('#111827')
+    doc.font(REG).fontSize(9).fillColor('#111827')
       .text(title, left + 8, rowY + 5, { width: descW - 12 })
     if (note) {
       doc.font(REG).fontSize(7.5).fillColor(MUTED)
-        .text(note, left + 8, rowY + 5 + titleH + 2, { width: descW - 12 })
+        .text(note, left + 8, rowY + 5 + titleH + 1, { width: descW - 12 })
     }
-    doc.font(REG).fontSize(9.5).fillColor('#111827')
-      .text(String(qty), qtyX, rowY + 5, { width: qtyW, align: 'right' })
 
+    const cellY = rowY + 5
+    doc.font(REG).fontSize(9).fillColor('#111827')
+      .text(String(qty), qtyX, cellY, { width: qtyW, align: 'right', lineBreak: false })
     if (kind === 'invoice') {
-      doc.text(sellerHasVat ? '19%' : '—', mwstX, rowY + 5, { width: mwstW, align: 'right' })
-      doc.text(pdfCents(unit, locale), unitX, rowY + 5, { width: unitW, align: 'right' })
-      doc.text(pdfCents(lineTotal, locale), totalX, rowY + 5, { width: totalW - 8, align: 'right' })
+      doc.text(sellerHasVat ? '19%' : '—', mwstX, cellY, { width: mwstW, align: 'right', lineBreak: false })
+      doc.text(pdfCents(unit, locale), unitX, cellY, { width: unitW, align: 'right', lineBreak: false })
+      doc.text(pdfCents(lineTotal, locale), totalX, cellY, { width: totalW - 8, align: 'right', lineBreak: false })
     }
 
     doc.moveTo(left, rowY + rowH).lineTo(right, rowY + rowH)
@@ -401,15 +426,15 @@ function renderRetailOrderDocument(doc, {
   if (kind === 'invoice' && shippingCents != null) {
     const shRowIdx = drawRows.length
     const shRowY = doc.y
-    const shRowH = 22
+    const shRowH = 20
     if (shRowIdx % 2 === 1) doc.rect(left, shRowY, contentWidth, shRowH).fill(ROW_ALT)
     const shTitle = txt(s.shipping, hasUnicode)
-    doc.font(REG).fontSize(9.5).fillColor('#111827')
-      .text(shTitle, left + 8, shRowY + 5, { width: descW - 12 })
-      .text('1', qtyX, shRowY + 5, { width: qtyW, align: 'right' })
-      .text(sellerHasVat ? '19%' : '—', mwstX, shRowY + 5, { width: mwstW, align: 'right' })
-      .text(pdfCents(shippingCents, locale), unitX, shRowY + 5, { width: unitW, align: 'right' })
-      .text(pdfCents(shippingCents, locale), totalX, shRowY + 5, { width: totalW - 8, align: 'right' })
+    doc.font(REG).fontSize(9).fillColor('#111827')
+      .text(shTitle, left + 8, shRowY + 5, { width: descW - 12, lineBreak: false })
+      .text('1', qtyX, shRowY + 5, { width: qtyW, align: 'right', lineBreak: false })
+      .text(sellerHasVat ? '19%' : '—', mwstX, shRowY + 5, { width: mwstW, align: 'right', lineBreak: false })
+      .text(pdfCents(shippingCents, locale), unitX, shRowY + 5, { width: unitW, align: 'right', lineBreak: false })
+      .text(pdfCents(shippingCents, locale), totalX, shRowY + 5, { width: totalW - 8, align: 'right', lineBreak: false })
     doc.moveTo(left, shRowY + shRowH).lineTo(right, shRowY + shRowH)
       .lineWidth(0.3).strokeColor(BORDER).stroke()
     doc.y = shRowY + shRowH
@@ -421,33 +446,48 @@ function renderRetailOrderDocument(doc, {
       doc.addPage()
       doc.y = doc.page.margins.top + 10
     }
-    const totalsW = 240
+    const totalsW = 230
     const totalsX = right - totalsW
-    doc.y += 12
+    doc.y += 14
     drawHRule(doc, doc.y)
     doc.y += 10
 
     totalsLines.forEach(({ label, value, bold, color, small }) => {
-      const y = doc.y
-      const fs = bold ? 10.5 : small ? 8 : 9.5
+      const ty = doc.y
+      const fs = bold ? 10 : small ? 8 : 9
       const hasVal = value != null && value !== ''
       doc.font(bold ? BOLD : REG).fontSize(fs).fillColor(color || '#111827')
-      doc.text(txt(label, hasUnicode), totalsX, y, { width: hasVal ? totalsW * 0.66 : totalsW })
-      if (hasVal) doc.text(txt(value, hasUnicode), totalsX + totalsW * 0.66, y, { width: totalsW * 0.34, align: 'right' })
-      doc.y = y + (bold ? 17 : small ? 12 : 14)
+      doc.text(txt(label, hasUnicode), totalsX, ty, {
+        width: hasVal ? totalsW * 0.62 : totalsW,
+        lineBreak: false,
+      })
+      if (hasVal) {
+        doc.text(txt(value, hasUnicode), totalsX + totalsW * 0.62, ty, {
+          width: totalsW * 0.38,
+          align: 'right',
+          lineBreak: false,
+        })
+      }
+      doc.y = ty + (bold ? 16 : small ? 12 : 13)
     })
 
     if (amountDueCents != null) {
       doc.y += 6
       const boxY = doc.y
-      const boxH = 28
-      doc.rect(totalsX - 8, boxY, totalsW + 8, boxH).fill(ACCENT)
-      doc.fillColor('#ffffff').font(BOLD).fontSize(10)
-        .text(txt(s.amountDueLabel, hasUnicode), totalsX - 2, boxY + 8, { width: (totalsW + 8) * 0.52 })
-      doc.text(pdfCents(amountDueCents, locale), totalsX + (totalsW + 8) * 0.5, boxY + 8, {
-        width: (totalsW + 8) * 0.46, align: 'right',
-      })
-      doc.y = boxY + boxH + 14
+      const boxH = 26
+      doc.rect(totalsX - 6, boxY, totalsW + 6, boxH).fill(ACCENT)
+      doc.fillColor('#ffffff').font(BOLD).fontSize(9.5)
+        .text(txt(s.amountDueLabel, hasUnicode), totalsX, boxY + 7, {
+          width: (totalsW + 6) * 0.52,
+          lineBreak: false,
+        })
+      doc.font(BOLD).fontSize(10)
+        .text(pdfCents(amountDueCents, locale), totalsX + (totalsW + 6) * 0.48, boxY + 7, {
+          width: (totalsW + 6) * 0.48,
+          align: 'right',
+          lineBreak: false,
+        })
+      doc.y = boxY + boxH + 12
     }
   }
 
@@ -456,16 +496,17 @@ function renderRetailOrderDocument(doc, {
     const paymentMethod = String(row.payment_method || '').trim()
     const lucidNumber = String(sellerInfo?.lucid_number || '').trim()
     if (paymentMethod || lucidNumber) {
-      doc.y += 10
+      let infoY = doc.y + 10
       doc.fillColor(MUTED).font(REG).fontSize(8)
       if (paymentMethod) {
-        doc.text(txt(`${s.paymentMethodLabel}: ${paymentMethod}`, hasUnicode), left, doc.y, { width: contentWidth })
-        doc.y += 2
+        doc.text(txt(`${s.paymentMethodLabel}: ${paymentMethod}`, hasUnicode), left, infoY, { width: contentWidth })
+        infoY = doc.y + 2
       }
       if (lucidNumber) {
-        doc.text(txt(`${s.lucidLabel}: ${lucidNumber}`, hasUnicode), left, doc.y, { width: contentWidth })
-        doc.y += 2
+        doc.text(txt(`${s.lucidLabel}: ${lucidNumber}`, hasUnicode), left, infoY, { width: contentWidth })
+        infoY = doc.y + 2
       }
+      doc.y = infoY
     }
   }
 
@@ -473,14 +514,459 @@ function renderRetailOrderDocument(doc, {
   const footerY = Math.max(doc.y + 16, doc.page.height - doc.page.margins.bottom - 52)
 
   if (kind === 'invoice' && sellerInfo) {
-    doc.fillColor(MUTED).font(REG).fontSize(7.5)
-      .text(txt(s.sellerDisclaimer, hasUnicode), left, footerY - 24, { width: contentWidth })
+    doc.fillColor(MUTED).font(REG).fontSize(7)
+      .text(txt(s.sellerDisclaimer, hasUnicode), left, footerY - 22, { width: contentWidth })
   }
 
-  doc.fillColor(MUTED).font(REG).fontSize(7.5)
-    .text(txt(footerText || (kind === 'invoice' ? s.invoiceFooter : s.deliveryFooter), hasUnicode), left, footerY, { width: contentWidth })
+  doc.fillColor(MUTED).font(REG).fontSize(7)
+    .text(txt(footerText || (kind === 'invoice' ? s.invoiceFooter : s.deliveryFooter), hasUnicode), left, footerY, {
+      width: contentWidth,
+    })
 
-  doc.rect(left, doc.page.height - doc.page.margins.bottom + 8, contentWidth, 3).fill(ACCENT)
+  doc.rect(left, doc.page.height - doc.page.margins.bottom + 8, contentWidth, 2).fill(ACCENT)
+}
+
+function parseReturnItems(returnRow) {
+  let items = returnRow?.items
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items) } catch (_) { items = [] }
+  }
+  return Array.isArray(items) ? items : []
+}
+
+function formatReturnDisplayNumber(returnRow, orderNum) {
+  const raw = returnRow?.return_number
+  if (raw == null || String(raw).trim() === '') {
+    return orderNum ? `R-${orderNum}` : 'R-—'
+  }
+  const s = String(raw).trim()
+  if (/^R-/i.test(s) || /^RT-/i.test(s)) return s
+  return `R-${s}`
+}
+
+// ─── Retourenschein (return slip) ────────────────────────────────────────────
+function renderRetourenscheinDocument(doc, {
+  row,
+  returnRow = null,
+  shopName,
+  sellerInfo,
+  shopLogoBuffer,
+  locale = 'de',
+  lineItems = null,
+}) {
+  const hasUnicode = setupDocFonts(doc)
+  const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
+  const BOLD = hasUnicode ? 'PdfBold' : 'Helvetica-Bold'
+  const s = getOrderPdfStrings(locale)
+  const { left, right, contentWidth } = pageMetrics(doc)
+
+  const orderNum = row.order_number != null ? String(row.order_number) : String(row.id || '').slice(0, 8)
+  const returnNum = formatReturnDisplayNumber(returnRow, orderNum)
+  const items = Array.isArray(lineItems) && lineItems.length
+    ? lineItems
+    : parseReturnItems(returnRow)
+
+  // Brand row
+  const brandY = 36
+  const LOGO_MAX_W = 108
+  const LOGO_MAX_H = 28
+  const brandBottom = brandY + LOGO_MAX_H
+
+  if (shopLogoBuffer) {
+    try {
+      doc.image(shopLogoBuffer, left, brandY, { fit: [LOGO_MAX_W, LOGO_MAX_H], align: 'left', valign: 'center' })
+    } catch (_) {
+      doc.fillColor(ACCENT).font(REG).fontSize(12)
+        .text(txt(shopName || 'Andertal', hasUnicode), left, brandY + 6, { width: LOGO_MAX_W, lineBreak: false })
+    }
+  } else {
+    doc.fillColor(ACCENT).font(REG).fontSize(12)
+      .text(txt(shopName || 'Andertal', hasUnicode), left, brandY + 6, { width: LOGO_MAX_W, lineBreak: false })
+  }
+
+  doc.fillColor(ACCENT).font(REG).fontSize(14)
+    .text(txt(s.returnTitle, hasUnicode), left + LOGO_MAX_W + 16, brandY + 6, {
+      width: contentWidth - LOGO_MAX_W - 16,
+      align: 'right',
+      lineBreak: false,
+    })
+
+  const ruleY = brandBottom + 10
+  drawHRule(doc, ruleY)
+
+  // Two-column header
+  const headerTop = ruleY + 12
+  const gap = 24
+  const leftColW = Math.round(contentWidth * 0.55)
+  const rightColX = left + leftColW + gap
+  const rightColW = contentWidth - leftColW - gap
+
+  let leftY = headerTop
+  const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ')
+  const shipCountry = getCountryName(row.country || '', locale)
+  const senderLines = [
+    customerName || '—',
+    row.address_line1,
+    row.address_line2,
+    [row.postal_code, row.city].filter(Boolean).join(' '),
+    shipCountry,
+  ].filter(Boolean)
+
+  leftY = drawLabel(doc, s.returnSenderLabel, left, leftY, leftColW, hasUnicode)
+  leftY = drawLines(doc, senderLines, left, leftY, leftColW, {
+    hasUnicode,
+    boldFirst: true,
+    fontSize: 9,
+  })
+  leftY += 10
+
+  const sellerLines = resolveSellerDisplayLines(sellerInfo, locale, hasUnicode)
+  const recipientLines = sellerLines.length
+    ? sellerLines
+    : [txt(shopName || 'Andertal', hasUnicode)]
+  leftY = drawLabel(doc, s.returnRecipientLabel, left, leftY, leftColW, hasUnicode)
+  leftY = drawLines(doc, recipientLines, left, leftY, leftColW, {
+    hasUnicode,
+    boldFirst: false,
+    fontSize: 8.5,
+  })
+
+  let rightY = headerTop
+  const metaLabelW = Math.min(100, Math.round(rightColW * 0.46))
+  const metaValW = rightColW - metaLabelW
+  const metaRows = [
+    { label: s.returnNoLabel, value: returnNum },
+    { label: s.orderNoLabel, value: `#${orderNum}` },
+    returnRow?.created_at ? { label: s.returnCreatedLabel, value: pdfFmtDate(returnRow.created_at, locale) } : null,
+    returnRow?.approved_at ? { label: s.returnApprovedLabel, value: pdfFmtDate(returnRow.approved_at, locale) } : null,
+  ].filter(Boolean)
+
+  metaRows.forEach(({ label, value }) => {
+    rightY = drawMetaRow(
+      doc,
+      txt(label, hasUnicode),
+      txt(value, hasUnicode),
+      rightColX,
+      rightY,
+      metaLabelW,
+      metaValW,
+      REG,
+    )
+  })
+
+  const afterHeader = Math.max(leftY, rightY) + 12
+  drawHRule(doc, afterHeader)
+
+  // Greeting
+  let y = afterHeader + 10
+  const greetingName = customerName || (row.email ? String(row.email).split('@')[0] : 'Kunde')
+  doc.fillColor('#1a1a2e').font(REG).fontSize(9.5)
+    .text(txt(s.greetingLine(greetingName), hasUnicode), left, y, { width: contentWidth, lineGap: 2 })
+  y = doc.y + 2
+  doc.font(REG).fontSize(9.5)
+    .text(txt(s.returnGreeting, hasUnicode), left, y, { width: contentWidth, lineGap: 2 })
+
+  // Return number highlight box
+  y = doc.y + 14
+  const boxH = 52
+  doc.rect(left, y, contentWidth, boxH).fill(ROW_ALT)
+  doc.rect(left, y, contentWidth, boxH).lineWidth(0.8).strokeColor(BORDER).stroke()
+  doc.fillColor(MUTED).font(REG).fontSize(7.5)
+    .text(txt(s.returnNumberBoxHint, hasUnicode), left + 12, y + 8, {
+      width: contentWidth - 24,
+      align: 'center',
+      lineBreak: false,
+    })
+  doc.fillColor(ACCENT).font(BOLD).fontSize(18)
+    .text(txt(returnNum, hasUnicode), left + 12, y + 22, {
+      width: contentWidth - 24,
+      align: 'center',
+      lineBreak: false,
+    })
+  doc.y = y + boxH + 12
+
+  // Items table (qty + title, like Lieferschein)
+  const tableTop = doc.y
+  const descW = Math.round(contentWidth * 0.76)
+  const qtyW = contentWidth - descW
+  const qtyX = left + descW
+  const headerH = 16
+  doc.rect(left, tableTop, contentWidth, headerH).fill(ACCENT)
+  doc.fillColor('#ffffff').font(REG).fontSize(7.5)
+  doc.text(txt(s.returnItemsLabel, hasUnicode), left + 8, tableTop + 4, { width: descW - 12, lineBreak: false })
+  doc.text(txt(s.qtyLabel, hasUnicode), qtyX, tableTop + 4, { width: qtyW - 8, align: 'right', lineBreak: false })
+  doc.y = tableTop + headerH
+
+  const drawRows = items.length
+    ? items
+    : [{ title: s.noItems, quantity: '' }]
+
+  drawRows.forEach((it, idx) => {
+    const qty = it.quantity != null && it.quantity !== '' ? String(it.quantity) : '—'
+    const { main: titleMain, note: titleNote } = splitItemTitle(it.title || it.name || s.itemFallback)
+    const title = txt(titleMain, hasUnicode)
+    const note = txt(titleNote, hasUnicode)
+
+    doc.font(REG).fontSize(9)
+    const titleH = doc.heightOfString(title, { width: descW - 12 })
+    doc.font(REG).fontSize(7.5)
+    const noteH = note ? doc.heightOfString(note, { width: descW - 12 }) : 0
+    const rowH = Math.max(20, titleH + (note ? noteH + 2 : 0) + 10)
+
+    if (doc.y + rowH > doc.page.height - doc.page.margins.bottom - 120) {
+      doc.addPage()
+      doc.y = doc.page.margins.top + 10
+    }
+
+    const rowY = doc.y
+    if (idx % 2 === 1) doc.rect(left, rowY, contentWidth, rowH).fill(ROW_ALT)
+
+    doc.font(REG).fontSize(9).fillColor('#111827')
+      .text(title, left + 8, rowY + 5, { width: descW - 12 })
+    if (note) {
+      doc.font(REG).fontSize(7.5).fillColor(MUTED)
+        .text(note, left + 8, rowY + 5 + titleH + 1, { width: descW - 12 })
+    }
+    doc.font(REG).fontSize(9).fillColor('#111827')
+      .text(qty, qtyX, rowY + 5, { width: qtyW - 8, align: 'right', lineBreak: false })
+
+    doc.moveTo(left, rowY + rowH).lineTo(right, rowY + rowH)
+      .lineWidth(0.3).strokeColor(BORDER).stroke()
+    doc.y = rowY + rowH
+  })
+
+  // Reason / notes
+  const reason = String(returnRow?.reason || '').trim()
+  const notes = String(returnRow?.notes || '').trim()
+  if (reason || notes) {
+    doc.y += 14
+    drawHRule(doc, doc.y)
+    doc.y += 10
+    if (reason) {
+      doc.fillColor(MUTED).font(REG).fontSize(7)
+        .text(txt(s.returnReasonLabel, hasUnicode), left, doc.y, {
+          width: contentWidth,
+          characterSpacing: 0.4,
+          lineBreak: false,
+        })
+      doc.y += 10
+      doc.fillColor('#1a1a2e').font(REG).fontSize(9)
+        .text(txt(reason, hasUnicode), left, doc.y, { width: contentWidth, lineGap: 2 })
+      doc.y += 8
+    }
+    if (notes) {
+      doc.fillColor(MUTED).font(REG).fontSize(7)
+        .text(txt(s.returnNotesLabel, hasUnicode), left, doc.y, {
+          width: contentWidth,
+          characterSpacing: 0.4,
+          lineBreak: false,
+        })
+      doc.y += 10
+      doc.fillColor('#1a1a2e').font(REG).fontSize(9)
+        .text(txt(notes, hasUnicode), left, doc.y, { width: contentWidth, lineGap: 2 })
+    }
+  }
+
+  // Footer
+  const footerY = Math.max(doc.y + 16, doc.page.height - doc.page.margins.bottom - 40)
+  doc.fillColor(MUTED).font(REG).fontSize(7)
+    .text(txt(s.returnFooter, hasUnicode), left, footerY, { width: contentWidth })
+  doc.rect(left, doc.page.height - doc.page.margins.bottom + 8, contentWidth, 2).fill(ACCENT)
+}
+
+// ─── Versandlabel (shipping label document) ──────────────────────────────────
+function renderVersandlabelDocument(doc, {
+  row,
+  itemRows = [],
+  shopName,
+  sellerInfo,
+  shopLogoBuffer,
+  locale = 'de',
+  carrierName = null,
+  trackingNumber = null,
+}) {
+  const hasUnicode = setupDocFonts(doc)
+  const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
+  const BOLD = hasUnicode ? 'PdfBold' : 'Helvetica-Bold'
+  const s = getOrderPdfStrings(locale)
+  const { left, right, contentWidth } = pageMetrics(doc)
+
+  const orderNum = row.order_number != null ? String(row.order_number) : String(row.id || '').slice(0, 8)
+  const carrier = String(carrierName || row.carrier_name || '').trim()
+  const tracking = String(trackingNumber || row.tracking_number || '').trim()
+  const shipAt = row.shipped_at || row.fulfilled_at || row.created_at || null
+  const items = Array.isArray(itemRows) ? itemRows : []
+
+  const brandY = 36
+  const LOGO_MAX_W = 108
+  const LOGO_MAX_H = 28
+  const brandBottom = brandY + LOGO_MAX_H
+
+  if (shopLogoBuffer) {
+    try {
+      doc.image(shopLogoBuffer, left, brandY, { fit: [LOGO_MAX_W, LOGO_MAX_H], align: 'left', valign: 'center' })
+    } catch (_) {
+      doc.fillColor(ACCENT).font(REG).fontSize(12)
+        .text(txt(shopName || 'Andertal', hasUnicode), left, brandY + 6, { width: LOGO_MAX_W, lineBreak: false })
+    }
+  } else {
+    doc.fillColor(ACCENT).font(REG).fontSize(12)
+      .text(txt(shopName || 'Andertal', hasUnicode), left, brandY + 6, { width: LOGO_MAX_W, lineBreak: false })
+  }
+
+  doc.fillColor(ACCENT).font(REG).fontSize(14)
+    .text(txt(s.shippingTitle, hasUnicode), left + LOGO_MAX_W + 16, brandY + 6, {
+      width: contentWidth - LOGO_MAX_W - 16,
+      align: 'right',
+      lineBreak: false,
+    })
+
+  const ruleY = brandBottom + 10
+  drawHRule(doc, ruleY)
+
+  const headerTop = ruleY + 12
+  const gap = 24
+  const leftColW = Math.round(contentWidth * 0.55)
+  const rightColX = left + leftColW + gap
+  const rightColW = contentWidth - leftColW - gap
+
+  let leftY = headerTop
+  const sellerLines = resolveSellerDisplayLines(sellerInfo, locale, hasUnicode)
+  const senderLines = sellerLines.length
+    ? sellerLines
+    : [txt(shopName || 'Andertal', hasUnicode)]
+  leftY = drawLabel(doc, s.shippingSenderLabel, left, leftY, leftColW, hasUnicode)
+  leftY = drawLines(doc, senderLines, left, leftY, leftColW, {
+    hasUnicode,
+    boldFirst: false,
+    fontSize: 8.5,
+  })
+  leftY += 10
+
+  const customerName = [row.first_name, row.last_name].filter(Boolean).join(' ')
+  const shipCountry = getCountryName(row.country || '', locale)
+  const recipientLines = [
+    customerName || '—',
+    row.address_line1,
+    row.address_line2,
+    [row.postal_code, row.city].filter(Boolean).join(' '),
+    shipCountry,
+  ].filter(Boolean)
+  leftY = drawLabel(doc, s.shippingRecipientLabel, left, leftY, leftColW, hasUnicode)
+  leftY = drawLines(doc, recipientLines, left, leftY, leftColW, {
+    hasUnicode,
+    boldFirst: true,
+    fontSize: 9.5,
+  })
+
+  let rightY = headerTop
+  const metaLabelW = Math.min(100, Math.round(rightColW * 0.46))
+  const metaValW = rightColW - metaLabelW
+  const metaRows = [
+    { label: s.orderNoLabel, value: `#${orderNum}` },
+    { label: s.shippingDateMetaLabel, value: pdfFmtDate(shipAt, locale) },
+    carrier ? { label: s.carrierLabel, value: carrier } : null,
+    tracking ? { label: s.shippingNoLabel, value: tracking } : null,
+  ].filter(Boolean)
+
+  metaRows.forEach(({ label, value }) => {
+    rightY = drawMetaRow(
+      doc,
+      txt(label, hasUnicode),
+      txt(value, hasUnicode),
+      rightColX,
+      rightY,
+      metaLabelW,
+      metaValW,
+      REG,
+    )
+  })
+
+  const afterHeader = Math.max(leftY, rightY) + 12
+  drawHRule(doc, afterHeader)
+
+  let y = afterHeader + 10
+  const greetingName = customerName || (row.email ? String(row.email).split('@')[0] : 'Kunde')
+  doc.fillColor('#1a1a2e').font(REG).fontSize(9.5)
+    .text(txt(s.greetingLine(greetingName), hasUnicode), left, y, { width: contentWidth, lineGap: 2 })
+  y = doc.y + 2
+  doc.font(REG).fontSize(9.5)
+    .text(txt(s.shippingGreeting, hasUnicode), left, y, { width: contentWidth, lineGap: 2 })
+
+  // Tracking / order highlight box
+  y = doc.y + 14
+  const boxH = 52
+  const boxValue = tracking || `#${orderNum}`
+  doc.rect(left, y, contentWidth, boxH).fill(ROW_ALT)
+  doc.rect(left, y, contentWidth, boxH).lineWidth(0.8).strokeColor(BORDER).stroke()
+  doc.fillColor(MUTED).font(REG).fontSize(7.5)
+    .text(txt(s.shippingTrackingBoxHint, hasUnicode), left + 12, y + 8, {
+      width: contentWidth - 24,
+      align: 'center',
+      lineBreak: false,
+    })
+  doc.fillColor(ACCENT).font(BOLD).fontSize(tracking ? 16 : 18)
+    .text(txt(boxValue, hasUnicode), left + 12, y + 22, {
+      width: contentWidth - 24,
+      align: 'center',
+      lineBreak: false,
+    })
+  doc.y = y + boxH + 12
+
+  // Items table
+  const tableTop = doc.y
+  const descW = Math.round(contentWidth * 0.76)
+  const qtyW = contentWidth - descW
+  const qtyX = left + descW
+  const headerH = 16
+  doc.rect(left, tableTop, contentWidth, headerH).fill(ACCENT)
+  doc.fillColor('#ffffff').font(REG).fontSize(7.5)
+  doc.text(txt(s.shippingItemsLabel, hasUnicode), left + 8, tableTop + 4, { width: descW - 12, lineBreak: false })
+  doc.text(txt(s.qtyLabel, hasUnicode), qtyX, tableTop + 4, { width: qtyW - 8, align: 'right', lineBreak: false })
+  doc.y = tableTop + headerH
+
+  const drawRows = items.length
+    ? items
+    : [{ title: s.noItems, quantity: '' }]
+
+  drawRows.forEach((it, idx) => {
+    const qty = it.quantity != null && it.quantity !== '' ? String(it.quantity) : '—'
+    const { main: titleMain, note: titleNote } = splitItemTitle(it.title || it.name || s.itemFallback)
+    const title = txt(titleMain, hasUnicode)
+    const note = txt(titleNote, hasUnicode)
+
+    doc.font(REG).fontSize(9)
+    const titleH = doc.heightOfString(title, { width: descW - 12 })
+    doc.font(REG).fontSize(7.5)
+    const noteH = note ? doc.heightOfString(note, { width: descW - 12 }) : 0
+    const rowH = Math.max(20, titleH + (note ? noteH + 2 : 0) + 10)
+
+    if (doc.y + rowH > doc.page.height - doc.page.margins.bottom - 120) {
+      doc.addPage()
+      doc.y = doc.page.margins.top + 10
+    }
+
+    const rowY = doc.y
+    if (idx % 2 === 1) doc.rect(left, rowY, contentWidth, rowH).fill(ROW_ALT)
+
+    doc.font(REG).fontSize(9).fillColor('#111827')
+      .text(title, left + 8, rowY + 5, { width: descW - 12 })
+    if (note) {
+      doc.font(REG).fontSize(7.5).fillColor(MUTED)
+        .text(note, left + 8, rowY + 5 + titleH + 1, { width: descW - 12 })
+    }
+    doc.font(REG).fontSize(9).fillColor('#111827')
+      .text(qty, qtyX, rowY + 5, { width: qtyW - 8, align: 'right', lineBreak: false })
+
+    doc.moveTo(left, rowY + rowH).lineTo(right, rowY + rowH)
+      .lineWidth(0.3).strokeColor(BORDER).stroke()
+    doc.y = rowY + rowH
+  })
+
+  const footerY = Math.max(doc.y + 16, doc.page.height - doc.page.margins.bottom - 40)
+  doc.fillColor(MUTED).font(REG).fontSize(7)
+    .text(txt(s.shippingFooter, hasUnicode), left, footerY, { width: contentWidth })
+  doc.rect(left, doc.page.height - doc.page.margins.bottom + 8, contentWidth, 2).fill(ACCENT)
 }
 
 // ─── Commission invoice (order-level) ─────────────────────────────────────────
@@ -784,6 +1270,8 @@ module.exports = {
   pdfCents,
   resolveSellerDisplayLines,
   renderRetailOrderDocument,
+  renderRetourenscheinDocument,
+  renderVersandlabelDocument,
   renderCommissionInvoiceDocument,
   renderPeriodCommissionInvoiceDocument,
 }

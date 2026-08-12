@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useContext, useRef } from "react";
 import { useParams } from "next/navigation";
@@ -41,10 +41,7 @@ const TrustpilotWordmark  = dynamic(
 import ProductPurchaseActions from "@/components/ui/ProductPurchaseActions";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import ProductImageBadges from "@/components/ProductImageBadges";
-import MadeInEuropeOverlay from "@/components/MadeInEuropeOverlay";
 import { isBestsellerMetadata } from "@/lib/bestseller";
-import { isEuOriginVerified } from "@andertal/shop-theme";
-import { useShopStyles } from "@/context/ShopStylesContext";
 
 const Container = styled.div`
   max-width: 100%;
@@ -99,6 +96,17 @@ const MainImageWrap = styled.div`
   overflow: hidden;
   background: #f3f4f6;
   cursor: pointer;
+
+  img.product-custom-badge-img {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    padding: 0 !important;
+    object-fit: contain !important;
+  }
 `;
 
 const GalleryActionRow = styled.div`
@@ -489,7 +497,7 @@ const PriceMainRow = styled.div`
 const PriceMain = styled.span`
   font-size: 1.7rem;
   font-weight: 650;
-  color: #374151;
+  color: ${(p) => (p.$sale ? "#e53e3e" : "#374151")};
   letter-spacing: -0.03em;
   line-height: 1.05;
 `;
@@ -513,7 +521,8 @@ const PriceSubRow = styled.div`
 `;
 
 const Strike = styled.span`
-  font-size: 0.9rem;
+  font-size: ${(p) => (p.$inline ? "1.05rem" : "0.9rem")};
+  font-weight: ${(p) => (p.$inline ? 500 : 400)};
   color: #9ca3af;
   text-decoration: line-through;
 `;
@@ -919,11 +928,18 @@ function ProductCampaignPriceBlock({
       : null;
   const discountPillPercent =
     campaignDiscountPct != null && campaignDiscountPct > 0 ? campaignDiscountPct : discountPercent;
+  const isDiscounted = showCampaignStrike || hasSale;
+  const strikeCents = showCampaignStrike
+    ? effectiveDisplayCents
+    : hasSale
+      ? priceCents
+      : null;
   return (
     <PriceTop>
       <PriceStack>
         <PriceMainRow>
-          <PriceMain>{formatPriceCents(buyBoxPriceCents)} €</PriceMain>
+          {strikeCents != null ? <Strike $inline>{formatPriceCents(strikeCents)} €</Strike> : null}
+          <PriceMain $sale={isDiscounted}>{formatPriceCents(buyBoxPriceCents)} €</PriceMain>
           {campaignPromo?.show_badge && (campaignPromo.badge_text || "").trim() ? (
             <DiscountPill title={campaignPromo.campaign_name || ""}>{campaignPromo.badge_text.trim()}</DiscountPill>
           ) : null}
@@ -931,11 +947,9 @@ function ProductCampaignPriceBlock({
             <DiscountPill>-{discountPillPercent}%</DiscountPill>
           )}
         </PriceMainRow>
-        {(showCampaignStrike || hasSale || (uvpCents != null && uvpCents > 0)) && (
+        {uvpCents != null && uvpCents > 0 && (
           <PriceSubRow>
-            {showCampaignStrike && <Strike>{formatPriceCents(effectiveDisplayCents)} €</Strike>}
-            {hasSale && <Strike>{formatPriceCents(priceCents)} €</Strike>}
-            {uvpCents != null && uvpCents > 0 && <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>}
+            <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>
           </PriceSubRow>
         )}
         <TaxLine>{tp("taxLine")}</TaxLine>
@@ -1034,9 +1048,6 @@ export default function ProductTemplateMobile() {
   const addToCart = cartState?.addToCart ?? (async () => null);
   const openCartSidebar = cartState?.openCartSidebar ?? (() => {});
   const shippingGroups = cartState?.shippingGroups ?? [];
-  const shopStyles = useShopStyles();
-  const showMadeInEurope = isEuOriginVerified(product?.metadata);
-  const madeInEuropeBadge = shopStyles?.made_in_europe_badge;
 
   useEffect(() => {
     let cancelled = false;
@@ -1644,39 +1655,40 @@ export default function ProductTemplateMobile() {
 
         {/* 3. Full-bleed swipeable gallery */}
         <MobileGalleryOuter>
-          <MobileGalleryTrack ref={galleryTrackRef} onScroll={handleMobileGalleryScroll}>
-            {(displayImages.length > 0 ? displayImages : [{ url: mainImage, alt: displayTitle }]).map((img, i) => (
-              <MobileGallerySlide key={i} onClick={() => { setSelectedImage(i); setLightboxOpen(true); }}>
-                <img
-                  src={img.url || mainImage}
-                  alt={img.alt || displayTitle}
-                  style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
-                />
-              </MobileGallerySlide>
-            ))}
-          </MobileGalleryTrack>
-          <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} customBadges={meta.custom_badges} locale={locale} />
-          {/* Wishlist + Share — bottom-right */}
-          {product?.id && (
-            <GalleryActionRow
-              onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              role="presentation"
-            >
-              <div style={{ position: "relative" }}>
-                <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
-              </div>
-              <GalleryActionBtn type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="18" cy="5" r="3" />
-                  <circle cx="6" cy="12" r="3" />
-                  <circle cx="18" cy="19" r="3" />
-                  <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
-                  <line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
-                </svg>
-              </GalleryActionBtn>
-            </GalleryActionRow>
-          )}
+          <div style={{ position: "relative", width: "100%" }}>
+            <MobileGalleryTrack ref={galleryTrackRef} onScroll={handleMobileGalleryScroll}>
+              {(displayImages.length > 0 ? displayImages : [{ url: mainImage, alt: displayTitle }]).map((img, i) => (
+                <MobileGallerySlide key={i} onClick={() => { setSelectedImage(i); setLightboxOpen(true); }}>
+                  <img
+                    src={img.url || mainImage}
+                    alt={img.alt || displayTitle}
+                    style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
+                  />
+                </MobileGallerySlide>
+              ))}
+            </MobileGalleryTrack>
+            <ProductImageBadges isComingSoon={isComingSoon} customBadges={meta.custom_badges} locale={locale} />
+            {product?.id && (
+              <GalleryActionRow
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                role="presentation"
+              >
+                <div style={{ position: "relative" }}>
+                  <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
+                </div>
+                <GalleryActionBtn type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="18" cy="5" r="3" />
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="19" r="3" />
+                    <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
+                    <line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
+                  </svg>
+                </GalleryActionBtn>
+              </GalleryActionRow>
+            )}
+          </div>
           {/* Slide dots */}
           {displayImages.length > 1 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 4, padding: "6px 0 8px" }}>
@@ -1786,9 +1798,8 @@ export default function ProductTemplateMobile() {
           <div style={{ position: "relative", width: "100%" }}>
             <MainImageWrap onClick={() => displayImages.length > 0 && setLightboxOpen(true)}>
               <MainImage src={mainImage} alt={displayTitle} />
+              <ProductImageBadges isComingSoon={isComingSoon} customBadges={meta.custom_badges} locale={locale} />
             </MainImageWrap>
-            <ProductImageBadges isBestseller={isBestseller} hasSale={hasSale} isComingSoon={isComingSoon} customBadges={meta.custom_badges} locale={locale} />
-            {showMadeInEurope && <MadeInEuropeOverlay badgeConfig={madeInEuropeBadge} />}
             {product?.id && (
               <GalleryActionRow
                 onClick={(e) => e.stopPropagation()}

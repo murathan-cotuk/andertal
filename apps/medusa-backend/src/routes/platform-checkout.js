@@ -201,9 +201,47 @@ const storeSellerSettingsGET = async (req, res) => {
   try {
     const sellerId = (req.query.seller_id || 'default').toString().trim() || 'default'
     const client = getDbClient()
-    if (!client) return res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30 })
+    if (!client) return res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30, enabled_shop_locales: null })
     await client.connect()
-    const r = await client.query('SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+    const r = await client.query(
+      'SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config, enabled_shop_locales FROM admin_hub_seller_settings WHERE seller_id = $1',
+      [sellerId],
+    )
+    // Platform language list always lives on seller_id=default
+    let enabled_shop_locales = null
+    if (sellerId === 'default') {
+      const raw = r.rows?.[0]?.enabled_shop_locales
+      if (raw != null) {
+        let list = raw
+        if (typeof list === 'string') {
+          try { list = JSON.parse(list) } catch (_) { list = null }
+        }
+        if (Array.isArray(list)) {
+          const ALL = ['en', 'de', 'tr', 'fr', 'it', 'es']
+          enabled_shop_locales = ALL.filter((c) => list.map((x) => String(x || '').toLowerCase()).includes(c))
+          if (!enabled_shop_locales.length) enabled_shop_locales = null
+        }
+      }
+    } else {
+      try {
+        const plat = await client.query(
+          'SELECT enabled_shop_locales FROM admin_hub_seller_settings WHERE seller_id = $1',
+          ['default'],
+        )
+        const raw = plat.rows?.[0]?.enabled_shop_locales
+        if (raw != null) {
+          let list = raw
+          if (typeof list === 'string') {
+            try { list = JSON.parse(list) } catch (_) { list = null }
+          }
+          if (Array.isArray(list)) {
+            const ALL = ['en', 'de', 'tr', 'fr', 'it', 'es']
+            enabled_shop_locales = ALL.filter((c) => list.map((x) => String(x || '').toLowerCase()).includes(c))
+            if (!enabled_shop_locales.length) enabled_shop_locales = null
+          }
+        }
+      } catch (_) {}
+    }
     await client.end()
     const row = r.rows && r.rows[0]
     const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -222,10 +260,10 @@ const storeSellerSettingsGET = async (req, res) => {
     if (row && row.logo_config != null) {
       logo_config = typeof row.logo_config === 'string' ? JSON.parse(row.logo_config) : row.logo_config
     }
-    res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config })
+    res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config, enabled_shop_locales })
   } catch (err) {
     console.error('[storeSellerSettingsGET] error:', err && err.message)
-    res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30, logo_config: null })
+    res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30, logo_config: null, enabled_shop_locales: null })
   }
 }
 

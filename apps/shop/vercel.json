@@ -3,6 +3,7 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "cd ../.. && npm install",
+  "regions": ["fra1"],
   "rewrites": [
     {
       "source": "/admin/:path*",

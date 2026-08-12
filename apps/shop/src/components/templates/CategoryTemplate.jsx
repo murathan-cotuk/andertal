@@ -603,7 +603,7 @@ const FilterGroupTitle = styled.button`
   text-align: left;
 `;
 
-const FilterGroupHeading = styled.h4`
+const FilterGroupHeading = styled.h4.attrs({ className: "shop-typo-sidebar-nav" })`
   margin: 0;
   padding: 0;
   flex: 1;
@@ -634,39 +634,30 @@ const FilterChevron = styled.span`
   }
 `;
 
-const CheckRow = styled.label`
+const CheckRow = styled.label.attrs({ className: "shop-typo-sidebar-submenu" })`
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 3px 0;
   cursor: pointer;
-  font-size: 12.5px;
-  color: ${(p) => (p.$on ? "#111" : "#555")};
-  font-weight: ${(p) => (p.$on ? "600" : "400")};
+  color: ${(p) => (p.$on ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
+  font-weight: ${(p) => (p.$on ? 600 : "var(--sidebar-submenu-fw, 400)")};
   transition: color 0.12s;
+  /* Do not override CustomCheckbox SVG size — parent CSS was forcing 15–18px and clipping strokes */
 
-  input {
-    width: 13px;
-    height: 13px;
-    accent-color: #111;
-    cursor: pointer;
+  & > label {
     flex-shrink: 0;
+    width: ${(p) => p.$cbSize || 12}px;
+    height: ${(p) => p.$cbSize || 12}px;
   }
 
-  svg {
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
+  & > label svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
   }
 
-  @media (max-width: 767px) {
-    svg {
-      width: 18px;
-      height: 18px;
-    }
-  }
-
-  &:hover { color: #111; }
+  &:hover { color: var(--sidebar-nav-color, #111827); }
 `;
 
 const SubcategoryGroup = styled.div`
@@ -675,7 +666,9 @@ const SubcategoryGroup = styled.div`
   margin-bottom: 0;
 `;
 
-const SubcategoryLink = styled(Link).attrs({ className: "shop-typo-sidebar-nav" })`
+const SubcategoryLink = styled(Link).attrs((p) => ({
+  className: p.$active ? "shop-typo-sidebar-submenu is-active" : "shop-typo-sidebar-submenu",
+}))`
   display: block;
   padding: 5px 8px;
   text-decoration: none;
@@ -683,9 +676,8 @@ const SubcategoryLink = styled(Link).attrs({ className: "shop-typo-sidebar-nav" 
   background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
   margin-bottom: 1px;
   transition: background 0.12s, color 0.12s;
-  /* font from .shop-typo-sidebar-nav (Sellercentral → Styles → Sidebar-Navigation) */
-  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111827)" : "#4b5563")};
-  font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-nav-fw, 400)")};
+  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
+  font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-submenu-fw, 400)")};
 
   &:hover {
     background: #e5e7eb;
@@ -913,7 +905,7 @@ export default function CategoryTemplate() {
   const marketPrefixVal = useMarketPrefix();
   const shopStyles = useShopStyles();
   const tmpl = shopStyles?.category_template || {};
-  const filterCheckboxSize = Math.min(24, Math.max(8, Number(tmpl.filter_checkbox_size) || 10));
+  const filterCheckboxSize = Math.min(14, Math.max(8, Number(tmpl.filter_checkbox_size) || 10));
 
   const [category, setCategory] = useState(null);
   const [products, setProducts] = useState([]);
@@ -1320,12 +1312,12 @@ export default function CategoryTemplate() {
                           <SubcategoryLink
                             href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
                             $active={false}
-                            style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                            style={{ marginBottom: 2, opacity: 0.75 }}
                           >
                             ← {parentCategory.name || parentCategory.slug}
                           </SubcategoryLink>
                         )}
-                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
+                        <div className="shop-typo-sidebar-nav" style={{ marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
                           {displayTitle}
                         </div>
                         <SubcategoryLink href={slug ? `/${slug}` : "#"} $active={true} onClick={() => { setFilters({}); setPage(1); }}>
@@ -1345,11 +1337,11 @@ export default function CategoryTemplate() {
                         <SubcategoryLink
                           href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
                           $active={false}
-                          style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
+                          style={{ marginBottom: 2, opacity: 0.75 }}
                         >
                           ← {parentCategory.name || parentCategory.slug}
                         </SubcategoryLink>
-                        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 4, marginTop: 4 }}>
+                        <div className="shop-typo-sidebar-nav" style={{ marginBottom: 4, marginTop: 4 }}>
                           {parentCategory.name || parentCategory.slug}
                         </div>
                         <SubcategoryLink
@@ -1396,7 +1388,7 @@ export default function CategoryTemplate() {
                           const on = (filters[key] || []).includes(val);
                           const label = formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions);
                           return (
-                            <CheckRow key={label} $on={on}>
+                            <CheckRow key={label} $on={on} $cbSize={filterCheckboxSize}>
                               <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={filterCheckboxSize} />
                               {label}
                             </CheckRow>

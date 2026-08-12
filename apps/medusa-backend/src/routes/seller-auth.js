@@ -420,13 +420,32 @@ const sellerAuthLoginPOST = async (req, res) => {
       const ss = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [effectiveSellerId])
       displayStoreName = (ss.rows[0]?.store_name || '').trim()
     }
+    let preferredLocale = 'de'
+    if (effectiveSellerId) {
+      try {
+        const lr = await client.query('SELECT locale FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1', [effectiveSellerId])
+        const loc = String(lr.rows[0]?.locale || '').trim().toLowerCase()
+        if (['en', 'de', 'tr', 'fr', 'it', 'es'].includes(loc)) preferredLocale = loc
+      } catch (_) {}
+    }
     const sessionId = await createSellerSession(client, { userId: user.id, sellerId: effectiveSellerId, req }).catch((e) => {
       console.error('createSellerSession (login) failed:', e?.message || e)
       return null
     })
     await client.end()
     const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, sid: sessionId || undefined })
-    res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: shouldBeSuperuser, store_name: displayStoreName, permissions: user.permissions || null } })
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        seller_id: effectiveSellerId,
+        is_superuser: shouldBeSuperuser,
+        store_name: displayStoreName,
+        permissions: user.permissions || null,
+        locale: preferredLocale,
+      },
+    })
   } catch (err) {
     try { await client.end() } catch (_) {}
     console.error('sellerAuthLoginPOST:', err)

@@ -366,11 +366,34 @@ async function loadOrderContext(client, orderId) {
     const sid = String(returnInfo?.seller_id || order.seller_id || '').trim()
     let addr = null
     if (sid && sid !== 'default') {
-      const ar = await client.query(
-        `SELECT return_address FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
-        [sid],
-      )
-      addr = ar.rows[0]?.return_address
+      // Prefer Settings → Locations returns purpose
+      try {
+        const lr = await client.query(
+          `SELECT name, address_line1, address_line2, city, postal_code, country
+             FROM seller_locations
+            WHERE seller_id = $1 AND is_returns_to = true
+            ORDER BY updated_at DESC NULLS LAST
+            LIMIT 1`,
+          [sid],
+        )
+        const loc = lr.rows[0]
+        if (loc && String(loc.address_line1 || '').trim()) {
+          addr = {
+            name: String(loc.name || '').trim(),
+            street: [loc.address_line1, loc.address_line2].filter(Boolean).map((x) => String(x).trim()).join(', '),
+            zip: String(loc.postal_code || '').trim(),
+            city: String(loc.city || '').trim(),
+            country: String(loc.country || 'DE').trim(),
+          }
+        }
+      } catch (_) {}
+      if (!addr || !String(addr.street || '').trim()) {
+        const ar = await client.query(
+          `SELECT return_address FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1`,
+          [sid],
+        )
+        addr = ar.rows[0]?.return_address
+      }
       if (!addr || typeof addr !== 'object' || !String(addr.street || '').trim()) {
         const su = await client.query(
           `SELECT store_name, company_name, business_address FROM seller_users WHERE seller_id = $1 LIMIT 1`,

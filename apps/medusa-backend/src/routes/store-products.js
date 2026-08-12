@@ -3,6 +3,7 @@ const { Router } = require('express')
 const { resolveAdminHub, mapAdminHubCategoryPgRow, buildAdminHubCategoryTreeFromFlat, getCategoriesPgClient } = require('../categories-helpers')
 const { getAdminHubProductByIdOrHandleDb, listAdminHubProductsDb, getProductsDbClient } = require('./admin-products')
 const { getSellerStoreName, getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct, storePublishedStatusSql } = require('./seller-settings')
+const { isEuOriginVerified } = require('../eu-origin')
 
 // ── DB ────────────────────────────────────────────────────────────────────────
 // Görev 25: shared pool (src/db-pool.js) instead of a fresh Client per call — this
@@ -543,11 +544,21 @@ const getGroupProductIdSets = async (groupIds) => {
 
 const hasSaleFromMapped = (mapped) => {
   const meta = mapped?.metadata || {}
+  const prices = meta.prices && typeof meta.prices === 'object' ? meta.prices : {}
+  for (const entry of Object.values(prices)) {
+    if (!entry || typeof entry !== 'object') continue
+    const base = entry.brutto_cents != null ? Number(entry.brutto_cents) : null
+    const sale = entry.sale_cents != null ? Number(entry.sale_cents) : null
+    if (Number.isFinite(base) && Number.isFinite(sale) && sale > 0 && sale < base) return true
+  }
   const priceCents = Number(mapped?.price_cents || 0)
-  const deSale = meta.prices?.DE?.sale_cents != null ? Number(meta.prices.DE.sale_cents) : null
   const legacySale = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null
-  const saleCents = deSale ?? legacySale
-  return saleCents != null && saleCents > 0 && saleCents < priceCents
+  if (legacySale != null && Number.isFinite(legacySale) && legacySale > 0) {
+    if (!(priceCents > 0) || legacySale < priceCents) return true
+  }
+  const deSale = meta.prices?.DE?.sale_cents != null ? Number(meta.prices.DE.sale_cents) : null
+  const deBase = meta.prices?.DE?.brutto_cents != null ? Number(meta.prices.DE.brutto_cents) : priceCents
+  return deSale != null && deSale > 0 && Number.isFinite(deBase) && deSale < deBase
 }
 
 // "Neu" is active for this many days after a product's publish date (falls back to its
@@ -589,6 +600,8 @@ const badgeToPayload = (b) => ({
   offset_y: b.offset_y,
   badge_type: b.badge_type,
   image_url: b.image_url,
+  image_width: b.image_width,
+  image_height: b.image_height,
   i18n: b.i18n,
 })
 
@@ -603,6 +616,7 @@ const resolveCustomBadgesForProduct = (productId, mapped, ctx) => {
       if (b.api_rule === 'bestseller_category') hit = ctx.categoryTopSellerIds.has(pid)
       else if (b.api_rule === 'sale') hit = hasSaleFromMapped(mapped)
       else if (b.api_rule === 'new') hit = isNewFromMapped(mapped)
+      else if (b.api_rule === 'made_in_europe') hit = isEuOriginVerified(mapped?.metadata)
     }
     if (hit) matched.push(badgeToPayload(b))
   }

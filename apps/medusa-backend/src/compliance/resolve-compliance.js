@@ -43,6 +43,7 @@ function resolveProfile(profileId) {
   let blocked = []
   let superuserOnly = false
   let label = null
+  let labelI18n = null
 
   let cursorId = id
   // Walk inheritance chain child → parent, guarding against cycles.
@@ -50,6 +51,7 @@ function resolveProfile(profileId) {
     seen.add(cursorId)
     const p = PROFILES[cursorId]
     if (label == null) label = p.label || cursorId
+    if (labelI18n == null && p.label_i18n && typeof p.label_i18n === 'object') labelI18n = p.label_i18n
     required = required.concat(p.required_fields || [])
     optional = optional.concat(p.optional_fields || [])
     blocked = blocked.concat(p.blocked_publish_without || [])
@@ -62,6 +64,7 @@ function resolveProfile(profileId) {
   return {
     id,
     label: label || id,
+    label_i18n: labelI18n || {},
     required_fields: uniq(required),
     optional_fields: uniq(optional).filter((f) => !required.includes(f)),
     blocked_publish_without: uniq(blocked),
@@ -104,6 +107,7 @@ function resolveComplianceProfile(profileId, marketplace = DEFAULT_MARKETPLACE) 
   return {
     profile_id: base.id,
     profile_label: base.label,
+    profile_label_i18n: base.label_i18n || {},
     marketplace: mp,
     label_language: overlay.label_language || null,
     superuser_only: base.superuser_only === true,

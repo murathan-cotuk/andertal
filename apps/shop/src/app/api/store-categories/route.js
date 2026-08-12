@@ -24,7 +24,9 @@ export async function GET(request) {
     if (!isDev) {
       const cached = categoriesCache.get(cacheKey);
       if (cached && cached.expiresAt > now) {
-        return NextResponse.json(cached.data);
+        return NextResponse.json(cached.data, {
+          headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" },
+        });
       }
     }
 
@@ -64,7 +66,10 @@ export async function GET(request) {
     if (!isDev) {
       categoriesCache.set(cacheKey, { data, expiresAt: now + CACHE_TTL_MS });
     }
-    return NextResponse.json(data);
+    return NextResponse.json(
+      data,
+      isDev ? undefined : { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
+    );
   } catch (e) {
     if (isDev) {
       const msg = e?.code === "ECONNREFUSED" || /fetch failed/i.test(String(e?.message || ""))

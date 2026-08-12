@@ -32,6 +32,32 @@ const STORE_PUBLISHED_STATUSES = new Set(['published', 'active'])
 const isStorePublishedStatus = (status) => STORE_PUBLISHED_STATUSES.has(String(status || '').trim().toLowerCase())
 const storePublishedStatusSql = (col) => `LOWER(TRIM(COALESCE(${col}, ''))) IN ('published', 'active')`
 
+/** All shop storefront UI locales. null/empty in DB = all enabled. */
+const ALL_SHOP_LOCALES = ['en', 'de', 'tr', 'fr', 'it', 'es']
+const normalizeEnabledShopLocales = (raw) => {
+  if (raw == null) return null
+  let list = raw
+  if (typeof list === 'string') {
+    try { list = JSON.parse(list) } catch (_) { return null }
+  }
+  if (!Array.isArray(list)) return null
+  const out = []
+  const seen = new Set()
+  for (const item of list) {
+    const code = String(item || '').trim().toLowerCase()
+    if (!ALL_SHOP_LOCALES.includes(code) || seen.has(code)) continue
+    seen.add(code)
+    out.push(code)
+  }
+  if (!out.length) return null
+  // Prefer stable order matching ALL_SHOP_LOCALES
+  return ALL_SHOP_LOCALES.filter((c) => out.includes(c))
+}
+const parseEnabledShopLocalesRow = (rowVal) => {
+  if (rowVal == null) return null
+  return normalizeEnabledShopLocales(rowVal)
+}
+
 const getSellerStoreName = async (sellerId) => {
   const id = (sellerId || 'default').toString().trim() || 'default'
   const client = getDbClient()
@@ -91,7 +117,7 @@ const sellerSettingsGET = async (req, res) => {
       const r = await client.query(
         `SELECT store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url,
                 shop_logo_height, sellercentral_logo_height, platform_name, support_email, admin_notification_email, storefront_url,
-                announcement_bar_items, logo_config, barcode_scanner_config,
+                announcement_bar_items, logo_config, barcode_scanner_config, enabled_shop_locales, locale,
                 legal_company_name, legal_representative, legal_street, legal_city,
                 legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email
          FROM admin_hub_seller_settings WHERE seller_id = $1`,
@@ -134,10 +160,15 @@ const sellerSettingsGET = async (req, res) => {
           barcode_scanner_config = row.barcode_scanner_config
         }
       }
+      const enabled_shop_locales = parseEnabledShopLocalesRow(row?.enabled_shop_locales)
+      const rawLocale = String(row?.locale || '').trim().toLowerCase()
+      const locale = ALL_SHOP_LOCALES.includes(rawLocale) ? rawLocale : 'de'
       res.json({
         store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url,
         sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height,
         platform_name, support_email, admin_notification_email, storefront_url, announcement_bar_items, logo_config, barcode_scanner_config,
+        enabled_shop_locales,
+        locale,
         legal_company_name: row?.legal_company_name || '',
         legal_representative: row?.legal_representative || '',
         legal_street: row?.legal_street || '',
@@ -209,6 +240,24 @@ const sellerSettingsPATCH = async (req, res) => {
     const legal_vat_id = legalStr('legal_vat_id')
     const legal_tax_id = legalStr('legal_tax_id')
     const legal_email = legalStr('legal_email')
+    let enabledLocalesJson = undefined
+    let enabled_shop_locales = undefined
+    if (Object.prototype.hasOwnProperty.call(body, 'enabled_shop_locales')) {
+      if (!isSuperuser) {
+        return res.status(403).json({ message: 'Only superuser can change shop languages' })
+      }
+      // Platform-wide setting — always stored on seller_id = default
+      sellerId = 'default'
+      const normalized = normalizeEnabledShopLocales(body.enabled_shop_locales)
+      // Require at least one language; fall back to all if empty
+      enabled_shop_locales = normalized && normalized.length ? normalized : [...ALL_SHOP_LOCALES]
+      enabledLocalesJson = JSON.stringify(enabled_shop_locales)
+    }
+    let uiLocale = undefined
+    if (Object.prototype.hasOwnProperty.call(body, 'locale')) {
+      const raw = String(body.locale || '').trim().toLowerCase()
+      uiLocale = ALL_SHOP_LOCALES.includes(raw) ? raw : 'de'
+    }
     if (free_shipping_thresholds) {
       free_shipping_thresholds = normalizeThresholdsObject(free_shipping_thresholds)
     }
@@ -223,9 +272,9 @@ const sellerSettingsPATCH = async (req, res) => {
     await client.query(
       `INSERT INTO admin_hub_seller_settings (
          seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, logo_config,
-         legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcode_scanner_config, admin_notification_email,
+         legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcode_scanner_config, admin_notification_email, enabled_shop_locales,
          updated_at
-       ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, now())
+       ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, $26::jsonb, now())
        ON CONFLICT (seller_id) DO UPDATE SET
          store_name = COALESCE($2, admin_hub_seller_settings.store_name),
          free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -251,10 +300,23 @@ const sellerSettingsPATCH = async (req, res) => {
          legal_email = COALESCE($23, admin_hub_seller_settings.legal_email),
          barcode_scanner_config = COALESCE($24::jsonb, admin_hub_seller_settings.barcode_scanner_config),
          admin_notification_email = COALESCE($25, admin_hub_seller_settings.admin_notification_email),
+         enabled_shop_locales = COALESCE($26::jsonb, admin_hub_seller_settings.enabled_shop_locales),
          updated_at = now()`,
       [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url, logoConfigJson !== undefined ? logoConfigJson : null,
-       legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcodeConfigJson !== undefined ? barcodeConfigJson : null, admin_notification_email]
+       legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcodeConfigJson !== undefined ? barcodeConfigJson : null, admin_notification_email,
+       enabledLocalesJson !== undefined ? enabledLocalesJson : null]
     )
+    if (uiLocale !== undefined) {
+      // Persist Sellercentral UI language on the acting seller's settings row (not platform `default`
+      // when a superuser toggles shop languages).
+      const localeSellerId = String(jwtSellerId || sellerId || '').trim() || 'default'
+      await client.query(
+        `INSERT INTO admin_hub_seller_settings (seller_id, locale, updated_at)
+         VALUES ($1, $2, now())
+         ON CONFLICT (seller_id) DO UPDATE SET locale = $2, updated_at = now()`,
+        [localeSellerId, uiLocale],
+      )
+    }
     await client.end()
     _log.info('[sellerSettingsPATCH] saved OK')
     res.json({
@@ -266,6 +328,8 @@ const sellerSettingsPATCH = async (req, res) => {
       sellercentral_favicon_url: sellercentral_favicon_url || '',
       shop_logo_height: shop_logo_height != null ? shop_logo_height : 34,
       sellercentral_logo_height: sellercentral_logo_height != null ? sellercentral_logo_height : 30,
+      enabled_shop_locales: enabled_shop_locales !== undefined ? enabled_shop_locales : undefined,
+      locale: uiLocale !== undefined ? uiLocale : undefined,
     })
   } catch (err) {
     console.error('sellerSettingsPATCH:', err)
@@ -285,6 +349,8 @@ module.exports = function createSellerSettingsRouter() {
 
 module.exports.normalizeHubCountryCode = normalizeHubCountryCode
 module.exports.normalizeThresholdsObject = normalizeThresholdsObject
+module.exports.ALL_SHOP_LOCALES = ALL_SHOP_LOCALES
+module.exports.normalizeEnabledShopLocales = normalizeEnabledShopLocales
 module.exports.STORE_PUBLISHED_STATUSES = STORE_PUBLISHED_STATUSES
 module.exports.isStorePublishedStatus = isStorePublishedStatus
 module.exports.storePublishedStatusSql = storePublishedStatusSql

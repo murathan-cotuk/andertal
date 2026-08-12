@@ -43,40 +43,50 @@ const DOC_TYPE_KEYS = [
 
 function DocBtn({ orderId, kind, label, available, locale = "de" }) {
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   if (!available) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
   const handleClick = async () => {
     setBusy(true);
+    setErr("");
     try {
       await downloadAuthenticatedPdf(getOrderPdfDownloadUrl(orderId, kind, locale), `${kind}-${orderId}.pdf`);
-    } catch (_) {
-      // Non-critical: user sees no file appear; a retry click is the recovery path.
+    } catch (e) {
+      setErr(e?.message || "Download failed");
     }
     setBusy(false);
   };
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={busy}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 3,
-        padding: "3px 7px",
-        borderRadius: 4,
-        border: "1px solid #e5e7eb",
-        background: "#f9fafb",
-        color: "#374151",
-        fontSize: 11,
-        fontWeight: 500,
-        textDecoration: "none",
-        cursor: busy ? "wait" : "pointer",
-        whiteSpace: "nowrap",
-        opacity: busy ? 0.6 : 1,
-      }}
-    >
-      ↓ {label}
-    </button>
+    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={busy}
+        title={err || undefined}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 3,
+          padding: "3px 7px",
+          borderRadius: 4,
+          border: `1px solid ${err ? "#fecaca" : "#e5e7eb"}`,
+          background: err ? "#fef2f2" : "#f9fafb",
+          color: err ? "#b91c1c" : "#374151",
+          fontSize: 11,
+          fontWeight: 500,
+          textDecoration: "none",
+          cursor: busy ? "wait" : "pointer",
+          whiteSpace: "nowrap",
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        ↓ {label}
+      </button>
+      {err ? (
+        <span style={{ fontSize: 9, color: "#b91c1c", maxWidth: 90, textAlign: "center", lineHeight: 1.2 }}>
+          {err}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -157,8 +167,9 @@ function SellerGroupHeader({ label }) {
 
 function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
   const hasReturn = returnsSet.has(order.id);
-  const hasTracking =
-    !!order.tracking_number ||
+  const hasShipDoc =
+    !!String(order.sendcloud_label_url || "").trim() ||
+    !!String(order.tracking_number || "").trim() ||
     order.delivery_status === "versendet" ||
     order.delivery_status === "zugestellt";
 
@@ -201,7 +212,7 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
         <DocBtn orderId={order.id} kind="lieferschein" label={ui.deliveryNoteDoc} available locale={locale} />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-        <DocBtn orderId={order.id} kind="versandlabel" label={ui.shippingLabel} available={hasTracking} locale={locale} />
+        <DocBtn orderId={order.id} kind="versandlabel" label={ui.shippingLabel} available={hasShipDoc} locale={locale} />
       </td>
       <td style={{ padding: "8px 12px", textAlign: "center" }}>
         <DocBtn orderId={order.id} kind="retoure" label={ui.returnDoc} available={hasReturn} locale={locale} />
@@ -310,9 +321,10 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
     if (docFilter === "versandlabel") {
       list = list.filter(
         (o) =>
-          !!o.tracking_number ||
+          !!String(o.sendcloud_label_url || "").trim() ||
+          !!String(o.tracking_number || "").trim() ||
           o.delivery_status === "versendet" ||
-          o.delivery_status === "zugestellt"
+          o.delivery_status === "zugestellt",
       );
     } else if (docFilter === "retoure") {
       list = list.filter((o) => returnsSet.has(o.id));

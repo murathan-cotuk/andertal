@@ -34,7 +34,11 @@ export async function GET(request) {
       const res = await fetch(singleUrl, { headers: { "Content-Type": "application/json" }, next: { revalidate: 60 } });
       if (res.ok) {
         const data = await res.json();
-        if (data?.collection) return NextResponse.json(data);
+        if (data?.collection) {
+          return NextResponse.json(data, {
+            headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" },
+          });
+        }
       }
       // Fallback: use cached list
       const collections = await fetchAllCollections(base);
@@ -44,11 +48,16 @@ export async function GET(request) {
           (c?.handle && String(c.handle).toLowerCase() === handle.toLowerCase()) ||
           (isUuid && c?.id && String(c.id).toLowerCase() === String(handle).trim().toLowerCase())
       );
-      return NextResponse.json(found ? { collection: found, collections } : { collection: null, collections });
+      return NextResponse.json(found ? { collection: found, collections } : { collection: null, collections }, {
+        headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" },
+      });
     }
 
     const collections = await fetchAllCollections(base);
-    return NextResponse.json({ collections });
+    return NextResponse.json(
+      { collections },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" } },
+    );
   } catch {
     return NextResponse.json({ collection: null, collections: [] }, { status: 200 });
   }

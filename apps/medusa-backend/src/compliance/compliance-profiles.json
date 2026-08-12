@@ -7,12 +7,28 @@
   "profiles": {
     "general_consumer_gpsr": {
       "label": "Allgemeine Verbraucherprodukte (GPSR)",
+      "label_i18n": {
+        "de": "Allgemeine Verbraucherprodukte (GPSR)",
+        "en": "General consumer products (GPSR)",
+        "tr": "Genel tüketici ürünleri (GPSR)",
+        "fr": "Produits de consommation généraux (GPSR)",
+        "es": "Productos de consumo generales (GPSR)",
+        "it": "Prodotti di consumo generali (GPSR)"
+      },
       "required_fields": ["hersteller", "hersteller_information", "verantwortliche_person_information"],
       "optional_fields": ["safety_warnings", "recall_procedure"],
       "blocked_publish_without": ["hersteller", "hersteller_information", "verantwortliche_person_information"]
     },
     "electronics_weee": {
       "label": "Elektro-/Elektronikgeräte (WEEE/ElektroG)",
+      "label_i18n": {
+        "de": "Elektro-/Elektronikgeräte (WEEE/ElektroG)",
+        "en": "Electrical/electronic equipment (WEEE)",
+        "tr": "Elektrikli/elektronik cihazlar (WEEE)",
+        "fr": "Équipements électriques/électroniques (DEEE)",
+        "es": "Equipos eléctricos/electrónicos (RAEE)",
+        "it": "Apparecchiature elettriche/elettroniche (RAEE)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["weee_number"],
       "optional_fields": ["ce_declaration_url", "rohs_declaration"],
@@ -20,6 +36,14 @@
     },
     "energy_labeled_eprel": {
       "label": "Energieverbrauchskennzeichnung (EPREL)",
+      "label_i18n": {
+        "de": "Energieverbrauchskennzeichnung (EPREL)",
+        "en": "Energy labelling (EPREL)",
+        "tr": "Enerji etiketlemesi (EPREL)",
+        "fr": "Étiquetage énergétique (EPREL)",
+        "es": "Etiquetado energético (EPREL)",
+        "it": "Etichettatura energetica (EPREL)"
+      },
       "inherits": "electronics_weee",
       "required_fields": ["eprel_number"],
       "optional_fields": ["energy_label_image", "energy_label_qr"],
@@ -27,6 +51,14 @@
     },
     "battery_containing": {
       "label": "Batterien / Akkus (Batterieverordnung 2023/1542)",
+      "label_i18n": {
+        "de": "Batterien / Akkus (Batterieverordnung 2023/1542)",
+        "en": "Batteries / accumulators (Battery Regulation)",
+        "tr": "Bataryalar / aküler (Batarya Yönetmeliği)",
+        "fr": "Batteries / accumulateurs (règlement batteries)",
+        "es": "Pilas / acumuladores (Reglamento de baterías)",
+        "it": "Batterie / accumulatori (Regolamento batterie)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["battery_chemistry", "battery_capacity_wh"],
       "optional_fields": ["battery_register_number", "battery_recycling_symbol"],
@@ -34,6 +66,14 @@
     },
     "cosmetics": {
       "label": "Kosmetik (VO 1223/2009)",
+      "label_i18n": {
+        "de": "Kosmetik (VO 1223/2009)",
+        "en": "Cosmetics (Reg. 1223/2009)",
+        "tr": "Kozmetik (Yön. 1223/2009)",
+        "fr": "Cosmétiques (règlement 1223/2009)",
+        "es": "Cosméticos (Reglamento 1223/2009)",
+        "it": "Cosmetici (Regolamento 1223/2009)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["inci_list", "responsible_person_eu"],
       "optional_fields": ["cpnp_reference"],
@@ -41,6 +81,14 @@
     },
     "food": {
       "label": "Lebensmittel (LMIV)",
+      "label_i18n": {
+        "de": "Lebensmittel (LMIV)",
+        "en": "Food (FIC / LMIV)",
+        "tr": "Gıda (LMIV)",
+        "fr": "Denrées alimentaires (INCO)",
+        "es": "Alimentos (INFORM)",
+        "it": "Alimenti (FIC)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["ingredients", "allergens", "best_before", "nutrition_values"],
       "optional_fields": ["origin_country", "storage_instructions"],
@@ -48,6 +96,14 @@
     },
     "food_supplement": {
       "label": "Nahrungsergänzungsmittel",
+      "label_i18n": {
+        "de": "Nahrungsergänzungsmittel",
+        "en": "Food supplements",
+        "tr": "Gıda takviyeleri",
+        "fr": "Compléments alimentaires",
+        "es": "Complementos alimenticios",
+        "it": "Integratori alimentari"
+      },
       "inherits": "food",
       "required_fields": ["daily_dose", "warning_text"],
       "optional_fields": [],
@@ -55,6 +111,14 @@
     },
     "toys": {
       "label": "Spielzeug (2009/48/EG, EN71)",
+      "label_i18n": {
+        "de": "Spielzeug (2009/48/EG, EN71)",
+        "en": "Toys (2009/48/EC, EN71)",
+        "tr": "Oyuncaklar (2009/48/AT, EN71)",
+        "fr": "Jouets (2009/48/CE, EN71)",
+        "es": "Juguetes (2009/48/CE, EN71)",
+        "it": "Giocattoli (2009/48/CE, EN71)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["ce_declaration_url", "age_warning"],
       "optional_fields": ["en71_test_report"],
@@ -62,6 +126,14 @@
     },
     "textiles": {
       "label": "Textilien / Bekleidung",
+      "label_i18n": {
+        "de": "Textilien / Bekleidung",
+        "en": "Textiles / clothing",
+        "tr": "Tekstil / giyim",
+        "fr": "Textiles / vêtements",
+        "es": "Textiles / ropa",
+        "it": "Tessili / abbigliamento"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["fiber_composition"],
       "optional_fields": ["care_symbols"],
@@ -69,6 +141,14 @@
     },
     "chemicals_reach": {
       "label": "Chemikalien (REACH/CLP)",
+      "label_i18n": {
+        "de": "Chemikalien (REACH/CLP)",
+        "en": "Chemicals (REACH/CLP)",
+        "tr": "Kimyasallar (REACH/CLP)",
+        "fr": "Produits chimiques (REACH/CLP)",
+        "es": "Productos químicos (REACH/CLP)",
+        "it": "Sostanze chimiche (REACH/CLP)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["safety_data_sheet_url"],
       "optional_fields": ["hazard_pictograms", "signal_word"],
@@ -76,6 +156,14 @@
     },
     "books_media": {
       "label": "Bücher / Medien",
+      "label_i18n": {
+        "de": "Bücher / Medien",
+        "en": "Books / media",
+        "tr": "Kitaplar / medya",
+        "fr": "Livres / médias",
+        "es": "Libros / medios",
+        "it": "Libri / media"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": [],
       "optional_fields": ["isbn"],
@@ -83,12 +171,28 @@
     },
     "digital_goods": {
       "label": "Digitale Produkte / Downloads",
+      "label_i18n": {
+        "de": "Digitale Produkte / Downloads",
+        "en": "Digital products / downloads",
+        "tr": "Dijital ürünler / indirmeler",
+        "fr": "Produits numériques / téléchargements",
+        "es": "Productos digitales / descargas",
+        "it": "Prodotti digitali / download"
+      },
       "required_fields": [],
       "optional_fields": ["license_type"],
       "blocked_publish_without": []
     },
     "nicotine_tpd": {
       "label": "Nikotinprodukte (TPD)",
+      "label_i18n": {
+        "de": "Nikotinprodukte (TPD)",
+        "en": "Nicotine products (TPD)",
+        "tr": "Nikotin ürünleri (TPD)",
+        "fr": "Produits nicotiniques (TPD)",
+        "es": "Productos de nicotina (TPD)",
+        "it": "Prodotti a base di nicotina (TPD)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["tpd_compliance_ref", "age_verification"],
       "optional_fields": ["nicotine_strength"],
@@ -96,6 +200,14 @@
     },
     "medical_device": {
       "label": "Medizinprodukt (MDR 2017/745)",
+      "label_i18n": {
+        "de": "Medizinprodukt (MDR 2017/745)",
+        "en": "Medical device (MDR 2017/745)",
+        "tr": "Tıbbi cihaz (MDR 2017/745)",
+        "fr": "Dispositif médical (MDR 2017/745)",
+        "es": "Producto sanitario (MDR 2017/745)",
+        "it": "Dispositivo medico (MDR 2017/745)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["ce_class", "udi", "authorized_representative"],
       "optional_fields": [],
@@ -105,6 +217,14 @@
     },
     "ce_marked_general": {
       "label": "CE-pflichtige Produkte (allgemein)",
+      "label_i18n": {
+        "de": "CE-pflichtige Produkte (allgemein)",
+        "en": "CE-marked products (general)",
+        "tr": "CE işaretli ürünler (genel)",
+        "fr": "Produits marqués CE (général)",
+        "es": "Productos con marcado CE (general)",
+        "it": "Prodotti con marcatura CE (generale)"
+      },
       "inherits": "general_consumer_gpsr",
       "required_fields": ["ce_declaration_url"],
       "optional_fields": ["test_report_reference"],
@@ -112,33 +232,722 @@
     }
   },
   "field_definitions": {
-    "hersteller": { "type": "text", "label_i18n": { "de": "Hersteller", "en": "Manufacturer", "tr": "Üretici" }, "validation_regex": null, "help_text_i18n": { "de": "Name des Herstellers", "en": "Manufacturer name", "tr": "Üretici adı" } },
-    "hersteller_information": { "type": "text", "label_i18n": { "de": "Herstellerinformationen", "en": "Manufacturer info", "tr": "Üretici bilgisi" }, "validation_regex": null, "help_text_i18n": { "de": "Adresse und Kontakt des Herstellers", "en": "Manufacturer address and contact", "tr": "Üretici adres/iletişim" } },
-    "verantwortliche_person_information": { "type": "text", "label_i18n": { "de": "Verantwortliche Person (EU)", "en": "Responsible person (EU)", "tr": "AB'de sorumlu kişi" }, "validation_regex": null, "help_text_i18n": { "de": "In der EU ansässige verantwortliche Person", "en": "EU-based responsible person", "tr": "AB'de yerleşik sorumlu kişi" } },
-    "weee_number": { "type": "text", "label_i18n": { "de": "WEEE-Nummer", "en": "WEEE number", "tr": "WEEE numarası" }, "validation_regex": null, "help_text_i18n": { "de": "Nationale WEEE-Registrierungsnummer", "en": "National WEEE registration number", "tr": "Ulusal WEEE kayıt no." } },
-    "eprel_number": { "type": "text", "label_i18n": { "de": "EPREL-Nummer", "en": "EPREL number", "tr": "EPREL numarası" }, "validation_regex": null, "help_text_i18n": { "de": "EPREL-Datenbanknummer", "en": "EPREL database number", "tr": "EPREL veritabanı no." } },
-    "energy_label_image": { "type": "file", "label_i18n": { "de": "Energielabel", "en": "Energy label", "tr": "Enerji etiketi" }, "validation_regex": null, "help_text_i18n": {} },
-    "energy_label_qr": { "type": "text", "label_i18n": { "de": "Energielabel QR", "en": "Energy label QR", "tr": "Enerji etiketi QR" }, "validation_regex": null, "help_text_i18n": {} },
-    "ce_declaration_url": { "type": "file", "label_i18n": { "de": "CE-Konformitätserklärung", "en": "CE declaration", "tr": "CE uygunluk beyanı" }, "validation_regex": null, "help_text_i18n": {} },
-    "battery_chemistry": { "type": "select", "label_i18n": { "de": "Batteriechemie", "en": "Battery chemistry", "tr": "Batarya kimyası" }, "options": ["li-ion", "li-po", "nimh", "alkaline", "lead-acid", "other"], "validation_regex": null, "help_text_i18n": {} },
-    "battery_capacity_wh": { "type": "number", "label_i18n": { "de": "Kapazität (Wh)", "en": "Capacity (Wh)", "tr": "Kapasite (Wh)" }, "validation_regex": null, "help_text_i18n": {} },
-    "inci_list": { "type": "text", "label_i18n": { "de": "INCI-Liste", "en": "INCI list", "tr": "INCI listesi" }, "validation_regex": null, "help_text_i18n": {} },
-    "responsible_person_eu": { "type": "text", "label_i18n": { "de": "Verantwortliche Person (Kosmetik)", "en": "Responsible person (cosmetics)", "tr": "Sorumlu kişi (kozmetik)" }, "validation_regex": null, "help_text_i18n": {} },
-    "ingredients": { "type": "text", "label_i18n": { "de": "Zutaten", "en": "Ingredients", "tr": "İçindekiler" }, "validation_regex": null, "help_text_i18n": {} },
-    "allergens": { "type": "text", "label_i18n": { "de": "Allergene", "en": "Allergens", "tr": "Alerjenler" }, "validation_regex": null, "help_text_i18n": {} },
-    "best_before": { "type": "text", "label_i18n": { "de": "Mindesthaltbarkeit", "en": "Best before", "tr": "Son kullanma" }, "validation_regex": null, "help_text_i18n": {} },
-    "nutrition_values": { "type": "text", "label_i18n": { "de": "Nährwerte", "en": "Nutrition values", "tr": "Besin değerleri" }, "validation_regex": null, "help_text_i18n": {} },
-    "daily_dose": { "type": "text", "label_i18n": { "de": "Tagesdosis", "en": "Daily dose", "tr": "Günlük doz" }, "validation_regex": null, "help_text_i18n": {} },
-    "warning_text": { "type": "text", "label_i18n": { "de": "Warnhinweis", "en": "Warning text", "tr": "Uyarı metni" }, "validation_regex": null, "help_text_i18n": {} },
-    "age_warning": { "type": "text", "label_i18n": { "de": "Altersempfehlung", "en": "Age warning", "tr": "Yaş uyarısı" }, "validation_regex": null, "help_text_i18n": {} },
-    "fiber_composition": { "type": "text", "label_i18n": { "de": "Faserzusammensetzung", "en": "Fiber composition", "tr": "Elyaf kompozisyonu" }, "validation_regex": null, "help_text_i18n": {} },
-    "care_symbols": { "type": "text", "label_i18n": { "de": "Pflegesymbole", "en": "Care symbols", "tr": "Bakım sembolleri" }, "validation_regex": null, "help_text_i18n": {} },
-    "safety_data_sheet_url": { "type": "file", "label_i18n": { "de": "Sicherheitsdatenblatt (SDB)", "en": "Safety data sheet", "tr": "Güvenlik bilgi formu" }, "validation_regex": null, "help_text_i18n": {} },
-    "tpd_compliance_ref": { "type": "text", "label_i18n": { "de": "TPD-Referenz", "en": "TPD reference", "tr": "TPD referansı" }, "validation_regex": null, "help_text_i18n": {} },
-    "age_verification": { "type": "select", "label_i18n": { "de": "Altersverifikation", "en": "Age verification", "tr": "Yaş doğrulama" }, "options": ["18+", "21+"], "validation_regex": null, "help_text_i18n": {} },
-    "ce_class": { "type": "text", "label_i18n": { "de": "CE-Klasse", "en": "CE class", "tr": "CE sınıfı" }, "validation_regex": null, "help_text_i18n": {} },
-    "udi": { "type": "text", "label_i18n": { "de": "UDI", "en": "UDI", "tr": "UDI" }, "validation_regex": null, "help_text_i18n": {} },
-    "authorized_representative": { "type": "text", "label_i18n": { "de": "Bevollmächtigter", "en": "Authorized representative", "tr": "Yetkili temsilci" }, "validation_regex": null, "help_text_i18n": {} },
-    "isbn": { "type": "text", "label_i18n": { "de": "ISBN", "en": "ISBN", "tr": "ISBN" }, "validation_regex": null, "help_text_i18n": {} }
+    "hersteller": {
+      "type": "text",
+      "label_i18n": { "de": "Hersteller", "en": "Manufacturer", "tr": "Üretici", "fr": "Fabricant", "es": "Fabricante", "it": "Fabbricante" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Name des Unternehmens oder der Person, die das Produkt hergestellt hat (wie auf Verpackung/Impressum).",
+        "en": "Name of the company or person that manufactured the product (as on packaging/imprint).",
+        "tr": "Ürünü üreten şirket veya kişinin adı (ambalaj/künyedeki gibi).",
+        "fr": "Nom de l'entreprise ou de la personne qui a fabriqué le produit (comme sur l'emballage).",
+        "es": "Nombre de la empresa o persona que fabricó el producto (como en el envase).",
+        "it": "Nome dell'azienda o della persona che ha fabbricato il prodotto (come sulla confezione)."
+      }
+    },
+    "hersteller_information": {
+      "type": "text",
+      "label_i18n": { "de": "Herstellerinformationen", "en": "Manufacturer details", "tr": "Üretici bilgileri", "fr": "Coordonnées du fabricant", "es": "Datos del fabricante", "it": "Dati del fabbricante" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Postanschrift und Kontakt des Herstellers (Straße, PLZ, Ort, Land, E-Mail und/oder Telefon).",
+        "en": "Postal address and contact of the manufacturer (street, postcode, city, country, email and/or phone).",
+        "tr": "Üreticinin posta adresi ve iletişimi (sokak, posta kodu, şehir, ülke, e-posta ve/veya telefon).",
+        "fr": "Adresse postale et contact du fabricant (rue, code postal, ville, pays, e-mail et/ou téléphone).",
+        "es": "Dirección postal y contacto del fabricante (calle, CP, ciudad, país, correo y/o teléfono).",
+        "it": "Indirizzo postale e contatto del fabbricante (via, CAP, città, paese, e-mail e/o telefono)."
+      }
+    },
+    "verantwortliche_person_information": {
+      "type": "text",
+      "label_i18n": { "de": "Verantwortliche Person (EU)", "en": "Responsible person (EU)", "tr": "Sorumlu kişi (AB)", "fr": "Personne responsable (UE)", "es": "Persona responsable (UE)", "it": "Persona responsabile (UE)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "In der EU ansässige Kontaktstelle für Produktsicherheit (Name + Adresse + Kontakt). Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein.",
+        "en": "EU-based contact for product safety (name + address + contact). If the manufacturer is in the EU, this can be the same party.",
+        "tr": "Ürün güvenliği için AB'de yerleşik iletişim (ad + adres + iletişim). Üretici AB'deyse aynı taraf olabilir.",
+        "fr": "Point de contact basé dans l'UE pour la sécurité produit (nom + adresse + contact). Si le fabricant est dans l'UE, ce peut être la même entité.",
+        "es": "Contacto establecido en la UE para seguridad del producto (nombre + dirección + contacto). Si el fabricante está en la UE, puede ser la misma parte.",
+        "it": "Contatto stabilito nell'UE per la sicurezza del prodotto (nome + indirizzo + contatto). Se il fabbricante è nell'UE, può essere la stessa parte."
+      }
+    },
+    "safety_warnings": {
+      "type": "text",
+      "label_i18n": { "de": "Sicherheitshinweise", "en": "Safety warnings", "tr": "Güvenlik uyarıları", "fr": "Avertissements de sécurité", "es": "Advertencias de seguridad", "it": "Avvertenze di sicurezza" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Wichtige Warnungen für Verbraucher (z. B. „Von Kindern fernhalten“, Erstickungsgefahr, richtige Verwendung). Werden im Shop bei den Produktsicherheitsinfos angezeigt.",
+        "en": "Optional: Important consumer warnings (e.g. “Keep away from children”, choking hazard, correct use). Shown in the shop under product safety info.",
+        "tr": "İsteğe bağlı: Tüketici için önemli uyarılar (örn. “Çocuklardan uzak tutun”, boğulma riski, doğru kullanım). Mağazada ürün güvenliği bilgisinde gösterilir.",
+        "fr": "Facultatif : avertissements importants pour le consommateur (ex. « Tenir hors de portée des enfants », risque d'étouffement). Affichés dans la boutique sous la sécurité produit.",
+        "es": "Opcional: advertencias importantes para el consumidor (p. ej. «Mantener fuera del alcance de los niños»). Se muestran en la tienda en la info de seguridad.",
+        "it": "Facoltativo: avvertenze importanti per il consumatore (es. «Tenere lontano dai bambini»). Mostrate nello shop nelle info di sicurezza."
+      }
+    },
+    "recall_procedure": {
+      "type": "text",
+      "label_i18n": { "de": "Rückruf / Meldeweg", "en": "Recall / reporting process", "tr": "Geri çağırma / bildirim yolu", "fr": "Rappel / voie de signalement", "es": "Retirada / canal de aviso", "it": "Ritiro / canale di segnalazione" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Wie Kunden oder Behörden einen Sicherheitsvorfall melden bzw. Rückrufinformationen erhalten (z. B. E-Mail/Telefon der Sicherheitsstelle).",
+        "en": "Optional: How customers or authorities report a safety issue or get recall information (e.g. safety contact email/phone).",
+        "tr": "İsteğe bağlı: Müşterilerin veya otoritelerin güvenlik sorununu nasıl bildireceği / geri çağırma bilgisini nasıl alacağı (örn. güvenlik e-posta/telefon).",
+        "fr": "Facultatif : comment clients ou autorités signalent un problème de sécurité ou obtiennent les infos de rappel (e-mail/téléphone).",
+        "es": "Opcional: cómo clientes o autoridades reportan un incidente de seguridad o reciben info de retirada (correo/teléfono).",
+        "it": "Facoltativo: come clienti o autorità segnalano un problema di sicurezza o ottengono info sul ritiro (e-mail/telefono)."
+      }
+    },
+    "weee_number": {
+      "type": "text",
+      "label_i18n": { "de": "WEEE-Nummer", "en": "WEEE number", "tr": "WEEE numarası", "fr": "Numéro DEEE", "es": "Número RAEE", "it": "Numero RAEE" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Nationale Registrierungsnummer für Elektroaltgeräte (z. B. Stiftung ear in DE).",
+        "en": "National registration number for electrical waste (e.g. Stiftung ear in DE).",
+        "tr": "Elektrikli atık için ulusal kayıt numarası (örn. DE'de Stiftung ear).",
+        "fr": "Numéro d'enregistrement national pour les DEEE.",
+        "es": "Número de registro nacional para residuos eléctricos.",
+        "it": "Numero di registrazione nazionale per i RAEE."
+      }
+    },
+    "eprel_number": {
+      "type": "text",
+      "label_i18n": { "de": "EPREL-Nummer", "en": "EPREL number", "tr": "EPREL numarası", "fr": "Numéro EPREL", "es": "Número EPREL", "it": "Numero EPREL" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Nummer aus der EU-EPREL-Datenbank für energiekennzeichnungspflichtige Produkte.",
+        "en": "Number from the EU EPREL database for energy-labelled products.",
+        "tr": "Enerji etiketli ürünler için AB EPREL veritabanı numarası.",
+        "fr": "Numéro de la base EPREL de l'UE pour les produits à étiquette énergie.",
+        "es": "Número de la base EPREL de la UE para productos con etiqueta energética.",
+        "it": "Numero dalla banca dati EPREL UE per prodotti con etichetta energetica."
+      }
+    },
+    "energy_label_image": {
+      "type": "file",
+      "label_i18n": { "de": "Energielabel (Bild/URL)", "en": "Energy label (image/URL)", "tr": "Enerji etiketi (görsel/URL)", "fr": "Étiquette énergie (image/URL)", "es": "Etiqueta energética (imagen/URL)", "it": "Etichetta energetica (immagine/URL)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Link oder Datei zum offiziellen Energielabel-Bild.",
+        "en": "Link or file for the official energy label image.",
+        "tr": "Resmi enerji etiketi görseli için bağlantı veya dosya.",
+        "fr": "Lien ou fichier de l'image officielle de l'étiquette énergie.",
+        "es": "Enlace o archivo de la imagen oficial de la etiqueta energética.",
+        "it": "Link o file dell'immagine ufficiale dell'etichetta energetica."
+      }
+    },
+    "energy_label_qr": {
+      "type": "text",
+      "label_i18n": { "de": "Energielabel QR / Link", "en": "Energy label QR / link", "tr": "Enerji etiketi QR / bağlantı", "fr": "QR / lien étiquette énergie", "es": "QR / enlace etiqueta energética", "it": "QR / link etichetta energetica" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "QR-Code-Inhalt oder Produktlink aus EPREL.",
+        "en": "QR code content or product link from EPREL.",
+        "tr": "EPREL'den QR kod içeriği veya ürün bağlantısı.",
+        "fr": "Contenu du QR ou lien produit depuis EPREL.",
+        "es": "Contenido del QR o enlace del producto desde EPREL.",
+        "it": "Contenuto del QR o link prodotto da EPREL."
+      }
+    },
+    "ce_declaration_url": {
+      "type": "file",
+      "label_i18n": { "de": "CE-Konformitätserklärung (URL)", "en": "CE declaration of conformity (URL)", "tr": "CE uygunluk beyanı (URL)", "fr": "Déclaration de conformité CE (URL)", "es": "Declaración de conformidad CE (URL)", "it": "Dichiarazione di conformità CE (URL)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Link zur EU-Konformitätserklärung (PDF) des Herstellers.",
+        "en": "Link to the manufacturer's EU declaration of conformity (PDF).",
+        "tr": "Üreticinin AB uygunluk beyanına (PDF) bağlantı.",
+        "fr": "Lien vers la déclaration de conformité UE (PDF) du fabricant.",
+        "es": "Enlace a la declaración de conformidad UE (PDF) del fabricante.",
+        "it": "Link alla dichiarazione di conformità UE (PDF) del fabbricante."
+      }
+    },
+    "rohs_declaration": {
+      "type": "text",
+      "label_i18n": { "de": "RoHS-Erklärung", "en": "RoHS declaration", "tr": "RoHS beyanı", "fr": "Déclaration RoHS", "es": "Declaración RoHS", "it": "Dichiarazione RoHS" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Kurzer Hinweis oder Link zur RoHS-Konformität (gefährliche Stoffe in Elektronik).",
+        "en": "Optional: Short note or link confirming RoHS compliance (hazardous substances in electronics).",
+        "tr": "İsteğe bağlı: RoHS uygunluğunu doğrulayan kısa not veya bağlantı.",
+        "fr": "Facultatif : note ou lien confirmant la conformité RoHS.",
+        "es": "Opcional: nota o enlace que confirme la conformidad RoHS.",
+        "it": "Facoltativo: nota o link che conferma la conformità RoHS."
+      }
+    },
+    "battery_chemistry": {
+      "type": "select",
+      "label_i18n": { "de": "Batteriechemie", "en": "Battery chemistry", "tr": "Batarya kimyası", "fr": "Chimie de la batterie", "es": "Química de la batería", "it": "Chimica della batteria" },
+      "options": ["li-ion", "li-po", "nimh", "alkaline", "lead-acid", "other"],
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Chemie der enthaltenen Batterie/des Akkus.",
+        "en": "Chemistry of the included battery/accumulator.",
+        "tr": "Dahil batarya/akünün kimyası.",
+        "fr": "Chimie de la batterie/accumulateur inclus.",
+        "es": "Química de la pila/acumulador incluido.",
+        "it": "Chimica della batteria/accumulatore inclusa."
+      }
+    },
+    "battery_capacity_wh": {
+      "type": "number",
+      "label_i18n": { "de": "Kapazität (Wh)", "en": "Capacity (Wh)", "tr": "Kapasite (Wh)", "fr": "Capacité (Wh)", "es": "Capacidad (Wh)", "it": "Capacità (Wh)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Nennenergie der Batterie in Wattstunden.",
+        "en": "Rated energy of the battery in watt-hours.",
+        "tr": "Bataryanın watt-saat cinsinden nominal enerjisi.",
+        "fr": "Énergie nominale de la batterie en wattheures.",
+        "es": "Energía nominal de la batería en vatios-hora.",
+        "it": "Energia nominale della batteria in wattora."
+      }
+    },
+    "battery_register_number": {
+      "type": "text",
+      "label_i18n": { "de": "Batterie-Register-Nr.", "en": "Battery register number", "tr": "Batarya kayıt no.", "fr": "N° registre batteries", "es": "N.º registro baterías", "it": "N. registro batterie" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Nationale Batterie-Registrierungsnummer, falls vorhanden.",
+        "en": "Optional: National battery registration number, if applicable.",
+        "tr": "İsteğe bağlı: Varsa ulusal batarya kayıt numarası.",
+        "fr": "Facultatif : numéro d'enregistrement national des batteries, le cas échéant.",
+        "es": "Opcional: número de registro nacional de baterías, si aplica.",
+        "it": "Facoltativo: numero di registrazione nazionale batterie, se applicabile."
+      }
+    },
+    "battery_recycling_symbol": {
+      "type": "text",
+      "label_i18n": { "de": "Recycling-Hinweis Batterie", "en": "Battery recycling note", "tr": "Batarya geri dönüşüm notu", "fr": "Note recyclage batterie", "es": "Nota reciclaje batería", "it": "Nota riciclo batteria" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Hinweis zur ordnungsgemäßen Entsorgung/Recycling der Batterie.",
+        "en": "Optional: Note on proper disposal/recycling of the battery.",
+        "tr": "İsteğe bağlı: Bataryanın doğru imhası/geri dönüşümü hakkında not.",
+        "fr": "Facultatif : note sur l'élimination/recyclage correct de la batterie.",
+        "es": "Opcional: nota sobre la correcta eliminación/reciclaje de la batería.",
+        "it": "Facoltativo: nota sul corretto smaltimento/riciclo della batteria."
+      }
+    },
+    "battery_register_de": {
+      "type": "text",
+      "label_i18n": { "de": "BattG-Register (DE)", "en": "Battery register (DE)", "tr": "Batarya kaydı (DE)", "fr": "Registre batteries (DE)", "es": "Registro baterías (DE)", "it": "Registro batterie (DE)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Deutsche Batteriegesetz-Registrierung, falls zutreffend.",
+        "en": "German Battery Act registration, if applicable.",
+        "tr": "Uygulanabilirse Alman Batarya Yasası kaydı.",
+        "fr": "Enregistrement allemand BattG, le cas échéant.",
+        "es": "Registro alemán BattG, si aplica.",
+        "it": "Registrazione tedesca BattG, se applicabile."
+      }
+    },
+    "inci_list": {
+      "type": "text",
+      "label_i18n": { "de": "INCI-Liste", "en": "INCI list", "tr": "INCI listesi", "fr": "Liste INCI", "es": "Lista INCI", "it": "Elenco INCI" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Vollständige Inhaltsstoffliste nach INCI.",
+        "en": "Full ingredient list according to INCI.",
+        "tr": "INCI'ye göre tam içerik listesi.",
+        "fr": "Liste complète des ingrédients selon l'INCI.",
+        "es": "Lista completa de ingredientes según INCI.",
+        "it": "Elenco completo degli ingredienti secondo INCI."
+      }
+    },
+    "responsible_person_eu": {
+      "type": "text",
+      "label_i18n": { "de": "Verantwortliche Person (Kosmetik)", "en": "Responsible person (cosmetics)", "tr": "Sorumlu kişi (kozmetik)", "fr": "Personne responsable (cosmétiques)", "es": "Persona responsable (cosméticos)", "it": "Persona responsabile (cosmetici)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Für Kosmetik in der EU benannte verantwortliche Person (Name + Adresse).",
+        "en": "Responsible person designated for cosmetics in the EU (name + address).",
+        "tr": "AB'de kozmetik için atanan sorumlu kişi (ad + adres).",
+        "fr": "Personne responsable désignée pour les cosmétiques dans l'UE (nom + adresse).",
+        "es": "Persona responsable designada para cosméticos en la UE (nombre + dirección).",
+        "it": "Persona responsabile designata per i cosmetici nell'UE (nome + indirizzo)."
+      }
+    },
+    "cpnp_reference": {
+      "type": "text",
+      "label_i18n": { "de": "CPNP-Referenz", "en": "CPNP reference", "tr": "CPNP referansı", "fr": "Référence CPNP", "es": "Referencia CPNP", "it": "Riferimento CPNP" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Referenz aus dem Cosmetic Products Notification Portal.",
+        "en": "Optional: Reference from the Cosmetic Products Notification Portal.",
+        "tr": "İsteğe bağlı: Kozmetik Ürün Bildirim Portalı referansı.",
+        "fr": "Facultatif : référence du portail de notification des produits cosmétiques.",
+        "es": "Opcional: referencia del portal de notificación de productos cosméticos.",
+        "it": "Facoltativo: riferimento del portale di notifica dei prodotti cosmetici."
+      }
+    },
+    "ingredients": {
+      "type": "text",
+      "label_i18n": { "de": "Zutaten", "en": "Ingredients", "tr": "İçindekiler", "fr": "Ingrédients", "es": "Ingredientes", "it": "Ingredienti" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Zutatenliste des Lebensmittels.",
+        "en": "Ingredient list of the food product.",
+        "tr": "Gıda ürününün içindekiler listesi.",
+        "fr": "Liste des ingrédients du produit alimentaire.",
+        "es": "Lista de ingredientes del producto alimenticio.",
+        "it": "Elenco degli ingredienti del prodotto alimentare."
+      }
+    },
+    "allergens": {
+      "type": "text",
+      "label_i18n": { "de": "Allergene", "en": "Allergens", "tr": "Alerjenler", "fr": "Allergènes", "es": "Alérgenos", "it": "Allergeni" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Enthaltene Allergene gemäß LMIV (z. B. Gluten, Milch, Nüsse).",
+        "en": "Contained allergens per FIC rules (e.g. gluten, milk, nuts).",
+        "tr": "İçerilen alerjenler (örn. glüten, süt, fındık).",
+        "fr": "Allergènes contenus (ex. gluten, lait, fruits à coque).",
+        "es": "Alérgenos contenidos (p. ej. gluten, leche, frutos secos).",
+        "it": "Allergeni contenuti (es. glutine, latte, frutta a guscio)."
+      }
+    },
+    "best_before": {
+      "type": "text",
+      "label_i18n": { "de": "Mindesthaltbarkeit", "en": "Best before / use by", "tr": "Son kullanma / tavsiye edilen tüketim", "fr": "Date de durabilité / DLC", "es": "Fecha de consumo preferente / caducidad", "it": "Da consumarsi preferibilmente entro / scadenza" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "MHD oder Verbrauchsdatum (wie auf der Verpackung).",
+        "en": "Best-before or use-by date (as on packaging).",
+        "tr": "Tavsiye edilen tüketim veya son kullanma tarihi (ambalajdaki gibi).",
+        "fr": "Date de durabilité minimale ou DLC (comme sur l'emballage).",
+        "es": "Fecha de consumo preferente o caducidad (como en el envase).",
+        "it": "Data di minima durata o scadenza (come sulla confezione)."
+      }
+    },
+    "nutrition_values": {
+      "type": "text",
+      "label_i18n": { "de": "Nährwerte", "en": "Nutrition values", "tr": "Besin değerleri", "fr": "Valeurs nutritionnelles", "es": "Valores nutricionales", "it": "Valori nutrizionali" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Nährwerttabelle (Energie, Fett, Kohlenhydrate, Eiweiß, Salz usw.).",
+        "en": "Nutrition table (energy, fat, carbs, protein, salt, etc.).",
+        "tr": "Besin değerleri tablosu (enerji, yağ, karbonhidrat, protein, tuz vb.).",
+        "fr": "Tableau nutritionnel (énergie, lipides, glucides, protéines, sel, etc.).",
+        "es": "Tabla nutricional (energía, grasas, hidratos, proteínas, sal, etc.).",
+        "it": "Tabella nutrizionale (energia, grassi, carboidrati, proteine, sale, ecc.)."
+      }
+    },
+    "origin_country": {
+      "type": "text",
+      "label_i18n": { "de": "Herkunftsland", "en": "Country of origin", "tr": "Menşe ülke", "fr": "Pays d'origine", "es": "País de origen", "it": "Paese di origine" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Herkunftsland der Zutaten/des Produkts, falls angegeben werden muss.",
+        "en": "Optional: Country of origin of ingredients/product when required.",
+        "tr": "İsteğe bağlı: Gerekliyse içindekilerin/ürünün menşe ülkesi.",
+        "fr": "Facultatif : pays d'origine des ingrédients/du produit si requis.",
+        "es": "Opcional: país de origen de ingredientes/producto si se exige.",
+        "it": "Facoltativo: paese di origine di ingredienti/prodotto se richiesto."
+      }
+    },
+    "storage_instructions": {
+      "type": "text",
+      "label_i18n": { "de": "Lagerungshinweise", "en": "Storage instructions", "tr": "Saklama talimatları", "fr": "Instructions de conservation", "es": "Instrucciones de conservación", "it": "Istruzioni di conservazione" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: z. B. kühl und trocken lagern, nach dem Öffnen verbrauchen.",
+        "en": "Optional: e.g. store cool and dry, consume after opening.",
+        "tr": "İsteğe bağlı: örn. serin ve kuru saklayın, açıldıktan sonra tüketin.",
+        "fr": "Facultatif : ex. conserver au frais et au sec, consommer après ouverture.",
+        "es": "Opcional: p. ej. conservar en lugar fresco y seco, consumir tras abrir.",
+        "it": "Facoltativo: es. conservare in luogo fresco e asciutto, consumare dopo l'apertura."
+      }
+    },
+    "daily_dose": {
+      "type": "text",
+      "label_i18n": { "de": "Tagesdosis", "en": "Daily dose", "tr": "Günlük doz", "fr": "Dose journalière", "es": "Dosis diaria", "it": "Dose giornaliera" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Empfohlene tägliche Verzehrmenge.",
+        "en": "Recommended daily intake amount.",
+        "tr": "Önerilen günlük tüketim miktarı.",
+        "fr": "Quantité journalière recommandée.",
+        "es": "Cantidad diaria recomendada.",
+        "it": "Quantità giornaliera raccomandata."
+      }
+    },
+    "warning_text": {
+      "type": "text",
+      "label_i18n": { "de": "Warnhinweis", "en": "Warning text", "tr": "Uyarı metni", "fr": "Texte d'avertissement", "es": "Texto de advertencia", "it": "Testo di avvertenza" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Gesetzlich vorgeschriebene Warnungen (z. B. nicht als Ersatz für ausgewogene Ernährung).",
+        "en": "Legally required warnings (e.g. not a substitute for a balanced diet).",
+        "tr": "Yasal uyarılar (örn. dengeli beslenmenin yerine geçmez).",
+        "fr": "Avertissements légalement requis (ex. ne remplace pas une alimentation équilibrée).",
+        "es": "Advertencias legalmente requeridas (p. ej. no sustituye una dieta equilibrada).",
+        "it": "Avvertenze legalmente richieste (es. non sostituisce una dieta equilibrata)."
+      }
+    },
+    "age_warning": {
+      "type": "text",
+      "label_i18n": { "de": "Altersempfehlung / Warnung", "en": "Age recommendation / warning", "tr": "Yaş önerisi / uyarı", "fr": "Recommandation d'âge / avertissement", "es": "Recomendación de edad / advertencia", "it": "Raccomandazione di età / avvertenza" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "z. B. „Nicht geeignet für Kinder unter 3 Jahren“.",
+        "en": "e.g. “Not suitable for children under 3 years”.",
+        "tr": "örn. “3 yaşından küçük çocuklar için uygun değildir”.",
+        "fr": "ex. « Non adapté aux enfants de moins de 3 ans ».",
+        "es": "p. ej. «No apto para menores de 3 años».",
+        "it": "es. «Non adatto a bambini di età inferiore a 3 anni»."
+      }
+    },
+    "en71_test_report": {
+      "type": "text",
+      "label_i18n": { "de": "EN71-Prüfbericht (URL)", "en": "EN71 test report (URL)", "tr": "EN71 test raporu (URL)", "fr": "Rapport d'essai EN71 (URL)", "es": "Informe de ensayo EN71 (URL)", "it": "Rapporto di prova EN71 (URL)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Link zum Spielzeug-Sicherheitsprüfbericht.",
+        "en": "Optional: Link to the toy safety test report.",
+        "tr": "İsteğe bağlı: Oyuncak güvenlik test raporuna bağlantı.",
+        "fr": "Facultatif : lien vers le rapport d'essai de sécurité jouets.",
+        "es": "Opcional: enlace al informe de ensayo de seguridad de juguetes.",
+        "it": "Facoltativo: link al rapporto di prova di sicurezza giocattoli."
+      }
+    },
+    "fiber_composition": {
+      "type": "text",
+      "label_i18n": { "de": "Faserzusammensetzung", "en": "Fiber composition", "tr": "Elyaf bileşimi", "fr": "Composition fibreuse", "es": "Composición fibrosa", "it": "Composizione fibrosa" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Materialanteile in % (z. B. 80 % Baumwolle, 20 % Polyester).",
+        "en": "Material shares in % (e.g. 80% cotton, 20% polyester).",
+        "tr": "Malzeme oranları % (örn. %80 pamuk, %20 polyester).",
+        "fr": "Parts des matières en % (ex. 80 % coton, 20 % polyester).",
+        "es": "Porcentajes de materiales (p. ej. 80 % algodón, 20 % poliéster).",
+        "it": "Quote dei materiali in % (es. 80 % cotone, 20 % poliestere)."
+      }
+    },
+    "care_symbols": {
+      "type": "text",
+      "label_i18n": { "de": "Pflegesymbole / Waschanleitung", "en": "Care symbols / washing instructions", "tr": "Bakım sembolleri / yıkama talimatı", "fr": "Symboles d'entretien / lavage", "es": "Símbolos de cuidado / lavado", "it": "Simboli di manutenzione / lavaggio" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Pflegehinweise (Waschtemperatur, Bügeln usw.).",
+        "en": "Optional: Care instructions (wash temperature, ironing, etc.).",
+        "tr": "İsteğe bağlı: Bakım talimatları (yıkama sıcaklığı, ütü vb.).",
+        "fr": "Facultatif : consignes d'entretien (température de lavage, repassage, etc.).",
+        "es": "Opcional: instrucciones de cuidado (temperatura de lavado, planchado, etc.).",
+        "it": "Facoltativo: istruzioni di cura (temperatura di lavaggio, stiratura, ecc.)."
+      }
+    },
+    "safety_data_sheet_url": {
+      "type": "file",
+      "label_i18n": { "de": "Sicherheitsdatenblatt (SDB)", "en": "Safety data sheet (SDS)", "tr": "Güvenlik bilgi formu (GBF)", "fr": "Fiche de données de sécurité (FDS)", "es": "Ficha de datos de seguridad (FDS)", "it": "Scheda di dati di sicurezza (SDS)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Link zum aktuellen Sicherheitsdatenblatt (PDF).",
+        "en": "Link to the current safety data sheet (PDF).",
+        "tr": "Güncel güvenlik bilgi formuna (PDF) bağlantı.",
+        "fr": "Lien vers la fiche de données de sécurité actuelle (PDF).",
+        "es": "Enlace a la ficha de datos de seguridad actual (PDF).",
+        "it": "Link alla scheda di dati di sicurezza attuale (PDF)."
+      }
+    },
+    "hazard_pictograms": {
+      "type": "text",
+      "label_i18n": { "de": "Gefahrenpiktogramme", "en": "Hazard pictograms", "tr": "Tehlike piktogramları", "fr": "Pictogrammes de danger", "es": "Pictogramas de peligro", "it": "Pittogrammi di pericolo" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: CLP-Piktogramme (z. B. GHS02, GHS07) oder Beschreibung.",
+        "en": "Optional: CLP pictograms (e.g. GHS02, GHS07) or description.",
+        "tr": "İsteğe bağlı: CLP piktogramları (örn. GHS02, GHS07) veya açıklama.",
+        "fr": "Facultatif : pictogrammes CLP (ex. GHS02, GHS07) ou description.",
+        "es": "Opcional: pictogramas CLP (p. ej. GHS02, GHS07) o descripción.",
+        "it": "Facoltativo: pittogrammi CLP (es. GHS02, GHS07) o descrizione."
+      }
+    },
+    "signal_word": {
+      "type": "text",
+      "label_i18n": { "de": "Signalwort", "en": "Signal word", "tr": "Uyarı kelimesi", "fr": "Mention d'avertissement", "es": "Palabra de advertencia", "it": "Avvertenza" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: „Achtung“ oder „Gefahr“ gemäß CLP.",
+        "en": "Optional: “Warning” or “Danger” per CLP.",
+        "tr": "İsteğe bağlı: CLP'ye göre “Dikkat” veya “Tehlike”.",
+        "fr": "Facultatif : « Attention » ou « Danger » selon le CLP.",
+        "es": "Opcional: «Atención» o «Peligro» según CLP.",
+        "it": "Facoltativo: «Attenzione» o «Pericolo» secondo CLP."
+      }
+    },
+    "tpd_compliance_ref": {
+      "type": "text",
+      "label_i18n": { "de": "TPD-Referenz", "en": "TPD reference", "tr": "TPD referansı", "fr": "Référence TPD", "es": "Referencia TPD", "it": "Riferimento TPD" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Referenz zur Tabakprodukt-Richtlinie / Notifizierung.",
+        "en": "Reference for Tobacco Products Directive / notification.",
+        "tr": "Tütün Ürünleri Direktifi / bildirim referansı.",
+        "fr": "Référence directive produits du tabac / notification.",
+        "es": "Referencia Directiva de productos del tabaco / notificación.",
+        "it": "Riferimento Direttiva prodotti del tabacco / notifica."
+      }
+    },
+    "age_verification": {
+      "type": "select",
+      "label_i18n": { "de": "Altersverifikation", "en": "Age verification", "tr": "Yaş doğrulama", "fr": "Vérification de l'âge", "es": "Verificación de edad", "it": "Verifica dell'età" },
+      "options": ["18+", "21+"],
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Erforderliche Altersgrenze für den Verkauf.",
+        "en": "Required age limit for sale.",
+        "tr": "Satış için gerekli yaş sınırı.",
+        "fr": "Limite d'âge requise pour la vente.",
+        "es": "Límite de edad requerido para la venta.",
+        "it": "Limite di età richiesto per la vendita."
+      }
+    },
+    "nicotine_strength": {
+      "type": "text",
+      "label_i18n": { "de": "Nikotinstärke", "en": "Nicotine strength", "tr": "Nikotin gücü", "fr": "Teneur en nicotine", "es": "Concentración de nicotina", "it": "Concentrazione di nicotina" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Nikotingehalt (z. B. mg/ml).",
+        "en": "Optional: Nicotine content (e.g. mg/ml).",
+        "tr": "İsteğe bağlı: Nikotin içeriği (örn. mg/ml).",
+        "fr": "Facultatif : teneur en nicotine (ex. mg/ml).",
+        "es": "Opcional: contenido de nicotina (p. ej. mg/ml).",
+        "it": "Facoltativo: contenuto di nicotina (es. mg/ml)."
+      }
+    },
+    "ce_class": {
+      "type": "text",
+      "label_i18n": { "de": "CE-Klasse (MDR)", "en": "CE class (MDR)", "tr": "CE sınıfı (MDR)", "fr": "Classe CE (MDR)", "es": "Clase CE (MDR)", "it": "Classe CE (MDR)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Risikoklasse des Medizinprodukts (z. B. I, IIa, IIb, III).",
+        "en": "Risk class of the medical device (e.g. I, IIa, IIb, III).",
+        "tr": "Tıbbi cihaz risk sınıfı (örn. I, IIa, IIb, III).",
+        "fr": "Classe de risque du dispositif médical (ex. I, IIa, IIb, III).",
+        "es": "Clase de riesgo del producto sanitario (p. ej. I, IIa, IIb, III).",
+        "it": "Classe di rischio del dispositivo medico (es. I, IIa, IIb, III)."
+      }
+    },
+    "udi": {
+      "type": "text",
+      "label_i18n": { "de": "UDI", "en": "UDI", "tr": "UDI", "fr": "UDI", "es": "UDI", "it": "UDI" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Unique Device Identifier des Medizinprodukts.",
+        "en": "Unique Device Identifier of the medical device.",
+        "tr": "Tıbbi cihazın Unique Device Identifier değeri.",
+        "fr": "Identifiant unique du dispositif (UDI).",
+        "es": "Identificador único del dispositivo (UDI).",
+        "it": "Identificatore unico del dispositivo (UDI)."
+      }
+    },
+    "authorized_representative": {
+      "type": "text",
+      "label_i18n": { "de": "Bevollmächtigter (EU)", "en": "Authorized representative (EU)", "tr": "Yetkili temsilci (AB)", "fr": "Mandataire (UE)", "es": "Representante autorizado (UE)", "it": "Rappresentante autorizzato (UE)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "EU-Bevollmächtigter für Medizinprodukte (Name + Adresse).",
+        "en": "EU authorized representative for medical devices (name + address).",
+        "tr": "Tıbbi cihazlar için AB yetkili temsilcisi (ad + adres).",
+        "fr": "Mandataire UE pour dispositifs médicaux (nom + adresse).",
+        "es": "Representante autorizado UE para productos sanitarios (nombre + dirección).",
+        "it": "Rappresentante autorizzato UE per dispositivi medici (nome + indirizzo)."
+      }
+    },
+    "isbn": {
+      "type": "text",
+      "label_i18n": { "de": "ISBN", "en": "ISBN", "tr": "ISBN", "fr": "ISBN", "es": "ISBN", "it": "ISBN" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Internationale Standardbuchnummer.",
+        "en": "Optional: International Standard Book Number.",
+        "tr": "İsteğe bağlı: Uluslararası Standart Kitap Numarası.",
+        "fr": "Facultatif : numéro ISBN.",
+        "es": "Opcional: número ISBN.",
+        "it": "Facoltativo: numero ISBN."
+      }
+    },
+    "license_type": {
+      "type": "text",
+      "label_i18n": { "de": "Lizenztyp", "en": "License type", "tr": "Lisans türü", "fr": "Type de licence", "es": "Tipo de licencia", "it": "Tipo di licenza" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Art der digitalen Lizenz (z. B. Einzelplatz, Abonnement).",
+        "en": "Optional: Type of digital license (e.g. single-seat, subscription).",
+        "tr": "İsteğe bağlı: Dijital lisans türü (örn. tek kullanıcı, abonelik).",
+        "fr": "Facultatif : type de licence numérique (ex. mono-poste, abonnement).",
+        "es": "Opcional: tipo de licencia digital (p. ej. monopuesto, suscripción).",
+        "it": "Facoltativo: tipo di licenza digitale (es. postazione singola, abbonamento)."
+      }
+    },
+    "test_report_reference": {
+      "type": "text",
+      "label_i18n": { "de": "Prüfbericht-Referenz", "en": "Test report reference", "tr": "Test raporu referansı", "fr": "Référence du rapport d'essai", "es": "Referencia del informe de ensayo", "it": "Riferimento rapporto di prova" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Referenz oder Link zum Konformitäts-/Prüfbericht.",
+        "en": "Optional: Reference or link to the conformity/test report.",
+        "tr": "İsteğe bağlı: Uygunluk/test raporuna referans veya bağlantı.",
+        "fr": "Facultatif : référence ou lien vers le rapport de conformité/essai.",
+        "es": "Opcional: referencia o enlace al informe de conformidad/ensayo.",
+        "it": "Facoltativo: riferimento o link al rapporto di conformità/prova."
+      }
+    },
+    "packaging_register_de": {
+      "type": "text",
+      "label_i18n": { "de": "LUCID / VerpackG (DE)", "en": "Packaging register (DE / LUCID)", "tr": "Ambalaj kaydı (DE / LUCID)", "fr": "Registre emballages (DE / LUCID)", "es": "Registro envases (DE / LUCID)", "it": "Registro imballaggi (DE / LUCID)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional/empfohlen: LUCID-Registrierungsnummer (Verpackungsgesetz).",
+        "en": "Optional/recommended: LUCID registration number (German Packaging Act).",
+        "tr": "İsteğe bağlı/önerilir: LUCID kayıt numarası (Alman Ambalaj Yasası).",
+        "fr": "Facultatif/recommandé : numéro LUCID (loi emballages DE).",
+        "es": "Opcional/recomendado: número LUCID (ley de envases DE).",
+        "it": "Facoltativo/consigliato: numero LUCID (legge imballaggi DE)."
+      }
+    },
+    "pfand_system": {
+      "type": "text",
+      "label_i18n": { "de": "Pfandsystem", "en": "Deposit system", "tr": "Depozito sistemi", "fr": "Système de consigne", "es": "Sistema de depósito", "it": "Sistema di cauzione" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Angabe zum Pfand (z. B. Einweg/Mehrweg, Betrag).",
+        "en": "Optional: Deposit info (e.g. single-use/reusable, amount).",
+        "tr": "İsteğe bağlı: Depozito bilgisi (örn. tek kullanımlık/çok kullanımlık, tutar).",
+        "fr": "Facultatif : info consigne (ex. jetable/réutilisable, montant).",
+        "es": "Opcional: info de depósito (p. ej. un solo uso/reutilizable, importe).",
+        "it": "Facoltativo: info cauzione (es. monouso/riutilizzabile, importo)."
+      }
+    },
+    "weee_number_fr": {
+      "type": "text",
+      "label_i18n": { "de": "WEEE-Nr. (FR)", "en": "WEEE number (FR)", "tr": "WEEE no. (FR)", "fr": "N° DEEE (FR)", "es": "N.º RAEE (FR)", "it": "N. RAEE (FR)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Französische DEEE-/Éco-organisme-Registrierung.",
+        "en": "French WEEE / eco-organism registration.",
+        "tr": "Fransız WEEE / eko-organizma kaydı.",
+        "fr": "Enregistrement DEEE / éco-organisme français.",
+        "es": "Registro RAEE / eco-organismo francés.",
+        "it": "Registrazione RAEE / eco-organismo francese."
+      }
+    },
+    "weee_number_it": {
+      "type": "text",
+      "label_i18n": { "de": "WEEE-Nr. (IT)", "en": "WEEE number (IT)", "tr": "WEEE no. (IT)", "fr": "N° DEEE (IT)", "es": "N.º RAEE (IT)", "it": "N. RAEE (IT)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Italienische RAEE-Registrierung.",
+        "en": "Italian RAEE registration.",
+        "tr": "İtalyan RAEE kaydı.",
+        "fr": "Enregistrement RAEE italien.",
+        "es": "Registro RAEE italiano.",
+        "it": "Registrazione RAEE italiana."
+      }
+    },
+    "weee_number_es": {
+      "type": "text",
+      "label_i18n": { "de": "WEEE-Nr. (ES)", "en": "WEEE number (ES)", "tr": "WEEE no. (ES)", "fr": "N° DEEE (ES)", "es": "N.º RAEE (ES)", "it": "N. RAEE (ES)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Spanische RAEE-Registrierung.",
+        "en": "Spanish RAEE registration.",
+        "tr": "İspanyol RAEE kaydı.",
+        "fr": "Enregistrement RAEE espagnol.",
+        "es": "Registro RAEE español.",
+        "it": "Registrazione RAEE spagnola."
+      }
+    },
+    "weee_number_at": {
+      "type": "text",
+      "label_i18n": { "de": "WEEE-Nr. (AT)", "en": "WEEE number (AT)", "tr": "WEEE no. (AT)", "fr": "N° DEEE (AT)", "es": "N.º RAEE (AT)", "it": "N. RAEE (AT)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Österreichische WEEE-/UFH-Registrierung.",
+        "en": "Austrian WEEE registration.",
+        "tr": "Avusturya WEEE kaydı.",
+        "fr": "Enregistrement DEEE autrichien.",
+        "es": "Registro RAEE austriaco.",
+        "it": "Registrazione RAEE austriaca."
+      }
+    },
+    "weee_number_nl": {
+      "type": "text",
+      "label_i18n": { "de": "WEEE-Nr. (NL)", "en": "WEEE number (NL)", "tr": "WEEE no. (NL)", "fr": "N° DEEE (NL)", "es": "N.º RAEE (NL)", "it": "N. RAEE (NL)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Niederländische WEEE-Registrierung.",
+        "en": "Dutch WEEE registration.",
+        "tr": "Hollanda WEEE kaydı.",
+        "fr": "Enregistrement DEEE néerlandais.",
+        "es": "Registro RAEE neerlandés.",
+        "it": "Registrazione RAEE olandese."
+      }
+    },
+    "weee_number_se": {
+      "type": "text",
+      "label_i18n": { "de": "WEEE-Nr. (SE)", "en": "WEEE number (SE)", "tr": "WEEE no. (SE)", "fr": "N° DEEE (SE)", "es": "N.º RAEE (SE)", "it": "N. RAEE (SE)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Schwedische WEEE-Registrierung.",
+        "en": "Swedish WEEE registration.",
+        "tr": "İsveç WEEE kaydı.",
+        "fr": "Enregistrement DEEE suédois.",
+        "es": "Registro RAEE sueco.",
+        "it": "Registrazione RAEE svedese."
+      }
+    },
+    "bdo_number": {
+      "type": "text",
+      "label_i18n": { "de": "BDO-Nummer (PL)", "en": "BDO number (PL)", "tr": "BDO numarası (PL)", "fr": "N° BDO (PL)", "es": "N.º BDO (PL)", "it": "N. BDO (PL)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Polnische BDO-Registrierungsnummer.",
+        "en": "Polish BDO registration number.",
+        "tr": "Polonya BDO kayıt numarası.",
+        "fr": "Numéro d'enregistrement BDO polonais.",
+        "es": "Número de registro BDO polaco.",
+        "it": "Numero di registrazione BDO polacco."
+      }
+    },
+    "packaging_register_it": {
+      "type": "text",
+      "label_i18n": { "de": "Verpackungsregister (IT)", "en": "Packaging register (IT)", "tr": "Ambalaj kaydı (IT)", "fr": "Registre emballages (IT)", "es": "Registro envases (IT)", "it": "Registro imballaggi (IT)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: italienische Verpackungsregistrierung (z. B. CONAI).",
+        "en": "Optional: Italian packaging registration (e.g. CONAI).",
+        "tr": "İsteğe bağlı: İtalyan ambalaj kaydı (örn. CONAI).",
+        "fr": "Facultatif : enregistrement emballages italien (ex. CONAI).",
+        "es": "Opcional: registro de envases italiano (p. ej. CONAI).",
+        "it": "Facoltativo: registrazione imballaggi italiana (es. CONAI)."
+      }
+    },
+    "triman_label_required": {
+      "type": "text",
+      "label_i18n": { "de": "Triman-Hinweis (FR)", "en": "Triman note (FR)", "tr": "Triman notu (FR)", "fr": "Mention Triman (FR)", "es": "Nota Triman (FR)", "it": "Nota Triman (FR)" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Bestätigung/Hinweis zur Triman-Kennzeichnung (Frankreich).",
+        "en": "Optional: Confirmation/note for Triman labelling (France).",
+        "tr": "İsteğe bağlı: Triman etiketlemesi için onay/not (Fransa).",
+        "fr": "Facultatif : confirmation/mention pour le marquage Triman (France).",
+        "es": "Opcional: confirmación/nota del etiquetado Triman (Francia).",
+        "it": "Facoltativo: conferma/nota per l'etichettatura Triman (Francia)."
+      }
+    },
+    "nutri_score": {
+      "type": "text",
+      "label_i18n": { "de": "Nutri-Score", "en": "Nutri-Score", "tr": "Nutri-Score", "fr": "Nutri-Score", "es": "Nutri-Score", "it": "Nutri-Score" },
+      "validation_regex": null,
+      "help_text_i18n": {
+        "de": "Optional: Nutri-Score-Wert (A–E), falls verwendet.",
+        "en": "Optional: Nutri-Score value (A–E), if used.",
+        "tr": "İsteğe bağlı: Kullanılıyorsa Nutri-Score değeri (A–E).",
+        "fr": "Facultatif : valeur Nutri-Score (A–E), si utilisée.",
+        "es": "Opcional: valor Nutri-Score (A–E), si se usa.",
+        "it": "Facoltativo: valore Nutri-Score (A–E), se usato."
+      }
+    }
   }
 }

@@ -45,16 +45,12 @@ export function getContainerTypes(locale) {
       description: t(loc, "Products from one collection as a carousel", "Bir koleksiyonun ürünlerini karusel olarak gösterir", "Produits d'une collection en carrousel", "Productos de una colección en carrusel", "Prodotti di una collezione in carosello", "Produkte einer Kollektion als Karussell"),
     },
     bestseller_carousel: {
-      label: t(loc, "Category carousel (Bestseller / Sale)", "Kategori Karuseli (Bestseller / İndirim)", "Carrousel catégorie (Bestseller / Soldes)", "Carrusel de categoría (Más vendidos / Rebajas)", "Carosello categoria (Bestseller / Saldi)", "Kategorie-Karussell (Bestseller / Sale)"),
-      description: t(loc, "One category's products — either ranked by sales (Bestseller) or filtered to discounted items (Sale), pick the mode below", "Bir kategorinin ürünleri — ya satışa göre sıralanır (Bestseller) ya da indirimli ürünlerle filtrelenir (İndirim), aşağıdan modu seçin", "Produits d'une catégorie — classés par ventes (Bestseller) ou filtrés sur les articles en solde (Soldes), choisissez le mode ci-dessous", "Productos de una categoría — clasificados por ventas (Más vendidos) o filtrados a artículos rebajados (Rebajas), elige el modo abajo", "Prodotti di una categoria — classificati per vendite (Bestseller) o filtrati sugli articoli scontati (Saldi), scegli la modalità sotto", "Produkte einer Kategorie — entweder nach Verkäufen sortiert (Bestseller) oder auf reduzierte Artikel gefiltert (Sale), Modus unten wählen"),
+      label: t(loc, "Seller carousel (legacy)", "Satici Karuseli (eski)", "Carrousel vendeurs (ancien)", "Carrusel vendedores (legado)", "Carosello venditori (legacy)", "Haendler-Karussell (alt)"),
+      description: t(loc, "Legacy - prefer Brands directory", "Eski tip - Marka Dizini kullanin", "Legacy - preferer Annuaire marques", "Legado - preferir Directorio de marcas", "Legacy - preferire Elenco brand", "Alt - besser Marken-Verzeichnis"),
     },
-    category_sidebar: {
-      label: t(loc, "Category sidebar", "Kategori Kenar Çubuğu", "Barre latérale catégories", "Barra lateral de categorías", "Barra laterale categorie", "Kategorie-Seitenleiste"),
-      description: t(loc, "Desktop sidebar of category links, auto-built from this page's category carousels — only categories with products show up", "Bu sayfadaki kategori karusellerinden otomatik oluşan masaüstü kenar çubuğu — yalnızca ürünü olan kategoriler görünür", "Barre latérale desktop de liens catégories, générée automatiquement à partir des carrousels de cette page", "Barra lateral de escritorio con enlaces de categoría, generada automáticamente a partir de los carruseles de esta página", "Barra laterale desktop di link categoria, generata automaticamente dai caroselli di questa pagina", "Desktop-Seitenleiste mit Kategorie-Links, automatisch aus den Kategorie-Karussells dieser Seite erzeugt — nur Kategorien mit Produkten erscheinen"),
-    },
-    seller_carousel: {
-      label: t(loc, "Seller carousel", "Satıcı Karuseli", "Carrousel vendeurs", "Carrusel vendedores", "Carosello venditori", "Händler-Karussell"),
-      description: t(loc, "Registered sellers as clickable shop cards", "Kayıtlı satıcıları tıklanabilir mağaza kartları olarak gösterir", "Vendeurs enregistrés comme cartes de boutique", "Vendedores registrados como tarjetas de tienda", "Venditori registrati come schede negozio", "Registrierte Händler als anklickbare Shop-Karten"),
+    brands_directory: {
+      label: t(loc, "Brands directory", "Marka Dizini", "Annuaire des marques", "Directorio de marcas", "Elenco brand", "Marken-Verzeichnis"),
+      description: t(loc, "A-Z filter, search and brand cards in a grid (e.g. 5x10)", "A-Z filtre, arama ve marka kartlari izgara (ornegin 5x10)", "Filtre A-Z, recherche et cartes marques en grille", "Filtro A-Z, busqueda y tarjetas de marca en cuadricula", "Filtro A-Z, ricerca e schede brand a griglia", "A-Z-Filter, Suchleiste und Markenkarten im Raster (z. B. 5x10)"),
     },
     collections_carousel: {
       label: t(loc, "Collections carousel", "Koleksiyonlar Karuseli", "Carrousel collections", "Carrusel de colecciones", "Carosello collezioni", "Kollektionen-Karussell"),
@@ -170,7 +166,7 @@ export function getLandingEditorCopy(locale) {
       "Steuert die Checkbox-Filter-Seitenleiste auf Kategorie- und Kollektionsseiten. Facetten aktualisieren sich anhand der Produkte auf der Seite. Titel-Typografie: Stile → Katalog-Navigation → Sidebar-Navigation."
     ),
     filterCheckboxSize: x("Filter checkbox size (px)", "Filtre onay kutusu boyutu (px)", "Taille des cases (px)", "Tamaño de casillas (px)", "Dimensione checkbox (px)", "Filter-Checkbox-Größe (px)"),
-    filterCheckboxSizeHelp: x("Default 10. Used on category and collection filter sidebars.", "Varsayılan 10. Kategori ve koleksiyon filtre kenar çubuklarında kullanılır.", "Défaut 10.", "Predeterminado 10.", "Predefinito 10.", "Standard 10. Gilt für Kategorie- und Kollektions-Filterleisten."),
+    filterCheckboxSizeHelp: x("Default 10 (8–14). Used on category and collection filter sidebars.", "Varsayılan 10 (8–14). Kategori ve koleksiyon filtre kenar çubuklarında kullanılır.", "Défaut 10 (8–14).", "Predeterminado 10 (8–14).", "Predefinito 10 (8–14).", "Standard 10 (8–14). Gilt für Kategorie- und Kollektions-Filterleisten."),
     showProductFilterBar: x("Show product filter sidebar on this page", "Bu sayfada ürün filtre kenar çubuğunu göster", "Afficher la barre de filtres produits", "Mostrar barra de filtros de producto", "Mostra sidebar filtri prodotto", "Produkt-Filterleiste auf dieser Seite anzeigen"),
     showProductFilterBarHelp: x(
       "When enabled, listing templates for this page can show the product facet filter. Facets are built from products currently listed.",

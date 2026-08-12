@@ -186,13 +186,21 @@ export const DEFAULT_SHOP_STYLES = {
       line_height: "1.35",
       color: "#374151",
     }),
-    /** Filter-Seitenleiste Gruppen-Titel (Facetten) */
+    /** Filter-Seitenleiste: Gruppen-Titel (Facetten) + Abschnitts-Titel */
     sidebar_nav: TYPO_LEVEL({
       font_size: "13px",
       font_weight: "700",
       line_height: "1.3",
       letter_spacing: "0.02em",
       color: "#111827",
+    }),
+    /** Filter-Seitenleiste: Subkategorie-Links + Facetten-Optionen */
+    sidebar_submenu: TYPO_LEVEL({
+      font_size: "13px",
+      font_weight: "400",
+      line_height: "1.35",
+      letter_spacing: "0",
+      color: "#4b5563",
     }),
   },
   scrollUpButton: {
