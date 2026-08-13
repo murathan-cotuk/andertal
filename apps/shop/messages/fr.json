@@ -212,7 +212,7 @@
     "freeShipping": "Gratuit",
     "discountLabel": "Remise",
     "netLabel": "Net",
-    "vatLabel": "TVA (19 %)",
+    "vatLabel": "TVA ({rate} %)",
     "shippingAddressHeading": "Adresse de livraison",
     "deliveredOn": "Livré le : {date}",
     "orderInfoHeading": "Infos commande",

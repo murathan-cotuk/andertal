@@ -1,9 +1,12 @@
 'use strict'
 const { Router } = require('express')
-const { resolveOrderPaidTotalCents } = require('../order-money')
+const { resolveOrderPaidTotalCents, orderBonusDiscountCents } = require('../order-money')
 const { renderPeriodCommissionInvoiceDocument } = require('../order-pdf-layout')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 const { resolveSellerScope, sqlOrderOwnedBySeller } = require('../seller-scope')
+const { salesInvoiceVat } = require('../goods-vat')
+
+const PLATFORM_VAT_PERCENT = Number(process.env.PLATFORM_VAT_PERCENT || '0')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -66,7 +69,9 @@ module.exports = function createTransactionsRouter({
           ? `LEFT JOIN seller_users s ON s.seller_id = CASE WHEN o.seller_id IS NOT NULL AND o.seller_id != 'default' THEN o.seller_id ELSE $${sellerParamNum}::varchar END`
           : `LEFT JOIN seller_users s ON s.seller_id = o.seller_id`
         const r = await client.query(
-          `SELECT o.id, o.order_number, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
+          `SELECT o.id, o.order_number, o.seller_id, o.customer_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
+                  o.coupon_discount_cents, o.country, o.bonus_points_redeemed,
+                  COALESCE(o.platform_bonus_funding_cents, 0)::bigint AS platform_bonus_funding_cents,
                   o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
                   o.stripe_transfer_status, o.stripe_transfer_id, o.stripe_transfer_error, o.stripe_transfer_at,
                   o.payment_intent_id, COALESCE(o.checkout_payment_kind, 'stripe') AS checkout_payment_kind,
@@ -74,7 +79,8 @@ module.exports = function createTransactionsRouter({
                   COALESCE(o.seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents,
                   o.stripe_payout_status, o.stripe_payout_id, o.stripe_account_id,
                   o.first_name, o.last_name, o.email, o.currency,
-                  s.store_name, s.commission_rate, s.iban,
+                  s.store_name, s.commission_rate, s.iban, s.vat_id,
+                  COALESCE((SELECT SUM(rr.refund_amount_cents) FROM store_returns rr WHERE rr.order_id = o.id), 0)::bigint AS refund_cents,
                   (o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days') AS payout_eligible
            FROM store_orders o
            ${sellerJoin}
@@ -143,11 +149,20 @@ module.exports = function createTransactionsRouter({
           const payout = isSharedForeignOrder
             ? Math.max(0, sellerBasis - commission)
             : (Number.isFinite(storedNet) && storedNet >= 0 ? storedNet : Math.max(0, sellerBasis - commission))
+          // Bonus points are platform-funded, not a seller price cut — the real (legal) order
+          // value is the paid amount plus the bonus-funded portion (BonusPunkte.md §3.5/§3.6).
+          const bonusRedeemedCents = orderBonusDiscountCents(row)
+          const orderValueCents = Math.max(0, customerPaid + bonusRedeemedCents)
+          const sellerVatId = row.vat_id ? String(row.vat_id).trim() : ''
+          const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents })
+          const commissionVatCents = PLATFORM_VAT_PERCENT > 0 ? Math.round(commission * PLATFORM_VAT_PERCENT / 100) : 0
           return {
             id: row.id,
+            order_id: row.id,
             type: 'order',
             order_number: row.order_number,
             seller_id: row.seller_id,
+            customer_id: row.customer_id || null,
             store_name: row.store_name || row.seller_id,
             total_cents: sellerBasis,
             customer_paid_cents: customerPaid,
@@ -155,10 +170,22 @@ module.exports = function createTransactionsRouter({
             discount_cents: row.discount_cents || 0,
             commission_rate: commRate,
             commission_cents: commission,
+            commission_vat_cents: commissionVatCents,
             payout_cents: payout,
             checkout_payment_kind: row.checkout_payment_kind || 'stripe',
             payment_intent_id: row.payment_intent_id || null,
+            stripe_transfer_or_payout_id: row.stripe_transfer_id || row.stripe_payout_id || null,
             settlement_breakdown: buildOrderSettlementBreakdown(row, commRate),
+            gross_sale_cents: sellerBasis,
+            bonus_earned_points: Math.ceil(Number(customerPaid || 0) / 100),
+            bonus_redeemed_cents: bonusRedeemedCents,
+            platform_bonus_funding_cents: Number(row.platform_bonus_funding_cents || 0),
+            refund_cents: Number(row.refund_cents || 0),
+            destination_country: row.country ? String(row.country).trim().toUpperCase() : null,
+            vat_scheme: goodsVat.exempt ? 'kleinunternehmer_exempt' : 'destination_country_vat',
+            goods_vat_rate_percent: goodsVat.exempt ? 0 : goodsVat.ratePercent,
+            goods_net_cents: goodsVat.netCents,
+            goods_vat_cents: goodsVat.vatCents,
             payout_eligible: row.payout_eligible === true || row.payout_eligible === 't',
             payment_status: row.payment_status || 'offen',
             delivery_status: row.delivery_status || null,

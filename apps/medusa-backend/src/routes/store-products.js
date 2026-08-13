@@ -400,7 +400,9 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   const ownRawMediaList = Array.isArray(media) ? media : (typeof media === 'string' && media ? [media] : [])
   if (ownRawMediaList.length === 0 && (meta.image_url || meta.image)) ownRawMediaList.push(meta.image_url || meta.image)
   const country = String(marketCountry || 'DE').toUpperCase()
-  const parentPriceByCountry = meta.prices && typeof meta.prices === 'object' ? meta.prices[country] : null
+  const parentPriceByCountry = (meta.prices && typeof meta.prices === 'object')
+    ? (meta.prices[country] || meta.prices.DE || null)
+    : null
   const priceCents = parentPriceByCountry && parentPriceByCountry.brutto_cents != null
     ? Number(parentPriceByCountry.brutto_cents)
     : (p.price != null ? Math.round(Number(p.price) * 100) : 0)
@@ -409,7 +411,9 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   const variants = rawVariants.length > 0
     ? rawVariants.map((v, i) => {
         const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
-        const vPriceByCountry = vMeta.prices && typeof vMeta.prices === 'object' ? vMeta.prices[country] : null
+        const vPriceByCountry = (vMeta.prices && typeof vMeta.prices === 'object')
+          ? (vMeta.prices[country] || vMeta.prices.DE || null)
+          : null
         const vPriceCents = vPriceByCountry && vPriceByCountry.brutto_cents != null
           ? Number(vPriceByCountry.brutto_cents)
           : (v.price_cents != null ? Number(v.price_cents) : (v.price != null ? Math.round(Number(v.price) * 100) : priceCents))

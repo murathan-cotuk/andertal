@@ -210,10 +210,18 @@ const adminHubReturnPATCH = async (req, res) => {
         `UPDATE store_orders SET order_status = 'refunded', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
         [id]
       ).catch(() => {})
-      // Auto-reverse bonus points on refund
+      // Auto-reverse bonus points on refund, proportional to how much of the order this specific
+      // return actually refunded (BonusPunkte.md §3.4). Idempotency is scoped to THIS return
+      // (return_id), not the whole order, so a second/third partial refund on the same order still
+      // gets its own reversal instead of being silently skipped because *some* return already ran.
       try {
         const retRow = await client.query(
-          `SELECT r.order_id, o.customer_id, o.order_number, COALESCE(o.bonus_points_redeemed, 0)::int AS bonus_points_redeemed
+          `SELECT r.order_id, r.refund_amount_cents, o.customer_id, o.order_number,
+                  COALESCE(o.bonus_points_redeemed, 0)::int AS bonus_points_redeemed,
+                  COALESCE(o.subtotal_cents, 0)::int AS subtotal_cents,
+                  COALESCE(o.shipping_cents, 0)::int AS shipping_cents,
+                  COALESCE(o.discount_cents, 0)::int AS discount_cents,
+                  o.total_cents AS order_total_cents
            FROM store_returns r
            LEFT JOIN store_orders o ON o.id = r.order_id
            WHERE r.id = $1::uuid`,
@@ -222,39 +230,53 @@ const adminHubReturnPATCH = async (req, res) => {
         const rr = retRow.rows[0]
         if (rr?.customer_id && rr?.order_id) {
           const alreadyEarnedDone = await client.query(
-            `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return_earn' LIMIT 1`,
-            [rr.order_id]
+            `SELECT id FROM store_customer_bonus_ledger WHERE return_id = $1::uuid AND source = 'order_return_earn' LIMIT 1`,
+            [id]
           )
           const alreadyRedeemDone = await client.query(
-            `SELECT id FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_return_redeem' LIMIT 1`,
-            [rr.order_id]
+            `SELECT id FROM store_customer_bonus_ledger WHERE return_id = $1::uuid AND source = 'order_return_redeem' LIMIT 1`,
+            [id]
           )
-          if (!alreadyEarnedDone.rows.length || !alreadyRedeemDone.rows.length) {
-            const earned = await client.query(
-              `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_earn'`,
-              [rr.order_id]
-            )
-            const earnedPts = Number(earned.rows[0]?.total || 0)
-            const redeemed = await client.query(
-              `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_redeem'`,
-              [rr.order_id]
-            )
-            const redeemedPts = Number(redeemed.rows[0]?.total || 0)
-            if (earnedPts > 0 && !alreadyEarnedDone.rows.length) {
-              await appendBonusLedger(client, {
-                customerId: rr.customer_id, pointsDelta: -earnedPts,
-                description: `Retoure Bestellung #${rr.order_number} — Punkte zurückgebucht (−${earnedPts} Punkte)`,
-                source: 'order_return_earn', orderId: rr.order_id,
-              })
+          // orderPaidTotalCents — same computation as order-money.js's resolveOrderPaidTotalCents,
+          // duplicated here (small pure calc) rather than requiring store-checkout.js's whole
+          // route module just for this one helper.
+          const orderPaidTotalCents = Math.max(
+            0,
+            (Number(rr.subtotal_cents) + Number(rr.shipping_cents)) - Number(rr.discount_cents),
+          ) || Math.max(0, Number(rr.order_total_cents) || 0)
+          const thisRefundCents = Math.max(0, Number(rr.refund_amount_cents) || 0)
+          // Ratio of THIS refund against what the customer actually paid. Clamped to [0,1] — a
+          // ratio of 1 (full refund) reproduces the pre-§3.4 full-reversal behavior exactly.
+          const refundRatio = orderPaidTotalCents > 0
+            ? Math.min(1, thisRefundCents / orderPaidTotalCents)
+            : 0
+
+          if (refundRatio > 0) {
+            if (!alreadyEarnedDone.rows.length) {
+              const earned = await client.query(
+                `SELECT COALESCE(SUM(points_delta), 0)::int AS total FROM store_customer_bonus_ledger WHERE order_id = $1::uuid AND source = 'order_earn'`,
+                [rr.order_id]
+              )
+              const earnedPts = Number(earned.rows[0]?.total || 0)
+              const earnedReversal = Math.round(earnedPts * refundRatio)
+              if (earnedReversal > 0) {
+                await appendBonusLedger(client, {
+                  customerId: rr.customer_id, pointsDelta: -earnedReversal,
+                  description: `Retoure Bestellung #${rr.order_number} — Punkte zurückgebucht (−${earnedReversal} Punkte, ${Math.round(refundRatio * 100)}% der Bestellung)`,
+                  source: 'order_return_earn', orderId: rr.order_id, returnId: id,
+                })
+              }
             }
-            const redeemedFromOrder = Number(rr.bonus_points_redeemed || 0)
-            const pointsToGiveBack = redeemedPts < 0 ? -redeemedPts : redeemedFromOrder
-            if (pointsToGiveBack > 0 && !alreadyRedeemDone.rows.length) {
-              await appendBonusLedger(client, {
-                customerId: rr.customer_id, pointsDelta: pointsToGiveBack,
-                description: `Retoure Bestellung #${rr.order_number} — eingelöste Punkte zurückgegeben (+${pointsToGiveBack} Punkte)`,
-                source: 'order_return_redeem', orderId: rr.order_id,
-              })
+            if (!alreadyRedeemDone.rows.length) {
+              const redeemedFromOrder = Number(rr.bonus_points_redeemed || 0)
+              const pointsToGiveBack = Math.round(redeemedFromOrder * refundRatio)
+              if (pointsToGiveBack > 0) {
+                await appendBonusLedger(client, {
+                  customerId: rr.customer_id, pointsDelta: pointsToGiveBack,
+                  description: `Retoure Bestellung #${rr.order_number} — eingelöste Punkte zurückgegeben (+${pointsToGiveBack} Punkte, ${Math.round(refundRatio * 100)}% der Bestellung)`,
+                  source: 'order_return_redeem', orderId: rr.order_id, returnId: id,
+                })
+              }
             }
           }
         }

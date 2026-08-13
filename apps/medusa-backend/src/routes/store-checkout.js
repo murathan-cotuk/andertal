@@ -1,6 +1,6 @@
 'use strict'
 const { Router } = require('express')
-const { resolveOrderPaidTotalCents } = require('../order-money')
+const { resolveOrderPaidTotalCents, orderBonusDiscountCents, orderCouponDiscountCents } = require('../order-money')
 const { loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform, resolveStripePublishableFromPlatform, paymentMethodTypesFromPlatformRow } = require('./platform-checkout')
 const { getBestsellerProductIds, mapAdminHubToStoreProduct } = require('./store-products')
 const { getAdminHubProductByIdOrHandleDb } = require('./admin-products')
@@ -12,6 +12,7 @@ const { renderInvoicePdfDocument, renderRetourenscheinPdfDocument, querySellerIn
 const { getOrderPdfFilename } = require('../order-pdf-i18n')
 const { resolveLocaleFromCountry } = require('../locale-from-country')
 const { createReturnLabelForOrder } = require('../return-label')
+const { pickCountryMerchandiseCents, normalizeCountryCode } = require('../goods-vat')
 
 const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
   const tk = String(triggerKey || '').trim()
@@ -372,7 +373,16 @@ const resolvePlatformApplicationFeeCents = (orderRow, commissionRate) => {
   return platformCommissionCentsFromMerchandise(orderRow, commissionRate)
 }
 
-/** Einheitliche API-Aufschlüsselung für Shop / Seller / Admin (kein Stripe-Geld bei platform_loyalty). */
+/**
+ * Einheitliche API-Aufschlüsselung für Shop / Seller / Admin (kein Stripe-Geld bei platform_loyalty).
+ *
+ * `platform_subsidy_cents` mixes bonus + coupon (kept for backward compat with existing callers —
+ * do not remove). `bonus_redeemed_cents` / `coupon_discount_cents` / `platform_bonus_funding_cents`
+ * below are the disambiguated fields (BonusPunkte.md §3.1) — prefer these for anything new.
+ *
+ * `goods_vat_rate_percent` / `goods_vat_cents` / `vat_scheme` are null until §3.10's per-order VAT
+ * columns exist — do NOT default them to 19%, that reintroduces the exact bug §3.10 documents.
+ */
 const buildOrderSettlementBreakdown = (orderRow, commissionRateFallback = 0.12) => {
   const sub = sellerOrderRevenueBasisCents(orderRow)
   const ship = Math.max(0, Number(orderRow.shipping_cents || 0))
@@ -387,6 +397,14 @@ const buildOrderSettlementBreakdown = (orderRow, commissionRateFallback = 0.12) 
   const kind = String(orderRow.checkout_payment_kind || 'stripe').trim() || 'stripe'
   const stripeCharged = paid > 0 && kind === 'stripe'
   const platformSubsidy = Math.max(0, sub + ship - paid)
+  const bonusRedeemed = orderBonusDiscountCents(orderRow)
+  const couponDiscount = orderCouponDiscountCents(orderRow)
+  const destinationCountry = orderRow.country ? String(orderRow.country).trim().toUpperCase() : null
+  const goodsVatRatePercent =
+    orderRow.goods_vat_rate_percent != null ? Number(orderRow.goods_vat_rate_percent) : null
+  const goodsVatCents =
+    orderRow.goods_vat_cents != null ? Math.max(0, Number(orderRow.goods_vat_cents)) : null
+  const vatScheme = orderRow.vat_scheme || null
   return {
     checkout_payment_kind: kind,
     merchandise_subtotal_cents: sub,
@@ -397,6 +415,14 @@ const buildOrderSettlementBreakdown = (orderRow, commissionRateFallback = 0.12) 
     platform_subsidy_cents: platformSubsidy,
     platform_commission_cents: commission,
     seller_net_merchandise_cents: sellerNet,
+    // §3.1 disambiguated fields:
+    bonus_redeemed_cents: bonusRedeemed,
+    coupon_discount_cents: couponDiscount,
+    platform_bonus_funding_cents: bonusRedeemed,
+    destination_country: destinationCountry,
+    goods_vat_rate_percent: goodsVatRatePercent,
+    goods_vat_cents: goodsVatCents,
+    vat_scheme: vatScheme,
   }
 }
 
@@ -511,7 +537,7 @@ const reconcileCartCheckoutFromPaymentIntent = async (client, cartId, cart, pi) 
 
 /**
  * @param {import('pg').Client} client
- * @param {{ customerId: string, pointsDelta: number, description: string, source?: string, orderId?: string|null, occurredAt?: string|Date|null, skipBalanceUpdate?: boolean }} opts
+ * @param {{ customerId: string, pointsDelta: number, description: string, source?: string, orderId?: string|null, returnId?: string|null, occurredAt?: string|Date|null, skipBalanceUpdate?: boolean }} opts
  */
 const appendBonusLedger = async (client, opts) => {
   const {
@@ -520,15 +546,16 @@ const appendBonusLedger = async (client, opts) => {
     description,
     source = 'manual',
     orderId = null,
+    returnId = null,
     occurredAt = null,
     skipBalanceUpdate = false,
   } = opts
   if (!customerId || !Number.isFinite(Number(pointsDelta))) return
   const at = occurredAt ? new Date(occurredAt).toISOString() : null
   await client.query(
-    `INSERT INTO store_customer_bonus_ledger (customer_id, occurred_at, points_delta, description, source, order_id)
-     VALUES ($1::uuid, COALESCE($2::timestamptz, NOW()), $3, $4, $5, $6::uuid)`,
-    [customerId, at, Number(pointsDelta), String(description || '').trim() || '—', String(source).slice(0, 40), orderId || null],
+    `INSERT INTO store_customer_bonus_ledger (customer_id, occurred_at, points_delta, description, source, order_id, return_id)
+     VALUES ($1::uuid, COALESCE($2::timestamptz, NOW()), $3, $4, $5, $6::uuid, $7::uuid)`,
+    [customerId, at, Number(pointsDelta), String(description || '').trim() || '—', String(source).slice(0, 40), orderId || null, returnId || null],
   )
   if (!skipBalanceUpdate) {
     await client.query(
@@ -763,6 +790,7 @@ const storeCartLineItemsPOST = async (req, res) => {
     const product = await getAdminHubProductByIdOrHandleDb(productId)
     if (!product) { await client.end(); return res.status(404).json({ message: 'Product not found' }) }
     const meta = product.metadata && typeof product.metadata === 'object' ? product.metadata : {}
+    const destCountry = normalizeCountryCode(body.country || body.shipping_country || body.market_country) || 'DE'
     const priceCents = product.price_cents != null ? Number(product.price_cents) : Math.round(Number(product.price || 0) * 100)
     const rawVariants = Array.isArray(product.variants) && product.variants.length > 0 ? product.variants : []
     let unitPriceCents = priceCents
@@ -797,12 +825,28 @@ const storeCartLineItemsPOST = async (req, res) => {
     // If a specific seller is chosen (Andere Verkäufer / buybox), their listing price wins.
     const productSellerId = product.seller_id ? String(product.seller_id).trim() : ''
     const lineSellerId = chosenSellerId || (productSellerId && productSellerId !== 'default' ? productSellerId : null) || null
+    let listingApplied = false
     if (lineSellerId) {
       const listingRow = await client.query(
         `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status = 'active' LIMIT 1`,
         [String(product.id || productId), lineSellerId]
       )
-      if (listingRow.rows[0]) unitPriceCents = Number(listingRow.rows[0].price_cents)
+      if (listingRow.rows[0]) {
+        unitPriceCents = Number(listingRow.rows[0].price_cents)
+        listingApplied = true
+      }
+    }
+    const variantPrices = rawVariants.length && variantIndex >= 0 && rawVariants[variantIndex]
+      && rawVariants[variantIndex].metadata && typeof rawVariants[variantIndex].metadata === 'object'
+      ? rawVariants[variantIndex].metadata.prices
+      : null
+    const exactCountryPrice = pickCountryMerchandiseCents(variantPrices, destCountry, { fallbackDe: false })
+      || pickCountryMerchandiseCents(meta.prices, destCountry, { fallbackDe: false })
+    if (exactCountryPrice != null) unitPriceCents = exactCountryPrice
+    else if (!listingApplied) {
+      const fallbackPrice = pickCountryMerchandiseCents(variantPrices, destCountry, { fallbackDe: true })
+        || pickCountryMerchandiseCents(meta.prices, destCountry, { fallbackDe: true })
+      if (fallbackPrice != null) unitPriceCents = fallbackPrice
     }
     const sellerForCamp = lineSellerId || ''
     if (sellerForCamp) {
@@ -1297,6 +1341,8 @@ const getOrderWithItems = async (client, orderId) => {
         total_cents: oRow.total_cents,
         shipping_cents: oRow.shipping_cents,
         discount_cents: oRow.discount_cents,
+        coupon_discount_cents: oRow.coupon_discount_cents,
+        country: oRow.country,
         stripe_application_fee_cents: oRow.stripe_application_fee_cents,
         checkout_payment_kind: oRow.checkout_payment_kind,
         seller_net_after_commission_cents: oRow.seller_net_after_commission_cents,
@@ -3632,11 +3678,13 @@ const storeOrdersPOST = async (req, res) => {
          order_status, payment_status, stripe_transfer_status,
          stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
          checkout_payment_kind, seller_net_after_commission_cents,
-         subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency, locale)
+         subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency, locale,
+         platform_bonus_funding_cents)
        VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'offen','bezahlt',
          '${stripeTransferInit}',$33,$23,'pending',
          $24,$25,
-         $26,$27,$28,$29,$30,$31,$32,'eur',$34)
+         $26,$27,$28,$29,$30,$31,$32,'eur',$34,
+         $35)
        RETURNING id, order_number`,
       [cartId, paymentIntentForDb, sellerId, email, first_name, last_name, phone,
        address_line1, address_line2, city, postal_code, country,
@@ -3646,7 +3694,8 @@ const storeOrdersPOST = async (req, res) => {
        checkoutPaymentKind,
        sellerNetMerchandiseCents,
        subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,
-       piStripeAccountId || null, locale]
+       piStripeAccountId || null, locale,
+       discountCentsFromBonusPoints(bonusPointsRedeemed)]
     )
 
     const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null
@@ -3894,3 +3943,5 @@ module.exports.getOrderWithItems = getOrderWithItems
 module.exports.resolveSellerDisplayNameForStripe = resolveSellerDisplayNameForStripe
 module.exports.truncateForStripeDescription = truncateForStripeDescription
 module.exports.computeCartCheckoutMoney = computeCartCheckoutMoney
+module.exports.discountCentsFromBonusPoints = discountCentsFromBonusPoints
+module.exports.clampCartBonusRedemption = clampCartBonusRedemption

@@ -14,6 +14,7 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
+import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, splitInclusiveVat } from "@/lib/goods-vat";
 
 /* ─────────────── Design tokens ─────────────── */
 const T = {
@@ -442,7 +443,8 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
   const subtotal = Number(order.subtotal_cents || 0);
   const shipping = Number(order.shipping_cents || 0);
   const discount = Number(order.discount_cents || 0);
-  const vatAmount = Math.round(total * 19 / 119);
+  const vatRate = getGoodsVatRatePercent(destinationCountryFromOrder(order));
+  const { vatCents: vatAmount } = splitInclusiveVat(Math.max(0, (subtotal || 0) + (shipping || 0) || total), vatRate);
   const orderNum = order.order_number || order.id?.slice(0, 8).toUpperCase();
 
   const activeReturn = returns.find(r => r.status !== "abgelehnt" && r.status !== "abgeschlossen");
@@ -560,7 +562,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 <span style={{ fontSize: 14, fontWeight: 800, color: T.dark, fontFamily: T.font }}>Gesamt</span>
                 <span style={{ fontSize: 14, fontWeight: 800, color: T.dark, fontFamily: T.font }}>{fmtEur(total)}</span>
               </div>
-              <PriceRow label="davon 19% MwSt." value={fmtEur(vatAmount)} muted />
+              <PriceRow label={`davon ${formatVatPercent(vatRate)}% MwSt.`} value={fmtEur(vatAmount)} muted />
             </div>
           </Section>
 

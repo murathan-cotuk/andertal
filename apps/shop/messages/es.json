@@ -212,7 +212,7 @@
     "freeShipping": "Gratis",
     "discountLabel": "Descuento",
     "netLabel": "Neto",
-    "vatLabel": "IVA (19 %)",
+    "vatLabel": "IVA ({rate} %)",
     "shippingAddressHeading": "Dirección de envío",
     "deliveredOn": "Entregado: {date}",
     "orderInfoHeading": "Info del pedido",

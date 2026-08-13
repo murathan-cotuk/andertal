@@ -7,7 +7,6 @@ import { lt } from "@/lib/locale-text";
 import { useRouter } from "@/i18n/navigation";
 import { getUI } from "@/lib/ui-strings";
 import { Modal, BlockStack, TextField, Text, Button, InlineStack } from "@shopify/polaris";
-import { EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { statusLabel } from "@/lib/status-labels";
 import { CustomerFormModal } from "@/components/CustomerFormModal";
@@ -305,11 +304,6 @@ export default function CustomerDetailPage() {
   const [editNotes, setEditNotes] = useState(false);
   const [notesVal, setNotesVal] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
-  const [editBonus, setEditBonus] = useState(false);
-  const [bonusVal, setBonusVal] = useState("");
-  const [savingBonus, setSavingBonus] = useState(false);
-  const [ledgerSaving, setLedgerSaving] = useState(false);
-  const [ledgerEdit, setLedgerEdit] = useState(null);
   const [returnsMap, setReturnsMap] = useState({});
   const [reviews, setReviews] = useState([]);
   const [editCustomerModal, setEditCustomerModal] = useState(false);
@@ -354,6 +348,7 @@ export default function CustomerDetailPage() {
   const orders = customer?.orders || [];
   const discounts = customer?.discounts || [];
   const bonusLedger = Array.isArray(customer?.bonus_ledger) ? customer.bonus_ledger : [];
+  const bonusSummary = customer?.bonus_summary || null;
   const totalSpent = orders.reduce((s, o) => s + Number(o.total_cents || 0), 0);
   const avgOrder = orders.length > 0 ? totalSpent / orders.length : 0;
   const firstOrder = orders.length > 0 ? orders[orders.length - 1]?.created_at : null;
@@ -378,16 +373,10 @@ export default function CustomerDetailPage() {
     setSavingNotes(false);
   };
 
-  const handleSaveBonus = async () => {
-    setSavingBonus(true);
-    try {
-      const client = getMedusaAdminClient();
-      await client.updateCustomer(id, { bonus_points: Number(bonusVal) });
-      setCustomer(c => ({ ...c, bonus_points: Number(bonusVal) }));
-      setEditBonus(false);
-    } catch { }
-    setSavingBonus(false);
-  };
+  // Balance is never set directly (BonusPunkte.md §3.3 — every change must be an audited ledger
+  // row, or the balance and the ledger silently drift apart). The stat tile's "edit" action opens
+  // the ledger "add entry" modal instead; see the ledger card below for the corresponding backend
+  // call (POST .../bonus-ledger, which updates store_customers.bonus_points itself).
 
   const handleDeleteDiscount = async (discountId) => {
     try {
@@ -404,32 +393,11 @@ export default function CustomerDetailPage() {
       bonus_points: res.bonus_points != null ? res.bonus_points : c.bonus_points,
       bonus_ledger: [res.entry, ...(c.bonus_ledger || [])],
     }));
-    setBonusVal(String(res.bonus_points ?? ""));
   };
 
-  const handleSaveLedgerEdit = async () => {
-    if (!ledgerEdit?.id) return;
-    const pts = parseInt(String(ledgerEdit.points_delta).replace(/[^\d-]/g, ""), 10);
-    if (!ledgerEdit.description?.trim() || !Number.isFinite(pts) || pts === 0) return;
-    setLedgerSaving(true);
-    try {
-      const client = getMedusaAdminClient();
-      const res = await client.updateCustomerBonusLedgerEntry(id, ledgerEdit.id, {
-        description: ledgerEdit.description.trim(),
-        points_delta: pts,
-      });
-      if (res?.entry) {
-        setCustomer((c) => ({
-          ...c,
-          bonus_points: res.bonus_points != null ? res.bonus_points : c.bonus_points,
-          bonus_ledger: (c.bonus_ledger || []).map((e) => (e.id === res.entry.id ? res.entry : e)),
-        }));
-        setBonusVal(String(res.bonus_points ?? ""));
-        setLedgerEdit(null);
-      }
-    } catch { }
-    setLedgerSaving(false);
-  };
+  // Bonus-ledger entries are append-only (BonusPunkte.md §3.3) — the backend rejects PATCH/DELETE
+  // outright, so there is no edit handler here. Corrections go through the "add entry" modal above
+  // with an offsetting points_delta (e.g. description "Korrektur").
 
   // --- Billing address: prefer stored customer billing address, fallback to last order billing ---
   const billingFromOrders = orders.find(o => o.billing_address_line1);
@@ -524,7 +492,7 @@ export default function CustomerDetailPage() {
                 { label: ui.totalSpent, value: fmtCents(totalSpent, locale), icon: "💰" },
                 { label: ui.orders, value: orders.length, icon: "📦" },
                 { label: lt(locale, "Avg. order", "Ort. sipariş", "Avg. order", "Avg. order", "Avg. order", "Ø Bestellwert"), value: fmtCents(avgOrder, locale), icon: "📊" },
-                ...(isSuperuser ? [{ label: lt(locale, "Bonus points", "Bonus puanı", "Bonus points", "Bonus points", "Bonus points", "Bonuspunkte"), value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => { setBonusVal(String(customer.bonus_points || 0)); setEditBonus(true); } }] : []),
+                ...(isSuperuser ? [{ label: lt(locale, "Bonus points", "Bonus puanı", "Bonus points", "Bonus points", "Bonus points", "Bonuspunkte"), value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => setShowBonusLedgerModal(true) }] : []),
               ].map((s, i) => (
                 <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -535,25 +503,7 @@ export default function CustomerDetailPage() {
                       </Button>
                     )}
                   </div>
-                  {editBonus && s.editable ? (
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                      <input
-                        type="number"
-                        value={bonusVal}
-                        onChange={e => setBonusVal(e.target.value)}
-                        style={{ width: 70, padding: "3px 6px", border: "1px solid #e5e7eb", borderRadius: 5, fontSize: 13 }}
-                        autoFocus
-                      />
-                      <Button size="micro" variant="primary" onClick={handleSaveBonus} disabled={savingBonus} loading={savingBonus}>
-                        {ui.save}
-                      </Button>
-                      <Button size="micro" onClick={() => setEditBonus(false)}>
-                        {ui.cancel}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>{s.value}</div>
-                  )}
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>{s.value}</div>
                   <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>{s.label}</div>
                 </div>
               ))}
@@ -730,6 +680,22 @@ export default function CustomerDetailPage() {
                 </Button>
               }
             >
+              {bonusSummary && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 14 }}>
+                  {[
+                    { label: lt(locale, "Balance", "Bakiye", "Balance", "Balance", "Balance", "Guthaben"), value: `${bonusSummary.balance_points} Pkt.`, sub: fmtCents(bonusSummary.balance_eur_cents, locale) },
+                    { label: lt(locale, "Earned (total)", "Kazanılan (toplam)", "Earned (total)", "Earned (total)", "Earned (total)", "Verdient (gesamt)"), value: `+${bonusSummary.earned_points} Pkt.`, color: "#065f46" },
+                    { label: lt(locale, "Redeemed (total)", "Kullanılan (toplam)", "Redeemed (total)", "Redeemed (total)", "Redeemed (total)", "Eingelöst (gesamt)"), value: `-${bonusSummary.redeemed_points} Pkt.`, color: "#991b1b" },
+                    { label: lt(locale, "Reversed (net)", "Ters kayıt (net)", "Reversed (net)", "Reversed (net)", "Reversed (net)", "Storniert (netto)"), value: `${bonusSummary.reversed_points > 0 ? "+" : ""}${bonusSummary.reversed_points} Pkt.`, color: bonusSummary.reversed_points >= 0 ? "#065f46" : "#991b1b" },
+                  ].map((s) => (
+                    <div key={s.label} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
+                      <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{s.label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: s.color || "#111827" }}>{s.value}</div>
+                      {s.sub && <div style={{ fontSize: 12, color: "#9ca3af" }}>{s.sub}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
               {bonusLedger.length === 0 ? (
                 <p style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>{lt(locale, "No ledger entries yet.", "Henüz kayıt yok.", "No ledger entries yet.", "No ledger entries yet.", "No ledger entries yet.", "Noch keine Einträge im Verlauf.")}</p>
               ) : (
@@ -740,76 +706,27 @@ export default function CustomerDetailPage() {
                         <th style={{ textAlign: "left", padding: "6px 8px 10px", width: 110 }}>{ui.colDate}</th>
                         <th style={{ textAlign: "left", padding: "6px 8px 10px" }}>{ui.colDescription}</th>
                         <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 100 }}>{lt(locale, "Bonus points", "Bonus puan", "Bonus points", "Bonus points", "Bonus points", "Bonuspunkte")}</th>
-                        <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 1 }} />
                       </tr>
                     </thead>
                     <tbody>
-                      {bonusLedger.map((row) => {
-                        const isEdit = ledgerEdit?.id === row.id;
-                        return (
-                          <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6", verticalAlign: "top" }}>
-                            <td style={{ padding: "10px 8px", whiteSpace: "nowrap", color: "#6b7280", fontSize: 12 }}>
-                              {fmtDateShort(row.occurred_at, locale)}
-                            </td>
-                            <td style={{ padding: "10px 8px", minWidth: 180 }}>
-                              {isEdit ? (
-                                <input
-                                  value={ledgerEdit.description}
-                                  onChange={(e) => setLedgerEdit((le) => ({ ...le, description: e.target.value }))}
-                                  style={{ width: "100%", padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, boxSizing: "border-box" }}
-                                />
-                              ) : (
-                                <div>
-                                  <span style={{ color: "#111827" }}>{row.description}</span>
-                                  {row.source && row.source !== "manual" && (
-                                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{bonusSourceLabel(row.source, locale)}</div>
-                                  )}
-                                </div>
+                      {bonusLedger.map((row) => (
+                        <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6", verticalAlign: "top" }}>
+                          <td style={{ padding: "10px 8px", whiteSpace: "nowrap", color: "#6b7280", fontSize: 12 }}>
+                            {fmtDateShort(row.occurred_at, locale)}
+                          </td>
+                          <td style={{ padding: "10px 8px", minWidth: 180 }}>
+                            <div>
+                              <span style={{ color: "#111827" }}>{row.description}</span>
+                              {row.source && row.source !== "manual" && (
+                                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{bonusSourceLabel(row.source, locale)}</div>
                               )}
-                            </td>
-                            <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700, color: row.points_delta >= 0 ? "#065f46" : "#991b1b" }}>
-                              {isEdit ? (
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  value={ledgerEdit.points_delta}
-                                  onChange={(e) => setLedgerEdit((le) => ({ ...le, points_delta: e.target.value }))}
-                                  style={{ width: 72, padding: "4px 6px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, textAlign: "right" }}
-                                />
-                              ) : (
-                                `${row.points_delta > 0 ? "+" : ""}${row.points_delta}`
-                              )}
-                            </td>
-                            <td style={{ padding: "10px 8px", textAlign: "right", whiteSpace: "nowrap" }}>
-                              {isEdit ? (
-                                <InlineStack gap="200" blockAlign="center">
-                                  <Button size="slim" variant="primary" onClick={handleSaveLedgerEdit} disabled={ledgerSaving} loading={ledgerSaving}>
-                                    {ui.save}
-                                  </Button>
-                                  <Button size="slim" onClick={() => setLedgerEdit(null)}>
-                                    Abbrechen
-                                  </Button>
-                                </InlineStack>
-                              ) : (
-                                <Button
-                                  size="slim"
-                                  variant="plain"
-                                  tone="subdued"
-                                  icon={EditIcon}
-                                  accessibilityLabel={locale === "en" ? "Edit" : locale === "tr" ? "Düzenle" : locale === "fr" ? "Modifier" : locale === "es" ? "Editar" : locale === "it" ? "Modifica" : "Bearbeiten"}
-                                  onClick={() =>
-                                    setLedgerEdit({
-                                      id: row.id,
-                                      description: row.description,
-                                      points_delta: String(row.points_delta),
-                                    })
-                                  }
-                                />
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                            </div>
+                          </td>
+                          <td style={{ padding: "10px 8px", textAlign: "right", fontWeight: 700, color: row.points_delta >= 0 ? "#065f46" : "#991b1b" }}>
+                            {`${row.points_delta > 0 ? "+" : ""}${row.points_delta}`}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

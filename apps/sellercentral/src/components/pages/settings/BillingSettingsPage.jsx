@@ -610,6 +610,12 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(new Set());
+  const [sort, setSort] = useState({ field: "period_start", dir: "desc" });
+  const toggleSort = (field) => {
+    setSort((s) =>
+      s.field === field ? { field, dir: s.dir === "asc" ? "desc" : "asc" } : { field, dir: "desc" }
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -641,11 +647,35 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     return m;
   }, [sellers]);
 
+  const sortedInvoices = useMemo(() => {
+    const list = [...invoices];
+    list.sort((a, b) => {
+      let va, vb;
+      if (sort.field === "period_start") {
+        va = new Date(a.period_start || 0).getTime();
+        vb = new Date(b.period_start || 0).getTime();
+      } else if (sort.field === "store_name") {
+        va = String(a.store_name || a.seller_id || "").toLowerCase();
+        vb = String(b.store_name || b.seller_id || "").toLowerCase();
+      } else if (sort.field === "amount_cents" || sort.field === "total_cents" || sort.field === "status") {
+        va = a[sort.field] ?? "";
+        vb = b[sort.field] ?? "";
+      } else {
+        va = a[sort.field] ?? "";
+        vb = b[sort.field] ?? "";
+      }
+      if (va < vb) return sort.dir === "asc" ? -1 : 1;
+      if (va > vb) return sort.dir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [invoices, sort]);
+
   const { ownInvoices, sellerGroups } = useMemo(() => {
-    if (!isSuperuser) return { ownInvoices: invoices, sellerGroups: [] };
-    const own = invoices.filter((i) => String(i.seller_id || "") === String(mySellerId || ""));
+    if (!isSuperuser) return { ownInvoices: sortedInvoices, sellerGroups: [] };
+    const own = sortedInvoices.filter((i) => String(i.seller_id || "") === String(mySellerId || ""));
     const groups = {};
-    for (const inv of invoices) {
+    for (const inv of sortedInvoices) {
       if (String(inv.seller_id || "") === String(mySellerId || "")) continue;
       const sid = String(inv.seller_id || "unknown");
       if (!groups[sid]) groups[sid] = [];
@@ -655,7 +685,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
       (sellerLabelMap[a] || a).localeCompare(sellerLabelMap[b] || b)
     );
     return { ownInvoices: own, sellerGroups: grouped };
-  }, [invoices, isSuperuser, mySellerId, sellerLabelMap]);
+  }, [sortedInvoices, isSuperuser, mySellerId, sellerLabelMap]);
 
   const toggleOne = (id) => {
     setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -799,22 +829,24 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
             style={{ cursor: "pointer" }}
           />
         </th>
-        {[ui.period, ui.type, ui.amount, "PDF"].map((h, i) => (
-          <th
-            key={h}
-            style={{
-              padding: "10px 12px",
-              textAlign: i === 2 ? "right" : i === 3 ? "center" : "left",
-              fontWeight: 600,
-              color: "#6d7175",
-              background: "#f6f6f7",
-              fontSize: 13,
-              borderBottom: "1px solid #e1e3e5",
-            }}
-          >
-            {h}
-          </th>
-        ))}
+        <ColHeader label={ui.period} field="period_start" sort={sort} onSort={toggleSort} />
+        <th
+          style={{
+            padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175",
+            background: "#f6f6f7", fontSize: 13, borderBottom: "1px solid #e1e3e5",
+          }}
+        >
+          {ui.type}
+        </th>
+        <ColHeader label={ui.amount} field="amount_cents" sort={sort} onSort={toggleSort} align="right" />
+        <th
+          style={{
+            padding: "10px 12px", textAlign: "center", fontWeight: 600, color: "#6d7175",
+            background: "#f6f6f7", fontSize: 13, borderBottom: "1px solid #e1e3e5",
+          }}
+        >
+          PDF
+        </th>
       </tr>
     </thead>
   );
@@ -907,6 +939,130 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   );
 }
 
+/* ─── Tab 3: Plattform / Finanzamt (superuser only) ──────────────────────────────
+ * BonusPunkte.md §3.8: period totals across ALL sellers. These numbers are a straight
+ * sum of Tab 2's per-seller Provisionsrechnungen (seller_payouts rows) — never an
+ * independently recomputed figure — so Tab 2 and Tab 3 can never disagree. */
+function FinanzamtTab() {
+  const localeFromIntl = useLocale();
+  const locale = localeFromIntl || "de";
+  const ui = getUI(locale);
+  const client = getMedusaAdminClient();
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
+  const [data, setData] = useState({ totals: null, sellers: [] });
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const qs = new URLSearchParams();
+      if (periodStart) qs.set("period_start", periodStart);
+      if (periodEnd) qs.set("period_end", periodEnd);
+      const res = await client
+        .request(`/admin-hub/v1/billing/finanzamt${qs.toString() ? `?${qs}` : ""}`)
+        .catch(() => ({ totals: null, sellers: [] }));
+      setData({ totals: res?.totals || null, sellers: res?.sellers || [] });
+    } finally {
+      setLoading(false);
+    }
+  }, [periodStart, periodEnd, client]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const absPdfUrl = (u) => (/^https?:\/\//i.test(u) ? u : `${client.baseURL}${u}`);
+  const t = data.totals;
+
+  return (
+    <BlockStack gap="400">
+      <Card>
+        <InlineStack gap="200" wrap>
+          <TextField
+            label={lt(locale, "From", "Başlangıç", "Du", "Desde", "Da", "Von")}
+            type="date" value={periodStart} onChange={setPeriodStart} autoComplete="off"
+          />
+          <TextField
+            label={lt(locale, "To", "Bitiş", "Au", "Hasta", "A", "Bis")}
+            type="date" value={periodEnd} onChange={setPeriodEnd} autoComplete="off"
+          />
+        </InlineStack>
+      </Card>
+      {loading ? (
+        <Box padding="400">
+          <InlineStack gap="200" blockAlign="center">
+            <Spinner size="small" />
+            <Text as="p" tone="subdued">{ui.loading}</Text>
+          </InlineStack>
+        </Box>
+      ) : !t || data.sellers.length === 0 ? (
+        <Banner tone="info">
+          {lt(locale, "No data for this period.", "Bu dönem için veri yok.", "Aucune donnée pour cette période.", "Sin datos para este período.", "Nessun dato per questo periodo.", "Keine Daten für diesen Zeitraum.")}
+        </Banner>
+      ) : (
+        <>
+          <Card>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+              {[
+                { label: lt(locale, "Gross sale", "Brüt satış", "Vente brute", "Venta bruta", "Vendita lorda", "Brutto Warenverkauf"), value: fmtCents(t.gross_sale_cents, locale) },
+                { label: lt(locale, "Customer paid", "Müşteri ödemesi", "Payé par le client", "Pagado por el cliente", "Pagato dal cliente", "Vom Kunden gezahlt"), value: fmtCents(t.customer_paid_cents, locale) },
+                { label: lt(locale, "Bonus funding", "Bonus finansmanı", "Financement bonus", "Financiación bonus", "Finanziamento bonus", "Andertal-Bonusfinanzierung"), value: fmtCents(t.bonus_funding_cents, locale) },
+                { label: lt(locale, "Commission (net)", "Komisyon (net)", "Commission (net)", "Comisión (neta)", "Commissione (netta)", "Provision (netto)"), value: fmtCents(t.commission_net_cents, locale) },
+                { label: lt(locale, "Commission VAT", "Komisyon KDV", "TVA commission", "IVA comisión", "IVA commissione", "Provision USt"), value: fmtCents(t.commission_vat_cents, locale) },
+                { label: lt(locale, "Seller payouts", "Satıcı ödemeleri", "Paiements vendeurs", "Pagos a vendedores", "Pagamenti venditori", "Auszahlungen an Verkäufer"), value: fmtCents(t.seller_payout_cents, locale) },
+                { label: lt(locale, "Refunds", "İadeler", "Remboursements", "Reembolsos", "Rimborsi", "Erstattungen"), value: fmtCents(t.refund_cents, locale) },
+                { label: lt(locale, "Orders / Sellers", "Sipariş / Satıcı", "Commandes / Vendeurs", "Pedidos / Vendedores", "Ordini / Venditori", "Bestellungen / Verkäufer"), value: `${t.order_count} / ${t.seller_count}` },
+              ].map((s) => (
+                <div key={s.label} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{s.label}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
+                    <th style={{ textAlign: "left", padding: "4px 8px" }}>{lt(locale, "Seller", "Satıcı", "Vendeur", "Vendedor", "Venditore", "Verkäufer")}</th>
+                    <th style={{ textAlign: "left", padding: "4px 8px" }}>{lt(locale, "Period", "Dönem", "Période", "Período", "Periodo", "Zeitraum")}</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px" }}>{lt(locale, "Gross", "Brüt", "Brut", "Bruto", "Lordo", "Brutto")}</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px" }}>{lt(locale, "Commission (+VAT)", "Komisyon (+KDV)", "Commission (+TVA)", "Comisión (+IVA)", "Commissione (+IVA)", "Provision (+USt)")}</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px" }}>{lt(locale, "Payout", "Ödeme", "Paiement", "Pago", "Pagamento", "Auszahlung")}</th>
+                    <th style={{ textAlign: "center", padding: "4px 8px" }}>{lt(locale, "Status", "Durum", "Statut", "Estado", "Stato", "Status")}</th>
+                    <th style={{ textAlign: "center", padding: "4px 8px" }}>PDF</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.sellers.map((row) => (
+                    <tr key={row.payout_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "6px 8px" }}>{row.store_name}</td>
+                      <td style={{ padding: "6px 8px", whiteSpace: "nowrap", color: "#6b7280" }}>{fmtDate(row.period_start, locale)} – {fmtDate(row.period_end, locale)}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right" }}>{fmtCents(row.gross_sale_cents, locale)}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right" }}>{fmtCents(row.commission_net_cents + row.commission_vat_cents, locale)}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600 }}>{fmtCents(row.seller_payout_cents, locale)}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "center" }}>{row.status}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                        <button
+                          type="button"
+                          onClick={() => downloadAuthenticatedPdf(absPdfUrl(row.pdf_url), `commission-invoice-${row.payout_id}.pdf`)}
+                          style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "2px 8px", fontSize: 11, cursor: "pointer", background: "#f9fafb" }}
+                        >
+                          PDF
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
+      )}
+    </BlockStack>
+  );
+}
+
 /* ─── Root Component ─────────────────────────────────────────────────────────── */
 
 export default function BillingSettingsPage() {
@@ -925,6 +1081,9 @@ export default function BillingSettingsPage() {
   const tabs = [
     { id: "order-docs", content: ui.orderDocuments },
     { id: "commission", content: ui.commissionInvoices },
+    ...(isSuperuser
+      ? [{ id: "finanzamt", content: lt(locale, "Platform / Tax office", "Platform / Vergi Dairesi", "Plateforme / Fisc", "Plataforma / Hacienda", "Piattaforma / Fisco", "Plattform / Finanzamt") }]
+      : []),
   ];
 
   return (
@@ -933,9 +1092,11 @@ export default function BillingSettingsPage() {
         <Box paddingBlockStart="400">
           {selectedTab === 0 ? (
             <OrderDocumentsTab isSuperuser={isSuperuser} mySellerId={mySellerId} />
-          ) : (
+          ) : selectedTab === 1 ? (
             <CommissionInvoicesTab isSuperuser={isSuperuser} mySellerId={mySellerId} />
-          )}
+          ) : isSuperuser ? (
+            <FinanzamtTab />
+          ) : null}
         </Box>
       </Tabs>
     </BlockStack>

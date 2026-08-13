@@ -162,9 +162,11 @@ class MedusaClient {
     return res
   }
 
-  async addToCart(cartId, variantId, quantity = 1, sellerId = null, authToken = null) {
+  async addToCart(cartId, variantId, quantity = 1, sellerId = null, authToken = null, country = null) {
     const body = { variant_id: variantId, quantity }
     if (sellerId) body.seller_id = sellerId
+    const cc = String(country || '').trim().toUpperCase().slice(0, 2)
+    if (cc.length === 2) body.country = cc
     const headers = {}
     // Lets the backend backfill Kunde/E-Mail onto the cart for logged-in shoppers as soon as
     // they add an item, instead of only once they reach the checkout form (see abandoned checkouts).

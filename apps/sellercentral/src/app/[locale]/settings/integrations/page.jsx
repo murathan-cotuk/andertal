@@ -632,8 +632,9 @@ function TrustpilotSuperuserSection({ onToast, copy, ui }) {
 
 function maskKey(val) {
   const s = String(val || "");
+  if (!s) return "";
   if (s.length <= 8) return "••••••••";
-  return `${s.slice(0, 4)}${"•".repeat(Math.min(20, s.length - 8))}${s.slice(-4)}`;
+  return `${s.slice(0, 4)}${"•".repeat(Math.min(16, s.length - 8))}${s.slice(-4)}`;
 }
 
 /** Einheitliche Akkordeon-Zeile: Logo | Titel (+ Untertitel) · rechts Chevron */
@@ -829,13 +830,6 @@ function documentSourcesCopy(locale) {
     ),
     goConfigure: t("Connect", "Bağlan", "Connecter", "Conectar", "Collega", "Verbinden"),
   };
-}
-
-function maskKey(val) {
-  const s = String(val || "");
-  if (!s) return "";
-  if (s.length <= 8) return "••••••••";
-  return `${s.slice(0, 4)}${"•".repeat(Math.min(16, s.length - 8))}${s.slice(-4)}`;
 }
 
 function DocumentSourcesSection({ ui, onFindInStore, onConfigureApp }) {

@@ -198,6 +198,7 @@ function renderRetailOrderDocument(doc, {
   invoiceNumber = null,
   carrierName = null,
   trackingNumber = null,
+  goodsVatPercent = null,
 }) {
   const hasUnicode = setupDocFonts(doc)
   const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
@@ -340,6 +341,12 @@ function renderRetailOrderDocument(doc, {
   // ── Products table ─────────────────────────────────────────────────────────
   const tableTop = tableRuleY + 8
   const sellerHasVat = !!(sellerInfo && sellerInfo.vat_id && String(sellerInfo.vat_id).trim())
+  const goodsVatRate = sellerHasVat && goodsVatPercent != null && Number(goodsVatPercent) > 0
+    ? Number(goodsVatPercent)
+    : (sellerHasVat ? 19 : 0)
+  const goodsVatLabel = sellerHasVat && goodsVatRate > 0
+    ? `${Math.abs(goodsVatRate - Math.round(goodsVatRate)) < 1e-9 ? String(Math.round(goodsVatRate)) : String(goodsVatRate)}%`
+    : '—'
   let descW, qtyW, mwstW, unitW, totalW, qtyX, mwstX, unitX, totalX
 
   if (kind === 'invoice') {
@@ -412,7 +419,7 @@ function renderRetailOrderDocument(doc, {
     doc.font(REG).fontSize(9).fillColor('#111827')
       .text(String(qty), qtyX, cellY, { width: qtyW, align: 'right', lineBreak: false })
     if (kind === 'invoice') {
-      doc.text(sellerHasVat ? '19%' : '—', mwstX, cellY, { width: mwstW, align: 'right', lineBreak: false })
+      doc.text(goodsVatLabel, mwstX, cellY, { width: mwstW, align: 'right', lineBreak: false })
       doc.text(pdfCents(unit, locale), unitX, cellY, { width: unitW, align: 'right', lineBreak: false })
       doc.text(pdfCents(lineTotal, locale), totalX, cellY, { width: totalW - 8, align: 'right', lineBreak: false })
     }
@@ -432,7 +439,7 @@ function renderRetailOrderDocument(doc, {
     doc.font(REG).fontSize(9).fillColor('#111827')
       .text(shTitle, left + 8, shRowY + 5, { width: descW - 12, lineBreak: false })
       .text('1', qtyX, shRowY + 5, { width: qtyW, align: 'right', lineBreak: false })
-      .text(sellerHasVat ? '19%' : '—', mwstX, shRowY + 5, { width: mwstW, align: 'right', lineBreak: false })
+      .text(goodsVatLabel, mwstX, shRowY + 5, { width: mwstW, align: 'right', lineBreak: false })
       .text(pdfCents(shippingCents, locale), unitX, shRowY + 5, { width: unitW, align: 'right', lineBreak: false })
       .text(pdfCents(shippingCents, locale), totalX, shRowY + 5, { width: totalW - 8, align: 'right', lineBreak: false })
     doc.moveTo(left, shRowY + shRowH).lineTo(right, shRowY + shRowH)
@@ -1119,7 +1126,17 @@ function renderPeriodCommissionInvoiceDocument(doc, {
   const commissionCents = Number(payout.commission_cents || 0)
   const payoutCents = Number(payout.payout_cents || Math.max(0, grossCents - commissionCents))
   const vatPercent = Number(platformVatPercent || 0)
-  const vatOnCommission = vatPercent > 0 ? Math.round(commissionCents * vatPercent / 100) : 0
+  // BonusPunkte.md §3.8 items 2-3: customer_paid_cents/bonus_funding_cents are period sums stored on
+  // seller_payouts (added alongside total/commission/payout — see server.js migration) — 0 on rows
+  // created before that column existed / not yet re-run through backfill, so both lines stay optional.
+  const customerPaidCents = Number(payout.customer_paid_cents || 0)
+  const bonusFundingCents = Number(payout.bonus_funding_cents || 0)
+  // Prefer the column stored at commission-invoice time; commission_vat_cents may be 0 on older rows
+  // even if PLATFORM_VAT_PERCENT is configured now — fall back to computing it live in that case.
+  const storedCommissionVat = Number(payout.commission_vat_cents || 0)
+  const vatOnCommission = storedCommissionVat > 0
+    ? storedCommissionVat
+    : (vatPercent > 0 ? Math.round(commissionCents * vatPercent / 100) : 0)
   const commissionTotal = commissionCents + vatOnCommission
 
   const sellerInfo = {
@@ -1228,31 +1245,29 @@ function renderPeriodCommissionInvoiceDocument(doc, {
     })
   }
 
-  const dueY = rowY + 14, dueW = 280, dueX = right - dueW
-  doc.rect(dueX, dueY, dueW, 22).fill('#fafafa').stroke(COMMISSION_BORDER)
-  doc.fillColor('#334155').font('Helvetica').fontSize(9)
-  doc.text('Gesamtwarenwert', dueX + 10, dueY + 6, { width: dueW * 0.55 })
-  doc.text(pdfCents(grossCents), dueX + dueW * 0.5, dueY + 6, { width: dueW * 0.45, align: 'right' })
-
-  const dueY2 = dueY + 26
-  doc.rect(dueX, dueY2, dueW, 22).fill('#fafafa').stroke(COMMISSION_BORDER)
-  doc.text(`Provision (${displayRate}%)`, dueX + 10, dueY2 + 6, { width: dueW * 0.55 })
-  doc.text(pdfCents(commissionCents), dueX + dueW * 0.5, dueY2 + 6, { width: dueW * 0.45, align: 'right' })
-
-  let dueY3 = dueY2 + 26
-  if (vatOnCommission > 0) {
-    doc.rect(dueX, dueY3, dueW, 22).fill('#fafafa').stroke(COMMISSION_BORDER)
-    doc.text(`MwSt. ${vatPercent}%`, dueX + 10, dueY3 + 6, { width: dueW * 0.55 })
-    doc.text(pdfCents(vatOnCommission), dueX + dueW * 0.5, dueY3 + 6, { width: dueW * 0.45, align: 'right' })
-    dueY3 += 26
+  const dueW = 280, dueX = right - dueW
+  let dueY = rowY + 14
+  const dueRow = (label, valueCents, opts = {}) => {
+    doc.rect(dueX, dueY, dueW, 22).fill(opts.bg || '#fafafa').stroke(COMMISSION_BORDER)
+    doc.fillColor(opts.color || '#334155').font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(9)
+    doc.text(label, dueX + 10, dueY + 6, { width: dueW * 0.55 })
+    doc.text(pdfCents(valueCents), dueX + dueW * 0.5, dueY + 6, { width: dueW * 0.45, align: 'right' })
+    dueY += 26
   }
 
-  doc.rect(dueX, dueY3, dueW, 28).fill(COMMISSION_ACCENT)
-  doc.fillColor('#fff').font('Helvetica-Bold').fontSize(10)
-  doc.text('PROVISION FAELLIG', dueX + 10, dueY3 + 8, { width: dueW * 0.55 })
-  doc.text(pdfCents(commissionTotal), dueX + dueW * 0.5, dueY3 + 7, { width: dueW * 0.45, align: 'right' })
+  dueRow('Gesamtwarenwert', grossCents)
+  if (customerPaidCents > 0) dueRow('Davon vom Kunden gezahlt', customerPaidCents)
+  if (bonusFundingCents > 0) dueRow('Davon von Andertal (Bonuspunkte)', bonusFundingCents, { color: '#2563eb' })
+  dueRow(`Provision (${displayRate}%)`, commissionCents)
+  if (vatOnCommission > 0) dueRow(`MwSt. ${vatPercent}%`, vatOnCommission)
 
-  const payoutY = dueY3 + 36
+  doc.rect(dueX, dueY, dueW, 28).fill(COMMISSION_ACCENT)
+  doc.fillColor('#fff').font('Helvetica-Bold').fontSize(10)
+  doc.text('PROVISION FAELLIG', dueX + 10, dueY + 8, { width: dueW * 0.55 })
+  doc.text(pdfCents(commissionTotal), dueX + dueW * 0.5, dueY + 7, { width: dueW * 0.45, align: 'right' })
+  dueY += 36
+
+  const payoutY = dueY
   doc.rect(left, payoutY, contentWidth, 26).fill(COMMISSION_BG).stroke(COMMISSION_BORDER)
   doc.fillColor(COMMISSION_ACCENT_DARK).font('Helvetica-Bold').fontSize(10)
   doc.text('AUSZAHLUNG AN VERKAEUFER (NETTO)', left + 10, payoutY + 8, { width: contentWidth * 0.6 })

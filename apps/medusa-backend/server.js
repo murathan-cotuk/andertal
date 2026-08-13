@@ -858,6 +858,10 @@ async function start() {
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS bonus_points_redeemed integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS checkout_payment_kind varchar(32) NOT NULL DEFAULT 'stripe'`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS seller_net_after_commission_cents integer NOT NULL DEFAULT 0`).catch(() => {})
+        // BonusPunkte.md §3.2 — persists the platform-funded discount cents for this order (= bonus
+        // redemption value at order time), independent of coupon_discount_cents, so settlement/export
+        // never has to re-derive "how much of discount_cents was bonus vs coupon" after the fact.
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS platform_bonus_funding_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_shipping_carriers (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1444,6 +1448,14 @@ async function start() {
             updated_at timestamp DEFAULT now()
           );
         `).catch(() => {})
+        // BonusPunkte.md §3.8: per-period breakdown so the Billing "Finanzamt" tab (superuser) can
+        // sum these across sellers and get the exact same numbers as each seller's own Provisionsrechnung
+        // (Tab 3 = Σ of Tab 2 rows), instead of recomputing independently from store_orders.
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS customer_paid_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS bonus_funding_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS commission_vat_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS refund_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS order_count integer NOT NULL DEFAULT 0`).catch(() => {})
         // Non-payout ledger adjustments against a seller's account (e.g. shipping label charges) —
         // netted out of their next payout instead of moving real money at charge time when they
         // have enough unpaid revenue to cover it; otherwise the seller's saved card is charged.
@@ -1513,6 +1525,23 @@ async function start() {
           );
         `).catch(() => {})
         await client.query('CREATE INDEX IF NOT EXISTS idx_store_customer_bonus_ledger_customer ON store_customer_bonus_ledger(customer_id)').catch(() => {})
+        // BonusPunkte.md §3.3 — one ledger row per (order, event-type) for the 4 sources that can only
+        // legitimately happen once per order (earn/redeem at checkout, cancel-earn/cancel-redeem at
+        // cancellation). Prevents a double webhook/double-cancel call from crediting or debiting twice.
+        // order_return_earn/order_return_redeem are excluded here on purpose — a single order can have
+        // several partial refunds over time (§3.4, not yet implemented), each needing its own row; that
+        // work will add a return_id column and its own uniqueness scope instead of reusing this index.
+        // If this fails (existing duplicate rows in production), it silently no-ops like every other
+        // migration in this file — check logs after deploy and clean up duplicates manually if needed.
+        await client.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_bonus_ledger_order_source_unique
+          ON store_customer_bonus_ledger (order_id, source)
+          WHERE order_id IS NOT NULL AND source IN ('order_earn', 'order_redeem', 'order_cancel_earn', 'order_cancel_redeem')
+        `).catch(() => {})
+        // return_id column + its unique index live further down, right after store_returns is
+        // created (search "BonusPunkte.md §3.4") — store_returns doesn't exist yet at this point in
+        // a fresh database, and the FK would silently fail forever under this file's .catch(()=>{})
+        // convention if added here.
         await client.query(`
   CREATE TABLE IF NOT EXISTS store_customers (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -1575,6 +1604,15 @@ async function start() {
     updated_at timestamp DEFAULT now()
   );
 `).catch(() => {})
+        // BonusPunkte.md §3.4 — a single order can have several partial refunds over time, each
+        // needing its own order_return_earn/order_return_redeem reversal row. return_id disambiguates
+        // them (NULL for every pre-existing row and for every non-return source — untouched).
+        await client.query(`ALTER TABLE store_customer_bonus_ledger ADD COLUMN IF NOT EXISTS return_id uuid REFERENCES store_returns(id) ON DELETE SET NULL`).catch(() => {})
+        await client.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_bonus_ledger_return_source_unique
+          ON store_customer_bonus_ledger (return_id, source)
+          WHERE return_id IS NOT NULL AND source IN ('order_return_earn', 'order_return_redeem')
+        `).catch(() => {})
         // Migrations: add refund fields to store_returns
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS refund_amount_cents integer`).catch(() => {})
         await client.query(`ALTER TABLE store_returns ADD COLUMN IF NOT EXISTS refund_status varchar(50)`).catch(() => {})

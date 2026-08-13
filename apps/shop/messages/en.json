@@ -229,7 +229,7 @@
     "freeShipping": "Free",
     "discountLabel": "Discount",
     "netLabel": "Net",
-    "vatLabel": "VAT (19%)",
+    "vatLabel": "VAT ({rate}%)",
     "shippingAddressHeading": "Shipping address",
     "deliveredOn": "Delivered: {date}",
     "orderInfoHeading": "Order info",

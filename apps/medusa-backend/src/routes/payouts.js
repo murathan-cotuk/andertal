@@ -1,6 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { resolveSellerScope } = require('../seller-scope')
+const { resolveOrderPaidTotalCents } = require('../order-money')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -136,47 +137,161 @@ module.exports = function createPayoutsRouter({
       }
     }
 
-    // POST /admin-hub/v1/payouts/backfill — superuser generates missing payout records for all past months
+    // POST /admin-hub/v1/payouts/backfill — superuser generates missing payout records for all past
+    // months. BonusPunkte.md §3.8: every approved seller gets a row per month — even 0 € (period proof)
+    // — not just sellers who happened to have orders; plus the per-period breakdown columns the Billing
+    // "Finanzamt" tab sums (customer_paid/bonus_funding/commission_vat/refund/order_count).
     const adminHubPayoutsBackfillPOST = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const r = await client.query(
-          `SELECT
-             o.seller_id,
-             date_trunc('month', o.created_at)::date AS month_start,
-             (date_trunc('month', o.created_at) + interval '1 month' - interval '1 day')::date AS month_end,
-             COALESCE(SUM(o.subtotal_cents), 0)::bigint AS total_cents,
-             ROUND(COALESCE(SUM(o.subtotal_cents), 0)::numeric * COALESCE(MAX(s.commission_rate), 0.12))::bigint AS commission_cents,
-             ROUND(COALESCE(SUM(o.subtotal_cents), 0)::numeric * (1 - COALESCE(MAX(s.commission_rate), 0.12)))::bigint AS payout_cents
+        const monthsR = await client.query(
+          `SELECT DISTINCT date_trunc('month', o.created_at)::date AS month_start
            FROM store_orders o
-           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
-           WHERE o.payment_status = 'bezahlt'
-             AND date_trunc('month', o.created_at) < date_trunc('month', now())
-             AND o.seller_id IS NOT NULL
-             AND LOWER(COALESCE(s.approval_status, 'approved')) = 'approved'
-           GROUP BY o.seller_id, date_trunc('month', o.created_at)
+           WHERE o.payment_status = 'bezahlt' AND date_trunc('month', o.created_at) < date_trunc('month', now())
            ORDER BY month_start ASC`
         )
+        const approvedR = await client.query(
+          `SELECT seller_id, commission_rate FROM seller_users
+           WHERE LOWER(COALESCE(approval_status, 'approved')) = 'approved' AND seller_id IS NOT NULL`
+        )
+        const approvedSellers = approvedR.rows || []
+        const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
         let created = 0
         let skipped = 0
-        for (const row of r.rows || []) {
-          const ex = await client.query(
-            `SELECT id FROM seller_payouts WHERE seller_id = $1 AND period_start = $2::date AND period_end = $3::date LIMIT 1`,
-            [row.seller_id, row.month_start, row.month_end]
+        for (const { month_start: monthStart } of monthsR.rows || []) {
+          const monthEndR = await client.query(`SELECT (($1::date) + interval '1 month' - interval '1 day')::date AS month_end`, [monthStart])
+          const monthEnd = monthEndR.rows[0].month_end
+          const ordersR = await client.query(
+            `SELECT o.seller_id, o.subtotal_cents, o.shipping_cents, o.discount_cents, o.coupon_discount_cents, o.total_cents,
+                    COALESCE(o.platform_bonus_funding_cents, 0) AS platform_bonus_funding_cents
+             FROM store_orders o
+             WHERE o.payment_status = 'bezahlt'
+               AND o.created_at >= $1::date AND o.created_at < ($1::date + interval '1 month')
+               AND o.seller_id IS NOT NULL`,
+            [monthStart],
           )
-          if (ex.rows.length) { skipped++; continue }
-          await client.query(
-            `INSERT INTO seller_payouts (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents, notes, status)
-             VALUES ($1, $2::date, $3::date, $4, $5, $6, 'Rückwirkend automatisch erstellt', 'offen')`,
-            [row.seller_id, row.month_start, row.month_end, row.total_cents, row.commission_cents, row.payout_cents]
+          const bySeller = new Map()
+          for (const o of ordersR.rows || []) {
+            const sid = String(o.seller_id || '').trim()
+            if (!sid) continue
+            if (!bySeller.has(sid)) bySeller.set(sid, { subtotal: 0, customerPaid: 0, bonusFunding: 0, orderCount: 0 })
+            const agg = bySeller.get(sid)
+            agg.subtotal += Math.max(0, Number(o.subtotal_cents || 0))
+            agg.customerPaid += resolveOrderPaidTotalCents(o)
+            agg.bonusFunding += Number(o.platform_bonus_funding_cents || 0)
+            agg.orderCount += 1
+          }
+          const refundR = await client.query(
+            `SELECT o.seller_id, COALESCE(SUM(rr.refund_amount_cents), 0)::bigint AS refund_cents
+             FROM store_returns rr JOIN store_orders o ON o.id = rr.order_id
+             WHERE rr.created_at >= $1::date AND rr.created_at < ($1::date + interval '1 month') AND o.seller_id IS NOT NULL
+             GROUP BY o.seller_id`,
+            [monthStart],
           )
-          created++
+          const refundBySeller = new Map((refundR.rows || []).map((rr) => [String(rr.seller_id).trim(), Number(rr.refund_cents || 0)]))
+
+          for (const s of approvedSellers) {
+            const sellerId = String(s.seller_id || '').trim()
+            if (!sellerId) continue
+            const ex = await client.query(
+              `SELECT id FROM seller_payouts WHERE seller_id = $1 AND period_start = $2::date AND period_end = $3::date LIMIT 1`,
+              [sellerId, monthStart, monthEnd],
+            )
+            if (ex.rows.length) { skipped++; continue }
+            const agg = bySeller.get(sellerId) || { subtotal: 0, customerPaid: 0, bonusFunding: 0, orderCount: 0 }
+            const rate = Number(s.commission_rate) >= 0 ? Number(s.commission_rate) : 0.12
+            const commissionCents = Math.round(agg.subtotal * rate)
+            const payoutCents = Math.max(0, agg.subtotal - commissionCents)
+            const commissionVatCents = platformVatPercent > 0 ? Math.round(commissionCents * platformVatPercent / 100) : 0
+            const refundCents = refundBySeller.get(sellerId) || 0
+            await client.query(
+              `INSERT INTO seller_payouts
+               (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents,
+                customer_paid_cents, bonus_funding_cents, commission_vat_cents, refund_cents, order_count, notes, status)
+               VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, 'Rückwirkend automatisch erstellt', 'offen')`,
+              [sellerId, monthStart, monthEnd, agg.subtotal, commissionCents, payoutCents,
+                agg.customerPaid, agg.bonusFunding, commissionVatCents, refundCents, agg.orderCount],
+            )
+            created++
+          }
         }
         await client.end()
         res.json({ message: `Backfill abgeschlossen: ${created} erstellt, ${skipped} übersprungen`, created, skipped })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/billing/finanzamt — superuser-only period totals across ALL sellers, built by
+    // summing seller_payouts rows (BonusPunkte.md §3.8: Tab 3 = Σ of Tab 2's per-seller Provisionsrechnungen,
+    // never an independently recomputed number).
+    const adminHubBillingFinanzamtGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { period_start, period_end, seller_id } = req.query
+        const where = []
+        const params = []
+        if (period_start) { params.push(period_start); where.push(`p.period_start >= $${params.length}::date`) }
+        if (period_end) { params.push(period_end); where.push(`p.period_end <= $${params.length}::date`) }
+        if (seller_id) { params.push(seller_id); where.push(`p.seller_id = $${params.length}`) }
+        const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
+        const r = await client.query(
+          `SELECT p.id, p.seller_id, p.period_start, p.period_end, p.status,
+                  p.total_cents, p.commission_cents, p.payout_cents,
+                  p.customer_paid_cents, p.bonus_funding_cents, p.commission_vat_cents, p.refund_cents, p.order_count,
+                  s.store_name
+             FROM seller_payouts p
+             LEFT JOIN seller_users s ON s.seller_id = p.seller_id
+             ${whereClause}
+             ORDER BY p.period_start DESC, s.store_name ASC
+             LIMIT 2000`,
+          params,
+        )
+        await client.end()
+        const rows = r.rows || []
+        const totals = rows.reduce((acc, row) => {
+          acc.gross_sale_cents += Number(row.total_cents || 0)
+          acc.customer_paid_cents += Number(row.customer_paid_cents || 0)
+          acc.bonus_funding_cents += Number(row.bonus_funding_cents || 0)
+          acc.commission_net_cents += Number(row.commission_cents || 0)
+          acc.commission_vat_cents += Number(row.commission_vat_cents || 0)
+          acc.seller_payout_cents += Number(row.payout_cents || 0)
+          acc.refund_cents += Number(row.refund_cents || 0)
+          acc.order_count += Number(row.order_count || 0)
+          return acc
+        }, {
+          gross_sale_cents: 0, customer_paid_cents: 0, bonus_funding_cents: 0, commission_net_cents: 0,
+          commission_vat_cents: 0, seller_payout_cents: 0, refund_cents: 0, order_count: 0,
+        })
+        totals.seller_count = new Set(rows.map((row) => row.seller_id)).size
+        totals.invoice_count = rows.length
+        res.json({
+          totals,
+          sellers: rows.map((row) => ({
+            payout_id: row.id,
+            seller_id: row.seller_id,
+            store_name: row.store_name || row.seller_id,
+            period_start: row.period_start,
+            period_end: row.period_end,
+            status: row.status,
+            gross_sale_cents: Number(row.total_cents || 0),
+            customer_paid_cents: Number(row.customer_paid_cents || 0),
+            bonus_funding_cents: Number(row.bonus_funding_cents || 0),
+            commission_net_cents: Number(row.commission_cents || 0),
+            commission_vat_cents: Number(row.commission_vat_cents || 0),
+            seller_payout_cents: Number(row.payout_cents || 0),
+            refund_cents: Number(row.refund_cents || 0),
+            order_count: Number(row.order_count || 0),
+            pdf_url: `/admin-hub/v1/seller-payouts/${row.id}/pdf`,
+          })),
+        })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -818,6 +933,7 @@ module.exports = function createPayoutsRouter({
   router.patch('/admin-hub/v1/payouts/:id', adminHubPayoutsPATCH)
   router.post('/admin-hub/v1/payouts/mark-paid', adminHubPayoutsMarkPaidPOST)
   router.post('/admin-hub/v1/payouts/backfill', adminHubPayoutsBackfillPOST)
+  router.get('/admin-hub/v1/billing/finanzamt', adminHubBillingFinanzamtGET)
   router.get('/admin-hub/v1/payout-summary', adminHubPayoutSummaryGET)
   router.get('/admin-hub/v1/analytics/marketing', adminHubAnalyticsMarketingGET)
   router.get('/admin-hub/v1/payout-overview', adminHubPayoutOverviewGET)

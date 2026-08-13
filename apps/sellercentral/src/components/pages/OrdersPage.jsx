@@ -53,8 +53,11 @@ const DELIVERY_STATUS_OPTIONS = ["offen", "versendet", "zugestellt"];
 
 const COUNTRY_VAT = {
   DE: { rate: 19, label: "MwSt." }, AT: { rate: 20, label: "MwSt." },
-  CH: { rate: 7.7, label: "MWST" }, FR: { rate: 20, label: "TVA" },
+  CH: { rate: 8.1, label: "MWST" }, FR: { rate: 20, label: "TVA" },
+  BE: { rate: 21, label: "TVA" }, NL: { rate: 21, label: "BTW" },
   IT: { rate: 22, label: "IVA" }, ES: { rate: 21, label: "IVA" },
+  PL: { rate: 23, label: "VAT" }, PT: { rate: 23, label: "IVA" },
+  IE: { rate: 23, label: "VAT" }, LU: { rate: 17, label: "TVA" },
   TR: { rate: 20, label: "KDV" }, GB: { rate: 20, label: "VAT" }, US: { rate: 0, label: "Tax" },
 };
 function getVatInfo(country) {

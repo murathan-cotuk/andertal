@@ -287,6 +287,7 @@ function mapOrderRow(o) {
 function mapTransactionRow(t) {
   return {
     type: str(t.type),
+    order_id: str(t.order_id),
     order_number: t.order_number != null ? String(t.order_number) : "",
     created_at: formatDate(t.created_at),
     payment_status: str(t.payment_status),
@@ -298,6 +299,24 @@ function mapTransactionRow(t) {
     payout_eligible: yesNo(t.payout_eligible),
     store_name: str(t.store_name),
     seller_id: str(t.seller_id),
+    customer_id: str(t.customer_id),
+    destination_country: str(t.destination_country),
+    vat_scheme: str(t.vat_scheme),
+    goods_vat_rate_percent: t.goods_vat_rate_percent != null ? String(t.goods_vat_rate_percent) : "",
+    goods_net_cents: centsToExcelPrice(t.goods_net_cents),
+    goods_vat_cents: centsToExcelPrice(t.goods_vat_cents),
+    gross_sale_cents: centsToExcelPrice(t.gross_sale_cents),
+    commission_net_cents: centsToExcelPrice(t.commission_cents),
+    commission_vat_cents: centsToExcelPrice(t.commission_vat_cents),
+    bonus_earned_points: t.bonus_earned_points != null ? String(t.bonus_earned_points) : "",
+    bonus_redeemed_cents: centsToExcelPrice(t.bonus_redeemed_cents),
+    platform_bonus_funding_cents: centsToExcelPrice(t.platform_bonus_funding_cents),
+    customer_paid_cents: centsToExcelPrice(t.customer_paid_cents),
+    seller_payout_cents: centsToExcelPrice(t.payout_cents),
+    refund_cents: centsToExcelPrice(t.refund_cents),
+    stripe_payment_intent_id: str(t.payment_intent_id),
+    stripe_transfer_or_payout_id: str(t.stripe_transfer_or_payout_id),
+    accounting_category: "",
   };
 }
 

@@ -229,7 +229,7 @@
     "freeShipping": "Kostenlos",
     "discountLabel": "Rabatt",
     "netLabel": "Netto",
-    "vatLabel": "MwSt. (19%)",
+    "vatLabel": "MwSt. ({rate}%)",
     "shippingAddressHeading": "Lieferadresse",
     "deliveredOn": "Zugestellt: {date}",
     "orderInfoHeading": "Bestellinfo",

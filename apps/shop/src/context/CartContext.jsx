@@ -4,8 +4,19 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useLocale } from "next-intl";
 import { getToken } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { CHECKOUT_SHIPPING_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 
 const CART_ID_KEY = "andertal_cart_id";
+const LOCALE_MARKET_COUNTRY = { de: "DE", fr: "FR", it: "IT", es: "ES", en: "DE", tr: "DE" };
+
+function readCartDestinationCountry(locale) {
+  try {
+    const stored = String(window.localStorage.getItem(CHECKOUT_SHIPPING_COUNTRY_LS) || "").trim();
+    if (/^[A-Za-z]{2}$/.test(stored)) return stored.toUpperCase();
+  } catch (_) {}
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  return LOCALE_MARKET_COUNTRY[loc] || "DE";
+}
 
 const CartContext = createContext(null);
 
@@ -24,6 +35,7 @@ function CartLocaleRefetch() {
 }
 
 export function CartProvider({ children }) {
+  const locale = useLocale();
   const [cart, setCart] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -94,14 +106,15 @@ export function CartProvider({ children }) {
         if (!c) return null;
       }
       const authToken = getToken("customer");
-      let res = await client.addToCart(c.id, variantId, quantity, sellerId, authToken);
+      const destCountry = readCartDestinationCountry(locale);
+      let res = await client.addToCart(c.id, variantId, quantity, sellerId, authToken, destCountry);
       // If cart not found (stale localStorage ID), create a new cart and retry once
       if (res?.__error && res?.status === 404) {
         try { window.localStorage.removeItem(CART_ID_KEY); } catch (_) {}
         setCart(null);
         c = await createCart();
         if (!c) return null;
-        res = await client.addToCart(c.id, variantId, quantity, sellerId, authToken);
+        res = await client.addToCart(c.id, variantId, quantity, sellerId, authToken, destCountry);
       }
       // If add explicitly failed, do not open sidebar
       if (res?.__error) return null;
@@ -118,7 +131,7 @@ export function CartProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [cart, createCart]);
+  }, [cart, createCart, locale]);
 
   const updateLineItem = useCallback(async (lineId, quantity) => {
     if (!cart?.id) return null;

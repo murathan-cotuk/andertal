@@ -123,7 +123,10 @@ const adminHubCustomerPATCH = async (req, res) => {
     const { Client } = require('pg')
     client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
     await client.connect()
-    const allowed = ['email','first_name','last_name','phone','account_type','address_line1','address_line2','zip_code','city','country','company_name','vat_number','billing_address_line1','billing_address_line2','billing_zip_code','billing_city','billing_country','gender','birth_date','notes','email_marketing_consent','bonus_points']
+    // bonus_points intentionally excluded (BonusPunkte.md §3.3) — the balance is only ever changed
+    // by an appended store_customer_bonus_ledger row (POST .../bonus-ledger), never overwritten
+    // directly, or the ledger and the balance can silently drift apart with no audit trail.
+    const allowed = ['email','first_name','last_name','phone','account_type','address_line1','address_line2','zip_code','city','country','company_name','vat_number','billing_address_line1','billing_address_line2','billing_zip_code','billing_city','billing_country','gender','birth_date','notes','email_marketing_consent']
     const body = req.body || {}
     const sets = []
     const vals = []
@@ -278,118 +281,27 @@ const adminHubCustomerBonusLedgerPOST = async (req, res) => {
   }
 }
 
+/**
+ * BonusPunkte.md §3.3 — the ledger is append-only: history is never rewritten, so every past
+ * balance is reconstructible from (and provable by) the row sequence alone. A correction is a
+ * new row with a delta, never an edit of what already happened.
+ *
+ * PATCH/DELETE on an existing entry are intentionally disabled (410 Gone, not just hidden in the
+ * UI) — this must hold even if someone calls the API directly. Use POST .../bonus-ledger with a
+ * 'Korrektur' description and the offsetting points_delta instead.
+ */
 const adminHubCustomerBonusLedgerPATCH = async (req, res) => {
   if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  const customerId = (req.params.customerId || '').trim()
-  const entryId = (req.params.entryId || '').trim()
-  if (!customerId || !entryId) return res.status(400).json({ message: 'customerId and entryId required' })
-  const body = req.body || {}
-  let client
-  try {
-    const { Client } = require('pg')
-    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
-    await client.connect()
-    const curR = await client.query(
-      'SELECT id, points_delta, description, occurred_at FROM store_customer_bonus_ledger WHERE id = $1::uuid AND customer_id = $2::uuid',
-      [entryId, customerId],
-    )
-    const cur = curR.rows?.[0]
-    if (!cur) {
-      await client.end()
-      return res.status(404).json({ message: 'Entry not found' })
-    }
-    const oldDelta = Number(cur.points_delta)
-    let newDelta = oldDelta
-    if (body.points_delta !== undefined && body.points_delta !== null) {
-      newDelta = parseInt(body.points_delta, 10)
-      if (!Number.isFinite(newDelta) || newDelta === 0) {
-        await client.end()
-        return res.status(400).json({ message: 'points_delta must be non-zero integer' })
-      }
-    }
-    const newDesc = body.description != null ? String(body.description).trim() : cur.description
-    if (!newDesc) {
-      await client.end()
-      return res.status(400).json({ message: 'description required' })
-    }
-    let newOccurred = cur.occurred_at
-    if (body.occurred_at != null && body.occurred_at !== '') {
-      newOccurred = new Date(body.occurred_at).toISOString()
-    }
-    const diff = newDelta - oldDelta
-    await client.query(
-      `UPDATE store_customer_bonus_ledger SET description = $1, points_delta = $2, occurred_at = $3::timestamptz, updated_at = NOW()
-       WHERE id = $4::uuid AND customer_id = $5::uuid`,
-      [newDesc, newDelta, newOccurred, entryId, customerId],
-    )
-    if (diff !== 0) {
-      await client.query(
-        `UPDATE store_customers SET bonus_points = COALESCE(bonus_points, 0) + $1, updated_at = NOW() WHERE id = $2::uuid`,
-        [diff, customerId],
-      )
-    }
-    const outR = await client.query(
-      'SELECT id, occurred_at, points_delta, description, source, order_id, created_at, updated_at FROM store_customer_bonus_ledger WHERE id = $1::uuid',
-      [entryId],
-    )
-    const balR = await client.query('SELECT COALESCE(bonus_points,0) AS bp FROM store_customers WHERE id = $1::uuid', [customerId])
-    await client.end()
-    const row = outR.rows?.[0]
-    res.json({
-      entry: row
-        ? {
-            id: row.id,
-            occurred_at: row.occurred_at,
-            points_delta: Number(row.points_delta),
-            description: row.description,
-            source: row.source,
-            order_id: row.order_id,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-          }
-        : null,
-      bonus_points: Number(balR.rows?.[0]?.bp || 0),
-    })
-  } catch (e) {
-    if (client) try { await client.end() } catch (_) {}
-    res.status(500).json({ message: e?.message || 'Error' })
-  }
+  res.status(410).json({
+    message: 'Bonus-Ledger-Einträge sind unveränderlich (append-only). Korrektur: neuen Eintrag per POST hinzufügen (Beschreibung "Korrektur", Delta = Ausgleichsbetrag).',
+  })
 }
 
 const adminHubCustomerBonusLedgerDELETE = async (req, res) => {
   if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
-  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-  const customerId = (req.params.customerId || '').trim()
-  const entryId = (req.params.entryId || '').trim()
-  if (!customerId || !entryId) return res.status(400).json({ message: 'customerId and entryId required' })
-  let client
-  try {
-    const { Client } = require('pg')
-    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
-    await client.connect()
-    const curR = await client.query(
-      'SELECT points_delta FROM store_customer_bonus_ledger WHERE id = $1::uuid AND customer_id = $2::uuid',
-      [entryId, customerId],
-    )
-    const cur = curR.rows?.[0]
-    if (!cur) {
-      await client.end()
-      return res.status(404).json({ message: 'Entry not found' })
-    }
-    const oldDelta = Number(cur.points_delta)
-    await client.query('DELETE FROM store_customer_bonus_ledger WHERE id = $1::uuid AND customer_id = $2::uuid', [entryId, customerId])
-    await client.query(
-      `UPDATE store_customers SET bonus_points = COALESCE(bonus_points, 0) - $1, updated_at = NOW() WHERE id = $2::uuid`,
-      [oldDelta, customerId],
-    )
-    const balR = await client.query('SELECT COALESCE(bonus_points,0) AS bp FROM store_customers WHERE id = $1::uuid', [customerId])
-    await client.end()
-    res.json({ success: true, bonus_points: Number(balR.rows?.[0]?.bp || 0) })
-  } catch (e) {
-    if (client) try { await client.end() } catch (_) {}
-    res.status(500).json({ message: e?.message || 'Error' })
-  }
+  res.status(410).json({
+    message: 'Bonus-Ledger-Einträge sind unveränderlich (append-only) und können nicht gelöscht werden. Korrektur: neuen Eintrag per POST hinzufügen (Beschreibung "Korrektur", Delta = Ausgleichsbetrag).',
+  })
 }
 
 const adminHubCustomerByIdGET = async (req, res) => {
@@ -490,8 +402,28 @@ const adminHubCustomerByIdGET = async (req, res) => {
       discounts,
     }
     if (isSuperuser) {
-      customerBase.bonus_points = Number(row.bonus_points || 0)
+      const balancePoints = Number(row.bonus_points || 0)
+      // Aggregate by ledger source (BonusPunkte.md §3.7). Sign convention (see store-checkout.js/
+      // returns.js): order_earn/order_cancel_redeem/order_return_redeem are positive; order_redeem/
+      // order_cancel_earn/order_return_earn are negative.
+      const sourceSums = {}
+      for (const e of bonus_ledger) {
+        const src = e.source || 'manual'
+        sourceSums[src] = (sourceSums[src] || 0) + Number(e.points_delta || 0)
+      }
+      customerBase.bonus_points = balancePoints
       customerBase.bonus_ledger = bonus_ledger
+      customerBase.bonus_summary = {
+        balance_points: balancePoints,
+        balance_eur_cents: Math.floor((balancePoints / 50) * 100),
+        earned_points: Math.max(0, sourceSums.order_earn || 0),
+        redeemed_points: Math.max(0, -(sourceSums.order_redeem || 0)),
+        reversed_points:
+          (sourceSums.order_cancel_earn || 0) + (sourceSums.order_cancel_redeem || 0) +
+          (sourceSums.order_return_earn || 0) + (sourceSums.order_return_redeem || 0),
+        manual_points: sourceSums.manual || 0,
+        by_source: sourceSums,
+      }
     }
     res.json({ customer: customerBase })
   } catch (e) {

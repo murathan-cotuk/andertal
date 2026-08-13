@@ -229,7 +229,7 @@
     "freeShipping": "Ücretsiz",
     "discountLabel": "İndirim",
     "netLabel": "Net",
-    "vatLabel": "KDV (%19)",
+    "vatLabel": "KDV (%{rate})",
     "shippingAddressHeading": "Teslimat adresi",
     "deliveredOn": "Teslim edildi: {date}",
     "orderInfoHeading": "Sipariş bilgisi",

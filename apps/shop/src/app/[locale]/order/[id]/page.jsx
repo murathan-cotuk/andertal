@@ -14,6 +14,7 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
+import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, splitInclusiveVat } from "@/lib/goods-vat";
 
 const ORANGE = "#ff971c";
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -695,8 +696,8 @@ export default function OrderDetailPage() {
   const subtotal = Number(order.subtotal_cents || 0) || items.reduce((s, it) => s + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0);
   const shipping = Number(order.shipping_cents || 0);
   const discount = Number(order.discount_cents || 0);
-  const vatAmount = Math.round(total * 19 / 119);
-  const netTotal = total - vatAmount;
+  const vatRate = getGoodsVatRatePercent(destinationCountryFromOrder(order));
+  const { vatCents: vatAmount, netCents: netTotal } = splitInclusiveVat(Math.max(0, subtotal + shipping), vatRate);
 
   const trackingUrl = getTrackingUrl(order.carrier_name, order.tracking_number);
   const activeReturn = returns.find(r => r.status !== "abgelehnt" && r.status !== "abgeschlossen");
@@ -863,7 +864,7 @@ export default function OrderDetailPage() {
               shipping !== 0 && { label: t("shippingLabel"), value: shipping > 0 ? fmtEur(shipping, locale) : t("freeShipping"), muted: true },
               discount > 0 && { label: t("discountLabel"), value: `−${fmtEur(discount, locale)}`, muted: true, green: true },
               { label: t("netLabel"), value: fmtEur(netTotal, locale), muted: true },
-              { label: t("vatLabel"), value: fmtEur(vatAmount, locale), muted: true },
+              { label: t("vatLabel", { rate: formatVatPercent(vatRate) }), value: fmtEur(vatAmount, locale), muted: true },
             ].filter(Boolean).map(row => (
               <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: row.green ? "#16a34a" : "#6b7280", marginBottom: 5 }}>
                 <span>{row.label}</span><span>{row.value}</span>

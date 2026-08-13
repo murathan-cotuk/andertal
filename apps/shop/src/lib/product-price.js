@@ -1,17 +1,21 @@
 /**
- * Single EUR list price in metadata.prices — country keys are legacy; VAT/shipping vary by market.
+ * Seller list price by destination country. No VAT remapping.
+ * Missing country → DE / EUR. Do not pick a random other market.
  */
 
 export function getPriceEntryFromMap(prices, countryCode, marketCountry) {
   if (!prices || typeof prices !== "object") return null;
   const code = String(countryCode || "").trim().toUpperCase();
   const market = String(marketCountry || "").trim().toUpperCase();
-  const direct = prices[code] || prices[market];
-  if (direct && typeof direct === "object") return direct;
-  if (prices.EUR && typeof prices.EUR === "object") return prices.EUR;
-  if (prices.DE && typeof prices.DE === "object") return prices.DE;
-  for (const v of Object.values(prices)) {
-    if (v && typeof v === "object" && v.brutto_cents != null) return v;
+  const keys = [code, market, "DE", "EUR"].filter(Boolean);
+  const seen = new Set();
+  for (const key of keys) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const entry = prices[key];
+    if (entry && typeof entry === "object" && (entry.brutto_cents != null || entry.sale_cents != null || entry.uvp_cents != null)) {
+      return entry;
+    }
   }
   return null;
 }

@@ -5,6 +5,7 @@
 const { resolveOrderPaidTotalCents, orderBonusDiscountCents, orderCouponDiscountCents } = require('./order-money')
 const { getOrderPdfStrings, getOrderPdfFilename } = require('./order-pdf-i18n')
 const { resolveLocaleFromCountry } = require('./locale-from-country')
+const { salesInvoiceVat, formatVatPercent } = require('./goods-vat')
 const {
   pdfCents,
   renderRetailOrderDocument,
@@ -28,24 +29,32 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   const discount = Number(row.discount_cents || 0)
   const bonusDisc = orderBonusDiscountCents(row)
   const couponDisc = orderCouponDiscountCents(row)
-  const grandTotal = resolveOrderPaidTotalCents(row)
+  const customerPaidCents = resolveOrderPaidTotalCents(row)
+  // Bonus points are a platform-funded payment method, not a price reduction: the seller's
+  // invoiced sale price (and the customer's legal order value) is the paid amount plus the
+  // bonus-funded portion, not the discounted card/PayPal charge.
+  const orderValueCents = customerPaidCents + bonusDisc
   const cc = row.coupon_code ? String(row.coupon_code).trim() : ''
 
   const sellerVatId = sellerInfo?.vat_id ? String(sellerInfo.vat_id).trim() : ''
+  const taxableGross = Math.max(0, orderValueCents)
+  const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: taxableGross })
+  const vatPctLabel = formatVatPercent(goodsVat.ratePercent)
   const totalsLines = []
-  if (bonusDisc > 0) totalsLines.push({ label: s.bonusPoints(Number(row.bonus_points_redeemed || 0)), value: `-${pdfCents(bonusDisc, locale)}` })
   if (couponDisc > 0) totalsLines.push({ label: cc ? `${s.coupon} (${cc})` : s.coupon, value: `-${pdfCents(couponDisc, locale)}` })
   const remainder = Math.max(0, discount - bonusDisc - couponDisc)
   if (remainder > 0) totalsLines.push({ label: s.discount, value: `-${pdfCents(remainder, locale)}` })
-  if (sellerVatId) {
-    const vatCents = Math.round(grandTotal * 19 / 119)
-    const netCents = grandTotal - vatCents
-    totalsLines.push({ label: s.netTotal, value: pdfCents(netCents, locale) })
-    totalsLines.push({ label: s.vatLine(19), value: pdfCents(vatCents, locale) })
+  if (sellerVatId && !goodsVat.exempt) {
+    totalsLines.push({ label: s.netTotal, value: pdfCents(goodsVat.netCents, locale) })
+    totalsLines.push({ label: s.vatLine(vatPctLabel), value: pdfCents(goodsVat.vatCents, locale) })
   } else {
     totalsLines.push({ label: s.vatExempt, value: '', color: '#64748b', small: true })
   }
-  totalsLines.push({ label: s.grandTotal, value: pdfCents(grandTotal, locale) })
+  totalsLines.push({ label: s.grandTotal, value: pdfCents(orderValueCents, locale) })
+  if (bonusDisc > 0) {
+    if (customerPaidCents > 0) totalsLines.push({ label: s.paidByCard, value: pdfCents(customerPaidCents, locale), small: true, color: '#64748b' })
+    totalsLines.push({ label: s.paidByBonus, value: pdfCents(bonusDisc, locale), small: true, color: '#64748b' })
+  }
 
   const displayNumber = String(invoiceNumber || '').startsWith('R-') ? String(invoiceNumber) : `R-${invoiceNumber}`
 
@@ -60,9 +69,10 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
     kind: 'invoice',
     totalsLines,
     shippingCents: shipping,
-    amountDueCents: grandTotal,
+    amountDueCents: orderValueCents,
     footerText: s.invoiceFooter,
     invoiceNumber: displayNumber,
+    goodsVatPercent: sellerVatId && !goodsVat.exempt ? goodsVat.ratePercent : 0,
   })
 }
 

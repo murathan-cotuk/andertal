@@ -48,6 +48,9 @@ function getTransactionsCopy(locale) {
     commission: (pct) => t(`Commission (${pct}%)`, `Komisyon (${pct}%)`, `Commission (${pct}%)`, `Comisión (${pct}%)`, `Commissione (${pct}%)`, `Provision (${pct}%)`),
     commissionNote: t("Eligible only", "Yalnızca uygun olanlar", "Éligibles uniquement", "Solo elegibles", "Solo idonei", "Nur freigegebene"),
     refunds: t("Refunds", "İadeler", "Remboursements", "Reembolsos", "Rimborsi", "Rückerstattungen"),
+    bonusFunding: t("Andertal bonus", "Andertal bonusu", "Bonus Andertal", "Bono Andertal", "Bonus Andertal", "Andertal-Bonus"),
+    customerPaid: t("Customer paid", "Müşteri ödedi", "Payé par le client", "Pagado por el cliente", "Pagato dal cliente", "Kunde gezahlt"),
+    commissionVat: t("Commission VAT", "Komisyon KDV", "TVA commission", "IVA comisión", "IVA commissione", "Provision USt"),
     shippingShare: t("Shipping (share)", "Kargo (pay)", "Expédition (part)", "Envío (cuota)", "Spedizione (quota)", "Versand (Beteiligung)"),
     eligibleNet: t("Eligible (net)", "Uygun (net)", "Éligible (net)", "Elegible (neto)", "Idoneo (netto)", "Freigegeben (netto)"),
     eligibleNote: (n) => t(
@@ -183,6 +186,8 @@ function getTransactionsCopy(locale) {
     noTransactions: t("No transactions in this period.", "Bu dönemde işlem yok.", "Aucune transaction sur cette période.", "No hay transacciones en este periodo.", "Nessuna transazione in questo periodo.", "Keine Transaktionen in diesem Zeitraum."),
     colOrder: t("Order", "Sipariş", "Commande", "Pedido", "Ordine", "Bestellung"),
     colShipping: t("Shipping", "Kargo", "Expédition", "Envío", "Spedizione", "Versand"),
+    colBonus: t("Bonus", "Bonus", "Bonus", "Bono", "Bonus", "Bonus"),
+    colCommissionVat: t("Comm. VAT", "Kom. KDV", "TVA comm.", "IVA com.", "IVA comm.", "Prov. USt"),
     colCommission: t("Commission", "Komisyon", "Commission", "Comisión", "Commissione", "Provision"),
     colNet: t("Net", "Net", "Net", "Neto", "Netto", "Netto"),
     colDelivery: t("Delivery", "Teslimat", "Livraison", "Entrega", "Consegna", "Lieferung"),
@@ -208,8 +213,6 @@ function fmtCents(cents, currency = "EUR", locale = "de") {
 function fmtDate(d, locale = "de") {
   return d ? new Date(d).toLocaleDateString(dateLocaleFor(locale), { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 }
-
-const COMMISSION_RATE = 0.12;
 
 function generatePeriods(count = 14) {
   const periods = [];
@@ -298,6 +301,13 @@ function SellerTransactionsView({ sellerId }) {
   const totalRefunds = periodTx.reduce((s, t) => s + (t.refund_cents || 0), 0);
   const totalShipping = periodTx.reduce((s, t) => s + (t.shipping_cents || 0), 0);
   const netPayout = eligible.reduce((s, t) => s + (t.payout_cents || 0), 0);
+  // BonusPunkte.md §3.9: COMMISSION_RATE was a hardcoded 12% label even though sellers can have a
+  // different rate — show the period's real blended rate (Σcommission/Σrevenue), and surface the
+  // bonus funding / customer-paid split that was previously invisible on this page.
+  const blendedCommissionPct = totalRevenue > 0 ? (totalCommission / totalRevenue) * 100 : 12;
+  const totalBonusFunding = periodTx.reduce((s, t) => s + (t.platform_bonus_funding_cents || t.settlement_breakdown?.platform_bonus_funding_cents || 0), 0);
+  const totalCustomerPaid = periodTx.reduce((s, t) => s + (t.customer_paid_cents || 0), 0);
+  const totalCommissionVat = eligible.reduce((s, t) => s + (t.commission_vat_cents || 0), 0);
 
   const periodPayouts = payouts.filter((p) => {
     const s = new Date(p.period_start), e = new Date(p.period_end);
@@ -356,7 +366,10 @@ function SellerTransactionsView({ sellerId }) {
                 ) : (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                     <StatBox label={copy.totalRevenue} value={fmt(totalRevenue)} note={copy.ordersCount(periodTx.length)} />
-                    <StatBox label={copy.commission((COMMISSION_RATE * 100).toFixed(0))} value={`– ${fmt(totalCommission)}`} color="#dc2626" note={copy.commissionNote} />
+                    <StatBox label={copy.customerPaid} value={fmt(totalCustomerPaid)} />
+                    <StatBox label={copy.bonusFunding} value={fmt(totalBonusFunding)} color="#2563eb" />
+                    <StatBox label={copy.commission(blendedCommissionPct.toFixed(1))} value={`– ${fmt(totalCommission)}`} color="#dc2626" note={copy.commissionNote} />
+                    {totalCommissionVat > 0 && <StatBox label={copy.commissionVat} value={`– ${fmt(totalCommissionVat)}`} color="#dc2626" />}
                     <StatBox label={copy.refunds} value={totalRefunds > 0 ? `– ${fmt(totalRefunds)}` : fmt(0)} color={totalRefunds > 0 ? "#dc2626" : undefined} />
                     <StatBox label={copy.shippingShare} value={fmt(totalShipping)} />
                     <StatBox label={copy.eligibleNet} value={fmt(netPayout)} color="#059669"
@@ -479,6 +492,9 @@ function AdminTransactionsView() {
   const totalRevenue = periodTx.reduce((s, t) => s + (t.total_cents || 0), 0);
   const totalCommission = eligible.reduce((s, t) => s + (t.commission_cents || 0), 0);
   const totalPayout = eligible.reduce((s, t) => s + (t.payout_cents || 0), 0);
+  const totalBonusFunding = periodTx.reduce((s, t) => s + (t.platform_bonus_funding_cents || t.settlement_breakdown?.platform_bonus_funding_cents || 0), 0);
+  const totalCustomerPaid = periodTx.reduce((s, t) => s + (t.customer_paid_cents || 0), 0);
+  const totalCommissionVat = eligible.reduce((s, t) => s + (t.commission_vat_cents || 0), 0);
 
   const perSeller = {};
   periodTx.forEach((tx) => {
@@ -619,7 +635,10 @@ function AdminTransactionsView() {
                 {loading ? <Text tone="subdued">{copy.loading}</Text> : (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                     <StatBox label={copy.platformRevenue} value={fmt(totalRevenue)} note={copy.totalOrders(periodTx.length)} />
+                    <StatBox label={copy.customerPaid} value={fmt(totalCustomerPaid)} />
+                    <StatBox label={copy.bonusFunding} value={fmt(totalBonusFunding)} color="#2563eb" />
                     <StatBox label={copy.commissionIncome} value={fmt(totalCommission)} color="#059669" note={copy.qualified(eligible.length)} />
+                    {totalCommissionVat > 0 && <StatBox label={copy.commissionVat} value={fmt(totalCommissionVat)} color="#059669" />}
                     <StatBox label={copy.toPayoutTotal} value={fmt(totalPayout)} color="#dc2626" note={copy.toAllSellers} />
                     <StatBox label={copy.stillPendingAmount} value={fmt(pending.reduce((s, t) => s + (t.total_cents || 0), 0))} note={copy.ordersCount(pending.length)} />
                   </div>
@@ -779,8 +798,8 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
   );
 
   const cols = isSuperuser
-    ? "1.2fr 100px 90px 90px 90px 90px 90px"
-    : "1.5fr 90px 90px 90px 90px 90px";
+    ? "1.2fr 100px 90px 90px 75px 75px 90px 90px 90px"
+    : "1.5fr 90px 90px 75px 75px 90px 90px";
 
   return (
     <div>
@@ -789,6 +808,8 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
         {isSuperuser && <div>{copy.seller}</div>}
         <div style={{ textAlign: "right" }}>{copy.revenue}</div>
         <div style={{ textAlign: "right" }}>{copy.colShipping}</div>
+        <div style={{ textAlign: "right" }}>{copy.colBonus}</div>
+        <div style={{ textAlign: "right" }}>{copy.colCommissionVat}</div>
         <div style={{ textAlign: "right" }}>{copy.colCommission}</div>
         <div style={{ textAlign: "right" }}>{copy.colNet}</div>
         <div style={{ textAlign: "right" }}>{copy.colDelivery}</div>
@@ -807,6 +828,8 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
           </div>
           {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
           <div style={{ textAlign: "right" }}>—</div>
+          <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
+          <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: tx.payout_cents < 0 ? "#ef4444" : "#10b981", fontWeight: 600 }}>{fmt(tx.payout_cents, tx.currency)}</div>
@@ -829,11 +852,16 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
         <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
           <div>
             <div style={{ fontWeight: 600, color: "#111827" }}>#{tx.order_number}</div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>{tx.first_name} {tx.last_name}</div>
+            <div style={{ fontSize: 11, color: "#9ca3af" }}>
+              {tx.first_name} {tx.last_name}
+              {tx.destination_country && <span style={{ marginLeft: 6, color: "#6b7280" }}>· {tx.destination_country}</span>}
+            </div>
           </div>
           {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
           <div style={{ textAlign: "right" }}>{fmt(tx.total_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(tx.shipping_cents || 0, tx.currency)}</div>
+          <div style={{ textAlign: "right", color: "#2563eb" }}>{tx.bonus_redeemed_cents > 0 ? fmt(tx.bonus_redeemed_cents, tx.currency) : "—"}</div>
+          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{tx.commission_vat_cents > 0 ? fmt(tx.commission_vat_cents, tx.currency) : "—"}</div>
           <div style={{ textAlign: "right", color: "#ef4444" }}>−{fmt(tx.commission_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#10b981", fontWeight: 600 }}>{fmt(tx.payout_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtD(tx.delivery_date)}</div>
