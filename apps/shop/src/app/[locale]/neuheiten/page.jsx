@@ -214,8 +214,8 @@ export default function NeuheitenPage() {
         setLoading(true);
         setError("");
         const [catRes, prRes] = await Promise.all([
-          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
-          fetch("/api/store-products?limit=1200", { cache: "no-store" }),
+          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`),
+          fetch("/api/store-products?limit=1200"),
         ]);
         const catData = catRes.ok ? await catRes.json() : { tree: [] };
         const prData = prRes.ok ? await prRes.json() : { products: [] };

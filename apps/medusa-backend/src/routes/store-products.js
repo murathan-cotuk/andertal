@@ -470,6 +470,12 @@ const storeProductCategoryIds = (p) => {
 
 let categoryTopSellerCache = { expiresAt: 0, topIdSet: new Set() }
 
+const {
+  getActiveProductBadges: getActiveProductBadgesCached,
+} = require('../product-badges-cache')
+
+const getActiveProductBadges = () => getActiveProductBadgesCached(getDbClient)
+
 /** No admin category-picker needed — the single top-selling product within EACH of its own
  * categories, catalog-wide. Backs the "bestseller_category" Product Badge rule: one active
  * rule, and every category's own #1 seller gets the badge (not top-5, no per-category rule
@@ -502,26 +508,6 @@ const getCategoryTopSellerIds = async () => {
   const topIdSet = new Set([...bestByCategory.values()].map(([pid]) => pid))
   categoryTopSellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, topIdSet }
   return topIdSet
-}
-
-let productBadgesCache = { expiresAt: 0, badges: [] }
-const PRODUCT_BADGES_CACHE_TTL_MS = 60 * 1000
-
-const getActiveProductBadges = async () => {
-  const now = Date.now()
-  if (productBadgesCache.expiresAt > now) return productBadgesCache.badges
-  let badges = []
-  const client = getDbClient()
-  if (client) {
-    try {
-      await client.connect()
-      const r = await client.query('SELECT * FROM admin_hub_product_badges WHERE active = true')
-      badges = r.rows || []
-      await client.end()
-    } catch (_) { try { await client.end() } catch (__) {} }
-  }
-  productBadgesCache = { expiresAt: now + PRODUCT_BADGES_CACHE_TTL_MS, badges }
-  return badges
 }
 
 const getGroupProductIdSets = async (groupIds) => {
@@ -605,26 +591,57 @@ const badgeToPayload = (b) => ({
   i18n: b.i18n,
 })
 
-const resolveCustomBadgesForProduct = (productId, mapped, ctx) => {
-  const pid = String(productId)
+/** Real catalog UUID — seller listing rows use synthetic ids like `{uuid}-listing-{seller}`. */
+const canonicalProductId = (productRowOrId) => {
+  if (productRowOrId == null) return ''
+  if (typeof productRowOrId === 'object') {
+    const listing = productRowOrId._listing_id != null ? String(productRowOrId._listing_id).trim() : ''
+    if (listing) return listing
+    const raw = String(productRowOrId.id || '').trim()
+    const m = raw.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-listing-/i)
+    return m ? m[1] : raw
+  }
+  const raw = String(productRowOrId).trim()
+  const m = raw.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-listing-/i)
+  return m ? m[1] : raw
+}
+
+const resolveCustomBadgesForProduct = (productIdOrIds, mapped, ctx) => {
+  const ids = [...new Set(
+    (Array.isArray(productIdOrIds) ? productIdOrIds : [productIdOrIds])
+      .flatMap((x) => {
+        const raw = String(x || '').trim()
+        const canon = canonicalProductId(x)
+        return [raw, canon].filter(Boolean)
+      })
+  )]
+  if (ids.length === 0) return mapped
   const matched = []
+  const seen = new Set()
   for (const b of ctx.badges) {
     let hit = false
-    if (b.target_type === 'product') hit = String(b.product_id) === pid
-    else if (b.target_type === 'group') hit = !!ctx.groupProductIdsByGroup.get(String(b.group_id))?.has(pid)
-    else if (b.target_type === 'api') {
-      if (b.api_rule === 'bestseller_category') hit = ctx.categoryTopSellerIds.has(pid)
+    if (b.target_type === 'product') {
+      hit = ids.some((pid) => String(b.product_id) === pid)
+    } else if (b.target_type === 'group') {
+      const set = ctx.groupProductIdsByGroup.get(String(b.group_id))
+      hit = !!set && ids.some((pid) => set.has(pid))
+    } else if (b.target_type === 'api') {
+      if (b.api_rule === 'bestseller_category') hit = ids.some((pid) => ctx.categoryTopSellerIds.has(pid))
       else if (b.api_rule === 'sale') hit = hasSaleFromMapped(mapped)
       else if (b.api_rule === 'new') hit = isNewFromMapped(mapped)
       else if (b.api_rule === 'made_in_europe') hit = isEuOriginVerified(mapped?.metadata)
     }
-    if (hit) matched.push(badgeToPayload(b))
+    if (!hit) continue
+    const key = String(b.id || `${b.label}-${b.position}-${b.api_rule || b.target_type}`)
+    if (seen.has(key)) continue
+    seen.add(key)
+    matched.push(badgeToPayload(b))
   }
   if (matched.length > 0) mapped.metadata = { ...(mapped.metadata || {}), custom_badges: matched }
   return mapped
 }
 
-const enrichMappedStoreProduct = async (productRow, mapped) => {
+const enrichMappedStoreProduct = async (productRow, mapped, { alsoMatchIds = [] } = {}) => {
   const existingSeller = (mapped.metadata && (mapped.metadata.seller_name || mapped.metadata.shop_name)) || ''
   if (!existingSeller && productRow.seller_id) {
     const storeName = await getSellerStoreName(productRow.seller_id)
@@ -643,12 +660,22 @@ const enrichMappedStoreProduct = async (productRow, mapped) => {
     const brand = await getBrandById(brandId)
     if (brand) mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
   }
+  const realId = canonicalProductId(productRow)
+  const matchIds = [...new Set([
+    productRow.id,
+    productRow._listing_id,
+    realId,
+    ...alsoMatchIds,
+  ].map((x) => String(x || '').trim()).filter(Boolean))]
   const bsIds = await getBestsellerProductIds()
-  const realSalesScore = bestsellerCache.scoresById?.get(String(productRow.id).trim())
+  const realSalesScore = matchIds.reduce((best, id) => {
+    const s = bestsellerCache.scoresById?.get(String(id).trim()) || 0
+    return s > best ? s : best
+  }, 0)
   if (realSalesScore > 0) mapped.metadata = { ...(mapped.metadata || {}), sales_count: realSalesScore }
-  if (bsIds.has(String(productRow.id))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
+  if (matchIds.some((id) => bsIds.has(String(id)))) mapped.metadata = { ...(mapped.metadata || {}), is_bestseller: true }
   const badgeCtx = await buildProductBadgeContext()
-  resolveCustomBadgesForProduct(productRow.id, mapped, badgeCtx)
+  resolveCustomBadgesForProduct(matchIds, mapped, badgeCtx)
   const sid = String(productRow.seller_id || '').trim()
   if (sid) {
     let client
@@ -797,8 +824,8 @@ const storeProductsFromAdminHubGET = async (req, res) => {
         const b = brandsById[brandId]
         mapped.metadata = { ...(mapped.metadata || {}), brand_name: b.name, brand_logo: b.logo_image || null, brand_handle: b.handle || null }
       }
-      await applyBestsellerFlagsToMappedProduct(mapped, p.id)
-      resolveCustomBadgesForProduct(p.id, mapped, badgeCtx)
+      await applyBestsellerFlagsToMappedProduct(mapped, canonicalProductId(p) || p.id)
+      resolveCustomBadgesForProduct([p.id, p._listing_id, canonicalProductId(p)], mapped, badgeCtx)
       products.push(mapped)
     }
     if (categorySlugFilter) {
@@ -860,7 +887,9 @@ const storeProductByIdFromAdminHubGET = async (req, res) => {
       if (collection) winnerRow.collection = collection
     }
     const mapped = mapAdminHubToStoreProduct(winnerRow, (req.query && req.query.country) || 'DE')
-    await enrichMappedStoreProduct(winnerRow, mapped)
+    await enrichMappedStoreProduct(winnerRow, mapped, {
+      alsoMatchIds: [landed.id, winnerRow._listing_id, canonicalProductId(winnerRow), canonicalProductId(landed)],
+    })
     res.json({ product: mapped, multi_offer: multiOffer })
   } catch (err) {
     console.error('Store product by id GET (admin hub):', err)

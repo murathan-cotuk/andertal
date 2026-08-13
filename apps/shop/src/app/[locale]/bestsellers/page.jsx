@@ -141,15 +141,15 @@ export default function BestsellersPage() {
         setLoading(true);
         setError("");
         const [catRes, prRes, settingsRes, landingFlag] = await Promise.all([
-          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { cache: "no-store" }),
-          fetch("/api/store-products?limit=1200", { cache: "no-store" }),
-          fetch("/api/store-api-page-settings/bestsellers", { cache: "no-store" }).catch(() => null),
+          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`),
+          fetch("/api/store-products?limit=1200"),
+          fetch("/api/store-api-page-settings/bestsellers").catch(() => null),
           (async () => {
             try {
               const client = getMedusaClient();
               const page = await client.getPageBySlug("bestsellers");
               if (!page?.id) return false;
-              const lp = await client.request(`/store/landing-page/${encodeURIComponent(page.id)}`, { cache: "no-store" });
+              const lp = await fetch(`/api/store-landing-page/${encodeURIComponent(page.id)}`).then((r) => r.json());
               return lp?.settings?.show_product_filter_bar === true;
             } catch {
               return false;

@@ -1,5 +1,10 @@
 'use strict'
 const { Router } = require('express')
+const {
+  invalidateProductBadgesCache,
+  getActiveProductBadges,
+  badgeStylePayload,
+} = require('../product-badges-cache')
 
 const pgDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -55,6 +60,20 @@ const normalizeBadgeInput = (body) => {
 module.exports = function createProductBadgesRouter({ requireSuperuser }) {
   const router = Router()
 
+  // Public: live badge styles for the shop (no CDN cache — size edits must show immediately).
+  router.get('/store/product-badges', async (_req, res) => {
+    try {
+      const badges = await getActiveProductBadges(pgDbClient)
+      res.setHeader('Cache-Control', 'no-store, max-age=0')
+      res.json({
+        badges: badges.map(badgeStylePayload).filter(Boolean),
+        fetched_at: new Date().toISOString(),
+      })
+    } catch (e) {
+      res.status(500).json({ message: e?.message || 'Error' })
+    }
+  })
+
   router.get('/admin-hub/v1/product-badges', requireSuperuser, async (_req, res) => {
     const c = pgDbClient(); try {
       await c.connect()
@@ -79,7 +98,9 @@ module.exports = function createProductBadgesRouter({ requireSuperuser }) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
         [b.label, b.position, b.bg_color, b.text_color, b.font_size, b.border_width, b.border_color, b.border_radius, b.offset_x, b.offset_y, b.target_type, b.product_id, b.group_id, b.api_rule, b.api_category_id, b.active, b.badge_type, b.image_url, b.i18n ? JSON.stringify(b.i18n) : null, b.image_width, b.image_height]
       )
-      await c.end(); res.status(201).json({ badge: r.rows[0] })
+      await c.end()
+      invalidateProductBadgesCache()
+      res.status(201).json({ badge: r.rows[0] })
     } catch (e) { try { await c.end() } catch (_) {}; res.status(500).json({ message: e?.message }) }
   })
 
@@ -103,7 +124,9 @@ module.exports = function createProductBadgesRouter({ requireSuperuser }) {
          WHERE id=$22 RETURNING *`,
         [b.label, b.position, b.bg_color, b.text_color, b.font_size, b.border_width, b.border_color, b.border_radius, b.offset_x, b.offset_y, b.target_type, b.product_id, b.group_id, b.api_rule, b.api_category_id, b.active, b.badge_type, b.image_url, b.i18n ? JSON.stringify(b.i18n) : null, b.image_width, b.image_height, req.params.id]
       )
-      await c.end(); res.json({ badge: r.rows[0] })
+      await c.end()
+      invalidateProductBadgesCache()
+      res.json({ badge: r.rows[0] })
     } catch (e) { try { await c.end() } catch (_) {}; res.status(500).json({ message: e?.message }) }
   })
 
@@ -111,7 +134,9 @@ module.exports = function createProductBadgesRouter({ requireSuperuser }) {
     const c = pgDbClient(); try {
       await c.connect()
       await c.query(`DELETE FROM admin_hub_product_badges WHERE id=$1`, [req.params.id])
-      await c.end(); res.json({ deleted: true })
+      await c.end()
+      invalidateProductBadgesCache()
+      res.json({ deleted: true })
     } catch (e) { try { await c.end() } catch (_) {}; res.status(500).json({ message: e?.message }) }
   })
 

@@ -240,8 +240,8 @@ export default function LandingPopup({ pageId }) {
   const frequencyRef = useRef("session");
 
   useEffect(() => {
-    getMedusaClient()
-      .request("/store/landing-page", { cache: "no-store" })
+    fetch("/api/store-landing-page")
+      .then((r) => r.json())
       .then((data) => {
         const popup = data?.settings?.popup;
         if (!popup) return;

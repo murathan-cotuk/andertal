@@ -105,7 +105,7 @@ export default function CatalogCmsLanding({
         setPage(data || null)
         if (data?.id) {
           try {
-            const lp = await client.request(`/store/landing-page/${encodeURIComponent(data.id)}`, { cache: 'no-store' })
+            const lp = await fetch(`/api/store-landing-page/${encodeURIComponent(data.id)}`).then((r) => r.json())
             if (!cancelled) setLanding(lp || null)
           } catch {
             if (!cancelled) setLanding(null)

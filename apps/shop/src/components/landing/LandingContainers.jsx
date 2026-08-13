@@ -2772,16 +2772,16 @@ export default function LandingContainers({ pageId, categoryId }) {
   const locale = useLocale();
 
   useEffect(() => {
-    let endpoint = "/store/landing-page";
+    let endpoint = "/api/store-landing-page";
     if (categoryId) {
-      endpoint = `/store/landing-page/category/${encodeURIComponent(categoryId)}`;
+      endpoint = `/api/store-landing-page/category/${encodeURIComponent(categoryId)}`;
     } else if (pageId) {
-      endpoint = `/store/landing-page/${encodeURIComponent(pageId)}`;
+      endpoint = `/api/store-landing-page/${encodeURIComponent(pageId)}`;
     }
     setContainers(null);
     setLandingSettings({});
-    getMedusaClient()
-      .request(endpoint, { cache: "no-store" })
+    fetch(endpoint)
+      .then((r) => r.json())
       .then((data) => {
         if (data?.__error) {
           if (process.env.NODE_ENV === "development") {

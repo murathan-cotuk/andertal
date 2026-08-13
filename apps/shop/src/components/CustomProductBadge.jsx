@@ -1,9 +1,13 @@
 "use client";
 
+import { useProductBadgeStyles, mergeBadgeWithLiveStyle } from "@/components/ProductBadgeStylesProvider";
+
 /**
  * Sellercentral Product Badges over a product image.
  * Sizes and offsets are percentages of the image box so cards and PDP match
  * across mobile / tablet / desktop. Offset 0 = flush to the chosen corner.
+ * Visual fields are merged with live /store/product-badges so size edits
+ * appear even when product API responses are still CDN-cached.
  */
 
 function clampPct(n, fallback, min = 0, max = 100) {
@@ -82,6 +86,10 @@ function textStyle(b) {
   const fs = badgeFontPct(b.font_size, 4.5);
   const br = Number(b.border_radius);
   const bw = Number(b.border_width);
+  // Padding scales with font size so “Schriftgröße” also changes visual bulk
+  // (Sellercentral has no separate padding field for text badges).
+  const padY = Math.max(0.12, Math.min(0.55, fs * 0.055));
+  const padX = Math.max(0.28, Math.min(0.9, fs * 0.1));
   return {
     display: "inline-block",
     background: b.bg_color || "#e53935",
@@ -91,7 +99,7 @@ function textStyle(b) {
     borderStyle: "solid",
     borderColor: b.border_color || "#000000",
     borderRadius: Number.isFinite(br) ? `${Math.max(0, br) * 0.12}cqw` : "0.2cqw",
-    padding: "0.28em 0.55em",
+    padding: `${padY}em ${padX}em`,
     fontWeight: 700,
     lineHeight: 1.2,
     whiteSpace: "nowrap",
@@ -101,20 +109,22 @@ function textStyle(b) {
 
 /** Single badge absolutely positioned over the product image box. */
 export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
-  if (!badge) return null;
-  if (badge.badge_type === "image") {
-    const imageUrl = bt(badge, "image_url", locale);
+  const { byId } = useProductBadgeStyles();
+  const b = mergeBadgeWithLiveStyle(badge, byId);
+  if (!b) return null;
+  if (b.badge_type === "image") {
+    const imageUrl = bt(b, "image_url", locale);
     if (!imageUrl) return null;
     return (
-      <div style={cornerBoxStyle(badge, stackIndex)}>
+      <div style={cornerBoxStyle(b, stackIndex)}>
         <img
           className="product-custom-badge-img"
           src={imageUrl}
-          alt={bt(badge, "label", locale) || ""}
+          alt={bt(b, "label", locale) || ""}
           style={{
             display: "block",
             width: "100%",
-            height: badge.image_height != null && Number(badge.image_height) > 0 ? "100%" : "auto",
+            height: b.image_height != null && Number(b.image_height) > 0 ? "100%" : "auto",
             maxWidth: "none",
             maxHeight: "none",
             objectFit: "contain",
@@ -129,11 +139,11 @@ export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
       </div>
     );
   }
-  const label = bt(badge, "label", locale);
+  const label = bt(b, "label", locale);
   if (!label) return null;
   return (
-    <div style={cornerBoxStyle(badge, stackIndex)}>
-      <span style={textStyle(badge)}>{label}</span>
+    <div style={cornerBoxStyle(b, stackIndex)}>
+      <span style={textStyle(b)}>{label}</span>
     </div>
   );
 }
@@ -151,7 +161,7 @@ export function CustomProductBadges({ badges, locale }) {
       style={{
         position: "absolute",
         inset: 0,
-        zIndex: 9,
+        zIndex: 20,
         pointerEvents: "none",
         containerType: "size",
         overflow: "hidden",

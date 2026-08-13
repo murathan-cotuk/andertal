@@ -64,7 +64,7 @@ export default function CmsPageBySlug() {
           // A page built with the Sellercentral landing-page container editor (e.g. the
           // "Kundenservice"/customer-support page) has its real content there, not in `body`.
           try {
-            const landing = await client.request(`/store/landing-page/${encodeURIComponent(data.id)}`, { cache: "no-store" });
+            const landing = await fetch(`/api/store-landing-page/${encodeURIComponent(data.id)}`).then((r) => r.json());
             setHasContainers(Array.isArray(landing?.containers) && landing.containers.length > 0);
           } catch {
             setHasContainers(false);

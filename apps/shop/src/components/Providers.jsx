@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useLenis } from "@/hooks/useLenis";
 import PostHogProvider from "@/components/PostHogProvider";
 import ShopPresenceHeartbeat from "@/components/ShopPresenceHeartbeat";
+import { ProductBadgeStylesProvider } from "@/components/ProductBadgeStylesProvider";
 
 // Lazy-loaded: not needed for initial paint — deferred to after hydration.
 const CartSidebar      = dynamic(() => import("@/components/CartSidebar"),      { ssr: false });
@@ -34,11 +35,13 @@ export default function Providers({ children }) {
             <MobileBottomNavScrollProvider>
               <ShopStylesProvider>
                 <ShopStylesInjector />
+                <ProductBadgeStylesProvider>
                 <LandingChromeProvider>
                   <LenisInit />
                   <ShopPresenceHeartbeat />
                   <MobileShell>{children}</MobileShell>
                 </LandingChromeProvider>
+                </ProductBadgeStylesProvider>
               </ShopStylesProvider>
               <CartSidebar />
               <ScrollToTopButton />

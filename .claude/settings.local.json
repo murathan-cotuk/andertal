@@ -247,7 +247,8 @@
       "PowerShell(npx eslint src/components/pages/products/ProductEditPage.jsx --max-warnings=0 2>&1 | Select-Object -Last 150)",
       "Bash(xargs -I{} basename {})",
       "Bash(curl -s \"https://www.andertal.com/de/en\")",
-      "Read(//c/Users/murat/AppData/Local/Temp/claude/**)"
+      "Read(//c/Users/murat/AppData/Local/Temp/claude/**)",
+      "Bash(git show *)"
     ]
   }
 }

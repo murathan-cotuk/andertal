@@ -1094,13 +1094,13 @@ function ProductBadgesCard({ locale, client, ui }) {
     fontSize: locale === "de" ? "Schriftgröße (% der Bildbreite)" : locale === "tr" ? "Yazı boyutu (görsel genişliğinin %)" : "Font size (% of image width)",
     offsetX: locale === "de" ? "Abstand X (%, 0 = bündig am Rand)" : locale === "tr" ? "Mesafe X (%, 0 = köşeye yapışık)" : "Offset X (%, 0 = flush edge)",
     offsetY: locale === "de" ? "Abstand Y (%, 0 = bündig am Rand)" : locale === "tr" ? "Mesafe Y (%, 0 = köşeye yapışık)" : "Offset Y (%, 0 = flush edge)",
-    imageWidth: locale === "de" ? "Breite (% vom Produktbild)" : locale === "tr" ? "Genişlik (ürün görselinin %)" : "Width (% of product image)",
+    imageWidth: locale === "de" ? "Badge-Breite (% vom Produktbild) — Größe im Shop" : locale === "tr" ? "Badge genişliği (ürün görselinin %) — shop’taki boyut" : "Badge width (% of product image) — size in shop",
     imageHeight: locale === "de" ? "Höhe (%, leer = auto)" : locale === "tr" ? "Yükseklik (%, boş = otomatik)" : "Height (%, empty = auto)",
     sizeHelp: locale === "de"
-      ? "Werte sind Anteile am Produktbild — auf Karten und PDP (Mobil/Desktop) gleich."
+      ? "Bild-Badge: Breite steuert die Größe im Shop sofort. Text-Badge: Schriftgröße (%). Produktlisten-Cache kann kurz hinterherhinken — Shop lädt Größen live nach."
       : locale === "tr"
-        ? "Değerler ürün görseline göre orandır — kart ve PDP’de (mobil/masaüstü) aynı görünür."
-        : "Values are ratios of the product image — same on cards and PDP (mobile/desktop).",
+        ? "Görsel badge: Genişlik shop’taki boyutu belirler. Metin badge: Yazı boyutu (%). Ürün listesi cache’i gecikebilir — shop boyutları canlı çeker."
+        : "Image badge: Width controls shop size. Text badge: Font size (%). Product list cache may lag — shop loads sizes live.",
     preview: locale === "de" ? "Vorschau" : locale === "tr" ? "Önizleme" : locale === "fr" ? "Aperçu" : locale === "es" ? "Vista previa" : locale === "it" ? "Anteprima" : "Preview",
     target: locale === "de" ? "Ziel" : locale === "tr" ? "Hedef" : locale === "fr" ? "Cible" : locale === "es" ? "Objetivo" : locale === "it" ? "Target" : "Target",
     apiRule: locale === "de" ? "API-Regel" : locale === "tr" ? "API kuralı" : locale === "fr" ? "Règle API" : locale === "es" ? "Regla API" : locale === "it" ? "Regola API" : "API rule",

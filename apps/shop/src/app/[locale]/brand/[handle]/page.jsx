@@ -646,7 +646,7 @@ export default function BrandPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
+    fetch("/api/store-categories?tree=true&is_visible=true")
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
@@ -662,7 +662,7 @@ export default function BrandPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-metafield-definitions", { cache: "no-store" })
+    fetch("/api/store-metafield-definitions")
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) setMetafieldDefinitions(data?.definitions || {});

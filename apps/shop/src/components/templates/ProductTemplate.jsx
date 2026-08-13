@@ -116,13 +116,24 @@ const GalleryCol = styled.div`
 
 const MainImageWrap = styled.div`
   position: relative;
-  z-index: 0;
+  isolation: isolate;
   width: 100%;
   aspect-ratio: 1;
   border-radius: 12px;
   overflow: hidden;
   background: #f3f4f6;
   cursor: pointer;
+
+  > img:not(.product-custom-badge-img) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #fff;
+    display: block;
+    z-index: 1;
+  }
 
   img.product-custom-badge-img {
     position: static !important;
@@ -133,6 +144,10 @@ const MainImageWrap = styled.div`
     max-height: none !important;
     padding: 0 !important;
     object-fit: contain !important;
+  }
+
+  .product-custom-badges-layer {
+    z-index: 20 !important;
   }
 `;
 
@@ -1125,7 +1140,7 @@ export default function ProductTemplate() {
     }
 
     let cancelled = false;
-    fetch("/api/store-categories?tree=true&is_visible=true", { cache: "no-store" })
+    fetch("/api/store-categories?tree=true&is_visible=true")
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;

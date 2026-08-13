@@ -955,7 +955,7 @@ export default function CategoryTemplate() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-metafield-definitions", { cache: "no-store" })
+    fetch("/api/store-metafield-definitions")
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) setMetafieldDefinitions(data?.definitions || {});

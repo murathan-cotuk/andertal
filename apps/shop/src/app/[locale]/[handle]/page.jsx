@@ -860,7 +860,7 @@ function CollectionPage() {
         const col = colData?.collection ?? null;
         if (!col) {
           // Fallback: try CMS page by slug (via proxy — avoids CORS with direct backend URL)
-          const pageRes = await fetch(`/api/store-pages/${encodeURIComponent(handle)}`, { cache: "no-store" }).catch(() => null);
+          const pageRes = await fetch(`/api/store-pages/${encodeURIComponent(handle)}`).catch(() => null);
           if (pageRes?.ok) {
             const pageData = await pageRes.json().catch(() => null);
             if (pageData?.id) { setCmsPage(pageData); setLoading(false); return; }
@@ -876,7 +876,7 @@ function CollectionPage() {
           }
           // Fallback 4: product by handle (supports {handle}-{8char-id} URL format)
           const tryProductHandle = async (h) => {
-            const r = await fetch(`/api/store-products/${encodeURIComponent(h)}`, { cache: "no-store" }).catch(() => null);
+            const r = await fetch(`/api/store-products/${encodeURIComponent(h)}`).catch(() => null);
             if (!r?.ok) return null;
             return r.json().catch(() => null);
           };
@@ -946,8 +946,8 @@ function CollectionPage() {
       return;
     }
     let cancelled = false;
-    getMedusaClient()
-      .request(`/store/landing-page/${encodeURIComponent(cmsPage.id)}`, { cache: "no-store" })
+    fetch(`/api/store-landing-page/${encodeURIComponent(cmsPage.id)}`)
+      .then((r) => r.json())
       .then(async (data) => {
         if (cancelled) return;
         const containers = Array.isArray(data?.containers) ? data.containers : [];
@@ -966,7 +966,7 @@ function CollectionPage() {
         // drop links whose category currently has nothing.
         const withCounts = await Promise.all(
           candidates.map((l) =>
-            fetch(`/api/store-products?category=${encodeURIComponent(l.slug)}&limit=1`, { cache: "no-store" })
+            fetch(`/api/store-products?category=${encodeURIComponent(l.slug)}&limit=1`)
               .then((r) => r.json())
               .then((d) => ({ ...l, hasProducts: Array.isArray(d?.products) && d.products.length > 0 }))
               .catch(() => ({ ...l, hasProducts: false }))
@@ -992,7 +992,7 @@ function CollectionPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-metafield-definitions", { cache: "no-store" })
+    fetch("/api/store-metafield-definitions")
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) setMetafieldDefinitions(data?.definitions || {});
