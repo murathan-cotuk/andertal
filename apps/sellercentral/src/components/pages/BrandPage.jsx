@@ -159,8 +159,12 @@ export default function BrandPage() {
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
 
   // Read caller identity from localStorage
-  const [callerId, setCallerId] = useState(null);
-  const [isSuperuser, setIsSuperuser] = useState(false);
+  const [callerId, setCallerId] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("sellerId") || null : null
+  );
+  const [isSuperuser, setIsSuperuser] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("sellerIsSuperuser") === "true" : false
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -295,13 +299,29 @@ export default function BrandPage() {
 
   useEffect(() => { loadBrands(); }, []);
 
-  // Split brands: mine vs others, then flatten into one paginated grid (mine first)
+  // Seller-owned brands stay in their own block at the top; everyone else's catalog is below.
   const myBrands = brands.filter((b) => b.seller_id && b.seller_id === callerId);
   const otherBrands = brands.filter((b) => !b.seller_id || b.seller_id !== callerId);
-  const allBrandsOrdered = [...myBrands, ...otherBrands];
-  const totalPages = Math.max(1, Math.ceil(allBrandsOrdered.length / BRANDS_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(otherBrands.length / BRANDS_PAGE_SIZE));
   const pageSafe = Math.min(Math.max(1, page), totalPages);
-  const pagedBrands = allBrandsOrdered.slice((pageSafe - 1) * BRANDS_PAGE_SIZE, pageSafe * BRANDS_PAGE_SIZE);
+  const pagedOtherBrands = otherBrands.slice((pageSafe - 1) * BRANDS_PAGE_SIZE, pageSafe * BRANDS_PAGE_SIZE);
+
+  const renderBrandGrid = (list, { isMineSection }) => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
+      {list.map((brand) => (
+        <BrandCard
+          key={brand.id}
+          brand={brand}
+          baseUrl={baseUrl}
+          onEdit={openEdit}
+          canEdit={canEditBrand(brand)}
+          isSuperuser={isSuperuser}
+          isMine={isMineSection || (!!brand.seller_id && brand.seller_id === callerId)}
+          copy={copy}
+        />
+      ))}
+    </div>
+  );
 
   const openCreate = () => {
     setEditingBrand(null);
@@ -484,13 +504,26 @@ export default function BrandPage() {
           </Card>
         )}
 
-        {/* ── ALL BRANDS (paginated grid: 4 per row, 100 per page) ─────────── */}
+        {/* ── MY BRANDS (seller-created, always on top, own block) ─────────── */}
+        {!loading && myBrands.length > 0 && (
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">{copy.myBrands}</Text>
+                <Badge tone="info">{myBrands.length}</Badge>
+              </InlineStack>
+              {renderBrandGrid(myBrands, { isMineSection: true })}
+            </BlockStack>
+          </Card>
+        )}
+
+        {/* ── ALL OTHER BRANDS (paginated grid: 4 per row, 100 per page) ───── */}
         <Card>
           <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center">
               <InlineStack gap="200" blockAlign="center">
-                <Text as="h2" variant="headingMd">{copy.title}</Text>
-                {allBrandsOrdered.length > 0 && <Badge tone="info">{allBrandsOrdered.length}</Badge>}
+                <Text as="h2" variant="headingMd">{copy.allBrands}</Text>
+                {otherBrands.length > 0 && <Badge>{otherBrands.length}</Badge>}
               </InlineStack>
               {totalPages > 1 && (
                 <InlineStack gap="200" blockAlign="center">
@@ -505,28 +538,26 @@ export default function BrandPage() {
               <Box padding="800">
                 <Text as="p" tone="subdued">{copy.loading}</Text>
               </Box>
-            ) : allBrandsOrdered.length === 0 ? (
+            ) : otherBrands.length === 0 ? (
               <Box padding="600" background="bg-surface-secondary" borderRadius="200">
                 <BlockStack gap="100">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">{copy.noBrandsYet}</Text>
-                  <Text as="p" tone="subdued">{copy.noBrandsHelp}</Text>
+                  {myBrands.length === 0 ? (
+                    <>
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">{copy.noBrandsYet}</Text>
+                      <Text as="p" tone="subdued">{copy.noBrandsHelp}</Text>
+                    </>
+                  ) : (
+                    <Text as="p" tone="subdued">{copy.noOtherBrands}</Text>
+                  )}
                 </BlockStack>
               </Box>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
-                {pagedBrands.map((brand) => (
-                  <BrandCard
-                    key={brand.id}
-                    brand={brand}
-                    baseUrl={baseUrl}
-                    onEdit={openEdit}
-                    canEdit={canEditBrand(brand)}
-                    isSuperuser={isSuperuser}
-                    isMine={!!brand.seller_id && brand.seller_id === callerId}
-                    copy={copy}
-                  />
-                ))}
-              </div>
+              <BlockStack gap="300">
+                {!isSuperuser && (
+                  <Text as="p" variant="bodySm" tone="subdued">{copy.othersReadonly}</Text>
+                )}
+                {renderBrandGrid(pagedOtherBrands, { isMineSection: false })}
+              </BlockStack>
             )}
           </BlockStack>
         </Card>

@@ -23,6 +23,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import { useLocale } from "next-intl";
 import { userError } from "@/lib/api-error-messages";
+import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { getCollectionEditCopy } from "@/lib/collection-edit-i18n";
 
 const getDefaultBaseUrl = () => {
@@ -652,14 +653,14 @@ export default function CollectionEditPage({ collection: initialCollection, isNe
                   <Text as="span" variant="bodySm" tone="subdued">{c.metaTitle}</Text>
                   <Text as="span" variant="bodySm" tone="subdued">{(form.meta_title || "").length} / {META_TITLE_MAX}</Text>
                 </div>
-                <TextField label="" labelHidden value={form.meta_title} onChange={(v) => setForm((prev) => ({ ...prev, meta_title: v.slice(0, META_TITLE_MAX) }))} placeholder={c.metaTitle} autoComplete="off" />
+                <TextField label="" labelHidden value={form.meta_title} onChange={(v) => setForm((prev) => ({ ...prev, meta_title: v.slice(0, META_TITLE_MAX) }))} placeholder={form.display_title || form.title || c.metaTitle} autoComplete="off" />
               </Box>
               <Box position="relative">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <Text as="span" variant="bodySm" tone="subdued">{c.metaDescription}</Text>
                   <Text as="span" variant="bodySm" tone="subdued">{(form.meta_description || "").length} / {META_DESC_MAX}</Text>
                 </div>
-                <TextField label="" labelHidden value={form.meta_description} onChange={(v) => setForm((prev) => ({ ...prev, meta_description: v.slice(0, META_DESC_MAX) }))} placeholder={c.metaDescription} multiline={2} autoComplete="off" />
+                <TextField label="" labelHidden value={form.meta_description} onChange={(v) => setForm((prev) => ({ ...prev, meta_description: v.slice(0, META_DESC_MAX) }))} placeholder={seoPlainPreview(form.richtext, 160) || c.metaDescription} multiline={2} autoComplete="off" />
               </Box>
               <TextField label={c.keywords} value={form.keywords} onChange={(value) => setForm((prev) => ({ ...prev, keywords: value }))} placeholder={c.keywordsPlaceholder} autoComplete="off" />
             </BlockStack>

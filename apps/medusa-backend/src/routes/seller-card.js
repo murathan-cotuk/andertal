@@ -153,6 +153,23 @@ module.exports = function createSellerCardRouter({
       }
     })
 
+    /** Resolve owner/team row by user uuid or marketplace seller_id; prefer a row that actually has a card. */
+    const findSellerCardRow = async (client, idOrSellerId) => {
+      const r = await client.query(
+        `SELECT id, stripe_payment_method_id, stripe_card_last4, stripe_card_brand, stripe_card_exp_month, stripe_card_exp_year
+         FROM seller_users
+         WHERE id::text = $1 OR seller_id = $1
+         ORDER BY
+           CASE WHEN COALESCE(stripe_payment_method_id, '') <> '' THEN 0 ELSE 1 END,
+           CASE WHEN id::text = $1 THEN 0 ELSE 1 END,
+           CASE WHEN sub_of_seller_id IS NULL THEN 0 ELSE 1 END,
+           created_at ASC
+         LIMIT 1`,
+        [String(idOrSellerId || '')],
+      )
+      return r.rows?.[0] || null
+    }
+
     /** GET /admin-hub/v1/sellers/:id/card — superuser: view seller's card */
   router.get('/admin-hub/v1/sellers/:id/card', requireSuperuser, async (req, res) => {
       const sellerId = req.params.id
@@ -160,14 +177,11 @@ module.exports = function createSellerCardRouter({
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const row = await client.query(
-          `SELECT stripe_payment_method_id, stripe_card_last4, stripe_card_brand, stripe_card_exp_month, stripe_card_exp_year FROM seller_users WHERE seller_id = $1 ORDER BY created_at LIMIT 1`,
-          [sellerId]
-        )
+        const r = await findSellerCardRow(client, sellerId)
         await client.end()
-        const r = row.rows?.[0] || {}
+        if (!r) return res.status(404).json({ message: 'Seller not found' })
         res.json({
-          has_card: !!r.stripe_payment_method_id,
+          has_card: !!(r.stripe_payment_method_id || r.stripe_card_last4),
           last4: r.stripe_card_last4 || null,
           brand: r.stripe_card_brand || null,
           exp_month: r.stripe_card_exp_month || null,
@@ -188,11 +202,7 @@ module.exports = function createSellerCardRouter({
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       try {
         await client.connect()
-        const row = await client.query(
-          `SELECT id, stripe_payment_method_id FROM seller_users WHERE seller_id = $1 ORDER BY created_at LIMIT 1`,
-          [sellerId]
-        )
-        const r = row.rows?.[0]
+        const r = await findSellerCardRow(client, sellerId)
         if (!r) { await client.end(); return res.status(404).json({ message: 'Seller not found' }) }
         if (r.stripe_payment_method_id && secretKey) {
           const stripe = new (require('stripe'))(secretKey)

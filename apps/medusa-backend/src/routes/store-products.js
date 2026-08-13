@@ -199,6 +199,59 @@ const extractEanFromHubProductRow = (p) => {
   return ''
 }
 
+/** True if parent metadata.ean OR any variants[].ean equals target. */
+const productHasEan = (p, targetEan) => {
+  const want = normalizeStoreEan(targetEan)
+  if (!p || !want) return false
+  const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+  if (normalizeStoreEan(meta.ean) === want) return true
+  for (const row of parseVariantsArray(p)) {
+    if (normalizeStoreEan(row && row.ean) === want) return true
+  }
+  return false
+}
+
+/** All distinct sellable EANs on a product (parent + variants). */
+const collectProductEans = (p) => {
+  const out = []
+  const seen = new Set()
+  const add = (raw) => {
+    const e = normalizeStoreEan(raw)
+    if (!e || seen.has(e)) return
+    seen.add(e)
+    out.push(e)
+  }
+  if (!p) return out
+  const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
+  add(meta.ean)
+  for (const row of parseVariantsArray(p)) add(row && row.ean)
+  return out
+}
+
+/**
+ * Whether a seller_listing applies to the given EAN.
+ * - seller_metadata.covers_all → every EAN on the parent
+ * - seller_metadata.ean → only that child EAN (seller joined via variant barcode)
+ * - empty metadata on multi-EAN parents → treat as covers_all for backward compat of
+ *   old full-product listings; new variant joins always write ean (see admin-products).
+ */
+const listingCoversEan = (listing, targetEan, productRow) => {
+  const want = normalizeStoreEan(targetEan)
+  if (!want) return false
+  const sm = listing && listing.seller_metadata && typeof listing.seller_metadata === 'object'
+    ? listing.seller_metadata
+    : {}
+  if (sm.covers_all === true) return true
+  const listed = normalizeStoreEan(sm.ean || sm.listed_ean || '')
+  if (listed) return listed === want
+  const all = collectProductEans(productRow)
+  if (all.length <= 1) return true
+  // Legacy listing with no EAN scope on a multi-variant parent: pin to the
+  // representative (first) EAN only so siblings don't inherit "Andere Verkäufer".
+  // New joins always persist seller_metadata.ean for the exact child barcode.
+  return extractEanFromHubProductRow(productRow) === want
+}
+
 const primaryPriceCentsHubProduct = (p) => {
   const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
   const prices = meta.prices && typeof meta.prices === 'object' ? meta.prices : {}
@@ -251,13 +304,19 @@ const loadSellerReviewStatsBatch = async (sellerIds) => {
   }
 }
 
-const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
+const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedList = null) => {
   const ean = normalizeStoreEan(canonicalEan)
   if (!ean) return []
-  let list = await listAdminHubProductsDb({ limit: 5000 })
-  list = list.filter((row) => isStorePublishedStatus(row.status) && isStoreVisibleSellerProduct(row, approvedSellerIds))
-  const legacyOffers = list.filter((row) => extractEanFromHubProductRow(row) === ean && row.seller_id)
-  const masterRow = list.find((row) => extractEanFromHubProductRow(row) === ean && !row.seller_id)
+  let list = preloadedList
+  if (!list) {
+    list = await listAdminHubProductsDb({ limit: 5000 })
+    list = list.filter((row) => isStorePublishedStatus(row.status) && isStoreVisibleSellerProduct(row, approvedSellerIds))
+  }
+  // Match any product that carries this EAN on parent OR a variant — not only the
+  // "first representative" EAN (extractEanFromHubProductRow), which hid sibling EANs.
+  const matchingRows = list.filter((row) => productHasEan(row, ean))
+  const legacyOffers = matchingRows.filter((row) => row.seller_id)
+  const masterRow = matchingRows.find((row) => !row.seller_id) || null
   const allEanPublishedRows = masterRow ? [masterRow, ...legacyOffers] : legacyOffers
   let listingOffers = []
   const productIdsForListings = [...new Set(allEanPublishedRows.map((r) => String(r.id)))]
@@ -268,16 +327,21 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
         const lc = require('../db-pool').getPooledClient()
         await lc.connect()
         const lr = await lc.query(
-          `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
+          `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id, seller_metadata
+           FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
           [productIdsForListings]
         )
         await lc.end()
         const productById = new Map(allEanPublishedRows.map((r) => [String(r.id), r]))
         listingOffers = (lr.rows || [])
           .filter((l) => !approvedSellerIds || approvedSellerIds.size === 0 || approvedSellerIds.has(l.seller_id))
+          .filter((l) => {
+            const baseRow = productById.get(String(l.product_id)) || masterRow || legacyOffers[0]
+            return listingCoversEan(l, ean, baseRow)
+          })
           .map((l) => {
             const baseRow = productById.get(String(l.product_id)) || masterRow || legacyOffers[0]
-            return { ...baseRow, id: String(l.product_id) + '-listing-' + l.seller_id, _listing_id: String(l.product_id), seller_id: l.seller_id, price_cents: l.price_cents, inventory: l.inventory, _orders_count: l.orders_count }
+            return { ...baseRow, id: String(l.product_id) + '-listing-' + l.seller_id, _listing_id: String(l.product_id), seller_id: l.seller_id, price_cents: l.price_cents, inventory: l.inventory, _orders_count: l.orders_count, _listing_ean: normalizeStoreEan(l.seller_metadata?.ean) || ean }
           })
       } catch (_) {}
     }
@@ -285,6 +349,46 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds) => {
   const sellersCoveredByListings = new Set(listingOffers.map((o) => o.seller_id))
   return [...listingOffers, ...legacyOffers.filter((o) => !sellersCoveredByListings.has(o.seller_id))]
 }
+
+const scoreEanOffers = async (offers) => {
+  if (!offers.length) return []
+  const sellerKeys = offers.map((p) => String(p.seller_id || 'default').trim() || 'default')
+  const statsMap = await loadSellerReviewStatsBatch(sellerKeys)
+  const scored = offers.map((p) => {
+    const sid = String(p.seller_id || 'default').trim() || 'default'
+    const st = statsMap.get(sid) || { avg: 0, count: 0 }
+    const price = primaryPriceCentsHubProduct(p)
+    const inv = totalInventoryHubProduct(p)
+    return { p, score: computeBuyBoxScore(price, st.avg, st.count, inv), price, inv, stats: st, sid }
+  })
+  scored.sort((a, b) => {
+    const diff = b.score - a.score
+    return diff !== 0 ? diff : new Date(a.p.created_at || 0) - new Date(b.p.created_at || 0)
+  })
+  return scored
+}
+
+const mapOtherSellersFromScored = (scored, storeNames) =>
+  scored.slice(1).map(({ p, price, stats, sid }) => {
+    const realProductId = p._listing_id || String(p.id)
+    const masterP = p._listing_id ? (scored.find((x) => String(x.p.id) === p._listing_id)?.p || p) : p
+    const m = masterP.metadata && typeof masterP.metadata === 'object' ? masterP.metadata : {}
+    const rawMediaList = Array.isArray(m.media) ? m.media : (typeof m.media === 'string' && m.media ? [m.media] : [])
+    const thumb = resolveUploadUrl((typeof rawMediaList[0] === 'string' ? rawMediaList[0] : (rawMediaList[0] && rawMediaList[0].url) || null) || m.thumbnail || null)
+    return {
+      product_id: realProductId,
+      handle: masterP.handle || p.handle,
+      title: masterP.title || p.title || '',
+      seller_id: sid,
+      store_name: storeNames[sid] || sid,
+      price_cents: price,
+      seller_review_avg: stats.avg,
+      seller_review_count: stats.count,
+      in_stock: (p.inventory != null ? p.inventory : totalInventoryHubProduct(p)) > 0,
+      thumbnail: thumb || null,
+      ean: p._listing_ean || null,
+    }
+  })
 
 const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
@@ -851,35 +955,57 @@ const storeProductByIdFromAdminHubGET = async (req, res) => {
     if (!landed || !isStorePublishedStatus(landed.status) || !isStoreVisibleSellerProduct(landed, approvedSellerIds)) {
       return res.status(404).json({ message: 'Product not found' })
     }
-    const canonicalEan = extractEanFromHubProductRow(landed)
+    const productEans = collectProductEans(landed)
+    const canonicalEan = extractEanFromHubProductRow(landed) || productEans[0] || ''
     let winnerRow = landed, multiOffer = null
-    if (canonicalEan) {
-      const offers = await findEanOffersFromHub(canonicalEan, approvedSellerIds)
-      if (offers.length >= 1) {
-        const sellerKeys = offers.map((p) => String(p.seller_id || 'default').trim() || 'default')
-        const statsMap = await loadSellerReviewStatsBatch(sellerKeys)
-        const scored = offers.map((p) => {
-          const sid = String(p.seller_id || 'default').trim() || 'default'
-          const st = statsMap.get(sid) || { avg: 0, count: 0 }
-          const price = primaryPriceCentsHubProduct(p)
-          const inv = totalInventoryHubProduct(p)
-          return { p, score: computeBuyBoxScore(price, st.avg, st.count, inv), price, inv, stats: st, sid }
-        })
-        scored.sort((a, b) => { const diff = b.score - a.score; return diff !== 0 ? diff : new Date(a.p.created_at || 0) - new Date(b.p.created_at || 0) })
-        winnerRow = scored[0].p
-        const uniqueSellers = [...new Set(scored.map((x) => x.sid))]
-        const storeNames = {}
-        await Promise.all(uniqueSellers.map(async (sid) => { storeNames[sid] = (await getSellerStoreName(sid)) || sid }))
-        const reviewProductIds = offers.map((p) => String(p._listing_id || p.id))
-        const otherSellers = scored.slice(1).map(({ p, price, stats, sid }) => {
-          const realProductId = p._listing_id || String(p.id)
-          const masterP = p._listing_id ? (scored.find((x) => String(x.p.id) === p._listing_id)?.p || p) : p
-          const m = masterP.metadata && typeof masterP.metadata === 'object' ? masterP.metadata : {}
-          const rawMediaList = Array.isArray(m.media) ? m.media : (typeof m.media === 'string' && m.media ? [m.media] : [])
-          const thumb = resolveUploadUrl((typeof rawMediaList[0] === 'string' ? rawMediaList[0] : (rawMediaList[0] && rawMediaList[0].url) || null) || m.thumbnail || null)
-          return { product_id: realProductId, handle: masterP.handle || p.handle, title: masterP.title || p.title || '', seller_id: sid, store_name: storeNames[sid] || sid, price_cents: price, seller_review_avg: stats.avg, seller_review_count: stats.count, in_stock: (p.inventory != null ? p.inventory : totalInventoryHubProduct(p)) > 0, thumbnail: thumb || null }
-        })
-        if (offers.length > 1) multiOffer = { canonical_ean: canonicalEan, review_product_ids: reviewProductIds, landed_product_id: String(landed.id), buy_box_product_id: String(winnerRow._listing_id || winnerRow.id), other_sellers: otherSellers }
+    if (canonicalEan || productEans.length) {
+      let publishedList = await listAdminHubProductsDb({ limit: 5000 })
+      publishedList = publishedList.filter((row) => isStorePublishedStatus(row.status) && isStoreVisibleSellerProduct(row, approvedSellerIds))
+      const eansToBuild = productEans.length ? productEans : (canonicalEan ? [canonicalEan] : [])
+      const byEan = {}
+      let primaryScored = null
+      const allSellerIds = new Set()
+      const offersByEan = {}
+      for (const ean of eansToBuild) {
+        const offers = await findEanOffersFromHub(ean, approvedSellerIds, publishedList)
+        offersByEan[ean] = offers
+        for (const o of offers) allSellerIds.add(String(o.seller_id || 'default').trim() || 'default')
+      }
+      const storeNames = {}
+      await Promise.all([...allSellerIds].map(async (sid) => { storeNames[sid] = (await getSellerStoreName(sid)) || sid }))
+      for (const ean of eansToBuild) {
+        const scored = await scoreEanOffers(offersByEan[ean] || [])
+        if (!scored.length) {
+          byEan[ean] = { other_sellers: [], buy_box_product_id: null }
+          continue
+        }
+        byEan[ean] = {
+          other_sellers: mapOtherSellersFromScored(scored, storeNames),
+          buy_box_product_id: String(scored[0].p._listing_id || scored[0].p.id),
+        }
+        if (ean === canonicalEan) primaryScored = scored
+      }
+      if (!primaryScored && eansToBuild[0]) primaryScored = await scoreEanOffers(offersByEan[eansToBuild[0]] || [])
+      if (primaryScored && primaryScored.length) {
+        winnerRow = primaryScored[0].p
+        const reviewProductIds = [...new Set(
+          eansToBuild.flatMap((ean) => (offersByEan[ean] || []).map((p) => String(p._listing_id || p.id)))
+        )]
+        const primaryEan = canonicalEan || eansToBuild[0]
+        const primaryOther = (byEan[primaryEan] && byEan[primaryEan].other_sellers) || []
+        const anyOther = primaryOther.length > 0 || Object.values(byEan).some((b) => (b.other_sellers || []).length > 0)
+        if (anyOther || (offersByEan[primaryEan] || []).length > 1) {
+          multiOffer = {
+            canonical_ean: primaryEan,
+            review_product_ids: reviewProductIds,
+            landed_product_id: String(landed.id),
+            buy_box_product_id: String(winnerRow._listing_id || winnerRow.id),
+            other_sellers: primaryOther,
+            // Per-variant EAN map so the shop can swap "Andere Verkäufer" when the
+            // customer changes size/color without refetching the product.
+            by_ean: byEan,
+          }
+        }
       }
     }
     if (winnerRow.collection_id) {
@@ -957,8 +1083,8 @@ module.exports = function createStoreProductsRouter() {
           mapped.metadata = { ...(mapped.metadata || {}), seller_name: storeName, shop_name: storeName }
         }
         mapped.metadata = { ...(mapped.metadata || {}), brand_name: brand.name, brand_logo: brand.logo_image || null, brand_handle: brand.handle || null }
-        await applyBestsellerFlagsToMappedProduct(mapped, p.id)
-        resolveCustomBadgesForProduct(p.id, mapped, badgeCtx)
+        await applyBestsellerFlagsToMappedProduct(mapped, canonicalProductId(p) || p.id)
+        resolveCustomBadgesForProduct([p.id, p._listing_id, canonicalProductId(p)], mapped, badgeCtx)
         products.push(mapped)
       }
       res.json({ brand, products, count: products.length })
@@ -978,6 +1104,9 @@ module.exports.normalizeStoreEan = normalizeStoreEan
 module.exports.parseVariantsArray = parseVariantsArray
 module.exports.getBestsellerProductIds = getBestsellerProductIds
 module.exports.applyBestsellerFlagsToMappedProduct = applyBestsellerFlagsToMappedProduct
+module.exports.buildProductBadgeContext = buildProductBadgeContext
+module.exports.resolveCustomBadgesForProduct = resolveCustomBadgesForProduct
+module.exports.canonicalProductId = canonicalProductId
 module.exports.isUuidLike = isUuidLike
 module.exports.getAdminHubCollectionIdByHandle = getAdminHubCollectionIdByHandle
 module.exports.storeProductCategoryIds = storeProductCategoryIds

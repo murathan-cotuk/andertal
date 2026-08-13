@@ -1,6 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { getPooledClient } = require('../db-pool')
+const { productHasPendingCatalogMetafields } = require('../catalog-metafield-pending')
 
 const _log = { info: (...a) => { if (process.env.NODE_ENV !== 'production') console.log(...a) } }
 
@@ -91,6 +92,7 @@ const getApprovedSellerIdsSet = async () => {
 }
 
 const isStoreVisibleSellerProduct = (product, approvedSellerIds) => {
+  if (productHasPendingCatalogMetafields(product)) return false
   const sid = String(product?.seller_id || '').trim()
   if (!sid || sid === 'default') return true
   return approvedSellerIds.has(sid)

@@ -1,5 +1,6 @@
 "use client";
 
+import "@/lib/tab-scoped-auth-storage";
 import { UnsavedChangesProvider } from "@/context/UnsavedChangesContext";
 import { SellerImpersonationProvider } from "@/context/SellerImpersonationContext";
 

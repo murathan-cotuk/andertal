@@ -16,8 +16,9 @@ import {
   Banner,
   Divider,
   Select,
+  Tabs,
 } from "@shopify/polaris";
-import { ProductIcon } from "@shopify/polaris-icons";
+import { ProductIcon, LockIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
@@ -31,6 +32,7 @@ import {
   PRODUCT_SECTION_STYLES,
 } from "@/components/products/ProductSection";
 import { lt } from "@/lib/locale-text";
+import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 
 /** Same shape as ProductEditPage's getMeta/updateMeta, but reads/writes the VARIANT's own
@@ -158,6 +160,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   const [shippingGroupsList, setShippingGroupsList] = useState([]);
   const [euOriginVerifying, setEuOriginVerifying] = useState(false);
   const [euOriginNotice, setEuOriginNotice] = useState("");
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -409,6 +412,53 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
     });
   };
 
+  /**
+   * Fields locked to the parent product's value: mirrors the parent live (both on screen and
+   * on save) while locked — the field is disabled and shows the parent's current value.
+   * Unlocking stops the mirroring and leaves the last-shown value in place, editable (it does
+   * not clear the field).
+   */
+  const lockedFields = Array.isArray(vm.parent_locked_fields) ? vm.parent_locked_fields : [];
+  const isFieldLocked = (key) => lockedFields.includes(key);
+  /** setValue: optional custom writer for fields not stored as a plain vm[key] (e.g. locale-translated description). */
+  const toggleFieldLock = (key, parentValue, setValue) => {
+    const nowLocked = isFieldLocked(key);
+    patchVariant((cur) => {
+      const m = { ...(cur.metadata && typeof cur.metadata === "object" ? cur.metadata : {}) };
+      const cf = Array.isArray(m.parent_locked_fields) ? m.parent_locked_fields : [];
+      if (nowLocked) {
+        m.parent_locked_fields = cf.filter((k) => k !== key);
+        return { ...cur, metadata: m };
+      }
+      m.parent_locked_fields = [...cf.filter((k) => k !== key), key];
+      if (!setValue) {
+        if (parentValue === "" || parentValue == null) delete m[key];
+        else m[key] = parentValue;
+      }
+      return { ...cur, metadata: m };
+    });
+    if (!nowLocked && setValue) setValue(parentValue);
+  };
+  /** Lock toggle button placed next to a lockable field's label. */
+  const LockToggle = ({ fieldKey, parentValue, setValue }) => {
+    const locked = isFieldLocked(fieldKey);
+    return (
+      <button
+        type="button"
+        onClick={() => toggleFieldLock(fieldKey, parentValue, setValue)}
+        title={locked ? t("Locked to parent value — click to unlock and edit", "Ana ürün değerine kilitli — düzenlemek için kilidi aç", "Verrouillé sur la valeur du produit parent — cliquez pour déverrouiller", "Bloqueado al valor del producto principal — clic para desbloquear", "Bloccato al valore del prodotto principale — clic per sbloccare", "An Hauptartikel-Wert gebunden — zum Bearbeiten entsperren") : t("Use parent value", "Ana ürün değerini kullan", "Utiliser la valeur du produit parent", "Usar el valor del producto principal", "Usa il valore del prodotto principale", "Wert vom Hauptartikel übernehmen")}
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 22, height: 22, padding: 0, border: "none", borderRadius: 4, cursor: "pointer",
+          background: locked ? "var(--p-color-bg-fill-brand, #303030)" : "transparent",
+          color: locked ? "#fff" : "var(--p-color-icon-subdued)",
+        }}
+      >
+        <span style={{ width: 14, height: 14, display: "block" }}><LockIcon /></span>
+      </button>
+    );
+  };
+
   const updateVariantCategoryWithParents = useCallback((categoryId) => {
     const selected = String(categoryId || "").trim();
     patchVariant((cur) => {
@@ -533,6 +583,8 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         .product-description-toolbar .product-desc-html-btn.active { background: var(--p-color-bg-surface-selected); }
         .product-description-editor { min-height: 160px; padding: 16px; outline: none; font-size: 14px; line-height: 1.6; }
         .product-description-html { min-height: 160px; width: 100%; padding: 16px; font-family: ui-monospace, monospace; font-size: 13px; border: none; resize: vertical; box-sizing: border-box; }
+        .product-edit-price-grid { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 16px; align-items: start; }
+        @media (max-width: 780px) { .product-edit-price-grid { grid-template-columns: 1fr; } }
         ${PRODUCT_SECTION_STYLES}
       `}</style>
 
@@ -561,6 +613,19 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         </Button>
       </div>
 
+      <Box paddingBlockEnd="300">
+        <Tabs
+          tabs={[
+            { id: "allgemein", content: t("General", "Genel", "Général", "General", "Generale", "Allgemein") },
+            { id: "spezifikationen", content: t("Specifications", "Özellikler", "Spécifications", "Especificaciones", "Specifiche", "Spezifikationen") },
+            { id: "rechtlich", content: t("Legal", "Yasal", "Juridique", "Legal", "Legale", "Rechtlich") },
+          ]}
+          selected={activeTabIndex}
+          onSelect={setActiveTabIndex}
+        />
+      </Box>
+
+      {activeTabIndex === 0 && (
       <Layout>
         <Layout.Section>
           <Card>
@@ -679,168 +744,15 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
               <ProductSectionRule />
 
-              <ProductSectionHeading>
-                {locale === "en" ? "Compliance / manufacturer (this variant)" : locale === "tr" ? "Uyumluluk / üretici (bu varyant)" : locale === "fr" ? "Conformité / fabricant (cette variante)" : locale === "es" ? "Cumplimiento / fabricante (esta variante)" : locale === "it" ? "Conformità / produttore (questa variante)" : "Compliance / Hersteller (diese Variante)"}
-              </ProductSectionHeading>
-              <Text as="p" variant="bodySm" tone="subdued">
-                {locale === "en"
-                  ? "EU product safety (GPSR). Tap “i” for what to enter in each field."
-                  : locale === "tr"
-                    ? "AB ürün güvenliği (GPSR). Her alana ne yazılacağını “i” ile görün."
-                    : locale === "fr"
-                      ? "Sécurité produit UE (GPSR). Appuyez sur « i » pour savoir quoi saisir."
-                      : locale === "es"
-                        ? "Seguridad de producto UE (GPSR). Pulsa « i » para ver qué indicar."
-                        : locale === "it"
-                          ? "Sicurezza prodotto UE (GPSR). Tocca « i » per sapere cosa inserire."
-                          : "EU-Produktsicherheit (GPSR). Tippen Sie auf „i“, um zu sehen, was einzutragen ist."}
-              </Text>
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>{locale === "en" ? "Manufacturer" : locale === "tr" ? "Üretici" : locale === "fr" ? "Fabricant" : locale === "es" ? "Fabricante" : locale === "it" ? "Fabbricante" : "Hersteller"}</span>
-                    <InfoIconTooltip
-                      text={
-                        locale === "en" ? "Name of the company or person that manufactured the product."
-                          : locale === "tr" ? "Ürünü üreten şirket veya kişinin adı."
-                            : locale === "fr" ? "Nom du fabricant."
-                              : locale === "es" ? "Nombre del fabricante."
-                                : locale === "it" ? "Nome del fabbricante."
-                                  : "Name des Herstellers."
-                      }
-                    />
-                  </InlineStack>
-                }
-                value={getMeta(v, "hersteller")}
-                onChange={(val) => updateVariantMeta("hersteller", val || undefined)}
-                placeholder={locale === "en" ? "e.g. Acme GmbH" : "z. B. Acme GmbH"}
-                autoComplete="off"
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>{locale === "en" ? "Manufacturer details" : locale === "tr" ? "Üretici bilgileri" : locale === "fr" ? "Coordonnées du fabricant" : locale === "es" ? "Datos del fabricante" : locale === "it" ? "Dati del fabbricante" : "Herstellerinformationen"}</span>
-                    <InfoIconTooltip
-                      text={
-                        locale === "en" ? "Postal address and contact of the manufacturer."
-                          : locale === "tr" ? "Üreticinin posta adresi ve iletişimi."
-                            : locale === "fr" ? "Adresse et contact du fabricant."
-                              : locale === "es" ? "Dirección y contacto del fabricante."
-                                : locale === "it" ? "Indirizzo e contatto del fabbricante."
-                                  : "Adresse und Kontakt des Herstellers."
-                      }
-                    />
-                  </InlineStack>
-                }
-                value={getMeta(v, "hersteller_information")}
-                onChange={(val) => updateVariantMeta("hersteller_information", val || undefined)}
-                placeholder={locale === "en" ? "Street, city, country, email/phone" : "Straße, Ort, Land, E-Mail/Telefon"}
-                multiline={2}
-                autoComplete="off"
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>{locale === "en" ? "Responsible person (EU)" : locale === "tr" ? "Sorumlu kişi (AB)" : locale === "fr" ? "Personne responsable (UE)" : locale === "es" ? "Persona responsable (UE)" : locale === "it" ? "Persona responsabile (UE)" : "Verantwortliche Person (EU)"}</span>
-                    <InfoIconTooltip
-                      text={
-                        locale === "en" ? "EU-based safety contact. If the manufacturer is in the EU, this can be the same party."
-                          : locale === "tr" ? "AB’de yerleşik güvenlik iletişimi. Üretici AB’deyse aynı taraf olabilir."
-                            : locale === "fr" ? "Contact sécurité basé dans l'UE. Si le fabricant est dans l'UE, ce peut être la même entité."
-                              : locale === "es" ? "Contacto de seguridad en la UE. Si el fabricante está en la UE, puede ser la misma parte."
-                                : locale === "it" ? "Contatto di sicurezza nell'UE. Se il fabbricante è nell'UE, può essere la stessa parte."
-                                  : "In der EU ansässige Sicherheitskontaktstelle. Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein."
-                      }
-                    />
-                  </InlineStack>
-                }
-                value={getMeta(v, "verantwortliche_person_information")}
-                onChange={(val) => updateVariantMeta("verantwortliche_person_information", val || undefined)}
-                placeholder={locale === "en" ? "Name, EU address, email/phone" : "Name, EU-Adresse, E-Mail/Telefon"}
-                multiline={2}
-                autoComplete="off"
-              />
-              <ComplianceFieldsSection
-                client={client}
-                categoryId={getMeta(v, "category_id")}
-                marketplace="DE"
-                locale={locale}
-                product={v}
-                getMeta={getMeta}
-                updateMeta={updateVariantMeta}
-              />
-
-              <ProductSectionRule />
-              <ProductSectionHeading>
-                {locale === "en" ? "Made in Europe (this variant, optional)" : locale === "tr" ? "Made in Europe (bu varyant, isteğe bağlı)" : locale === "fr" ? "Made in Europe (cette variante, optionnel)" : locale === "es" ? "Made in Europe (esta variante, opcional)" : locale === "it" ? "Made in Europe (questa variante, opzionale)" : "Made in Europe (diese Variante, optional)"}
-              </ProductSectionHeading>
-              {euOriginNotice ? (
-                <Banner tone="info" onDismiss={() => setEuOriginNotice("")}>{euOriginNotice}</Banner>
-              ) : null}
-              <TextField
-                label={locale === "en" ? "Country of origin (EU)" : locale === "tr" ? "Menşe ülke (AB)" : locale === "fr" ? "Pays d'origine (UE)" : locale === "es" ? "País de origen (UE)" : locale === "it" ? "Paese di origine (UE)" : "Herkunftsland (EU)"}
-                value={vm.eu_origin_country ?? ""}
-                onChange={(val) => updateVariantMeta("eu_origin_country", val || undefined)}
-                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
-                autoComplete="off"
-              />
-              <TextField
-                label="Registry-ID"
-                value={vm.eu_origin_registry_id ?? ""}
-                onChange={(val) => updateVariantMeta("eu_origin_registry_id", val || undefined)}
-                placeholder={locale === "en" ? "EU registry / certificate number" : locale === "tr" ? "AB kayıt / sertifika numarası" : locale === "fr" ? "Registre UE / numéro de certificat" : locale === "es" ? "Registro UE / número de certificado" : locale === "it" ? "Registro UE / numero di certificato" : "EU-Registry / Zertifikatsnummer"}
-                autoComplete="off"
-              />
-              <TextField
-                label="Nachweisdokument (URL)"
-                value={vm.eu_origin_document_url ?? ""}
-                onChange={(val) => updateVariantMeta("eu_origin_document_url", val || undefined)}
-                placeholder="https://…"
-                autoComplete="off"
-              />
-              <Select
-                label={locale === "en" ? "Registry provider" : locale === "tr" ? "Registry sağlayıcısı" : locale === "fr" ? "Fournisseur de registre" : locale === "es" ? "Proveedor de registro" : locale === "it" ? "Provider registro" : "Registry-Provider"}
-                options={[
-                  { label: locale === "en" ? "Stub (manual check)" : locale === "tr" ? "Stub (manuel kontrol)" : locale === "fr" ? "Stub (vérification manuelle)" : locale === "es" ? "Stub (verificación manual)" : locale === "it" ? "Stub (verifica manuale)" : "Stub (manuelle Prüfung)", value: "stub" },
-                ]}
-                value={vm.eu_origin_provider || "stub"}
-                onChange={(val) => updateVariantMeta("eu_origin_provider", val || "stub")}
-              />
-              <TextField
-                label="Status"
-                value={vm.eu_origin_status || "—"}
-                readOnly
-                autoComplete="off"
-                helpText={
-                  vm.eu_origin_verified_at
-                    ? `${locale === "en" ? "Verified at:" : locale === "tr" ? "Doğrulandı:" : locale === "fr" ? "Vérifié le :" : locale === "es" ? "Verificado el:" : locale === "it" ? "Verificato il:" : "Verifiziert am:"} ${vm.eu_origin_verified_at}`
-                    : (locale === "en" ? "Only backend/superuser sets \"verified\"." : locale === "tr" ? "Yalnızca backend/süper kullanıcı \"doğrulandı\" olarak ayarlar." : locale === "fr" ? "Seul le backend/superuser définit \"vérifié\"." : locale === "es" ? "Solo backend/superusuario establece \"verificado\"." : locale === "it" ? "Solo backend/superuser imposta \"verificato\"." : 'Nur Backend/Superuser setzt „verified".')
-                }
-              />
-              <InlineStack gap="200">
-                <Button
-                  onClick={() => handleVerifyEuOriginVariant(false)}
-                  loading={euOriginVerifying}
-                  disabled={!product?.id || euOriginVerifying}
-                >
-                  {locale === "en" ? "Check registry (stub)" : locale === "tr" ? "Registry kontrol et (stub)" : locale === "fr" ? "Vérifier le registre (stub)" : locale === "es" ? "Verificar registro (stub)" : locale === "it" ? "Controlla registro (stub)" : "Registry prüfen (Stub)"}
-                </Button>
-                {isSuperuser ? (
-                  <Button
-                    variant="primary"
-                    onClick={() => handleVerifyEuOriginVariant(true)}
-                    loading={euOriginVerifying}
-                    disabled={!product?.id || euOriginVerifying}
-                  >
-                    {locale === "en" ? "Verify manually" : locale === "tr" ? "Manuel doğrula" : locale === "fr" ? "Vérifier manuellement" : locale === "es" ? "Verificar manualmente" : locale === "it" ? "Verifica manualmente" : "Manuell verifizieren"}
-                  </Button>
-                ) : null}
+              <InlineStack gap="200" blockAlign="center" wrap={false}>
+                <ProductSectionHeading>Description</ProductSectionHeading>
+                <LockToggle
+                  fieldKey="description"
+                  parentValue={locale === "de" ? (product?.description || "") : (product?.metadata?.translations?.[locale]?.description || "")}
+                  setValue={(val) => (locale === "de" ? updateVariantMeta("description", val) : updateLocaleVariantField("description", val))}
+                />
               </InlineStack>
-
-              <ProductSectionRule />
-
-              <ProductSectionHeading>Description</ProductSectionHeading>
-              <div className="product-description-box">
+              <div className="product-description-box" style={isFieldLocked("description") ? { opacity: 0.6, pointerEvents: "none" } : undefined}>
                 <div className="product-description-toolbar">
                   <div />
                   <button
@@ -976,11 +888,12 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
               <ProductSectionRule />
 
-              <ProductSectionHeading>Prices (€)</ProductSectionHeading>
+              <ProductSectionHeading>{lt(locale, "Pricing", "Fiyatlandırma", "Tarification", "Precios", "Prezzi", "Preisgestaltung")}</ProductSectionHeading>
+              <div className="product-edit-price-grid">
               {[
-                { field: "price", centsKey: "price_cents", label: "Price" },
-                { field: "compare_at_price", centsKey: "compare_at_price_cents", label: "UVP" },
-                { field: "sale_price", centsKey: "sale_price_cents", label: "Sale" },
+                { field: "compare_at_price", centsKey: "compare_at_price_cents", label: lt(locale, "UVP (RRP)", "UVP", "PVR", "PVP", "PVR", "UVP") },
+                { field: "price", centsKey: "price_cents", label: lt(locale, "Selling price", "Satış fiyatı", "Prix de vente", "Precio de venta", "Prezzo di vendita", "Verkaufspreis") },
+                { field: "sale_price", centsKey: "sale_price_cents", label: lt(locale, "Discount price", "İndirim fiyatı", "Prix réduit", "Precio de descuento", "Prezzo scontato", "Rabattpreis") },
               ].map(({ field: f, centsKey: ck, label: priceLabel }) => {
                 const dk = `${f}_draft`;
                 const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
@@ -1014,6 +927,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                   />
                 );
               })}
+              </div>
 
               <ProductSectionRule />
 
@@ -1056,6 +970,90 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 </Button>
               )}
 
+              <ProductSectionRule />
+
+              <ProductSectionHeading>SEO (variant)</ProductSectionHeading>
+              <TextField
+                label="Meta title"
+                value={vm.seo_meta_title ?? vTr.seo_title ?? ""}
+                onChange={(t) => updateVariantMeta("seo_meta_title", t || undefined)}
+                placeholder={editingTitle || product?.title || "Meta title"}
+              />
+              <TextField
+                label="Meta description"
+                value={vm.seo_meta_description ?? vTr.seo_description ?? ""}
+                onChange={(t) => updateVariantMeta("seo_meta_description", t || undefined)}
+                placeholder={seoPlainPreview(editingDescription || product?.description, 160) || "Meta description"}
+                multiline={2}
+              />
+              <TextField
+                label="Keywords"
+                value={vm.seo_keywords ?? vTr.seo_keywords ?? ""}
+                onChange={(t) => updateVariantMeta("seo_keywords", t || undefined)}
+              />
+            </BlockStack>
+            </div>
+          </Card>
+        </Layout.Section>
+
+        <Layout.Section variant="oneThird">
+          <div className="product-edit-sidebar">
+          <Card>
+            <BlockStack gap="300">
+              <ProductSectionHeading>Product status</ProductSectionHeading>
+              <Select
+                label="Status"
+                labelHidden
+                options={STATUS_OPTIONS(locale)}
+                value={product.status || "draft"}
+                disabled
+              />
+              <Text as="p" variant="bodySm" tone="subdued">
+                Change status on the main product page.
+              </Text>
+              <Divider />
+              <Button onClick={() => router.push(`/products/${idOrHandle}`)}>{t("Back to product", "Ürüne dön", "Retour au produit", "Volver al producto", "Torna al prodotto", "Zurück zum Produkt")}</Button>
+            </BlockStack>
+          </Card>
+          </div>
+        </Layout.Section>
+      </Layout>
+      )}
+
+      {activeTabIndex === 1 && (
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{t("Dimensions & packaging", "Ölçüler ve ambalaj", "Dimensions et emballage", "Dimensiones y embalaje", "Dimensioni e imballaggio", "Maße & Verpackung")}</ProductSectionHeading>
+              <InlineStack gap="200" wrap>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${t("Width", "Genişlik", "Largeur", "Ancho", "Larghezza", "Breite")} (cm)`} type="number" value={vm.dimensions_width != null ? String(vm.dimensions_width) : ""} onChange={(val) => updateVariantMeta("dimensions_width", val)} placeholder="0" />
+                </Box>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${t("Height", "Yükseklik", "Hauteur", "Alto", "Altezza", "Höhe")} (cm)`} type="number" value={vm.dimensions_height != null ? String(vm.dimensions_height) : ""} onChange={(val) => updateVariantMeta("dimensions_height", val)} placeholder="0" />
+                </Box>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${t("Length", "Uzunluk", "Longueur", "Largo", "Lunghezza", "Länge")} (cm)`} type="number" value={vm.dimensions_length != null ? String(vm.dimensions_length) : ""} onChange={(val) => updateVariantMeta("dimensions_length", val)} placeholder="0" />
+                </Box>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${t("Weight", "Ağırlık", "Poids", "Peso", "Peso", "Gewicht")} (g)`} type="number" value={vm.weight_grams != null ? String(vm.weight_grams) : ""} onChange={(val) => updateVariantMeta("weight_grams", val === "" ? "" : parseInt(val, 10))} placeholder="0" />
+                </Box>
+              </InlineStack>
+              <InlineStack gap="200" wrap>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={t("Sales unit","Satış birimi","Unité de vente","Unidad de venta","Unità di vendita","Verkaufseinheit")} value={vm.sales_unit ?? ""} onChange={(val) => updateVariantMeta("sales_unit", val)} autoComplete="off" />
+                </Box>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={t("Packaging unit","Ambalaj birimi","Unité d'emballage","Unidad de embalaje","Unità di imballaggio","Verpackungseinheit")} value={vm.packaging_unit ?? ""} onChange={(val) => updateVariantMeta("packaging_unit", val)} autoComplete="off" />
+                </Box>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={t("Packaging unit (plural)","Ambalaj birimi (çoğul)","Unité d'emballage (pluriel)","Unidad de embalaje (plural)","Unità di imballaggio (plurale)","Verpackungseinheit (Mehrzahl)")} value={vm.packaging_unit_plural ?? ""} onChange={(val) => updateVariantMeta("packaging_unit_plural", val)} autoComplete="off" />
+                </Box>
+              </InlineStack>
+
+              <ProductSectionRule />
               <ProductSectionRule />
 
               <ProductSectionHeading>Content per unit</ProductSectionHeading>
@@ -1161,53 +1159,206 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                   </BlockStack>
                 </Box>
               </BlockStack>
-
-              <ProductSectionRule />
-
-              <ProductSectionHeading>SEO (variant)</ProductSectionHeading>
-              <TextField
-                label="Meta title"
-                value={vm.seo_meta_title ?? vTr.seo_title ?? ""}
-                onChange={(t) => updateVariantMeta("seo_meta_title", t || undefined)}
-              />
-              <TextField
-                label="Meta description"
-                value={vm.seo_meta_description ?? vTr.seo_description ?? ""}
-                onChange={(t) => updateVariantMeta("seo_meta_description", t || undefined)}
-                multiline={2}
-              />
-              <TextField
-                label="Keywords"
-                value={vm.seo_keywords ?? vTr.seo_keywords ?? ""}
-                onChange={(t) => updateVariantMeta("seo_keywords", t || undefined)}
-              />
             </BlockStack>
             </div>
           </Card>
         </Layout.Section>
+      </Layout>
+      )}
 
-        <Layout.Section variant="oneThird">
-          <div className="product-edit-sidebar">
+      {activeTabIndex === 2 && (
+      <Layout>
+        <Layout.Section>
           <Card>
-            <BlockStack gap="300">
-              <ProductSectionHeading>Product status</ProductSectionHeading>
-              <Select
-                label="Status"
-                labelHidden
-                options={STATUS_OPTIONS(locale)}
-                value={product.status || "draft"}
-                disabled
-              />
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>
+                {locale === "en" ? "Compliance / manufacturer (this variant)" : locale === "tr" ? "Uyumluluk / üretici (bu varyant)" : locale === "fr" ? "Conformité / fabricant (cette variante)" : locale === "es" ? "Cumplimiento / fabricante (esta variante)" : locale === "it" ? "Conformità / produttore (questa variante)" : "Compliance / Hersteller (diese Variante)"}
+              </ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
-                Change status on the main product page.
+                {locale === "en"
+                  ? "EU product safety (GPSR). Tap “i” for what to enter in each field."
+                  : locale === "tr"
+                    ? "AB ürün güvenliği (GPSR). Her alana ne yazılacağını “i” ile görün."
+                    : locale === "fr"
+                      ? "Sécurité produit UE (GPSR). Appuyez sur « i » pour savoir quoi saisir."
+                      : locale === "es"
+                        ? "Seguridad de producto UE (GPSR). Pulsa « i » para ver qué indicar."
+                        : locale === "it"
+                          ? "Sicurezza prodotto UE (GPSR). Tocca « i » per sapere cosa inserire."
+                          : "EU-Produktsicherheit (GPSR). Tippen Sie auf „i“, um zu sehen, was einzutragen ist."}
               </Text>
-              <Divider />
-              <Button onClick={() => router.push(`/products/${idOrHandle}`)}>{t("Back to product", "Ürüne dön", "Retour au produit", "Volver al producto", "Torna al prodotto", "Zurück zum Produkt")}</Button>
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Manufacturer" : locale === "tr" ? "Üretici" : locale === "fr" ? "Fabricant" : locale === "es" ? "Fabricante" : locale === "it" ? "Fabbricante" : "Hersteller"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Name of the company or person that manufactured the product."
+                          : locale === "tr" ? "Ürünü üreten şirket veya kişinin adı."
+                            : locale === "fr" ? "Nom du fabricant."
+                              : locale === "es" ? "Nombre del fabricante."
+                                : locale === "it" ? "Nome del fabbricante."
+                                  : "Name des Herstellers."
+                      }
+                    />
+                    <LockToggle fieldKey="hersteller" parentValue={getMeta(product, "hersteller")} />
+                  </InlineStack>
+                }
+                value={getMeta(v, "hersteller")}
+                onChange={(val) => updateVariantMeta("hersteller", val || undefined)}
+                placeholder={locale === "en" ? "e.g. Acme GmbH" : "z. B. Acme GmbH"}
+                autoComplete="off"
+                disabled={isFieldLocked("hersteller")}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Manufacturer details" : locale === "tr" ? "Üretici bilgileri" : locale === "fr" ? "Coordonnées du fabricant" : locale === "es" ? "Datos del fabricante" : locale === "it" ? "Dati del fabbricante" : "Herstellerinformationen"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Postal address and contact of the manufacturer."
+                          : locale === "tr" ? "Üreticinin posta adresi ve iletişimi."
+                            : locale === "fr" ? "Adresse et contact du fabricant."
+                              : locale === "es" ? "Dirección y contacto del fabricante."
+                                : locale === "it" ? "Indirizzo e contatto del fabbricante."
+                                  : "Adresse und Kontakt des Herstellers."
+                      }
+                    />
+                    <LockToggle fieldKey="hersteller_information" parentValue={getMeta(product, "hersteller_information")} />
+                  </InlineStack>
+                }
+                value={getMeta(v, "hersteller_information")}
+                onChange={(val) => updateVariantMeta("hersteller_information", val || undefined)}
+                placeholder={locale === "en" ? "Street, city, country, email/phone" : "Straße, Ort, Land, E-Mail/Telefon"}
+                multiline={2}
+                autoComplete="off"
+                disabled={isFieldLocked("hersteller_information")}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Responsible person (EU)" : locale === "tr" ? "Sorumlu kişi (AB)" : locale === "fr" ? "Personne responsable (UE)" : locale === "es" ? "Persona responsable (UE)" : locale === "it" ? "Persona responsabile (UE)" : "Verantwortliche Person (EU)"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "EU-based safety contact. If the manufacturer is in the EU, this can be the same party."
+                          : locale === "tr" ? "AB’de yerleşik güvenlik iletişimi. Üretici AB’deyse aynı taraf olabilir."
+                            : locale === "fr" ? "Contact sécurité basé dans l'UE. Si le fabricant est dans l'UE, ce peut être la même entité."
+                              : locale === "es" ? "Contacto de seguridad en la UE. Si el fabricante está en la UE, puede ser la misma parte."
+                                : locale === "it" ? "Contatto di sicurezza nell'UE. Se il fabbricante è nell'UE, può essere la stessa parte."
+                                  : "In der EU ansässige Sicherheitskontaktstelle. Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein."
+                      }
+                    />
+                    <LockToggle fieldKey="verantwortliche_person_information" parentValue={getMeta(product, "verantwortliche_person_information")} />
+                  </InlineStack>
+                }
+                value={getMeta(v, "verantwortliche_person_information")}
+                onChange={(val) => updateVariantMeta("verantwortliche_person_information", val || undefined)}
+                placeholder={locale === "en" ? "Name, EU address, email/phone" : "Name, EU-Adresse, E-Mail/Telefon"}
+                multiline={2}
+                autoComplete="off"
+                disabled={isFieldLocked("verantwortliche_person_information")}
+              />
+              <ComplianceFieldsSection
+                client={client}
+                categoryId={getMeta(v, "category_id")}
+                marketplace="DE"
+                locale={locale}
+                product={v}
+                getMeta={getMeta}
+                updateMeta={updateVariantMeta}
+              />
+
+              <ProductSectionRule />
+              <ProductSectionHeading>
+                {locale === "en" ? "Made in Europe (this variant, optional)" : locale === "tr" ? "Made in Europe (bu varyant, isteğe bağlı)" : locale === "fr" ? "Made in Europe (cette variante, optionnel)" : locale === "es" ? "Made in Europe (esta variante, opcional)" : locale === "it" ? "Made in Europe (questa variante, opzionale)" : "Made in Europe (diese Variante, optional)"}
+              </ProductSectionHeading>
+              {euOriginNotice ? (
+                <Banner tone="info" onDismiss={() => setEuOriginNotice("")}>{euOriginNotice}</Banner>
+              ) : null}
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Country of origin (EU)" : locale === "tr" ? "Menşe ülke (AB)" : locale === "fr" ? "Pays d'origine (UE)" : locale === "es" ? "País de origen (UE)" : locale === "it" ? "Paese di origine (UE)" : "Herkunftsland (EU)"}</span>
+                    <LockToggle fieldKey="eu_origin_country" parentValue={getMeta(product, "eu_origin_country")} />
+                  </InlineStack>
+                }
+                value={vm.eu_origin_country ?? ""}
+                onChange={(val) => updateVariantMeta("eu_origin_country", val || undefined)}
+                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
+                autoComplete="off"
+                disabled={isFieldLocked("eu_origin_country")}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Registry-ID</span>
+                    <LockToggle fieldKey="eu_origin_registry_id" parentValue={getMeta(product, "eu_origin_registry_id")} />
+                  </InlineStack>
+                }
+                value={vm.eu_origin_registry_id ?? ""}
+                onChange={(val) => updateVariantMeta("eu_origin_registry_id", val || undefined)}
+                placeholder={locale === "en" ? "EU registry / certificate number" : locale === "tr" ? "AB kayıt / sertifika numarası" : locale === "fr" ? "Registre UE / numéro de certificat" : locale === "es" ? "Registro UE / número de certificado" : locale === "it" ? "Registro UE / numero di certificato" : "EU-Registry / Zertifikatsnummer"}
+                autoComplete="off"
+                disabled={isFieldLocked("eu_origin_registry_id")}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Nachweisdokument (URL)</span>
+                    <LockToggle fieldKey="eu_origin_document_url" parentValue={getMeta(product, "eu_origin_document_url")} />
+                  </InlineStack>
+                }
+                value={vm.eu_origin_document_url ?? ""}
+                onChange={(val) => updateVariantMeta("eu_origin_document_url", val || undefined)}
+                placeholder="https://…"
+                autoComplete="off"
+                disabled={isFieldLocked("eu_origin_document_url")}
+              />
+              <Select
+                label={locale === "en" ? "Registry provider" : locale === "tr" ? "Registry sağlayıcısı" : locale === "fr" ? "Fournisseur de registre" : locale === "es" ? "Proveedor de registro" : locale === "it" ? "Provider registro" : "Registry-Provider"}
+                options={[
+                  { label: locale === "en" ? "Stub (manual check)" : locale === "tr" ? "Stub (manuel kontrol)" : locale === "fr" ? "Stub (vérification manuelle)" : locale === "es" ? "Stub (verificación manual)" : locale === "it" ? "Stub (verifica manuale)" : "Stub (manuelle Prüfung)", value: "stub" },
+                ]}
+                value={vm.eu_origin_provider || "stub"}
+                onChange={(val) => updateVariantMeta("eu_origin_provider", val || "stub")}
+              />
+              <TextField
+                label="Status"
+                value={vm.eu_origin_status || "—"}
+                readOnly
+                autoComplete="off"
+                helpText={
+                  vm.eu_origin_verified_at
+                    ? `${locale === "en" ? "Verified at:" : locale === "tr" ? "Doğrulandı:" : locale === "fr" ? "Vérifié le :" : locale === "es" ? "Verificado el:" : locale === "it" ? "Verificato il:" : "Verifiziert am:"} ${vm.eu_origin_verified_at}`
+                    : undefined
+                }
+              />
+              <InlineStack gap="200">
+                <Button
+                  onClick={() => handleVerifyEuOriginVariant(false)}
+                  loading={euOriginVerifying}
+                  disabled={!product?.id || euOriginVerifying}
+                >
+                  {locale === "en" ? "Check registry (stub)" : locale === "tr" ? "Registry kontrol et (stub)" : locale === "fr" ? "Vérifier le registre (stub)" : locale === "es" ? "Verificar registro (stub)" : locale === "it" ? "Controlla registro (stub)" : "Registry prüfen (Stub)"}
+                </Button>
+                {isSuperuser ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleVerifyEuOriginVariant(true)}
+                    loading={euOriginVerifying}
+                    disabled={!product?.id || euOriginVerifying}
+                  >
+                    {locale === "en" ? "Verify manually" : locale === "tr" ? "Manuel doğrula" : locale === "fr" ? "Vérifier manuellement" : locale === "es" ? "Verificar manualmente" : locale === "it" ? "Verifica manualmente" : "Manuell verifizieren"}
+                  </Button>
+                ) : null}
+              </InlineStack>
             </BlockStack>
+            </div>
           </Card>
-          </div>
         </Layout.Section>
       </Layout>
+      )}
     </Page>
   );
 }

@@ -47,9 +47,14 @@ const normalizeBadgeInput = (body) => {
     active: b.active !== false,
     badge_type: ALLOWED_BADGE_TYPES.has(b.badge_type) ? b.badge_type : 'text',
     image_url: (b.image_url || '').toString().trim() || null,
-    image_width: Number.isFinite(Number(b.image_width)) && Number(b.image_width) > 0
-      ? Math.min(100, Math.max(1, Math.round(Number(b.image_width))))
-      : 22,
+    image_width: (() => {
+      const type = ALLOWED_BADGE_TYPES.has(b.badge_type) ? b.badge_type : 'text'
+      if (Number.isFinite(Number(b.image_width)) && Number(b.image_width) > 0) {
+        return Math.min(100, Math.max(1, Math.round(Number(b.image_width))))
+      }
+      // Image badges need a default box; text badges stay content-sized when empty.
+      return type === 'image' ? 22 : null
+    })(),
     image_height: Number.isFinite(Number(b.image_height)) && Number(b.image_height) > 0
       ? Math.min(100, Math.max(1, Math.round(Number(b.image_height))))
       : null,

@@ -91,7 +91,6 @@ export function getPermissionsList(locale, superuser = false) {
     { group: "Content", items: [
       { key: "/content/media", label: t("Media", "Medya", "Médias", "Medios", "Media", "Medien") },
       { key: "/content/brands", label: t("Brands", "Markalar", "Marques", "Marcas", "Marchi", "Marken") },
-      { key: "/content/metaobjects", label: t("Metaobjects", "Metaobjeler", "Métaobjets", "Metaobjetos", "Metaoggetti", "Metaobjekte") },
     ]},
     { group: "Analytics", items: [
       { key: "/analytics/reports", label: t("Reports", "Raporlar", "Rapports", "Informes", "Report", "Berichte") },
@@ -109,7 +108,7 @@ export function getPermissionsList(locale, superuser = false) {
 export const DEFAULT_SELLER_PERMS = [
   "/dashboard", "/inbox", "/orders", "/orders/returns", "/products", "/products/inventory",
   "/products/gift-cards", "/customers", "/customers/reviews", "/marketing", "/discounts",
-  "/content/media", "/content/brands", "/content/metaobjects",
+  "/content/media", "/content/brands",
   "/analytics/reports", "/analytics/ranking", "/analytics/transactions", "/settings", "/settings/payments",
 ];
 

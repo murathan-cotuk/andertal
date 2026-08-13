@@ -23,6 +23,7 @@ import { titleToHandle, sanitizeSeoHandleInput, normalizeSeoHandle } from "@/lib
 import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import { getContentPagesCopy } from "@/lib/content-pages-i18n";
+import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { dateLocaleFor } from "@/lib/locale-text";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 import { showToast } from "@/lib/toast";
@@ -485,8 +486,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
               placeholder={c.bodyPh}
               helpText={c.bodyHelp}
             />
-            {blogOnly && (
-              <BlockStack gap="300">
+            <BlockStack gap="300">
                 <Text as="h3" variant="headingSm">{c.seoHeading}</Text>
                 <TextField
                   label={c.metaTitle}
@@ -496,6 +496,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
                     setForm((prev) => ({ ...prev, meta_title_i18n: setPageI18nField(prev.meta_title_i18n, "meta_title", editLang, value) }));
                   }}
                   autoComplete="off"
+                  placeholder={giPageField(form, "title", "title_i18n", editLang) || ""}
                 />
                 <TextField
                   label={c.metaDescription}
@@ -506,6 +507,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
                   }}
                   multiline={3}
                   autoComplete="off"
+                  placeholder={seoPlainPreview(giPageField(form, "body", "body_i18n", editLang), 160)}
                 />
                 <TextField
                   label={c.metaKeywords}
@@ -514,7 +516,6 @@ export default function ContentPagesPage({ blogOnly = false }) {
                   autoComplete="off"
                 />
               </BlockStack>
-            )}
             <Select
               label={c.fieldStatus}
               options={statusOptions}

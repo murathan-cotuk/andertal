@@ -1,5 +1,11 @@
 'use strict'
 const { Router } = require('express')
+const {
+  buildCatalogMaps,
+  persistCatalogPendingScan,
+  stripRejectedCatalogValues,
+  scanProductCatalogPending,
+} = require('../catalog-metafield-pending')
 
 const requireSuperuser = (req, res, next) => {
   if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
@@ -96,21 +102,46 @@ const metafieldProposalNormalizeValues = (arr) => {
 }
 
 const SYSTEM_KEYS = new Set([
-  'media', 'image_url', 'image', 'thumbnail', 'ean', 'sku', 'bullet_points',
+  'media', 'image_url', 'image', 'thumbnail', 'ean', 'sku', 'handle', 'title', 'description', 'status',
+  'inventory', 'price', 'type', 'bullet_points', 'bullet1', 'bullet2', 'bullet3', 'bullet4', 'bullet5',
   'translations', 'variation_groups', 'metafields', 'shipping_group_id', 'collection_id', 'collection_ids',
-  'admin_category_id', 'category_id', 'seller_id', 'product_id', 'brand_id', 'brand_logo', 'brand_handle',
+  'admin_category_id', 'category_id', 'category_ids', 'category_slug', 'category',
+  'seller_id', 'product_id', 'brand_id', 'brand_logo', 'brand_handle',
   'brand', 'brand_name', 'shop_name', 'store_name', 'seller_name', 'hersteller', 'hersteller_information',
-  'verantwortliche_person_information', 'seo_keywords', 'seo_meta_title', 'seo_meta_description',
+  'verantwortliche_person_information', 'manufacturer', 'manufacturer_information',
+  'responsible_person_information', 'seo_keywords', 'seo_meta_title', 'seo_meta_description',
   'publish_date', 'return_days', 'return_cost', 'return_kostenlos', 'related_product_ids',
   'dimensions', 'dimensions_length', 'dimensions_width', 'dimensions_height', 'weight', 'weight_grams',
-  'unit_type', 'unit_value', 'unit_reference', 'shipping_info', 'versand', 'rabattpreis_cents',
+  'unit_type', 'unit_value', 'unit_reference', 'sales_unit', 'packaging_unit', 'packaging_unit_plural',
+  'minimum_order_quantity', 'shipping_info', 'versand', 'rabattpreis_cents',
   'uvp_cents', 'price_cents', 'compare_at_price_cents', 'sale_price_cents', 'review_count',
   'review_avg', 'sold_last_month', 'sold', 'sales_count', 'salescount', 'sold_count',
   'master_total_variants', 'master_total_variant', 'total_variants', 'variant_count', 'variants_count',
   'is_new', 'badge', 'sale', 'is_bestseller', 'view_count', 'views', 'prices', 'custom_badges',
   'eu_origin_provider', 'eu_origin_registry_id', 'eu_origin_document_url', 'eu_origin_status',
   'eu_origin_verified_at', 'eu_origin_country',
+  'weee_number', 'wee_number', 'weee', 'wee', 'eprel_number', 'eprel', 'eprel_id', 'eprel_registration_number',
+  'product_files', 'files',
 ])
+
+const isSystemCatalogKey = (raw) => {
+  const key = normalizeMetaKey(raw)
+  if (!key || key.startsWith('_')) return true
+  if (SYSTEM_KEYS.has(key)) return true
+  if (key.endsWith('_id') || key.endsWith('_ids')) return true
+  if (/(^|_)(weee?|eprel|bullet|hersteller|manufacturer|gpsr)(_|$)/i.test(key)) return true
+  if (key.includes('bullet_point')) return true
+  return false
+}
+
+dbQ(
+  `DELETE FROM admin_hub_metafield_definitions
+   WHERE key = ANY($1::text[])
+      OR key ~ '(_id|_ids)$'
+      OR key ~* '(^|_)(weee?|eprel|bullet|hersteller|manufacturer|gpsr)(_|$)'
+      OR key ILIKE '%bullet_point%'`,
+  [Array.from(SYSTEM_KEYS)]
+).catch(() => {})
 
 const parseI18nObject = (raw) => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -123,6 +154,39 @@ const metafieldI18nJsonbOrNull = (raw) => {
   return JSON.stringify(obj)
 }
 
+const refreshCatalogPendingOnProducts = async () => {
+  const defRes = await dbQ('SELECT key, label, values, label_i18n FROM admin_hub_metafield_definitions')
+  const maps = buildCatalogMaps(defRes.rows)
+  await persistCatalogPendingScan(dbQ, maps)
+}
+
+const stripRejectedThenRefresh = async (rejectKey, rejectValues) => {
+  const key = String(rejectKey || '').trim()
+  if (!key) return
+  let prodRes
+  try {
+    prodRes = await dbQ(
+      `SELECT id, metadata, variants FROM admin_hub_products
+       WHERE (metadata ? '_catalog_approval_pending')
+          OR (metadata ? '_pending_catalog_metafields')`
+    )
+  } catch (_) {
+    return
+  }
+  const defRes = await dbQ('SELECT key, label, values, label_i18n FROM admin_hub_metafield_definitions')
+  const maps = buildCatalogMaps(defRes.rows)
+  for (const row of (prodRes.rows || [])) {
+    const stripped = stripRejectedCatalogValues(row.metadata, row.variants, key, rejectValues)
+    const scanned = scanProductCatalogPending(stripped.metadata, stripped.variants, maps)
+    try {
+      await dbQ(
+        `UPDATE admin_hub_products SET metadata = $1::jsonb, variants = $2::jsonb, updated_at = NOW() WHERE id = $3`,
+        [JSON.stringify(scanned.metadata), JSON.stringify(scanned.variants == null ? (row.variants || []) : scanned.variants), row.id]
+      )
+    } catch (_) {}
+  }
+}
+
 // ── Handlers ──────────────────────────────────────────────────────────────────
 
 const metafieldDefinitionsGET = async (req, res) => {
@@ -132,7 +196,7 @@ const metafieldDefinitionsGET = async (req, res) => {
     )
     const stored = {}
     for (const row of storedRes.rows) {
-      if (SYSTEM_KEYS.has(row.key) || String(row.key || '').startsWith('_')) continue
+      if (isSystemCatalogKey(row.key)) continue
       stored[row.key] = {
         label: row.label || row.key,
         values: Array.isArray(row.values) ? row.values : [],
@@ -141,42 +205,10 @@ const metafieldDefinitionsGET = async (req, res) => {
       }
     }
 
-    const prodRes = await dbQ('SELECT metadata FROM admin_hub_products WHERE metadata IS NOT NULL')
-    const fromProducts = {}
-    for (const row of prodRes.rows) {
-      const meta = typeof row.metadata === 'object' && row.metadata ? row.metadata : {}
-      for (const [k, v] of Object.entries(meta)) {
-        if (SYSTEM_KEYS.has(k) || k.startsWith('_')) continue
-        if (v == null || v === '') continue
-        if (typeof v === 'object' && !Array.isArray(v)) continue
-        const vals = Array.isArray(v) ? v : [v]
-        if (vals.length > 0 && typeof vals[0] === 'object') continue
-        if (!fromProducts[k]) fromProducts[k] = new Set()
-        vals.forEach((x) => { const s = String(x).trim(); if (s && s.length <= 120) fromProducts[k].add(s) })
-      }
-      if (Array.isArray(meta.metafields)) {
-        for (const { key, value } of meta.metafields) {
-          if (!key || !value || SYSTEM_KEYS.has(key) || key.startsWith('_')) continue
-          if (!fromProducts[key]) fromProducts[key] = new Set()
-          const s = String(value).trim()
-          if (s && s.length <= 120) fromProducts[key].add(s)
-        }
-      }
-    }
-
-    const allKeys = new Set([...Object.keys(stored), ...Object.keys(fromProducts)])
     const definitions = {}
-    for (const key of allKeys) {
-      if (SYSTEM_KEYS.has(key) || key.startsWith('_')) continue
-      const storedVals = new Set(stored[key]?.values || [])
-      const prodVals = fromProducts[key] || new Set()
-      const merged = [...new Set([...storedVals, ...prodVals])].sort()
-      definitions[key] = {
-        label: stored[key]?.label || key,
-        values: merged,
-        label_i18n: stored[key]?.label_i18n || null,
-        values_i18n: stored[key]?.values_i18n || null,
-      }
+    for (const key of Object.keys(stored)) {
+      if (isSystemCatalogKey(key)) continue
+      definitions[key] = stored[key]
     }
 
     res.json({ definitions })
@@ -194,7 +226,7 @@ const storeMetafieldDefinitionsGET = async (req, res) => {
     )
     const definitions = {}
     for (const row of storedRes.rows) {
-      if (SYSTEM_KEYS.has(row.key) || String(row.key || '').startsWith('_')) continue
+      if (isSystemCatalogKey(row.key)) continue
       definitions[row.key] = {
         label: row.label || row.key,
         values: Array.isArray(row.values) ? row.values : [],
@@ -213,7 +245,7 @@ const metafieldDefinitionsPUT = async (req, res) => {
   try {
     const key = (req.params.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
     if (!key) return res.status(400).json({ error: 'key required' })
-    if (SYSTEM_KEYS.has(key)) return res.status(400).json({ error: 'system key not allowed' })
+    if (isSystemCatalogKey(key)) return res.status(400).json({ error: 'system key not allowed' })
     const { label, values, label_i18n, values_i18n } = req.body || {}
     const safeValues = (Array.isArray(values) ? values : []).map((v) => String(v).trim()).filter(Boolean)
     const safeLabel = (label || key).toString().trim()
@@ -230,6 +262,7 @@ const metafieldDefinitionsPUT = async (req, res) => {
          updated_at = NOW()`,
       [key, safeLabel, JSON.stringify(safeValues), labelI18nJson, valuesI18nJson]
     )
+    refreshCatalogPendingOnProducts().catch(() => {})
     res.json({
       ok: true,
       key,
@@ -267,7 +300,7 @@ const metafieldPendingGET = async (req, res) => {
       seller_id: row.seller_id,
       status: row.status,
       created_at: row.created_at,
-    }))
+    })).filter((row) => !isSystemCatalogKey(row.key))
     res.json({ pending: rows })
   } catch (err) {
     console.error('metafield-definitions pending GET:', err)
@@ -284,6 +317,7 @@ const metafieldProposalsPOST = async (req, res) => {
     if (!labelIn) return res.status(400).json({ message: 'label required' })
     if (!key) key = normalizeMetaKey(labelIn.replace(/\s+/g, '_'))
     if (!key) return res.status(400).json({ message: 'could not derive key' })
+    if (isSystemCatalogKey(key)) return res.status(400).json({ message: 'system key not allowed' })
     const proposed = metafieldProposalNormalizeValues(body.values)
     if (proposed.length === 0) return res.status(400).json({ message: 'values required' })
 
@@ -299,6 +333,7 @@ const metafieldProposalsPOST = async (req, res) => {
          ON CONFLICT (key) DO UPDATE SET label = $2, values = $3, updated_at = NOW()`,
         [key, safeLabel, JSON.stringify(mergedVals)]
       )
+      await refreshCatalogPendingOnProducts().catch(() => {})
       return res.json({ ok: true, applied: true, key, label: safeLabel, values: mergedVals })
     }
 
@@ -352,6 +387,7 @@ const metafieldPendingApprovePOST = async (req, res) => {
       [key, safeLabel, JSON.stringify(mergedVals)]
     )
     await dbQ(`DELETE FROM admin_hub_metafield_pending WHERE id = $1::uuid`, [id])
+    await refreshCatalogPendingOnProducts().catch(() => {})
     if (pending.seller_id) {
       await dbQ(
         `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
@@ -375,10 +411,14 @@ const metafieldPendingRejectPOST = async (req, res) => {
   try {
     const id = String(req.params.id || '').trim()
     if (!id) return res.status(400).json({ message: 'id required' })
-    const pr = await dbQ(`SELECT id, key, label, seller_id FROM admin_hub_metafield_pending WHERE id = $1::uuid AND status = 'pending'`, [id])
+    const pr = await dbQ(`SELECT id, key, label, proposed_values, seller_id FROM admin_hub_metafield_pending WHERE id = $1::uuid AND status = 'pending'`, [id])
     const pending = pr.rows?.[0]
     const del = await dbQ(`DELETE FROM admin_hub_metafield_pending WHERE id = $1::uuid AND status = 'pending'`, [id])
     if (!del.rowCount) return res.status(404).json({ message: 'Proposal not found' })
+    const rejectedValues = Array.isArray(pending?.proposed_values) ? pending.proposed_values.map(String) : []
+    if (pending?.key && rejectedValues.length) {
+      await stripRejectedThenRefresh(pending.key, rejectedValues).catch(() => {})
+    }
     if (pending?.seller_id) {
       await dbQ(
         `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)

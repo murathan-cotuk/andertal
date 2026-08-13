@@ -1,18 +1,21 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import {
   Page, Text, BlockStack, InlineStack, TextField,
-  Button, Banner, Badge, Modal, EmptyState, Divider, Box,
+  Button, Banner, Badge, Modal, Divider, Box,
 } from "@shopify/polaris";
 import { ChevronDownIcon } from "@shopify/polaris-icons";
 import { useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import MarketingAccountsSection from "@/components/settings/MarketingAccountsSection";
-import BillbeeSettingsPage from "@/components/pages/settings/BillbeeSettingsPage";
+import AppStoreHub, { useInstalledApps } from "@/components/settings/AppStoreHub";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useUI } from "@/lib/ui-strings";
 import { getIntegrationsCopy, getSmtpProviders } from "@/lib/integrations-i18n";
+import { appDisplayName, getAppStoreCopy } from "@/lib/app-store-i18n";
 import { lt } from "@/lib/locale-text";
 
 const client = getMedusaAdminClient();
@@ -773,30 +776,6 @@ function LogoMarketing() {
   );
 }
 
-function LogoBillbee() {
-  return (
-    <AccordionLogoWrap bg="#fff7ed">
-      <span style={{ fontSize: 13, fontWeight: 800, color: "#ea580c", letterSpacing: "-0.02em" }}>Bb</span>
-    </AccordionLogoWrap>
-  );
-}
-
-function LogoApi() {
-  return (
-    <AccordionLogoWrap bg="#f3f4f6">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M8 16l-4-4 4-4M16 8l4 4-4 4M13 7l-2 10"
-          stroke="#374151"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </AccordionLogoWrap>
-  );
-}
-
 function LogoDocuments() {
   return (
     <AccordionLogoWrap bg="#eff6ff">
@@ -809,7 +788,6 @@ function LogoDocuments() {
 }
 
 const DOCUMENT_TYPE_KEYS = ["invoice", "lieferschein", "retourelabel"];
-const DOC_API_INTEGRATION_NAME = "Beleg-API (ERP)";
 
 function documentSourcesCopy(locale) {
   const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
@@ -824,64 +802,55 @@ function documentSourcesCopy(locale) {
       "Wähle, ob Rechnungen, Lieferscheine und Retourenetiketten von Andertal oder deinem eigenen ERP-System kommen.",
     ),
     intro: t(
-      "By default Andertal generates these documents for you automatically. If your own system (ERP, accounting software, warehouse system) already produces them, switch a document type to \"My own system\" — Andertal will then serve whatever your system pushes to us via API instead of generating its own.",
-      "Varsayılan olarak bu belgeleri Andertal sizin için otomatik oluşturur. Kendi sisteminiz (ERP, muhasebe yazılımı, depo sistemi) bunları zaten üretiyorsa, ilgili belge türünü \"Kendi sistemim\"e çevirin — Andertal artık kendi belgesini oluşturmak yerine sisteminizin API ile gönderdiğini sunar.",
-      "Par défaut, Andertal génère ces documents automatiquement pour vous. Si votre propre système (ERP, comptabilité, entrepôt) les produit déjà, basculez ce type de document sur « Mon propre système » — Andertal fournira alors ce que votre système nous envoie via l'API au lieu de générer le sien.",
-      "Por defecto, Andertal genera estos documentos automáticamente. Si tu propio sistema (ERP, contabilidad, almacén) ya los produce, cambia ese tipo de documento a «Mi propio sistema» — Andertal entregará entonces lo que tu sistema nos envíe vía API en lugar de generar el suyo.",
-      "Per impostazione predefinita, Andertal genera questi documenti automaticamente. Se il tuo sistema (ERP, contabilità, magazzino) li produce già, imposta quel tipo di documento su \"Il mio sistema\" — Andertal fornirà quanto il tuo sistema invia tramite API invece di generarne uno proprio.",
-      "Standardmäßig erstellt Andertal diese Dokumente automatisch für dich. Falls dein eigenes System (ERP, Buchhaltung, Lager) sie bereits erzeugt, stelle diesen Beleg-Typ auf „Mein eigenes System“ um — Andertal liefert dann aus, was dein System uns per API sendet, statt selbst eins zu erstellen.",
+      "By default Andertal generates these documents for you automatically. If your own system (ERP, accounting software, warehouse system) already produces them, switch a document type to \"My own system\" — connected apps from the App Store appear below.",
+      "Varsayılan olarak bu belgeleri Andertal sizin için otomatik oluşturur. Kendi sisteminiz (ERP, muhasebe yazılımı, depo sistemi) bunları zaten üretiyorsa, ilgili belge türünü \"Kendi sistemim\"e çevirin — App Store’dan bağlanan uygulamalar altta görünür.",
+      "Par défaut, Andertal génère ces documents automatiquement. Si votre propre système les produit déjà, basculez sur « Mon propre système » — les apps connectées de l’App Store apparaissent en dessous.",
+      "Por defecto Andertal genera estos documentos. Si tu propio sistema ya los produce, cambia a «Mi propio sistema» — las apps conectadas del App Store aparecen debajo.",
+      "Per impostazione predefinita Andertal genera questi documenti. Se il tuo sistema li produce già, imposta \"Il mio sistema\" — le app connesse dell’App Store appaiono sotto.",
+      "Standardmäßig erstellt Andertal diese Dokumente. Falls dein eigenes System sie bereits erzeugt, stelle auf „Mein eigenes System“ um — verbundene Apps aus dem App Store erscheinen darunter.",
     ),
     invoice: t("Invoice", "Fatura", "Facture", "Factura", "Fattura", "Rechnung"),
     lieferschein: t("Delivery note", "İrsaliye", "Bon de livraison", "Albarán", "Bolla di consegna", "Lieferschein"),
     retourelabel: t("Return label", "İade etiketi", "Étiquette de retour", "Etiqueta de devolución", "Etichetta di reso", "Retourenetikett"),
     platform: t("Andertal generates it", "Andertal oluştursun", "Andertal génère", "Andertal genera", "Andertal genera", "Andertal erstellt"),
-    customerApi: t("My own system (API)", "Kendi sistemim (API)", "Mon propre système (API)", "Mi propio sistema (API)", "Il mio sistema (API)", "Mein eigenes System (API)"),
+    customerApi: t("My own system", "Kendi sistemim", "Mon propre système", "Mi propio sistema", "Il mio sistema", "Mein eigenes System"),
     save: t("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern"),
     saved: t("Saved.", "Kaydedildi.", "Enregistré.", "Guardado.", "Salvato.", "Gespeichert."),
-    apiSectionTitle: t("API access for your system", "Sisteminiz için API erişimi", "Accès API pour votre système", "Acceso API para tu sistema", "Accesso API per il tuo sistema", "API-Zugang für dein System"),
-    apiSectionBody: t(
-      "Have your ERP/accounting system send a POST request per document, authenticated with the credentials below (HTTP Basic Auth). We only accept PDF files, up to 15 MB.",
-      "ERP/muhasebe sisteminiz her belge için aşağıdaki bilgilerle (HTTP Basic Auth) kimlik doğrulaması yaparak bir POST isteği göndersin. Sadece PDF dosyaları kabul edilir, en fazla 15 MB.",
-      "Faites en sorte que votre ERP/comptabilité envoie une requête POST par document, authentifiée avec les identifiants ci-dessous (HTTP Basic Auth). Seuls les PDF sont acceptés, jusqu'à 15 Mo.",
-      "Haz que tu ERP/contabilidad envíe una solicitud POST por documento, autenticada con las credenciales de abajo (HTTP Basic Auth). Solo se aceptan PDF, hasta 15 MB.",
-      "Fai inviare al tuo ERP/contabilità una richiesta POST per ogni documento, autenticata con le credenziali sottostanti (HTTP Basic Auth). Sono accettati solo PDF, fino a 15 MB.",
-      "Lass dein ERP-/Buchhaltungssystem pro Beleg einen POST-Request senden, authentifiziert mit den Zugangsdaten unten (HTTP Basic Auth). Es werden nur PDF-Dateien akzeptiert, bis 15 MB.",
-    ),
-    createKey: t("Generate API key", "API anahtarı oluştur", "Générer une clé API", "Generar clave API", "Genera chiave API", "API-Schlüssel erstellen"),
-    endpoint: t("Endpoint", "Uç nokta", "Point de terminaison", "Endpoint", "Endpoint", "Endpoint"),
-    accessId: t("Username (api_key)", "Kullanıcı adı (api_key)", "Nom d'utilisateur (api_key)", "Usuario (api_key)", "Nome utente (api_key)", "Benutzername (api_key)"),
-    securityKey: t("Password (api_secret)", "Şifre (api_secret)", "Mot de passe (api_secret)", "Contraseña (api_secret)", "Password (api_secret)", "Passwort (api_secret)"),
-    oneTimeWarning: t(
-      "The password is only shown once — copy it now.",
-      "Şifre yalnızca bir kez gösterilir — şimdi kopyalayın.",
-      "Le mot de passe n'est affiché qu'une seule fois — copiez-le maintenant.",
-      "La contraseña solo se muestra una vez — cópiala ahora.",
-      "La password viene mostrata una sola volta — copiala ora.",
-      "Das Passwort wird nur einmal angezeigt — jetzt kopieren.",
-    ),
     saveError: t("Could not save", "Kaydedilemedi", "Échec de l'enregistrement", "No se pudo guardar", "Salvataggio non riuscito", "Speichern fehlgeschlagen"),
-    keyError: t("Could not create API key", "API anahtarı oluşturulamadı", "Échec de création de la clé API", "No se pudo crear la clave API", "Creazione chiave API non riuscita", "API-Schlüssel konnte nicht erstellt werden"),
+    connectedTitle: t("Connected integrations", "Bağlı entegrasyonlar", "Intégrations connectées", "Integraciones conectadas", "Integrazioni connesse", "Verbundene Integrationen"),
+    findInStore: t("Find your product in the App Store", "Ürününü App Store’da bul", "Trouver votre produit dans l’App Store", "Encuentra tu producto en el App Store", "Trova il tuo prodotto nell’App Store", "Dein Produkt im App Store finden"),
+    findInStoreBody: t(
+      "Install the ERP or accounting app you use, then configure the connection.",
+      "Kullandığınız ERP veya muhasebe uygulamasını yükleyin, ardından bağlantıyı yapılandırın.",
+      "Installez l’app ERP ou comptable que vous utilisez, puis configurez la connexion.",
+      "Instala la app de ERP o contabilidad que uses y configura la conexión.",
+      "Installa l’app ERP o contabile che usi, poi configura la connessione.",
+      "Installiere die ERP- oder Buchhaltungs-App, die du nutzt, und konfiguriere danach die Verbindung.",
+    ),
+    goConfigure: t("Connect", "Bağlan", "Connecter", "Conectar", "Collega", "Verbinden"),
   };
 }
 
-function DocumentSourcesSection({ ui }) {
+function maskKey(val) {
+  const s = String(val || "");
+  if (!s) return "";
+  if (s.length <= 8) return "••••••••";
+  return `${s.slice(0, 4)}${"•".repeat(Math.min(16, s.length - 8))}${s.slice(-4)}`;
+}
+
+function DocumentSourcesSection({ ui, onFindInStore, onConfigureApp }) {
   const locale = useLocale();
   const t = useMemo(() => documentSourcesCopy(locale), [locale]);
+  const storeCopy = useMemo(() => getAppStoreCopy(locale), [locale]);
   const [sources, setSources] = useState({ invoice: "platform", lieferschein: "platform", retourelabel: "platform" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
-  const [docIntegration, setDocIntegration] = useState(null);
-  const [creatingKey, setCreatingKey] = useState(false);
-  const [createdCreds, setCreatedCreds] = useState(null);
+  const { installations, loading: loadingApps } = useInstalledApps();
 
   useEffect(() => {
-    Promise.all([client.getDocumentSources(), client.getIntegrations()])
-      .then(([ds, integ]) => {
-        setSources((s) => ({ ...s, ...(ds?.document_sources || {}) }));
-        const found = (integ?.integrations || []).find((i) => i.name === DOC_API_INTEGRATION_NAME);
-        if (found) setDocIntegration(found);
-      })
+    client.getDocumentSources()
+      .then((ds) => setSources((s) => ({ ...s, ...(ds?.document_sources || {}) })))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -898,22 +867,6 @@ function DocumentSourcesSection({ ui }) {
     } catch (e) { setMsg({ tone: "critical", text: e?.message || t.saveError }); }
     setSaving(false);
   };
-
-  const createDocKey = async () => {
-    setCreatingKey(true);
-    try {
-      const data = await client.saveIntegration({ name: DOC_API_INTEGRATION_NAME, category: "documents", is_active: true });
-      const integ = data?.integration;
-      if (integ) {
-        setDocIntegration(integ);
-        setCreatedCreds({ zugang: integ.api_key, secret: integ.api_secret });
-      }
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || t.keyError }); }
-    setCreatingKey(false);
-  };
-
-  const endpointUrl = `${(process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "https://api.andertal.com").replace(/\/$/, "")}/api/v1/orders/:order_id/documents`;
-  const copyText = (text) => { if (text) navigator.clipboard.writeText(String(text)); };
 
   if (loading) return <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>;
 
@@ -940,22 +893,57 @@ function DocumentSourcesSection({ ui }) {
         <>
           <Divider />
           <BlockStack gap="300">
-            <Text as="h3" variant="headingSm">{t.apiSectionTitle}</Text>
-            <Text as="p" variant="bodySm" tone="subdued">{t.apiSectionBody}</Text>
-            <TextField label={t.endpoint} value={`POST ${endpointUrl}`} readOnly autoComplete="off" />
-            {docIntegration ? (
-              <TextField label={t.accessId} value={docIntegration.api_key || ""} readOnly autoComplete="off" />
-            ) : (
-              <Button onClick={createDocKey} loading={creatingKey}>{t.createKey}</Button>
-            )}
-            {createdCreds && (
+            <Text as="h3" variant="headingSm">{t.connectedTitle}</Text>
+            {loadingApps ? (
+              <Text as="p" tone="subdued" variant="bodySm">{ui.loading}</Text>
+            ) : installations.length === 0 ? (
               <BlockStack gap="200">
-                <Banner tone="warning">{t.oneTimeWarning}</Banner>
-                <TextField label={t.accessId} value={createdCreds.zugang} readOnly autoComplete="off" />
-                <Button size="slim" onClick={() => copyText(createdCreds.zugang)}>{ui.copy || "Copy"}</Button>
-                <TextField label={t.securityKey} value={createdCreds.secret} readOnly autoComplete="off" />
-                <Button size="slim" onClick={() => copyText(createdCreds.secret)}>{ui.copy || "Copy"}</Button>
+                <Text as="p" variant="bodySm" tone="subdued">{t.findInStoreBody}</Text>
+                <Button onClick={onFindInStore}>{t.findInStore}</Button>
               </BlockStack>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {installations.map((inst) => {
+                  const connected = !!inst.connected;
+                  const apiKey = inst.api_key || inst.settings?.api_key || inst.client_id || "";
+                  return (
+                    <div
+                      key={inst.id}
+                      style={{
+                        background: "#fff",
+                        border: `1px solid ${connected ? "#d1fae5" : "#e5e7eb"}`,
+                        borderRadius: 10,
+                        padding: "14px 16px",
+                      }}
+                    >
+                      <InlineStack align="space-between" blockAlign="start" wrap>
+                        <BlockStack gap="100">
+                          <Text as="span" fontWeight="semibold">{appDisplayName(inst)}</Text>
+                          {apiKey ? (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {storeCopy.apiKey}: {maskKey(apiKey)}
+                            </Text>
+                          ) : null}
+                        </BlockStack>
+                        <InlineStack gap="200" blockAlign="center">
+                          <Badge tone={connected ? "success" : "critical"}>
+                            {connected ? storeCopy.connectionOk : storeCopy.connectionFail}
+                          </Badge>
+                          {!connected ? (
+                            <Button size="slim" variant="primary" onClick={() => onConfigureApp?.(inst)}>
+                              {t.goConfigure}
+                            </Button>
+                          ) : (
+                            <Button size="slim" onClick={() => onConfigureApp?.(inst)}>
+                              {storeCopy.configure}
+                            </Button>
+                          )}
+                        </InlineStack>
+                      </InlineStack>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </BlockStack>
         </>
@@ -964,162 +952,64 @@ function DocumentSourcesSection({ ui }) {
   );
 }
 
-function IntegrationCard({ integration, onEdit, onToggle, onDelete, onRotateSecret, copy, ui }) {
-  const initials = (integration.name || "?").split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-  return (
-    <div style={{
-      background: "#fff",
-      border: `1px solid ${integration.is_active ? "#d1fae5" : "#e5e7eb"}`,
-      borderRadius: 10, padding: "16px 18px", display: "flex", gap: 14, alignItems: "flex-start",
-    }}>
-      <div style={{
-        width: 44, height: 44, borderRadius: 10,
-        background: integration.is_active ? "#ecfdf5" : "#f3f4f6",
-        border: `1px solid ${integration.is_active ? "#a7f3d0" : "#e5e7eb"}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 13, fontWeight: 700,
-        color: integration.is_active ? "#065f46" : "#6b7280", flexShrink: 0,
-      }}>
-        {initials}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <InlineStack align="space-between" blockAlign="start">
-          <Text as="span" fontWeight="semibold" variant="bodyMd">{integration.name}</Text>
-          <Badge tone={integration.is_active ? "success" : "new"}>
-            {integration.is_active ? copy.activeBadge : copy.inactiveBadge}
-          </Badge>
-        </InlineStack>
-        <div style={{ marginTop: 8, padding: "8px 12px", background: "#f9fafb", borderRadius: 6, fontSize: 12, color: "#6b7280", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
-          {integration.api_key && (
-            <>
-              <span style={{ fontWeight: 600, color: "#374151" }}>{copy.accessId}</span>
-              <span style={{ fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {maskKey(integration.api_key)}
-              </span>
-            </>
-          )}
-          <span style={{ fontWeight: 600, color: "#374151" }}>{copy.securityKey}</span>
-          <span style={{ color: "#9ca3af" }}>{copy.keyStored}</span>
-        </div>
-        <InlineStack gap="200" blockAlign="center" style={{ marginTop: 10 }}>
-          <Button size="slim" onClick={() => onEdit(integration)}>{ui.edit}</Button>
-          <Button size="slim" onClick={() => onToggle(integration)}>
-            {integration.is_active ? copy.deactivate : copy.activate}
-          </Button>
-          <Button size="slim" onClick={() => onRotateSecret(integration)}>{copy.newKey}</Button>
-          <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(integration)}>{ui.delete}</Button>
-        </InlineStack>
-      </div>
-    </div>
-  );
-}
 
-// ─── Main Page ───────────────────────────────────────────────────────────────
-
-export default function IntegrationsSettingsPage() {
+function IntegrationsSettingsPageInner() {
   const locale = useLocale();
   const ui = useUI();
   const copy = useMemo(() => getIntegrationsCopy(locale), [locale]);
   const smtpProviders = useMemo(() => getSmtpProviders(locale), [locale]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [openSection, setOpenSection] = useState(null);
-  const toggleSection = (key) => {
-    setOpenSection((prev) => (prev === key ? null : key));
-  };
-
   const [isSuperuser, setIsSuperuser] = useState(false);
-  const [integrations, setIntegrations] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [msg, setMsg]           = useState(null);
-  const [modalOpen, setModalOpen]   = useState(false);
-  const [editingId, setEditingId]   = useState(null);
-  const [formName, setFormName]     = useState("");
-  const [createdCreds, setCreatedCreds] = useState(null);
+  const [msg, setMsg] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await client.getIntegrations();
-      setIntegrations(data.integrations || []);
-    } catch (e) {
-      setMsg({ tone: "critical", text: e?.message || copy.loadError });
-    } finally { setLoading(false); }
-  }, []);
+  const tab = searchParams.get("tab") === "installed" ? "installed" : "store";
+  const appHandle = searchParams.get("app") || "";
+
+  const setHubTab = (nextTab) => {
+    const params = new URLSearchParams();
+    params.set("tab", nextTab);
+    router.replace("/settings/integrations?" + params.toString());
+  };
 
   useEffect(() => {
     const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
     setIsSuperuser(su);
-    if (su) load();
-    else setLoading(false);
-  }, [load]);
+  }, []);
 
-  const openCreate = () => { setEditingId(null); setFormName(""); setCreatedCreds(null); setModalOpen(true); };
-  const openEdit = (i) => { setEditingId(i.id); setFormName(i.name || ""); setCreatedCreds(null); setModalOpen(true); };
-  const closeModal = () => { setModalOpen(false); setEditingId(null); setFormName(""); setCreatedCreds(null); };
-
-  const save = async () => {
-    if (!formName.trim()) { setMsg({ tone: "warning", text: copy.enterName }); return; }
-    setSaving(true); setMsg(null);
-    try {
-      if (editingId) {
-        await client.updateIntegration(editingId, { name: formName.trim(), is_active: true });
-        setMsg({ tone: "success", text: copy.updated });
-        closeModal(); await load();
-      } else {
-        const data = await client.saveIntegration({ name: formName.trim(), category: "custom", is_active: true });
-        const integ = data?.integration;
-        if (integ?.api_key && integ?.api_secret) {
-          setCreatedCreds({ name: integ.name, zugang: integ.api_key, secret: integ.api_secret });
-        }
-        setMsg({ tone: "success", text: copy.credentialsCreated });
-        await load();
-      }
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.saveError }); }
-    finally { setSaving(false); }
+  const toggleSection = (key) => {
+    setOpenSection((prev) => (prev === key ? null : key));
   };
-
-  const rotateSecret = async (integration) => {
-    if (!(await confirmDelete(copy.rotateConfirm))) return;
-    try {
-      const data = await client.updateIntegration(integration.id, { regenerate_secret: true });
-      const sec = data?.integration?.api_secret;
-      if (sec) {
-        setCreatedCreds({ name: integration.name, zugang: data.integration?.api_key || integration.api_key, secret: sec });
-        setModalOpen(true); setEditingId(null); setFormName("");
-      }
-      setMsg({ tone: "success", text: copy.rotateSaved });
-      await load();
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.rotateError }); }
-  };
-
-  const toggleActive = async (integration) => {
-    try {
-      await client.updateIntegration(integration.id, { is_active: !integration.is_active });
-      setIntegrations((prev) => prev.map((i) => i.id === integration.id ? { ...i, is_active: !i.is_active } : i));
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.statusError }); }
-  };
-
-  const remove = async (integration) => {
-    if (!(await confirmDelete(copy.deleteConfirm(integration.name)))) return;
-    try {
-      await client.deleteIntegration(integration.id);
-      setIntegrations((prev) => prev.filter((i) => i.id !== integration.id));
-      setMsg({ tone: "success", text: copy.deleted });
-    } catch (e) { setMsg({ tone: "critical", text: e?.message || copy.deleteError }); }
-  };
-
-  const copyText = (text) => { if (text) navigator.clipboard.writeText(String(text)); };
-
-  const active   = integrations.filter((i) => i.is_active);
-  const inactive = integrations.filter((i) => !i.is_active);
 
   return (
-    <Page
-      title={copy.pageTitle}
-      primaryAction={isSuperuser ? { content: copy.createIntegration, onAction: openCreate } : undefined}
-    >
+    <Page title={copy.pageTitle}>
       <BlockStack gap="400">
         {msg && <Banner tone={msg.tone} onDismiss={() => setMsg(null)}>{msg.text}</Banner>}
+
+        <AppStoreHub
+          selectedTab={tab}
+          onTabChange={setHubTab}
+          highlightHandle={appHandle}
+          onFindStoreConsumed={() => {
+            if (appHandle) router.replace("/settings/integrations?tab=store");
+          }}
+        />
+
+        <IntegrationsAccordion
+          sectionId="documents"
+          open={openSection === "documents"}
+          onToggle={() => toggleSection("documents")}
+          logo={<LogoDocuments />}
+          title={documentSourcesCopy(locale).title}
+          subtitle={documentSourcesCopy(locale).sub}
+        >
+          <DocumentSourcesSection
+            ui={ui}
+            onFindInStore={() => setHubTab("store")}
+            onConfigureApp={() => setHubTab("installed")}
+          />
+        </IntegrationsAccordion>
 
         {isSuperuser && (
           <IntegrationsAccordion
@@ -1165,123 +1055,15 @@ export default function IntegrationsSettingsPage() {
             <MarketingAccountsSection hideFooterHint />
           </IntegrationsAccordion>
         )}
-
-        <IntegrationsAccordion
-          sectionId="billbee"
-          open={openSection === "billbee"}
-          onToggle={() => toggleSection("billbee")}
-          logo={<LogoBillbee />}
-          title={copy.billbeeTitle}
-          subtitle={copy.billbeeSub}
-        >
-          <BillbeeSettingsPage embedded />
-        </IntegrationsAccordion>
-
-        <IntegrationsAccordion
-          sectionId="documents"
-          open={openSection === "documents"}
-          onToggle={() => toggleSection("documents")}
-          logo={<LogoDocuments />}
-          title={documentSourcesCopy(locale).title}
-          subtitle={documentSourcesCopy(locale).sub}
-        >
-          <DocumentSourcesSection ui={ui} />
-        </IntegrationsAccordion>
-
-        {isSuperuser && (
-          <IntegrationsAccordion
-            sectionId="api"
-            open={openSection === "api"}
-            onToggle={() => toggleSection("api")}
-            logo={<LogoApi />}
-            title={copy.apiTitle}
-            subtitle={copy.apiSub}
-            headerExtra={
-              !loading && integrations.length > 0 ? (
-                <Badge tone="info">{integrations.length}</Badge>
-              ) : null
-            }
-          >
-            {loading ? (
-              <Box padding="400"><Text tone="subdued">{ui.loading}</Text></Box>
-            ) : integrations.length === 0 ? (
-              <EmptyState heading={copy.noIntegrations}>
-                <p>{copy.noIntegrationsBody}</p>
-                <Button variant="primary" onClick={openCreate}>{copy.createIntegration}</Button>
-              </EmptyState>
-            ) : (
-              <BlockStack gap="400">
-                {active.length > 0 && (
-                  <BlockStack gap="300">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <Text as="h3" variant="headingSm">{copy.active(active.length)}</Text>
-                      <Button size="slim" onClick={load} loading={loading}>{ui.refresh}</Button>
-                    </InlineStack>
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {active.map((i) => (
-                        <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
-                      ))}
-                    </div>
-                  </BlockStack>
-                )}
-                {inactive.length > 0 && (
-                  <BlockStack gap="300">
-                    <Text as="h3" variant="headingSm">{copy.inactive(inactive.length)}</Text>
-                    <div style={{ display: "grid", gap: 10 }}>
-                      {inactive.map((i) => (
-                        <IntegrationCard key={i.id} integration={i} onEdit={openEdit} onToggle={toggleActive} onDelete={remove} onRotateSecret={rotateSecret} copy={copy} ui={ui} />
-                      ))}
-                    </div>
-                  </BlockStack>
-                )}
-              </BlockStack>
-            )}
-          </IntegrationsAccordion>
-        )}
       </BlockStack>
-
-      <Modal
-        open={modalOpen}
-        onClose={closeModal}
-        title={createdCreds ? copy.modalCredentials : editingId ? copy.modalEdit : copy.modalCreate}
-        primaryAction={
-          createdCreds
-            ? { content: ui.close, onAction: closeModal }
-            : { content: ui.save, onAction: save, loading: saving }
-        }
-        secondaryActions={createdCreds ? [] : [{ content: ui.cancel, onAction: closeModal }]}
-      >
-        <Modal.Section>
-          {createdCreds ? (
-            <BlockStack gap="400">
-              <Banner tone="warning">
-                {copy.oneTimeWarning}
-              </Banner>
-              <Text as="p" variant="bodyMd"><strong>{createdCreds.name}</strong></Text>
-              <TextField label={copy.accessId} value={createdCreds.zugang} readOnly autoComplete="off" multiline={2} />
-              <Button onClick={() => copyText(createdCreds.zugang)}>{copy.copyAccessId}</Button>
-              <TextField label={copy.securityKey} value={createdCreds.secret} readOnly autoComplete="off" multiline={3} />
-              <Button onClick={() => copyText(createdCreds.secret)}>{copy.copySecurityKey}</Button>
-            </BlockStack>
-          ) : (
-            <BlockStack gap="400">
-              <TextField
-                label={ui.colName}
-                value={formName}
-                onChange={setFormName}
-                autoComplete="off"
-                placeholder={copy.namePlaceholder}
-                helpText={copy.nameHelp}
-              />
-              {editingId && (
-                <Text as="p" tone="subdued" variant="bodySm">
-                  {copy.nameEditHint}
-                </Text>
-              )}
-            </BlockStack>
-          )}
-        </Modal.Section>
-      </Modal>
     </Page>
+  );
+}
+
+export default function IntegrationsSettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <IntegrationsSettingsPageInner />
+    </Suspense>
   );
 }

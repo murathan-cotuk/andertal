@@ -305,7 +305,7 @@ function HeroBanner({ container, locale = "de" }) {
         subtitle: container.subtitle || "",
         btn_text: container.btn_text || "",
         btn_url: container.btn_url || "",
-        overlay: container.overlay_opacity != null ? Number(container.overlay_opacity) : 0.45,
+        overlay: 0,
         text_color: container.text_color || "#ffffff",
         text_position: container.text_position || "center",
         _i18n: container._i18n || undefined,
@@ -446,9 +446,6 @@ function HeroBanner({ container, locale = "de" }) {
                   ) : (
                     <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
                   )}
-                  {(slideOverlayOpacity(s) > 0) && (
-                    <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${slideOverlayOpacity(s)})`, pointerEvents: "none" }} />
-                  )}
                   <Overlay s={s} mobile />
                 </>
               );
@@ -482,9 +479,6 @@ function HeroBanner({ container, locale = "de" }) {
                 {videoSrc
                   ? <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
                   : <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
-                {(slideOverlayOpacity(s) > 0) && (
-                  <div style={{ position: "absolute", inset: 0, background: `rgba(0,0,0,${slideOverlayOpacity(s)})`, pointerEvents: "none" }} />
-                )}
               </>
             );
             const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease", pointerEvents: i === current ? "auto" : "none" };

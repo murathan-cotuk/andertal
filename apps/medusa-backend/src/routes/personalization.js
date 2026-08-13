@@ -84,8 +84,14 @@ async function productsByIds(client, ids, limit) {
   if (!ids.length) return []
   // Must include variants + full row so ProductCard can resolve first-variant cover images
   // (parent umbrella rows often have no own media). Map through the same storefront mapper
-  // as /store/products so carousels/cards get thumbnail + variants[].images + is_bestseller.
-  const { mapAdminHubToStoreProduct, applyBestsellerFlagsToMappedProduct } = require('./store-products')
+  // as /store/products so carousels/cards get thumbnail + variants[].images + custom_badges.
+  const {
+    mapAdminHubToStoreProduct,
+    applyBestsellerFlagsToMappedProduct,
+    buildProductBadgeContext,
+    resolveCustomBadgesForProduct,
+    canonicalProductId,
+  } = require('./store-products')
   const r = await client.query(
     `SELECT id, title, handle, sku, description, status, seller_id, collection_id,
             price_cents, inventory, metadata, variants, created_at, updated_at
@@ -95,12 +101,15 @@ async function productsByIds(client, ids, limit) {
   )
   // Preserve caller's ordering (ANY() doesn't guarantee it)
   const byId = new Map(r.rows.map((p) => [String(p.id), p]))
+  const badgeCtx = await buildProductBadgeContext()
   const out = []
   for (const id of ids) {
     const p = byId.get(String(id))
     if (!p) continue
     const mapped = mapAdminHubToStoreProduct(p, 'DE')
-    await applyBestsellerFlagsToMappedProduct(mapped, p.id)
+    const realId = canonicalProductId(p) || p.id
+    await applyBestsellerFlagsToMappedProduct(mapped, realId)
+    resolveCustomBadgesForProduct([p.id, p._listing_id, realId], mapped, badgeCtx)
     out.push(mapped)
     if (out.length >= limit) break
   }

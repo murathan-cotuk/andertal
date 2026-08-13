@@ -1,5 +1,6 @@
 ﻿import ExcelJS from "exceljs";
 import { getImportApiMessages, resolveRequestLocale } from "@/lib/import-export-i18n";
+import { EXPORT_DATASETS, getExportDataset, resolveExportColumns } from "@/lib/import-export-columns";
 
 const DEFAULT_BACKEND = "https://api.andertal.com";
 
@@ -244,100 +245,193 @@ function expandProductToImportRows(p) {
   return rows;
 }
 
-function buildImportExportColumns() {
-  const cols = [
-    "product_type", "sku", "parent_sku", "status", "ean", "inventory",
-    "brand", "type", "category_slug", "shipping_group",
-    "manufacturer", "manufacturer_information", "responsible_person_information",
-    "weight_grams", "dim_length_cm", "dim_width_cm", "dim_height_cm",
-    "image_url_1", "image_url_2", "image_url_3", "image_url_4", "image_url_5",
-    "swatch_image_url",
-  ];
-  for (let i = 1; i <= 6; i++) {
-    cols.push(`option${i}_name`, `option${i}_value`);
-  }
-  cols.push("unit_type", "unit_value", "per_unit", "price", "price_uvp", "price_sale", "weee_number", "eprel_number");
-  for (let i = 1; i <= 5; i++) {
-    cols.push(`file_${i}_url`, `file_${i}_name`);
-  }
-  for (let i = 1; i <= METAFIELD_PAIRS; i++) {
-    cols.push(`metafield_${i}_key`, `metafield_${i}_value`);
-  }
-  for (const lang of LANGS) {
-    cols.push(
-      `title_${lang}`, `description_${lang}`,
-      `bullet1_${lang}`, `bullet2_${lang}`, `bullet3_${lang}`, `bullet4_${lang}`, `bullet5_${lang}`,
-      `seo_title_${lang}`, `seo_description_${lang}`, `seo_keywords_${lang}`,
-    );
-  }
-  cols.push("Verkäufer", "_product_id");
-  return cols;
+function formatDate(v) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return str(v);
+  return d.toISOString().replace("T", " ").slice(0, 19);
 }
 
-const PRODUCT_COLUMNS = buildImportExportColumns();
-
-// ── Generic row flattener for non-product datasets ────────────────────────────
-function flattenObject(obj, prefix = "", out = {}) {
-  if (obj == null) return out;
-  if (Array.isArray(obj)) {
-    out[prefix] = obj.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join(" | ");
-    return out;
-  }
-  if (typeof obj !== "object") { out[prefix] = obj; return out; }
-  for (const [k, v] of Object.entries(obj)) {
-    const key = prefix ? `${prefix}.${k}` : k;
-    if (v == null) out[key] = "";
-    else if (typeof v === "object" && !Array.isArray(v)) flattenObject(v, key, out);
-    else if (Array.isArray(v)) out[key] = v.map((x) => (typeof x === "object" ? JSON.stringify(x) : String(x))).join(" | ");
-    else out[key] = v;
-  }
-  return out;
+function yesNo(v) {
+  return v === true || v === "t" || v === "true" ? "yes" : "no";
 }
 
-async function fetchDataset(backendUrl, token, key) {
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  const map = {
-    products: { url: `${backendUrl}/admin-hub/products?limit=5000`, root: "products", structured: true },
-    orders: { url: `${backendUrl}/admin-hub/v1/orders?limit=5000`, root: "orders" },
-    customers: { url: `${backendUrl}/admin-hub/v1/customers?limit=5000`, root: "customers" },
-    transactions: { url: `${backendUrl}/admin-hub/v1/transactions?limit=5000`, root: "transactions" },
-    ranking: { url: `${backendUrl}/admin-hub/v1/ranking/products?limit=5000`, root: "products" },
+function mapOrderRow(o) {
+  return {
+    order_number: o.order_number != null ? String(o.order_number) : "",
+    created_at: formatDate(o.created_at),
+    order_status: str(o.order_status),
+    payment_status: str(o.payment_status),
+    delivery_status: str(o.delivery_status),
+    email: str(o.email),
+    first_name: str(o.first_name),
+    last_name: str(o.last_name),
+    phone: str(o.phone),
+    address_line1: str(o.address_line1),
+    address_line2: str(o.address_line2),
+    city: str(o.city),
+    postal_code: str(o.postal_code),
+    country: str(o.country),
+    currency: str(o.currency || "EUR"),
+    subtotal: centsToExcelPrice(o.subtotal_cents),
+    shipping: centsToExcelPrice(o.shipping_cents),
+    discount: centsToExcelPrice(o.discount_cents),
+    total: centsToExcelPrice(o.total_cents),
+    tracking_number: str(o.tracking_number),
+    carrier_name: str(o.carrier_name),
+    shipped_at: formatDate(o.shipped_at),
+    seller_id: str(o.seller_id),
   };
-  const conf = map[key];
-  if (!conf) return { rows: [], columns: null };
-  const data = await fetchJson(conf.url, { headers });
-  const arr = Array.isArray(data?.[conf.root]) ? data[conf.root] : [];
-  if (conf.structured) {
-    const rows = [];
-    for (const p of arr) {
-      rows.push(...expandProductToImportRows(p));
-    }
-    return { rows, columns: PRODUCT_COLUMNS };
+}
+
+function mapTransactionRow(t) {
+  return {
+    type: str(t.type),
+    order_number: t.order_number != null ? String(t.order_number) : "",
+    created_at: formatDate(t.created_at),
+    payment_status: str(t.payment_status),
+    delivery_status: str(t.delivery_status),
+    currency: str(t.currency || "EUR"),
+    total: centsToExcelPrice(t.total_cents),
+    commission: centsToExcelPrice(t.commission_cents),
+    payout: centsToExcelPrice(t.payout_cents),
+    payout_eligible: yesNo(t.payout_eligible),
+    store_name: str(t.store_name),
+    seller_id: str(t.seller_id),
+  };
+}
+
+function mapCustomerRow(c) {
+  return {
+    customer_number: c.customer_number != null ? String(c.customer_number) : "",
+    email: str(c.email),
+    first_name: str(c.first_name),
+    last_name: str(c.last_name),
+    phone: str(c.phone),
+    country: str(c.country),
+    is_registered: yesNo(c.is_registered),
+    order_count: c.order_count != null ? String(c.order_count) : "0",
+    total_spent: centsToExcelPrice(c.total_spent),
+    created_at: formatDate(c.created_at),
+  };
+}
+
+function mapRankingRow(p) {
+  return {
+    title: str(p.title),
+    handle: str(p.handle),
+    status: str(p.status),
+    seller_id: str(p.seller_id),
+    impressions_30d: p.impressions_30d != null ? String(p.impressions_30d) : "0",
+    clicks_30d: p.clicks_30d != null ? String(p.clicks_30d) : "0",
+    add_to_cart_30d: p.add_to_cart_30d != null ? String(p.add_to_cart_30d) : "0",
+    sales_7d: p.sales_7d != null ? String(p.sales_7d) : "0",
+    sales_30d: p.sales_30d != null ? String(p.sales_30d) : "0",
+    sales_90d: p.sales_90d != null ? String(p.sales_90d) : "0",
+    gmv_30d: centsToExcelPrice(p.gmv_30d_cents),
+    review_avg: p.review_avg != null ? String(p.review_avg) : "",
+    review_count: p.review_count != null ? String(p.review_count) : "0",
+    inventory: p.inventory != null ? String(p.inventory) : "",
+    final_score: p.final_score != null ? String(p.final_score) : "",
+  };
+}
+
+function qs(params) {
+  const parts = [];
+  for (const [k, v] of Object.entries(params || {})) {
+    if (v == null || v === "") continue;
+    parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
   }
-  return { rows: arr.map((row) => flattenObject(row)), columns: null };
+  return parts.length ? `?${parts.join("&")}` : "";
 }
 
-function normalizeSellerKey(flat) {
-  return str(flat.Verkäufer || flat.seller_id || flat["metadata.seller_id"] || "platform_admin");
+async function fetchAllPages(url, headers, root, pageSize, maxRows) {
+  const rows = [];
+  let offset = 0;
+  while (rows.length < maxRows) {
+    const join = url.includes("?") ? "&" : "?";
+    const data = await fetchJson(`${url}${join}limit=${pageSize}&offset=${offset}`, { headers });
+    const arr = Array.isArray(data?.[root]) ? data[root] : [];
+    rows.push(...arr);
+    if (arr.length < pageSize) break;
+    offset += pageSize;
+  }
+  return rows.slice(0, maxRows);
 }
 
-function normalizeDateKey(flat) {
-  return str(flat["Erstellt"] || flat.created_at || flat.date || flat.updated_at || "");
+async function fetchDataset(backendUrl, token, key, { sellerQuery, status } = {}) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  if (key === "products") {
+    const arr = await fetchAllPages(
+      `${backendUrl}/admin-hub/products${qs({ seller_id: sellerQuery, status })}`,
+      headers,
+      "products",
+      500,
+      5000,
+    );
+    const rows = [];
+    for (const p of arr) rows.push(...expandProductToImportRows(p));
+    return rows;
+  }
+  if (key === "orders") {
+    const arr = await fetchAllPages(
+      `${backendUrl}/admin-hub/v1/orders${qs({ seller_id: sellerQuery, order_status: status })}`,
+      headers,
+      "orders",
+      200,
+      10000,
+    );
+    return arr.map(mapOrderRow);
+  }
+  if (key === "transactions") {
+    const data = await fetchJson(
+      `${backendUrl}/admin-hub/v1/transactions${qs({ seller_id: sellerQuery, include_pending: "true" })}`,
+      { headers },
+    );
+    const arr = Array.isArray(data?.transactions) ? data.transactions : [];
+    return arr.map(mapTransactionRow);
+  }
+  if (key === "customers") {
+    const arr = await fetchAllPages(
+      `${backendUrl}/admin-hub/v1/customers`,
+      headers,
+      "customers",
+      200,
+      5000,
+    );
+    return arr.map(mapCustomerRow);
+  }
+  if (key === "ranking") {
+    const data = await fetchJson(`${backendUrl}/admin-hub/v1/ranking/products`, { headers });
+    const arr = Array.isArray(data?.products) ? data.products : [];
+    return arr.map(mapRankingRow);
+  }
+  return [];
 }
 
-function applyFilters(rows, filters = {}, ctx = {}) {
+function normalizeSellerKey(row) {
+  return str(row.Verkäufer || row.seller_id || "");
+}
+
+function normalizeDateKey(row) {
+  return str(row.created_at || row.shipped_at || "");
+}
+
+function applyFilters(rows, filters = {}, datasetKey = "products") {
   const q = str(filters.search).toLowerCase();
   const status = str(filters.status).toLowerCase();
   const from = str(filters.date_from);
   const to = str(filters.date_to);
   const sellerFilter = str(filters.seller_id);
-  const forcedSellerId = str(ctx.forcedSellerId);
   return rows.filter((row) => {
-    const sellerKey = normalizeSellerKey(row);
-    if (forcedSellerId && sellerKey !== forcedSellerId) return false;
-    if (sellerFilter && sellerKey !== sellerFilter) return false;
-    if (status) {
-      const s = str(row["Status"] || row.status || "").toLowerCase();
+    if (sellerFilter) {
+      const sellerKey = normalizeSellerKey(row);
+      if (sellerKey && sellerKey !== sellerFilter) return false;
+    }
+    if (status && datasetKey !== "products") {
+      const s = str(
+        row.order_status || row.payment_status || row.status || "",
+      ).toLowerCase();
       if (s !== status) return false;
     }
     if (from || to) {
@@ -345,9 +439,17 @@ function applyFilters(rows, filters = {}, ctx = {}) {
       if (rawDate) {
         const t = new Date(rawDate).getTime();
         if (!Number.isNaN(t)) {
-          if (from) { const ft = new Date(from).getTime(); if (!Number.isNaN(ft) && t < ft) return false; }
-          if (to) { const tt = new Date(to).getTime() + 86399999; if (!Number.isNaN(tt) && t > tt) return false; }
+          if (from) {
+            const ft = new Date(from).getTime();
+            if (!Number.isNaN(ft) && t < ft) return false;
+          }
+          if (to) {
+            const tt = new Date(to).getTime() + 86399999;
+            if (!Number.isNaN(tt) && t > tt) return false;
+          }
         }
+      } else if (datasetKey !== "products") {
+        return false;
       }
     }
     if (q) {
@@ -358,94 +460,95 @@ function applyFilters(rows, filters = {}, ctx = {}) {
   });
 }
 
-function collectColumns(rows) {
-  const set = new Set();
-  for (const row of rows) for (const k of Object.keys(row)) set.add(k);
-  const base = ["id", "title", "sku", "status", "seller_id", "created_at", "updated_at"];
-  const all = [...set];
-  all.sort((a, b) => a.localeCompare(b));
-  return [...base.filter((x) => set.has(x)), ...all.filter((x) => !base.includes(x))];
-}
-
-function toCsv(columns, rows) {
+function toDelimited(colDefs, rows, delimiter) {
   const esc = (v) => {
     const s = String(v ?? "");
-    if (s.includes('"') || s.includes(",") || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
+    if (s.includes('"') || s.includes(delimiter) || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
-  const lines = [columns.join(",")];
-  for (const row of rows) lines.push(columns.map((c) => esc(row[c] ?? "")).join(","));
+  const headers = colDefs.map((c) => c.label || c.key);
+  const lines = [headers.map(esc).join(delimiter)];
+  for (const row of rows) {
+    lines.push(colDefs.map((c) => esc(row[c.key] ?? "")).join(delimiter));
+  }
   return `\uFEFF${lines.join("\n")}`;
 }
 
-async function toXlsx(columns, rows, groupBySeller = false, meta = {}) {
+function addDataSheet(wb, name, colDefs, sheetRows) {
+  const ws = wb.addWorksheet(String(name || "Export").substring(0, 31));
+  const headers = colDefs.map((c) => c.label || c.key);
+  ws.addRow(headers);
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  if (colDefs.length) {
+    ws.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: 1, column: colDefs.length },
+    };
+  }
+  const header = ws.getRow(1);
+  header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF111827" } };
+  header.alignment = { vertical: "middle", wrapText: false };
+  header.height = 22;
+  for (const row of sheetRows) {
+    ws.addRow(colDefs.map((c) => row[c.key] ?? ""));
+  }
+  for (let i = 2; i <= ws.rowCount; i++) {
+    if (i % 2 === 0) {
+      ws.getRow(i).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+    }
+  }
+  const sampleSize = Math.min(sheetRows.length, 200);
+  ws.columns.forEach((col, colIdx) => {
+    const label = headers[colIdx] || "";
+    const key = colDefs[colIdx]?.key || "";
+    let maxLen = Math.max(10, label.length + 2);
+    for (let i = 0; i < sampleSize; i++) {
+      const l = String(sheetRows[i]?.[key] ?? "").length;
+      if (l > maxLen) maxLen = l;
+    }
+    col.width = Math.min(48, Math.max(12, maxLen + 2));
+  });
+}
+
+async function toXlsx(sheets, { groupBySeller = false } = {}) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Andertal Sellercentral";
   wb.created = new Date();
 
-  // Summary sheet
-  const ws0 = wb.addWorksheet("Info");
-  ws0.columns = [{ width: 26 }, { width: 80 }];
-  [
-    ["Erstellt am", new Date().toISOString()],
-    ["Datensätze", Array.isArray(meta.datasets) ? meta.datasets.join(", ") : ""],
-    ["Zeilen gesamt", String(meta.totalRows ?? rows.length)],
-    ["Format", "xlsx"],
-    ["Suchfilter", str(meta.filters?.search)],
-    ["Statusfilter", str(meta.filters?.status)],
-    ["Datum von", str(meta.filters?.date_from)],
-    ["Datum bis", str(meta.filters?.date_to)],
-  ].forEach((r, i) => {
-    ws0.addRow(r);
-    if (i === 0) ws0.getRow(1).font = { bold: true };
-  });
-
-  const addSheet = (name, sheetRows) => {
-    const ws = wb.addWorksheet(name.substring(0, 31));
-    ws.addRow(columns);
-    ws.views = [{ state: "frozen", ySplit: 1 }];
-    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: Math.max(1, columns.length) } };
-    const header = ws.getRow(1);
-    header.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    header.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F2937" } };
-    for (const row of sheetRows) ws.addRow(columns.map((c) => row[c] ?? ""));
-    for (let i = 2; i <= ws.rowCount; i++) {
-      if (i % 2 === 0) ws.getRow(i).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
-    }
-    const sampleSize = Math.min(sheetRows.length, 200);
-    ws.columns.forEach((col, colIdx) => {
-      const key = columns[colIdx] || "";
-      let maxLen = Math.max(12, key.length + 2);
-      for (let i = 0; i < sampleSize; i++) {
-        const v = sheetRows[i]?.[key];
-        const l = String(v ?? "").length;
-        if (l > maxLen) maxLen = l;
+  for (const sheet of sheets) {
+    const colDefs = sheet.columns || [];
+    const rows = sheet.rows || [];
+    if (groupBySeller) {
+      const buckets = new Map();
+      for (const row of rows) {
+        const s = normalizeSellerKey(row) || "unknown";
+        if (!buckets.has(s)) buckets.set(s, []);
+        buckets.get(s).push(row);
       }
-      col.width = Math.min(60, Math.max(12, maxLen + 2));
-    });
-  };
-
-  if (groupBySeller) {
-    const buckets = new Map();
-    for (const row of rows) {
-      const s = normalizeSellerKey(row);
-      if (!buckets.has(s)) buckets.set(s, []);
-      buckets.get(s).push(row);
+      for (const [sellerId, sellerRows] of buckets.entries()) {
+        const short = String(sellerId).replace(/[^\w-]/g, "").slice(0, 18) || "seller";
+        addDataSheet(wb, `${sheet.name}_${short}`.substring(0, 31), colDefs, sellerRows);
+      }
+    } else {
+      addDataSheet(wb, sheet.name, colDefs, rows);
     }
-    for (const [sellerId, sellerRows] of buckets.entries()) addSheet(`seller_${sellerId}`, sellerRows);
-  } else {
-    addSheet("Inventar", rows);
+  }
+
+  if (wb.worksheets.length === 0) {
+    addDataSheet(wb, "Export", [{ key: "info", label: "info" }], [{ info: "No rows" }]);
   }
   return wb.xlsx.writeBuffer();
 }
 
 export async function POST(request) {
+  let msg = getImportApiMessages("de");
   try {
     const body = await request.json().catch(() => ({}));
     const locale = body.locale
       ? String(body.locale).slice(0, 2).toLowerCase()
       : resolveRequestLocale(request);
-    const msg = getImportApiMessages(locale);
+    msg = getImportApiMessages(locale);
     const backendUrl = getBackendBase();
     const token = str(body.sellerToken);
     if (!token) return Response.json({ error: msg.missingSellerToken }, { status: 401 });
@@ -456,54 +559,71 @@ export async function POST(request) {
     const isSuperuser = !!sellerUser?.is_superuser;
     const ownSellerId = str(sellerUser?.seller_id);
 
-    const datasets = Array.isArray(body.datasets) && body.datasets.length
-      ? body.datasets.filter((x) => ["products", "orders", "customers", "transactions", "ranking"].includes(x))
-      : ["products"];
-    const includeAllSellers = !!body.include_all_sellers;
-    const forcedSellerId = !isSuperuser ? ownSellerId : (includeAllSellers ? "" : "platform_admin");
-    const filters = body.filters && typeof body.filters === "object" ? body.filters : {};
-
-    let rows = [];
-    let structuredColumns = null;
-    for (const ds of datasets) {
-      const { rows: part, columns } = await fetchDataset(backendUrl, token, ds);
-      if (columns && !structuredColumns) structuredColumns = columns;
-      rows.push(...part);
+    const requested = Array.isArray(body.datasets) && body.datasets.length
+      ? body.datasets.map(String)
+      : [str(body.dataset) || "products"];
+    const datasets = [];
+    for (const key of requested) {
+      const spec = getExportDataset(key);
+      if (!spec) continue;
+      if (spec.superuserOnly && !isSuperuser) continue;
+      if (!datasets.includes(key)) datasets.push(key);
     }
-    rows = applyFilters(rows, filters, { forcedSellerId });
+    if (!datasets.length) datasets.push("products");
 
-    const columns = structuredColumns ?? collectColumns(rows);
+    const includeAllSellers = !!body.include_all_sellers;
+    const sellerQuery = isSuperuser && includeAllSellers ? "" : ownSellerId;
+    const filters = body.filters && typeof body.filters === "object" ? body.filters : {};
+    const selectedKeys = Array.isArray(body.columns) ? body.columns : null;
 
     if (body.preview) {
+      const key = datasets[0];
+      const spec = EXPORT_DATASETS[key];
+      const cols = resolveExportColumns(key, selectedKeys);
       return Response.json({
         ok: true,
         is_superuser: isSuperuser,
         seller_id: ownSellerId || null,
-        total: rows.length,
-        columns,
+        dataset: key,
+        columns: (spec?.columns || []).map((c) => c.key),
+        column_defs: spec?.columns || [],
+        groups: spec?.groups || [],
+        default_keys: spec?.defaultKeys || [],
+        selected: cols.map((c) => c.key),
       });
     }
 
-    const format = str(body.format || "xlsx").toLowerCase();
-    const fileBase = `andertal-inventar-${new Date().toISOString().slice(0, 10)}`;
+    const sheets = [];
+    for (const key of datasets) {
+      const spec = EXPORT_DATASETS[key];
+      const raw = await fetchDataset(backendUrl, token, key, {
+        sellerQuery,
+        status: key === "products" || key === "orders" ? str(filters.status) : "",
+      });
+      const rows = applyFilters(raw, filters, key);
+      const colDefs = resolveExportColumns(key, datasets.length === 1 ? selectedKeys : null);
+      sheets.push({ name: spec.sheetName, key, columns: colDefs, rows });
+    }
 
-    if (format === "csv") {
-      const text = toCsv(columns, rows);
+    const format = str(body.format || "xlsx").toLowerCase();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const fileBase = `andertal-${datasets.join("-")}-${stamp}`;
+    const primary = sheets[0];
+
+    if (format === "csv" || format === "txt") {
+      const text = toDelimited(primary.columns, primary.rows, format === "txt" ? "\t" : ",");
       return new Response(text, {
         status: 200,
         headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="${fileBase}.csv"`,
+          "Content-Type": format === "txt" ? "text/tab-separated-values; charset=utf-8" : "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${fileBase}.${format}"`,
         },
       });
     }
 
-    const buf = await toXlsx(
-      columns,
-      rows,
-      isSuperuser && includeAllSellers && !!body.group_by_seller,
-      { datasets, filters, totalRows: rows.length }
-    );
+    const buf = await toXlsx(sheets, {
+      groupBySeller: isSuperuser && includeAllSellers && !!body.group_by_seller,
+    });
     return new Response(buf, {
       status: 200,
       headers: {

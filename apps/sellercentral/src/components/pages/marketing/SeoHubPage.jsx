@@ -6,6 +6,7 @@ import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import { seoPlainPreview } from "@/lib/product-change-request-format";
 
 const ENTITY_TYPES = [
   { id: "products", label: "Products" },
@@ -309,7 +310,7 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
                     /{node.handle || "—"}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {node.meta_title || "No meta title"}
+                    {node.meta_title || node.label || "No meta title"}
                     {hasKids ? ` · ${node.children.length} sub` : ""}
                   </div>
                 </button>
@@ -754,7 +755,7 @@ export default function SeoHubPage() {
                     {item.seller_label ? ` · ${item.seller_label}` : ""}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {item.meta_title || "No meta title"}
+                    {item.meta_title || item.label || "No meta title"}
                   </div>
                 </button>
               ))
@@ -879,7 +880,7 @@ export default function SeoHubPage() {
                   <input
                     value={draft.meta_title}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_title: e.target.value }))}
-                    placeholder={editLang === "de" ? "" : (entity.meta_title || "")}
+                    placeholder={editLang === "de" ? (entity.label || "") : (entity.meta_title || entity.label || "")}
                     style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
                   />
                 </label>
@@ -897,7 +898,7 @@ export default function SeoHubPage() {
                     value={draft.meta_description}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_description: e.target.value }))}
                     rows={4}
-                    placeholder={editLang === "de" ? "" : (entity.meta_description || "")}
+                    placeholder={editLang === "de" ? (seoPlainPreview(entity.content_html, 160) || "") : (entity.meta_description || seoPlainPreview(entity.content_html, 160) || "")}
                     style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, resize: "vertical" }}
                   />
                 </label>

@@ -5,6 +5,7 @@ const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderRetourens
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
+const { sqlOrderOwnedBySeller, sqlOrderItemOwnedBySeller } = require('../seller-scope')
 
 function getClientIpFromRequest(req) {
   const xff = req.headers['x-forwarded-for']
@@ -77,30 +78,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         if (filterSellerId) {
           params.push(filterSellerId)
           const n = params.length
-          conditions.push(`(
-            EXISTS (
-              SELECT 1 FROM store_order_items oi
-              WHERE oi.order_id = o.id AND (
-                NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
-                OR (
-                  NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
-                  AND (
-                    EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
-                    -- Only infer via listings when exactly one seller lists this product — for a
-                    -- product listed by multiple sellers, an unstamped item's true seller is
-                    -- genuinely ambiguous, and guessing "any of them" leaked every listing
-                    -- seller's own unrelated orders to each other (see docs/TASKS.md).
-                    OR EXISTS (
-                      SELECT 1 FROM admin_hub_seller_listings sl
-                      WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n}
-                        AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
-                    )
-                  )
-                )
-              )
-            )
-            OR (o.seller_id = $${n} AND o.seller_id IS DISTINCT FROM 'default')
-          )`)
+          conditions.push(sqlOrderOwnedBySeller('o', `$${n}`))
         }
         const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
         const sortMap = {
@@ -118,20 +96,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           ? `, (
               SELECT COALESCE(SUM(oi.unit_price_cents::bigint * oi.quantity::bigint), 0)
               FROM store_order_items oi
-              WHERE oi.order_id = o.id AND (
-                NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${params.length}
-                OR (
-                  NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
-                  AND (
-                    EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${params.length})
-                    OR EXISTS (
-                      SELECT 1 FROM admin_hub_seller_listings sl
-                      WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${params.length}
-                        AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
-                    )
-                  )
-                )
-              )
+              WHERE oi.order_id = o.id AND ${sqlOrderItemOwnedBySeller('oi', `$${params.length}`)}
             )::bigint AS seller_items_subtotal_cents`
           : ', NULL::bigint AS seller_items_subtotal_cents'
         const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, o.sendcloud_label_url, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered${sellerSubtotalSelect} FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
@@ -190,13 +155,12 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const callerSellerId = String(req.sellerUser?.seller_id || '').trim()
         const isSuperuser = !!req.sellerUser?.is_superuser
         items = filterItemsForSeller(items, callerSellerId, { isSuperuser, orderSellerId: row.seller_id })
-        // Non-superuser may only open orders they own or that contain their lines.
-        if (!isSuperuser && callerSellerId) {
-          const ownsOrder = String(row.seller_id || '').trim() === callerSellerId
-          if (!ownsOrder && items.length === 0) {
-            await client.end()
-            return res.status(403).json({ message: 'Forbidden' })
-          }
+        // Non-superuser may only open orders that contain their lines.
+        // Header store_orders.seller_id is the platform (`default`) or a stale catalog-owner
+        // stamp — never a reason to show another seller's fulfilled offer.
+        if (!isSuperuser && callerSellerId && items.length === 0) {
+          await client.end()
+          return res.status(403).json({ message: 'Forbidden' })
         }
         const sellerSubtotal = itemsSubtotalCents(items)
         // Look up customer info by email

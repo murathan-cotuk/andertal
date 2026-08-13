@@ -27,6 +27,7 @@ import RichTextEditor from "@/components/RichTextEditor";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
 import { categoryDisplayName } from "@/lib/category-locale";
+import { seoPlainPreview } from "@/lib/product-change-request-format";
 
 function slugFromName(name) {
   return titleToHandle(name || "");
@@ -661,6 +662,7 @@ export default function ContentCategoriesPage() {
               value={form.meta_title}
               onChange={(value) => setForm((prev) => ({ ...prev, meta_title: value }))}
               autoComplete="off"
+              placeholder={form.name || form.display_title || ""}
             />
             <TextField
               label="Meta description"
@@ -668,6 +670,7 @@ export default function ContentCategoriesPage() {
               onChange={(value) => setForm((prev) => ({ ...prev, meta_description: value }))}
               autoComplete="off"
               multiline={2}
+              placeholder={seoPlainPreview(form.description, 160)}
             />
             <TextField
               label="Keywords"

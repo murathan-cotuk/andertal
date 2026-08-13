@@ -115,12 +115,17 @@ async function enrichOrderItemRows(client, itemRows) {
     const pid = String(r.product_id || '').trim()
     const p = productById[pid] || null
     const storedSeller = String(r.seller_id || '').trim()
+    const storedReal = storedSeller && storedSeller !== 'default' ? storedSeller : ''
     const productSellerRaw = String(p?.seller_id || '').trim()
     const productSeller = productSellerRaw && productSellerRaw !== 'default' ? productSellerRaw : ''
     const listingSellers = listingSellersByProduct[pid] || []
-    let resolvedSeller = storedSeller || productSeller || ''
-    // Master products: if exactly one listing seller, attribute the line to them.
-    if (!resolvedSeller && listingSellers.length === 1) resolvedSeller = listingSellers[0]
+    const otherListers = listingSellers.filter((s) => s && s !== productSeller)
+    let resolvedSeller = storedReal
+    if (!resolvedSeller) {
+      // Unstamped: catalog owner only when nobody else lists this product.
+      if (productSeller && otherListers.length === 0) resolvedSeller = productSeller
+      else if (!productSeller && listingSellers.length === 1) resolvedSeller = listingSellers[0]
+    }
     const listingSku = resolvedSeller ? listingSkuByKey[`${pid}::${resolvedSeller}`] : ''
     const sku = String(listingSku || skuFromProductRow(p, r.variant_id) || '').trim()
     const ean = eanFromProductRow(p, r.variant_id)
@@ -143,21 +148,20 @@ async function enrichOrderItemRows(client, itemRows) {
 
 /**
  * Keep only lines that belong to sellerId.
- * Prefer stored/resolved item.seller_id; for ambiguous master products only keep the line
- * if this seller is the sole listing seller, or the order itself is stamped to them.
+ * Stamped item.seller_id wins. Unstamped lines are not guessed when other sellers list the product.
  */
-function filterItemsForSeller(items, sellerId, { isSuperuser = false, orderSellerId = null } = {}) {
+function filterItemsForSeller(items, sellerId, { isSuperuser = false } = {}) {
   if (isSuperuser || !sellerId) return items
   const sid = String(sellerId).trim()
-  if (!sid) return items
-  const orderSid = String(orderSellerId || '').trim()
+  if (!sid || sid === 'default') return items
   return (items || []).filter((it) => {
     const lineSeller = String(it.seller_id || '').trim()
-    if (lineSeller) return lineSeller === sid
+    if (lineSeller && lineSeller !== 'default') return lineSeller === sid
     const listings = Array.isArray(it.listing_seller_ids) ? it.listing_seller_ids : []
-    if (!listings.includes(sid)) return false
-    if (listings.length === 1) return true
-    return orderSid === sid
+    const others = listings.filter((s) => s && s !== sid)
+    if (others.length > 0) return false
+    if (listings.length === 1 && listings[0] === sid) return true
+    return false
   })
 }
 

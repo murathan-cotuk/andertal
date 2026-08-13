@@ -22,6 +22,7 @@ import {
   SORT_OPTIONS,
   PER_PAGE,
   buildFacetsFromProducts,
+  filterFacetsToCatalog,
   filterProductsByFacets,
   applyCatalogSort,
   isDiscountedProduct,
@@ -1001,7 +1002,7 @@ function CollectionPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const facets = buildFacetsFromProducts(products);
+  const facets = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions);
 
   const hasFacets = Object.keys(facets).length > 0;
   const showCatalogSidebar = hasFacets;

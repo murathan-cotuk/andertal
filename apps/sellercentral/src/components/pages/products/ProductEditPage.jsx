@@ -24,6 +24,7 @@ import {
   Modal,
   Checkbox,
   Tag,
+  Tabs,
 } from "@shopify/polaris";
 import { ProductIcon, MenuHorizontalIcon, ViewIcon, EditIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
@@ -42,6 +43,7 @@ import { ChangeRequestFieldBadge } from "@/components/ChangeRequestFieldBadge";
 import {
   fieldNameDisplayLabel,
   formatChangeRequestValueForDisplay,
+  seoPlainPreview,
 } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 import {
@@ -140,11 +142,13 @@ function optionDisplayLabel(opt, loc) {
   return String(opt ?? "").trim();
 }
 
-const STATUS_OPTIONS = [
-  { label: "Active", value: "published" },
-  { label: "Draft", value: "draft" },
-  { label: "Inactive", value: "archived" },
-];
+function statusOptionsFor(locale) {
+  return [
+    { label: lt(locale, "Active", "Aktif", "Actif", "Activo", "Attivo", "Aktiv"), value: "published" },
+    { label: lt(locale, "Draft", "Taslak", "Brouillon", "Borrador", "Bozza", "Entwurf"), value: "draft" },
+    { label: lt(locale, "Inactive", "Pasif", "Inactif", "Inactivo", "Inattivo", "Inaktiv"), value: "archived" },
+  ];
+}
 
 const DEFAULT_DUPLICATE_OPTIONS = {
   title: true,
@@ -156,21 +160,35 @@ const DEFAULT_DUPLICATE_OPTIONS = {
   variants: true,
 };
 
-/** Katalog-Metafeld-UI: Kategorie-Zuordnung läuft über Category-Feld, nicht über dieses Dropdown */
+/** Katalog-Metafeld-UI: ürün operasyonel alanları (WEEE, EPREL, üretici, ID, type, …) burada yok */
 const EXCLUDED_CATALOG_METAFIELD_KEYS = new Set([
-  "category_ids",
-  "category_slug",
-  "sales_count",
-  "salescount",
-  "sold",
-  "sold_count",
-  "sold_last_month",
-  "master_total_variants",
-  "master_total_variant",
-  "total_variants",
-  "variant_count",
-  "variants_count",
+  "category_ids", "category_id", "admin_category_id", "category_slug", "category",
+  "sales_count", "salescount", "sold", "sold_count", "sold_last_month",
+  "master_total_variants", "master_total_variant", "total_variants", "variant_count", "variants_count",
+  "type", "ean", "sku", "handle", "title", "description", "status", "inventory", "price",
+  "brand", "brand_id", "brand_name", "brand_handle", "brand_logo",
+  "hersteller", "hersteller_information", "verantwortliche_person_information",
+  "manufacturer", "manufacturer_information", "responsible_person_information",
+  "weee_number", "wee_number", "weee", "wee", "eprel_number", "eprel", "eprel_id", "eprel_registration_number",
+  "bullet_points", "bullet1", "bullet2", "bullet3", "bullet4", "bullet5",
+  "seller_id", "product_id", "shipping_group_id", "collection_id", "collection_ids",
+  "seo_keywords", "seo_meta_title", "seo_meta_description",
+  "dimensions", "dimensions_length", "dimensions_width", "dimensions_height", "weight", "weight_grams",
+  "unit_type", "unit_value", "unit_reference", "sales_unit", "packaging_unit", "packaging_unit_plural",
+  "minimum_order_quantity", "product_files", "files", "media", "prices",
+  "eu_origin_provider", "eu_origin_registry_id", "eu_origin_document_url", "eu_origin_status",
+  "eu_origin_verified_at", "eu_origin_country",
 ]);
+
+function isExcludedCatalogMetaKey(raw) {
+  const k = String(raw || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  if (!k || k.startsWith("_")) return true;
+  if (EXCLUDED_CATALOG_METAFIELD_KEYS.has(k)) return true;
+  if (k.endsWith("_id") || k.endsWith("_ids")) return true;
+  if (/(^|_)(weee?|eprel|bullet|hersteller|manufacturer|gpsr)(_|$)/i.test(k)) return true;
+  if (k.includes("bullet_point")) return true;
+  return false;
+}
 
 function resolveMetaDefLabel(def, key, uiLocale) {
   const loc = String(uiLocale || "de").slice(0, 2).toLowerCase();
@@ -186,7 +204,7 @@ function filterMetaDefsForCatalog(definitions) {
   if (!definitions || typeof definitions !== "object") return {};
   const out = {};
   for (const [k, v] of Object.entries(definitions)) {
-    if (EXCLUDED_CATALOG_METAFIELD_KEYS.has(String(k).trim().toLowerCase())) continue;
+    if (isExcludedCatalogMetaKey(k)) continue;
     out[k] = v;
   }
   return out;
@@ -234,6 +252,87 @@ const PRODUCT_COUNTRIES_MAP = Object.fromEntries(PRODUCT_COUNTRIES.map((c) => [c
 
 /** Pricing country from app locale (globe). AT/CH are not separate here. */
 const COUNTRY_FOR_UI_LOCALE = { de: "DE", en: "US", tr: "TR", fr: "FR", it: "IT", es: "ES" };
+
+function productEditCopy(locale) {
+  return {
+    title: lt(locale, "Title", "Başlık", "Titre", "Título", "Titolo", "Titel"),
+    media: lt(locale, "Media", "Medya", "Médias", "Medios", "Media", "Medien"),
+    variations: lt(locale, "Variations", "Varyasyonlar", "Variantes", "Variaciones", "Varianti", "Variationen"),
+    variationsHelp: lt(
+      locale,
+      "Add groups (e.g. Color, Size). Combinations are generated automatically. Switch the globe to translate option labels.",
+      "Grup ekle (örn. Renk, Beden). Kombinasyonlar otomatik oluşur. Seçenek etiketlerini çevirmek için küreyi değiştir.",
+      "Ajoutez des groupes (ex. Couleur, Taille). Les combinaisons sont générées automatiquement.",
+      "Añade grupos (p. ej. Color, Talla). Las combinaciones se generan automáticamente.",
+      "Aggiungi gruppi (es. Colore, Taglia). Le combinazioni vengono generate automaticamente.",
+      "Gruppen hinzufügen (z. B. Farbe, Größe). Kombinationen werden automatisch erzeugt. Globus wechseln, um Optionslabels zu übersetzen."
+    ),
+    pricing: lt(locale, "Pricing", "Fiyatlandırma", "Tarification", "Precios", "Prezzi", "Preisgestaltung"),
+    uvp: lt(locale, "UVP (RRP)", "UVP", "PVR", "PVP", "PVR", "UVP"),
+    sellingPrice: lt(locale, "Selling price", "Satış fiyatı", "Prix de vente", "Precio de venta", "Prezzo di vendita", "Verkaufspreis"),
+    discountPrice: lt(locale, "Discount price", "İndirim fiyatı", "Prix réduit", "Precio de descuento", "Prezzo scontato", "Rabattpreis"),
+    status: lt(locale, "Status", "Durum", "Statut", "Estado", "Stato", "Status"),
+    inventory: lt(locale, "Inventory", "Stok", "Stock", "Inventario", "Inventario", "Bestand"),
+    seo: lt(locale, "SEO", "SEO", "SEO", "SEO", "SEO", "SEO"),
+    type: lt(locale, "Type", "Tür", "Type", "Tipo", "Tipo", "Typ"),
+    sales: lt(locale, "Sales", "Satışlar", "Ventes", "Ventas", "Vendite", "Verkäufe"),
+    weightDims: lt(locale, "Weight & dimensions", "Ağırlık ve ölçü", "Poids et dimensions", "Peso y dimensiones", "Peso e dimensioni", "Gewicht & Maße"),
+    contentPerUnit: lt(locale, "Content per unit", "Birim içeriği", "Contenu par unité", "Contenido por unidad", "Contenuto per unità", "Inhalt pro Einheit"),
+    moreActions: lt(locale, "More actions", "Diğer işlemler", "Plus d'actions", "Más acciones", "Altre azioni", "Weitere Aktionen"),
+    addGroup: lt(locale, "+ Add Group", "+ Grup ekle", "+ Ajouter un groupe", "+ Añadir grupo", "+ Aggiungi gruppo", "+ Gruppe hinzufügen"),
+    variationMatrix: lt(locale, "Variation matrix", "Varyasyon matrisi", "Matrice des variantes", "Matriz de variaciones", "Matrice varianti", "Variationsmatrix"),
+    inventoryIds: lt(locale, "Inventory & identifiers", "Stok ve tanımlayıcılar", "Stock et identifiants", "Inventario e identificadores", "Inventario e identificatori", "Bestand & Kennungen"),
+    newProduct: lt(locale, "New product", "Yeni ürün", "Nouveau produit", "Producto nuevo", "Nuovo prodotto", "Neues Produkt"),
+    productFallback: lt(locale, "Product", "Ürün", "Produit", "Producto", "Prodotto", "Produkt"),
+    viewInShop: lt(locale, "View in shop", "Mağazada gör", "Voir dans la boutique", "Ver en la tienda", "Vedi nel negozio", "Im Shop ansehen"),
+    quantity: lt(locale, "Quantity", "Adet", "Quantité", "Cantidad", "Quantità", "Menge"),
+    description: lt(locale, "Description", "Açıklama", "Description", "Descripción", "Descrizione", "Beschreibung"),
+    descriptionHint: lt(locale, "Shown on the product page.", "Ürün sayfasında gösterilir.", "Affiché sur la page produit.", "Se muestra en la página del producto.", "Mostrato nella pagina prodotto.", "Wird auf der Produktseite angezeigt."),
+    bullets: lt(locale, "Bullet points (max 5)", "Madde işaretleri (en fazla 5)", "Puces (max. 5)", "Viñetas (máx. 5)", "Punti elenco (max 5)", "Aufzählungspunkte (max. 5)"),
+    bulletsHelp: lt(locale, "Short selling points shown on the product page. Max. 120 characters each.", "Ürün sayfasında görünen kısa satış noktaları. Her biri en fazla 120 karakter.", "Arguments de vente courts affichés sur la page produit. Max. 120 caractères chacun.", "Argumentos de venta cortos en la página del producto. Máx. 120 caracteres cada uno.", "Punti vendita brevi mostrati nella pagina prodotto. Max. 120 caratteri ciascuno.", "Kurze Verkaufsargumente auf der Produktseite. Je max. 120 Zeichen."),
+    noVariantGroups: lt(locale, "No variant groups yet. Click + Add Group to start.", "Henüz varyant grubu yok. Başlamak için + Grup ekle’ye tıklayın.", "Aucun groupe de variantes. Cliquez sur + Ajouter un groupe.", "Aún no hay grupos de variantes. Pulsa + Añadir grupo.", "Nessun gruppo di varianti. Clicca + Aggiungi gruppo.", "Noch keine Variantengruppen. Klicken Sie auf + Gruppe hinzufügen."),
+    addOption: lt(locale, "+ Add option", "+ Seçenek ekle", "+ Ajouter une option", "+ Añadir opción", "+ Aggiungi opzione", "+ Option hinzufügen"),
+    optionsCount: (n) => lt(locale, `${n} option(s)`, `${n} seçenek`, `${n} option(s)`, `${n} opción(es)`, `${n} opzione/i`, `${n} Option(en)`),
+    variantWord: (n) => lt(locale, n === 1 ? "variant" : "variants", n === 1 ? "varyant" : "varyant", n === 1 ? "variante" : "variantes", n === 1 ? "variante" : "variantes", n === 1 ? "variante" : "varianti", n === 1 ? "Variante" : "Varianten"),
+    images: lt(locale, "Images", "Görseller", "Images", "Imágenes", "Immagini", "Bilder"),
+    groupName: lt(locale, "Group name", "Grup adı", "Nom du groupe", "Nombre del grupo", "Nome del gruppo", "Gruppenname"),
+    pricingHelp: lt(locale, "UVP is the recommended retail price. Selling price is what the customer pays. Discount price is the reduced price when on sale.", "UVP tavsiye edilen perakende fiyatıdır. Satış fiyatı müşterinin ödediği fiyattır. İndirim fiyatı kampanyadaki düşürülmüş fiyattır.", "Le PVR est le prix recommandé. Le prix de vente est ce que paie le client. Le prix réduit s’applique en promotion.", "El PVP es el precio recomendado. El precio de venta es lo que paga el cliente. El precio de descuento aplica en oferta.", "Il PVR è il prezzo consigliato. Il prezzo di vendita è quanto paga il cliente. Il prezzo scontato vale in promozione.", "UVP ist der empfohlene Verkaufspreis. Verkaufspreis zahlt der Kunde. Rabattpreis gilt im Angebot."),
+    madeInEurope: lt(locale, "Made in Europe", "Avrupa malı", "Fabriqué en Europe", "Hecho en Europa", "Fatto in Europa", "Made in Europe"),
+    proofDocument: lt(locale, "Proof document (URL)", "Kanıt belgesi (URL)", "Document justificatif (URL)", "Documento de prueba (URL)", "Documento di prova (URL)", "Nachweisdokument (URL)"),
+    warehouseHint: lt(locale, "Warehouse split can be set later in metadata.", "Depo dağılımı daha sonra metafield’larda ayarlanabilir.", "La répartition d’entrepôt peut être définie plus tard.", "La división de almacén se puede definir más tarde.", "La suddivisione magazzino si può impostare dopo.", "Lageraufteilung kann später in Metafeldern gesetzt werden."),
+
+    // Tabs
+    tabGeneral: lt(locale, "General", "Genel", "Général", "General", "Generale", "Allgemein"),
+    tabSpecs: lt(locale, "Specifications", "Özellikler", "Spécifications", "Especificaciones", "Specifiche", "Spezifikationen"),
+    tabVariants: lt(locale, "Variants", "Varyasyonlar", "Variantes", "Variantes", "Varianti", "Variante"),
+    tabLegal: lt(locale, "Legal", "Yasal", "Juridique", "Legal", "Legale", "Rechtlich"),
+
+    // Spezifikationen — Maße & Verpackung
+    dimsPackaging: lt(locale, "Dimensions & packaging", "Ölçüler ve ambalaj", "Dimensions et emballage", "Dimensiones y embalaje", "Dimensioni e imballaggio", "Maße & Verpackung"),
+    width: lt(locale, "Width", "Genişlik", "Largeur", "Ancho", "Larghezza", "Breite"),
+    height: lt(locale, "Height", "Yükseklik", "Hauteur", "Alto", "Altezza", "Höhe"),
+    length: lt(locale, "Length", "Uzunluk", "Longueur", "Largo", "Lunghezza", "Länge"),
+    weight: lt(locale, "Weight", "Ağırlık", "Poids", "Peso", "Peso", "Gewicht"),
+    salesUnit: lt(locale, "Sales unit", "Satış birimi", "Unité de vente", "Unidad de venta", "Unità di vendita", "Verkaufseinheit"),
+    unitOfMeasure: lt(locale, "Unit of measure", "Ölçü birimi", "Unité de mesure", "Unidad de medida", "Unità di misura", "Maßeinheit"),
+    packagingUnit: lt(locale, "Packaging unit", "Ambalaj birimi", "Unité d'emballage", "Unidad de embalaje", "Unità di imballaggio", "Verpackungseinheit"),
+    packagingUnitPlural: lt(locale, "Packaging unit (plural)", "Ambalaj birimi (çoğul)", "Unité d'emballage (pluriel)", "Unidad de embalaje (plural)", "Unità di imballaggio (plurale)", "Verpackungseinheit (Mehrzahl)"),
+    baseUnit: lt(locale, "Base unit", "Temel birim", "Unité de base", "Unidad base", "Unità base", "Grundeinheit"),
+
+    // Eigenschaften (metafields)
+    eigenschaften: lt(locale, "Properties", "Özellikler", "Propriétés", "Propiedades", "Proprietà", "Eigenschaften"),
+    searchEigenschaft: lt(locale, "Search property", "Özellik ara", "Rechercher une propriété", "Buscar propiedad", "Cerca proprietà", "Eigenschaft suchen"),
+
+    // Allgemein — stock / MOQ
+    minOrderQty: lt(locale, "Minimum order quantity", "Minimum sipariş adedi", "Quantité minimale de commande", "Cantidad mínima de pedido", "Quantità minima ordinabile", "Mindestbestellmenge"),
+
+    // Rechtlich
+    legalRequirements: lt(locale, "Legal requirements", "Yasal gereklilikler", "Exigences légales", "Requisitos legales", "Requisiti legali", "Rechtliche Anforderungen"),
+
+    // Variante — parent lock
+    lockToParent: lt(locale, "Use parent value", "Ana ürün değerini kullan", "Utiliser la valeur du produit parent", "Usar el valor del producto principal", "Usa il valore del prodotto principale", "Wert vom Hauptartikel übernehmen"),
+  };
+}
 
 function defaultShopMarketForLocale(loc) {
   const l = String(loc || "de").toLowerCase();
@@ -385,6 +484,7 @@ function changeRequestSellerLabel(cr) {
 export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [] }) {
   const router = useRouter();
   const locale = useLocale();
+  const pe = useMemo(() => productEditCopy(locale), [locale]);
   const ui = getUI(locale);
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
@@ -459,10 +559,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [metaDefs, setMetaDefs] = useState({});
   const [metaDefSearch, setMetaDefSearch] = useState({});
   const [metaDefPopover, setMetaDefPopover] = useState({});
+  const [vgValuePopover, setVgValuePopover] = useState({});
+  const [vgValueSearch, setVgValueSearch] = useState({});
   /** Katalogdaki tüm tanımlar yerine: değeri olan veya kullanıcının eklediği metafield satırları */
   const [extraVisibleMetaDefKeys, setExtraVisibleMetaDefKeys] = useState({});
   const [addMetaDefPopoverOpen, setAddMetaDefPopoverOpen] = useState(false);
   const [classificationOpen, setClassificationOpen] = useState(false);
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
   /** Neues Katalog-Metafeld (Titel + Wert); Seller → Freigabe durch Superuser */
   const [newCatalogMetaOpen, setNewCatalogMetaOpen] = useState(false);
   const [newCatalogMetaLabel, setNewCatalogMetaLabel] = useState("");
@@ -1213,6 +1316,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       if (variantGroups.length > 0) {
         metadata.variation_groups = variantGroups.map((g) => ({
           name: (g.name || "Option").trim() || "Option",
+          ...(g.metafield_key ? { metafield_key: g.metafield_key } : {}),
           options: (g.options || []).map((o) => {
             const row = {
               value: String(o.value ?? "").trim(),
@@ -1232,6 +1336,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           type: "warning",
           text: lt(locale, "Enter EAN for all variants before saving.", "Kaydetmek için tüm varyantlarda EAN girilmelidir.", "Saisissez un EAN pour toutes les variantes avant d'enregistrer.", "Introduce EAN para todas las variantes antes de guardar.", "Inserisci l'EAN per tutte le varianti prima di salvare.", "Bitte EAN für alle Varianten eintragen, um zu speichern."),
         });
+        setActiveTabIndex(2);
         return false;
       }
       const gpsrMissing = [];
@@ -1251,6 +1356,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             `Bitte folgende GPSR-Felder ausfüllen, um zu speichern: ${gpsrMissing.join(", ")}`,
           ),
         });
+        setActiveTabIndex(3);
         return false;
       }
       const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
@@ -1459,7 +1565,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setNewCatalogMetaErr(locale === "en" ? "Invalid key." : locale === "tr" ? "Geçersiz anahtar." : locale === "fr" ? "Clé invalide." : locale === "es" ? "Clave inválida." : locale === "it" ? "Chiave non valida." : "Ungültiger Key.");
       return;
     }
-    if (EXCLUDED_CATALOG_METAFIELD_KEYS.has(key)) {
+    if (isExcludedCatalogMetaKey(key)) {
       setNewCatalogMetaErr(locale === "en" ? "This key is reserved for category assignment and cannot be used as a metafield." : locale === "tr" ? "Bu anahtar kategori atama için ayrılmıştır ve metafield olarak kullanılamaz." : locale === "fr" ? "Cette clé est réservée à l'attribution de catégorie et ne peut pas être utilisée comme métachamp." : locale === "es" ? "Esta clave está reservada para la asignación de categoría y no puede usarse como metacampo." : locale === "it" ? "Questa chiave è riservata all'assegnazione di categoria e non può essere usata come metacampo." : "Dieser Key ist für die Kategorie-Zuordnung reserviert und kann nicht als Metafeld angelegt werden.");
       return;
     }
@@ -1483,7 +1589,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         type: "success",
         text: isSuperuser
           ? (locale === "en" ? "Metafield saved in catalog." : locale === "tr" ? "Metafield katalogda kaydedildi." : locale === "fr" ? "Métachamp enregistré dans le catalogue." : locale === "es" ? "Metacampo guardado en el catálogo." : locale === "it" ? "Metacampo salvato nel catalogo." : "Metafeld wurde im Katalog gespeichert.")
-          : (locale === "en" ? "Suggestion submitted — a superuser can approve it under Content → Metaobjects. Please save the product." : locale === "tr" ? "Öneri gönderildi — bir süper kullanıcı İçerik → Metaobjects altında onaylayabilir. Lütfen ürünü kaydedin." : locale === "fr" ? "Suggestion soumise — un superuser peut l'approuver sous Contenu → Metaobjects. Veuillez enregistrer le produit." : locale === "es" ? "Sugerencia enviada — un superusuario puede aprobarla en Contenido → Metaobjetos. Por favor, guarda el producto." : locale === "it" ? "Suggerimento inviato — un superuser può approvarlo in Contenuto → Metaoggetti. Salva il prodotto." : "Vorschlag eingereicht — ein Superuser kann ihn unter Content → Metaobjects freigeben. Bitte Produkt speichern."),
+          : (locale === "en" ? "Suggestion submitted — a superuser can approve it under Content → Metaobjects. Save the product: it will not appear in the shop until the new title/value is approved." : locale === "tr" ? "Öneri gönderildi — süper kullanıcı İçerik → Metaobjects altında onaylayabilir. Ürünü kaydedin: yeni başlık/değer onaylanana kadar shop’ta görünmez." : locale === "fr" ? "Suggestion soumise — un superuser peut l'approuver sous Contenu → Metaobjects. Enregistrez le produit : il restera masqué en boutique jusqu'à approbation." : locale === "es" ? "Sugerencia enviada — un superusuario puede aprobarla en Contenido → Metaobjetos. Guarda el producto: no aparecerá en la tienda hasta que se apruebe." : locale === "it" ? "Suggerimento inviato — un superuser può approvarlo in Contenuto → Metaoggetti. Salva il prodotto: resta nascosto nello shop fino all'approvazione." : "Vorschlag eingereicht — ein Superuser kann ihn unter Content → Metaobjects freigeben. Bitte Produkt speichern: Es bleibt im Shop unsichtbar, bis Titel/Wert freigegeben sind."),
       });
     } catch (e) {
       setNewCatalogMetaErr(e?.message || (locale === "en" ? "Error." : locale === "tr" ? "Hata." : locale === "fr" ? "Erreur." : locale === "es" ? "Error." : locale === "it" ? "Errore." : "Fehler"));
@@ -1501,13 +1607,17 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     return s;
   }, [metafieldsList]);
 
-  const visibleMetaDefEntries = useMemo(
-    () =>
-      Object.entries(metaDefs)
-        .filter(([k]) => metaDefKeysWithValues.has(k) || extraVisibleMetaDefKeys[k])
-        .sort(([a], [b]) => a.localeCompare(b)),
-    [metaDefs, metaDefKeysWithValues, extraVisibleMetaDefKeys],
-  );
+  const visibleMetaDefEntries = useMemo(() => {
+    const fromDefs = Object.entries(metaDefs)
+      .filter(([k]) => metaDefKeysWithValues.has(k) || extraVisibleMetaDefKeys[k]);
+    const seen = new Set(fromDefs.map(([k]) => k));
+    const extra = [];
+    for (const k of metaDefKeysWithValues) {
+      if (seen.has(k) || isExcludedCatalogMetaKey(k)) continue;
+      extra.push([k, { label: k, values: metafieldsList.filter((m) => m.key === k).map((m) => m.value).filter(Boolean) }]);
+    }
+    return [...fromDefs, ...extra].sort(([a], [b]) => a.localeCompare(b));
+  }, [metaDefs, metaDefKeysWithValues, extraVisibleMetaDefKeys, metafieldsList]);
 
   const hiddenMetaDefKeys = useMemo(
     () =>
@@ -1679,6 +1789,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       });
       const metaGroups = nextGroups.map((g) => ({
         name: g.name || "Option",
+        ...(g.metafield_key ? { metafield_key: g.metafield_key } : {}),
         options: (g.options || []).map((o) => {
           const row = {
             value: String(o.value ?? "").trim(),
@@ -1776,6 +1887,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       return { ...prev, metadata: m };
     });
   };
+  /** Link a group to a catalog Eigenschaft (metafield definition) — name follows the definition's label; "" unlinks back to free text. */
+  const vg_setGroupMetaKey = (gi, key) => {
+    const def = key ? metaDefs[key] : null;
+    const label = def ? resolveMetaDefLabel(def, key, locale) : "";
+    applyVariantGroups(variantGroups.map((g, i) =>
+      i === gi ? { ...g, metafield_key: key || undefined, name: key ? label : g.name } : g
+    ));
+  };
   const vg_addOption = (gi) =>
     applyVariantGroups(variantGroups.map((g, i) =>
       i === gi ? { ...g, options: [...(g.options || []), { value: "", swatch_image: "", labels: {} }] } : g
@@ -1792,6 +1911,26 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       opts[oi] = { ...opts[oi], [field]: value };
       return { ...g, options: opts };
     }));
+  /**
+   * Add a value picked from (or newly proposed for) a linked Eigenschaft to a variant group.
+   * Known values are added as a plain option; unknown ones are also submitted as a catalog
+   * proposal — superusers get it applied immediately, sellers get a pending review (and the
+   * superuser is notified) — while the seller keeps working locally with the value right away.
+   */
+  const vg_addLinkedOptionValue = (gi, value) => {
+    const v = String(value || "").trim();
+    if (!v) return;
+    const g = variantGroups[gi];
+    const key = g?.metafield_key;
+    const def = key ? metaDefs[key] : null;
+    const known = def && Array.isArray(def.values) ? def.values.includes(v) : true;
+    applyVariantGroups(variantGroups.map((gr, i) =>
+      i !== gi ? gr : { ...gr, options: [...(gr.options || []).filter((o) => String(o.value || "").trim()), { value: v, swatch_image: "", labels: {} }] }
+    ));
+    if (key && def && !known) {
+      client.submitMetafieldCatalogProposal({ key, label: resolveMetaDefLabel(def, key, locale), values: [v] }).catch(() => {});
+    }
+  };
   const vg_moveGroup = (from, to) => {
     if (from === to) return;
     const next = [...variantGroups];
@@ -1955,12 +2094,17 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   return (
     <Page title="">
       <style>{`
-        .product-edit-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-        .product-edit-header .product-edit-title-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--p-color-text); font-size: 0.875rem; }
+        .product-edit-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--p-color-border); }
+        .product-edit-header .product-edit-title-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: var(--p-color-text); font-size: 0.875rem; }
         .product-edit-header .product-edit-title-link:hover { color: var(--p-color-text); }
-        .product-edit-header .product-edit-name { margin: 0; font-size: 0.875rem; font-weight: 700; }
+        .product-edit-header .product-edit-name { margin: 0; font-size: 1.125rem; font-weight: 700; letter-spacing: -0.02em; }
         ${PRODUCT_SECTION_STYLES}
-        .product-edit-label { font-size: 0.8125rem; font-weight: 400; color: var(--p-color-text-subdued); margin-bottom: 4px; }
+        .product-edit-label { font-size: 0.8125rem; font-weight: 500; color: var(--p-color-text); margin-bottom: 6px; }
+        .product-edit-price-grid { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 16px; align-items: start; }
+        @media (max-width: 780px) { .product-edit-price-grid { grid-template-columns: 1fr; } }
+        .product-edit-main-stack { width: 100%; }
+        .product-edit-sidebar { display: flex; flex-direction: column; gap: 16px; }
+        .variations-fullwidth { width: 100%; }
         .product-price-strike { text-decoration: line-through; color: var(--p-color-text-subdued); }
         .product-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-width: 400px; }
         .product-media-item { aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--p-color-bg-fill-secondary); position: relative; cursor: grab; border: 2px solid transparent; transition: border-color 0.15s, opacity 0.15s, box-shadow 0.15s; }
@@ -2062,7 +2206,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vm-img-add { width: 56px; height: 56px; border-radius: 8px; border: 2px dashed var(--p-color-border); background: #fff; cursor: pointer; font-size: 20px; color: var(--p-color-text-subdued); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: border-color .12s, color .12s; }
         .vm-img-add:hover { border-color: var(--p-color-border-hover); color: var(--p-color-text); }
         .vm-edit-btn { flex-shrink: 0; align-self: center; }
-        .variations-fullwidth { margin-top: 16px; width: 100%; }
+        .variations-fullwidth { width: 100%; }
         .variations-fullwidth .Polaris-ShadowBevel { width: 100%; }
         @media (max-width: 900px) {
           .vm-grid-3 { grid-template-columns: 1fr; }
@@ -2089,6 +2233,24 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         <Box paddingBlockEnd="200">
           <Banner tone="info">
             {sharedCatalogNoticeMsg}
+          </Banner>
+        </Box>
+      )}
+
+      {!isSuperuser && (meta._catalog_approval_pending || (Array.isArray(meta._pending_catalog_metafields) && meta._pending_catalog_metafields.length > 0)) && (
+        <Box paddingBlockEnd="200">
+          <Banner tone="warning">
+            {locale === "en"
+              ? "This product uses Eigenschaften or variation values waiting for superuser approval. It will not appear in the shop until they are approved (Content → Metaobjects)."
+              : locale === "tr"
+                ? "Bu ürün, superuser onayı bekleyen Eigenschaften veya varyasyon değerleri kullanıyor. Onaylanana kadar shop’ta görünmez (İçerik → Metaobjects)."
+                : locale === "fr"
+                  ? "Ce produit utilise des Eigenschaften ou des valeurs de variante en attente d'approbation superuser. Il restera masqué en boutique jusqu'à approbation (Contenu → Metaobjects)."
+                  : locale === "es"
+                    ? "Este producto usa Eigenschaften o valores de variante pendientes de aprobación. No aparecerá en la tienda hasta que se aprueben (Contenido → Metaobjetos)."
+                    : locale === "it"
+                      ? "Questo prodotto usa Eigenschaften o valori variante in attesa di approvazione. Resta nascosto nello shop fino all'approvazione (Contenuto → Metaoggetti)."
+                      : "Dieses Produkt verwendet Eigenschaften- oder Variantenwerte, die auf Superuser-Freigabe warten. Es erscheint erst im Shop, wenn sie unter Content → Metaobjects freigegeben sind."}
           </Banner>
         </Box>
       )}
@@ -2220,7 +2382,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       <div className="product-edit-header">
         <Link href="/products/inventory" className="product-edit-title-link" style={{ marginRight: 4 }}>
           <span style={{ display: "flex", alignItems: "center", width: 20, height: 20 }}><ProductIcon /></span>
-          <span className="product-edit-name">{isNew ? "New product" : (product?.title || "Product")}</span>
+          <span className="product-edit-name">{isNew ? pe.newProduct : (product?.title || pe.productFallback)}</span>
         </Link>
         <span style={{ flex: 1 }} />
         {!isNew && (
@@ -2233,18 +2395,34 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 style={{ textDecoration: "none" }}
               >
                 <Button size="slim" icon={ViewIcon}>
-                  View in shop
+                  {pe.viewInShop}
                 </Button>
               </a>
             )}
             <Button size="slim" variant="primary" onClick={save} loading={saving}>
-              Save
+              {ui.save}
             </Button>
-            <Popover active={moreActionsOpen} onClose={() => setMoreActionsOpen(false)} activator={<Button size="slim" icon={MenuHorizontalIcon} onClick={() => setMoreActionsOpen(true)} accessibilityLabel="More actions" style={{ background: "#1f2937", color: "#fff", border: "none" }}>More actions</Button>} autofocusTarget="first-node">
+            <Popover
+              active={moreActionsOpen}
+              onClose={() => setMoreActionsOpen(false)}
+              preferredPosition="below"
+              activator={
+                <Button
+                  size="slim"
+                  icon={MenuHorizontalIcon}
+                  onClick={() => setMoreActionsOpen((v) => !v)}
+                  accessibilityLabel={pe.moreActions}
+                  style={{ background: "#1f2937", color: "#fff", border: "none" }}
+                >
+                  {pe.moreActions}
+                </Button>
+              }
+              autofocusTarget="first-node"
+            >
               <ActionList
                 items={[
-                  { content: "Duplicate", onAction: () => { setMoreActionsOpen(false); openDuplicateModal(); } },
-                  { content: "Delete", destructive: true, onAction: () => { setMoreActionsOpen(false); setDeleteConfirmOpen(true); } },
+                  { content: ui.duplicate, onAction: () => { setMoreActionsOpen(false); openDuplicateModal(); } },
+                  { content: ui.delete, destructive: true, onAction: () => { setMoreActionsOpen(false); setDeleteConfirmOpen(true); } },
                 ]}
               />
             </Popover>
@@ -2252,14 +2430,34 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         )}
       </div>
 
+      <Box paddingBlockEnd="300">
+        <Tabs
+          tabs={[
+            { id: "allgemein", content: pe.tabGeneral },
+            { id: "spezifikationen", content: pe.tabSpecs },
+            { id: "variante", content: pe.tabVariants },
+            { id: "rechtlich", content: pe.tabLegal },
+          ]}
+          selected={activeTabIndex}
+          onSelect={setActiveTabIndex}
+        />
+      </Box>
+
+      {activeTabIndex === 0 && (
       <Layout>
         <Layout.Section>
+          <BlockStack gap="300">
           <Card>
             <div className="product-edit-sections">
             <BlockStack gap="500">
-              <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />}>
-                Title
-              </ProductSectionHeading>
+              <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
+                <ProductSectionHeading badge={<ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="title" />}>
+                  {pe.title}
+                </ProductSectionHeading>
+                <Box minWidth="160px">
+                  <Select label={pe.status} labelHidden options={statusOptionsFor(locale)} value={product.status || "draft"} onChange={(v) => update({ status: v })} />
+                </Box>
+              </InlineStack>
               <TextField label="Title" labelHidden value={editingTitle} onChange={(v) => updateLocaleField("title", v)} placeholder="e.g. Cotton T-Shirt" autoComplete="off" />
 
               <ProductSectionRule />
@@ -2331,36 +2529,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
               <Box padding="400" background="bg-surface-secondary" borderRadius="300" borderWidth="025" borderColor="border">
                 <BlockStack gap="300">
-                  <InlineStack align="space-between" blockAlign="start" gap="400" wrap>
-                    <BlockStack gap="150">
-                      <ProductSectionHeading>{locale === "en" ? "Shop assignment" : locale === "tr" ? "Mağaza ataması" : locale === "fr" ? "Attribution boutique" : locale === "es" ? "Asignación de tienda" : locale === "it" ? "Assegnazione negozio" : "Shop-Zuordnung"}</ProductSectionHeading>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        {locale === "en" ? `Category, brand, shipping group${isSuperuser ? " and collections" : ""} — control catalog and shop navigation.` : locale === "tr" ? `Kategori, marka, kargo grubu${isSuperuser ? " ve koleksiyonlar" : ""} — katalog ve mağaza navigasyonunu yönetir.` : locale === "fr" ? `Catégorie, marque, groupe d'expédition${isSuperuser ? " et collections" : ""} — gèrent le catalogue et la navigation boutique.` : locale === "es" ? `Categoría, marca, grupo de envío${isSuperuser ? " y colecciones" : ""} — controlan el catálogo y la navegación de la tienda.` : locale === "it" ? `Categoria, marca, gruppo di spedizione${isSuperuser ? " e collezioni" : ""} — gestiscono il catalogo e la navigazione del negozio.` : `Kategorie, Marke, Versandgruppe${isSuperuser ? " und Kollektionen" : ""} — steuern Katalog und Shop-Navigation.`}
-                      </Text>
-                      {!classificationOpen && (
-                        classificationChips.length > 0 ? (
-                          <InlineStack gap="150" wrap blockAlign="center">
-                            {classificationChips.map((c) => (
-                              <Tag key={c.key}>{c.text}</Tag>
-                            ))}
-                          </InlineStack>
-                        ) : (
-                          <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Not yet assigned — open \"Edit\"." : locale === "tr" ? "Henüz atanmadı — \"Düzenle\"yi açın." : locale === "fr" ? "Pas encore attribué — ouvrir \"Modifier\"." : locale === "es" ? "Aún no asignado — abrir \"Editar\"." : locale === "it" ? "Non ancora assegnato — aprire \"Modifica\"." : 'Noch nicht zugeordnet — „Bearbeiten" öffnen.'}</Text>
-                        )
-                      )}
-                    </BlockStack>
-                    <Box style={{ flexShrink: 0 }}>
-                      <Button
-                        onClick={() => setClassificationOpen((o) => !o)}
-                        disclosure={classificationOpen ? "up" : "down"}
-                        variant={classificationOpen ? "plain" : "primary"}
-                      >
-                        {classificationOpen ? (locale === "en" ? "Collapse" : locale === "tr" ? "Daralt" : locale === "fr" ? "Réduire" : locale === "es" ? "Colapsar" : locale === "it" ? "Comprimi" : "Einklappen") : (locale === "en" ? "Edit" : locale === "tr" ? "Düzenle" : locale === "fr" ? "Modifier" : locale === "es" ? "Editar" : locale === "it" ? "Modifica" : "Bearbeiten")}
-                      </Button>
-                    </Box>
-                  </InlineStack>
+                  <BlockStack gap="150">
+                    <ProductSectionHeading>{locale === "en" ? "Shop assignment" : locale === "tr" ? "Mağaza ataması" : locale === "fr" ? "Attribution boutique" : locale === "es" ? "Asignación de tienda" : locale === "it" ? "Assegnazione negozio" : "Shop-Zuordnung"}</ProductSectionHeading>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {locale === "en" ? `Category, brand, shipping group${isSuperuser ? " and collections" : ""} — control catalog and shop navigation.` : locale === "tr" ? `Kategori, marka, kargo grubu${isSuperuser ? " ve koleksiyonlar" : ""} — katalog ve mağaza navigasyonunu yönetir.` : locale === "fr" ? `Catégorie, marque, groupe d'expédition${isSuperuser ? " et collections" : ""} — gèrent le catalogue et la navigation boutique.` : locale === "es" ? `Categoría, marca, grupo de envío${isSuperuser ? " y colecciones" : ""} — controlan el catálogo y la navegación de la tienda.` : locale === "it" ? `Categoria, marca, gruppo di spedizione${isSuperuser ? " e collezioni" : ""} — gestiscono il catalogo e la navigazione del negozio.` : `Kategorie, Marke, Versandgruppe${isSuperuser ? " und Kollektionen" : ""} — steuern Katalog und Shop-Navigation.`}
+                    </Text>
+                  </BlockStack>
 
-                  {classificationOpen && (
                   <div>
                     <BlockStack gap="400">
                       <Divider />
@@ -2489,7 +2664,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       )}
                     </BlockStack>
                   </div>
-                  )}
                 </BlockStack>
               </Box>
 
@@ -2558,19 +2732,25 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     />
                   )}
                 </div>
-                <p className="product-description-hint">Shown on the product page. Changes are saved when you blur the field or switch mode.</p>
+                <p className="product-description-hint">{pe.descriptionHint}</p>
               </BlockStack>
 
-              <ProductSectionRule />
-              <ProductSectionHeading>Media</ProductSectionHeading>
+            </BlockStack>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{pe.media}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
                 {locale === "en" ? "New image uploads: JPEG or PNG, minimum 1000×1000 px; the server saves square WebP (1000×1000) for the shop." : locale === "tr" ? "Yeni görsel yüklemeleri: JPEG veya PNG, minimum 1000×1000 px; sunucu mağaza için kare WebP (1000×1000) kaydeder." : locale === "fr" ? "Nouveaux téléchargements d'images : JPEG ou PNG, minimum 1000×1000 px ; le serveur enregistre du WebP carré (1000×1000) pour la boutique." : locale === "es" ? "Nuevas subidas de imágenes: JPEG o PNG, mínimo 1000×1000 px; el servidor guarda WebP cuadrado (1000×1000) para la tienda." : locale === "it" ? "Nuovi caricamenti di immagini: JPEG o PNG, minimo 1000×1000 px; il server salva WebP quadrato (1000×1000) per il negozio." : "Neue Bild-Uploads: JPEG oder PNG, mindestens 1000×1000 px; der Server speichert quadratisches WebP (1000×1000) für den Shop."}
               </Text>
               {locale !== "de" && (
                 <Text as="p" variant="bodySm" tone="subdued">
                   {hasLocaleMedia
-                    ? "Images for this language only. Clear all to fall back to German media."
-                    : "Using German images until you add images for this language."}
+                    ? (locale === "en" ? "Images for this language only. Clear all to fall back to German media." : locale === "tr" ? "Yalnızca bu dil için görseller. Tümünü silerseniz Almanca görseller kullanılır." : locale === "fr" ? "Images pour cette langue uniquement. Tout effacer pour revenir aux visuels allemands." : locale === "es" ? "Imágenes solo para este idioma. Bórralas todas para usar las alemanas." : locale === "it" ? "Immagini solo per questa lingua. Cancella tutto per tornare ai media tedeschi." : "Bilder nur für diese Sprache. Alle leeren, um auf deutsche Medien zurückzufallen.")
+                    : (locale === "en" ? "Using German images until you add images for this language." : locale === "tr" ? "Bu dil için görsel ekleyene kadar Almanca görseller kullanılıyor." : locale === "fr" ? "Images allemandes utilisées jusqu’à ce que vous en ajoutiez pour cette langue." : locale === "es" ? "Se usan imágenes alemanas hasta que añadas las de este idioma." : locale === "it" ? "Si usano le immagini tedesche finché non ne aggiungi per questa lingua." : "Deutsche Bilder, bis Sie Bilder für diese Sprache hinzufügen.")}
                 </Text>
               )}
               <div className="product-media-grid">
@@ -2655,7 +2835,1239 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 }}
               />
 
-              <ProductSectionRule />
+            </BlockStack>
+            </div>
+          </Card>
+
+
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{pe.pricing}</ProductSectionHeading>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {pe.pricingHelp}
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {currentCountryConf.label} · {currentCountryConf.currency} · {currentCountryConf.taxLabel} {currentCountryConf.vatRate}%
+              </Text>
+              <div className="product-edit-price-grid">
+                {[
+                  { metaKey: "uvp_cents", label: pe.uvp, cents: cpUvpCents, placeholder: "—" },
+                  { metaKey: "brutto_cents", label: pe.sellingPrice, cents: cpBruttoCents, placeholder: "0.00", clearNetto: true },
+                  { metaKey: "sale_cents", label: pe.discountPrice, cents: cpSaleCents, placeholder: "—" },
+                ].map(({ metaKey, label, cents, placeholder, clearNetto }) => {
+                  const dk = `${editingCountry}_${metaKey}`;
+                  const display = Object.prototype.hasOwnProperty.call(countryPriceDrafts, dk)
+                    ? countryPriceDrafts[dk]
+                    : cents != null
+                      ? (cents / 100).toFixed(2)
+                      : "";
+                  return (
+                    <TextField
+                      key={metaKey}
+                      label={label}
+                      prefix={currentCountryConf.symbol}
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      value={display}
+                      placeholder={placeholder}
+                      onChange={(v) => {
+                        const clean = sanitizePriceDraftString(v);
+                        setCountryPriceDrafts((prev) => {
+                          const next = { ...prev, [dk]: clean };
+                          countryPriceDraftsRef.current = next;
+                          return next;
+                        });
+                      }}
+                      onBlur={(e) => {
+                        const clearNettoKey = clearNetto && cpLinked ? `${editingCountry}_netto_cents` : null;
+                        commitCountryPriceDraft(dk, metaKey, clearNettoKey, e.currentTarget.value);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </BlockStack>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{pe.bullets}</ProductSectionHeading>
+              <Text as="p" variant="bodySm" tone="subdued">{pe.bulletsHelp}</Text>
+              {[0, 1, 2, 3, 4].map((i) => {
+                const val = editingBullets[i] ?? "";
+                const len = String(val).length;
+                const overLimit = len > 120;
+                return (
+                  <Box key={i}>
+                    <TextField
+                      label={`Bullet ${i + 1}`}
+                      labelHidden
+                      value={val}
+                      maxLength={120}
+                      onChange={(v) => {
+                        const trimmed = String(v).slice(0, 120);
+                        const next = [...editingBullets.slice(0, 5)];
+                        while (next.length <= i) next.push("");
+                        next[i] = trimmed;
+                        updateLocaleField("bullet_points", next.filter((x, j) => j < 5));
+                      }}
+                      placeholder={i === 0 ? "e.g. Premium quality" : ""}
+                      autoComplete="off"
+                    />
+                    <Text as="p" variant="bodySm" tone="subdued" style={{ marginTop: 4, color: overLimit ? "var(--p-color-text-critical)" : undefined }}>
+                      {len} / 120
+                    </Text>
+                  </Box>
+                );
+              })}
+            </BlockStack>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{pe.inventory}</ProductSectionHeading>
+              <InlineStack gap="200" wrap>
+                <Box minWidth="120px">
+                  <TextField label={pe.quantity} type="number" value={product.inventory != null ? String(product.inventory) : "0"} onChange={(v) => update({ inventory: parseInt(v, 10) || 0 })} min={0} />
+                </Box>
+                <Box minWidth="180px">
+                  <TextField label={pe.minOrderQty} type="number" min={1} value={meta.minimum_order_quantity != null ? String(meta.minimum_order_quantity) : ""} onChange={(v) => updateMeta("minimum_order_quantity", v === "" ? undefined : Math.max(1, parseInt(v, 10) || 1))} placeholder="1" />
+                </Box>
+              </InlineStack>
+              <Text as="p" variant="bodySm" tone="subdued">{pe.warehouseHint}</Text>
+            </BlockStack>
+            </div>
+          </Card>
+
+              {isSuperuser && (
+              <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{pe.seo}</ProductSectionHeading>
+              <div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--p-color-text-subdued)", marginBottom: 4 }}>
+                    URL-Handle (Shop){locale !== "de" ? " — this language" : " — canonical (German)"}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      value={
+                        locale === "de"
+                          ? ((product.handle || "").trim() || titleToHandle(editingTitle || product.title || ""))
+                          : ((editingTr.handle || "").trim())
+                      }
+                      onChange={(e) => {
+                        const v = sanitizeSeoHandleInput(e.target.value);
+                        if (locale === "de") {
+                          setProduct((prev) => {
+                            if (!prev) return prev;
+                            const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
+                            const tr = { ...(m.translations || {}) };
+                            tr.de = { ...(tr.de || {}), handle: v };
+                            return { ...prev, handle: v, metadata: { ...m, translations: tr } };
+                          });
+                        } else {
+                          updateLocaleField("handle", v);
+                        }
+                      }}
+                      style={{ flex: 1, padding: "6px 10px", border: "1px solid var(--p-color-border)", borderRadius: 6, fontSize: 12, fontFamily: "monospace" }}
+                      placeholder="url-handle"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = titleToHandle(editingTitle || product.title || "");
+                        if (locale === "de") {
+                          setProduct((prev) => {
+                            if (!prev) return prev;
+                            const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
+                            const tr = { ...(m.translations || {}) };
+                            tr.de = { ...(tr.de || {}), handle: next };
+                            return { ...prev, handle: next, metadata: { ...m, translations: tr } };
+                          });
+                        } else {
+                          updateLocaleField("handle", next);
+                        }
+                      }}
+                      title="Titel → Handle synchronisieren"
+                      style={{ padding: "6px 10px", background: "var(--p-color-bg-surface-hover)", border: "1px solid var(--p-color-border)", borderRadius: 6, cursor: "pointer", fontSize: 11, whiteSpace: "nowrap" }}
+                    >
+                      ↻ Sync
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 4 }}>
+                    Shop-URL: {shopPreviewPrefix(locale)}/
+                    <span style={{ fontFamily: "monospace" }}>
+                      {shopProductHandleForLocale(product, locale) || titleToHandle(editingTitle || product.title || "…")}
+                    </span>
+                    {locale !== "de" && !(editingTr.handle || "").trim() && (product.handle || "").trim() ? (
+                      <span> (empty uses DE handle)</span>
+                    ) : null}
+                  </div>
+              </div>
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Meta title</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_title" />
+                  </InlineStack>
+                }
+                value={meta.seo_meta_title ?? ""}
+                onChange={(v) => updateMeta("seo_meta_title", v)}
+                placeholder={editingTitle || product.title || "Meta title"}
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Meta description</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_description" />
+                  </InlineStack>
+                }
+                value={meta.seo_meta_description ?? ""}
+                onChange={(v) => updateMeta("seo_meta_description", v)}
+                placeholder={seoPlainPreview(editingDescription || product.description, 160) || "Meta description"}
+                multiline={2}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Keywords</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_keywords" />
+                  </InlineStack>
+                }
+                value={meta.seo_keywords ?? ""}
+                onChange={(v) => updateMeta("seo_keywords", v)}
+                placeholder="keyword1, keyword2"
+                autoComplete="off"
+              />
+            </BlockStack>
+            </div>
+          </Card>
+              )}
+          </BlockStack>
+        </Layout.Section>
+
+        <Layout.Section variant="oneThird">
+          <div className="product-edit-sidebar">
+          <BlockStack gap="300">
+            <Card>
+              <BlockStack gap="400">
+                <BlockStack gap="200">
+                  <ProductSectionHeading>{locale === "en" ? "Publish date (optional)" : locale === "tr" ? "Yayın tarihi (isteğe bağlı)" : locale === "fr" ? "Date de publication (optionnel)" : locale === "es" ? "Fecha de publicación (opcional)" : locale === "it" ? "Data di pubblicazione (opzionale)" : "Veröffentlichungsdatum (optional)"}</ProductSectionHeading>
+                  <TextField
+                    label=""
+                    labelHidden
+                    type="datetime-local"
+                    value={(() => {
+                      // Keep the input controlled: datetime-local expects "YYYY-MM-DDTHH:mm"
+                      const raw = meta.publish_date;
+                      if (!raw) return "";
+                      const d = new Date(raw);
+                      if (isNaN(d.getTime())) return "";
+                      const pad = (n) => String(n).padStart(2, "0");
+                      const yyyy = d.getFullYear();
+                      const mm = pad(d.getMonth() + 1);
+                      const dd = pad(d.getDate());
+                      const hh = pad(d.getHours());
+                      const min = pad(d.getMinutes());
+                      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+                    })()}
+                    onChange={(v) => {
+                      if (!v) return updateMeta("publish_date", undefined);
+                      const d = new Date(v);
+                      if (isNaN(d.getTime())) return updateMeta("publish_date", undefined);
+                      // Store ISO so shop can do new Date(publish_date) safely
+                      updateMeta("publish_date", d.toISOString());
+                    }}
+                    placeholder="YYYY-MM-DDTHH:mm"
+                    helpText={locale === "en" ? "If a future date + time is set, the shop shows \"Coming soon\"." : locale === "tr" ? "İleri tarih + saat seçilirse shop’ta \"Pek yakında\" gösterilir." : locale === "fr" ? "Si une date + heure future est sélectionnée, la boutique affiche \"Bientôt disponible\"." : locale === "es" ? "Si se selecciona una fecha + hora futura, la tienda muestra \"Próximamente\"." : locale === "it" ? "Se si seleziona una data + ora futura, il negozio mostra \"Presto disponibile\"." : "Bei zukünftigem Datum + Uhrzeit zeigt der Shop \"Demnächst verfügbar\"."}
+                  />
+                </BlockStack>
+
+                {isSuperuser && (
+                <>
+                <div style={{ position: "relative", zIndex: relatedProductPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
+                  <BlockStack gap="200">
+                    <ProductSectionHeading>{locale === "en" ? "Related products (customers also bought)" : locale === "tr" ? "İlgili ürünler (müşteriler de satın aldı)" : locale === "fr" ? "Produits associés (les clients ont aussi acheté)" : locale === "es" ? "Productos relacionados (los clientes también compraron)" : locale === "it" ? "Prodotti correlati (i clienti hanno anche acquistato)" : "Verwandte Produkte (Kunden kauften auch)"}</ProductSectionHeading>
+                    <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Products shown in the \"Customers who bought this item also bought\" section on the product page." : locale === "tr" ? "Ürün sayfasında \"Bu ürünü satın alanlar bunları da satın aldı\" bölümünde gösterilecek ürünler." : locale === "fr" ? "Produits affichés dans la section \"Les clients qui ont acheté cet article ont aussi acheté\" sur la page produit." : locale === "es" ? "Productos mostrados en la sección \"Los clientes que compraron este artículo también compraron\" en la página del producto." : locale === "it" ? "Prodotti mostrati nella sezione \"I clienti che hanno acquistato questo articolo hanno anche acquistato\" nella pagina prodotto." : "Produkte die im Bereich \"Kunden, die diesen Artikel gekauft haben, kauften auch\" auf der Produktseite angezeigt werden."}</Text>
+                    <TextField
+                      label=""
+                      labelHidden
+                      value={relatedProductSearch}
+                      onChange={setRelatedProductSearch}
+                      onFocus={() => setRelatedProductPopoverOpen(true)}
+                      placeholder={locale === "en" ? "Search product…" : locale === "tr" ? "Ürün ara…" : locale === "fr" ? "Rechercher un produit…" : locale === "es" ? "Buscar producto…" : locale === "it" ? "Cerca prodotto…" : "Produkt suchen…"}
+                      autoComplete="off"
+                    />
+                    <div style={{ position: "relative" }}>
+                      {relatedProductPopoverOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            maxHeight: 280,
+                            overflowY: "auto",
+                            background: "var(--p-color-bg-surface)",
+                            border: "1px solid var(--p-color-border)",
+                            borderRadius: 8,
+                            marginTop: 4,
+                            zIndex: 10002,
+                            boxShadow: "var(--p-shadow-400)",
+                          }}
+                        >
+                          {(relatedProductsList || [])
+                            .filter((p) => p.id !== product?.id && (!relatedProductSearch.trim() || (p.title || p.handle || "").toLowerCase().includes(relatedProductSearch.toLowerCase())))
+                            .slice(0, 50)
+                            .map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                style={{ display: "block", width: "100%", padding: "8px 12px", textAlign: "left", border: "none", background: relatedProductIds.includes(p.id) ? "var(--p-color-bg-fill-secondary)" : "transparent", cursor: "pointer", fontSize: 13 }}
+                                onClick={() => {
+                                  const next = relatedProductIds.includes(p.id) ? relatedProductIds.filter((id) => id !== p.id) : [...relatedProductIds, p.id];
+                                  updateMeta("related_product_ids", next.length ? next : null);
+                                }}
+                              >
+                                <span style={{ marginRight: 8 }}>{relatedProductIds.includes(p.id) ? "✓" : ""}</span>
+                                {p.title || p.handle || p.id}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                    {relatedProductPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setRelatedProductPopoverOpen(false)} aria-hidden />}
+                    {relatedProductIds.length > 0 && (
+                      <InlineStack gap="100" wrap>
+                        {relatedProductIds.map((id) => {
+                          const p = (relatedProductsList || []).find((x) => x.id === id);
+                          const label = p ? (p.title || p.handle || id) : id;
+                          return (
+                            <span
+                              key={id}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
+                            >
+                              {String(label).slice(0, 40)}{String(label).length > 40 ? "…" : ""}
+                              <button type="button" onClick={() => updateMeta("related_product_ids", relatedProductIds.filter((x) => x !== id).length ? relatedProductIds.filter((x) => x !== id) : null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
+                            </span>
+                          );
+                        })}
+                      </InlineStack>
+                    )}
+                  </BlockStack>
+                </div>
+
+                <ProductSectionRule />
+
+                <BlockStack gap="200">
+                  <ProductSectionHeading>{pe.sales}</ProductSectionHeading>
+                  <Text as="p" variant="bodyMd">{meta.sales_count != null ? meta.sales_count : 0} {locale === "en" ? "sales" : locale === "tr" ? "satış" : locale === "fr" ? "ventes" : locale === "es" ? "ventas" : locale === "it" ? "vendite" : "Verkäufe"}</Text>
+                </BlockStack>
+
+                <ProductSectionRule />
+
+                <BlockStack gap="200">
+                  <ProductSectionHeading>{pe.type}</ProductSectionHeading>
+                  <TextField label="Product type" labelHidden value={meta.type ?? ""} onChange={(v) => updateMeta("type", v)} placeholder="e.g. T-Shirt" autoComplete="off" />
+                </BlockStack>
+                </>
+                )}
+              </BlockStack>
+            </Card>
+          </BlockStack>
+          </div>
+        </Layout.Section>
+      </Layout>
+      )}
+
+      {activeTabIndex === 2 && (
+      <Layout>
+        <Layout.Section>
+              {/* Variations — directly after Media so they are not buried under GPSR/SEO */}
+          <div className="variations-fullwidth">
+            <Card>
+              <BlockStack gap="400">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <ProductSectionHeading>{pe.variations}</ProductSectionHeading>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {pe.variationsHelp}
+                    </Text>
+                  </div>
+                  <Button variant="primary" size="slim" onClick={vg_addGroup}>{pe.addGroup}</Button>
+                </div>
+    
+                {variantGroups.length === 0 && (
+                  <div style={{ padding: "24px 0", textAlign: "center", color: "var(--p-color-text-subdued)", fontSize: 13 }}>
+                    {pe.noVariantGroups}
+                  </div>
+                )}
+    
+                <BlockStack gap="300">
+                  {variantGroups.map((group, gi) => (
+                    <div
+                      key={gi}
+                      className="vg-group"
+                      draggable
+                      onDragStart={() => { dragGroupIdx.current = gi; }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        const from = dragGroupIdx.current;
+                        dragGroupIdx.current = null;
+                        if (from !== null && from !== gi) vg_moveGroup(from, gi);
+                      }}
+                    >
+                      <div className="vg-group-header">
+                        <span className="vg-drag-handle" title="Drag to reorder">⠿</span>
+                        <span className="vg-group-num">{gi + 1}</span>
+                        {Object.keys(metaDefs).length > 0 && (
+                          <div style={{ width: 150, flexShrink: 0 }}>
+                            <Select
+                              label={pe.eigenschaften}
+                              labelHidden
+                              options={[
+                                { label: lt(locale, "Custom (free text)", "Serbest metin", "Texte libre", "Texto libre", "Testo libero", "Frei (Text)"), value: "" },
+                                ...Object.keys(metaDefs).map((k) => ({ label: resolveMetaDefLabel(metaDefs[k], k, locale), value: k })),
+                              ]}
+                              value={group.metafield_key || ""}
+                              onChange={(v) => vg_setGroupMetaKey(gi, v)}
+                            />
+                          </div>
+                        )}
+                        <div style={{ flex: 1, maxWidth: 220 }}>
+                          <TextField
+                            label="Group name"
+                            labelHidden
+                            value={getGroupDisplayName(gi)}
+                            onChange={(v) => vg_setGroupName(gi, v)}
+                            placeholder="e.g. Color, Size, Material"
+                            autoComplete="off"
+                            disabled={!!group.metafield_key}
+                          />
+                        </div>
+                        <Text as="span" variant="bodySm" tone="subdued">
+                          {pe.optionsCount((group.options || []).filter((o) => o.value.trim()).length)}
+                        </Text>
+                        <Button size="slim" variant="plain" tone="critical" onClick={() => vg_removeGroup(gi)}>
+                          {ui.remove}
+                        </Button>
+                      </div>
+    
+                      <div className="vg-group-body">
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                          {(group.options || []).map((opt, oi) => (
+                            <div key={oi} className="vg-option-chip">
+                              <div style={{ position: "relative", flexShrink: 0 }}>
+                                <button
+                                  type="button"
+                                  className={opt.swatch_image ? "vg-swatch" : "vg-swatch-empty"}
+                                  title={opt.swatch_image ? "Swatch görselini değiştir" : "Swatch görseli ekle (shopta renk/desen simgesi)"}
+                                  onClick={() => openSwatchPicker(gi, oi)}
+                                >
+                                  {opt.swatch_image
+                                    ? <img src={resolveMediaUrl(opt.swatch_image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                    : <span style={{ fontSize: 10, lineHeight: 1, color: "#6b7280" }}>SW</span>}
+                                </button>
+                                {opt.swatch_image && (
+                                  <button
+                                    type="button"
+                                    style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#de3618", border: "none", color: "#fff", fontSize: 9, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                                    onClick={(e) => { e.stopPropagation(); vg_setOption(gi, oi, "swatch_image", ""); }}
+                                    title="Remove swatch"
+                                  >×</button>
+                                )}
+                              </div>
+                              {group.metafield_key ? (
+                                <span style={{ fontSize: 13, color: "var(--p-color-text)", minWidth: 64, padding: "0 4px" }}>{getOptionInputValue(opt)}</span>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={getOptionInputValue(opt)}
+                                  onChange={(e) => handleOptionDisplayChange(gi, oi, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      vg_addOption(gi);
+                                    }
+                                  }}
+                                  placeholder="Value"
+                                />
+                              )}
+                              <button type="button" className="vg-remove-btn" onClick={() => vg_removeOption(gi, oi)} title="Remove option">×</button>
+                            </div>
+                          ))}
+                          {group.metafield_key ? (
+                            (() => {
+                              const def = metaDefs[group.metafield_key];
+                              const used = (group.options || []).map((o) => String(o.value || "").trim());
+                              const search = vgValueSearch[gi] || "";
+                              const availableVals = (def?.values || []).filter((v) => !used.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
+                              const canAddCustom = search.trim() && !used.includes(search.trim()) && !(def?.values || []).includes(search.trim());
+                              return (
+                                <Popover
+                                  active={!!vgValuePopover[gi]}
+                                  onClose={() => setVgValuePopover((p) => ({ ...p, [gi]: false }))}
+                                  activator={
+                                    <Button size="slim" variant="plain" onClick={() => setVgValuePopover((p) => ({ ...p, [gi]: !p[gi] }))}>{pe.addOption}</Button>
+                                  }
+                                >
+                                  <Box padding="200" minWidth="220px">
+                                    <BlockStack gap="150">
+                                      <TextField
+                                        label={pe.searchEigenschaft}
+                                        labelHidden
+                                        autoComplete="off"
+                                        size="slim"
+                                        value={search}
+                                        onChange={(v) => setVgValueSearch((p) => ({ ...p, [gi]: v }))}
+                                        placeholder={pe.searchEigenschaft}
+                                        autoFocus
+                                      />
+                                      <div style={{ maxHeight: 220, overflowY: "auto" }}>
+                                        {availableVals.map((v) => (
+                                          <div
+                                            key={v}
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => { vg_addLinkedOptionValue(gi, v); setVgValueSearch((p) => ({ ...p, [gi]: "" })); setVgValuePopover((p) => ({ ...p, [gi]: false })); }}
+                                            style={{ padding: "6px 8px", fontSize: 13, cursor: "pointer", borderRadius: 4 }}
+                                          >
+                                            {v}
+                                          </div>
+                                        ))}
+                                        {canAddCustom && (
+                                          <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={() => { vg_addLinkedOptionValue(gi, search.trim()); setVgValueSearch((p) => ({ ...p, [gi]: "" })); setVgValuePopover((p) => ({ ...p, [gi]: false })); }}
+                                            style={{ padding: "6px 8px", fontSize: 13, cursor: "pointer", borderRadius: 4, color: "var(--p-color-text-brand, #2c6ecb)" }}
+                                          >
+                                            "{search.trim()}" {lt(locale, "propose new", "yeni öner", "proposer nouveau", "proponer nuevo", "proponi nuovo", "neu vorschlagen")}
+                                          </div>
+                                        )}
+                                        {availableVals.length === 0 && !canAddCustom && (
+                                          <div style={{ padding: "6px 8px", fontSize: 12, color: "var(--p-color-text-subdued)" }}>
+                                            {lt(locale, "No more values", "Başka değer yok", "Aucune autre valeur", "No hay más valores", "Nessun altro valore", "Keine weiteren Werte")}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </BlockStack>
+                                  </Box>
+                                </Popover>
+                              );
+                            })()
+                          ) : (
+                            <Button size="slim" variant="plain" onClick={() => vg_addOption(gi)}>{pe.addOption}</Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </BlockStack>
+    
+                {variantGroups.length > 0 && (() => {
+                  const matrixRows = (product?.variants || []).filter((v) => Array.isArray(v.option_values));
+                  if (matrixRows.length === 0) {
+                    return (
+                      <div style={{ padding: "12px 16px", background: "var(--p-color-bg-surface-warning, #fffbeb)", borderRadius: 8, fontSize: 13, color: "var(--p-color-text-subdued)" }}>
+                        Add at least one option to each group to generate combinations.
+                      </div>
+                    );
+                  }
+                  return (
+                    <div>
+                      <div style={{ marginBottom: 10 }}>
+                        <Text as="p" variant="bodySm" fontWeight="semibold">
+                          {pe.variationMatrix} — {matrixRows.length} {pe.variantWord(matrixRows.length)}
+                        </Text>
+                      </div>
+                      <div>
+                        {matrixRows.map((v, vi) => {
+                          const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
+                          const localeVariantImg =
+                            String(locale).toLowerCase() === "de"
+                              ? v.image_url || ""
+                              : v.image_urls?.[locale] || v.image_url || "";
+                          const thumbUrl = variantImgs[0]
+                            ? resolveMediaUrl(variantImgs[0])
+                            : localeVariantImg
+                              ? resolveMediaUrl(localeVariantImg)
+                              : null;
+                          const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
+                          const mkDraftKey = (f) => `${vkey}_${f}`;
+                          const priceFields = [
+                            { f: "compare_at_price", centsKey: "compare_at_price_cents", label: pe.uvp,           placeholder: "—" },
+                            { f: "price",            centsKey: "price_cents",            label: pe.sellingPrice,  placeholder: "0.00" },
+                            { f: "sale_price",       centsKey: "sale_price_cents",       label: pe.discountPrice, placeholder: "—" },
+                          ];
+    
+                          return (
+                            <div key={vi} className="vm-card">
+                              <div className="vm-row">
+                                <div className="vm-row-main">
+                                  {thumbUrl
+                                    ? <img src={thumbUrl} alt="" className="vm-thumb" />
+                                    : <div className="vm-thumb-empty">+</div>
+                                  }
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>
+                                    {(v.option_values || []).map((val, oi) => {
+                                      const gOpt = variantGroups[oi];
+                                      const opt = (gOpt?.options || []).find(
+                                        (o) => String(o.value || "").trim().toLowerCase() === String(val || "").trim().toLowerCase()
+                                      );
+                                      const label = opt ? optionDisplayLabel(opt, locale) : val;
+                                      const swatchUrl = opt?.swatch_image;
+                                      return (
+                                        <span key={oi} className="vm-badge">
+                                          {swatchUrl && (
+                                            <span style={{ width: 12, height: 12, borderRadius: "50%", display: "inline-block", backgroundImage: `url(${resolveMediaUrl(swatchUrl)})`, backgroundSize: "cover", border: "1px solid var(--p-color-border)", flexShrink: 0 }} />
+                                          )}
+                                          <span style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginRight: 2 }}>{getGroupDisplayName(oi) || gOpt?.name || `G${oi + 1}`}:</span>
+                                          {label}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+    
+                                <div className="vm-field-group">
+                                  <div className="vm-sub-label">{pe.inventoryIds}</div>
+                                  <div className="vm-grid-3">
+                                    <TextField label="SKU" value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" />
+                                    <TextField
+                                      label="EAN / GTIN"
+                                      value={v.ean ?? ""}
+                                      onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)}
+                                      placeholder="EAN"
+                                      autoComplete="off"
+                                      error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
+                                    />
+                                    <TextField label={pe.inventory} type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" />
+                                  </div>
+                                </div>
+    
+                                <div className="vm-field-group vm-prices">
+                                  <div className="vm-sub-label">{pe.pricing}</div>
+                                  <div className="vm-grid-3">
+                                    {priceFields.map(({ f, centsKey, label, placeholder }) => {
+                                      const dk = mkDraftKey(f);
+                                      const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
+                                      const displayVal = isDraft
+                                        ? priceInputs[dk]
+                                        : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
+                                      return (
+                                        <TextField
+                                          key={f}
+                                          label={label}
+                                          value={displayVal}
+                                          placeholder={placeholder}
+                                          autoComplete="off"
+                                          onChange={(val) => {
+                                            const clean = sanitizePriceDraftString(val);
+                                            setPriceInputs((prev) => {
+                                              const next = { ...prev, [dk]: clean };
+                                              priceInputsRef.current = next;
+                                              return next;
+                                            });
+                                          }}
+                                          onBlur={(e) => {
+                                            const raw = sanitizePriceDraftString(e.currentTarget.value);
+                                            updateMatrixVariant(v.option_values, f, raw);
+                                            setPriceInputs((prev) => {
+                                              const next = { ...prev };
+                                              delete next[dk];
+                                              priceInputsRef.current = next;
+                                              return next;
+                                            });
+                                          }}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+    
+                                <div className="vm-field-group vm-images">
+                                  <div className="vm-sub-label">{pe.images}</div>
+                                  <div className="vm-img-strip">
+                                    {variantImgs.length === 0 && localeVariantImg && (
+                                      <div className="vm-img-item" title="Added via the full Variant Edit page — manage it there">
+                                        <img src={resolveMediaUrl(localeVariantImg)} alt="" />
+                                      </div>
+                                    )}
+                                    {variantImgs.map((imgUrl, imgIdx) => (
+                                      <div key={imgIdx} className="vm-img-item">
+                                        <img src={resolveMediaUrl(imgUrl)} alt="" />
+                                        <button
+                                          type="button"
+                                          className="vm-img-del"
+                                          onClick={() => {
+                                            const next = variantImgs.filter((_, i) => i !== imgIdx);
+                                            updateMatrixVariantMeta(v.option_values, "media", next.length ? next : null);
+                                          }}
+                                        >×</button>
+                                      </div>
+                                    ))}
+                                    {variantImgs.length < 8 && (
+                                      <button
+                                        type="button"
+                                        className="vm-img-add"
+                                        onClick={() => openVariantImgPicker(v.option_values)}
+                                      >+</button>
+                                    )}
+                                  </div>
+                                </div>
+    
+                                {!isNew && (
+                                  <div className="vm-edit-btn">
+                                    <Button
+                                      size="slim"
+                                      variant="plain"
+                                      icon={EditIcon}
+                                      accessibilityLabel="Edit variant"
+                                      onClick={() => router.push(`/products/${idOrHandle}/variants/${encodeVariantPathKey(v.option_values)}`)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </BlockStack>
+            </Card>
+          </div>
+        </Layout.Section>
+      </Layout>
+      )}
+
+      {activeTabIndex === 1 && (
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="300">
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="300">
+              <ProductSectionHeading>{pe.dimsPackaging}</ProductSectionHeading>
+              <InlineStack gap="200" wrap>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${pe.width} (cm)`} type="number" value={meta.dimensions_width != null ? String(meta.dimensions_width) : ""} onChange={(v) => updateMeta("dimensions_width", v)} placeholder="0" />
+                </Box>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${pe.height} (cm)`} type="number" value={meta.dimensions_height != null ? String(meta.dimensions_height) : ""} onChange={(v) => updateMeta("dimensions_height", v)} placeholder="0" />
+                </Box>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${pe.length} (cm)`} type="number" value={meta.dimensions_length != null ? String(meta.dimensions_length) : ""} onChange={(v) => updateMeta("dimensions_length", v)} placeholder="0" />
+                </Box>
+                <Box minWidth="140px" flex="1">
+                  <TextField label={`${pe.weight} (g)`} type="number" value={meta.weight_grams != null ? String(meta.weight_grams) : ""} onChange={(v) => updateMeta("weight_grams", v === "" ? "" : parseInt(v, 10))} placeholder="0" />
+                </Box>
+              </InlineStack>
+              <InlineStack gap="200" wrap>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={pe.salesUnit} value={meta.sales_unit ?? ""} onChange={(v) => updateMeta("sales_unit", v)} placeholder={lt(locale, "e.g. piece", "örn. adet", "ex. pièce", "ej. unidad", "es. pezzo", "z. B. Stück")} autoComplete="off" />
+                </Box>
+                <Box minWidth="180px" flex="1">
+                  <Select label={pe.unitOfMeasure} options={UNIT_TYPE_OPTIONS} value={meta.unit_type ?? ""} onChange={(v) => updateMeta("unit_type", v)} />
+                </Box>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={pe.packagingUnit} value={meta.packaging_unit ?? ""} onChange={(v) => updateMeta("packaging_unit", v)} placeholder={lt(locale, "e.g. carton", "örn. koli", "ex. carton", "ej. cartón", "es. cartone", "z. B. Karton")} autoComplete="off" />
+                </Box>
+              </InlineStack>
+              <InlineStack gap="200" wrap>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={pe.packagingUnitPlural} value={meta.packaging_unit_plural ?? ""} onChange={(v) => updateMeta("packaging_unit_plural", v)} placeholder={lt(locale, "e.g. cartons", "örn. koliler", "ex. cartons", "ej. cartones", "es. cartoni", "z. B. Kartons")} autoComplete="off" />
+                </Box>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={pe.baseUnit} type="number" value={meta.unit_reference != null ? String(meta.unit_reference) : "1"} onChange={(v) => updateMeta("unit_reference", v)} placeholder="1" />
+                </Box>
+                <Box minWidth="180px" flex="1">
+                  <TextField label={lt(locale, "Amount", "Miktar", "Quantité", "Cantidad", "Quantità", "Menge")} type="number" value={meta.unit_value != null ? String(meta.unit_value) : ""} onChange={(v) => updateMeta("unit_value", v)} placeholder="e.g. 200" />
+                </Box>
+              </InlineStack>
+              <Text as="p" variant="bodySm" tone="subdued">{lt(locale, "Shown on the product, e.g. \"Content: 200 g (€5.00* / 1 kg)\".", "Ürün sayfasında gösterilir, örn. \"İçerik: 200 g (€5,00* / 1 kg)\".", "Affiché sur le produit, ex. « Contenu : 200 g (5,00 €* / 1 kg) ».", "Se muestra en el producto, ej. « Contenido: 200 g (5,00 €* / 1 kg) ».", "Mostrato sul prodotto, es. « Contenuto: 200 g (5,00 €* / 1 kg) ».", "Wird auf dem Produkt angezeigt, z. B. „Inhalt: 200 g (5,00 €* / 1 kg)“.")}</Text>
+            </BlockStack>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <BlockStack gap="150">
+                  <ProductSectionHeading>{pe.eigenschaften}</ProductSectionHeading>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {locale === "en" ? "Only metafields with set values — or those selected via \"Add metafield\" — are shown (not the entire catalog). Custom titles/values need superuser approval; until then the product stays hidden in the shop." : locale === "tr" ? "Yalnızca değer atanmış metafield'lar — veya \"Metafield ekle\" ile seçilenler — gösterilir (tüm katalog değil). Özel başlık/değerler superuser onayı ister; onaylanana kadar ürün shop’ta görünmez." : locale === "fr" ? "Seuls les métachamps avec des valeurs définies — ou sélectionnés via \"Ajouter un métachamp\" — sont affichés (pas l'ensemble du catalogue). Titres/valeurs personnalisés : approbation superuser, sinon le produit reste masqué." : locale === "es" ? "Solo se muestran los metacampos con valores establecidos — o los seleccionados mediante \"Agregar metacampo\" — (no el catálogo completo). Títulos/valores propios requieren aprobación; hasta entonces el producto no aparece en la tienda." : locale === "it" ? "Vengono mostrati solo i metacampi con valori impostati — o quelli selezionati tramite \"Aggiungi metacampo\" — (non l'intero catalogo). Titoli/valori personalizzati richiedono approvazione; fino ad allora il prodotto resta nascosto." : 'Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen" ausgewählte — werden angezeigt (nicht der gesamte Katalog). Eigene Titel/Werte brauchen Superuser-Freigabe; bis dahin bleibt das Produkt im Shop unsichtbar.'}
+                  </Text>
+                </BlockStack>
+                {Object.keys(metaDefs).length === 0 ? (
+                  <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {locale === "en" ? "No catalog definitions yet — use \"New metafield (catalog)\" to create title and value (superuser: immediately active; seller: approval required)." : locale === "tr" ? "Henüz katalog tanımı yok — başlık ve değer oluşturmak için \"Yeni metafield (katalog)\" kullanın (süper kullanıcı: hemen aktif; satıcı: onay gerekli)." : locale === "fr" ? "Aucune définition de catalogue — utilisez \"Nouveau métachamp (catalogue)\" pour créer titre et valeur (superuser : immédiatement actif ; vendeur : approbation requise)." : locale === "es" ? "Aún no hay definiciones de catálogo — usa \"Nuevo metacampo (catálogo)\" para crear título y valor (superusuario: activo inmediatamente; vendedor: se requiere aprobación)." : locale === "it" ? "Nessuna definizione di catalogo ancora — usa \"Nuovo metacampo (catalogo)\" per creare titolo e valore (superuser: immediatamente attivo; venditore: approvazione richiesta)." : 'Noch keine Katalog-Definitionen — du kannst mit „Neues Metafeld (Katalog)" Titel und Wert anlegen (Superuser: sofort aktiv; Verkäufer: Freigabe nötig).'}
+                    </Text>
+                  </Box>
+                ) : (
+                  <Box padding="400" background="bg-surface-secondary" borderRadius="300">
+                    <BlockStack gap="400">
+                      {visibleMetaDefEntries.length === 0 && (
+                        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No metafields for this product. You can add some below." : locale === "tr" ? "Bu ürün için metafield yok. Aşağıdan ekleyebilirsiniz." : locale === "fr" ? "Aucun métachamp pour ce produit. Vous pouvez en ajouter ci-dessous." : locale === "es" ? "No hay metacampos para este producto. Puedes agregar algunos abajo." : locale === "it" ? "Nessun metacampo per questo prodotto. Puoi aggiungerne qui sotto." : "Keine Metafelder für dieses Produkt. Unten kannst du welche hinzufügen."}</Text>
+                      )}
+                      {visibleMetaDefEntries.map(([defKey, def]) => {
+                        const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
+                        const isOpen = !!metaDefPopover[defKey];
+                        const search = metaDefSearch[defKey] || "";
+                        const availableVals = (def.values || []).filter(v => !selected.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
+                        const canAddCustom = search.trim() && !selected.includes(search.trim()) && !(def.values || []).includes(search.trim());
+                        const toggleVal = (val) => {
+                          const others = metafieldsList.filter(m => m.key !== defKey);
+                          const cur = selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val];
+                          updateMeta("metafields", [...others, ...cur.map(v => ({ key: defKey, value: v }))]);
+                        };
+                        return (
+                          <Box
+                            key={defKey}
+                            padding="400"
+                            background="bg-surface"
+                            borderRadius="200"
+                            borderWidth="025"
+                            borderColor="border"
+                          >
+                            <BlockStack gap="300">
+                              <BlockStack gap="050">
+                                <InlineStack gap="200" blockAlign="center" wrap={false}>
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{resolveMetaDefLabel(def, defKey, locale)}</Text>
+                                  <InfoIconTooltip
+                                    text={
+                                      locale === "en" ? `Internal key: ${defKey}` :
+                                      locale === "tr" ? `Teknik anahtar: ${defKey}` :
+                                      locale === "fr" ? `Clé interne : ${defKey}` :
+                                      locale === "es" ? `Clave interna: ${defKey}` :
+                                      locale === "it" ? `Chiave interna: ${defKey}` :
+                                      `Interner Schlüssel: ${defKey}`
+                                    }
+                                  />
+                                  <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName={`metadata.${defKey}`} />
+                                </InlineStack>
+                              </BlockStack>
+                              {selected.length > 0 && (
+                                <InlineStack gap="200" wrap>
+                                  {selected.map(val => (
+                                    <Tag key={val} onRemove={() => {
+                                      const others = metafieldsList.filter(m => m.key !== defKey);
+                                      updateMeta("metafields", [...others, ...selected.filter(v => v !== val).map(v => ({ key: defKey, value: v }))]);
+                                    }}>{val}</Tag>
+                                  ))}
+                                </InlineStack>
+                              )}
+                              <Popover
+                                active={isOpen}
+                                onClose={() => setMetaDefPopover(p => ({ ...p, [defKey]: false }))}
+                                activator={
+                                  <Button size="slim" variant="secondary" onClick={() => setMetaDefPopover(p => ({ ...p, [defKey]: !p[defKey] }))}>
+                                    + {locale === "en" ? "Select value" : locale === "tr" ? "Değer seç" : locale === "fr" ? "Choisir une valeur" : locale === "es" ? "Seleccionar valor" : locale === "it" ? "Seleziona valore" : "Wert wählen"}
+                                  </Button>
+                                }
+                              >
+                                <Box padding="300" minWidth="220px">
+                                  <BlockStack gap="200">
+                                    <TextField
+                                      label={locale === "en" ? "Search" : locale === "tr" ? "Ara" : locale === "fr" ? "Rechercher" : locale === "es" ? "Buscar" : locale === "it" ? "Cerca" : "Suchen"}
+                                      labelHidden
+                                      placeholder={locale === "en" ? "Search or enter…" : locale === "tr" ? "Ara veya gir…" : locale === "fr" ? "Rechercher ou saisir…" : locale === "es" ? "Buscar o ingresar…" : locale === "it" ? "Cerca o inserisci…" : "Suchen oder eingeben…"}
+                                      value={search}
+                                      onChange={v => setMetaDefSearch(p => ({ ...p, [defKey]: v }))}
+                                      autoComplete="off"
+                                      size="slim"
+                                    />
+                                    <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                                      {availableVals.map(val => (
+                                        <div
+                                          key={val}
+                                          role="button"
+                                          tabIndex={0}
+                                          style={{ padding: "8px 10px", cursor: "pointer", borderRadius: 6, fontSize: 13 }}
+                                          onMouseEnter={e => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"; }}
+                                          onMouseLeave={e => { e.currentTarget.style.background = ""; }}
+                                          onMouseDown={e => {
+                                            e.preventDefault();
+                                            toggleVal(val);
+                                            setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
+                                            setMetaDefPopover(p => ({ ...p, [defKey]: false }));
+                                          }}
+                                        >{val}</div>
+                                      ))}
+                                      {canAddCustom && (
+                                        <div
+                                          role="button"
+                                          tabIndex={0}
+                                          style={{ padding: "8px 10px", cursor: "pointer", borderRadius: 6, fontSize: 13, fontStyle: "italic", color: "var(--p-color-text-subdued)" }}
+                                          onMouseEnter={e => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"; }}
+                                          onMouseLeave={e => { e.currentTarget.style.background = ""; }}
+                                          onMouseDown={e => {
+                                            e.preventDefault();
+                                            const custom = search.trim();
+                                            toggleVal(custom);
+                                            if (custom && !(def.values || []).includes(custom)) {
+                                              client.submitMetafieldCatalogProposal({
+                                                key: defKey,
+                                                label: resolveMetaDefLabel(def, defKey, locale),
+                                                values: [custom],
+                                              }).catch(() => {});
+                                            }
+                                            setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
+                                            setMetaDefPopover(p => ({ ...p, [defKey]: false }));
+                                          }}
+                                        >"{search.trim()}" {locale === "en" ? "add" : locale === "tr" ? "ekle" : locale === "fr" ? "ajouter" : locale === "es" ? "agregar" : locale === "it" ? "aggiungi" : "hinzufügen"}</div>
+                                      )}
+                                      {availableVals.length === 0 && !canAddCustom && (
+                                        <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>{locale === "en" ? "No more options" : locale === "tr" ? "Başka seçenek yok" : locale === "fr" ? "Aucune autre option" : locale === "es" ? "No hay más opciones" : locale === "it" ? "Nessun'altra opzione" : "Keine weiteren Optionen"}</div>
+                                      )}
+                                    </div>
+                                  </BlockStack>
+                                </Box>
+                              </Popover>
+                            </BlockStack>
+                          </Box>
+                        );
+                      })}
+                      {hiddenMetaDefKeys.length > 0 && (
+                        <Box paddingBlockStart="100">
+                          <Popover
+                            active={addMetaDefPopoverOpen}
+                            preferredPosition="below"
+                            preferredAlignment="left"
+                            onClose={() => { setAddMetaDefPopoverOpen(false); setAddMetaDefSearch(""); }}
+                            activator={
+                              <Button size="slim" variant="secondary" onClick={() => setAddMetaDefPopoverOpen((o) => !o)}>
+                                + {pe.searchEigenschaft}
+                              </Button>
+                            }
+                          >
+                            <div style={{ width: 380, maxWidth: "calc(100vw - 24px)" }}>
+                              <div style={{ padding: "8px 10px 6px", borderBottom: "1px solid var(--p-color-border-secondary)" }}>
+                                <TextField
+                                  label={locale === "en" ? "Search" : locale === "tr" ? "Ara" : locale === "fr" ? "Rechercher" : locale === "es" ? "Buscar" : locale === "it" ? "Cerca" : "Suchen"}
+                                  labelHidden
+                                  autoComplete="off"
+                                  size="slim"
+                                  value={addMetaDefSearch}
+                                  onChange={setAddMetaDefSearch}
+                                  placeholder={locale === "en" ? "Search…" : locale === "tr" ? "Ara…" : locale === "fr" ? "Rechercher…" : locale === "es" ? "Buscar…" : locale === "it" ? "Cerca…" : "Suchen…"}
+                                  autoFocus
+                                />
+                              </div>
+                              <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                                {visibleHiddenMetaDefKeys.length === 0 ? (
+                                  <div style={{ padding: "10px 12px", fontSize: 12, color: "var(--p-color-text-subdued)" }}>
+                                    {locale === "en" ? "No matching fields." : locale === "tr" ? "Eşleşen alan yok." : locale === "fr" ? "Aucun champ correspondant." : locale === "es" ? "No hay campos coincidentes." : locale === "it" ? "Nessun campo corrispondente." : "Keine passenden Felder."}
+                                  </div>
+                                ) : (
+                                  visibleHiddenMetaDefKeys.map((k) => {
+                                    const label = resolveMetaDefLabel(metaDefs[k], k, locale);
+                                    const valCount = Array.isArray(metaDefs[k]?.values) ? metaDefs[k].values.length : 0;
+                                    const addField = () => {
+                                      setExtraVisibleMetaDefKeys((p) => ({ ...p, [k]: true }));
+                                      setAddMetaDefPopoverOpen(false);
+                                      setAddMetaDefSearch("");
+                                    };
+                                    return (
+                                      <div
+                                        key={k}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={addField}
+                                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); addField(); } }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"; }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = ""; }}
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 10,
+                                          padding: "7px 12px",
+                                          cursor: "pointer",
+                                          borderBottom: "1px solid var(--p-color-border-secondary)",
+                                          lineHeight: 1.25,
+                                        }}
+                                      >
+                                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: "var(--p-color-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          {label}
+                                        </span>
+                                        <span style={{ flexShrink: 0, fontSize: 11, color: "var(--p-color-text-subdued)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                          {k}
+                                        </span>
+                                        {valCount > 0 ? (
+                                          <span style={{ flexShrink: 0, fontSize: 11, color: "var(--p-color-text-subdued)", minWidth: 28, textAlign: "right" }}>
+                                            {valCount}
+                                          </span>
+                                        ) : null}
+                                        <span style={{ flexShrink: 0, fontSize: 16, fontWeight: 500, color: "var(--p-color-text-secondary)", lineHeight: 1 }} aria-hidden>+</span>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          </Popover>
+                        </Box>
+                      )}
+                    </BlockStack>
+                  </Box>
+                )}
+                <InlineStack gap="300" blockAlign="center" wrap>
+                  <Button size="slim" variant="primary" onClick={() => { setNewCatalogMetaErr(""); setNewCatalogMetaOpen(true); }}>
+                    + {locale === "en" ? "New metafield (catalog)" : locale === "tr" ? "Yeni metafield (katalog)" : locale === "fr" ? "Nouveau métachamp (catalogue)" : locale === "es" ? "Nuevo metacampo (catálogo)" : locale === "it" ? "Nuovo metacampo (catalogo)" : "Neues Metafeld (Katalog)"}
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+
+              <Modal
+                open={newCatalogMetaOpen}
+                onClose={() => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); }}
+                title={locale === "en" ? "New catalog metafield" : locale === "tr" ? "Yeni katalog metafield'ı" : locale === "fr" ? "Nouveau métachamp de catalogue" : locale === "es" ? "Nuevo metacampo de catálogo" : locale === "it" ? "Nuovo metacampo catalogo" : "Neues Katalog-Metafeld"}
+                primaryAction={{
+                  content: isSuperuser ? (locale === "en" ? "Save in catalog" : locale === "tr" ? "Katalogda kaydet" : locale === "fr" ? "Enregistrer dans le catalogue" : locale === "es" ? "Guardar en catálogo" : locale === "it" ? "Salva nel catalogo" : "Im Katalog speichern") : (locale === "en" ? "Submit for approval" : locale === "tr" ? "Onay için gönder" : locale === "fr" ? "Soumettre pour approbation" : locale === "es" ? "Enviar para aprobación" : locale === "it" ? "Invia per approvazione" : "Zur Freigabe einreichen"),
+                  onAction: submitNewCatalogMetafield,
+                  loading: newCatalogMetaSaving,
+                }}
+                secondaryActions={[{ content: ui.cancel, onAction: () => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); } }]}
+              >
+                <Modal.Section>
+                  <BlockStack gap="400">
+                    {newCatalogMetaErr ? <Banner tone="critical" onDismiss={() => setNewCatalogMetaErr("")}>{newCatalogMetaErr}</Banner> : null}
+                    <TextField
+                      label={locale === "en" ? "Title (display name)" : locale === "tr" ? "Başlık (görünen ad)" : locale === "fr" ? "Titre (nom d'affichage)" : locale === "es" ? "Título (nombre de visualización)" : locale === "it" ? "Titolo (nome di visualizzazione)" : "Titel (Anzeigename)"}
+                      value={newCatalogMetaLabel}
+                      onChange={setNewCatalogMetaLabel}
+                      placeholder={locale === "en" ? "e.g. Material, Certificate, Care instructions" : locale === "tr" ? "örn. Malzeme, Sertifika, Bakım talimatları" : locale === "fr" ? "ex. Matière, Certificat, Instructions d'entretien" : locale === "es" ? "ej. Material, Certificado, Instrucciones de cuidado" : locale === "it" ? "es. Materiale, Certificato, Istruzioni per la cura" : "z.B. Material, Zertifikat, Pflegehinweis"}
+                      autoComplete="off"
+                    />
+                    <TextField
+                      label={locale === "en" ? "Content (value)" : locale === "tr" ? "İçerik (değer)" : locale === "fr" ? "Contenu (valeur)" : locale === "es" ? "Contenido (valor)" : locale === "it" ? "Contenuto (valore)" : "Inhalt (Wert)"}
+                      value={newCatalogMetaValue}
+                      onChange={setNewCatalogMetaValue}
+                      placeholder={locale === "en" ? "e.g. Cotton, OEKO-TEX, Machine wash 40°" : locale === "tr" ? "örn. Pamuk, OEKO-TEX, Makinede yıkama 40°" : locale === "fr" ? "ex. Coton, OEKO-TEX, Lavage machine 40°" : locale === "es" ? "ej. Algodón, OEKO-TEX, Lavado a máquina 40°" : locale === "it" ? "es. Cotone, OEKO-TEX, Lavaggio in lavatrice 40°" : "z.B. Baumwolle, OEKO-TEX, Maschinenwäsche 40°"}
+                      autoComplete="off"
+                    />
+                    <TextField
+                      label={locale === "en" ? "Key (optional)" : locale === "tr" ? "Anahtar (isteğe bağlı)" : locale === "fr" ? "Clé (optionnel)" : locale === "es" ? "Clave (opcional)" : locale === "it" ? "Chiave (opzionale)" : "Key (optional)"}
+                      value={newCatalogMetaKey}
+                      onChange={(v) => setNewCatalogMetaKey(v.toLowerCase())}
+                      helpText={locale === "en" ? "Leave empty: generated from title (lowercase, underscores)." : locale === "tr" ? "Boş bırakın: başlıktan oluşturulur (küçük harf, alt çizgi)." : locale === "fr" ? "Laisser vide : généré à partir du titre (minuscules, tirets bas)." : locale === "es" ? "Dejar vacío: se genera desde el título (minúsculas, guiones bajos)." : locale === "it" ? "Lascia vuoto: generato dal titolo (minuscolo, trattini bassi)." : "Leer lassen: wird aus dem Titel erzeugt (kleinbuchstaben, Unterstriche)."}
+                      autoComplete="off"
+                    />
+                  </BlockStack>
+                </Modal.Section>
+              </Modal>
+            </div>
+          </Card>
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
+      )}
+
+      {activeTabIndex === 3 && (
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="300">
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{locale === "en" ? "Product safety information (GPSR)" : locale === "tr" ? "Ürün güvenlik bilgileri (GPSR)" : locale === "fr" ? "Informations de sécurité produit (GPSR)" : locale === "es" ? "Información de seguridad del producto (GPSR)" : locale === "it" ? "Informazioni di sicurezza prodotto (GPSR)" : "Produktsicherheitsinformationen (GPSR)"}</ProductSectionHeading>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {locale === "en"
+                  ? "Required by the EU General Product Safety Regulation. Enter the manufacturer and an EU-based responsible person so the shop can show the legally required safety contacts. Tap “i” next to each field for details."
+                  : locale === "tr"
+                    ? "AB Genel Ürün Güvenliği Tüzüğü (GPSR) gereği zorunlu. Mağazada yasal güvenlik iletişimlerinin gösterilmesi için üreticiyi ve AB’de yerleşik sorumlu kişiyi girin. Ayrıntı için her alanın yanındaki “i”ye tıklayın."
+                    : locale === "fr"
+                      ? "Exigé par le règlement UE sur la sécurité générale des produits. Indiquez le fabricant et une personne responsable basée dans l'UE pour afficher les contacts de sécurité légalement requis. Appuyez sur « i » pour les détails."
+                      : locale === "es"
+                        ? "Exigido por el Reglamento UE de seguridad general de los productos. Indica el fabricante y una persona responsable en la UE para mostrar los contactos de seguridad. Pulsa « i » para más detalles."
+                        : locale === "it"
+                          ? "Richiesto dal regolamento UE sulla sicurezza generale dei prodotti. Inserisci il fabbricante e una persona responsabile nell'UE per mostrare i contatti di sicurezza. Tocca « i » per i dettagli."
+                          : "Erforderlich nach der EU-Produktsicherheitsverordnung (GPSR). Tragen Sie Hersteller und eine in der EU ansässige verantwortliche Person ein, damit der Shop die gesetzlich vorgeschriebenen Sicherheitskontakte anzeigen kann. Tippen Sie auf „i“ für Details."}
+              </Text>
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Manufacturer" : locale === "tr" ? "Üretici" : locale === "fr" ? "Fabricant" : locale === "es" ? "Fabricante" : locale === "it" ? "Fabbricante" : "Hersteller"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Name of the company or person that manufactured the product (as on packaging/imprint)."
+                          : locale === "tr" ? "Ürünü üreten şirket veya kişinin adı (ambalaj/künyedeki gibi)."
+                            : locale === "fr" ? "Nom de l'entreprise ou de la personne qui a fabriqué le produit (comme sur l'emballage)."
+                              : locale === "es" ? "Nombre de la empresa o persona que fabricó el producto (como en el envase)."
+                                : locale === "it" ? "Nome dell'azienda o della persona che ha fabbricato il prodotto (come sulla confezione)."
+                                  : "Name des Unternehmens oder der Person, die das Produkt hergestellt hat (wie auf Verpackung/Impressum)."
+                      }
+                    />
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller" />
+                  </InlineStack>
+                }
+                requiredIndicator
+                value={meta.hersteller ?? ""}
+                onChange={(v) => updateMeta("hersteller", v || undefined)}
+                placeholder={locale === "en" ? "e.g. Acme GmbH" : locale === "tr" ? "örn. Acme GmbH" : "z. B. Acme GmbH"}
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Manufacturer details" : locale === "tr" ? "Üretici bilgileri" : locale === "fr" ? "Coordonnées du fabricant" : locale === "es" ? "Datos del fabricante" : locale === "it" ? "Dati del fabbricante" : "Herstellerinformationen"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "Postal address and contact of the manufacturer (street, postcode, city, country, email and/or phone)."
+                          : locale === "tr" ? "Üreticinin posta adresi ve iletişimi (sokak, posta kodu, şehir, ülke, e-posta ve/veya telefon)."
+                            : locale === "fr" ? "Adresse postale et contact du fabricant (rue, code postal, ville, pays, e-mail et/ou téléphone)."
+                              : locale === "es" ? "Dirección postal y contacto del fabricante (calle, CP, ciudad, país, correo y/o teléfono)."
+                                : locale === "it" ? "Indirizzo postale e contatto del fabbricante (via, CAP, città, paese, e-mail e/o telefono)."
+                                  : "Postanschrift und Kontakt des Herstellers (Straße, PLZ, Ort, Land, E-Mail und/oder Telefon)."
+                      }
+                    />
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller_information" />
+                  </InlineStack>
+                }
+                requiredIndicator
+                value={meta.hersteller_information ?? ""}
+                onChange={(v) => updateMeta("hersteller_information", v || undefined)}
+                placeholder={locale === "en" ? "Street, city, country, email/phone" : locale === "tr" ? "Sokak, şehir, ülke, e-posta/telefon" : "Straße, Ort, Land, E-Mail/Telefon"}
+                multiline={2}
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Responsible person (EU)" : locale === "tr" ? "Sorumlu kişi (AB)" : locale === "fr" ? "Personne responsable (UE)" : locale === "es" ? "Persona responsable (UE)" : locale === "it" ? "Persona responsabile (UE)" : "Verantwortliche Person (EU)"}</span>
+                    <InfoIconTooltip
+                      text={
+                        locale === "en" ? "EU-based contact for product safety (name + address + contact). If the manufacturer is in the EU, this can be the same party."
+                          : locale === "tr" ? "Ürün güvenliği için AB'de yerleşik iletişim (ad + adres + iletişim). Üretici AB'deyse aynı taraf olabilir."
+                            : locale === "fr" ? "Point de contact basé dans l'UE pour la sécurité produit (nom + adresse + contact). Si le fabricant est dans l'UE, ce peut être la même entité."
+                              : locale === "es" ? "Contacto establecido en la UE para seguridad del producto (nombre + dirección + contacto). Si el fabricante está en la UE, puede ser la misma parte."
+                                : locale === "it" ? "Contatto stabilito nell'UE per la sicurezza del prodotto (nome + indirizzo + contatto). Se il fabbricante è nell'UE, può essere la stessa parte."
+                                  : "In der EU ansässige Kontaktstelle für Produktsicherheit (Name + Adresse + Kontakt). Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein."
+                      }
+                    />
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.verantwortliche_person_information" />
+                  </InlineStack>
+                }
+                requiredIndicator
+                value={meta.verantwortliche_person_information ?? ""}
+                onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)}
+                placeholder={locale === "en" ? "Name, EU address, email/phone" : locale === "tr" ? "Ad, AB adresi, e-posta/telefon" : "Name, EU-Adresse, E-Mail/Telefon"}
+                multiline={2}
+              />
+
+              <ComplianceFieldsSection
+                client={client}
+                categoryId={getMeta(product, "category_id")}
+                marketplace="DE"
+                locale={locale}
+                product={product}
+                getMeta={getMeta}
+                updateMeta={updateMeta}
+              />
+            </BlockStack>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
+              <ProductSectionHeading>{pe.madeInEurope} ({locale === "en" ? "optional" : locale === "tr" ? "isteğe bağlı" : locale === "fr" ? "optionnel" : locale === "es" ? "opcional" : locale === "it" ? "opzionale" : "optional"})</ProductSectionHeading>
+              <Text as="p" tone="subdued">
+                {locale === "en" ? "Registry ID and proof document are optional. After saving with changed details: status \"pending\". The badge appears in the shop only when status is \"verified\" (superuser or later registry check)." : locale === "tr" ? "Registry ID ve kanıt belgesi isteğe bağlıdır. Değiştirilen bilgilerle kaydedildikten sonra: durum \"beklemede\". Mağazada rozet yalnızca durum \"doğrulandı\" olduğunda görünür (süper kullanıcı veya sonraki registry kontrolü)." : locale === "fr" ? "L'ID de registre et le document justificatif sont optionnels. Après enregistrement avec des informations modifiées : statut \"en attente\". Le badge n'apparaît dans la boutique qu'avec le statut \"vérifié\" (superuser ou vérification ultérieure du registre)." : locale === "es" ? "El ID de registro y el documento de prueba son opcionales. Tras guardar con datos modificados: estado \"pendiente\". El badge aparece en la tienda solo con estado \"verificado\" (superusuario o verificación posterior del registro)." : locale === "it" ? "L'ID registro e il documento di prova sono opzionali. Dopo il salvataggio con dati modificati: stato \"in sospeso\". Il badge appare nel negozio solo quando lo stato è \"verificato\" (superuser o controllo registro successivo)." : 'Registry-ID und Nachweisdokument optional. Nach Speichern mit geänderten Angaben: Status „pending". Im Shop erscheint das Badge nur bei Status „verified" (Superuser oder spätere Registry-Prüfung).'}
+              </Text>
+              {euOriginNotice ? (
+                <Banner tone="info" onDismiss={() => setEuOriginNotice("")}>{euOriginNotice}</Banner>
+              ) : null}
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{locale === "en" ? "Country of origin (EU)" : locale === "tr" ? "Menşe ülke (AB)" : locale === "fr" ? "Pays d'origine (UE)" : locale === "es" ? "País de origen (UE)" : locale === "it" ? "Paese di origine (UE)" : "Herkunftsland (EU)"}</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_country" />
+                  </InlineStack>
+                }
+                value={meta.eu_origin_country ?? ""}
+                onChange={(v) => updateMeta("eu_origin_country", v || undefined)}
+                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>Registry-ID</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_registry_id" />
+                  </InlineStack>
+                }
+                value={meta.eu_origin_registry_id ?? ""}
+                onChange={(v) => updateMeta("eu_origin_registry_id", v || undefined)}
+                placeholder={locale === "en" ? "EU registry / certificate number" : locale === "tr" ? "AB kayıt / sertifika numarası" : locale === "fr" ? "Registre UE / numéro de certificat" : locale === "es" ? "Registro UE / número de certificado" : locale === "it" ? "Registro UE / numero di certificato" : "EU-Registry / Zertifikatsnummer"}
+                autoComplete="off"
+              />
+              <TextField
+                label={
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <span>{pe.proofDocument}</span>
+                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_document_url" />
+                  </InlineStack>
+                }
+                value={meta.eu_origin_document_url ?? ""}
+                onChange={(v) => updateMeta("eu_origin_document_url", v || undefined)}
+                placeholder="https://…"
+                autoComplete="off"
+              />
+              <Select
+                label={locale === "en" ? "Registry provider" : locale === "tr" ? "Registry sağlayıcısı" : locale === "fr" ? "Fournisseur de registre" : locale === "es" ? "Proveedor de registro" : locale === "it" ? "Provider registro" : "Registry-Provider"}
+                options={[
+                  { label: locale === "en" ? "Stub (manual check)" : locale === "tr" ? "Stub (manuel kontrol)" : locale === "fr" ? "Stub (vérification manuelle)" : locale === "es" ? "Stub (verificación manual)" : locale === "it" ? "Stub (verifica manuale)" : "Stub (manuelle Prüfung)", value: "stub" },
+                ]}
+                value={meta.eu_origin_provider || "stub"}
+                onChange={(v) => updateMeta("eu_origin_provider", v || "stub")}
+              />
+              <TextField
+                label="Status"
+                value={meta.eu_origin_status || "—"}
+                readOnly
+                autoComplete="off"
+                helpText={
+                  meta.eu_origin_verified_at
+                    ? `${locale === "en" ? "Verified at:" : locale === "tr" ? "Doğrulandı:" : locale === "fr" ? "Vérifié le :" : locale === "es" ? "Verificado el:" : locale === "it" ? "Verificato il:" : "Verifiziert am:"} ${meta.eu_origin_verified_at}`
+                    : undefined
+                }
+              />
+              <InlineStack gap="200">
+                <Button
+                  onClick={() => handleVerifyEuOrigin(false)}
+                  loading={euOriginVerifying}
+                  disabled={!product?.id || euOriginVerifying}
+                >
+                  {locale === "en" ? "Check registry (stub)" : locale === "tr" ? "Registry kontrol et (stub)" : locale === "fr" ? "Vérifier le registre (stub)" : locale === "es" ? "Verificar registro (stub)" : locale === "it" ? "Controlla registro (stub)" : "Registry prüfen (Stub)"}
+                </Button>
+                {isSuperuser ? (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleVerifyEuOrigin(true)}
+                    loading={euOriginVerifying}
+                    disabled={!product?.id || euOriginVerifying}
+                  >
+                    {locale === "en" ? "Verify manually" : locale === "tr" ? "Manuel doğrula" : locale === "fr" ? "Vérifier manuellement" : locale === "es" ? "Verificar manualmente" : locale === "it" ? "Verifica manualmente" : "Manuell verifizieren"}
+                  </Button>
+                ) : null}
+              </InlineStack>
+            </BlockStack>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="product-edit-sections">
+            <BlockStack gap="400">
               <ProductSectionHeading>{locale === "en" ? "Product documents & compliance" : locale === "tr" ? "Ürün belgeleri ve uyumluluk" : locale === "fr" ? "Documents produit & conformité" : locale === "es" ? "Documentos de producto y cumplimiento" : locale === "it" ? "Documenti prodotto e conformità" : "Produktdokumente & Compliance"}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
                 {locale === "en" ? "WEEE registration number, EPREL number and product files (e.g. product data sheet, energy label). Files are shown in the shop below the product description." : locale === "tr" ? "WEEE kayıt numarası, EPREL numarası ve ürün dosyaları (örn. ürün veri sayfası, enerji etiketi). Dosyalar mağazada ürün açıklamasının altında gösterilir." : locale === "fr" ? "Numéro d'enregistrement WEEE, numéro EPREL et fichiers produit (ex. fiche technique, étiquette énergétique). Les fichiers sont affichés dans la boutique sous la description du produit." : locale === "es" ? "Número de registro WEEE, número EPREL y archivos de producto (ej. ficha técnica, etiqueta energética). Los archivos se muestran en la tienda debajo de la descripción del producto." : locale === "it" ? "Numero di registrazione WEEE, numero EPREL e file prodotto (es. scheda tecnica, etichetta energetica). I file vengono mostrati nel negozio sotto la descrizione del prodotto." : "WEEE-Reg.-Nummer, EPREL-Nummer und Produktdateien (z. B. Produktdatenblatt, EEK-Label). Dateien werden im Shop unter der Produktbeschreibung angezeigt."}
@@ -2775,1151 +4187,21 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   </Button>
                 )}
               </InlineStack>
-
-              <ProductSectionRule />
-              <ProductSectionHeading>Pricing</ProductSectionHeading>
-
-              <Text as="p" variant="bodySm" tone="subdued">
-                {currentCountryConf.label} · {currentCountryConf.currency} · {currentCountryConf.taxLabel} {currentCountryConf.vatRate}%
-              </Text>
-
-              {/* Sellers only ever see/enter the gross (Brutto) price shown in the shop — Netto keeps
-                  being computed/stored automatically from it internally (metadata.prices[country]),
-                  it's just never rendered as an editable field. */}
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
-                <Box minWidth="130px" flex="1">
-                  <div className="product-edit-label">{locale === "en" ? `Gross (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "tr" ? `Brüt (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} dahil)` : locale === "fr" ? `Brut (${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""} incl.)` : locale === "es" ? `Bruto (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : locale === "it" ? `Lordo (incl. ${currentCountryConf.taxLabel}${currentCountryConf.vatRate > 0 ? ` ${currentCountryConf.vatRate}%` : ""})` : `Brutto (inkl. ${currentCountryConf.taxLabel} ${currentCountryConf.vatRate > 0 ? currentCountryConf.vatRate + "%" : ""})`}</div>
-                  <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
-                    <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 14, fontWeight: 600, color: "var(--p-color-text-subdued)", minWidth: "1.25em" }} aria-hidden>{currentCountryConf.symbol}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <TextField
-                        label="Brutto"
-                        labelHidden
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={
-                          (() => {
-                            const dk = `${editingCountry}_brutto_cents`;
-                            return Object.prototype.hasOwnProperty.call(countryPriceDrafts, dk)
-                              ? countryPriceDrafts[dk]
-                              : cpBruttoCents != null
-                                ? (cpBruttoCents / 100).toFixed(2)
-                                : "";
-                          })()
-                        }
-                        onChange={(v) => {
-                          const dk = `${editingCountry}_brutto_cents`;
-                          const clean = sanitizePriceDraftString(v);
-                          setCountryPriceDrafts((prev) => {
-                            const next = { ...prev, [dk]: clean };
-                            countryPriceDraftsRef.current = next;
-                            return next;
-                          });
-                        }}
-                        onBlur={(e) => {
-                          const dk = `${editingCountry}_brutto_cents`;
-                          const clearNetto = cpLinked ? `${editingCountry}_netto_cents` : null;
-                          commitCountryPriceDraft(dk, "brutto_cents", clearNetto, e.currentTarget.value);
-                        }}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                </Box>
-                <Box minWidth="130px" flex="1">
-                  <div className="product-edit-label">UVP</div>
-                  <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
-                    <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 14, fontWeight: 600, color: "var(--p-color-text-subdued)", minWidth: "1.25em" }} aria-hidden>{currentCountryConf.symbol}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <TextField
-                        label="UVP"
-                        labelHidden
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={
-                          (() => {
-                            const dk = `${editingCountry}_uvp_cents`;
-                            return Object.prototype.hasOwnProperty.call(countryPriceDrafts, dk)
-                              ? countryPriceDrafts[dk]
-                              : cpUvpCents != null
-                                ? (cpUvpCents / 100).toFixed(2)
-                                : "";
-                          })()
-                        }
-                        onChange={(v) => {
-                          const dk = `${editingCountry}_uvp_cents`;
-                          const clean = sanitizePriceDraftString(v);
-                          setCountryPriceDrafts((prev) => {
-                            const next = { ...prev, [dk]: clean };
-                            countryPriceDraftsRef.current = next;
-                            return next;
-                          });
-                        }}
-                        onBlur={(e) => commitCountryPriceDraft(`${editingCountry}_uvp_cents`, "uvp_cents", null, e.currentTarget.value)}
-                        placeholder="—"
-                      />
-                    </div>
-                  </div>
-                </Box>
-                <Box minWidth="130px" flex="1">
-                  <div className="product-edit-label">{locale === "en" ? "Sale price" : locale === "tr" ? "İndirimli fiyat" : locale === "fr" ? "Prix soldé" : locale === "es" ? "Precio de oferta" : locale === "it" ? "Prezzo scontato" : "Sale-Preis"}</div>
-                  <div style={{ display: "flex", alignItems: "stretch", gap: 8 }}>
-                    <span style={{ flexShrink: 0, alignSelf: "center", fontSize: 14, fontWeight: 600, color: "var(--p-color-text-subdued)", minWidth: "1.25em" }} aria-hidden>{currentCountryConf.symbol}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <TextField
-                        label="Sale"
-                        labelHidden
-                        type="text"
-                        inputMode="decimal"
-                        autoComplete="off"
-                        value={
-                          (() => {
-                            const dk = `${editingCountry}_sale_cents`;
-                            return Object.prototype.hasOwnProperty.call(countryPriceDrafts, dk)
-                              ? countryPriceDrafts[dk]
-                              : cpSaleCents != null
-                                ? (cpSaleCents / 100).toFixed(2)
-                                : "";
-                          })()
-                        }
-                        onChange={(v) => {
-                          const dk = `${editingCountry}_sale_cents`;
-                          const clean = sanitizePriceDraftString(v);
-                          setCountryPriceDrafts((prev) => {
-                            const next = { ...prev, [dk]: clean };
-                            countryPriceDraftsRef.current = next;
-                            return next;
-                          });
-                        }}
-                        onBlur={(e) => commitCountryPriceDraft(`${editingCountry}_sale_cents`, "sale_cents", null, e.currentTarget.value)}
-                        placeholder="—"
-                      />
-                    </div>
-                  </div>
-                </Box>
-              </div>
-
-              <ProductSectionRule />
-              <ProductSectionHeading>Bullet points (max 5{locale === "en" ? ", max. 120 chars each" : locale === "tr" ? ", her biri max. 120 karakter" : locale === "fr" ? ", max. 120 caractères chacun" : locale === "es" ? ", máx. 120 caracteres cada uno" : locale === "it" ? ", max. 120 caratteri ciascuno" : ", je max. 120 Zeichen"})</ProductSectionHeading>
-              <Text as="p" variant="bodySm" tone="subdued">Short selling points shown on the product page.</Text>
-              {[0, 1, 2, 3, 4].map((i) => {
-                const val = editingBullets[i] ?? "";
-                const len = String(val).length;
-                const overLimit = len > 120;
-                return (
-                  <Box key={i}>
-                    <TextField
-                      label={`Bullet ${i + 1}`}
-                      labelHidden
-                      value={val}
-                      maxLength={120}
-                      onChange={(v) => {
-                        const trimmed = String(v).slice(0, 120);
-                        const next = [...editingBullets.slice(0, 5)];
-                        while (next.length <= i) next.push("");
-                        next[i] = trimmed;
-                        updateLocaleField("bullet_points", next.filter((x, j) => j < 5));
-                      }}
-                      placeholder={i === 0 ? "e.g. Premium quality" : ""}
-                      autoComplete="off"
-                    />
-                    <Text as="p" variant="bodySm" tone="subdued" style={{ marginTop: 4, color: overLimit ? "var(--p-color-text-critical)" : undefined }}>
-                      {len} / 120
-                    </Text>
-                  </Box>
-                );
-              })}
-
-              <ProductSectionRule />
-              <ProductSectionHeading>Inventory</ProductSectionHeading>
-              <Box minWidth="120px">
-                <TextField label="Quantity" labelHidden type="number" value={product.inventory != null ? String(product.inventory) : "0"} onChange={(v) => update({ inventory: parseInt(v, 10) || 0 })} min={0} />
-              </Box>
-              <Text as="p" variant="bodySm" tone="subdued">Warehouse split can be set later in metadata.</Text>
-
-              <ProductSectionRule />
-              <BlockStack gap="400">
-                <BlockStack gap="150">
-                  <ProductSectionHeading>{locale === "en" ? "Metafields (catalog)" : locale === "tr" ? "Metafield'lar (katalog)" : locale === "fr" ? "Métachamps (catalogue)" : locale === "es" ? "Metacampos (catálogo)" : locale === "it" ? "Metacampi (catalogo)" : "Metafelder (Katalog)"}</ProductSectionHeading>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {locale === "en" ? "Only metafields with set values — or those selected via \"Add metafield\" — are shown (not the entire catalog)." : locale === "tr" ? "Yalnızca değer atanmış metafield'lar — veya \"Metafield ekle\" ile seçilenler — gösterilir (tüm katalog değil)." : locale === "fr" ? "Seuls les métachamps avec des valeurs définies — ou sélectionnés via \"Ajouter un métachamp\" — sont affichés (pas l'ensemble du catalogue)." : locale === "es" ? "Solo se muestran los metacampos con valores establecidos — o los seleccionados mediante \"Agregar metacampo\" — (no el catálogo completo)." : locale === "it" ? "Vengono mostrati solo i metacampi con valori impostati — o quelli selezionati tramite \"Aggiungi metacampo\" — (non l'intero catalogo)." : 'Nur Metafelder mit gesetzten Werten — oder über „Metafeld hinzufügen" ausgewählte — werden angezeigt (nicht der gesamte Katalog).'}
-                  </Text>
-                </BlockStack>
-                {Object.keys(metaDefs).length === 0 ? (
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {locale === "en" ? "No catalog definitions yet — use \"New metafield (catalog)\" to create title and value (superuser: immediately active; seller: approval required)." : locale === "tr" ? "Henüz katalog tanımı yok — başlık ve değer oluşturmak için \"Yeni metafield (katalog)\" kullanın (süper kullanıcı: hemen aktif; satıcı: onay gerekli)." : locale === "fr" ? "Aucune définition de catalogue — utilisez \"Nouveau métachamp (catalogue)\" pour créer titre et valeur (superuser : immédiatement actif ; vendeur : approbation requise)." : locale === "es" ? "Aún no hay definiciones de catálogo — usa \"Nuevo metacampo (catálogo)\" para crear título y valor (superusuario: activo inmediatamente; vendedor: se requiere aprobación)." : locale === "it" ? "Nessuna definizione di catalogo ancora — usa \"Nuovo metacampo (catalogo)\" per creare titolo e valore (superuser: immediatamente attivo; venditore: approvazione richiesta)." : 'Noch keine Katalog-Definitionen — du kannst mit „Neues Metafeld (Katalog)" Titel und Wert anlegen (Superuser: sofort aktiv; Verkäufer: Freigabe nötig).'}
-                    </Text>
-                  </Box>
-                ) : (
-                  <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                    <BlockStack gap="400">
-                      {visibleMetaDefEntries.length === 0 && (
-                        <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "No metafields for this product. You can add some below." : locale === "tr" ? "Bu ürün için metafield yok. Aşağıdan ekleyebilirsiniz." : locale === "fr" ? "Aucun métachamp pour ce produit. Vous pouvez en ajouter ci-dessous." : locale === "es" ? "No hay metacampos para este producto. Puedes agregar algunos abajo." : locale === "it" ? "Nessun metacampo per questo prodotto. Puoi aggiungerne qui sotto." : "Keine Metafelder für dieses Produkt. Unten kannst du welche hinzufügen."}</Text>
-                      )}
-                      {visibleMetaDefEntries.map(([defKey, def]) => {
-                        const selected = metafieldsList.filter(m => m.key === defKey).map(m => m.value).filter(Boolean);
-                        const isOpen = !!metaDefPopover[defKey];
-                        const search = metaDefSearch[defKey] || "";
-                        const availableVals = (def.values || []).filter(v => !selected.includes(v) && v.toLowerCase().includes(search.toLowerCase()));
-                        const canAddCustom = search.trim() && !selected.includes(search.trim()) && !(def.values || []).includes(search.trim());
-                        const toggleVal = (val) => {
-                          const others = metafieldsList.filter(m => m.key !== defKey);
-                          const cur = selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val];
-                          updateMeta("metafields", [...others, ...cur.map(v => ({ key: defKey, value: v }))]);
-                        };
-                        return (
-                          <Box
-                            key={defKey}
-                            padding="400"
-                            background="bg-surface"
-                            borderRadius="200"
-                            borderWidth="025"
-                            borderColor="border"
-                          >
-                            <BlockStack gap="300">
-                              <BlockStack gap="050">
-                                <InlineStack gap="200" blockAlign="center" wrap={false}>
-                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{resolveMetaDefLabel(def, defKey, locale)}</Text>
-                                  <InfoIconTooltip
-                                    text={
-                                      locale === "en" ? `Internal key: ${defKey}` :
-                                      locale === "tr" ? `Teknik anahtar: ${defKey}` :
-                                      locale === "fr" ? `Clé interne : ${defKey}` :
-                                      locale === "es" ? `Clave interna: ${defKey}` :
-                                      locale === "it" ? `Chiave interna: ${defKey}` :
-                                      `Interner Schlüssel: ${defKey}`
-                                    }
-                                  />
-                                  <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName={`metadata.${defKey}`} />
-                                </InlineStack>
-                              </BlockStack>
-                              {selected.length > 0 && (
-                                <InlineStack gap="200" wrap>
-                                  {selected.map(val => (
-                                    <Tag key={val} onRemove={() => {
-                                      const others = metafieldsList.filter(m => m.key !== defKey);
-                                      updateMeta("metafields", [...others, ...selected.filter(v => v !== val).map(v => ({ key: defKey, value: v }))]);
-                                    }}>{val}</Tag>
-                                  ))}
-                                </InlineStack>
-                              )}
-                              <Popover
-                                active={isOpen}
-                                onClose={() => setMetaDefPopover(p => ({ ...p, [defKey]: false }))}
-                                activator={
-                                  <Button size="slim" variant="secondary" onClick={() => setMetaDefPopover(p => ({ ...p, [defKey]: !p[defKey] }))}>
-                                    + {locale === "en" ? "Select value" : locale === "tr" ? "Değer seç" : locale === "fr" ? "Choisir une valeur" : locale === "es" ? "Seleccionar valor" : locale === "it" ? "Seleziona valore" : "Wert wählen"}
-                                  </Button>
-                                }
-                              >
-                                <Box padding="300" minWidth="220px">
-                                  <BlockStack gap="200">
-                                    <TextField
-                                      label={locale === "en" ? "Search" : locale === "tr" ? "Ara" : locale === "fr" ? "Rechercher" : locale === "es" ? "Buscar" : locale === "it" ? "Cerca" : "Suchen"}
-                                      labelHidden
-                                      placeholder={locale === "en" ? "Search or enter…" : locale === "tr" ? "Ara veya gir…" : locale === "fr" ? "Rechercher ou saisir…" : locale === "es" ? "Buscar o ingresar…" : locale === "it" ? "Cerca o inserisci…" : "Suchen oder eingeben…"}
-                                      value={search}
-                                      onChange={v => setMetaDefSearch(p => ({ ...p, [defKey]: v }))}
-                                      autoComplete="off"
-                                      size="slim"
-                                    />
-                                    <div style={{ maxHeight: 200, overflowY: "auto" }}>
-                                      {availableVals.map(val => (
-                                        <div
-                                          key={val}
-                                          role="button"
-                                          tabIndex={0}
-                                          style={{ padding: "8px 10px", cursor: "pointer", borderRadius: 6, fontSize: 13 }}
-                                          onMouseEnter={e => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"; }}
-                                          onMouseLeave={e => { e.currentTarget.style.background = ""; }}
-                                          onMouseDown={e => {
-                                            e.preventDefault();
-                                            toggleVal(val);
-                                            setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
-                                            setMetaDefPopover(p => ({ ...p, [defKey]: false }));
-                                          }}
-                                        >{val}</div>
-                                      ))}
-                                      {canAddCustom && (
-                                        <div
-                                          role="button"
-                                          tabIndex={0}
-                                          style={{ padding: "8px 10px", cursor: "pointer", borderRadius: 6, fontSize: 13, fontStyle: "italic", color: "var(--p-color-text-subdued)" }}
-                                          onMouseEnter={e => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover)"; }}
-                                          onMouseLeave={e => { e.currentTarget.style.background = ""; }}
-                                          onMouseDown={e => {
-                                            e.preventDefault();
-                                            toggleVal(search.trim());
-                                            setMetaDefSearch(p => ({ ...p, [defKey]: "" }));
-                                            setMetaDefPopover(p => ({ ...p, [defKey]: false }));
-                                          }}
-                                        >"{search.trim()}" {locale === "en" ? "add" : locale === "tr" ? "ekle" : locale === "fr" ? "ajouter" : locale === "es" ? "agregar" : locale === "it" ? "aggiungi" : "hinzufügen"}</div>
-                                      )}
-                                      {availableVals.length === 0 && !canAddCustom && (
-                                        <div style={{ padding: "8px 10px", fontSize: 13, color: "var(--p-color-text-subdued)" }}>{locale === "en" ? "No more options" : locale === "tr" ? "Başka seçenek yok" : locale === "fr" ? "Aucune autre option" : locale === "es" ? "No hay más opciones" : locale === "it" ? "Nessun'altra opzione" : "Keine weiteren Optionen"}</div>
-                                      )}
-                                    </div>
-                                  </BlockStack>
-                                </Box>
-                              </Popover>
-                            </BlockStack>
-                          </Box>
-                        );
-                      })}
-                      {hiddenMetaDefKeys.length > 0 && (
-                        <Box paddingBlockStart="100">
-                          <Popover
-                            active={addMetaDefPopoverOpen}
-                            preferredPosition="below"
-                            preferredAlignment="left"
-                            onClose={() => { setAddMetaDefPopoverOpen(false); setAddMetaDefSearch(""); }}
-                            activator={
-                              <Button size="slim" variant="secondary" onClick={() => setAddMetaDefPopoverOpen((o) => !o)}>
-                                + {locale === "en" ? "Add metafield" : locale === "tr" ? "Metafield ekle" : locale === "fr" ? "Ajouter un métachamp" : locale === "es" ? "Agregar metacampo" : locale === "it" ? "Aggiungi metacampo" : "Metafeld hinzufügen"}
-                              </Button>
-                            }
-                          >
-                            <Box
-                              padding="500"
-                              minWidth="min(440px, calc(100vw - 32px))"
-                              maxWidth="520px"
-                              background="bg-surface"
-                              borderRadius="300"
-                              shadow="400"
-                            >
-                              <BlockStack gap="400">
-                                <BlockStack gap="150">
-                                  <Text variant="headingSm" as="h3">
-                                    {locale === "en" ? "Select metafield" : locale === "tr" ? "Metafield seç" : locale === "fr" ? "Sélectionner un métachamp" : locale === "es" ? "Seleccionar metacampo" : locale === "it" ? "Seleziona metacampo" : "Metafeld auswählen"}
-                                  </Text>
-                                  <Text variant="bodySm" tone="subdued">
-                                    {locale === "en" ? "Choose a field from the catalog. It will appear below as its own row for editing." : locale === "tr" ? "Katalogdan bir alan seçin. Aşağıda düzenleme için kendi satırı olarak görünecektir." : locale === "fr" ? "Choisissez un champ du catalogue. Il apparaîtra ci-dessous comme une ligne à part pour l'édition." : locale === "es" ? "Elige un campo del catálogo. Aparecerá abajo como su propia fila para edición." : locale === "it" ? "Scegli un campo dal catalogo. Apparirà sotto come riga propria per la modifica." : "Wähle ein Feld aus dem Katalog. Es erscheint darunter als eigene Zeile zum Bearbeiten."}
-                                  </Text>
-                                </BlockStack>
-                                <TextField
-                                  label={locale === "en" ? "Search" : locale === "tr" ? "Ara" : locale === "fr" ? "Rechercher" : locale === "es" ? "Buscar" : locale === "it" ? "Cerca" : "Suchen"}
-                                  labelHidden
-                                  autoComplete="off"
-                                  value={addMetaDefSearch}
-                                  onChange={setAddMetaDefSearch}
-                                  placeholder={locale === "en" ? "Search fields…" : locale === "tr" ? "Alanlarda ara…" : locale === "fr" ? "Rechercher des champs…" : locale === "es" ? "Buscar campos…" : locale === "it" ? "Cerca campi…" : "Felder durchsuchen…"}
-                                  autoFocus
-                                />
-                                <div
-                                  style={{
-                                    maxHeight: 360,
-                                    overflowY: "auto",
-                                    marginInline: -4,
-                                    paddingInline: 4,
-                                    borderRadius: 8,
-                                    border: "1px solid var(--p-color-border-secondary)",
-                                    background: "var(--p-color-bg-surface-secondary)",
-                                  }}
-                                >
-                                  {visibleHiddenMetaDefKeys.length === 0 ? (
-                                    <Box padding="400">
-                                      <Text variant="bodySm" tone="subdued">
-                                        {locale === "en" ? "No matching fields." : locale === "tr" ? "Eşleşen alan yok." : locale === "fr" ? "Aucun champ correspondant." : locale === "es" ? "No hay campos coincidentes." : locale === "it" ? "Nessun campo corrispondente." : "Keine passenden Felder."}
-                                      </Text>
-                                    </Box>
-                                  ) : (
-                                    <ActionList
-                                      actionRole="menu"
-                                      items={visibleHiddenMetaDefKeys.map((k) => {
-                                        const label = resolveMetaDefLabel(metaDefs[k], k, locale);
-                                        return {
-                                          content: label,
-                                          onAction: () => {
-                                            setExtraVisibleMetaDefKeys((p) => ({ ...p, [k]: true }));
-                                            setAddMetaDefPopoverOpen(false);
-                                            setAddMetaDefSearch("");
-                                          },
-                                        };
-                                      })}
-                                    />
-                                  )}
-                                </div>
-                              </BlockStack>
-                            </Box>
-                          </Popover>
-                        </Box>
-                      )}
-                    </BlockStack>
-                  </Box>
-                )}
-                <InlineStack gap="300" blockAlign="center" wrap>
-                  <Button size="slim" variant="primary" onClick={() => { setNewCatalogMetaErr(""); setNewCatalogMetaOpen(true); }}>
-                    + {locale === "en" ? "New metafield (catalog)" : locale === "tr" ? "Yeni metafield (katalog)" : locale === "fr" ? "Nouveau métachamp (catalogue)" : locale === "es" ? "Nuevo metacampo (catálogo)" : locale === "it" ? "Nuovo metacampo (catalogo)" : "Neues Metafeld (Katalog)"}
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-
-              <Modal
-                open={newCatalogMetaOpen}
-                onClose={() => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); }}
-                title={locale === "en" ? "New catalog metafield" : locale === "tr" ? "Yeni katalog metafield'ı" : locale === "fr" ? "Nouveau métachamp de catalogue" : locale === "es" ? "Nuevo metacampo de catálogo" : locale === "it" ? "Nuovo metacampo catalogo" : "Neues Katalog-Metafeld"}
-                primaryAction={{
-                  content: isSuperuser ? (locale === "en" ? "Save in catalog" : locale === "tr" ? "Katalogda kaydet" : locale === "fr" ? "Enregistrer dans le catalogue" : locale === "es" ? "Guardar en catálogo" : locale === "it" ? "Salva nel catalogo" : "Im Katalog speichern") : (locale === "en" ? "Submit for approval" : locale === "tr" ? "Onay için gönder" : locale === "fr" ? "Soumettre pour approbation" : locale === "es" ? "Enviar para aprobación" : locale === "it" ? "Invia per approvazione" : "Zur Freigabe einreichen"),
-                  onAction: submitNewCatalogMetafield,
-                  loading: newCatalogMetaSaving,
-                }}
-                secondaryActions={[{ content: ui.cancel, onAction: () => { if (!newCatalogMetaSaving) setNewCatalogMetaOpen(false); } }]}
-              >
-                <Modal.Section>
-                  <BlockStack gap="400">
-                    {newCatalogMetaErr ? <Banner tone="critical" onDismiss={() => setNewCatalogMetaErr("")}>{newCatalogMetaErr}</Banner> : null}
-                    <TextField
-                      label={locale === "en" ? "Title (display name)" : locale === "tr" ? "Başlık (görünen ad)" : locale === "fr" ? "Titre (nom d'affichage)" : locale === "es" ? "Título (nombre de visualización)" : locale === "it" ? "Titolo (nome di visualizzazione)" : "Titel (Anzeigename)"}
-                      value={newCatalogMetaLabel}
-                      onChange={setNewCatalogMetaLabel}
-                      placeholder={locale === "en" ? "e.g. Material, Certificate, Care instructions" : locale === "tr" ? "örn. Malzeme, Sertifika, Bakım talimatları" : locale === "fr" ? "ex. Matière, Certificat, Instructions d'entretien" : locale === "es" ? "ej. Material, Certificado, Instrucciones de cuidado" : locale === "it" ? "es. Materiale, Certificato, Istruzioni per la cura" : "z.B. Material, Zertifikat, Pflegehinweis"}
-                      autoComplete="off"
-                    />
-                    <TextField
-                      label={locale === "en" ? "Content (value)" : locale === "tr" ? "İçerik (değer)" : locale === "fr" ? "Contenu (valeur)" : locale === "es" ? "Contenido (valor)" : locale === "it" ? "Contenuto (valore)" : "Inhalt (Wert)"}
-                      value={newCatalogMetaValue}
-                      onChange={setNewCatalogMetaValue}
-                      placeholder={locale === "en" ? "e.g. Cotton, OEKO-TEX, Machine wash 40°" : locale === "tr" ? "örn. Pamuk, OEKO-TEX, Makinede yıkama 40°" : locale === "fr" ? "ex. Coton, OEKO-TEX, Lavage machine 40°" : locale === "es" ? "ej. Algodón, OEKO-TEX, Lavado a máquina 40°" : locale === "it" ? "es. Cotone, OEKO-TEX, Lavaggio in lavatrice 40°" : "z.B. Baumwolle, OEKO-TEX, Maschinenwäsche 40°"}
-                      autoComplete="off"
-                    />
-                    <TextField
-                      label={locale === "en" ? "Key (optional)" : locale === "tr" ? "Anahtar (isteğe bağlı)" : locale === "fr" ? "Clé (optionnel)" : locale === "es" ? "Clave (opcional)" : locale === "it" ? "Chiave (opzionale)" : "Key (optional)"}
-                      value={newCatalogMetaKey}
-                      onChange={(v) => setNewCatalogMetaKey(v.toLowerCase())}
-                      helpText={locale === "en" ? "Leave empty: generated from title (lowercase, underscores)." : locale === "tr" ? "Boş bırakın: başlıktan oluşturulur (küçük harf, alt çizgi)." : locale === "fr" ? "Laisser vide : généré à partir du titre (minuscules, tirets bas)." : locale === "es" ? "Dejar vacío: se genera desde el título (minúsculas, guiones bajos)." : locale === "it" ? "Lascia vuoto: generato dal titolo (minuscolo, trattini bassi)." : "Leer lassen: wird aus dem Titel erzeugt (kleinbuchstaben, Unterstriche)."}
-                      autoComplete="off"
-                    />
-                  </BlockStack>
-                </Modal.Section>
-              </Modal>
-
-              <ProductSectionRule />
-              <ProductSectionHeading>{locale === "en" ? "Product safety information (GPSR)" : locale === "tr" ? "Ürün güvenlik bilgileri (GPSR)" : locale === "fr" ? "Informations de sécurité produit (GPSR)" : locale === "es" ? "Información de seguridad del producto (GPSR)" : locale === "it" ? "Informazioni di sicurezza prodotto (GPSR)" : "Produktsicherheitsinformationen (GPSR)"}</ProductSectionHeading>
-              <Text as="p" variant="bodySm" tone="subdued">
-                {locale === "en"
-                  ? "Required by the EU General Product Safety Regulation. Enter the manufacturer and an EU-based responsible person so the shop can show the legally required safety contacts. Tap “i” next to each field for details."
-                  : locale === "tr"
-                    ? "AB Genel Ürün Güvenliği Tüzüğü (GPSR) gereği zorunlu. Mağazada yasal güvenlik iletişimlerinin gösterilmesi için üreticiyi ve AB’de yerleşik sorumlu kişiyi girin. Ayrıntı için her alanın yanındaki “i”ye tıklayın."
-                    : locale === "fr"
-                      ? "Exigé par le règlement UE sur la sécurité générale des produits. Indiquez le fabricant et une personne responsable basée dans l'UE pour afficher les contacts de sécurité légalement requis. Appuyez sur « i » pour les détails."
-                      : locale === "es"
-                        ? "Exigido por el Reglamento UE de seguridad general de los productos. Indica el fabricante y una persona responsable en la UE para mostrar los contactos de seguridad. Pulsa « i » para más detalles."
-                        : locale === "it"
-                          ? "Richiesto dal regolamento UE sulla sicurezza generale dei prodotti. Inserisci il fabbricante e una persona responsabile nell'UE per mostrare i contatti di sicurezza. Tocca « i » per i dettagli."
-                          : "Erforderlich nach der EU-Produktsicherheitsverordnung (GPSR). Tragen Sie Hersteller und eine in der EU ansässige verantwortliche Person ein, damit der Shop die gesetzlich vorgeschriebenen Sicherheitskontakte anzeigen kann. Tippen Sie auf „i“ für Details."}
-              </Text>
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>{locale === "en" ? "Manufacturer" : locale === "tr" ? "Üretici" : locale === "fr" ? "Fabricant" : locale === "es" ? "Fabricante" : locale === "it" ? "Fabbricante" : "Hersteller"}</span>
-                    <InfoIconTooltip
-                      text={
-                        locale === "en" ? "Name of the company or person that manufactured the product (as on packaging/imprint)."
-                          : locale === "tr" ? "Ürünü üreten şirket veya kişinin adı (ambalaj/künyedeki gibi)."
-                            : locale === "fr" ? "Nom de l'entreprise ou de la personne qui a fabriqué le produit (comme sur l'emballage)."
-                              : locale === "es" ? "Nombre de la empresa o persona que fabricó el producto (como en el envase)."
-                                : locale === "it" ? "Nome dell'azienda o della persona che ha fabbricato il prodotto (come sulla confezione)."
-                                  : "Name des Unternehmens oder der Person, die das Produkt hergestellt hat (wie auf Verpackung/Impressum)."
-                      }
-                    />
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller" />
-                  </InlineStack>
-                }
-                requiredIndicator
-                value={meta.hersteller ?? ""}
-                onChange={(v) => updateMeta("hersteller", v || undefined)}
-                placeholder={locale === "en" ? "e.g. Acme GmbH" : locale === "tr" ? "örn. Acme GmbH" : "z. B. Acme GmbH"}
-                autoComplete="off"
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>{locale === "en" ? "Manufacturer details" : locale === "tr" ? "Üretici bilgileri" : locale === "fr" ? "Coordonnées du fabricant" : locale === "es" ? "Datos del fabricante" : locale === "it" ? "Dati del fabbricante" : "Herstellerinformationen"}</span>
-                    <InfoIconTooltip
-                      text={
-                        locale === "en" ? "Postal address and contact of the manufacturer (street, postcode, city, country, email and/or phone)."
-                          : locale === "tr" ? "Üreticinin posta adresi ve iletişimi (sokak, posta kodu, şehir, ülke, e-posta ve/veya telefon)."
-                            : locale === "fr" ? "Adresse postale et contact du fabricant (rue, code postal, ville, pays, e-mail et/ou téléphone)."
-                              : locale === "es" ? "Dirección postal y contacto del fabricante (calle, CP, ciudad, país, correo y/o teléfono)."
-                                : locale === "it" ? "Indirizzo postale e contatto del fabbricante (via, CAP, città, paese, e-mail e/o telefono)."
-                                  : "Postanschrift und Kontakt des Herstellers (Straße, PLZ, Ort, Land, E-Mail und/oder Telefon)."
-                      }
-                    />
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.hersteller_information" />
-                  </InlineStack>
-                }
-                requiredIndicator
-                value={meta.hersteller_information ?? ""}
-                onChange={(v) => updateMeta("hersteller_information", v || undefined)}
-                placeholder={locale === "en" ? "Street, city, country, email/phone" : locale === "tr" ? "Sokak, şehir, ülke, e-posta/telefon" : "Straße, Ort, Land, E-Mail/Telefon"}
-                multiline={2}
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>{locale === "en" ? "Responsible person (EU)" : locale === "tr" ? "Sorumlu kişi (AB)" : locale === "fr" ? "Personne responsable (UE)" : locale === "es" ? "Persona responsable (UE)" : locale === "it" ? "Persona responsabile (UE)" : "Verantwortliche Person (EU)"}</span>
-                    <InfoIconTooltip
-                      text={
-                        locale === "en" ? "EU-based contact for product safety (name + address + contact). If the manufacturer is in the EU, this can be the same party."
-                          : locale === "tr" ? "Ürün güvenliği için AB'de yerleşik iletişim (ad + adres + iletişim). Üretici AB'deyse aynı taraf olabilir."
-                            : locale === "fr" ? "Point de contact basé dans l'UE pour la sécurité produit (nom + adresse + contact). Si le fabricant est dans l'UE, ce peut être la même entité."
-                              : locale === "es" ? "Contacto establecido en la UE para seguridad del producto (nombre + dirección + contacto). Si el fabricante está en la UE, puede ser la misma parte."
-                                : locale === "it" ? "Contatto stabilito nell'UE per la sicurezza del prodotto (nome + indirizzo + contatto). Se il fabbricante è nell'UE, può essere la stessa parte."
-                                  : "In der EU ansässige Kontaktstelle für Produktsicherheit (Name + Adresse + Kontakt). Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein."
-                      }
-                    />
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.verantwortliche_person_information" />
-                  </InlineStack>
-                }
-                requiredIndicator
-                value={meta.verantwortliche_person_information ?? ""}
-                onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)}
-                placeholder={locale === "en" ? "Name, EU address, email/phone" : locale === "tr" ? "Ad, AB adresi, e-posta/telefon" : "Name, EU-Adresse, E-Mail/Telefon"}
-                multiline={2}
-              />
-
-              <ComplianceFieldsSection
-                client={client}
-                categoryId={getMeta(product, "category_id")}
-                marketplace="DE"
-                locale={locale}
-                product={product}
-                getMeta={getMeta}
-                updateMeta={updateMeta}
-              />
-
-              <ProductSectionRule />
-              <ProductSectionHeading>Made in Europe ({locale === "en" ? "optional" : locale === "tr" ? "isteğe bağlı" : locale === "fr" ? "optionnel" : locale === "es" ? "opcional" : locale === "it" ? "opzionale" : "optional"})</ProductSectionHeading>
-              <Text as="p" tone="subdued">
-                {locale === "en" ? "Registry ID and proof document are optional. After saving with changed details: status \"pending\". The badge appears in the shop only when status is \"verified\" (superuser or later registry check)." : locale === "tr" ? "Registry ID ve kanıt belgesi isteğe bağlıdır. Değiştirilen bilgilerle kaydedildikten sonra: durum \"beklemede\". Mağazada rozet yalnızca durum \"doğrulandı\" olduğunda görünür (süper kullanıcı veya sonraki registry kontrolü)." : locale === "fr" ? "L'ID de registre et le document justificatif sont optionnels. Après enregistrement avec des informations modifiées : statut \"en attente\". Le badge n'apparaît dans la boutique qu'avec le statut \"vérifié\" (superuser ou vérification ultérieure du registre)." : locale === "es" ? "El ID de registro y el documento de prueba son opcionales. Tras guardar con datos modificados: estado \"pendiente\". El badge aparece en la tienda solo con estado \"verificado\" (superusuario o verificación posterior del registro)." : locale === "it" ? "L'ID registro e il documento di prova sono opzionali. Dopo il salvataggio con dati modificati: stato \"in sospeso\". Il badge appare nel negozio solo quando lo stato è \"verificato\" (superuser o controllo registro successivo)." : 'Registry-ID und Nachweisdokument optional. Nach Speichern mit geänderten Angaben: Status „pending". Im Shop erscheint das Badge nur bei Status „verified" (Superuser oder spätere Registry-Prüfung).'}
-              </Text>
-              {euOriginNotice ? (
-                <Banner tone="info" onDismiss={() => setEuOriginNotice("")}>{euOriginNotice}</Banner>
-              ) : null}
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>{locale === "en" ? "Country of origin (EU)" : locale === "tr" ? "Menşe ülke (AB)" : locale === "fr" ? "Pays d'origine (UE)" : locale === "es" ? "País de origen (UE)" : locale === "it" ? "Paese di origine (UE)" : "Herkunftsland (EU)"}</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_country" />
-                  </InlineStack>
-                }
-                value={meta.eu_origin_country ?? ""}
-                onChange={(v) => updateMeta("eu_origin_country", v || undefined)}
-                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
-                autoComplete="off"
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Registry-ID</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_registry_id" />
-                  </InlineStack>
-                }
-                value={meta.eu_origin_registry_id ?? ""}
-                onChange={(v) => updateMeta("eu_origin_registry_id", v || undefined)}
-                placeholder={locale === "en" ? "EU registry / certificate number" : locale === "tr" ? "AB kayıt / sertifika numarası" : locale === "fr" ? "Registre UE / numéro de certificat" : locale === "es" ? "Registro UE / número de certificado" : locale === "it" ? "Registro UE / numero di certificato" : "EU-Registry / Zertifikatsnummer"}
-                autoComplete="off"
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Nachweisdokument (URL)</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.eu_origin_document_url" />
-                  </InlineStack>
-                }
-                value={meta.eu_origin_document_url ?? ""}
-                onChange={(v) => updateMeta("eu_origin_document_url", v || undefined)}
-                placeholder="https://…"
-                autoComplete="off"
-              />
-              <Select
-                label={locale === "en" ? "Registry provider" : locale === "tr" ? "Registry sağlayıcısı" : locale === "fr" ? "Fournisseur de registre" : locale === "es" ? "Proveedor de registro" : locale === "it" ? "Provider registro" : "Registry-Provider"}
-                options={[
-                  { label: locale === "en" ? "Stub (manual check)" : locale === "tr" ? "Stub (manuel kontrol)" : locale === "fr" ? "Stub (vérification manuelle)" : locale === "es" ? "Stub (verificación manual)" : locale === "it" ? "Stub (verifica manuale)" : "Stub (manuelle Prüfung)", value: "stub" },
-                ]}
-                value={meta.eu_origin_provider || "stub"}
-                onChange={(v) => updateMeta("eu_origin_provider", v || "stub")}
-              />
-              <TextField
-                label="Status"
-                value={meta.eu_origin_status || "—"}
-                readOnly
-                autoComplete="off"
-                helpText={
-                  meta.eu_origin_verified_at
-                    ? `${locale === "en" ? "Verified at:" : locale === "tr" ? "Doğrulandı:" : locale === "fr" ? "Vérifié le :" : locale === "es" ? "Verificado el:" : locale === "it" ? "Verificato il:" : "Verifiziert am:"} ${meta.eu_origin_verified_at}`
-                    : (locale === "en" ? "Only backend/superuser sets \"verified\"." : locale === "tr" ? "Yalnızca backend/süper kullanıcı \"doğrulandı\" olarak ayarlar." : locale === "fr" ? "Seul le backend/superuser définit \"vérifié\"." : locale === "es" ? "Solo backend/superusuario establece \"verificado\"." : locale === "it" ? "Solo backend/superuser imposta \"verificato\"." : 'Nur Backend/Superuser setzt „verified".')
-                }
-              />
-              <InlineStack gap="200">
-                <Button
-                  onClick={() => handleVerifyEuOrigin(false)}
-                  loading={euOriginVerifying}
-                  disabled={!product?.id || euOriginVerifying}
-                >
-                  {locale === "en" ? "Check registry (stub)" : locale === "tr" ? "Registry kontrol et (stub)" : locale === "fr" ? "Vérifier le registre (stub)" : locale === "es" ? "Verificar registro (stub)" : locale === "it" ? "Controlla registro (stub)" : "Registry prüfen (Stub)"}
-                </Button>
-                {isSuperuser ? (
-                  <Button
-                    variant="primary"
-                    onClick={() => handleVerifyEuOrigin(true)}
-                    loading={euOriginVerifying}
-                    disabled={!product?.id || euOriginVerifying}
-                  >
-                    {locale === "en" ? "Verify manually" : locale === "tr" ? "Manuel doğrula" : locale === "fr" ? "Vérifier manuellement" : locale === "es" ? "Verificar manualmente" : locale === "it" ? "Verifica manualmente" : "Manuell verifizieren"}
-                  </Button>
-                ) : null}
-              </InlineStack>
-
-              {isSuperuser && (
-              <>
-              <ProductSectionRule />
-              <ProductSectionHeading>SEO</ProductSectionHeading>
-              <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--p-color-text-subdued)", marginBottom: 4 }}>
-                    URL-Handle (Shop){locale !== "de" ? " — this language" : " — canonical (German)"}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input
-                      value={
-                        locale === "de"
-                          ? ((product.handle || "").trim() || titleToHandle(editingTitle || product.title || ""))
-                          : ((editingTr.handle || "").trim())
-                      }
-                      onChange={(e) => {
-                        const v = sanitizeSeoHandleInput(e.target.value);
-                        if (locale === "de") {
-                          setProduct((prev) => {
-                            if (!prev) return prev;
-                            const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
-                            const tr = { ...(m.translations || {}) };
-                            tr.de = { ...(tr.de || {}), handle: v };
-                            return { ...prev, handle: v, metadata: { ...m, translations: tr } };
-                          });
-                        } else {
-                          updateLocaleField("handle", v);
-                        }
-                      }}
-                      style={{ flex: 1, padding: "6px 10px", border: "1px solid var(--p-color-border)", borderRadius: 6, fontSize: 12, fontFamily: "monospace" }}
-                      placeholder="url-handle"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = titleToHandle(editingTitle || product.title || "");
-                        if (locale === "de") {
-                          setProduct((prev) => {
-                            if (!prev) return prev;
-                            const m = { ...(prev.metadata && typeof prev.metadata === "object" ? prev.metadata : {}) };
-                            const tr = { ...(m.translations || {}) };
-                            tr.de = { ...(tr.de || {}), handle: next };
-                            return { ...prev, handle: next, metadata: { ...m, translations: tr } };
-                          });
-                        } else {
-                          updateLocaleField("handle", next);
-                        }
-                      }}
-                      title="Titel → Handle synchronisieren"
-                      style={{ padding: "6px 10px", background: "var(--p-color-bg-surface-hover)", border: "1px solid var(--p-color-border)", borderRadius: 6, cursor: "pointer", fontSize: 11, whiteSpace: "nowrap" }}
-                    >
-                      ↻ Sync
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginTop: 4 }}>
-                    Shop-URL: {shopPreviewPrefix(locale)}/
-                    <span style={{ fontFamily: "monospace" }}>
-                      {shopProductHandleForLocale(product, locale) || titleToHandle(editingTitle || product.title || "…")}
-                    </span>
-                    {locale !== "de" && !(editingTr.handle || "").trim() && (product.handle || "").trim() ? (
-                      <span> (empty uses DE handle)</span>
-                    ) : null}
-                  </div>
-              </div>
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Meta title</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_title" />
-                  </InlineStack>
-                }
-                value={meta.seo_meta_title ?? ""}
-                onChange={(v) => updateMeta("seo_meta_title", v)}
-                placeholder="Meta title"
-                autoComplete="off"
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Meta description</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_description" />
-                  </InlineStack>
-                }
-                value={meta.seo_meta_description ?? ""}
-                onChange={(v) => updateMeta("seo_meta_description", v)}
-                placeholder="Meta description"
-                multiline={2}
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Keywords</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_keywords" />
-                  </InlineStack>
-                }
-                value={meta.seo_keywords ?? ""}
-                onChange={(v) => updateMeta("seo_keywords", v)}
-                placeholder="keyword1, keyword2"
-                autoComplete="off"
-              />
-              </>
-              )}
             </BlockStack>
             </div>
           </Card>
-        </Layout.Section>
-
-        <Layout.Section variant="oneThird">
-          <div className="product-edit-sidebar">
-          <BlockStack gap="300">
-            <Card>
-              <BlockStack gap="400">
-                <BlockStack gap="200">
-                  <ProductSectionHeading>Status</ProductSectionHeading>
-                  <Select label="Status" labelHidden options={STATUS_OPTIONS} value={product.status || "draft"} onChange={(v) => update({ status: v })} />
-                </BlockStack>
-                <BlockStack gap="200">
-                  <ProductSectionHeading>{locale === "en" ? "Publish date (optional)" : locale === "tr" ? "Yayın tarihi (isteğe bağlı)" : locale === "fr" ? "Date de publication (optionnel)" : locale === "es" ? "Fecha de publicación (opcional)" : locale === "it" ? "Data di pubblicazione (opzionale)" : "Veröffentlichungsdatum (optional)"}</ProductSectionHeading>
-                  <TextField
-                    label=""
-                    labelHidden
-                    type="datetime-local"
-                    value={(() => {
-                      // Keep the input controlled: datetime-local expects "YYYY-MM-DDTHH:mm"
-                      const raw = meta.publish_date;
-                      if (!raw) return "";
-                      const d = new Date(raw);
-                      if (isNaN(d.getTime())) return "";
-                      const pad = (n) => String(n).padStart(2, "0");
-                      const yyyy = d.getFullYear();
-                      const mm = pad(d.getMonth() + 1);
-                      const dd = pad(d.getDate());
-                      const hh = pad(d.getHours());
-                      const min = pad(d.getMinutes());
-                      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
-                    })()}
-                    onChange={(v) => {
-                      if (!v) return updateMeta("publish_date", undefined);
-                      const d = new Date(v);
-                      if (isNaN(d.getTime())) return updateMeta("publish_date", undefined);
-                      // Store ISO so shop can do new Date(publish_date) safely
-                      updateMeta("publish_date", d.toISOString());
-                    }}
-                    placeholder="YYYY-MM-DDTHH:mm"
-                    helpText={locale === "en" ? "If a future date + time is set, the shop shows \"Coming soon\"." : locale === "tr" ? "İleri tarih + saat seçilirse shop’ta \"Pek yakında\" gösterilir." : locale === "fr" ? "Si une date + heure future est sélectionnée, la boutique affiche \"Bientôt disponible\"." : locale === "es" ? "Si se selecciona una fecha + hora futura, la tienda muestra \"Próximamente\"." : locale === "it" ? "Se si seleziona una data + ora futura, il negozio mostra \"Presto disponibile\"." : "Bei zukünftigem Datum + Uhrzeit zeigt der Shop \"Demnächst verfügbar\"."}
-                  />
-                </BlockStack>
-
-                <div style={{ position: "relative", zIndex: relatedProductPopoverOpen ? 10000 : undefined, overflow: "visible" }}>
-                  <BlockStack gap="200">
-                    <ProductSectionHeading>{locale === "en" ? "Related products (customers also bought)" : locale === "tr" ? "İlgili ürünler (müşteriler de satın aldı)" : locale === "fr" ? "Produits associés (les clients ont aussi acheté)" : locale === "es" ? "Productos relacionados (los clientes también compraron)" : locale === "it" ? "Prodotti correlati (i clienti hanno anche acquistato)" : "Verwandte Produkte (Kunden kauften auch)"}</ProductSectionHeading>
-                    <Text as="p" variant="bodySm" tone="subdued">{locale === "en" ? "Products shown in the \"Customers who bought this item also bought\" section on the product page." : locale === "tr" ? "Ürün sayfasında \"Bu ürünü satın alanlar bunları da satın aldı\" bölümünde gösterilecek ürünler." : locale === "fr" ? "Produits affichés dans la section \"Les clients qui ont acheté cet article ont aussi acheté\" sur la page produit." : locale === "es" ? "Productos mostrados en la sección \"Los clientes que compraron este artículo también compraron\" en la página del producto." : locale === "it" ? "Prodotti mostrati nella sezione \"I clienti che hanno acquistato questo articolo hanno anche acquistato\" nella pagina prodotto." : "Produkte die im Bereich \"Kunden, die diesen Artikel gekauft haben, kauften auch\" auf der Produktseite angezeigt werden."}</Text>
-                    <TextField
-                      label=""
-                      labelHidden
-                      value={relatedProductSearch}
-                      onChange={setRelatedProductSearch}
-                      onFocus={() => setRelatedProductPopoverOpen(true)}
-                      placeholder={locale === "en" ? "Search product…" : locale === "tr" ? "Ürün ara…" : locale === "fr" ? "Rechercher un produit…" : locale === "es" ? "Buscar producto…" : locale === "it" ? "Cerca prodotto…" : "Produkt suchen…"}
-                      autoComplete="off"
-                    />
-                    <div style={{ position: "relative" }}>
-                      {relatedProductPopoverOpen && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: "100%",
-                            left: 0,
-                            right: 0,
-                            maxHeight: 280,
-                            overflowY: "auto",
-                            background: "var(--p-color-bg-surface)",
-                            border: "1px solid var(--p-color-border)",
-                            borderRadius: 8,
-                            marginTop: 4,
-                            zIndex: 10002,
-                            boxShadow: "var(--p-shadow-400)",
-                          }}
-                        >
-                          {(relatedProductsList || [])
-                            .filter((p) => p.id !== product?.id && (!relatedProductSearch.trim() || (p.title || p.handle || "").toLowerCase().includes(relatedProductSearch.toLowerCase())))
-                            .slice(0, 50)
-                            .map((p) => (
-                              <button
-                                key={p.id}
-                                type="button"
-                                style={{ display: "block", width: "100%", padding: "8px 12px", textAlign: "left", border: "none", background: relatedProductIds.includes(p.id) ? "var(--p-color-bg-fill-secondary)" : "transparent", cursor: "pointer", fontSize: 13 }}
-                                onClick={() => {
-                                  const next = relatedProductIds.includes(p.id) ? relatedProductIds.filter((id) => id !== p.id) : [...relatedProductIds, p.id];
-                                  updateMeta("related_product_ids", next.length ? next : null);
-                                }}
-                              >
-                                <span style={{ marginRight: 8 }}>{relatedProductIds.includes(p.id) ? "✓" : ""}</span>
-                                {p.title || p.handle || p.id}
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                    {relatedProductPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setRelatedProductPopoverOpen(false)} aria-hidden />}
-                    {relatedProductIds.length > 0 && (
-                      <InlineStack gap="100" wrap>
-                        {relatedProductIds.map((id) => {
-                          const p = (relatedProductsList || []).find((x) => x.id === id);
-                          const label = p ? (p.title || p.handle || id) : id;
-                          return (
-                            <span
-                              key={id}
-                              style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", background: "var(--p-color-bg-fill-secondary)", borderRadius: 6, fontSize: 12, color: "var(--p-color-text-subdued)" }}
-                            >
-                              {String(label).slice(0, 40)}{String(label).length > 40 ? "…" : ""}
-                              <button type="button" onClick={() => updateMeta("related_product_ids", relatedProductIds.filter((x) => x !== id).length ? relatedProductIds.filter((x) => x !== id) : null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "inherit" }} aria-label="Remove">×</button>
-                            </span>
-                          );
-                        })}
-                      </InlineStack>
-                    )}
-                  </BlockStack>
-                </div>
-
-                <ProductSectionRule />
-
-                <BlockStack gap="200">
-                  <ProductSectionHeading>Sales</ProductSectionHeading>
-                  <Text as="p" variant="bodyMd">{meta.sales_count != null ? meta.sales_count : 0} sales</Text>
-                </BlockStack>
-
-                <ProductSectionRule />
-
-                <BlockStack gap="200">
-                  <ProductSectionHeading>Type</ProductSectionHeading>
-                  <TextField label="Product type" labelHidden value={meta.type ?? ""} onChange={(v) => updateMeta("type", v)} placeholder="e.g. T-Shirt" autoComplete="off" />
-                </BlockStack>
-              </BlockStack>
-            </Card>
-
-            <Card>
-              <BlockStack gap="200">
-                <ProductSectionHeading>Weight & dimensions</ProductSectionHeading>
-                <TextField label="Weight (g)" labelHidden type="number" value={meta.weight_grams != null ? String(meta.weight_grams) : ""} onChange={(v) => updateMeta("weight_grams", v === "" ? "" : parseInt(v, 10))} placeholder="grams" />
-                <InlineStack gap="200">
-                  <TextField label="L (cm)" labelHidden type="number" value={meta.dimensions_length != null ? String(meta.dimensions_length) : ""} onChange={(v) => updateMeta("dimensions_length", v)} placeholder="L" />
-                  <TextField label="W (cm)" labelHidden type="number" value={meta.dimensions_width != null ? String(meta.dimensions_width) : ""} onChange={(v) => updateMeta("dimensions_width", v)} placeholder="W" />
-                  <TextField label="H (cm)" labelHidden type="number" value={meta.dimensions_height != null ? String(meta.dimensions_height) : ""} onChange={(v) => updateMeta("dimensions_height", v)} placeholder="H" />
-                </InlineStack>
-              </BlockStack>
-            </Card>
-
-            <Card>
-              <BlockStack gap="200">
-                <ProductSectionHeading>Content per unit</ProductSectionHeading>
-                <Text as="p" variant="bodySm" tone="subdued">Shown on product e.g. &quot;Content: 200 g (€5.00* / 1 kg)&quot;. Enter the amount, unit, and reference quantity for the price per unit.</Text>
-                <TextField label="Amount" labelHidden type="number" value={meta.unit_value != null ? String(meta.unit_value) : ""} onChange={(v) => updateMeta("unit_value", v)} placeholder="e.g. 200" helpText="Numeric amount (e.g. 200 for 200 g)" />
-                <Select label="Unit" options={UNIT_TYPE_OPTIONS} value={meta.unit_type ?? ""} onChange={(v) => updateMeta("unit_type", v)} />
-                <TextField label="Reference quantity" labelHidden type="number" value={meta.unit_reference != null ? String(meta.unit_reference) : "1"} onChange={(v) => updateMeta("unit_reference", v)} placeholder="1" helpText="Reference for price per unit (e.g. 1 = per 1 kg when unit is kg)" />
-              </BlockStack>
-            </Card>
           </BlockStack>
-          </div>
         </Layout.Section>
       </Layout>
-
-      {/* Variations — full page width white card (always expanded matrix) */}
-      <div className="variations-fullwidth">
-        <Card>
-          <BlockStack gap="400">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-              <div>
-                <ProductSectionHeading>Variations</ProductSectionHeading>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Add groups (e.g. Color, Size). Variant combinations are auto-generated.
-                  Option values use one internal key (set on first entry); switch the globe to translate labels per language — shop shows the label for each locale.
-                </Text>
-              </div>
-              <Button variant="primary" size="slim" onClick={vg_addGroup}>+ Add Group</Button>
-            </div>
-
-            {variantGroups.length === 0 && (
-              <div style={{ padding: "24px 0", textAlign: "center", color: "var(--p-color-text-subdued)", fontSize: 13 }}>
-                No variant groups yet. Click <strong>+ Add Group</strong> to start.
-              </div>
-            )}
-
-            <BlockStack gap="300">
-              {variantGroups.map((group, gi) => (
-                <div
-                  key={gi}
-                  className="vg-group"
-                  draggable
-                  onDragStart={() => { dragGroupIdx.current = gi; }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    const from = dragGroupIdx.current;
-                    dragGroupIdx.current = null;
-                    if (from !== null && from !== gi) vg_moveGroup(from, gi);
-                  }}
-                >
-                  <div className="vg-group-header">
-                    <span className="vg-drag-handle" title="Drag to reorder">⠿</span>
-                    <span className="vg-group-num">{gi + 1}</span>
-                    <div style={{ flex: 1, maxWidth: 220 }}>
-                      <TextField
-                        label="Group name"
-                        labelHidden
-                        value={getGroupDisplayName(gi)}
-                        onChange={(v) => vg_setGroupName(gi, v)}
-                        placeholder="e.g. Color, Size, Material"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <Text as="span" variant="bodySm" tone="subdued">
-                      {(group.options || []).filter((o) => o.value.trim()).length} option(s)
-                    </Text>
-                    <Button size="slim" variant="plain" tone="critical" onClick={() => vg_removeGroup(gi)}>
-                      Remove
-                    </Button>
-                  </div>
-
-                  <div className="vg-group-body">
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                      {(group.options || []).map((opt, oi) => (
-                        <div key={oi} className="vg-option-chip">
-                          <div style={{ position: "relative", flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              className={opt.swatch_image ? "vg-swatch" : "vg-swatch-empty"}
-                              title={opt.swatch_image ? "Swatch görselini değiştir" : "Swatch görseli ekle (shopta renk/desen simgesi)"}
-                              onClick={() => openSwatchPicker(gi, oi)}
-                            >
-                              {opt.swatch_image
-                                ? <img src={resolveMediaUrl(opt.swatch_image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                : <span style={{ fontSize: 10, lineHeight: 1, color: "#6b7280" }}>SW</span>}
-                            </button>
-                            {opt.swatch_image && (
-                              <button
-                                type="button"
-                                style={{ position: "absolute", top: -4, right: -4, width: 14, height: 14, borderRadius: "50%", background: "#de3618", border: "none", color: "#fff", fontSize: 9, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                                onClick={(e) => { e.stopPropagation(); vg_setOption(gi, oi, "swatch_image", ""); }}
-                                title="Remove swatch"
-                              >×</button>
-                            )}
-                          </div>
-                          <input
-                            type="text"
-                            value={getOptionInputValue(opt)}
-                            onChange={(e) => handleOptionDisplayChange(gi, oi, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                vg_addOption(gi);
-                              }
-                            }}
-                            placeholder="Value"
-                          />
-                          <button type="button" className="vg-remove-btn" onClick={() => vg_removeOption(gi, oi)} title="Remove option">×</button>
-                        </div>
-                      ))}
-                      <Button size="slim" variant="plain" onClick={() => vg_addOption(gi)}>+ Add option</Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </BlockStack>
-
-            {variantGroups.length > 0 && (() => {
-              const matrixRows = (product?.variants || []).filter((v) => Array.isArray(v.option_values));
-              if (matrixRows.length === 0) {
-                return (
-                  <div style={{ padding: "12px 16px", background: "var(--p-color-bg-surface-warning, #fffbeb)", borderRadius: 8, fontSize: 13, color: "var(--p-color-text-subdued)" }}>
-                    Add at least one option to each group to generate combinations.
-                  </div>
-                );
-              }
-              return (
-                <div>
-                  <div style={{ marginBottom: 10 }}>
-                    <Text as="p" variant="bodySm" fontWeight="semibold">
-                      Variation Matrix — {matrixRows.length} {matrixRows.length === 1 ? "variant" : "variants"}
-                    </Text>
-                  </div>
-                  <div>
-                    {matrixRows.map((v, vi) => {
-                      const variantImgs = Array.isArray(v.metadata?.media) ? v.metadata.media : [];
-                      const localeVariantImg =
-                        String(locale).toLowerCase() === "de"
-                          ? v.image_url || ""
-                          : v.image_urls?.[locale] || v.image_url || "";
-                      const thumbUrl = variantImgs[0]
-                        ? resolveMediaUrl(variantImgs[0])
-                        : localeVariantImg
-                          ? resolveMediaUrl(localeVariantImg)
-                          : null;
-                      const vkey = Array.isArray(v.option_values) ? v.option_values.join("\u0000") : "";
-                      const mkDraftKey = (f) => `${vkey}_${f}`;
-                      const priceFields = [
-                        { f: "price",            centsKey: "price_cents",            label: "Price (€)",   placeholder: "0.00" },
-                        { f: "compare_at_price", centsKey: "compare_at_price_cents", label: "UVP (€)",     placeholder: "—"    },
-                        { f: "sale_price",       centsKey: "sale_price_cents",       label: "Sale (€)",    placeholder: "—"    },
-                      ];
-
-                      return (
-                        <div key={vi} className="vm-card">
-                          <div className="vm-row">
-                            <div className="vm-row-main">
-                              {thumbUrl
-                                ? <img src={thumbUrl} alt="" className="vm-thumb" />
-                                : <div className="vm-thumb-empty">+</div>
-                              }
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, flex: 1 }}>
-                                {(v.option_values || []).map((val, oi) => {
-                                  const gOpt = variantGroups[oi];
-                                  const opt = (gOpt?.options || []).find(
-                                    (o) => String(o.value || "").trim().toLowerCase() === String(val || "").trim().toLowerCase()
-                                  );
-                                  const label = opt ? optionDisplayLabel(opt, locale) : val;
-                                  const swatchUrl = opt?.swatch_image;
-                                  return (
-                                    <span key={oi} className="vm-badge">
-                                      {swatchUrl && (
-                                        <span style={{ width: 12, height: 12, borderRadius: "50%", display: "inline-block", backgroundImage: `url(${resolveMediaUrl(swatchUrl)})`, backgroundSize: "cover", border: "1px solid var(--p-color-border)", flexShrink: 0 }} />
-                                      )}
-                                      <span style={{ fontSize: 11, color: "var(--p-color-text-subdued)", marginRight: 2 }}>{getGroupDisplayName(oi) || gOpt?.name || `G${oi + 1}`}:</span>
-                                      {label}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            <div className="vm-field-group">
-                              <div className="vm-sub-label">Inventory & Identifiers</div>
-                              <div className="vm-grid-3">
-                                <TextField label="SKU" value={v.sku ?? ""} onChange={(val) => updateMatrixVariant(v.option_values, "sku", val)} placeholder="SKU" autoComplete="off" />
-                                <TextField
-                                  label="EAN / GTIN"
-                                  value={v.ean ?? ""}
-                                  onChange={(val) => updateMatrixVariant(v.option_values, "ean", val)}
-                                  placeholder="EAN"
-                                  autoComplete="off"
-                                  error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
-                                />
-                                <TextField label="Stock" type="number" min={0} value={v.inventory != null ? String(v.inventory) : "0"} onChange={(val) => updateMatrixVariant(v.option_values, "inventory", val)} placeholder="0" />
-                              </div>
-                            </div>
-
-                            <div className="vm-field-group vm-prices">
-                              <div className="vm-sub-label">Pricing</div>
-                              <div className="vm-grid-3">
-                                {priceFields.map(({ f, centsKey, label, placeholder }) => {
-                                  const dk = mkDraftKey(f);
-                                  const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
-                                  const displayVal = isDraft
-                                    ? priceInputs[dk]
-                                    : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
-                                  return (
-                                    <TextField
-                                      key={f}
-                                      label={label}
-                                      value={displayVal}
-                                      placeholder={placeholder}
-                                      autoComplete="off"
-                                      onChange={(val) => {
-                                        const clean = sanitizePriceDraftString(val);
-                                        setPriceInputs((prev) => {
-                                          const next = { ...prev, [dk]: clean };
-                                          priceInputsRef.current = next;
-                                          return next;
-                                        });
-                                      }}
-                                      onBlur={(e) => {
-                                        const raw = sanitizePriceDraftString(e.currentTarget.value);
-                                        updateMatrixVariant(v.option_values, f, raw);
-                                        setPriceInputs((prev) => {
-                                          const next = { ...prev };
-                                          delete next[dk];
-                                          priceInputsRef.current = next;
-                                          return next;
-                                        });
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            </div>
-
-                            <div className="vm-field-group vm-images">
-                              <div className="vm-sub-label">Images</div>
-                              <div className="vm-img-strip">
-                                {variantImgs.length === 0 && localeVariantImg && (
-                                  <div className="vm-img-item" title="Added via the full Variant Edit page — manage it there">
-                                    <img src={resolveMediaUrl(localeVariantImg)} alt="" />
-                                  </div>
-                                )}
-                                {variantImgs.map((imgUrl, imgIdx) => (
-                                  <div key={imgIdx} className="vm-img-item">
-                                    <img src={resolveMediaUrl(imgUrl)} alt="" />
-                                    <button
-                                      type="button"
-                                      className="vm-img-del"
-                                      onClick={() => {
-                                        const next = variantImgs.filter((_, i) => i !== imgIdx);
-                                        updateMatrixVariantMeta(v.option_values, "media", next.length ? next : null);
-                                      }}
-                                    >×</button>
-                                  </div>
-                                ))}
-                                {variantImgs.length < 8 && (
-                                  <button
-                                    type="button"
-                                    className="vm-img-add"
-                                    onClick={() => openVariantImgPicker(v.option_values)}
-                                  >+</button>
-                                )}
-                              </div>
-                            </div>
-
-                            {!isNew && (
-                              <div className="vm-edit-btn">
-                                <Button
-                                  size="slim"
-                                  variant="plain"
-                                  icon={EditIcon}
-                                  accessibilityLabel="Edit variant"
-                                  onClick={() => router.push(`/products/${idOrHandle}/variants/${encodeVariantPathKey(v.option_values)}`)}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </BlockStack>
-        </Card>
-      </div>
+      )}
 
       {deleteConfirmOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setDeleteConfirmOpen(false)}>
           <div style={{ background: "var(--p-color-bg-surface)", padding: 24, borderRadius: 12, maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-            <Text as="p" variant="bodyMd">Delete "{product.title}"?</Text>
+            <Text as="p" variant="bodyMd">{ui.delete} “{product.title}”?</Text>
             <InlineStack gap="200" blockAlign="end">
-              <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-              <Button variant="primary" tone="critical" onClick={() => { setDeleteConfirmOpen(false); deleteProduct(); }}>Delete</Button>
+              <Button onClick={() => setDeleteConfirmOpen(false)}>{ui.cancel}</Button>
+              <Button variant="primary" tone="critical" onClick={() => { setDeleteConfirmOpen(false); deleteProduct(); }}>{ui.delete}</Button>
             </InlineStack>
           </div>
         </div>
@@ -3928,13 +4210,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       <Modal
         open={duplicateModalOpen}
         onClose={() => setDuplicateModalOpen(false)}
-        title="Duplicate product"
+        title={ui.duplicate}
         primaryAction={{
-          content: "Create duplicate",
+          content: ui.duplicate,
           onAction: runDuplicate,
           loading: duplicateSaving,
         }}
-        secondaryActions={[{ content: "Cancel", onAction: () => setDuplicateModalOpen(false) }]}
+        secondaryActions={[{ content: ui.cancel, onAction: () => setDuplicateModalOpen(false) }]}
       >
         <Modal.Section>
           <BlockStack gap="400">

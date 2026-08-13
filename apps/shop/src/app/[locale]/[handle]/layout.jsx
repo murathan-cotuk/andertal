@@ -11,6 +11,8 @@ import {
   marketFromHeader,
   productHandleForLocale,
   productImageUrls,
+  productSeoFallback,
+  categorySeoFallback,
   stripHtml,
   absolutePublicUrl,
 } from "@/lib/seo";
@@ -81,11 +83,9 @@ export async function generateMetadata({ params }) {
 
   if (entity.kind === "product") {
     const product = entity.product;
-    const meta = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
-    const title =
-      (meta.seo_meta_title || product.title || handle).trim() || "Andertal";
-    const description =
-      stripHtml(meta.seo_meta_description || product.description || "", 160) || undefined;
+    const seo = productSeoFallback(product, locale);
+    const title = (seo.title || handle).trim() || "Andertal";
+    const description = seo.description || undefined;
     return buildPageMetadata({
       title,
       description,
@@ -100,7 +100,8 @@ export async function generateMetadata({ params }) {
   if (entity.kind === "collection") {
     const c = entity.collection;
     const title = (c.meta_title || c.display_title || c.title || handle).trim() || "Andertal";
-    const description = (c.meta_description || "").trim() || undefined;
+    const description =
+      stripHtml(c.meta_description || c.description || c.richtext || "", 160) || undefined;
     return buildPageMetadata({
       title,
       description,
@@ -113,31 +114,14 @@ export async function generateMetadata({ params }) {
 
   if (entity.kind === "category") {
     const c = entity.category;
+    const seo = categorySeoFallback(c, locale);
     const m = c.metadata && typeof c.metadata === "object" ? c.metadata : {};
     const seoLoc =
       locale && locale !== "de" && m.seo_i18n && typeof m.seo_i18n === "object"
         ? m.seo_i18n[locale]
         : null;
-    const title =
-      (
-        (seoLoc && (seoLoc.meta_title || seoLoc.title)) ||
-        c.seo_title ||
-        m.meta_title ||
-        c.name ||
-        c.slug ||
-        handle
-      )
-        .toString()
-        .trim() || "Andertal";
-    const description =
-      (
-        (seoLoc && (seoLoc.meta_description || seoLoc.description)) ||
-        c.seo_description ||
-        m.meta_description ||
-        ""
-      )
-        .toString()
-        .trim() || undefined;
+    const title = (seo.title || handle).trim() || "Andertal";
+    const description = seo.description || undefined;
     const keywords =
       (
         (seoLoc && (seoLoc.meta_keywords || seoLoc.keywords)) ||

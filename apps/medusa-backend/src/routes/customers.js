@@ -1,6 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { appendBonusLedger, stripLegacyBonusLedgerVersandSuffix } = require('./store-checkout')
+const { sqlOrderOwnedBySeller } = require('../seller-scope')
 
 const adminHubCustomersGET = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -26,27 +27,7 @@ const adminHubCustomersGET = async (req, res) => {
       const n = params.length
       whereParts.push(`EXISTS (
         SELECT 1 FROM store_orders o
-        WHERE LOWER(o.email) = LOWER(c.email) AND (
-          EXISTS (
-            SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-              NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
-              OR (
-                NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
-                AND (
-                  -- Only infer via listings when exactly one seller lists this product —
-                  -- otherwise an unstamped item's seller is ambiguous and must not match everyone.
-                  EXISTS (
-                    SELECT 1 FROM admin_hub_seller_listings sl
-                    WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n}
-                      AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
-                  )
-                  OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
-                )
-              )
-            )
-          )
-          OR (o.seller_id = $${n} AND o.seller_id IS DISTINCT FROM 'default')
-        )
+        WHERE LOWER(o.email) = LOWER(c.email) AND ${sqlOrderOwnedBySeller('o', `$${n}`)}
       )`)
     }
     if (search) {
@@ -60,24 +41,9 @@ const adminHubCustomersGET = async (req, res) => {
     }
     const where = whereParts.length > 0 ? 'WHERE ' + whereParts.join(' AND ') : ''
     // Stats must use item ownership — store_orders.seller_id is platform `default`.
+    const sellerIdLit = `'${String(sellerSellerId || '').replace(/'/g, "''")}'`
     const orderStatsSeller = (!isSuperuser && sellerSellerId)
-      ? `WHERE EXISTS (
-           SELECT 1 FROM store_order_items oi
-           WHERE oi.order_id = store_orders.id AND (
-             NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = '${sellerSellerId.replace(/'/g, "''")}'
-             OR (
-               NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
-               AND (
-                 EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = '${sellerSellerId.replace(/'/g, "''")}')
-                 OR EXISTS (
-                   SELECT 1 FROM admin_hub_seller_listings sl
-                   WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = '${sellerSellerId.replace(/'/g, "''")}'
-                     AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
-                 )
-               )
-             )
-           )
-         )`
+      ? `WHERE ${sqlOrderOwnedBySeller('store_orders', sellerIdLit)}`
       : ''
     const q = `
       SELECT c.id, c.customer_number, c.email, c.first_name, c.last_name, c.phone, c.country,
@@ -454,7 +420,7 @@ const adminHubCustomerByIdGET = async (req, res) => {
       const acc = await client.query(
         `SELECT 1 FROM store_customers c
          WHERE c.id = $1::uuid AND EXISTS (
-           SELECT 1 FROM store_orders o WHERE LOWER(o.email) = LOWER(c.email) AND o.seller_id = $2
+           SELECT 1 FROM store_orders o WHERE LOWER(o.email) = LOWER(c.email) AND ${sqlOrderOwnedBySeller('o', '$2')}
          )`,
         [id, sellerSellerId],
       )
@@ -463,13 +429,13 @@ const adminHubCustomerByIdGET = async (req, res) => {
         return res.status(404).json({ message: 'Customer not found' })
       }
     }
-    let ordersQ = `SELECT id, order_number, order_status, payment_status, delivery_status,
-              total_cents, currency, newsletter_opted_in, created_at
-       FROM store_orders WHERE LOWER(email) = LOWER($1)`
+    let ordersQ = `SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status,
+              o.total_cents, o.currency, o.newsletter_opted_in, o.created_at
+       FROM store_orders o WHERE LOWER(o.email) = LOWER($1)`
     const ordersParams = [row.email]
     if (!isSuperuser && sellerSellerId) {
       ordersParams.push(sellerSellerId)
-      ordersQ += ` AND seller_id = $2`
+      ordersQ += ` AND ${sqlOrderOwnedBySeller('o', '$2')}`
     }
     ordersQ += ' ORDER BY created_at DESC'
     const ordersR = await client.query(ordersQ, ordersParams)

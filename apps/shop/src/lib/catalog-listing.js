@@ -16,16 +16,14 @@ export const PER_PAGE = 24;
 
 /** Display titles for normalized facet keys (matches CategoryTemplate / brand listing). DE defaults. */
 const FACET_GROUP_TITLE_OVERRIDES = {
-  brand_name: "Marke",
-  category_slug: "Category",
-  category: "Category",
+  type: "Typ",
+  typ: "Typ",
   farbe: "Farbe",
   colour: "Colour",
   color: "Color",
   material: "Material",
   size: "Größe",
   groesse: "Größe",
-  typ: "Typ",
   style: "Style",
   gender: "Gender",
   age_group: "Altersgruppe",
@@ -180,9 +178,24 @@ export const FACET_SKIP = new Set([
   "eu_origin_provider", "eu_origin_registry_id", "eu_origin_document_url",
   "eu_origin_status", "eu_origin_verified_at", "eu_origin_country",
   "wee_number", "wee", "weee", "weee_number", "eprel_number", "eprel", "eprel_id", "eprel_registration_number", "description",
-  "is_bestseller", "category_slug", "category", "prices",
+  "is_bestseller", "category_slug", "category", "category_ids", "prices",
   "view_count", "views", "custom_badges",
+  "handle", "title", "status", "inventory", "price",
+  "sales_unit", "packaging_unit", "packaging_unit_plural", "minimum_order_quantity",
+  "manufacturer", "manufacturer_information", "responsible_person_information",
+  "product_files", "files", "bullet1", "bullet2", "bullet3", "bullet4", "bullet5",
+  "_catalog_approval_pending", "_pending_catalog_metafields",
 ]);
+
+export function isProductSystemMetaKey(raw) {
+  const k = String(raw || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  if (!k || k.startsWith("_")) return true;
+  if (FACET_SKIP.has(k)) return true;
+  if (k.endsWith("_id") || k.endsWith("_ids")) return true;
+  if (/(^|_)(weee?|eprel|bullet|hersteller|manufacturer|gpsr)(_|$)/i.test(k)) return true;
+  if (k.includes("bullet_point")) return true;
+  return false;
+}
 
 export function normalizeFacetKey(key) {
   const raw = String(key || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -198,7 +211,7 @@ export function normalizeFacetKey(key) {
 }
 
 export function variationGroupFacetKey(group, fallbackIndex) {
-  const raw = group?.key || group?.name || group?.title || `option_${fallbackIndex + 1}`;
+  const raw = group?.metafield_key || group?.key || group?.name || group?.title || `option_${fallbackIndex + 1}`;
   return normalizeFacetKey(raw);
 }
 
@@ -285,7 +298,8 @@ function isCleanValue(s) {
 
 function addFacetValue(f, key, rawVal) {
   const normalizedKey = normalizeFacetKey(key);
-  if (!normalizedKey || FACET_SKIP.has(normalizedKey) || normalizedKey.startsWith("_")) return;
+  if (!normalizedKey || normalizedKey.startsWith("_")) return;
+  if (normalizedKey !== "type" && normalizedKey !== "typ" && isProductSystemMetaKey(normalizedKey)) return;
   const vals = Array.isArray(rawVal) ? rawVal : [rawVal];
   vals.forEach((x) => {
     if (x == null || typeof x === "object") return;
@@ -296,51 +310,59 @@ function addFacetValue(f, key, rawVal) {
   });
 }
 
+export function catalogFacetKeySet(definitions) {
+  const s = new Set();
+  if (!definitions || typeof definitions !== "object") return s;
+  for (const k of Object.keys(definitions)) {
+    const nk = normalizeFacetKey(k);
+    if (nk && nk !== "type" && nk !== "typ" && isProductSystemMetaKey(nk)) continue;
+    if (nk) s.add(nk);
+    if (k) s.add(String(k).trim().toLowerCase());
+  }
+  return s;
+}
+
+/** Catalog Eigenschaften plus Type. Never dump product operational fields. */
+export function filterFacetsToCatalog(facets, definitions) {
+  const allowed = catalogFacetKeySet(definitions);
+  allowed.add("type");
+  allowed.add("typ");
+  return Object.fromEntries(
+    Object.entries(facets || {}).filter(([k]) => {
+      const nk = normalizeFacetKey(k);
+      if (nk === "type" || nk === "typ") return true;
+      if (isProductSystemMetaKey(nk)) return false;
+      if (allowed.size <= 2) return !isProductSystemMetaKey(nk);
+      return allowed.has(nk) || allowed.has(String(k || "").trim().toLowerCase());
+    }),
+  );
+}
+
 export function buildFacetsFromProducts(products) {
   const f = {};
   (products || []).forEach((p) => {
     const meta = typeof p.metadata === "object" && p.metadata ? p.metadata : {};
-
-    Object.entries(meta).forEach(([k, v]) => {
-      const nk = normalizeFacetKey(k);
-      if (FACET_SKIP.has(nk) || nk.startsWith("_")) return;
-      if (Array.isArray(v) && v.length > 0 && typeof v[0] === "object") return;
-      if (v !== null && typeof v === "object" && !Array.isArray(v)) return;
-      addFacetValue(f, nk, v);
-    });
+    const typeVal = p.type || meta.type;
+    if (typeVal != null && String(typeVal).trim()) addFacetValue(f, "type", typeVal);
 
     if (Array.isArray(meta.metafields)) {
       meta.metafields.forEach(({ key, value } = {}) => {
-        const nk = normalizeFacetKey(key);
-        if (!nk || value == null || value === "") return;
-        if (FACET_SKIP.has(nk) || nk.startsWith("_")) return;
-        addFacetValue(f, nk, value);
+        if (!key || value == null || value === "") return;
+        addFacetValue(f, key, value);
       });
     }
 
     if (Array.isArray(p.variants)) {
       p.variants.forEach((variant) => {
         const variantMeta = typeof variant?.metadata === "object" && variant.metadata ? variant.metadata : {};
-
-        Object.entries(variantMeta).forEach(([k, v]) => {
-          const nk = normalizeFacetKey(k);
-          if (FACET_SKIP.has(nk) || nk.startsWith("_")) return;
-          if (Array.isArray(v) && v.length > 0 && typeof v[0] === "object") return;
-          if (v !== null && typeof v === "object" && !Array.isArray(v)) return;
-          addFacetValue(f, nk, v);
-        });
-
         if (Array.isArray(variantMeta.metafields)) {
           variantMeta.metafields.forEach(({ key, value } = {}) => {
-            const nk = normalizeFacetKey(key);
-            if (!nk || value == null || value === "") return;
-            if (FACET_SKIP.has(nk) || nk.startsWith("_")) return;
-            addFacetValue(f, nk, value);
+            if (!key || value == null || value === "") return;
+            addFacetValue(f, key, value);
           });
         }
-
         if (Array.isArray(variant?.option_values)) {
-          const groups = Array.isArray(p.variation_groups) ? p.variation_groups : [];
+          const groups = Array.isArray(p.variation_groups) ? p.variation_groups : (Array.isArray(meta.variation_groups) ? meta.variation_groups : []);
           variant.option_values.forEach((value, idx) => {
             const groupKey = inferFacetKeyFromValue(value, variationGroupFacetKey(groups[idx], idx));
             addFacetValue(f, groupKey, value);
@@ -364,6 +386,7 @@ export function filterProductsByFacets(products, filters) {
     out = out.filter((p) => {
       const meta = p.metadata || {};
       const normalizedKey = normalizeFacetKey(k);
+      if ((normalizedKey === "type" || k === "type" || k === "typ") && vals.includes(String(p.type || meta.type || "").trim())) return true;
       const direct = meta[k];
       if (direct != null && (Array.isArray(direct) ? direct : [direct]).some((x) => vals.includes(String(x).trim()))) return true;
       const directNormalized = meta[normalizedKey];

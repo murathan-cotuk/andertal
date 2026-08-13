@@ -1,4 +1,4 @@
-import { getLocalizedProduct } from "@/lib/format";
+import { getLocalizedProduct, getLocalizedCategory } from "@/lib/format";
 import {
   DEFAULT_MARKET,
   SHOP_LOCALES,
@@ -73,6 +73,55 @@ export function stripHtml(value, maxLength = 160) {
     .trim();
   if (!maxLength || plain.length <= maxLength) return plain;
   return `${plain.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+}
+
+/** Shop <title> / meta description: explicit SEO fields, else product name + description. */
+export function productSeoFallback(product, locale) {
+  const meta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+  const loc = getLocalizedProduct(product, locale);
+  const locKey = normalizeLocale(locale);
+  const tr = meta.translations && typeof meta.translations === "object" ? meta.translations[locKey] : null;
+  const title = String(
+    (tr && tr.seo_title) || meta.seo_meta_title || loc.title || product?.title || ""
+  ).trim();
+  const description = stripHtml(
+    (tr && tr.seo_description) || meta.seo_meta_description || loc.description || product?.description || "",
+    160
+  );
+  return { title, description };
+}
+
+/** Shop <title> / meta description: explicit SEO fields, else category name + body. */
+export function categorySeoFallback(category, locale) {
+  const c = category || {};
+  const m = c.metadata && typeof c.metadata === "object" ? c.metadata : {};
+  const locKey = normalizeLocale(locale);
+  const seoLoc =
+    locKey && locKey !== "de" && m.seo_i18n && typeof m.seo_i18n === "object" ? m.seo_i18n[locKey] : null;
+  const localizedName = getLocalizedCategory(c, locale)?.name || "";
+  const localizedDesc = getLocalizedCategory(c, locale)?.description || "";
+  const title = String(
+    (seoLoc && (seoLoc.meta_title || seoLoc.title)) ||
+      c.seo_title ||
+      m.meta_title ||
+      m.display_title ||
+      localizedName ||
+      c.name ||
+      c.slug ||
+      ""
+  ).trim();
+  const description = stripHtml(
+    (seoLoc && (seoLoc.meta_description || seoLoc.description)) ||
+      c.seo_description ||
+      m.meta_description ||
+      localizedDesc ||
+      c.long_content ||
+      m.richtext ||
+      c.description ||
+      "",
+    160
+  );
+  return { title, description };
 }
 
 export function productHandleForLocale(product, locale) {

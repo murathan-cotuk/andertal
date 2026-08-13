@@ -5,7 +5,7 @@ import {
   marketFromHeader,
   productHandleForLocale,
   productImageUrls,
-  stripHtml,
+  productSeoFallback,
 } from "@/lib/seo";
 
 /** Legacy /produkt/[handle] — metadata kept for redirect response; page permanently redirects. */
@@ -16,10 +16,9 @@ export async function generateMetadata({ params }) {
   if (!handle) return { title: "Andertal" };
   const product = await fetchStoreProduct(handle);
   if (!product) return { title: "Andertal" };
-  const meta = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
-  const title = (meta.seo_meta_title || product.title || handle).trim() || "Andertal";
-  const description =
-    stripHtml(meta.seo_meta_description || product.description || "", 160) || undefined;
+  const seo = productSeoFallback(product, locale);
+  const title = (seo.title || handle).trim() || "Andertal";
+  const description = seo.description || undefined;
   return buildPageMetadata({
     title,
     description,

@@ -8,7 +8,6 @@ import { getUI } from "@/lib/ui-strings";
 import { useLt } from "@/lib/use-locale-text";
 import { dateLocaleFor } from "@/lib/locale-text";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
-import { confirmDelete } from "@/lib/confirm-delete";
 import { getNotificationsPageCopy } from "@/lib/notifications-page-i18n";
 import {
   getNotificationGroupLabel,
@@ -194,8 +193,6 @@ export default function NotificationsPage() {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [activeGroupKey, setActiveGroupKey] = useState(null);
-
-  const flatItems = useMemo(() => groups.flatMap((g) => g.items || []), [groups]);
   const activeGroup = useMemo(() => groups.find((g) => g.key === activeGroupKey) || null, [groups, activeGroupKey]);
   const activeGroupItems = useMemo(() => activeGroup?.items || [], [activeGroup]);
   const isChangeSuggestionTab = activeGroupKey === "change_suggestion";
@@ -210,7 +207,8 @@ export default function NotificationsPage() {
         setGroups(nextGroups);
         setActiveGroupKey((prev) => {
           if (prev && nextGroups.some((g) => g.key === prev)) return prev;
-          return nextGroups[0]?.key || null;
+          const withItems = nextGroups.find((g) => (g.items || []).length > 0);
+          return withItems?.key || nextGroups[0]?.key || null;
         });
         setGrandTotal(typeof data.grand_total === "number" ? data.grand_total : (data.groups || []).reduce((s, g) => s + (g.items?.length || 0), 0));
       } else {
@@ -289,22 +287,6 @@ export default function NotificationsPage() {
     setBusy(false);
   };
 
-  const deleteAll = async () => {
-    if (!await confirmDelete(c.removeAllConfirm)) return;
-    setBusy(true);
-    try {
-      await getMedusaAdminClient().deleteNotifications({ all: true });
-      setSelected(new Set());
-      await load();
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("andertal-notifications-refresh"));
-      }
-    } catch {
-      /* ignore */
-    }
-    setBusy(false);
-  };
-
   const deleteOne = async (it) => {
     setBusy(true);
     try {
@@ -353,9 +335,6 @@ export default function NotificationsPage() {
               <Button disabled={busy || selected.size === 0} onClick={deleteSelected}>
                 {removeSelectedLabel}
               </Button>
-              <Button tone="critical" disabled={busy || flatItems.length === 0} onClick={deleteAll}>
-                {c.removeAll}
-              </Button>
               <Button variant="plain" disabled={busy || loading} onClick={load}>
                 {ui.refresh}
               </Button>
@@ -368,7 +347,7 @@ export default function NotificationsPage() {
             <Box padding="400">
               <Text as="p">{ui.loading}</Text>
             </Box>
-          ) : flatItems.length === 0 ? (
+          ) : groups.length === 0 ? (
             <Box padding="400">
               <Text as="p" tone="subdued">
                 {ui.noNotifications}.
@@ -493,7 +472,7 @@ export default function NotificationsPage() {
               </div>
             </div>
           )}
-          {!loading && flatItems.length > 0 && (
+          {!loading && groups.length > 0 && (
             <Box padding="300">
               <Text as="p" tone="subdued">
                 {footerText}

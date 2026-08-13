@@ -168,6 +168,63 @@ async function registerImportedMediaUrls(backendUrl, authHeaders, urls, targetSe
   return { registered, skipped, folder, errors };
 }
 
+function buildMetafieldLookup(definitions) {
+  const keyByAlias = new Map();
+  const valueByKeyAndAlias = new Map();
+  for (const [rawKey, def] of Object.entries(definitions || {})) {
+    const key = String(rawKey || "").trim();
+    if (!key) continue;
+    keyByAlias.set(key.toLowerCase(), key);
+    const label = String(def?.label || "").trim();
+    if (label) keyByAlias.set(label.toLowerCase(), key);
+    const li18n = def?.label_i18n && typeof def.label_i18n === "object" ? def.label_i18n : {};
+    for (const loc of Object.values(li18n)) {
+      const lab = loc && typeof loc === "object" ? loc.label : loc;
+      if (lab != null && String(lab).trim()) keyByAlias.set(String(lab).trim().toLowerCase(), key);
+    }
+    const vmap = new Map();
+    for (const v of (Array.isArray(def?.values) ? def.values : [])) {
+      const s = String(v || "").trim();
+      if (s) vmap.set(s.toLowerCase(), s);
+    }
+    const vi18n = def?.values_i18n && typeof def.values_i18n === "object" ? def.values_i18n : {};
+    for (const locMap of Object.values(vi18n)) {
+      if (!locMap || typeof locMap !== "object") continue;
+      for (const [canon, translated] of Object.entries(locMap)) {
+        if (translated != null && String(translated).trim()) {
+          vmap.set(String(translated).trim().toLowerCase(), String(canon).trim());
+        }
+        if (canon) vmap.set(String(canon).trim().toLowerCase(), String(canon).trim());
+      }
+    }
+    valueByKeyAndAlias.set(key, vmap);
+  }
+  return { keyByAlias, valueByKeyAndAlias };
+}
+
+function resolveImportedMetaKey(raw, lookup) {
+  const s = String(raw || "").trim();
+  if (!s) return s;
+  return lookup?.keyByAlias?.get(s.toLowerCase()) || s;
+}
+
+function resolveImportedMetaValue(key, raw, lookup) {
+  const s = String(raw || "").trim();
+  if (!s) return s;
+  const vmap = lookup?.valueByKeyAndAlias?.get(key);
+  if (vmap && vmap.has(s.toLowerCase())) return vmap.get(s.toLowerCase());
+  return s;
+}
+
+function resolveMetafieldPairs(pairs, lookup) {
+  if (!Array.isArray(pairs) || !pairs.length) return pairs;
+  return pairs.map((p) => {
+    const key = resolveImportedMetaKey(p.key, lookup);
+    const value = resolveImportedMetaValue(key, p.value, lookup);
+    return { key, value };
+  });
+}
+
 async function loadImportLookups(backendUrl, sellerToken) {
   const authHeaders = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
 
@@ -217,7 +274,17 @@ async function loadImportLookups(backendUrl, sellerToken) {
     if (k) shipByLowerName.set(k, g);
   }
 
-  return { slugToId, brandByLowerName, shipByLowerName };
+  let metafieldDefs = {};
+  try {
+    if (sellerToken) {
+      const data = await fetchJson(`${backendUrl}/admin-hub/metafield-definitions`, { headers: authHeaders });
+      metafieldDefs = data?.definitions && typeof data.definitions === "object" ? data.definitions : {};
+    }
+  } catch {
+    metafieldDefs = {};
+  }
+
+  return { slugToId, brandByLowerName, shipByLowerName, metafieldLookup: buildMetafieldLookup(metafieldDefs) };
 }
 
 /** Dense row values aligned to header columns */
@@ -302,15 +369,17 @@ function countParentOptionNames(parentRow, get, maxScan = 40) {
   return n;
 }
 
-function buildVariationGroups(parentRow, childRows, get, optCount) {
+function buildVariationGroups(parentRow, childRows, get, optCount, lookup) {
   const groups = [];
   for (let n = 1; n <= optCount; n++) {
     const name = str(get(parentRow, `option${n}_name`));
     if (!name) continue;
+    const resolvedKey = resolveImportedMetaKey(name, lookup);
     const valMap = {};
     for (const cRow of childRows || []) {
       const cv = (k) => get(cRow, k);
-      const val = str(cv(`option${n}_value`));
+      const rawVal = str(cv(`option${n}_value`));
+      const val = resolveImportedMetaValue(resolvedKey, rawVal, lookup);
       if (!val) continue;
       if (!valMap[val]) valMap[val] = {};
       if (n === 1) {
@@ -321,6 +390,7 @@ function buildVariationGroups(parentRow, childRows, get, optCount) {
     if (Object.keys(valMap).length) {
       groups.push({
         name,
+        ...(lookup?.keyByAlias?.has(String(name).toLowerCase()) ? { metafield_key: resolvedKey } : {}),
         options: Object.entries(valMap).map(([value, meta]) => ({
           value,
           ...(meta.swatch_image ? { swatch_image: meta.swatch_image } : {}),
@@ -867,7 +937,7 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
 
 function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, msg) {
   const G = (key) => get(parentRow, key);
-  const { slugToId, brandByLowerName, shipByLowerName } = lookups;
+  const { slugToId, brandByLowerName, shipByLowerName, metafieldLookup } = lookups;
 
   const translations = {};
   const sharedTitle = G("title");
@@ -905,14 +975,16 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
   const media = [1, 2, 3, 4, 5].map((n) => G(`image_url_${n}`)).filter(Boolean);
 
   const optCount = countParentOptionNames(parentRow, get);
-  const variationGroups = buildVariationGroups(parentRow, childRows, get, optCount);
+  const variationGroups = buildVariationGroups(parentRow, childRows, get, optCount, metafieldLookup);
 
   const variants = [];
   for (const cRow of childRows || []) {
     const cGet = (key) => get(cRow, key);
     const option_values = [];
     for (let n = 1; n <= optCount; n++) {
-      const v = str(cGet(`option${n}_value`));
+      const optName = str(get(parentRow, `option${n}_name`));
+      const key = resolveImportedMetaKey(optName, metafieldLookup);
+      const v = resolveImportedMetaValue(key, str(cGet(`option${n}_value`)), metafieldLookup);
       if (v) option_values.push(v);
     }
     const variantTranslations = {};
@@ -937,7 +1009,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
       if (seoDescription) variantTranslations[lang].seo_description = seoDescription;
       if (seoKeywords) variantTranslations[lang].seo_keywords = seoKeywords;
     }
-    const variantMetafields = collectRowMetafields(cRow, headers, idx);
+    const variantMetafields = resolveMetafieldPairs(collectRowMetafields(cRow, headers, idx), metafieldLookup);
     const variantMeta = {};
     if (Object.keys(variantTranslations).length) variantMeta.translations = variantTranslations;
     if (variantMetafields?.length) variantMeta.metafields = variantMetafields;
@@ -1009,7 +1081,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
     });
   }
 
-  const metafields = collectRowMetafields(parentRow, headers, idx);
+  const metafields = resolveMetafieldPairs(collectRowMetafields(parentRow, headers, idx), metafieldLookup);
 
   const meta = {
     translations: Object.keys(translations).length ? translations : undefined,

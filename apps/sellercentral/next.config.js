@@ -97,6 +97,9 @@ const nextConfig = {
   async redirects() {
     return [
       { source: "/:locale/apps/smtp", destination: "/:locale/settings/integrations", permanent: true },
+      { source: "/:locale/apps/installed", destination: "/:locale/settings/integrations?tab=installed", permanent: false },
+      { source: "/:locale/apps/:handle", destination: "/:locale/settings/integrations?tab=store&app=:handle", permanent: false },
+      { source: "/:locale/apps", destination: "/:locale/settings/integrations?tab=store", permanent: false },
     ];
   },
 };

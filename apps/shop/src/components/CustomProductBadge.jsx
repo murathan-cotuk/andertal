@@ -54,16 +54,21 @@ function cornerBoxStyle(b, stackIndex = 0) {
     boxSizing: "border-box",
   };
   const ox = badgeOffsetPct(b.offset_x);
-  const size = badgeSizePct(b.image_width, 22);
+  const wRaw = Number(b.image_width);
+  const hRaw = Number(b.image_height);
+  const hasW = Number.isFinite(wRaw) && wRaw > 0;
+  const hasH = Number.isFinite(hRaw) && hRaw > 0;
+  const size = hasW ? badgeSizePct(wRaw, 22) : 22;
   const stack = stackIndex > 0 ? stackIndex * (size + 2) : 0;
   const oy = badgeOffsetPct(b.offset_y) + stack;
 
+  // Image: width always (default 22%). Text: width/height only when merchant set them.
   if (b.badge_type === "image") {
     style.width = `${size}%`;
-    const hRaw = Number(b.image_height);
-    if (Number.isFinite(hRaw) && hRaw > 0) {
-      style.height = `${badgeSizePct(hRaw, size)}%`;
-    }
+    if (hasH) style.height = `${badgeSizePct(hRaw, size)}%`;
+  } else {
+    if (hasW) style.width = `${size}%`;
+    if (hasH) style.height = `${badgeSizePct(hRaw, hasW ? size : 22)}%`;
   }
 
   if (b.position === "top-left") {
@@ -86,12 +91,19 @@ function textStyle(b) {
   const fs = badgeFontPct(b.font_size, 4.5);
   const br = Number(b.border_radius);
   const bw = Number(b.border_width);
+  const hasW = Number.isFinite(Number(b.image_width)) && Number(b.image_width) > 0;
+  const hasH = Number.isFinite(Number(b.image_height)) && Number(b.image_height) > 0;
   // Padding scales with font size so “Schriftgröße” also changes visual bulk
   // (Sellercentral has no separate padding field for text badges).
   const padY = Math.max(0.12, Math.min(0.55, fs * 0.055));
   const padX = Math.max(0.28, Math.min(0.9, fs * 0.1));
   return {
-    display: "inline-block",
+    display: hasW || hasH ? "flex" : "inline-block",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
+    width: hasW ? "100%" : undefined,
+    height: hasH ? "100%" : undefined,
     background: b.bg_color || "#e53935",
     color: b.text_color || "#ffffff",
     fontSize: `${fs}cqw`,
@@ -102,7 +114,9 @@ function textStyle(b) {
     padding: `${padY}em ${padX}em`,
     fontWeight: 700,
     lineHeight: 1.2,
-    whiteSpace: "nowrap",
+    whiteSpace: hasW ? "normal" : "nowrap",
+    textAlign: "center",
+    overflow: "hidden",
     boxShadow: "0 1px 4px rgba(0, 0, 0, 0.16)",
   };
 }
@@ -132,7 +146,9 @@ export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
             inset: "auto",
             padding: 0,
             margin: 0,
-            boxShadow: "0 1px 4px rgba(0, 0, 0, 0.16)",
+            border: "none",
+            boxShadow: "none",
+            background: "transparent",
           }}
           draggable={false}
         />

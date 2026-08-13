@@ -1,4 +1,5 @@
-﻿import { formatApiError, getClientLocale } from './api-error-messages';
+﻿import './tab-scoped-auth-storage';
+import { formatApiError, getClientLocale } from './api-error-messages';
 import { reportSellerClientError } from './report-seller-client-error';
 
 /**

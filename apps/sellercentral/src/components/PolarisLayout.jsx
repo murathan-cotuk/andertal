@@ -35,7 +35,6 @@ import {
   ImportIcon,
   StoreIcon,
   EditIcon,
-  AppsIcon,
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
@@ -170,6 +169,7 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/content/pages",
   "/content/blog-posts",
   "/content/flows",
+  "/content/metaobjects",
   "/analytics/live-view",
 ];
 
@@ -276,9 +276,10 @@ function getMenuItemsMain(t, isSuperuser = false) {
       url: "/customers-menu",
       label: tx("customers", "Customers"),
       icon: ProfileIcon,
+      superuserOnly: true,
       subNavigationItems: [
-        { url: "/customers", label: tx("list", "List") },
-        { url: "/customers/reviews", label: tx("reviews", "Reviews") },
+        { url: "/customers", label: tx("list", "List"), superuserOnly: true },
+        { url: "/customers/reviews", label: tx("reviews", "Reviews"), superuserOnly: true },
         { url: "/customers/newsletter", label: tx("newsletter", "Newsletter"), superuserOnly: true },
       ],
     },
@@ -327,7 +328,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/content/menus", label: tx("menus", "Menus"), superuserOnly: true },
         { url: "/content/categories", label: tx("categories", "Categories"), superuserOnly: true },
         { url: "/content/brands", label: tx("brands", "Brands") },
-        { url: "/content/metaobjects", label: tx("metaobjects", "Metaobjects") },
+        { url: "/content/metaobjects", label: tx("metaobjects", "Metaobjects"), superuserOnly: true },
         { url: "/content/landing-page", label: tx("landingPage", "Landing Page"), superuserOnly: true },
         { url: "/content/styles", label: tx("styles", "Styles"), superuserOnly: true },
         { url: "/content/pages", label: tx("pages", "Pages"), superuserOnly: true },
@@ -347,15 +348,6 @@ function getMenuItemsMain(t, isSuperuser = false) {
       ],
     },
     { url: "/import-export", label: tx("importExport", "Import/Export"), icon: ImportIcon },
-    {
-      url: "/apps",
-      label: tx("apps", "Apps"),
-      icon: AppsIcon,
-      subNavigationItems: [
-        { url: "/apps", label: tx("appStore", "App Store") },
-        { url: "/apps/installed", label: tx("installed", "Installed") },
-      ],
-    },
   );
   return items;
 }
@@ -370,7 +362,7 @@ function getMenuItemsSettings(t, isSuperuser = false) {
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)
 const PARENT_NAV_URLS = new Set([
-  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu", "/discounts", "/apps",
+  "/products", "/marketing", "/content", "/analytics", "/customers-menu", "/sellers-menu", "/discounts",
 ]);
 const NAV_VIRTUAL_URL_FALLBACK = {
   "/customers-menu": "/customers",
@@ -688,13 +680,24 @@ export default function PolarisLayout({ children }) {
     "/content/pages",
     "/content/blog-posts",
     "/content/flows",
+    "/content/metaobjects",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
+    "/customers-menu",
+    "/customers",
+    "/customers/reviews",
     "/customers/newsletter",
     "/marketing/automations",
     "/marketing/seo",
     "/settings/checkout",
   ]);
+  const isSellerBlockedPath = (path) => {
+    if (!path) return false;
+    if (SELLER_BLOCKED_ROUTES.has(path)) return true;
+    // Customer detail / nested customer routes
+    if (path === "/customers" || path.startsWith("/customers/")) return true;
+    return false;
+  };
 
   useEffect(() => {
     if (pathname === "/login" || pathname === "/register") return;
@@ -725,12 +728,12 @@ export default function PolarisLayout({ children }) {
         setIsSuperuser(accountSuper);
         const accountSellerId = String(d?.user?.seller_id || d?.user?.effective_seller_id || "").trim();
         if (accountSellerId) localStorage.setItem("sellerId", accountSellerId);
-        if (!accountSuper && SELLER_BLOCKED_ROUTES.has(pathname)) {
+        if (!accountSuper && isSellerBlockedPath(pathname)) {
           router.replace("/dashboard");
         }
       }).catch(() => {});
       // Redirect non-superusers away from blocked routes (cached role; account fetch re-checks)
-      if (!superuser && SELLER_BLOCKED_ROUTES.has(pathname)) {
+      if (!superuser && isSellerBlockedPath(pathname)) {
         router.replace("/dashboard");
         return;
       }
@@ -824,7 +827,8 @@ export default function PolarisLayout({ children }) {
       (notifData.seller_listings_pending || 0) +
       (notifData.brand_authorizations_pending || 0) +
       (notifData.flow_failures || 0) +
-      (notifData.support_cases || 0)
+      (notifData.support_cases || 0) +
+      (notifData.eu_origin_pending || 0)
     : 0;
 
   const topBarIconStyle = {
@@ -960,7 +964,9 @@ export default function PolarisLayout({ children }) {
                     !notifData?.recent_product_change_requests?.length &&
                     !notifData?.recent_campaigns_submitted?.length &&
                     !notifData?.recent_seller_errors?.length &&
-                    !notifData?.recent_support_cases?.length) ? (
+                    !notifData?.recent_support_cases?.length &&
+                    !notifData?.recent_seller_listings_pending?.length &&
+                    !notifData?.recent_eu_origin_pending?.length) ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>{notifCopy.empty}</div>
                   ) : (
                     <>
@@ -1033,11 +1039,30 @@ export default function PolarisLayout({ children }) {
                         </div>
                       )}
                       {(notifData?.recent_verifications || []).map((v) => (
-                        <Link key={v.id} href={v.seller_id ? `/sellers/${v.seller_id}` : "/sellers"} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
-                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📋</span>
+                        <Link key={v.id} href={v.reference_id || v.seller_id ? `/sellers/${v.reference_id || v.seller_id}` : "/sellers"} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>{v.type === "seller_registered" ? "🆕" : "📋"}</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{v.title || notifCopy.docSubmitted}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>{v.body || notifCopy.docSubmittedBody}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{v.title || (v.type === "seller_registered" ? notifCopy.sellerRegistered : notifCopy.docSubmitted)}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{v.body || (v.type === "seller_registered" ? "" : notifCopy.docSubmittedBody)}</div>
+                          </div>
+                        </Link>
+                      ))}
+                      {(notifData?.recent_eu_origin_pending || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {notifCopy.euOrigin}
+                        </div>
+                      )}
+                      {(notifData?.recent_eu_origin_pending || []).map((e) => (
+                        <Link
+                          key={e.id}
+                          href={e.product_id ? `/products/${e.product_id}` : "/products/inventory"}
+                          onClick={() => setNotifOpen(false)}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                        >
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>🇪🇺</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{notifCopy.euOriginPending}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>{e.product_title || e.registry_id || e.country || ""}</div>
                           </div>
                         </Link>
                       ))}
@@ -1046,10 +1071,15 @@ export default function PolarisLayout({ children }) {
                           {notifCopy.productChanges}
                         </div>
                       )}
-                      {(notifData?.recent_product_change_requests || []).map((cr) => (
+                      {(notifData?.recent_product_change_requests || []).map((cr) => {
+                        const isSellerInfo = !cr.product_id && (cr.title || cr.reference_id);
+                        const href = cr.product_id
+                          ? `/products/${cr.product_id}`
+                          : (cr.reference_id || cr.seller_id ? `/sellers/${cr.reference_id || cr.seller_id}` : "/products/inventory");
+                        return (
                         <Link
                           key={cr.id}
-                          href={cr.product_id ? `/products/${cr.product_id}` : "/products/inventory"}
+                          href={href}
                           onClick={() => setNotifOpen(false)}
                           style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
                         >
@@ -1072,14 +1102,17 @@ export default function PolarisLayout({ children }) {
                           </span>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--p-color-text)" }}>
-                              {notifCopy.productChangePending}
+                              {isSellerInfo ? (cr.title || notifCopy.productChangePending) : notifCopy.productChangePending}
                             </div>
                             <div style={{ fontSize: 12, color: "var(--p-color-text-secondary)", lineHeight: 1.35, marginTop: 2 }}>
-                              {cr.product_title || notifCopy.productFallback} · {fieldNameDisplayLabel(cr.field_name, locale)}
+                              {isSellerInfo
+                                ? (cr.body || "")
+                                : `${cr.product_title || notifCopy.productFallback} · ${fieldNameDisplayLabel(cr.field_name, locale)}`}
                             </div>
                           </div>
                         </Link>
-                      ))}
+                        );
+                      })}
                       {(notifData?.recent_orders || []).length > 0 && (
                         <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.orders}
@@ -1184,8 +1217,12 @@ export default function PolarisLayout({ children }) {
     "/content/pages",
     "/content/blog-posts",
     "/content/flows",
+    "/content/metaobjects",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
+    "/customers-menu",
+    "/customers",
+    "/customers/reviews",
     "/customers/newsletter",
     "/marketing/automations",
     "/marketing/seo",

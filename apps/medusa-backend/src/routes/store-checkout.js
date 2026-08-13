@@ -794,15 +794,17 @@ const storeCartLineItemsPOST = async (req, res) => {
     const mappedForThumb = mapAdminHubToStoreProduct(product)
     const mappedVariant = variantIndex != null && Number.isFinite(variantIndex) ? mappedForThumb.variants?.[variantIndex] : null
     const thumb = mappedVariant?.images?.[0] || mappedVariant?.image_url || mappedForThumb.thumbnail || null
-    // If a specific seller is chosen, override price from their listing
-    if (chosenSellerId) {
+    // If a specific seller is chosen (Andere Verkäufer / buybox), their listing price wins.
+    const productSellerId = product.seller_id ? String(product.seller_id).trim() : ''
+    const lineSellerId = chosenSellerId || (productSellerId && productSellerId !== 'default' ? productSellerId : null) || null
+    if (lineSellerId) {
       const listingRow = await client.query(
         `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status = 'active' LIMIT 1`,
-        [String(product.id || productId), chosenSellerId]
+        [String(product.id || productId), lineSellerId]
       )
       if (listingRow.rows[0]) unitPriceCents = Number(listingRow.rows[0].price_cents)
     }
-    const sellerForCamp = chosenSellerId || (product.seller_id ? String(product.seller_id).trim() : '')
+    const sellerForCamp = lineSellerId || ''
     if (sellerForCamp) {
       try {
         const campRow = await findBestSellerCampaignDiscountRow(client, {
@@ -817,14 +819,29 @@ const storeCartLineItemsPOST = async (req, res) => {
     const handle = product.handle || product.id
     const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
     if (!cartExists.rows || !cartExists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
-    const existing = await client.query('SELECT id, quantity FROM store_cart_items WHERE cart_id = $1 AND variant_id = $2 AND removed_at IS NULL', [cartId, variantId])
+    const existing = lineSellerId
+      ? await client.query(
+          `SELECT id, quantity FROM store_cart_items
+           WHERE cart_id = $1 AND variant_id = $2 AND removed_at IS NULL
+             AND COALESCE(NULLIF(TRIM(seller_id), ''), '') = $3`,
+          [cartId, variantId, lineSellerId]
+        )
+      : await client.query(
+          `SELECT id, quantity FROM store_cart_items
+           WHERE cart_id = $1 AND variant_id = $2 AND removed_at IS NULL
+             AND (seller_id IS NULL OR TRIM(seller_id) = '' OR seller_id = 'default')`,
+          [cartId, variantId]
+        )
     if (existing.rows && existing.rows[0]) {
       const newQty = (existing.rows[0].quantity || 0) + quantity
-      await client.query('UPDATE store_cart_items SET quantity = $1, seller_id = COALESCE($2, seller_id), updated_at = now() WHERE id = $3', [newQty, chosenSellerId, existing.rows[0].id])
+      await client.query(
+        'UPDATE store_cart_items SET quantity = $1, seller_id = COALESCE($2, seller_id), unit_price_cents = $3, updated_at = now() WHERE id = $4',
+        [newQty, lineSellerId, unitPriceCents, existing.rows[0].id]
+      )
     } else {
       await client.query(
         'INSERT INTO store_cart_items (cart_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-        [cartId, variantId, String(product.id || productId), quantity, unitPriceCents, title, thumb, handle, chosenSellerId]
+        [cartId, variantId, String(product.id || productId), quantity, unitPriceCents, title, thumb, handle, lineSellerId]
       )
     }
     await clearCartBonusReserve(client, cartId)

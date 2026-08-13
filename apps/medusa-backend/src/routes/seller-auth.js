@@ -217,16 +217,24 @@ function requireSuperuser(req, res, next) {
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-async function notifySuperusersNewSeller({ email, store_name, seller_id, first_name, last_name }) {
+async function notifySuperusersNewSeller({ email, store_name, seller_id, first_name, last_name, seller_user_id }) {
   // Recipients: explicit SUPERUSER_EMAILS env var, else the same default superuser
   // list used to decide is_superuser at registration time (INITIAL_SUPERUSER_EMAILS).
   // Previously this fell back to an empty list and silently no-op'd when
   // SUPERUSER_EMAILS wasn't set, even though a superuser account clearly existed.
   const superuserEmails = (process.env.SUPERUSER_EMAILS || '').split(',').map((e) => e.trim()).filter(Boolean)
   const recipients = superuserEmails.length ? superuserEmails : INITIAL_SUPERUSER_EMAILS
-  if (!recipients.length) return
   const sellerCentralUrl = process.env.SELLER_CENTRAL_URL || 'https://andertal-sellercentral.vercel.app'
   const displayName = [first_name, last_name].filter(Boolean).join(' ') || email
+  const { insertAdminHubNotificationSafe } = require('../admin-hub-notify')
+  await insertAdminHubNotificationSafe({
+    type: 'seller_registered',
+    title: `Neuer Seller registriert: ${store_name || email}`,
+    body: `${displayName} (${email}) hat sich registriert. Bitte prüfen und freischalten.`,
+    sellerId: seller_id || null,
+    referenceId: seller_user_id || null,
+  })
+  if (!recipients.length) return
   const subject = `Neuer Seller registriert: ${store_name || email}`
   const html = `
 <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1f2937">
@@ -359,7 +367,7 @@ const sellerAuthRegisterPOST = async (req, res) => {
     const token = signSellerToken({ id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName, sid: sessionId || undefined })
     res.json({ token, user: { id: user.id, email: user.email, seller_id: effectiveSellerId, is_superuser: user.is_superuser, store_name: displayStoreName } })
     if (!is_superuser && !sub_of_seller_id) {
-      notifySuperusersNewSeller({ email: user.email, store_name: displayStoreName, seller_id: effectiveSellerId, first_name: user.first_name, last_name: user.last_name }).catch((e) => console.error('notifySuperusersNewSeller:', e.message))
+      notifySuperusersNewSeller({ email: user.email, store_name: displayStoreName, seller_id: effectiveSellerId, first_name: user.first_name, last_name: user.last_name, seller_user_id: user.id }).catch((e) => console.error('notifySuperusersNewSeller:', e.message))
       setImmediate(() => {
         try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: 'seller_signup', sellerUserId: user.id }).catch(() => {}) } catch (_) {}
       })

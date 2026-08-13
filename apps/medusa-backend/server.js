@@ -1789,6 +1789,15 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS i18n jsonb;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS image_width int;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_product_badges ADD COLUMN IF NOT EXISTS image_height int;`).catch(() => {})
+        // Text badges never used image_width in the UI (unused default 22) — clear so
+        // optional width/height controls mean "auto" until the merchant sets them.
+        await client.query(`
+          UPDATE admin_hub_product_badges
+             SET image_width = NULL
+           WHERE COALESCE(badge_type, 'text') = 'text'
+             AND image_height IS NULL
+             AND image_width = 22
+        `).catch(() => {})
         try {
           const { seedDefaultProductBadges } = require('./src/product-badges-seed')
           const seedRes = await seedDefaultProductBadges(client)
@@ -2064,8 +2073,6 @@ async function start() {
       /^\/auth\/register(\/|\?|$)/,
       // Billbee integration callbacks use Basic Auth, not seller JWT.
       /^\/v1\/integrations\/billbee\/webhook(\/|\?|$)/,
-      // App Store catalog is public (read-only listing)
-      /^\/v1\/app-store\/apps(\/[^/]+)?(\/|\?|$)/,
     ]
     httpApp.use('/admin-hub', (req, res, next) => {
       if (req.method === 'OPTIONS') return next() // CORS preflight

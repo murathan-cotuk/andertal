@@ -49,7 +49,7 @@ function _restoreSuperuserFrom(ctx) {
 
 function _readBackup() {
   try {
-    const raw = localStorage.getItem(SU_BACKUP_KEY);
+    const raw = sessionStorage.getItem(SU_BACKUP_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.sellerToken) return parsed;
@@ -62,7 +62,7 @@ function _readBackup() {
 function _writeBackup(snap) {
   if (!snap?.sellerToken) return;
   try {
-    localStorage.setItem(SU_BACKUP_KEY, JSON.stringify(snap));
+    sessionStorage.setItem(SU_BACKUP_KEY, JSON.stringify(snap));
   } catch {
     /* ignore */
   }
@@ -79,7 +79,7 @@ function _clearSession() {
 export function clearSellerImpersonationStorage() {
   _clearSession();
   try {
-    localStorage.removeItem(SU_BACKUP_KEY);
+    sessionStorage.removeItem(SU_BACKUP_KEY);
   } catch {
     /* ignore */
   }

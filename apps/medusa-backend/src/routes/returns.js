@@ -1,6 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { appendBonusLedger } = require('./store-checkout')
+const { sqlOrderOwnedBySeller } = require('../seller-scope')
 
 const adminHubAbandonedCartsGET = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -115,23 +116,7 @@ const adminHubReturnsGET = async (req, res) => {
       const n = params.length
       where = `WHERE (
         NULLIF(TRIM(COALESCE(r.seller_id, '')), '') = $${n}
-        OR EXISTS (
-          SELECT 1 FROM store_order_items oi WHERE oi.order_id = o.id AND (
-            NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $${n}
-            OR (
-              NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
-              AND (
-                EXISTS (
-                  SELECT 1 FROM admin_hub_seller_listings sl
-                  WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = $${n}
-                    AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text = oi.product_id::text) = 1
-                )
-                OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text = oi.product_id::text AND ap.seller_id = $${n})
-              )
-            )
-          )
-        )
-        OR (o.seller_id = $${n} AND o.seller_id IS DISTINCT FROM 'default')
+        OR ${sqlOrderOwnedBySeller('o', `$${n}`)}
       )`
     }
     const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method, o.seller_id FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id ${where} ORDER BY r.created_at DESC LIMIT 100`, params)
@@ -196,11 +181,7 @@ const adminHubReturnPATCH = async (req, res) => {
          LEFT JOIN store_orders o ON o.id = r.order_id
          WHERE r.id = $1::uuid AND (
            NULLIF(TRIM(COALESCE(r.seller_id, '')), '') = $2
-           OR (o.seller_id = $2 AND o.seller_id IS DISTINCT FROM 'default')
-           OR EXISTS (
-             SELECT 1 FROM store_order_items oi
-             WHERE oi.order_id = r.order_id AND NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = $2
-           )
+           OR ${sqlOrderOwnedBySeller('o', '$2')}
          )`,
         [id, jwtSellerId],
       )

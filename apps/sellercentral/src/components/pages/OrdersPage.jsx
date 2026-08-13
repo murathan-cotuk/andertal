@@ -503,7 +503,7 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
 
   const handleClick = async (e) => {
     e.stopPropagation();
-    if (navigating) return;
+    if (!isSuperuser || navigating) return;
     if (order.customer_id) {
       router.push(`/${locale}/customers/${order.customer_id}`);
       return;
@@ -525,12 +525,16 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
-        <button
-          onClick={handleClick}
-          style={{ background: "none", border: "none", padding: 0, cursor: navigating ? "wait" : "pointer", textAlign: "left", fontWeight: 600, fontSize: 13, color: navigating ? "#9ca3af" : "#111827", textDecoration: "underline" }}
-        >
-          {label}
-        </button>
+        {isSuperuser ? (
+          <button
+            onClick={handleClick}
+            style={{ background: "none", border: "none", padding: 0, cursor: navigating ? "wait" : "pointer", textAlign: "left", fontWeight: 600, fontSize: 13, color: navigating ? "#9ca3af" : "#111827", textDecoration: "underline" }}
+          >
+            {label}
+          </button>
+        ) : (
+          <span style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{label}</span>
+        )}
         {isSuperuser && order.is_guest && (
           <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600, flexShrink: 0 }}>
             {_ui.guestBadge}
@@ -542,7 +546,7 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
   );
 }
 
-function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser }) {
+function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser, showShipInMenu = true }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const params = useParams();
@@ -557,13 +561,17 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser }) {
         router.push(`/${locale}/orders/${order.id}`);
       },
     },
-    {
-      content: ui.ship,
-      onAction: () => {
-        setOpen(false);
-        onVersenden?.();
-      },
-    },
+    ...(showShipInMenu
+      ? [
+          {
+            content: ui.ship,
+            onAction: () => {
+              setOpen(false);
+              onVersenden?.();
+            },
+          },
+        ]
+      : []),
     {
       content: ui.cancelOrder,
       destructive: true,
@@ -588,7 +596,7 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser }) {
 
   return (
     <div
-      style={{ display: "inline-block" }}
+      style={{ display: "inline-flex", flexShrink: 0 }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -972,7 +980,7 @@ const COL_DEFS_BASE = [
   { key: "date",            labelKey: "colDate",         hideable: true,  sortKey: "created_at",   defaultWidth: 145, align: "left"   },
   { key: "country",         labelKey: "colCountry",      hideable: true,  sortKey: "country",      defaultWidth: 70,  align: "center" },
   { key: "review",          labelKey: "colReview",       hideable: true,  sortKey: null,           defaultWidth: 70,  align: "center" },
-  { key: "actions",         labelKey: "",                hideable: false, sortKey: null,           defaultWidth: 70,  align: "right"  },
+  { key: "actions",         labelKey: "",                hideable: false, sortKey: null,           defaultWidth: 148, align: "right"  },
 ];
 // Kept for backward compat in column-width tracking
 const COL_DEFS = COL_DEFS_BASE;
@@ -1015,7 +1023,17 @@ export default function OrdersPage() {
   useEffect(() => {
     try {
       const savedWidths = JSON.parse(localStorage.getItem("sellercentral_orders_colWidths") || "null");
-      if (Array.isArray(savedWidths) && savedWidths.length === COL_DEFS.length) setColWidths(savedWidths);
+      if (Array.isArray(savedWidths) && savedWidths.length === COL_DEFS.length) {
+        const next = savedWidths.map((w, i) => {
+          const def = COL_DEFS[i];
+          const n = Number(w);
+          if (!Number.isFinite(n) || n <= 0) return def.defaultWidth;
+          // Actions column used to be ~70px and clipped the ship button — bump stale prefs.
+          if (def.key === "actions" && n < def.defaultWidth) return def.defaultWidth;
+          return n;
+        });
+        setColWidths(next);
+      }
       const savedHidden = JSON.parse(localStorage.getItem("sellercentral_orders_hiddenCols") || "null");
       if (Array.isArray(savedHidden)) setHiddenCols(new Set(savedHidden));
     } catch (_) { /* ignore malformed prefs */ }
@@ -1349,19 +1367,31 @@ export default function OrdersPage() {
               })()}
             </td>
           )}
-          <td style={{ padding: "7px 8px", textAlign: "right", borderRight: "1px solid #e5e7eb" }}>
-            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
-              {order.delivery_status !== "zugestellt" && order.delivery_status !== "versendet" && (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); startPacking([order]); }}
-                  style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #2563eb", background: "#eff6ff", color: "#1d4ed8", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}
-                >
-                  {ui.ship}
-                </button>
-              )}
-              <ActionMenu order={order} onUpdate={handleUpdate} onDelete={handleDelete} onVersenden={() => startPacking([order])} isSuperuser={isSuperuser} />
-            </div>
+          <td style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", overflow: "visible" }}>
+            {(() => {
+              const canShip = order.delivery_status !== "zugestellt" && order.delivery_status !== "versendet";
+              return (
+                <div style={{ display: "inline-flex", gap: 4, justifyContent: "flex-end", alignItems: "center", flexWrap: "nowrap" }}>
+                  {canShip && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); startPacking([order]); }}
+                      style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #2563eb", background: "#eff6ff", color: "#1d4ed8", fontSize: 11, fontWeight: 650, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1.25, flexShrink: 0 }}
+                    >
+                      {ui.ship}
+                    </button>
+                  )}
+                  <ActionMenu
+                    order={order}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    onVersenden={() => startPacking([order])}
+                    isSuperuser={isSuperuser}
+                    showShipInMenu={!canShip}
+                  />
+                </div>
+              );
+            })()}
           </td>
         </tr>
         {expanded[order.id] && <ExpandedRow order={order} locale={locale} onSaveFields={handleUpdate} colCount={visibleColCount} ui={ui} />}

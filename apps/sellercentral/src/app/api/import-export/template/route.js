@@ -42,16 +42,70 @@ function colLetter(n) {
 function flattenCategoryTree(nodes, parentPath = "") {
   const out = [];
   for (const node of nodes || []) {
-    const slug = (node.slug || "").trim();
-    const name = (node.name || slug || "").trim();
+    const slug = String(node.slug || node.handle || "").trim();
+    const name = String(node.name || node.title || slug || "").trim();
     const path = parentPath ? `${parentPath} › ${name}` : name;
-    if (slug) out.push({ id: node.id, slug, name, path });
+    if (slug || node.id) {
+      out.push({
+        id: node.id,
+        slug: slug || String(node.id || ""),
+        handle: String(node.handle || "").trim(),
+        name,
+        path,
+      });
+    }
     const children = node.children || node.category_children;
     if (Array.isArray(children) && children.length) {
       out.push(...flattenCategoryTree(children, path));
     }
   }
   return out;
+}
+
+function flattenCategoryList(list) {
+  if (!Array.isArray(list) || list.length === 0) return [];
+  if (list.some((c) => Array.isArray(c?.children) && c.children.length)) {
+    return flattenCategoryTree(list);
+  }
+  const byId = new Map();
+  for (const c of list) {
+    if (c?.id) byId.set(String(c.id), { ...c, children: [] });
+  }
+  if (byId.size === 0) return flattenCategoryTree(list);
+  const roots = [];
+  byId.forEach((node) => {
+    const pid = node.parent_id != null ? String(node.parent_id) : "";
+    if (pid && byId.has(pid)) byId.get(pid).children.push(node);
+    else roots.push(node);
+  });
+  return flattenCategoryTree(roots);
+}
+
+function categoryMatchKeys(c) {
+  return [c.slug, c.handle, c.id]
+    .map((v) => String(v || "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+async function loadCategoriesFlat(backendUrl, authHeaders, locale) {
+  const loc = locale ? `&locale=${encodeURIComponent(locale)}` : "";
+  const urls = [
+    `${backendUrl}/admin-hub/v1/categories?tree=true&active=true${loc}`,
+    `${backendUrl}/admin-hub/categories?tree=true&active=true${loc}`,
+    `${backendUrl}/admin-hub/v1/categories?all=true&active=true${loc}`,
+    `${backendUrl}/admin-hub/categories?all=true&active=true${loc}`,
+  ];
+  for (const u of urls) {
+    try {
+      const data = await fetchJson(u, { headers: authHeaders });
+      const raw = data.tree || data.categories || [];
+      const flat = flattenCategoryList(Array.isArray(raw) ? raw : []);
+      if (flat.length) return flat;
+    } catch {
+      /* try next */
+    }
+  }
+  return [];
 }
 
 async function fetchJson(url, init = {}) {
@@ -63,17 +117,14 @@ async function fetchJson(url, init = {}) {
   return res.json();
 }
 
-async function loadReferenceData(backendUrl, sellerToken) {
+async function loadReferenceData(backendUrl, sellerToken, locale) {
   const authHeaders = sellerToken
     ? { Authorization: `Bearer ${sellerToken}` }
     : {};
 
   let catsFlat = [];
   try {
-    const u = `${backendUrl}/admin-hub/v1/categories?tree=true&active=true`;
-    const data = await fetchJson(u);
-    const tree = data.tree || data.categories || [];
-    catsFlat = flattenCategoryTree(Array.isArray(tree) ? tree : []);
+    catsFlat = await loadCategoriesFlat(backendUrl, authHeaders, locale);
   } catch {
     catsFlat = [];
   }
@@ -98,7 +149,17 @@ async function loadReferenceData(backendUrl, sellerToken) {
     shippingGroups = [];
   }
 
-  return { catsFlat, brands, shippingGroups };
+  let metafieldDefs = {};
+  try {
+    if (sellerToken) {
+      const data = await fetchJson(`${backendUrl}/admin-hub/metafield-definitions`, { headers: authHeaders });
+      metafieldDefs = data?.definitions && typeof data.definitions === "object" ? data.definitions : {};
+    }
+  } catch {
+    metafieldDefs = {};
+  }
+
+  return { catsFlat, brands, shippingGroups, metafieldDefs };
 }
 
 /** Column definitions — no collection_handles, no handle_*; shipping + extra options + metafields */
@@ -168,7 +229,7 @@ function buildColumns(locale) {
       {
         key: `metafield_${i}_key`,
         label: `metafield_${i}_key`,
-        note: x(`Metafield ${i} key — parent row → product; child row → that variant`, `Metafield ${i} anahtar — parent satır → ürün; child satır → varyant`, `Metafield ${i} clé — parent → produit; enfant → variante`, `Metafield ${i} clave — parent → producto; child → variante`, `Metafield ${i} chiave — parent → prodotto; child → variante`, `Metafield ${i} Schlüssel — Parent-Zeile → Produkt; Child-Zeile → Variante`),
+        note: x(`Eigenschaft ${i} title — pick from the dropdown or type a new title (needs superuser approval before the product appears in the shop)`, `Eigenschaft ${i} başlık — listeden seçin veya yeni yazın (shop’ta görünmesi için superuser onayı gerekir)`, `Eigenschaft ${i} titre — liste ou saisie libre (approbation superuser avant affichage boutique)`, `Eigenschaft ${i} título — elija o escriba uno nuevo (aprobación de superusuario para la tienda)`, `Eigenschaft ${i} titolo — scegli o scrivi (approvazione superuser per lo shop)`, `Eigenschaft ${i} Titel — aus der Liste wählen oder neuen Titel eingeben (Shop-Sichtbarkeit erst nach Superuser-Freigabe)`),
         width: 22,
         group: "metafields",
         outline: 1,
@@ -176,7 +237,7 @@ function buildColumns(locale) {
       {
         key: `metafield_${i}_value`,
         label: `metafield_${i}_value`,
-        note: x(`Metafield ${i} value — same row as SKU (parent or child)`, `Metafield ${i} değer — SKU ile aynı satır (parent veya child)`, `Metafield ${i} valeur — même ligne que SKU`, `Metafield ${i} valor — misma fila que SKU`, `Metafield ${i} valore — stessa riga dello SKU`, `Metafield ${i} Wert — gleiche Zeile wie SKU (Parent oder Child)`),
+        note: x(`Eigenschaft ${i} value — dropdown of catalog values; you may type a custom value (approval required)`, `Eigenschaft ${i} değer — katalog değerleri; özel değer yazılabilir (onay gerekir)`, `Eigenschaft ${i} valeur — valeurs catalogue ; saisie libre possible (approbation requise)`, `Eigenschaft ${i} valor — valores del catálogo; puede escribir uno propio (requiere aprobación)`, `Eigenschaft ${i} valore — valori catalogo; testo libero possibile (approvazione richiesta)`, `Eigenschaft ${i} Wert — Katalogwerte im Dropdown; eigener Wert möglich (Freigabe nötig)`),
         width: 34,
         group: "metafields",
         outline: 1,
@@ -245,7 +306,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "Zeilen 1–3: Gruppenkopf, Spaltenname, Kurzhinweis — nicht löschen.",
       parentChild: "Parent-Zeilen: gemeinsame Texte, Bilder, Preise, Kategorie, Marke, Versandgruppe, optionN_name (Optionstitel). Child-Zeilen: gleiche product_type-Spalte „child“, parent_sku, varianten-spezifisch optionN_value, SKU, EAN, Lager, optionale Bilder/Swatch. Titel/Beschreibung/Bullets werden zentral über title, description, bullet1..bullet5 gepflegt.",
       options: "Varianten: Mindestens zwei Optionen (option1/option2) sind im Beispiel; Sie können option3_name … option6_name (und passende *_value in Child-Zeilen) nutzen. Weitere Optionen können Sie analog ergänzen (option7_name …), sofern Sie die Spalten in Excel hinzufügen — der Import liest alle fortlaufenden optionN_*-Spalten.",
-      metafields: `Metafelder: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}, weitere N möglich). Parent-Zeile → Produkt-Metafelder; Child-Zeile → Metafelder der Variante in derselben Zeile. Keine separaten variant_metafield_*-Spalten nötig.`,
+      metafields: `Eigenschaften: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Titel und Werte kommen aus Metaobjects (Dropdown). Eigene Titel/Werte dürfen eingetippt werden — das Produkt bleibt im Shop unsichtbar, bis ein Superuser sie freigibt. Parent-Zeile → Produkt; Child-Zeile → Variante.`,
       noCollection: "Kollektionen werden bei diesem Import nicht per Excel gesetzt — bitte im Anschluss in der Oberfläche zuordnen, falls nötig.",
       prices: "Preise nur in EUR: price (Verkaufspreis brutto), price_uvp, price_sale — keine länderbezogenen Preisspalten. MwSt. und Versand je Markt separat. Komma als Dezimaltrenner (z. B. 29,99).",
       comments: "Leere Datenzeilen werden übersprungen. Zeilen mit SKU beginnend mit # sind Kommentare.",
@@ -265,7 +326,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "Rows 1–3: group header, column key, short hint — do not delete.",
       parentChild: 'Parent rows: shared copy, images, prices, category, brand, shipping group, optionN_names. Child rows: product_type = child, parent_sku, per-variant optionN_value, SKU, EAN, stock, optional images/swatch. Use title, description and bullet1..bullet5 as single shared content fields.',
       options: "Variants: the sample uses two options; you may use option3…option6 (add option7_name / option7_value columns in Excel if needed — import reads consecutive optionN_* columns).",
-      metafields: `Metafields: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}; more N allowed). Parent row → product; child row → that variant. No separate variant_metafield_* columns.`,
+      metafields: `Eigenschaften: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Titles and values come from Metaobjects (dropdowns). You may type a custom title/value — the product stays hidden in the shop until a superuser approves it. Parent row → product; child row → variant.`,
       noCollection: "Collections are not set via this Excel import — assign in the UI afterward if needed.",
       prices: "Prices in EUR only: price, price_uvp, price_sale — no per-country price columns. VAT and shipping vary by market. Use comma decimals (e.g. 29,99).",
       comments: "Empty rows are skipped. Rows with SKU starting with # are comments.",
@@ -285,7 +346,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "1–3. satırlar: grup başlığı, sütun adı, kısa not — silmeyin.",
       parentChild: "Parent satırlar: ortak metin, görseller, fiyat, kategori, marka, kargo grubu, optionN_name. Child: product_type = child, parent_sku, varyant için optionN_value, SKU, stok vb.",
       options: "Örnekte iki seçenek vardır; option3…option6 kullanılabilir; daha fazlası için Excel’de option7_name / option7_value sütunları eklenebilir.",
-      metafields: `Metafield: metafield_N_key / metafield_N_value. Parent satır → ürün; child satır → o varyant. Ayrı variant_metafield sütunları gerekmez.`,
+      metafields: `Eigenschaften: metafield_N_key / metafield_N_value. Başlık ve değerler Metaobjects’ten gelir (açılır liste). Listede yoksa yazabilirsiniz — superuser onaylayana kadar ürün shop’ta görünmez. Parent satır → ürün; child satır → varyant.`,
       noCollection: "Koleksiyonlar bu Excel ile atanmaz — gerekirse arayüzden ekleyin.",
       prices: "Fiyatlar yalnızca EUR: price, price_uvp, price_sale. Ülkeye göre fiyat sütunu yok. Virgül ondalık (örn. 29,99).",
       comments: "Boş satırlar atlanır. SKU # ile başlayan satırlar yorum sayılır.",
@@ -305,7 +366,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "Lignes 1–3 : en-tête de groupe, clé de colonne, courte aide — ne pas supprimer.",
       parentChild: 'Lignes parent : textes, images, prix, catégorie, marque, groupe d\'expédition, optionN_name partagés. Lignes enfant : product_type = child, parent_sku, optionN_value, SKU, EAN, stock par variante. title, description et bullet1..bullet5 sont partagés.',
       options: "Variantes : l'exemple utilise deux options ; option3…option6 possibles ; ajoutez option7_name / option7_value dans Excel si besoin.",
-      metafields: `Metachamps : metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Ligne parent → produit ; ligne enfant → variante. Pas de colonnes variant_metafield_* séparées.`,
+      metafields: `Eigenschaften : metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Titres et valeurs issus des Metaobjects (listes). Saisie libre possible — le produit reste masqué en boutique jusqu’à approbation superuser. Ligne parent → produit ; ligne enfant → variante.`,
       noCollection: "Les collections ne sont pas définies via cet import Excel — assignez-les dans l'interface si nécessaire.",
       prices: "Prix en EUR uniquement : price, price_uvp, price_sale. Virgule décimale (ex. 29,99).",
       comments: "Les lignes vides sont ignorées. Les lignes dont le SKU commence par # sont des commentaires.",
@@ -324,7 +385,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "Filas 1–3: cabecera de grupo, clave de columna, nota breve — no eliminar.",
       parentChild: 'Filas parent: textos, imágenes, precios, categoría, marca, grupo de envío y optionN_name compartidos. Filas child: product_type = child, parent_sku, optionN_value, SKU, EAN, stock por variante.',
       options: "Variantes: el ejemplo usa dos opciones; puede usar option3…option6; añada option7_name / option7_value en Excel si hace falta.",
-      metafields: `Metacampos: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Fila parent → producto; fila child → variante.`,
+      metafields: `Eigenschaften: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Títulos y valores de Metaobjects (desplegables). Puede escribir valores propios — el producto no aparece en la tienda hasta que un superusuario los apruebe. Fila parent → producto; fila child → variante.`,
       noCollection: "Las colecciones no se asignan con este Excel — asígnelas en la interfaz si es necesario.",
       prices: "Precios solo en EUR: price, price_uvp, price_sale. Use coma decimal (ej. 29,99).",
       comments: "Se omiten filas vacías. Las filas con SKU que empieza por # son comentarios.",
@@ -343,7 +404,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       rowStructure: "Righe 1–3: intestazione gruppo, chiave colonna, nota breve — non eliminare.",
       parentChild: 'Righe parent: testi, immagini, prezzi, categoria, marca, gruppo spedizione e optionN_name condivisi. Righe child: product_type = child, parent_sku, optionN_value, SKU, EAN, stock per variante.',
       options: "Varianti: l'esempio usa due opzioni; è possibile usare option3…option6; aggiungere option7_name / option7_value in Excel se serve.",
-      metafields: `Metafield: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Riga parent → prodotto; riga child → variante.`,
+      metafields: `Eigenschaften: metafield_N_key / metafield_N_value (N=1…${METAFIELD_PAIRS}). Titoli e valori dai Metaobjects (menu a tendina). Puoi scrivere valori propri — il prodotto resta nascosto nello shop finché un superuser non li approva. Riga parent → prodotto; riga child → variante.`,
       noCollection: "Le collezioni non si impostano con questo Excel — assegnarle nell'interfaccia se necessario.",
       prices: "Prezzi solo in EUR: price, price_uvp, price_sale. Usare la virgola decimale (es. 29,99).",
       comments: "Le righe vuote vengono saltate. Le righe con SKU che inizia per # sono commenti.",
@@ -390,8 +451,17 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
   return { lines, sheetTitle: `📋 ${INFO_SHEET_TITLES[loc] || "Guide"}` };
 }
 
+function defDisplayLabel(key, def, locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  if (loc && loc !== "de") {
+    const t = def?.label_i18n?.[loc]?.label;
+    if (t != null && String(t).trim()) return String(t).trim();
+  }
+  return String(def?.label || key).trim() || key;
+}
+
 function fillListsSheet(ws, lists) {
-  const { productTypes, statuses, unitTypes, categorySlugs, brandNames, shipNames } = lists;
+  const { productTypes, statuses, unitTypes, categorySlugs, brandNames, shipNames, titleAliases, allValues } = lists;
 
   productTypes.forEach((v, i) => { ws.getCell(i + 1, 1).value = v; });
   statuses.forEach((v, i) => { ws.getCell(i + 1, 2).value = v; });
@@ -399,11 +469,14 @@ function fillListsSheet(ws, lists) {
   categorySlugs.forEach((v, i) => { ws.getCell(i + 1, 4).value = v; });
   brandNames.forEach((v, i) => { ws.getCell(i + 1, 5).value = v; });
   shipNames.forEach((v, i) => { ws.getCell(i + 1, 6).value = v; });
+  (titleAliases || []).forEach((v, i) => { ws.getCell(i + 1, 7).value = v; });
+  (allValues || []).forEach((v, i) => { ws.getCell(i + 1, 8).value = v; });
 
   ws.state = "veryHidden";
   ws.columns = [
     { width: 14 }, { width: 12 }, { width: 10 },
     { width: 28 }, { width: 22 }, { width: 26 },
+    { width: 28 }, { width: 28 },
   ];
 
   return {
@@ -413,10 +486,12 @@ function fillListsSheet(ws, lists) {
     rD: { col: 4, start: 1, end: Math.max(1, categorySlugs.length) },
     rE: { col: 5, start: 1, end: Math.max(1, brandNames.length) },
     rF: { col: 6, start: 1, end: Math.max(1, shipNames.length) },
+    rTitles: { col: 7, start: 1, end: Math.max(1, (titleAliases || []).length) },
+    rValues: { col: 8, start: 1, end: Math.max(1, (allValues || []).length) },
   };
 }
 
-function applyListValidation(ws, colIndex, listRef, maxRow = 5000) {
+function applyListValidation(ws, colIndex, listRef, maxRow = 5000, { allowCustom = false } = {}) {
   if (!listRef || listRef.end < listRef.start) return;
   const letter = colLetter(listRef.col);
   const f = `Lists!$${letter}$${listRef.start}:$${letter}$${listRef.end}`;
@@ -425,6 +500,8 @@ function applyListValidation(ws, colIndex, listRef, maxRow = 5000) {
     type: "list",
     allowBlank: true,
     formulae: [`=${f}`],
+    showErrorMessage: !allowCustom,
+    ...(allowCustom ? { showInputMessage: false } : {}),
   });
 }
 
@@ -433,6 +510,7 @@ async function buildWorkbook({
   categoriesForList,
   brands,
   shippingGroups,
+  metafieldDefs,
 }) {
   const loc = String(locale || "de").slice(0, 2).toLowerCase();
   const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
@@ -473,7 +551,7 @@ async function buildWorkbook({
     core: { label: x("Core", "Temel", "Noyau", "Núcleo", "Nucleo", "Kern"), bg: COLORS.coreBg, fg: COLORS.core },
     variations: { label: x("Variations", "Varyasyonlar", "Variantes", "Variaciones", "Varianti", "Varianten"), bg: COLORS.coreBg, fg: COLORS.core },
     seo: { label: "SEO", bg: COLORS.seoBg, fg: COLORS.seo },
-    metafields: { label: x("Metafields (optional +)", "Metafield (isteğe bağlı +)", "Metachamps (optionnel +)", "Metacampos (opcional +)", "Metafield (opzionale +)", "Metafelder (optional +)"), bg: COLORS.metaBg, fg: COLORS.meta },
+    metafields: { label: x("Eigenschaften", "Eigenschaften", "Eigenschaften", "Eigenschaften", "Eigenschaften", "Eigenschaften"), bg: COLORS.metaBg, fg: COLORS.meta },
     price_eur: { label: x("💰 Prices (EUR)", "💰 Fiyatlar (EUR)", "💰 Prix (EUR)", "💰 Precios (EUR)", "💰 Prezzi (EUR)", "💰 Preise (EUR)"), bg: COLORS.price_eurBg, fg: COLORS.price_eur },
     files: { label: x("📁 Files (optional)", "📁 Dosyalar (isteğe bağlı)", "📁 Fichiers (optionnel)", "📁 Archivos (opcional)", "📁 File (opzionale)", "📁 Dateien (optional)"), bg: COLORS.filesBg, fg: COLORS.files },
   };
@@ -657,6 +735,45 @@ async function buildWorkbook({
   });
 
   const listsWs = wb.addWorksheet("Lists");
+  const defs = metafieldDefs && typeof metafieldDefs === "object" ? metafieldDefs : {};
+  const titleAliases = [];
+  const seenAlias = new Set();
+  const allValues = [];
+  const seenVal = new Set();
+  for (const [key, def] of Object.entries(defs)) {
+    const k = String(key || "").trim();
+    if (!k) continue;
+    const label = defDisplayLabel(k, def, loc);
+    for (const alias of [label, k, def?.label].map((x) => String(x || "").trim()).filter(Boolean)) {
+      const lk = alias.toLowerCase();
+      if (seenAlias.has(lk)) continue;
+      seenAlias.add(lk);
+      titleAliases.push(alias);
+    }
+    for (const v of (Array.isArray(def?.values) ? def.values : [])) {
+      const s = String(v || "").trim();
+      if (!s) continue;
+      const lk = s.toLowerCase();
+      if (seenVal.has(lk)) continue;
+      seenVal.add(lk);
+      allValues.push(s);
+    }
+    const vi18n = def?.values_i18n && typeof def.values_i18n === "object" ? def.values_i18n : {};
+    const locMap = vi18n[loc];
+    if (locMap && typeof locMap === "object") {
+      for (const translated of Object.values(locMap)) {
+        const s = String(translated || "").trim();
+        if (!s) continue;
+        const lk = s.toLowerCase();
+        if (seenVal.has(lk)) continue;
+        seenVal.add(lk);
+        allValues.push(s);
+      }
+    }
+  }
+  titleAliases.sort((a, b) => a.localeCompare(b, loc));
+  allValues.sort((a, b) => a.localeCompare(b, loc));
+
   const listRefs = fillListsSheet(listsWs, {
     productTypes: ["parent", "child"],
     statuses: ["draft", "published"],
@@ -664,6 +781,8 @@ async function buildWorkbook({
     categorySlugs: categorySlugs.length ? categorySlugs : ["—"],
     brandNames: brandNames.length ? brandNames : ["—"],
     shipNames: shipNames.length ? shipNames : ["—"],
+    titleAliases: titleAliases.length ? titleAliases : ["—"],
+    allValues: allValues.length ? allValues : ["—"],
   });
 
   const ix = (k) => keyIndex[k] + 1;
@@ -673,6 +792,16 @@ async function buildWorkbook({
   applyListValidation(ws, ix("category_slug"), listRefs.rD);
   applyListValidation(ws, ix("brand"), listRefs.rE);
   applyListValidation(ws, ix("shipping_group"), listRefs.rF);
+  if (titleAliases.length) {
+    for (let i = 1; i <= 6; i++) {
+      applyListValidation(ws, ix(`option${i}_name`), listRefs.rTitles, 5000, { allowCustom: true });
+      applyListValidation(ws, ix(`option${i}_value`), listRefs.rValues, 5000, { allowCustom: true });
+    }
+    for (let i = 1; i <= METAFIELD_PAIRS; i++) {
+      applyListValidation(ws, ix(`metafield_${i}_key`), listRefs.rTitles, 5000, { allowCustom: true });
+      applyListValidation(ws, ix(`metafield_${i}_value`), listRefs.rValues, 5000, { allowCustom: true });
+    }
+  }
 
   return wb.xlsx.writeBuffer();
 }
@@ -687,8 +816,11 @@ export async function POST(request) {
     const selectedCategorySlugs = Array.isArray(body.selectedCategorySlugs)
       ? body.selectedCategorySlugs.map((s) => String(s).trim()).filter(Boolean)
       : [];
+    const selectedCategoriesIn = Array.isArray(body.selectedCategories)
+      ? body.selectedCategories
+      : [];
 
-    if (selectedCategorySlugs.length === 0) {
+    if (selectedCategorySlugs.length === 0 && selectedCategoriesIn.length === 0) {
       return Response.json(
         { error: msg.templateSelectCategory },
         { status: 400 }
@@ -696,10 +828,44 @@ export async function POST(request) {
     }
 
     const backendUrl = getBackendBase();
-    const { catsFlat, brands, shippingGroups } = await loadReferenceData(backendUrl, sellerToken);
+    const { catsFlat, brands, shippingGroups, metafieldDefs } = await loadReferenceData(backendUrl, sellerToken, locale);
 
-    const slugSet = new Set(selectedCategorySlugs.map((s) => String(s).trim().toLowerCase()).filter(Boolean));
-    const categoriesForList = catsFlat.filter((c) => slugSet.has(String(c.slug || "").trim().toLowerCase()));
+    const byKey = new Map();
+    for (const c of catsFlat) {
+      for (const k of categoryMatchKeys(c)) {
+        if (!byKey.has(k)) byKey.set(k, c);
+      }
+    }
+
+    const categoriesForList = [];
+    const seen = new Set();
+    const pushCat = (c) => {
+      const slug = String(c?.slug || "").trim();
+      if (!slug || seen.has(slug.toLowerCase())) return;
+      seen.add(slug.toLowerCase());
+      categoriesForList.push({
+        id: c.id,
+        slug,
+        name: String(c.name || slug).trim(),
+        path: String(c.path || c.breadcrumb || c.name || slug).trim(),
+      });
+    };
+
+    for (const raw of selectedCategorySlugs) {
+      const hit = byKey.get(String(raw).trim().toLowerCase());
+      if (hit) pushCat(hit);
+    }
+    for (const row of selectedCategoriesIn) {
+      const slug = String(row?.slug || row?.handle || "").trim();
+      if (!slug) continue;
+      const hit = byKey.get(slug.toLowerCase());
+      pushCat(hit || { slug, name: row.name || slug, path: row.breadcrumb || row.path || slug });
+    }
+    for (const raw of selectedCategorySlugs) {
+      const slug = String(raw).trim();
+      if (slug) pushCat({ slug, name: slug, path: slug });
+    }
+
     if (categoriesForList.length === 0) {
       return Response.json(
         {
@@ -714,6 +880,7 @@ export async function POST(request) {
       categoriesForList,
       brands,
       shippingGroups,
+      metafieldDefs,
     });
 
     return new Response(buf, {

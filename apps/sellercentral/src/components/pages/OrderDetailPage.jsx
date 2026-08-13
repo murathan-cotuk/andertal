@@ -257,7 +257,7 @@ export default function OrderDetailPage() {
 
   const goToCustomerProfile = async (e) => {
     e?.preventDefault?.();
-    if (!order) return;
+    if (!isSuperuser || !order) return;
     if (order.customer_id) {
       router.push(`/${locale}/customers/${order.customer_id}`);
       return;
@@ -460,13 +460,17 @@ export default function OrderDetailPage() {
           {/* Customer */}
           <Section title={ui.customer}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
-              <a
-                href={order?.customer_id ? `/${locale}/customers/${order.customer_id}` : `/${locale}/customers`}
-                onClick={goToCustomerProfile}
-                style={{ color: "#202223", textDecoration: "underline" }}
-              >
-                {customerLabel}
-              </a>
+              {isSuperuser ? (
+                <a
+                  href={order?.customer_id ? `/${locale}/customers/${order.customer_id}` : `/${locale}/customers`}
+                  onClick={goToCustomerProfile}
+                  style={{ color: "#202223", textDecoration: "underline" }}
+                >
+                  {customerLabel}
+                </a>
+              ) : (
+                <span style={{ color: "#202223" }}>{customerLabel}</span>
+              )}
             </div>
             {isSuperuser && order?.email && (
               <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 2 }}>

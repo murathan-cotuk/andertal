@@ -22,6 +22,7 @@ import {
   SORT_OPTIONS,
   PER_PAGE,
   buildFacetsFromProducts,
+  filterFacetsToCatalog,
   filterProductsByFacets,
   applyCatalogSort,
   getFacetGroupTitle,
@@ -859,9 +860,9 @@ export default function SearchTemplate() {
   }, [q, textHits, catNodeForFilter]);
 
   const facets = useMemo(() => {
-    const raw = buildFacetsFromProducts(baseAfterCat);
+    const raw = filterFacetsToCatalog(buildFacetsFromProducts(baseAfterCat), metafieldDefinitions);
     return Object.fromEntries(Object.entries(raw).filter(([k]) => k !== "category" && k !== "category_slug"));
-  }, [baseAfterCat]);
+  }, [baseAfterCat, metafieldDefinitions]);
   const hasFacets = Object.keys(facets).length > 0;
 
   useEffect(() => {

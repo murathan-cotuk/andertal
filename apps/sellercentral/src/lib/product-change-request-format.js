@@ -12,6 +12,19 @@ function stripHtml(s) {
   return s.replace(/<[^>]*>/g, " ").replace(/&(?:[a-z]+|#\d+);/gi, " ").replace(/\s+/g, " ").trim() || "—";
 }
 
+/** Plain-text preview for empty SEO fields (product name / description as placeholder). */
+export function seoPlainPreview(html, max = 160) {
+  const s = String(html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(?:nbsp|#160);/gi, " ")
+    .replace(/&(?:[a-z]+|#\d+);/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return "";
+  if (!max || s.length <= max) return s;
+  return `${s.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
 function formatObjectFields(obj) {
   if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return String(obj ?? "");
   const entries = Object.entries(obj).filter(([k]) => !URL_KEY_RE.test(k));

@@ -3,7 +3,8 @@
 /**
  * Strict seller scope helpers.
  * Multi-seller carts stamp store_orders.seller_id = 'default'; real ownership is on
- * store_order_items.seller_id (with legacy product/listing fallback when item seller is null).
+ * store_order_items.seller_id. Catalog ownership / listings must never leak a sold
+ * offer to a seller who was not the chosen merchant.
  */
 
 function isStrictSuperuser(user) {
@@ -28,10 +29,59 @@ function resolveSellerScope(user) {
   return { isSuperuser, sellerId }
 }
 
+/** SQL: treat '', whitespace, and platform 'default' as "no seller stamped". */
+function sqlRealSellerId(expr) {
+  return `NULLIF(NULLIF(TRIM(COALESCE(${expr}, '')), ''), 'default')`
+}
+
+/**
+ * SQL boolean: does order line `oiAlias` belong to seller param (e.g. `$3`)?
+ * Stamped line seller always wins. Unstamped lines fall back to the catalog owner
+ * only when no other seller lists that product — otherwise the sold-from merchant
+ * is ambiguous and must not match the catalog owner (or every listing seller).
+ */
+function sqlOrderItemOwnedBySeller(oiAlias, sellerParam) {
+  const oi = oiAlias || 'oi'
+  const p = sellerParam
+  const line = sqlRealSellerId(`${oi}.seller_id`)
+  return `(
+    ${line} = ${p}
+    OR (
+      ${line} IS NULL
+      AND EXISTS (
+        SELECT 1 FROM admin_hub_products ap
+        WHERE ap.id::text = ${oi}.product_id::text AND ap.seller_id = ${p}
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM admin_hub_seller_listings sl
+        WHERE sl.product_id::text = ${oi}.product_id::text
+          AND ${sqlRealSellerId('sl.seller_id')} IS NOT NULL
+          AND ${sqlRealSellerId('sl.seller_id')} IS DISTINCT FROM ${p}
+      )
+    )
+    OR (
+      ${line} IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM admin_hub_products ap
+        WHERE ap.id::text = ${oi}.product_id::text
+          AND ${sqlRealSellerId('ap.seller_id')} IS NOT NULL
+      )
+      AND EXISTS (
+        SELECT 1 FROM admin_hub_seller_listings sl
+        WHERE sl.product_id::text = ${oi}.product_id::text AND sl.seller_id = ${p}
+      )
+      AND (
+        SELECT COUNT(*) FROM admin_hub_seller_listings sl2
+        WHERE sl2.product_id::text = ${oi}.product_id::text
+      ) = 1
+    )
+  )`
+}
+
 /**
  * SQL boolean expression: does order `oAlias` belong to seller param (e.g. `$3`)?
- * Prefer line-item seller_id; fall back to product/listing only when item seller is unset.
- * Never treat platform header seller_id='default' as ownership for a real seller.
+ * Prefer line-item seller_id. Header store_orders.seller_id is never enough to claim
+ * an order whose lines are stamped to a different seller, and 'default' is never ownership.
  */
 function sqlOrderOwnedBySeller(oAlias, sellerParam) {
   const o = oAlias || 'o'
@@ -39,24 +89,18 @@ function sqlOrderOwnedBySeller(oAlias, sellerParam) {
   return `(
     EXISTS (
       SELECT 1 FROM store_order_items oi
-      WHERE oi.order_id = ${o}.id AND (
-        NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') = ${p}
-        OR (
-          NULLIF(TRIM(COALESCE(oi.seller_id, '')), '') IS NULL
-          AND (
-            EXISTS (
-              SELECT 1 FROM admin_hub_seller_listings sl
-              WHERE sl.product_id::text = oi.product_id::text AND sl.seller_id = ${p}
-            )
-            OR EXISTS (
-              SELECT 1 FROM admin_hub_products ap
-              WHERE ap.id::text = oi.product_id::text AND ap.seller_id = ${p}
-            )
-          )
-        )
+      WHERE oi.order_id = ${o}.id AND ${sqlOrderItemOwnedBySeller('oi', p)}
+    )
+    OR (
+      ${o}.seller_id = ${p}
+      AND ${sqlRealSellerId(`${o}.seller_id`)} IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM store_order_items oi
+        WHERE oi.order_id = ${o}.id
+          AND ${sqlRealSellerId('oi.seller_id')} IS NOT NULL
+          AND ${sqlRealSellerId('oi.seller_id')} IS DISTINCT FROM ${p}
       )
     )
-    OR (${o}.seller_id = ${p} AND NULLIF(TRIM(COALESCE(${o}.seller_id, '')), '') IS DISTINCT FROM 'default')
   )`
 }
 
@@ -69,6 +113,8 @@ module.exports = {
   isStrictSuperuser,
   sellerIdOf,
   resolveSellerScope,
+  sqlRealSellerId,
+  sqlOrderItemOwnedBySeller,
   sqlOrderOwnedBySeller,
   sqlOrderVisibleToActor,
 }

@@ -28,6 +28,7 @@ const ICONS = {
   dac7:         "M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm5 5a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1z",
   locations:    "M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z",
   notifications:"M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z",
+  bonus:        "M10 2a1 1 0 01.894.553l1.545 3.09 3.41.495a1 1 0 01.554 1.706l-2.468 2.406.583 3.397a1 1 0 01-1.451 1.054L10 13.09l-3.067 1.611a1 1 0 01-1.451-1.054l.583-3.397-2.468-2.406a1 1 0 01.554-1.706l3.41-.495 1.545-3.09A1 1 0 0110 2z",
 };
 
 export default function SettingsLayout({ children }) {
@@ -75,6 +76,7 @@ export default function SettingsLayout({ children }) {
         { href: "/settings/integrations",      label: ui.settingsIntegrations,  icon: "integrations" },
         { href: "/notifications",               label: ui.settingsNotifications, icon: "notifications" },
         { href: "/settings/dac7",              label: "DAC7 / PStTG",           icon: "dac7", superuserOnly: true },
+        { href: "/settings/bonus-points",      label: "Bonus Puan",             icon: "bonus", superuserOnly: true },
       ],
     },
   ];

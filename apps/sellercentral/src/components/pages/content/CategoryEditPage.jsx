@@ -18,6 +18,7 @@ import { getCategoryEditCopy } from "@/lib/category-edit-i18n";
 import { categoryDisplayName, categoryNameForEditForm, normalizeCategoryLocale } from "@/lib/category-locale";
 import { userError } from "@/lib/api-error-messages";
 import { productStatusLabel, productStatusBadgeTone } from "@/lib/product-status-labels";
+import { seoPlainPreview } from "@/lib/product-change-request-format";
 
 const getDefaultBaseUrl = () => {
   const env = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "";
@@ -493,8 +494,8 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
             <Card>
               <BlockStack gap="300">
                 <Text as="h2" variant="headingMd">{c.seo}</Text>
-                <TextField label={c.metaTitle} value={form.meta_title} onChange={(v) => setForm((p) => ({ ...p, meta_title: v }))} autoComplete="off" helpText={`${form.meta_title.length}/60`} />
-                <TextField label={c.metaDescription} value={form.meta_description} onChange={(v) => setForm((p) => ({ ...p, meta_description: v }))} multiline={2} autoComplete="off" helpText={`${form.meta_description.length}/160`} />
+                <TextField label={c.metaTitle} value={form.meta_title} onChange={(v) => setForm((p) => ({ ...p, meta_title: v }))} autoComplete="off" helpText={`${form.meta_title.length}/60`} placeholder={form.name || ""} />
+                <TextField label={c.metaDescription} value={form.meta_description} onChange={(v) => setForm((p) => ({ ...p, meta_description: v }))} multiline={2} autoComplete="off" helpText={`${form.meta_description.length}/160`} placeholder={seoPlainPreview(form.long_content, 160)} />
                 <TextField label={c.keywords} value={form.keywords} onChange={(v) => setForm((p) => ({ ...p, keywords: v }))} autoComplete="off" helpText={c.keywordsHelp} />
               </BlockStack>
             </Card>

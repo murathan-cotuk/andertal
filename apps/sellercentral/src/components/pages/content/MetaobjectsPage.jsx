@@ -1,32 +1,86 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
-  Page, Layout, Card, Text, Button, TextField, Badge, Select,
-  BlockStack, InlineStack, Box, Divider, Spinner, Banner,
-  Modal, Tag, EmptyState,
+  Page, Card, Text, Button, TextField, Badge, Select,
+  BlockStack, InlineStack, Box, Spinner, Banner, Modal, Tag,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useLocale } from "next-intl";
-import { getMetaobjectsCopy } from "@/lib/metaobjects-i18n";
+import { getMetaobjectsCopy, METAOBJECT_LANGS, slugifyMetaKey } from "@/lib/metaobjects-i18n";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 import { getUI } from "@/lib/ui-strings";
+import { confirmDelete } from "@/lib/confirm-delete";
 
 const client = getMedusaAdminClient();
 
-function setI18nField(i18nObj, field, lang, value) {
-  return { ...(i18nObj || {}), [lang]: { ...(i18nObj?.[lang] || {}), [field]: value } };
+function emptyLangDraft() {
+  const d = {};
+  METAOBJECT_LANGS.forEach((L) => { d[L.code] = ""; });
+  return d;
 }
 
-function setValueTranslation(valuesI18n, lang, canonical, translated) {
-  const nextLang = { ...(valuesI18n?.[lang] || {}) };
-  const t = String(translated ?? "").trim();
-  if (!t) delete nextLang[canonical];
-  else nextLang[canonical] = t;
-  const next = { ...(valuesI18n || {}) };
-  if (Object.keys(nextLang).length === 0) delete next[lang];
-  else next[lang] = nextLang;
-  return next;
+function titleDraftFromDef(def) {
+  const d = emptyLangDraft();
+  d.de = def?.label || "";
+  const i18n = def?.label_i18n && typeof def.label_i18n === "object" ? def.label_i18n : {};
+  METAOBJECT_LANGS.forEach((L) => {
+    if (L.code === "de") return;
+    d[L.code] = i18n[L.code]?.label || "";
+  });
+  return d;
+}
+
+function valueDraftFromDef(def, canonical) {
+  const d = emptyLangDraft();
+  d.de = canonical || "";
+  const i18n = def?.values_i18n && typeof def.values_i18n === "object" ? def.values_i18n : {};
+  METAOBJECT_LANGS.forEach((L) => {
+    if (L.code === "de") return;
+    d[L.code] = i18n[L.code]?.[canonical] || "";
+  });
+  return d;
+}
+
+function DropZone({ onFile, accept, label, hint }) {
+  const [drag, setDrag] = useState(false);
+  const [fileName, setFileName] = useState(null);
+  const inputRef = useRef();
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setDrag(false);
+    const f = e.dataTransfer?.files?.[0];
+    if (f) { setFileName(f.name); onFile(f); }
+  }, [onFile]);
+
+  const handleFile = useCallback((e) => {
+    const f = e.target.files?.[0];
+    if (f) { setFileName(f.name); onFile(f); }
+  }, [onFile]);
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={handleDrop}
+      onClick={() => inputRef.current?.click()}
+      style={{
+        border: `2px dashed ${drag ? "#2563eb" : "#d1d5db"}`,
+        borderRadius: 10,
+        padding: "24px 20px",
+        background: drag ? "#eff6ff" : "#fafafa",
+        cursor: "pointer",
+        textAlign: "center",
+      }}
+    >
+      <input ref={inputRef} type="file" accept={accept} style={{ display: "none" }} onChange={handleFile} />
+      <Text as="p" variant="bodyMd" fontWeight="semibold">
+        {fileName ? `✓ ${fileName}` : label}
+      </Text>
+      <Text as="p" variant="bodySm" tone="subdued">{hint}</Text>
+    </div>
+  );
 }
 
 export default function MetaobjectsPage() {
@@ -35,27 +89,32 @@ export default function MetaobjectsPage() {
   const c = getMetaobjectsCopy(locale);
   const langOptions = getLandingEditorCopy(locale).shopContentLangOptions();
   const [isSuperuser, setIsSuperuser] = useState(false);
-  const [definitions, setDefinitions] = useState({}); // { key: { label, values[], label_i18n, values_i18n } }
+  const [definitions, setDefinitions] = useState({});
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState("");
   const [pendingActionId, setPendingActionId] = useState("");
-  const [editLang, setEditLang] = useState("de");
-  const saveTimersRef = useRef({});
+  const [selectedKey, setSelectedKey] = useState("");
+  const [search, setSearch] = useState("");
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState(null);
+
+  const [titleModal, setTitleModal] = useState(null);
+  const [titleLang, setTitleLang] = useState("de");
+  const [titleDraft, setTitleDraft] = useState(emptyLangDraft());
+  const [titleKey, setTitleKey] = useState("");
+  const [titleKeyErr, setTitleKeyErr] = useState("");
+
+  const [valueModal, setValueModal] = useState(null);
+  const [valueLang, setValueLang] = useState("de");
+  const [valueDraft, setValueDraft] = useState(emptyLangDraft());
+
   const definitionsRef = useRef(definitions);
   definitionsRef.current = definitions;
-
-  // New definition modal
-  const [newDefOpen, setNewDefOpen] = useState(false);
-  const [newKey, setNewKey] = useState("");
-  const [newLabel, setNewLabel] = useState("");
-  const [newKeyErr, setNewKeyErr] = useState("");
-
-  // Add value modal
-  const [addValOpen, setAddValOpen] = useState(false);
-  const [addValKey, setAddValKey] = useState("");
-  const [addValText, setAddValText] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -67,7 +126,9 @@ export default function MetaobjectsPage() {
     setError("");
     try {
       const res = await client.getMetafieldDefinitions();
-      setDefinitions(res?.definitions || {});
+      const defs = res?.definitions || {};
+      setDefinitions(defs);
+      setSelectedKey((prev) => (prev && defs[prev] ? prev : Object.keys(defs).sort()[0] || ""));
       const sup = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
       if (sup) {
         try {
@@ -99,7 +160,7 @@ export default function MetaobjectsPage() {
     }
   };
 
-  const saveDef = async (key, patch, { debounceMs = 0 } = {}) => {
+  const saveDef = async (key, patch) => {
     const prev = definitionsRef.current[key] || { label: key, values: [], label_i18n: null, values_i18n: null };
     const next = {
       label: patch.label !== undefined ? patch.label : prev.label,
@@ -112,18 +173,119 @@ export default function MetaobjectsPage() {
       definitionsRef.current = merged;
       return merged;
     });
-    if (saveTimersRef.current[key]) clearTimeout(saveTimersRef.current[key]);
-    if (debounceMs > 0) {
-      saveTimersRef.current[key] = setTimeout(() => {
-        const latest = definitionsRef.current[key] || next;
-        persistDef(key, latest);
-      }, debounceMs);
-      return;
-    }
     await persistDef(key, next);
   };
 
-  const removeValue = (key, val) => {
+  const sortedKeys = useMemo(() => Object.keys(definitions).sort((a, b) => {
+    const la = (definitions[a]?.label || a).toLocaleLowerCase();
+    const lb = (definitions[b]?.label || b).toLocaleLowerCase();
+    return la.localeCompare(lb);
+  }), [definitions]);
+
+  const filteredKeys = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sortedKeys;
+    return sortedKeys.filter((key) => {
+      const def = definitions[key];
+      const hay = [
+        key,
+        def?.label,
+        ...METAOBJECT_LANGS.map((L) => def?.label_i18n?.[L.code]?.label),
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [sortedKeys, search, definitions]);
+
+  const selected = selectedKey ? definitions[selectedKey] : null;
+
+  const openNewTitle = () => {
+    setTitleModal({ isNew: true });
+    setTitleLang("de");
+    setTitleDraft(emptyLangDraft());
+    setTitleKey("");
+    setTitleKeyErr("");
+  };
+
+  const openEditTitle = (key) => {
+    const def = definitions[key];
+    if (!def) return;
+    setTitleModal({ isNew: false, key });
+    setTitleLang("de");
+    setTitleDraft(titleDraftFromDef(def));
+    setTitleKey(key);
+    setTitleKeyErr("");
+  };
+
+  const saveTitleModal = async () => {
+    const deLabel = (titleDraft.de || Object.values(titleDraft).find(Boolean) || "").trim();
+    if (!deLabel) return;
+    let key = titleModal?.isNew ? (slugifyMetaKey(titleKey || deLabel) || slugifyMetaKey(deLabel)) : titleModal.key;
+    if (!key) { setTitleKeyErr(c.keyRequired); return; }
+    if (titleModal?.isNew && definitions[key]) { setTitleKeyErr(c.keyExists); return; }
+    const label_i18n = {};
+    METAOBJECT_LANGS.forEach((L) => {
+      if (L.code === "de") return;
+      const t = (titleDraft[L.code] || "").trim();
+      if (t) label_i18n[L.code] = { label: t };
+    });
+    const prev = definitions[key];
+    await saveDef(key, {
+      label: (titleDraft.de || deLabel).trim() || deLabel,
+      values: prev?.values || [],
+      label_i18n: Object.keys(label_i18n).length ? label_i18n : null,
+      values_i18n: prev?.values_i18n || null,
+    });
+    setSelectedKey(key);
+    setTitleModal(null);
+  };
+
+  const openNewValue = (key) => {
+    setValueModal({ isNew: true, defKey: key, canonical: "" });
+    setValueLang("de");
+    setValueDraft(emptyLangDraft());
+  };
+
+  const openEditValue = (key, canonical) => {
+    setValueModal({ isNew: false, defKey: key, canonical });
+    setValueLang("de");
+    setValueDraft(valueDraftFromDef(definitions[key], canonical));
+  };
+
+  const saveValueModal = async () => {
+    const defKey = valueModal?.defKey;
+    const def = definitions[defKey];
+    if (!def) return;
+    const canonicalNew = (valueDraft.de || Object.values(valueDraft).find(Boolean) || "").trim();
+    if (!canonicalNew) return;
+    const old = valueModal.canonical;
+    let values = [...(def.values || [])];
+    let values_i18n = def.values_i18n && typeof def.values_i18n === "object" ? JSON.parse(JSON.stringify(def.values_i18n)) : {};
+    if (valueModal.isNew) {
+      if (!values.some((v) => String(v).toLowerCase() === canonicalNew.toLowerCase())) values = [...values, canonicalNew].sort();
+    } else if (old && old !== canonicalNew) {
+      values = values.map((v) => (v === old ? canonicalNew : v));
+      for (const loc of Object.keys(values_i18n)) {
+        const map = values_i18n[loc];
+        if (!map || typeof map !== "object") continue;
+        if (Object.prototype.hasOwnProperty.call(map, old)) {
+          map[canonicalNew] = map[old];
+          delete map[old];
+        }
+      }
+    }
+    METAOBJECT_LANGS.forEach((L) => {
+      if (L.code === "de") return;
+      const t = (valueDraft[L.code] || "").trim();
+      if (!values_i18n[L.code]) values_i18n[L.code] = {};
+      if (t) values_i18n[L.code][canonicalNew] = t;
+      else delete values_i18n[L.code][canonicalNew];
+      if (!Object.keys(values_i18n[L.code]).length) delete values_i18n[L.code];
+    });
+    await saveDef(defKey, { values, values_i18n: Object.keys(values_i18n).length ? values_i18n : null });
+    setValueModal(null);
+  };
+
+  const removeValue = async (key, val) => {
     const def = definitions[key];
     if (!def) return;
     const values = (def.values || []).filter((v) => v !== val);
@@ -138,44 +300,28 @@ export default function MetaobjectsPage() {
       }
       values_i18n = Object.keys(cleaned).length ? cleaned : null;
     }
-    saveDef(key, { values, values_i18n });
+    await saveDef(key, { values, values_i18n });
   };
 
   const deleteDef = async (key) => {
     if (!isSuperuser) return;
+    if (!(await confirmDelete(`${definitions[key]?.label || key}`))) return;
     setSaving(key);
     try {
       await client.deleteMetafieldDefinition(key);
-      setDefinitions((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      setDefinitions((prev) => {
+        const n = { ...prev };
+        delete n[key];
+        definitionsRef.current = n;
+        return n;
+      });
+      setSelectedKey((prev) => (prev === key ? "" : prev));
     } catch (e) {
       setError(e?.message || ui.error);
     } finally {
       setSaving("");
     }
   };
-
-  const handleCreateDef = async () => {
-    const k = newKey.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
-    if (!k) { setNewKeyErr(c.keyRequired); return; }
-    if (definitions[k]) { setNewKeyErr(c.keyExists); return; }
-    await saveDef(k, { label: newLabel.trim() || k, values: [], label_i18n: null, values_i18n: null });
-    setNewDefOpen(false);
-    setNewKey(""); setNewLabel(""); setNewKeyErr("");
-  };
-
-  const handleAddValue = async () => {
-    if (!isSuperuser) return;
-    const val = addValText.trim();
-    if (!val || !addValKey) return;
-    const def = definitions[addValKey];
-    if (!def) return;
-    if ((def.values || []).includes(val)) { setAddValText(""); return; }
-    await saveDef(addValKey, { values: [...(def.values || []), val].sort() });
-    setAddValText("");
-    setAddValOpen(false);
-  };
-
-  const openAddVal = (key) => { setAddValKey(key); setAddValText(""); setAddValOpen(true); };
 
   const approvePending = async (id) => {
     setPendingActionId(id);
@@ -204,7 +350,6 @@ export default function MetaobjectsPage() {
       setPendingActionId("");
     }
   };
-
   const rejectPending = async (id) => {
     setPendingActionId(id);
     try {
@@ -217,8 +362,38 @@ export default function MetaobjectsPage() {
     }
   };
 
-  const sortedKeys = Object.keys(definitions).sort();
-  const isDe = !editLang || editLang === "de";
+  const downloadTemplate = async () => {
+    const res = await fetch("/api/metaobjects/template");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "andertal-metaobjects-template.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const runImport = async () => {
+    if (!importFile) { setImportMsg({ tone: "warning", text: c.chooseFile }); return; }
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", importFile);
+      fd.append("sellerToken", typeof window !== "undefined" ? (localStorage.getItem("sellerToken") || "") : "");
+      const res = await fetch("/api/metaobjects/import", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || c.importFail);
+      setImportMsg({ tone: "success", text: c.importOk(data.created || 0, data.updated || 0, data.valuesAdded || 0) });
+      await load();
+    } catch (e) {
+      setImportMsg({ tone: "critical", text: e?.message || c.importFail });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const isSaving = saving === selectedKey;
 
   return (
     <Page
@@ -226,276 +401,177 @@ export default function MetaobjectsPage() {
       subtitle={c.pageSubtitle}
       primaryAction={
         isSuperuser
-          ? {
-              content: c.newDefinition,
-              onAction: () => { setNewKey(""); setNewLabel(""); setNewKeyErr(""); setNewDefOpen(true); },
-            }
+          ? { content: c.newDefinition, onAction: openNewTitle }
+          : undefined
+      }
+      secondaryActions={
+        isSuperuser
+          ? [
+              ...(pending.length
+                ? [{ content: c.pendingBadge(pending.length), onAction: () => setPendingOpen(true), destructive: true }]
+                : []),
+              { content: c.importBtn, onAction: () => { setImportFile(null); setImportMsg(null); setImportOpen(true); } },
+            ]
           : undefined
       }
     >
-      <Layout>
-        {error && (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError("")}>{error}</Banner>
-          </Layout.Section>
-        )}
+      <BlockStack gap="400">
+        {error && <Banner tone="critical" onDismiss={() => setError("")}>{error}</Banner>}
 
-        {!isSuperuser && (
-          <Layout.Section>
-            <Banner tone="info">
-              {c.sellerBanner}
-            </Banner>
-          </Layout.Section>
-        )}
-
-        {isSuperuser && (
-          <Layout.Section>
-            <Card>
-              <Select
-                label={c.language}
-                options={langOptions}
-                value={editLang}
-                onChange={setEditLang}
-              />
-            </Card>
-          </Layout.Section>
-        )}
-
-        {isSuperuser && pending.length > 0 && (
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingSm">
-                  {c.pendingHeading}
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  {c.pendingHelp}
-                </Text>
-                <BlockStack gap="300">
-                  {pending.map((p) => (
-                    <Box key={p.id} padding="300" background="bg-surface-secondary" borderRadius="200">
-                      <BlockStack gap="200">
-                        <InlineStack align="space-between" blockAlign="start" wrap>
-                          <BlockStack gap="100">
-                            <Text as="p" variant="bodyMd" fontWeight="semibold">{p.label || p.key}</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">
-                              key: <code style={{ fontFamily: "monospace", background: "var(--p-color-bg-surface-secondary)", padding: "1px 5px", borderRadius: 3 }}>{p.key}</code>
-                              {p.seller_id ? (
-                                <> · {c.seller}: <code style={{ fontFamily: "monospace", background: "var(--p-color-bg-surface-secondary)", padding: "1px 5px", borderRadius: 3 }}>{p.seller_id}</code></>
-                              ) : null}
-                            </Text>
-                            <InlineStack gap="150" wrap>
-                              {(p.proposed_values || []).map((v) => <Tag key={v}>{v}</Tag>)}
-                            </InlineStack>
-                          </BlockStack>
-                          <InlineStack gap="200">
-                            <Button
-                              size="slim"
-                              variant="primary"
-                              loading={pendingActionId === p.id}
-                              onClick={() => approvePending(p.id)}
-                            >
-                              {c.approve}
-                            </Button>
-                            <Button size="slim" onClick={() => editAndApprovePending(p)} disabled={pendingActionId === p.id}>
-                              {c.editApprove}
-                            </Button>
-                            <Button size="slim" tone="critical" onClick={() => rejectPending(p.id)} disabled={pendingActionId === p.id}>
-                              {c.reject}
-                            </Button>
-                          </InlineStack>
-                        </InlineStack>
-                      </BlockStack>
-                    </Box>
-                  ))}
+        {loading ? (
+          <Card><Box padding="600"><InlineStack align="center"><Spinner /></InlineStack></Box></Card>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(220px, 280px) minmax(0, 1fr)",
+              gap: 12,
+              alignItems: "stretch",
+              minHeight: 420,
+            }}
+          >
+            <Card padding="0">
+              <Box padding="300">
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingSm">{c.titles}</Text>
+                  <TextField
+                    label={c.searchTitles}
+                    labelHidden
+                    value={search}
+                    onChange={setSearch}
+                    placeholder={c.searchTitles}
+                    autoComplete="off"
+                    clearButton
+                    onClearButtonClick={() => setSearch("")}
+                  />
                 </BlockStack>
-              </BlockStack>
+              </Box>
+              <div style={{ borderTop: "1px solid #e5e7eb", maxHeight: 560, overflowY: "auto" }}>
+                {filteredKeys.length === 0 ? (
+                  <Box padding="400"><Text as="p" tone="subdued" variant="bodySm">{sortedKeys.length ? c.noMatch : c.emptyHeading}</Text></Box>
+                ) : filteredKeys.map((key) => {
+                  const def = definitions[key];
+                  const active = key === selectedKey;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedKey(key)}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        padding: "8px 12px",
+                        border: "none",
+                        borderLeft: active ? "3px solid #111827" : "3px solid transparent",
+                        background: active ? "#f3f4f6" : "#fff",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {def?.label || key}
+                      </span>
+                      <Badge>{(def?.values || []).length}</Badge>
+                    </button>
+                  );
+                })}
+              </div>
             </Card>
-          </Layout.Section>
-        )}
 
-        <Layout.Section>
-          {loading ? (
-            <Card><Box padding="600"><InlineStack align="center"><Spinner /></InlineStack></Box></Card>
-          ) : sortedKeys.length === 0 ? (
             <Card>
-              <EmptyState
-                heading={c.emptyHeading}
-                action={
-                  isSuperuser
-                    ? { content: c.createFirst, onAction: () => setNewDefOpen(true) }
-                    : undefined
-                }
-                image=""
-              >
-                <p>
-                  {isSuperuser ? c.emptySuperuser : c.emptySeller}
-                </p>
-              </EmptyState>
-            </Card>
-          ) : (
-            <BlockStack gap="400">
-              {sortedKeys.map((key) => {
-                const def = definitions[key];
-                const isSaving = saving === key;
-                const displayedLabel = isDe
-                  ? (def.label || "")
-                  : (def.label_i18n?.[editLang]?.label || "");
-                return (
-                  <Card key={key}>
-                    <BlockStack gap="300">
-                      <InlineStack align="space-between" blockAlign="start" wrap>
-                        <BlockStack gap="200">
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            key: <code style={{ fontFamily: "monospace", background: "var(--p-color-bg-surface-secondary)", padding: "1px 5px", borderRadius: 3 }}>{key}</code>
-                          </Text>
-                          {isSuperuser ? (
-                            <TextField
-                              label={c.fieldLabel}
-                              helpText={c.fieldLabelHelp}
-                              value={displayedLabel}
-                              onChange={(v) => {
-                                if (isDe) {
-                                  saveDef(key, { label: v }, { debounceMs: 450 });
-                                  return;
-                                }
-                                saveDef(key, { label_i18n: setI18nField(def.label_i18n, "label", editLang, v) }, { debounceMs: 450 });
-                              }}
-                              placeholder={isDe ? key : (def.label || key)}
-                              autoComplete="off"
-                              disabled={isSaving}
-                            />
-                          ) : (
-                            <Text as="h2" variant="headingSm">
-                              {displayedLabel || def.label || key}
-                            </Text>
-                          )}
-                        </BlockStack>
-                        <InlineStack gap="200">
-                          <Badge>{(def.values || []).length} {(def.values || []).length === 1 ? c.value : c.values}</Badge>
-                          {isSuperuser && isDe ? (
-                            <>
-                              <Button size="slim" onClick={() => openAddVal(key)} disabled={isSaving}>+ {c.addValue}</Button>
-                              <Button size="slim" tone="critical" variant="plain" onClick={() => deleteDef(key)} disabled={isSaving} loading={isSaving}>
-                                {ui.delete}
-                              </Button>
-                            </>
-                          ) : null}
-                          {isSuperuser && !isDe ? (
-                            <Button size="slim" tone="critical" variant="plain" onClick={() => deleteDef(key)} disabled={isSaving} loading={isSaving}>
-                              {ui.delete}
-                            </Button>
-                          ) : null}
-                        </InlineStack>
-                      </InlineStack>
-
-                      {(def.values || []).length > 0 && (
-                        <>
-                          <Divider />
-                          {isDe ? (
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                              {def.values.map((val) => (
-                                <Tag
-                                  key={val}
-                                  onRemove={isSuperuser ? () => removeValue(key, val) : undefined}
-                                >
-                                  {val}
-                                </Tag>
-                              ))}
-                            </div>
-                          ) : (
-                            <BlockStack gap="300">
-                              <Text as="p" variant="bodySm" tone="subdued">{c.translateValuesHint}</Text>
-                              {def.values.map((val) => (
-                                <InlineStack key={val} gap="300" wrap blockAlign="end">
-                                  <div style={{ minWidth: 140, flex: "0 0 auto" }}>
-                                    <Text as="p" variant="bodySm" tone="subdued">{c.valueCanonical}</Text>
-                                    <Text as="p" variant="bodyMd">{val}</Text>
-                                  </div>
-                                  {isSuperuser ? (
-                                    <div style={{ flex: "1 1 220px", minWidth: 180 }}>
-                                      <TextField
-                                        label={c.valueTranslation}
-                                        labelHidden
-                                        value={def.values_i18n?.[editLang]?.[val] || ""}
-                                        onChange={(v) => {
-                                          saveDef(key, {
-                                            values_i18n: setValueTranslation(def.values_i18n, editLang, val, v),
-                                          }, { debounceMs: 450 });
-                                        }}
-                                        placeholder={val}
-                                        autoComplete="off"
-                                        disabled={isSaving}
-                                      />
-                                    </div>
-                                  ) : (
-                                    <Text as="p" variant="bodyMd">
-                                      {def.values_i18n?.[editLang]?.[val] || "—"}
-                                    </Text>
-                                  )}
-                                </InlineStack>
-                              ))}
-                            </BlockStack>
-                          )}
-                        </>
-                      )}
-
-                      {(def.values || []).length === 0 && (
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {c.noValues}{isSuperuser && isDe ? <> {c.clickAddValue}</> : null}
-                        </Text>
-                      )}
+              {!selected ? (
+                <Box padding="400">
+                  <Text as="p" tone="subdued">{sortedKeys.length === 0 ? (isSuperuser ? c.emptySuperuser : c.emptySeller) : c.selectTitle}</Text>
+                </Box>
+              ) : (
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center" wrap>
+                    <BlockStack gap="050">
+                      <Text as="h2" variant="headingSm">{selected.label || selectedKey}</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        key: <code style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{selectedKey}</code>
+                      </Text>
                     </BlockStack>
-                  </Card>
-                );
-              })}
-            </BlockStack>
-          )}
-        </Layout.Section>
+                    {isSuperuser ? (
+                      <InlineStack gap="200">
+                        <Button size="slim" onClick={() => openEditTitle(selectedKey)}>{ui.edit}</Button>
+                        <Button size="slim" onClick={() => openNewValue(selectedKey)} disabled={isSaving}>+ {c.addValue}</Button>
+                        <Button size="slim" tone="critical" variant="plain" onClick={() => deleteDef(selectedKey)} loading={isSaving}>
+                          {ui.delete}
+                        </Button>
+                      </InlineStack>
+                    ) : null}
+                  </InlineStack>
 
-        <Layout.Section variant="oneThird">
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingSm">
-                {c.howTitle}
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                {c.howDefine}
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                {c.howDropdown}
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                {c.autoValues}
-              </Text>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-      </Layout>
+                  {(selected.values || []).length === 0 ? (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {c.noValues}{isSuperuser ? <> {c.clickAddValue}</> : null}
+                    </Text>
+                  ) : (
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {(selected.values || []).map((val) => (
+                        <div
+                          key={val}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 8,
+                            padding: "6px 10px",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            background: "#fff",
+                          }}
+                        >
+                          <Text as="span" variant="bodySm">{val}</Text>
+                          {isSuperuser ? (
+                            <InlineStack gap="100">
+                              <Button size="slim" onClick={() => openEditValue(selectedKey, val)}>{ui.edit}</Button>
+                              <Button size="slim" tone="critical" variant="plain" onClick={() => removeValue(selectedKey, val)}>{ui.delete}</Button>
+                            </InlineStack>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </BlockStack>
+              )}
+            </Card>
+          </div>
+        )}
+      </BlockStack>
 
       <Modal
-        open={newDefOpen}
-        onClose={() => setNewDefOpen(false)}
-        title={c.modalNewTitle}
-        primaryAction={{ content: c.create, onAction: handleCreateDef }}
-        secondaryActions={[{ content: c.cancel, onAction: () => setNewDefOpen(false) }]}
+        open={!!titleModal}
+        onClose={() => setTitleModal(null)}
+        title={titleModal?.isNew ? c.modalNewTitle : c.editTitle}
+        primaryAction={{ content: titleModal?.isNew ? c.create : ui.save, onAction: saveTitleModal }}
+        secondaryActions={[{ content: c.cancel, onAction: () => setTitleModal(null) }]}
       >
         <Modal.Section>
           <BlockStack gap="400">
-            <TextField
-              label={c.fieldKey}
-              value={newKey}
-              onChange={(v) => { setNewKey(v); setNewKeyErr(""); }}
-              helpText={c.fieldKeyHelp}
-              error={newKeyErr}
-              autoComplete="off"
-            />
+            <Select label={c.langPicker} options={langOptions} value={titleLang} onChange={setTitleLang} helpText={c.langHelp} />
+            {titleModal?.isNew ? (
+              <TextField
+                label={c.fieldKey}
+                value={titleKey}
+                onChange={(v) => { setTitleKey(v); setTitleKeyErr(""); }}
+                helpText={c.fieldKeyHelp}
+                error={titleKeyErr}
+                autoComplete="off"
+                placeholder={slugifyMetaKey(titleDraft.de || titleDraft[titleLang] || "")}
+              />
+            ) : (
+              <Text as="p" variant="bodySm" tone="subdued">key: {titleModal?.key}</Text>
+            )}
             <TextField
               label={c.fieldLabel}
-              value={newLabel}
-              onChange={setNewLabel}
-              placeholder={newKey || c.fieldLabel}
-              helpText={c.fieldLabelHelp}
+              value={titleDraft[titleLang] || ""}
+              onChange={(v) => setTitleDraft((d) => ({ ...d, [titleLang]: v }))}
+              helpText={titleLang === "de" ? c.catalogLangHint : c.fieldLabelHelp}
               autoComplete="off"
             />
           </BlockStack>
@@ -503,25 +579,78 @@ export default function MetaobjectsPage() {
       </Modal>
 
       <Modal
-        open={addValOpen}
-        onClose={() => setAddValOpen(false)}
-        title={`${c.modalAddValueTitle} — ${definitions[addValKey]?.label || addValKey}`}
-        primaryAction={{
-          content: c.add,
-          onAction: handleAddValue,
-          disabled: !addValText.trim(),
-        }}
-        secondaryActions={[{ content: c.cancel, onAction: () => setAddValOpen(false) }]}
+        open={!!valueModal}
+        onClose={() => setValueModal(null)}
+        title={valueModal?.isNew ? c.modalAddValueTitle : c.editValue}
+        primaryAction={{ content: valueModal?.isNew ? c.add : ui.save, onAction: saveValueModal }}
+        secondaryActions={[{ content: c.cancel, onAction: () => setValueModal(null) }]}
       >
         <Modal.Section>
-          <TextField
-            label={c.addValue}
-            value={addValText}
-            onChange={setAddValText}
-            placeholder={c.valuePh}
-            autoComplete="off"
-            onKeyDown={(e) => { if (e.key === "Enter") handleAddValue(); }}
-          />
+          <BlockStack gap="400">
+            <Select label={c.langPicker} options={langOptions} value={valueLang} onChange={setValueLang} helpText={c.langHelp} />
+            <TextField
+              label={c.addValue}
+              value={valueDraft[valueLang] || ""}
+              onChange={(v) => setValueDraft((d) => ({ ...d, [valueLang]: v }))}
+              placeholder={c.valuePh}
+              autoComplete="off"
+              helpText={valueLang === "de" ? c.catalogLangHint : undefined}
+            />
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={pendingOpen}
+        onClose={() => setPendingOpen(false)}
+        title={c.pendingModalTitle}
+        secondaryActions={[{ content: ui.close, onAction: () => setPendingOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text as="p" variant="bodySm" tone="subdued">{c.pendingHelp}</Text>
+            {pending.map((p) => (
+              <Box key={p.id} padding="300" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="200">
+                  <Text as="p" variant="bodyMd" fontWeight="semibold">{p.label || p.key}</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    key: {p.key}
+                    {p.seller_id ? <> · {c.seller}: {p.seller_id}</> : null}
+                  </Text>
+                  <InlineStack gap="150" wrap>
+                    {(p.proposed_values || []).map((v) => <Tag key={v}>{v}</Tag>)}
+                  </InlineStack>
+                  <InlineStack gap="200">
+                    <Button size="slim" variant="primary" loading={pendingActionId === p.id} onClick={() => approvePending(p.id)}>{c.approve}</Button>
+                    <Button size="slim" onClick={() => editAndApprovePending(p)} disabled={pendingActionId === p.id}>{c.editApprove}</Button>
+                    <Button size="slim" tone="critical" onClick={() => rejectPending(p.id)} disabled={pendingActionId === p.id}>{c.reject}</Button>
+                  </InlineStack>
+                </BlockStack>
+              </Box>
+            ))}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title={c.importTitle}
+        primaryAction={{ content: importing ? c.importing : c.importAction, onAction: runImport, loading: importing }}
+        secondaryActions={[{ content: c.cancel, onAction: () => setImportOpen(false) }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            {importMsg && <Banner tone={importMsg.tone} onDismiss={() => setImportMsg(null)}>{importMsg.text}</Banner>}
+            <Text as="p" variant="bodySm">{c.importHelp}</Text>
+            <Button onClick={downloadTemplate}>{c.downloadTemplate}</Button>
+            <DropZone
+              onFile={setImportFile}
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              label={c.dropLabel}
+              hint={c.dropHint}
+            />
+          </BlockStack>
         </Modal.Section>
       </Modal>
     </Page>

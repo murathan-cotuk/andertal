@@ -47,6 +47,22 @@ module.exports = function createNotificationsRouter() {
         )
         await client.query(
           `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, n.type, n.id, now()
+           FROM admin_hub_notifications n WHERE n.type IN ('seller_registered', 'seller_info_change')
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        ).catch(() => {})
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
+           SELECT $1::varchar, 'eu_origin_pending', q.id, now()
+           FROM admin_hub_eu_origin_pending q WHERE q.status = 'pending'
+           ON CONFLICT (recipient_key, source_type, source_id)
+           DO UPDATE SET read_at = now() WHERE seller_hub_notification_state.deleted_at IS NULL`,
+          [recipientKey],
+        ).catch(() => {})
+        await client.query(
+          `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, read_at)
            SELECT $1::varchar, 'product_change_request', cr.id, now()
            FROM admin_hub_product_change_requests cr
            WHERE cr.status = 'pending'
@@ -181,11 +197,27 @@ module.exports = function createNotificationsRouter() {
           ? `
           SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
           LEFT JOIN seller_hub_notification_state s
-            ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
-          WHERE n.type = 'verification_submitted'
+            ON s.recipient_key = $1
+           AND s.source_type = CASE n.type WHEN 'verification_submitted' THEN 'verification' ELSE n.type END
+           AND s.source_id = n.id
+          WHERE n.type IN ('verification_submitted', 'seller_registered')
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
           : `SELECT 0::int AS c`
+        const sellerInfoUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'seller_info_change' AND s.source_id = n.id
+          WHERE n.type = 'seller_info_change'
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
+        const euOriginUnreadQ = `
+          SELECT COUNT(*)::int AS c FROM admin_hub_eu_origin_pending q
+          LEFT JOIN seller_hub_notification_state s
+            ON s.recipient_key = $1 AND s.source_type = 'eu_origin_pending' AND s.source_id = q.id
+          WHERE q.status = 'pending'
+            AND (s.id IS NULL OR s.deleted_at IS NULL)
+            AND (s.id IS NULL OR s.read_at IS NULL)`
         const campaignsUnreadQ = sup
           ? `
           SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
@@ -259,7 +291,7 @@ module.exports = function createNotificationsRouter() {
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
 
-        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR, sellerErrorsR, sellerListingR, brandAuthR, flowFailuresR, supportCasesR] = await Promise.all([
+        const [ordersR, returnsR, verificationsR, changeReqR, metafieldR, sellerNoticeR, campaignsR, sellerErrorsR, sellerListingR, brandAuthR, flowFailuresR, supportCasesR, sellerInfoR, euOriginR] = await Promise.all([
           client.query(ordersUnreadQ, [rk, sup, sid]),
           client.query(returnsUnreadQ, [rk, sup, sid]),
           sup ? client.query(verificationsUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
@@ -272,6 +304,8 @@ module.exports = function createNotificationsRouter() {
           sup ? client.query(brandAuthUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           sup ? client.query(flowFailuresUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
           (sup || sid) ? client.query(supportCasesUnreadQ, [rk, !!sup, sid || '']).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          sup ? client.query(sellerInfoUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
+          sup ? client.query(euOriginUnreadQ, [rk]).catch(() => ({ rows: [{ c: 0 }] })) : { rows: [{ c: 0 }] },
         ])
 
         const recentOrders = await client.query(
@@ -300,14 +334,46 @@ module.exports = function createNotificationsRouter() {
         let recentVerifications = { rows: [] }
         if (sup) {
           recentVerifications = await client.query(
-            `SELECT n.id, n.title, n.body, n.seller_id, n.created_at,
+            `SELECT n.id, n.type, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
                     (s.read_at IS NOT NULL) AS read
              FROM admin_hub_notifications n
              LEFT JOIN seller_hub_notification_state s
-               ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
-             WHERE n.type = 'verification_submitted'
+               ON s.recipient_key = $1
+              AND s.source_type = CASE n.type WHEN 'verification_submitted' THEN 'verification' ELSE n.type END
+              AND s.source_id = n.id
+             WHERE n.type IN ('verification_submitted', 'seller_registered')
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 8`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let recentSellerInfoChanges = { rows: [] }
+        if (sup) {
+          recentSellerInfoChanges = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'seller_info_change' AND s.source_id = n.id
+             WHERE n.type = 'seller_info_change'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 8`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let recentEuOriginPending = { rows: [] }
+        if (sup) {
+          recentEuOriginPending = await client.query(
+            `SELECT q.id, q.product_id, q.seller_id, q.registry_id, q.country, q.created_at,
+                    p.title AS product_title,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_eu_origin_pending q
+             LEFT JOIN admin_hub_products p ON p.id = q.product_id
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'eu_origin_pending' AND s.source_id = q.id
+             WHERE q.status = 'pending'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY q.created_at DESC LIMIT 8`,
             [rk],
           ).catch(() => ({ rows: [] }))
         }
@@ -453,25 +519,28 @@ module.exports = function createNotificationsRouter() {
         const brandAuthCount = brandAuthR.rows[0]?.c || 0
         const flowFailuresCount = flowFailuresR.rows[0]?.c || 0
         const supportCasesCount = supportCasesR.rows[0]?.c || 0
+        const sellerInfoCount = sellerInfoR.rows[0]?.c || 0
+        const euOriginCount = euOriginR.rows[0]?.c || 0
         const ordCount = ordersR.rows[0]?.c || 0
         const retCount = returnsR.rows[0]?.c || 0
         res.json({
-          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount + sellerErrorsCount + sellerListingCount + brandAuthCount + flowFailuresCount + supportCasesCount,
+          unread: ordCount + retCount + (messagesR.rows[0]?.c || 0) + verCount + crCount + mfCount + sellerNoticeCount + campaignCount + sellerErrorsCount + sellerListingCount + brandAuthCount + flowFailuresCount + supportCasesCount + sellerInfoCount + euOriginCount,
           orders: ordCount,
           returns: retCount,
           messages: messagesR.rows[0]?.c || 0,
           verifications: verCount,
-          change_requests: crCount + mfCount,
+          change_requests: crCount + mfCount + sellerInfoCount,
           campaigns: campaignCount,
           seller_errors: sellerErrorsCount,
           seller_listings_pending: sellerListingCount,
           brand_authorizations_pending: brandAuthCount,
           flow_failures: flowFailuresCount,
           support_cases: supportCasesCount,
+          eu_origin_pending: euOriginCount,
           recent_orders: recentOrders.rows.map((r) => ({ ...r, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_returns: recentReturns.rows.map((r) => ({ ...r, return_number: r.return_number ? Number(r.return_number) : null, order_number: r.order_number ? Number(r.order_number) : null })),
           recent_verifications: recentVerifications.rows,
-          recent_product_change_requests: [...(recentChangeRequests.rows || []), ...(recentMetafieldPending.rows || [])],
+          recent_product_change_requests: [...(recentChangeRequests.rows || []), ...(recentMetafieldPending.rows || []), ...(recentSellerInfoChanges.rows || [])],
           recent_seller_notices: recentSellerNotices.rows || [],
           recent_campaigns_submitted: recentCampaignSubmitted.rows || [],
           recent_seller_errors: recentSellerErrors.rows || [],
@@ -479,6 +548,7 @@ module.exports = function createNotificationsRouter() {
           recent_brand_authorizations_pending: recentBrandAuthPending.rows || [],
           recent_flow_failures: recentFlowFailures.rows || [],
           recent_support_cases: recentSupportCases.rows || [],
+          recent_eu_origin_pending: recentEuOriginPending.rows || [],
         })
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
@@ -542,16 +612,50 @@ module.exports = function createNotificationsRouter() {
         let verQ = { rows: [] }
         if (sup) {
           verQ = await client.query(
-            `SELECT n.id, n.title, n.body, n.seller_id, n.created_at,
+            `SELECT n.id, n.type, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
                     su.id AS seller_user_id,
                     (s.read_at IS NOT NULL) AS read
              FROM admin_hub_notifications n
              LEFT JOIN seller_users su ON su.seller_id = n.seller_id AND su.sub_of_seller_id IS NULL
              LEFT JOIN seller_hub_notification_state s
-               ON s.recipient_key = $1 AND s.source_type = 'verification' AND s.source_id = n.id
-             WHERE n.type = 'verification_submitted'
+               ON s.recipient_key = $1
+              AND s.source_type = CASE n.type WHEN 'verification_submitted' THEN 'verification' ELSE n.type END
+              AND s.source_id = n.id
+             WHERE n.type IN ('verification_submitted', 'seller_registered')
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 500`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let sellerInfoQ = { rows: [] }
+        if (sup) {
+          sellerInfoQ = await client.query(
+            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                    su.id AS seller_user_id,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_notifications n
+             LEFT JOIN seller_users su ON su.seller_id = n.seller_id AND su.sub_of_seller_id IS NULL
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'seller_info_change' AND s.source_id = n.id
+             WHERE n.type = 'seller_info_change'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY n.created_at DESC LIMIT 500`,
+            [rk],
+          ).catch(() => ({ rows: [] }))
+        }
+        let euOriginQ = { rows: [] }
+        if (sup) {
+          euOriginQ = await client.query(
+            `SELECT q.id, q.product_id, q.seller_id, q.provider, q.registry_id, q.country, q.note, q.created_at,
+                    p.title AS product_title,
+                    (s.read_at IS NOT NULL) AS read
+             FROM admin_hub_eu_origin_pending q
+             LEFT JOIN admin_hub_products p ON p.id = q.product_id
+             LEFT JOIN seller_hub_notification_state s
+               ON s.recipient_key = $1 AND s.source_type = 'eu_origin_pending' AND s.source_id = q.id
+             WHERE q.status = 'pending'
+               AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ORDER BY q.created_at DESC LIMIT 500`,
             [rk],
           ).catch(() => ({ rows: [] }))
         }
@@ -743,14 +847,50 @@ module.exports = function createNotificationsRouter() {
         }
         const verificationFeedItems = []
         for (const r of verQ.rows || []) {
+          const isSignup = r.type === 'seller_registered'
+          const hrefId = r.seller_user_id || r.reference_id || r.seller_id
           verificationFeedItems.push({
-            source_type: 'verification',
+            source_type: isSignup ? 'seller_registered' : 'verification',
             source_id: r.id,
             read: !!r.read,
             created_at: r.created_at,
-            title: r.title || 'Evrak',
+            title: r.title || (isSignup ? 'Neuer Seller registriert' : 'Evrak'),
             subtitle: r.body || '',
-            href: r.seller_user_id ? `/sellers/${r.seller_user_id}` : (r.seller_id ? `/sellers/${r.seller_id}` : '/sellers'),
+            href: hrefId ? `/sellers/${hrefId}` : '/sellers',
+          })
+        }
+        const sellerInfoFeedItems = []
+        for (const r of sellerInfoQ.rows || []) {
+          const hrefId = r.seller_user_id || r.reference_id || r.seller_id
+          sellerInfoFeedItems.push({
+            source_type: 'seller_info_change',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: r.title || 'Unternehmensdaten geändert',
+            subtitle: r.body || '',
+            href: hrefId ? `/sellers/${hrefId}` : '/sellers',
+            seller_id: r.seller_id || undefined,
+          })
+        }
+        const euOriginFeedItems = []
+        for (const r of euOriginQ.rows || []) {
+          const pid = r.product_id ? String(r.product_id) : ''
+          const bits = [r.product_title || 'Produkt', r.country, r.registry_id].filter(Boolean)
+          euOriginFeedItems.push({
+            source_type: 'eu_origin_pending',
+            source_id: r.id,
+            read: !!r.read,
+            created_at: r.created_at,
+            title: 'EU-Herkunft / Badge ausstehend',
+            subtitle: bits.join(' · '),
+            href: pid ? `/products/${pid}` : '/products/inventory',
+            product_id: pid || undefined,
+            product_title: r.product_title || undefined,
+            seller_id: r.seller_id || undefined,
+            field_name: 'eu_origin',
+            old_value: null,
+            new_value: [r.country, r.registry_id].filter(Boolean).join(' / ') || r.note || '',
           })
         }
         const campaignSubmittedFeedItems = []
@@ -897,14 +1037,27 @@ module.exports = function createNotificationsRouter() {
               {
                 key: 'verification',
                 label_de: 'Verifizierung & Evrak',
-                description_de: 'Verkäufer-Verifizierung und eingereichte Dokumente',
+                description_de: 'Verkäufer-Registrierung, Verifizierung und eingereichte Dokumente',
                 items: verificationFeedItems,
               },
               {
                 key: 'change_suggestion',
                 label_de: 'Änderungsvorschläge',
-                description_de: 'Ausstehende Freigaben für Produkt- und Metafield-Änderungen',
-                items: [...productChangeFeedItems, ...metafieldSuggestionFeedItems].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+                description_de: 'Ausstehende Freigaben für Produkt-, Metafield- und Stammdaten-Änderungen',
+                items: [
+                  ...productChangeFeedItems.filter((it) => !String(it.field_name || '').includes('eu_origin')),
+                  ...metafieldSuggestionFeedItems,
+                  ...sellerInfoFeedItems,
+                ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+              },
+              {
+                key: 'eu_origin',
+                label_de: 'EU-Herkunft / Badge',
+                description_de: 'Ausstehende Prüfung der EU-Herkunftsangaben für das Shop-Badge',
+                items: [
+                  ...euOriginFeedItems,
+                  ...productChangeFeedItems.filter((it) => String(it.field_name || '').includes('eu_origin')),
+                ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
               },
               {
                 key: 'campaign_submitted',
@@ -954,7 +1107,7 @@ module.exports = function createNotificationsRouter() {
           })
         }
 
-        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerNoticeFeedItems, ...campaignSubmittedFeedItems, ...sellerListingFeedItems, ...brandAuthFeedItems, ...flowFailureFeedItems, ...supportCaseFeedItems]
+        const items = [...orderFeedItems, ...returnFeedItems, ...verificationFeedItems, ...productChangeFeedItems, ...metafieldSuggestionFeedItems, ...sellerInfoFeedItems, ...euOriginFeedItems, ...sellerNoticeFeedItems, ...campaignSubmittedFeedItems, ...sellerListingFeedItems, ...brandAuthFeedItems, ...flowFailureFeedItems, ...supportCaseFeedItems]
         items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         const total = items.length
         const paged = items.slice(off, off + lim)
@@ -1013,6 +1166,20 @@ module.exports = function createNotificationsRouter() {
                ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
               [rk],
             )
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, n.type, n.id, now()
+               FROM admin_hub_notifications n WHERE n.type IN ('seller_registered', 'seller_info_change')
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk],
+            ).catch(() => {})
+            await client.query(
+              `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
+               SELECT $1::varchar, 'eu_origin_pending', q.id, now()
+               FROM admin_hub_eu_origin_pending q WHERE q.status = 'pending'
+               ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
+              [rk],
+            ).catch(() => {})
             await client.query(
               `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
                SELECT $1::varchar, 'product_change_request', cr.id, now()
@@ -1087,7 +1254,7 @@ module.exports = function createNotificationsRouter() {
             const st = String(it.source_type || '').trim()
             const id = it.source_id
             if (!st || !id) continue
-            if (!sup && (st === 'product_change_request' || st === 'metafield_pending' || st === 'verification' || st === 'campaign_submitted' || st === 'seller_listing_pending' || st === 'brand_authorization_pending' || st === 'flow_send_failed')) continue
+            if (!sup && (st === 'product_change_request' || st === 'metafield_pending' || st === 'verification' || st === 'seller_registered' || st === 'seller_info_change' || st === 'eu_origin_pending' || st === 'campaign_submitted' || st === 'seller_listing_pending' || st === 'brand_authorization_pending' || st === 'flow_send_failed')) continue
             await markDeleted(st, id)
           }
         }

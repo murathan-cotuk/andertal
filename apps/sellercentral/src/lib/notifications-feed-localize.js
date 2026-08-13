@@ -74,6 +74,30 @@ export function localizeNotificationItem(it, locale) {
     };
   }
 
+  if (type === "seller_registered") {
+    return {
+      ...it,
+      title: it.title || c.itemTitles.sellerRegistered,
+      subtitle: it.subtitle || it.body || "",
+    };
+  }
+
+  if (type === "seller_info_change") {
+    return {
+      ...it,
+      title: it.title || c.itemTitles.sellerInfoChange,
+      subtitle: it.subtitle || it.body || "",
+    };
+  }
+
+  if (type === "eu_origin_pending") {
+    return {
+      ...it,
+      title: c.itemTitles.euOriginPending,
+      subtitle: it.subtitle || it.product_title || "",
+    };
+  }
+
   if (type === "campaign_submitted") {
     return {
       ...it,
@@ -96,6 +120,7 @@ export function localizeNotificationItem(it, locale) {
 export function changeSuggestionTypeLabel(it, locale) {
   const c = getNotificationsPageCopy(locale);
   if (it.source_type === "metafield_pending") return c.typeMetafield;
+  if (it.source_type === "seller_info_change") return c.typeSeller;
   return c.typeProduct;
 }
 
@@ -103,6 +128,9 @@ export function changeSuggestionItemLabel(it, locale) {
   const c = getNotificationsPageCopy(locale);
   if (it.source_type === "metafield_pending") {
     return it.metafield_label || it.metafield_key || c.metafieldFallback;
+  }
+  if (it.source_type === "seller_info_change") {
+    return it.title || c.itemTitles.sellerInfoChange;
   }
   return it.product_title || c.productFallback;
 }

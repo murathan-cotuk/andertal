@@ -1,6 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { applyEuOriginMetadataPolicy, registerEuOriginRoutes } = require('../eu-origin')
+const { buildCatalogMaps, scanProductCatalogPending } = require('../catalog-metafield-pending')
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -275,63 +276,41 @@ const normalizeProductMetadata = (meta) => {
   return out
 }
 
-const normalizeCatalogMetaKey = (raw) => (
-  String(raw || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
-)
-
 const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
   const result = { body: body && typeof body === 'object' ? { ...body } : {}, queued: 0 }
   const sid = String(sellerId || '').trim()
   if (!sid) return result
-  const meta = result.body.metadata && typeof result.body.metadata === 'object' ? { ...result.body.metadata } : {}
-  const variants = Array.isArray(result.body.variants) ? result.body.variants.map((v) => ({ ...(v || {}) })) : null
   let definitionRows
-  try { definitionRows = await dbQ('SELECT key, values FROM admin_hub_metafield_definitions') } catch (_) { definitionRows = { rows: [] } }
-  const allowedByKey = new Map()
-  for (const row of (definitionRows.rows || [])) {
-    const key = normalizeCatalogMetaKey(row?.key)
-    if (!key) continue
-    const vals = new Set((Array.isArray(row?.values) ? row.values : []).map((v) => String(v || '').trim().toLowerCase()).filter(Boolean))
-    allowedByKey.set(key, vals)
+  try {
+    definitionRows = await dbQ('SELECT key, label, values, label_i18n FROM admin_hub_metafield_definitions')
+  } catch (_) {
+    definitionRows = { rows: [] }
   }
-  const proposalsByKey = new Map()
-  const sanitizeMfArray = (arr) => {
-    const out = []
-    for (const pair of (Array.isArray(arr) ? arr : [])) {
-      const key = normalizeCatalogMetaKey(pair?.key)
-      const val = String(pair?.value || '').trim()
-      if (!key || !val) continue
-      const allowedVals = allowedByKey.get(key)
-      if (allowedVals && allowedVals.has(val.toLowerCase())) { out.push({ key, value: val }); continue }
-      if (!proposalsByKey.has(key)) proposalsByKey.set(key, new Set())
-      proposalsByKey.get(key).add(val)
-    }
-    return out
-  }
-  if (Array.isArray(meta.metafields)) meta.metafields = sanitizeMfArray(meta.metafields)
-  if (variants) {
-    for (const v of variants) {
-      if (Array.isArray(v && v.metafields)) v.metafields = sanitizeMfArray(v.metafields)
-    }
-    result.body.variants = variants
-  }
-  result.body.metadata = meta
-  if (proposalsByKey.size > 0) {
+  const maps = buildCatalogMaps(definitionRows.rows)
+  const scanned = scanProductCatalogPending(result.body.metadata, result.body.variants, maps)
+  result.body.metadata = scanned.metadata
+  if (scanned.variants) result.body.variants = scanned.variants
+  if (scanned.pendingByKey.size > 0) {
     try {
       const existingPending = await dbQ(
-        `SELECT id, key, proposed_values FROM admin_hub_metafield_pending WHERE seller_id = $1`,
+        `SELECT id, key, label, proposed_values FROM admin_hub_metafield_pending WHERE seller_id = $1 AND status = 'pending'`,
         [sid]
       )
       const existingByKey = new Map((existingPending.rows || []).map((r) => [r.key, r]))
-      for (const [key, vals] of proposalsByKey.entries()) {
+      for (const [key, rec] of scanned.pendingByKey.entries()) {
+        const vals = Array.from(rec.values)
+        const label = rec.label || maps.labelByKey.get(key) || key
         const existing = existingByKey.get(key)
         if (existing) {
-          const merged = [...new Set([...(Array.isArray(existing.proposed_values) ? existing.proposed_values : []), ...Array.from(vals)])]
-          await dbQ(`UPDATE admin_hub_metafield_pending SET proposed_values = $1, created_at = now() WHERE id = $2::uuid`, [JSON.stringify(merged), existing.id])
+          const merged = [...new Set([...(Array.isArray(existing.proposed_values) ? existing.proposed_values : []), ...vals])]
+          await dbQ(
+            `UPDATE admin_hub_metafield_pending SET proposed_values = $1, label = COALESCE(NULLIF($2, ''), label), created_at = now() WHERE id = $3::uuid`,
+            [JSON.stringify(merged), label, existing.id]
+          )
         } else {
           await dbQ(
-            `INSERT INTO admin_hub_metafield_pending (key, seller_id, proposed_values) VALUES ($1, $2, $3)`,
-            [key, sid, JSON.stringify(Array.from(vals))]
+            `INSERT INTO admin_hub_metafield_pending (key, label, seller_id, proposed_values) VALUES ($1, $2, $3, $4)`,
+            [key, label, sid, JSON.stringify(vals)]
           )
         }
         result.queued++
@@ -694,9 +673,15 @@ const adminHubProductsPOST = async (req, res) => {
           const skuVal = (body.sku || '').toString().trim() || null
           // New cross-seller listings start as 'draft' so they never appear live/in the buy box
           // until the seller (or superuser review) activates them explicitly.
+          // Scope the listing to the EAN the seller actually joined with (variant child vs
+          // whole family). Otherwise "Andere Verkäufer" shows them under every sibling.
+          const matchedOnParentEan = normalizeStoreEan(masterProduct?.metadata?.ean) === incomingEan
+          const listingSellerMeta = incomingEan
+            ? JSON.stringify(matchedOnParentEan ? { covers_all: true } : { ean: incomingEan })
+            : null
           const lr = await lc.query(
-            'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
-            [masterProduct.id, effectiveSellerId, priceCents, inventory, 'draft', skuVal]
+            'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) RETURNING *',
+            [masterProduct.id, effectiveSellerId, priceCents, inventory, 'draft', skuVal, listingSellerMeta]
           )
           listing = lr.rows[0]
           newListingCreated = true
@@ -897,9 +882,12 @@ const adminHubProductsPOST = async (req, res) => {
               const inventoryFb = parseInt(body.inventory, 10) || 0
               // New cross-seller listings start as 'draft' so they never appear live/in the buy box
               // until the seller (or superuser review) activates them explicitly.
+              const eanFb = normalizeStoreEan(eanFromErr || incomingMeta?.ean || body?.ean || '')
+              const matchedParentFb = eanFb && normalizeStoreEan(fallbackMaster?.metadata?.ean) === eanFb
+              const metaFb = eanFb ? JSON.stringify(matchedParentFb ? { covers_all: true } : { ean: eanFb }) : null
               const lrFb = await lc2.query(
-                'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status) VALUES ($1,$2,$3,$4,$5) RETURNING *',
-                [fallbackMaster.id, callerSellerId, priceCentsFb, inventoryFb, 'draft']
+                'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING *',
+                [fallbackMaster.id, callerSellerId, priceCentsFb, inventoryFb, 'draft', metaFb]
               )
               fallbackListing = lrFb.rows[0] || null
               try {
@@ -1027,6 +1015,8 @@ const adminHubProductByIdPUT = async (req, res) => {
       'shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name',
       // Seller commercial data — not shared catalog / not a change-request
       'sku', 'prices', 'uvp_cents', 'rabattpreis_cents', 'related_product_ids',
+      // Listed child EAN lives on seller_listings.seller_metadata, never on the master row
+      'ean',
     ]
 
     if (callerSellerId && existing && existing.seller_id && String(existing.seller_id).trim() !== callerSellerId && !isSuperuserCaller) {
@@ -1084,18 +1074,23 @@ const adminHubProductByIdPUT = async (req, res) => {
       const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
       const brandId = meta.brand_id !== undefined ? (meta.brand_id || null) : null
       const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
+      const listedEan = normalizeStoreEan(meta.ean || body.ean || '')
+      const matchedOnParentEan = listedEan && normalizeStoreEan(existing?.metadata?.ean) === listedEan
+      const listingSellerMeta = listedEan
+        ? (matchedOnParentEan ? { covers_all: true, ean: listedEan } : { ean: listedEan })
+        : null
       let listing = null
       if (existingListing.rows[0]) {
         const lid = existingListing.rows[0].id
         const ur = await lc.query(
-          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), updated_at = now() WHERE id = $8 RETURNING *`,
-          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, lid]
+          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, updated_at = now() WHERE id = $9 RETURNING *`,
+          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid]
         )
         listing = ur.rows[0] || null
       } else {
         const ir = await lc.query(
-          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate]
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING *`,
+          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null]
         )
         listing = ir.rows[0] || null
         try {
@@ -1177,18 +1172,23 @@ const adminHubProductByIdPUT = async (req, res) => {
       const shippingGroupId = meta.shipping_group_id !== undefined ? (meta.shipping_group_id || null) : null
       const brandId = meta.brand_id !== undefined ? (meta.brand_id || null) : null
       const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
+      const listedEan = normalizeStoreEan(meta.ean || body.ean || '')
+      const matchedOnParentEan = listedEan && normalizeStoreEan(existing?.metadata?.ean) === listedEan
+      const listingSellerMeta = listedEan
+        ? (matchedOnParentEan ? { covers_all: true, ean: listedEan } : { ean: listedEan })
+        : null
       let listing = null
       if (existingListing.rows[0]) {
         const lid = existingListing.rows[0].id
         const ur = await lc.query(
-          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), updated_at = now() WHERE id = $8 RETURNING *`,
-          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, lid]
+          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, updated_at = now() WHERE id = $9 RETURNING *`,
+          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid]
         )
         listing = ur.rows[0] || null
       } else {
         const ir = await lc.query(
-          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate]
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING *`,
+          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null]
         )
         listing = ir.rows[0] || null
         try {
@@ -1242,6 +1242,29 @@ const adminHubProductByIdPUT = async (req, res) => {
     const product = await updateAdminHubProductDb(req.params.id, body)
     if (product && product.__error) { res.status(400).json({ message: product.__error }); return }
     if (!product) { res.status(404).json({ message: 'Product not found' }); return }
+    if (!isSuperuserCaller && product) {
+      const { pickEuOriginFields } = require('../eu-origin')
+      const { enqueueEuOriginPending } = require('../eu-origin/queue')
+      const candidates = []
+      if (product.metadata && typeof product.metadata === 'object') candidates.push(product.metadata)
+      if (Array.isArray(product.variants)) {
+        for (const v of product.variants) {
+          if (v?.metadata && typeof v.metadata === 'object') candidates.push(v.metadata)
+        }
+      }
+      const filled = candidates.find((m) => {
+        const f = pickEuOriginFields(m)
+        return !!(f.eu_origin_registry_id || f.eu_origin_document_url || f.eu_origin_country)
+      })
+      if (filled) {
+        enqueueEuOriginPending(dbQ, {
+          productId: product.id,
+          sellerId: callerSellerId,
+          meta: filled,
+          note: 'Seller filled EU origin badge fields',
+        }).catch((e) => console.error('[eu-origin] enqueue after product PUT:', e?.message || e))
+      }
+    }
     res.json({ product, metafield_suggestions_submitted: queuedMetaSuggestionCount > 0 })
   } catch (err) {
     console.error('Admin Hub product PUT error:', err)
@@ -1618,14 +1641,41 @@ module.exports = function createAdminProductsRouter() {
       )
 
       for (const sourceId of plan.source_ids_to_archive) {
-        // Listings / wishlist / change-requests → parent (same pattern as duplicate-ean merge)
+        // Listings / wishlist / change-requests → parent (same pattern as duplicate-ean merge).
+        // Carry the source product's sellable EAN into seller_metadata so multi-offer stays
+        // scoped to that child after fold-into-parent.
+        const sourceRow = await client.query(
+          `SELECT metadata, variants FROM admin_hub_products WHERE id = $1 LIMIT 1`,
+          [sourceId]
+        )
+        const src = sourceRow.rows[0] || {}
+        const srcMeta = src.metadata && typeof src.metadata === 'object' ? src.metadata : {}
+        let srcEan = normalizeStoreEan(srcMeta.ean)
+        if (!srcEan) {
+          const srcVars = Array.isArray(src.variants) ? src.variants : (typeof src.variants === 'string' ? (() => { try { const j = JSON.parse(src.variants); return Array.isArray(j) ? j : [] } catch (_) { return [] } })() : [])
+          for (const v of srcVars) {
+            srcEan = normalizeStoreEan(v && v.ean)
+            if (srcEan) break
+          }
+        }
+        const srcListingMeta = srcEan ? JSON.stringify({ ean: srcEan }) : null
         await client.query(
-          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku)
-           SELECT $1, seller_id, price_cents, inventory, status, sku FROM admin_hub_seller_listings
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, seller_metadata)
+           SELECT $1, seller_id, price_cents, inventory, status, sku, COALESCE(seller_metadata, $3::jsonb) FROM admin_hub_seller_listings
            WHERE product_id = $2
            ON CONFLICT (product_id, seller_id) DO NOTHING`,
-          [plan.parentId, sourceId]
+          [plan.parentId, sourceId, srcListingMeta]
         )
+        // Existing rows that moved via UPDATE below also get EAN if still empty
+        if (srcListingMeta) {
+          await client.query(
+            `UPDATE admin_hub_seller_listings
+             SET seller_metadata = COALESCE(seller_metadata, '{}'::jsonb) || $3::jsonb
+             WHERE product_id = $2
+               AND (seller_metadata IS NULL OR seller_metadata->>'ean' IS NULL OR TRIM(COALESCE(seller_metadata->>'ean','')) = '')`,
+            [plan.parentId, sourceId, srcListingMeta]
+          )
+        }
         await client.query(
           `DELETE FROM admin_hub_seller_listings sl
            WHERE sl.product_id = $1
@@ -1695,12 +1745,16 @@ module.exports = function createAdminProductsRouter() {
     if (!client) return res.status(503).json({ message: 'Database not configured' })
     try {
       await client.connect()
+      // Don't reuse $1 as both column value and jsonb_build_object arg — Postgres
+      // then fails with "inconsistent types deduced for parameter $1".
       const r = await client.query(
         `UPDATE admin_hub_products
-         SET seller_id = $1, metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('seller_id', $1::text), updated_at = now()
-         WHERE id = $2 AND seller_id IS NULL
+         SET seller_id = $1,
+             metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+             updated_at = now()
+         WHERE id = $2::uuid AND seller_id IS NULL
          RETURNING id, seller_id`,
-        [sellerId, productId]
+        [sellerId, productId, JSON.stringify({ seller_id: sellerId })]
       )
       if (!r.rows[0]) return res.status(409).json({ message: 'Product already has an owner' })
       res.json({ claimed: true, product_id: productId, seller_id: sellerId })

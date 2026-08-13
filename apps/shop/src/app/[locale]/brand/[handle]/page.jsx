@@ -13,6 +13,7 @@ import {
   SORT_OPTIONS,
   PER_PAGE,
   buildFacetsFromProducts,
+  filterFacetsToCatalog,
   buildCategorySlugToNameMap,
   deriveCategoriesFromProducts,
   productCategoryIds,
@@ -671,7 +672,10 @@ export default function BrandPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const facets = useMemo(() => buildFacetsFromProducts(products), [products]);
+  const facets = useMemo(
+    () => filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions),
+    [products, metafieldDefinitions],
+  );
   const hasFacets = Object.keys(facets).length > 0;
   const brandCategories = useMemo(
     () => deriveCategoriesFromProducts(products, categoryTree),

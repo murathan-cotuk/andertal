@@ -32,9 +32,10 @@ assert(
 )
 
 const owned = sqlOrderOwnedBySeller('o', '$3')
-assert(owned.includes("oi.seller_id"), 'prefers item seller')
-assert(owned.includes("IS DISTINCT FROM 'default'"), 'never treat default header as ownership')
-assert(!/o\.seller_id = \$3\s*\)/.test(owned.replace(/\s+/g, ' ')) || owned.includes('IS DISTINCT FROM'), 'default excluded')
+assert(owned.includes('oi.seller_id'), 'prefers item seller')
+assert(owned.includes('IS DISTINCT FROM $3'), 'header cannot claim another seller\'s stamped lines')
+assert(owned.includes('admin_hub_seller_listings'), 'listings considered only for unstamped lines')
+assert(owned.includes("NULLIF(NULLIF(TRIM(COALESCE(o.seller_id, '')), ''), 'default')"), 'never treat default header as ownership')
 
 const visible = sqlOrderVisibleToActor('o', '$2', '$3')
 assert(visible.startsWith('($2::boolean OR'), 'superuser bypass')

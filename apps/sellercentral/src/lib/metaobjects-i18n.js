@@ -1,5 +1,31 @@
 import { lt } from "@/lib/locale-text";
 
+export const METAOBJECT_LANGS = [
+  { code: "de", name: "German" },
+  { code: "en", name: "English" },
+  { code: "fr", name: "French" },
+  { code: "es", name: "Spanish" },
+  { code: "it", name: "Italian" },
+  { code: "tr", name: "Turkish" },
+];
+
+export function slugifyMetaKey(raw) {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/ş/g, "s")
+    .replace(/ç/g, "c")
+    .replace(/ğ/g, "g")
+    .replace(/ı/g, "i")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 80);
+}
+
 export function getMetaobjectsCopy(locale) {
   const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   return {
@@ -49,5 +75,48 @@ export function getMetaobjectsCopy(locale) {
     modalAddValueTitle: t("Add value", "Değer ekle", "Ajouter une valeur", "Añadir valor", "Aggiungi valore", "Wert hinzufügen"),
     valuePh: t("e.g. Red", "ör. Kırmızı", "ex. Rouge", "p. ej. Rojo", "es. Rosso", "z. B. Rot"),
     add: t("Add", "Ekle", "Ajouter", "Añadir", "Aggiungi", "Hinzufügen"),
+    importBtn: t("Import metaobjects", "Metaobject içe aktar", "Importer des méta-objets", "Importar metaobjetos", "Importa meta oggetti", "Metaobjekte importieren"),
+    importTitle: t("Import metaobjects", "Metaobject içe aktar", "Importer des méta-objets", "Importar metaobjetos", "Importa meta oggetti", "Metaobjekte importieren"),
+    importHelp: t(
+      "Download the Excel template, fill Title + Value for each language, then upload. Existing titles receive new values (nothing is deleted). New titles are created.",
+      "Excel şablonunu indirin, her dil için Title + Value doldurun, sonra yükleyin. Mevcut başlıklara yeni değerler eklenir (silinmez). Yeni başlıklar oluşturulur.",
+      "Téléchargez le modèle, remplissez Title + Value par langue, puis importez. Les titres existants reçoivent de nouvelles valeurs (rien n’est supprimé).",
+      "Descarga la plantilla, rellena Title + Value por idioma e importa. Los títulos existentes reciben valores nuevos (no se borra nada).",
+      "Scarica il modello, compila Title + Value per lingua e importa. I titoli esistenti ricevono nuovi valori (niente viene cancellato).",
+      "Vorlage herunterladen, Title + Value je Sprache ausfüllen und hochladen. Vorhandene Titel erhalten neue Werte (nichts wird gelöscht). Neue Titel werden angelegt.",
+    ),
+    downloadTemplate: t("Download .xlsx template", ".xlsx şablonunu indir", "Télécharger le modèle .xlsx", "Descargar plantilla .xlsx", "Scarica modello .xlsx", ".xlsx-Vorlage herunterladen"),
+    dropLabel: t("Drop your .xlsx here or click to select", "xlsx dosyasını buraya bırakın veya seçin", "Déposez le .xlsx ici ou cliquez pour choisir", "Suelta el .xlsx aquí o haz clic para elegir", "Trascina il .xlsx qui o clicca per scegliere", ".xlsx hierher ziehen oder zum Auswählen klicken"),
+    dropHint: t(".xlsx • Title + Value per language", ".xlsx • Dil başına Title + Value", ".xlsx • Title + Value par langue", ".xlsx • Title + Value por idioma", ".xlsx • Title + Value per lingua", ".xlsx • Title + Value je Sprache"),
+    importAction: t("Import", "İçe aktar", "Importer", "Importar", "Importa", "Importieren"),
+    importing: t("Importing…", "İçe aktarılıyor…", "Import…", "Importando…", "Importazione…", "Importiere…"),
+    importOk: (created, updated, valuesAdded) => t(
+      `Imported: ${created} new titles, ${updated} updated, ${valuesAdded} values added.`,
+      `İçe aktarıldı: ${created} yeni başlık, ${updated} güncellendi, ${valuesAdded} değer eklendi.`,
+      `Importé : ${created} nouveaux titres, ${updated} mis à jour, ${valuesAdded} valeurs ajoutées.`,
+      `Importado: ${created} títulos nuevos, ${updated} actualizados, ${valuesAdded} valores añadidos.`,
+      `Importato: ${created} nuovi titoli, ${updated} aggiornati, ${valuesAdded} valori aggiunti.`,
+      `Importiert: ${created} neue Titel, ${updated} aktualisiert, ${valuesAdded} Werte ergänzt.`,
+    ),
+    importFail: t("Import failed", "İçe aktarma başarısız", "Échec de l’import", "Error al importar", "Importazione non riuscita", "Import fehlgeschlagen"),
+    chooseFile: t("Choose a file first.", "Önce bir dosya seçin.", "Choisissez d’abord un fichier.", "Elige un archivo primero.", "Scegli prima un file.", "Bitte zuerst eine Datei wählen."),
+    pendingBadge: (n) => t(
+      `${n} pending approval${n === 1 ? "" : "s"}`,
+      `${n} bekleyen onay`,
+      `${n} approbation${n === 1 ? "" : "s"} en attente`,
+      `${n} aprobación${n === 1 ? "" : "es"} pendiente${n === 1 ? "" : "s"}`,
+      `${n} approvazione${n === 1 ? "" : "i"} in sospeso`,
+      `${n} ausstehende Freigabe${n === 1 ? "" : "n"}`,
+    ),
+    pendingModalTitle: t("Pending approvals", "Bekleyen onaylar", "Approbations en attente", "Aprobaciones pendientes", "Approvazioni in sospeso", "Ausstehende Freigaben"),
+    searchTitles: t("Search titles…", "Başlık ara…", "Rechercher des titres…", "Buscar títulos…", "Cerca titoli…", "Titel suchen…"),
+    titles: t("Titles", "Başlıklar", "Titres", "Títulos", "Titoli", "Titel"),
+    selectTitle: t("Select a title on the left to see its values.", "Değerleri görmek için soldan bir başlık seçin.", "Sélectionnez un titre à gauche pour voir ses valeurs.", "Selecciona un título a la izquierda para ver sus valores.", "Seleziona un titolo a sinistra per vedere i valori.", "Wähle links einen Titel, um die Werte zu sehen."),
+    editTitle: t("Edit title", "Başlığı düzenle", "Modifier le titre", "Editar título", "Modifica titolo", "Titel bearbeiten"),
+    editValue: t("Edit value", "Değeri düzenle", "Modifier la valeur", "Editar valor", "Modifica valore", "Wert bearbeiten"),
+    langPicker: t("Language", "Dil", "Langue", "Idioma", "Lingua", "Sprache"),
+    langHelp: t("Switch language and enter the matching translation. The shop shows the visitor’s language.", "Dil seçin ve o dildeki karşılığı yazın. Shop, ziyaretçinin dilini gösterir.", "Changez de langue et saisissez la traduction. La boutique affiche la langue du visiteur.", "Cambia el idioma e introduce la traducción. La tienda muestra el idioma del visitante.", "Cambia lingua e inserisci la traduzione. Lo shop mostra la lingua del visitatore.", "Sprache wechseln und die passende Übersetzung eintragen. Der Shop zeigt die Sprache des Besuchers."),
+    catalogLangHint: t("German is the catalog language stored on products. Other languages are shop labels only.", "Almanca ürünlerde saklanan katalog dilidir. Diğer diller yalnızca shop etiketidir.", "L’allemand est la langue catalogue des produits. Les autres langues sont des libellés boutique.", "El alemán es el idioma de catálogo en productos. Los demás son etiquetas de tienda.", "Il tedesco è la lingua catalogo nei prodotti. Le altre sono etichette shop.", "Deutsch ist die Katalogsprache in den Produkten. Andere Sprachen sind nur Shop-Beschriftungen."),
+    noMatch: t("No titles match your search.", "Aramanıza uyan başlık yok.", "Aucun titre ne correspond.", "Ningún título coincide.", "Nessun titolo corrisponde.", "Keine Titel passen zur Suche."),
   };
 }

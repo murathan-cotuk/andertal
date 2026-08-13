@@ -5,6 +5,7 @@ import { useLocale } from "next-intl";
 import DashboardLayout from "@/components/DashboardLayout";
 import { productExcelTemplateFilename } from "@/lib/download-names";
 import { getImportExportCopy } from "@/lib/import-export-i18n";
+import { EXPORT_DATASETS, getExportDataset } from "@/lib/import-export-columns";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import {
   Page, Layout, Card, Button, Text, BlockStack, InlineStack,
@@ -33,8 +34,36 @@ function buildTreeFromFlat(list) {
 
 function collectAllSlugs(nodes, out = []) {
   for (const n of nodes || []) {
-    if (n.slug) out.push(n.slug);
+    const slug = String(n.slug || n.handle || "").trim();
+    if (slug) out.push(slug);
     if (n.children?.length) collectAllSlugs(n.children, out);
+  }
+  return out;
+}
+
+function nodeSlug(node) {
+  return String(node?.slug || node?.handle || "").trim();
+}
+
+/** slug → Set of ancestor slugs from every occurrence in the tree */
+function buildAncestorMap(nodes, ancestors = [], map = new Map()) {
+  for (const n of nodes || []) {
+    const slug = nodeSlug(n);
+    if (slug) {
+      if (!map.has(slug)) map.set(slug, new Set());
+      for (const a of ancestors) map.get(slug).add(a);
+    }
+    const next = slug ? [...ancestors, slug] : [...ancestors];
+    if (Array.isArray(n.children) && n.children.length) buildAncestorMap(n.children, next, map);
+  }
+  return map;
+}
+
+function findNodesBySlug(nodes, slug, out = []) {
+  const want = String(slug || "").trim();
+  for (const n of nodes || []) {
+    if (nodeSlug(n) === want) out.push(n);
+    if (n.children?.length) findNodesBySlug(n.children, want, out);
   }
   return out;
 }
@@ -68,7 +97,7 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
       const hasKids = (node.children?.length || 0) > 0;
       const allSelected = isSubtreeFullySelected(node);
       const partial = !allSelected && isSubtreePartiallySelected(node);
-      const directSelected = selectedSlugs.has(node.slug);
+      const directSelected = selectedSlugs.has(nodeSlug(node));
       const isOpen = openPath[depth] === node.id;
       return (
         <React.Fragment key={`${depth}-${node.id}`}>
@@ -90,7 +119,7 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
             >
               <CustomCheckbox
                 checked={directSelected}
-                onChange={() => onToggle(node.slug)}
+                onChange={() => onToggle(nodeSlug(node))}
                 size={18}
                 style={{ flexShrink: 0 }}
               />
@@ -271,10 +300,8 @@ export default function ImportExportPage() {
   const [progress, setProgress] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState(null);
-  const [exportInfo, setExportInfo] = useState(null);
-  const [availableColumns, setAvailableColumns] = useState([]);
-  const [selectedColumns, setSelectedColumns] = useState(() => new Set());
-  const [exportDatasets, setExportDatasets] = useState(() => new Set(["products"]));
+  const [selectedColumns, setSelectedColumns] = useState(() => new Set(EXPORT_DATASETS.products.defaultKeys));
+  const [exportDataset, setExportDataset] = useState("products");
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [includeAllSellers, setIncludeAllSellers] = useState(false);
   const [groupBySeller, setGroupBySeller] = useState(true);
@@ -282,7 +309,6 @@ export default function ImportExportPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [exportPreset, setExportPreset] = useState("custom");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -290,29 +316,31 @@ export default function ImportExportPage() {
   }, []);
 
   useEffect(() => {
-    if (!isSuperuser) setGroupBySeller(false);
+    if (!isSuperuser) {
+      setGroupBySeller(false);
+      setIncludeAllSellers(false);
+    } else {
+      setIncludeAllSellers(true);
+    }
   }, [isSuperuser]);
 
-  const applyPreset = useCallback((preset) => {
-    if (preset === "basic_products") {
-      setExportDatasets(new Set(["products"]));
-      setFilterStatus("published");
-      setExportFormat("xlsx");
-      return;
+  const exportSpec = useMemo(() => getExportDataset(exportDataset) || EXPORT_DATASETS.products, [exportDataset]);
+  const visibleDatasets = useMemo(() => {
+    const keys = ["products", "orders", "transactions"];
+    if (isSuperuser) keys.push("customers", "ranking");
+    return keys.map((k) => EXPORT_DATASETS[k]).filter(Boolean);
+  }, [isSuperuser]);
+
+  useEffect(() => {
+    if (!isSuperuser && (exportDataset === "customers" || exportDataset === "ranking")) {
+      setExportDataset("products");
     }
-    if (preset === "sales_report") {
-      setExportDatasets(new Set(["orders", "transactions"]));
-      setFilterStatus("");
-      setExportFormat("xlsx");
-      return;
-    }
-    if (preset === "full_export") {
-      setExportDatasets(new Set(["products", "orders", "customers", "transactions", "ranking"]));
-      setFilterStatus("");
-      setExportFormat("xlsx");
-      return;
-    }
-  }, []);
+  }, [isSuperuser, exportDataset]);
+
+  useEffect(() => {
+    setSelectedColumns(new Set(exportSpec.defaultKeys));
+    setFilterStatus("");
+  }, [exportSpec]);
 
   useEffect(() => {
     let cancelled = false;
@@ -336,53 +364,52 @@ export default function ImportExportPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const categoryAncestorsBySlug = useMemo(() => {
-    const map = new Map();
-    const walk = (nodes, ancestors = []) => {
-      for (const n of nodes || []) {
-        if (!n) continue;
-        const slug = String(n.slug || "").trim();
-        const nextAncestors = slug ? [...ancestors, slug] : [...ancestors];
-        if (slug) map.set(slug, ancestors);
-        if (Array.isArray(n.children) && n.children.length) walk(n.children, nextAncestors);
-      }
-    };
-    walk(categoryTree, []);
-    return map;
-  }, [categoryTree]);
+  const ancestorMap = useMemo(() => buildAncestorMap(categoryTree), [categoryTree]);
+
+  const selectedWithAncestors = useMemo(() => {
+    const next = new Set();
+    for (const slug of selectedSlugs) {
+      const k = String(slug || "").trim();
+      if (!k) continue;
+      next.add(k);
+      for (const a of ancestorMap.get(k) || []) next.add(a);
+    }
+    return next;
+  }, [selectedSlugs, ancestorMap]);
 
   const toggleCategory = useCallback((slug) => {
     const k = String(slug || "").trim();
     if (!k) return;
     setSelectedSlugs((prev) => {
+      const implied = new Set(prev);
+      for (const s of prev) {
+        for (const a of ancestorMap.get(s) || []) implied.add(a);
+      }
       const next = new Set(prev);
-      if (next.has(k)) next.delete(k);
-      else {
+      if (implied.has(k)) {
+        const nodes = findNodesBySlug(categoryTree, k);
+        const remove = new Set([k]);
+        for (const n of nodes) {
+          for (const d of collectAllSlugs(n.children || [])) remove.add(d);
+        }
+        for (const r of remove) next.delete(r);
+      } else {
         next.add(k);
-        const ancestors = categoryAncestorsBySlug.get(k) || [];
-        for (const a of ancestors) next.delete(a);
       }
       return next;
     });
-  }, [categoryAncestorsBySlug]);
+  }, [ancestorMap, categoryTree]);
 
   const selectedCategoryDetails = useMemo(() => {
     const out = [];
-    const selected = new Set([...selectedSlugs].map((s) => String(s).trim()).filter(Boolean));
-    const selectedEffective = new Set(selected);
-    for (const slug of selected) {
-      const ancestors = categoryAncestorsBySlug.get(slug) || [];
-      for (const a of ancestors) {
-        if (selected.has(a)) selectedEffective.delete(a);
-      }
-    }
+    const selected = selectedWithAncestors;
     const walk = (nodes, parents = []) => {
       for (const n of nodes || []) {
         if (!n) continue;
-        const slug = String(n.slug || "").trim();
-        const name = String(n.name || n.slug || "").trim();
+        const slug = nodeSlug(n);
+        const name = String(n.name || n.slug || n.handle || "").trim();
         const nextParents = [...parents, name];
-        if (slug && selectedEffective.has(slug)) {
+        if (slug && selected.has(slug)) {
           out.push({
             slug,
             name,
@@ -393,9 +420,17 @@ export default function ImportExportPage() {
       }
     };
     walk(categoryTree, []);
-    out.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-    return out;
-  }, [categoryTree, selectedSlugs, categoryAncestorsBySlug]);
+    const seen = new Set();
+    const unique = [];
+    for (const row of out) {
+      const key = `${row.slug}::${row.breadcrumb}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(row);
+    }
+    unique.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    return unique;
+  }, [categoryTree, selectedWithAncestors]);
 
   const handleProductImport = async () => {
     if (!productFile) return;
@@ -431,7 +466,7 @@ export default function ImportExportPage() {
 
   const downloadProductTemplate = async () => {
     setTemplateError(null);
-    if (selectedSlugs.size === 0) {
+    if (selectedWithAncestors.size === 0) {
       setTemplateError(t.selectCategoryError);
       return;
     }
@@ -444,7 +479,8 @@ export default function ImportExportPage() {
         body: JSON.stringify({
           sellerToken,
           locale,
-          selectedCategorySlugs: [...selectedSlugs],
+          selectedCategorySlugs: [...selectedWithAncestors],
+          selectedCategories: selectedCategoryDetails,
         }),
       });
       if (!res.ok) {
@@ -468,52 +504,18 @@ export default function ImportExportPage() {
     }
   };
 
-  const loadExportColumns = async () => {
-    setExportError(null);
-    try {
-      const sellerToken = typeof window !== "undefined" ? (localStorage.getItem("sellerToken") || "") : "";
-      const res = await fetch("/api/import-export/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          preview: true,
-          sellerToken,
-          datasets: [...exportDatasets],
-          include_all_sellers: includeAllSellers,
-          locale,
-          filters: {
-            search: filterSearch,
-            status: filterStatus,
-            date_from: filterDateFrom,
-            date_to: filterDateTo,
-          },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        setExportError(data.error || t.columnsLoadError);
-        return;
-      }
-      setExportInfo(data);
-      setAvailableColumns(data.columns || []);
-      setSelectedColumns(new Set(data.columns || []));
-    } catch (e) {
-      setExportError(e?.message || t.columnsLoadError);
-    }
-  };
-
   const runExport = async () => {
     setExporting(true);
     setExportError(null);
     try {
       const sellerToken = typeof window !== "undefined" ? (localStorage.getItem("sellerToken") || "") : "";
-      const cols = selectedColumns.size ? [...selectedColumns] : availableColumns;
+      const cols = selectedColumns.size ? [...selectedColumns] : exportSpec.defaultKeys;
       const res = await fetch("/api/import-export/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sellerToken,
-          datasets: [...exportDatasets],
+          datasets: [exportDataset],
           columns: cols,
           format: exportFormat,
           include_all_sellers: includeAllSellers,
@@ -536,7 +538,7 @@ export default function ImportExportPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `andertal-export.${exportFormat}`;
+      a.download = `andertal-${exportDataset}.${exportFormat}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -584,9 +586,9 @@ export default function ImportExportPage() {
                     <Text as="p" variant="bodySm" fontWeight="semibold">
                       {t.categorySelectLabel}
                     </Text>
-                    {selectedSlugs.size > 0 && (
+                    {selectedWithAncestors.size > 0 && (
                       <InlineStack gap="200" blockAlign="center">
-                        <Text as="span" variant="bodySm" tone="subdued">{t.selectedCount(selectedSlugs.size)}</Text>
+                        <Text as="span" variant="bodySm" tone="subdued">{t.selectedCount(selectedWithAncestors.size)}</Text>
                         <Button size="slim" variant="plain" tone="critical" onClick={() => setSelectedSlugs(new Set())}>{t.reset}</Button>
                       </InlineStack>
                     )}
@@ -595,7 +597,7 @@ export default function ImportExportPage() {
                     <div style={{ width: "60%", minWidth: 320, maxWidth: 760 }}>
                       <CategoryMultiDrilldown
                         tree={categoryTree}
-                        selectedSlugs={selectedSlugs}
+                        selectedSlugs={selectedWithAncestors}
                         onToggle={toggleCategory}
                         t={t}
                       />
@@ -664,7 +666,7 @@ export default function ImportExportPage() {
                         size="slim"
                         icon={NoteIcon}
                         onClick={() => type === "products" && downloadProductTemplate()}
-                        disabled={type !== "products" || categoriesLoading || selectedSlugs.size === 0}
+                        disabled={type !== "products" || categoriesLoading || selectedWithAncestors.size === 0}
                         loading={type === "products" && templateDownloading}
                       >
                         {t.downloadXlsx}
@@ -759,44 +761,35 @@ export default function ImportExportPage() {
                 <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
                     <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportScope}</Text>
-                    <div style={{ maxWidth: 360 }}>
-                      <select
-                        value={exportPreset}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setExportPreset(v);
-                          if (v !== "custom") applyPreset(v);
-                        }}
-                        style={{ width: "100%", padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}
-                      >
-                        <option value="custom">{t.presetCustom}</option>
-                        <option value="basic_products">{t.presetBasicProducts}</option>
-                        <option value="sales_report">{t.presetSalesReport}</option>
-                        <option value="full_export">{t.presetFullExport}</option>
-                      </select>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-                      {[
-                        ["products", t.datasetProducts],
-                        ["orders", t.datasetOrders],
-                        ["customers", t.datasetCustomers],
-                        ["transactions", t.datasetTransactions],
-                        ["ranking", t.datasetRanking],
-                      ].map(([k, label]) => (
-                        <div key={k} style={{ border: "1px solid #eef0f3", borderRadius: 8, padding: "8px 10px", background: "#fafbfc" }}>
-                          <Checkbox
-                            label={label}
-                            checked={exportDatasets.has(k)}
-                            onChange={() =>
-                              setExportDatasets((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(k)) next.delete(k); else next.add(k);
-                                return next;
-                              })
-                            }
-                          />
-                        </div>
-                      ))}
+                    <Text as="p" variant="bodySm" tone="subdued">{t.exportScopeHint}</Text>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+                      {visibleDatasets.map((ds) => {
+                        const selected = exportDataset === ds.key;
+                        const labels = {
+                          products: t.datasetProducts,
+                          orders: t.datasetOrders,
+                          transactions: t.datasetTransactions,
+                          customers: t.datasetCustomers,
+                          ranking: t.datasetRanking,
+                        };
+                        return (
+                          <button
+                            key={ds.key}
+                            type="button"
+                            onClick={() => setExportDataset(ds.key)}
+                            style={{
+                              textAlign: "left",
+                              border: `2px solid ${selected ? "#2563eb" : "#e5e7eb"}`,
+                              borderRadius: 10,
+                              padding: "12px 14px",
+                              background: selected ? "#eff6ff" : "#fff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <Text as="p" variant="bodyMd" fontWeight="semibold">{labels[ds.key]}</Text>
+                          </button>
+                        );
+                      })}
                     </div>
                   </BlockStack>
                 </div>
@@ -806,7 +799,22 @@ export default function ImportExportPage() {
                     <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportFilters}</Text>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
                       <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder={t.filterSearch} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
-                      <input value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} placeholder={t.filterStatus} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      {(exportDataset === "products" || exportDataset === "orders") ? (
+                      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}>
+                        <option value="">{t.filterStatusAll}</option>
+                        {(exportDataset === "products" ? [
+                          ["published", t.statusPublished],
+                          ["draft", t.statusDraft],
+                        ] : [
+                          ["offen", t.statusOpen],
+                          ["in_bearbeitung", t.statusProcessing],
+                          ["abgeschlossen", t.statusCompleted],
+                          ["storniert", t.statusCancelled],
+                        ]).map(([v, label]) => (
+                          <option key={v} value={v}>{label}</option>
+                        ))}
+                      </select>
+                      ) : null}
                       <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
                       <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
                     </div>
@@ -826,40 +834,40 @@ export default function ImportExportPage() {
                     <InlineStack align="space-between" blockAlign="center">
                       <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportColumns}</Text>
                       <InlineStack gap="200">
-                        <Button variant="secondary" onClick={loadExportColumns}>{t.loadColumns}</Button>
-                        {availableColumns.length > 0 && (
-                          <>
-                            <Button size="slim" onClick={() => setSelectedColumns(new Set(availableColumns))}>{t.selectAll}</Button>
-                            <Button size="slim" onClick={() => setSelectedColumns(new Set())}>{t.clear}</Button>
-                          </>
-                        )}
+                        <Button size="slim" onClick={() => setSelectedColumns(new Set(exportSpec.defaultKeys))}>{t.recommendedColumns}</Button>
+                        <Button size="slim" onClick={() => setSelectedColumns(new Set(exportSpec.columns.map((c) => c.key)))}>{t.selectAll}</Button>
+                        <Button size="slim" onClick={() => setSelectedColumns(new Set())}>{t.clear}</Button>
                       </InlineStack>
                     </InlineStack>
-                    <InlineStack gap="200">
-                      {exportInfo?.total != null ? <Badge tone="info">{t.rowsMatched(exportInfo.total)}</Badge> : null}
-                      {availableColumns.length > 0 ? <Badge tone="success">{t.columnsSelected(selectedColumns.size)}</Badge> : null}
-                    </InlineStack>
-                    {availableColumns.length > 0 && (
-                      <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
-                          {availableColumns.map((c) => (
-                            <div key={c} style={{ border: "1px solid #f1f2f4", borderRadius: 7, padding: "6px 8px" }}>
-                              <Checkbox
-                                label={c}
-                                checked={selectedColumns.has(c)}
-                                onChange={() =>
-                                  setSelectedColumns((prev) => {
-                                    const next = new Set(prev);
-                                    if (next.has(c)) next.delete(c); else next.add(c);
-                                    return next;
-                                  })
-                                }
-                              />
+                    <Badge tone="success">{t.columnsSelected(selectedColumns.size)}</Badge>
+                    <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
+                      {exportSpec.groups.map((group) => (
+                        <div key={group.id} style={{ marginBottom: 12 }}>
+                          {exportSpec.groups.length > 1 ? (
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase", margin: "6px 4px" }}>
+                              {group.label}
                             </div>
-                          ))}
+                          ) : null}
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                            {group.columns.map((c) => (
+                              <div key={c.key} style={{ border: "1px solid #f1f2f4", borderRadius: 7, padding: "6px 8px" }}>
+                                <Checkbox
+                                  label={c.label}
+                                  checked={selectedColumns.has(c.key)}
+                                  onChange={() =>
+                                    setSelectedColumns((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(c.key)) next.delete(c.key); else next.add(c.key);
+                                      return next;
+                                    })
+                                  }
+                                />
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </BlockStack>
                 </div>
 
@@ -880,7 +888,7 @@ export default function ImportExportPage() {
                         icon={ExportIcon}
                         onClick={runExport}
                         loading={exporting}
-                        disabled={exporting || exportDatasets.size === 0}
+                        disabled={exporting || selectedColumns.size === 0}
                       >
                         {exporting ? t.exportRunning : t.startExport}
                       </Button>

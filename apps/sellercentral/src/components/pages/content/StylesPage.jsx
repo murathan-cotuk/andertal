@@ -842,11 +842,21 @@ function badgeFontPctForForm(raw, fallback = 5) {
 }
 
 function badgePositionStyle(b) {
-  const style = { position: "absolute", lineHeight: 0 };
+  const style = { position: "absolute", lineHeight: 0, boxSizing: "border-box" };
   const ox = badgeOffsetPctForForm(b.offset_x);
   const oy = badgeOffsetPctForForm(b.offset_y);
-  const size = badgeSizePctForForm(b.image_width, 22);
-  if (b.badge_type === "image") style.width = `${size}%`;
+  const wRaw = Number(b.image_width);
+  const hRaw = Number(b.image_height);
+  const hasW = Number.isFinite(wRaw) && wRaw > 0;
+  const hasH = Number.isFinite(hRaw) && hRaw > 0;
+  const size = hasW ? badgeSizePctForForm(wRaw, 22) : 22;
+  if (b.badge_type === "image") {
+    style.width = `${size}%`;
+    if (hasH) style.height = `${badgeSizePctForForm(hRaw, size)}%`;
+  } else {
+    if (hasW) style.width = `${size}%`;
+    if (hasH) style.height = `${badgeSizePctForForm(hRaw, hasW ? size : 22)}%`;
+  }
   if (b.position === "top-left") { style.top = `${oy}%`; style.left = `${ox}%`; }
   else if (b.position === "top-right") { style.top = `${oy}%`; style.right = `${ox}%`; }
   else if (b.position === "bottom-left") { style.bottom = `${oy}%`; style.left = `${ox}%`; }
@@ -856,7 +866,15 @@ function badgePositionStyle(b) {
 
 function badgeVisualStyle(b) {
   const fs = badgeFontPctForForm(b.font_size, 5);
+  const hasW = Number.isFinite(Number(b.image_width)) && Number(b.image_width) > 0;
+  const hasH = Number.isFinite(Number(b.image_height)) && Number(b.image_height) > 0;
   return {
+    display: hasW || hasH ? "flex" : "inline-block",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
+    width: hasW ? "100%" : undefined,
+    height: hasH ? "100%" : undefined,
     background: b.bg_color || "#e53935",
     color: b.text_color || "#ffffff",
     fontSize: `${fs * 1.6}px`,
@@ -867,7 +885,9 @@ function badgeVisualStyle(b) {
     padding: "3px 8px",
     fontWeight: 700,
     lineHeight: 1.2,
-    whiteSpace: "nowrap",
+    whiteSpace: hasW ? "normal" : "nowrap",
+    textAlign: "center",
+    overflow: "hidden",
   };
 }
 
@@ -886,7 +906,7 @@ function emptyBadgeForm() {
     border_radius: 4,
     offset_x: 0,
     offset_y: 0,
-    image_width: 22,
+    image_width: null,
     image_height: null,
     target_type: "product",
     product_id: "",
@@ -969,7 +989,9 @@ function ProductBadgesCard({ locale, client, ui }) {
       api_category_id: b.api_category_id || "",
       badge_type: b.badge_type === "image" ? "image" : "text",
       image_url: b.image_url || "",
-      image_width: badgeSizePctForForm(b.image_width, 22),
+      image_width: b.image_width != null && Number(b.image_width) > 0
+        ? badgeSizePctForForm(b.image_width, b.badge_type === "image" ? 22 : null)
+        : (b.badge_type === "image" ? 22 : null),
       image_height: b.image_height != null && Number(b.image_height) > 0 ? badgeSizePctForForm(b.image_height, null) : null,
       offset_x: badgeOffsetPctForForm(b.offset_x),
       offset_y: badgeOffsetPctForForm(b.offset_y),
@@ -1094,13 +1116,13 @@ function ProductBadgesCard({ locale, client, ui }) {
     fontSize: locale === "de" ? "Schriftgröße (% der Bildbreite)" : locale === "tr" ? "Yazı boyutu (görsel genişliğinin %)" : "Font size (% of image width)",
     offsetX: locale === "de" ? "Abstand X (%, 0 = bündig am Rand)" : locale === "tr" ? "Mesafe X (%, 0 = köşeye yapışık)" : "Offset X (%, 0 = flush edge)",
     offsetY: locale === "de" ? "Abstand Y (%, 0 = bündig am Rand)" : locale === "tr" ? "Mesafe Y (%, 0 = köşeye yapışık)" : "Offset Y (%, 0 = flush edge)",
-    imageWidth: locale === "de" ? "Badge-Breite (% vom Produktbild) — Größe im Shop" : locale === "tr" ? "Badge genişliği (ürün görselinin %) — shop’taki boyut" : "Badge width (% of product image) — size in shop",
+    imageWidth: locale === "de" ? "Breite (% vom Produktbild, leer = auto)" : locale === "tr" ? "Genişlik (ürün görselinin %, boş = otomatik)" : "Width (% of product image, empty = auto)",
     imageHeight: locale === "de" ? "Höhe (%, leer = auto)" : locale === "tr" ? "Yükseklik (%, boş = otomatik)" : "Height (%, empty = auto)",
     sizeHelp: locale === "de"
-      ? "Bild-Badge: Breite steuert die Größe im Shop sofort. Text-Badge: Schriftgröße (%). Produktlisten-Cache kann kurz hinterherhinken — Shop lädt Größen live nach."
+      ? "Breite/Höhe steuern die Badge-Box im Shop (% vom Produktbild). Leer = Inhalt bestimmt die Größe. Text: zusätzlich Schriftgröße."
       : locale === "tr"
-        ? "Görsel badge: Genişlik shop’taki boyutu belirler. Metin badge: Yazı boyutu (%). Ürün listesi cache’i gecikebilir — shop boyutları canlı çeker."
-        : "Image badge: Width controls shop size. Text badge: Font size (%). Product list cache may lag — shop loads sizes live.",
+        ? "Genişlik/yükseklik shop’taki badge kutusunu belirler (ürün görselinin %). Boş = içeriğe göre. Metin: ayrıca yazı boyutu."
+        : "Width/height control the badge box in the shop (% of product image). Empty = size to content. Text: also font size.",
     preview: locale === "de" ? "Vorschau" : locale === "tr" ? "Önizleme" : locale === "fr" ? "Aperçu" : locale === "es" ? "Vista previa" : locale === "it" ? "Anteprima" : "Preview",
     target: locale === "de" ? "Ziel" : locale === "tr" ? "Hedef" : locale === "fr" ? "Cible" : locale === "es" ? "Objetivo" : locale === "it" ? "Target" : "Target",
     apiRule: locale === "de" ? "API-Regel" : locale === "tr" ? "API kuralı" : locale === "fr" ? "Règle API" : locale === "es" ? "Regla API" : locale === "it" ? "Regola API" : "API rule",
@@ -1160,7 +1182,18 @@ function ProductBadgesCard({ locale, client, ui }) {
               <Select label={t.shopLang} options={langOptions} value={editLang} onChange={setEditLang} helpText={t.shopLangHelp} />
               <InlineStack gap="400" wrap={false}>
                 <div style={{ flex: 1 }}>
-                  <Select label={t.badgeType} options={badgeTypeOptions} value={form.badge_type || "text"} onChange={(v) => setField("badge_type", v)} />
+                  <Select
+                    label={t.badgeType}
+                    options={badgeTypeOptions}
+                    value={form.badge_type || "text"}
+                    onChange={(v) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        badge_type: v,
+                        image_width: v === "image" && !(Number(prev.image_width) > 0) ? 22 : prev.image_width,
+                      }));
+                    }}
+                  />
                 </div>
                 <div style={{ flex: 1 }}>
                   <Select label={t.position} options={positionSelectOptions} value={form.position} onChange={(v) => setField("position", v)} />
@@ -1220,7 +1253,9 @@ function ProductBadgesCard({ locale, client, ui }) {
                     />
                   </div>
                 ) : (
-                  <div style={{ ...badgePositionStyle({ ...form, badge_type: "text" }), ...badgeVisualStyle(form) }}>{displayedLabel || form.label || "Badge"}</div>
+                  <div style={badgePositionStyle({ ...form, badge_type: "text" })}>
+                    <span style={badgeVisualStyle(form)}>{displayedLabel || form.label || "Badge"}</span>
+                  </div>
                 )}
               </div>
 
@@ -1234,6 +1269,8 @@ function ProductBadgesCard({ locale, client, ui }) {
                     <NumericTextField label={t.borderWidth} value={form.border_width} min={0} max={10} fallback={0} onChange={(n) => setField("border_width", n)} />
                     <NumericTextField label={t.borderRadius} value={form.border_radius} min={0} max={100} fallback={4} onChange={(n) => setField("border_radius", n)} />
                     <NumericTextField label={t.fontSize} value={form.font_size} min={2} max={20} fallback={5} onChange={(n) => setField("font_size", n)} />
+                    <NumericTextField label={t.imageWidth} value={form.image_width ?? null} min={5} max={80} allowEmpty onChange={(n) => setField("image_width", n)} />
+                    <NumericTextField label={t.imageHeight} value={form.image_height ?? null} min={5} max={80} allowEmpty onChange={(n) => setField("image_height", n)} />
                     <NumericTextField label={t.offsetX} value={form.offset_x} min={0} max={40} fallback={0} onChange={(n) => setField("offset_x", n)} />
                     <NumericTextField label={t.offsetY} value={form.offset_y} min={0} max={40} fallback={0} onChange={(n) => setField("offset_y", n)} />
                   </div>

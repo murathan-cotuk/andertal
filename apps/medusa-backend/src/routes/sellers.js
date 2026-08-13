@@ -171,10 +171,14 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
         }
         try {
           const cardR = await client.query(
-            `SELECT stripe_payment_method_id FROM seller_users WHERE id = $1`,
-            [id],
+            `SELECT stripe_payment_method_id, stripe_card_last4
+             FROM seller_users
+             WHERE id::text = $1 OR seller_id = $2
+             ORDER BY CASE WHEN COALESCE(stripe_payment_method_id, '') <> '' THEN 0 ELSE 1 END, created_at ASC
+             LIMIT 1`,
+            [id, sellerId],
           )
-          setup.has_card = !!(cardR.rows[0]?.stripe_payment_method_id)
+          setup.has_card = !!(cardR.rows[0]?.stripe_payment_method_id || cardR.rows[0]?.stripe_card_last4)
         } catch (_) {}
         try {
           const locR = await client.query(
@@ -343,11 +347,9 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        let wasRegistered = false
-        if (body.documents !== undefined) {
-          const prev = await client.query(`SELECT approval_status FROM seller_users WHERE seller_id = $1 LIMIT 1`, [sellerId])
-          wasRegistered = String(prev.rows[0]?.approval_status || 'registered') === 'registered'
-        }
+        const prevRes = await client.query(`SELECT ${SELLER_SELECT} FROM seller_users WHERE seller_id = $1 LIMIT 1`, [sellerId])
+        const prevRow = prevRes.rows[0] || {}
+        const wasRegistered = String(prevRow.approval_status || 'registered') === 'registered'
         const r = await client.query(
           `UPDATE seller_users SET ${updates.join(', ')} WHERE seller_id = $${n} RETURNING ${SELLER_SELECT}`,
           params
@@ -356,38 +358,41 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
         if (!r.rows[0]) return res.status(404).json({ message: 'Seller not found' })
         const seller = r.rows[0]
         res.json({ seller })
-        if (wasRegistered && seller.approval_status === 'documents_submitted') {
+        if (body.documents !== undefined && wasRegistered && seller.approval_status === 'documents_submitted') {
           setImmediate(() => {
             try { require('../flow-automation').runAutomationFlowsForSellerEvent({ triggerKey: 'seller_docs_submitted', sellerUserId: seller.id }).catch(() => {}) } catch (_) {}
           })
-          // Superuser panel notification (SellerCentral bell → "Verifizierung & Evrak").
-          // Previously ONLY POST /admin-hub/v1/verification/start inserted this row, but a
-          // seller can submit documents here (draft save) without ever reaching that gated
-          // endpoint (it requires LUCID number + trade-register + ID doc + signed agreement) —
-          // so first-time document submissions produced no admin-facing signal at all.
+        }
+        const storeName = seller.store_name || seller.email || sellerId || 'Ein Verkäufer'
+        const sameJson = (a, b) => {
+          try { return JSON.stringify(a ?? null) === JSON.stringify(b ?? null) } catch (_) { return a === b }
+        }
+        const docsChanged = body.documents !== undefined
+          && Array.isArray(body.documents)
+          && body.documents.length > 0
+          && !sameJson(prevRow.documents, body.documents)
+        const changedInfoKeys = allowed.filter((key) => body[key] !== undefined && !sameJson(prevRow[key], body[key]))
+        if (docsChanged || changedInfoKeys.length) {
           setImmediate(() => {
-            (async () => {
-              const notifClient = getDbClient ? getDbClient() : getSellerDbClient()
-              if (!notifClient) return
-              try {
-                await notifClient.connect()
-                const storeName = seller.store_name || seller.email || sellerId || 'Ein Verkäufer'
-                await notifClient.query(
-                  `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
-                   VALUES ('verification_submitted', $1, $2, $3, $4)`,
-                  [
-                    `${storeName} — Evrak eingereicht`,
-                    `${storeName} hat Verifizierungsdokumente eingereicht. Bitte prüfen.`,
-                    sellerId || null,
-                    seller.id,
-                  ]
-                )
-                await notifClient.end()
-              } catch (e) {
-                try { await notifClient.end() } catch (_) {}
-                console.error('[adminHubSellerCompanyInfoPATCH] admin_hub_notifications insert failed:', e.message)
-              }
-            })()
+            const { insertAdminHubNotificationSafe } = require('../admin-hub-notify')
+            if (docsChanged) {
+              insertAdminHubNotificationSafe({
+                type: 'verification_submitted',
+                title: `${storeName} — Evrak eingereicht`,
+                body: `${storeName} hat Verifizierungsdokumente eingereicht. Bitte prüfen.`,
+                sellerId: sellerId || null,
+                referenceId: seller.id,
+              })
+            }
+            if (changedInfoKeys.length) {
+              insertAdminHubNotificationSafe({
+                type: 'seller_info_change',
+                title: `${storeName} — Unternehmensdaten geändert`,
+                body: `${storeName} hat Stammdaten aktualisiert (${changedInfoKeys.join(', ')}). Bitte prüfen.`,
+                sellerId: sellerId || null,
+                referenceId: seller.id,
+              })
+            }
           })
         }
       } catch (e) {

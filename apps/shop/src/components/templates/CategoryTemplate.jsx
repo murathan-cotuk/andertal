@@ -11,6 +11,7 @@ import {
   SORT_OPTIONS,
   PER_PAGE,
   buildFacetsFromProducts,
+  filterFacetsToCatalog,
   filterProductsByFacets,
   applyCatalogSort,
   getFacetGroupTitle,
@@ -23,7 +24,7 @@ import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import LandingContainers from "@/components/landing/LandingContainers";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
-import { SITE_URL } from "@/lib/seo";
+import { SITE_URL, categorySeoFallback } from "@/lib/seo";
 import CustomCheckbox from "../ui/CustomCheckbox";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
@@ -1056,15 +1057,10 @@ export default function CategoryTemplate() {
       getLocalizedCategory(category, locale).name ||
       slug ||
       "Category";
-    const docTitle =
-      (category.seo_title && String(category.seo_title).trim()) ||
-      (m.meta_title && String(m.meta_title).trim()) ||
-      dt;
+    const seo = categorySeoFallback(category, locale);
+    const docTitle = seo.title || dt;
     document.title = docTitle;
-    const desc =
-      (category.seo_description && String(category.seo_description).trim()) ||
-      (m.meta_description && String(m.meta_description).trim()) ||
-      "";
+    const desc = seo.description || "";
     const keywords =
       (category.seo_keywords && String(category.seo_keywords).trim()) ||
       (m.keywords && String(m.keywords).trim()) ||
@@ -1089,7 +1085,7 @@ export default function CategoryTemplate() {
     if (keywords) {
       ensureMeta('meta[name="keywords"]', { name: "keywords" }).setAttribute("content", keywords);
     }
-  }, [category, slug]);
+  }, [category, slug, locale]);
 
   useEffect(() => {
     if (typeof document === "undefined" || !slug) return;
@@ -1103,7 +1099,7 @@ export default function CategoryTemplate() {
     el.href = `${SITE_URL}${prefix}/${slug}`;
   }, [slug, locale, marketPrefixVal]);
 
-  const rawFacets = buildFacetsFromProducts(products);
+  const rawFacets = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions);
   const facets = Object.fromEntries(
     Object.entries(rawFacets).filter(([k]) => k !== "category" && k !== "category_slug")
   );

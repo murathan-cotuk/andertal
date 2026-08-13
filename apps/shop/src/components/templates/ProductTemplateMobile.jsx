@@ -57,7 +57,7 @@ const Container = styled.div`
 
 const ThreeCol = styled.div`
   display: grid;
-  grid-template-columns: 0.55fr 1fr 290px;
+  grid-template-columns: 0.55fr 1fr minmax(300px, 360px);
   gap: 32px;
   margin-bottom: 48px;
   align-items: start;
@@ -472,20 +472,40 @@ const BuyboxInner = styled.div`
 const OtherSellersCard = styled.div`
   border-radius: 12px;
   border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  padding: 14px 16px 10px;
+  background: #fff;
+  padding: 14px 14px 8px;
 `;
 
 const OtherSellerRow = styled.div`
   display: grid;
-  grid-template-columns: 44px 1fr auto;
+  grid-template-columns: 52px minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 4px;
+  border-bottom: 1px solid #f3f4f6;
   &:last-child {
     border-bottom: none;
-    padding-bottom: 2px;
+  }
+`;
+
+const OtherSellerCartBtn = styled.button`
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid ${(p) => (p.$disabled ? "#e5e7eb" : "#111827")};
+  background: ${(p) => (p.$disabled ? "#f3f4f6" : "#111827")};
+  color: ${(p) => (p.$disabled ? "#9ca3af" : "#fff")};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ${(p) => (p.$disabled ? "not-allowed" : "pointer")};
+  flex-shrink: 0;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  &:hover:not(:disabled) {
+    background: #374151;
+  }
+  &:disabled {
+    cursor: not-allowed;
   }
 `;
 
@@ -766,6 +786,33 @@ const META_HIDDEN_KEYS = [
   "daily_dose", "warning_text", "age_warning", "fiber_composition", "care_symbols", "safety_data_sheet_url",
   "tpd_compliance_ref", "age_verification", "ce_class", "udi", "authorized_representative", "isbn",
 ];
+
+/** Normalize barcode digits for multi-offer / by_ean lookup. */
+function normalizeOfferEan(raw) {
+  if (raw == null || raw === "") return "";
+  const d = String(raw).replace(/\D/g, "");
+  return d.length >= 8 ? d : "";
+}
+
+/**
+ * "Andere Verkäufer" must follow the currently selected variant EAN — a seller who only
+ * listed child A1 must not appear when the customer switches to A2.
+ */
+function resolveOtherSellersForVariant(multiOffer, variant, productMeta) {
+  if (!multiOffer) return [];
+  const variantEan = normalizeOfferEan(variant?.ean);
+  const metaEan = normalizeOfferEan(productMeta?.ean);
+  const canonical = normalizeOfferEan(multiOffer.canonical_ean);
+  const ean = variantEan || metaEan || canonical;
+  const byEan = multiOffer.by_ean && typeof multiOffer.by_ean === "object" ? multiOffer.by_ean : null;
+  if (ean && byEan) {
+    const bucket = byEan[ean];
+    if (bucket && Array.isArray(bucket.other_sellers)) return bucket.other_sellers;
+    if (Object.prototype.hasOwnProperty.call(byEan, ean)) return [];
+  }
+  if (ean && canonical && ean !== canonical) return [];
+  return Array.isArray(multiOffer.other_sellers) ? multiOffer.other_sellers : [];
+}
 
 /** Extra GPSR category-specific fields (docs/HUKUKI.md Faz 4) — rendered in the "Produktsicherheitsinformationen" section when present. */
 const EXTRA_COMPLIANCE_KEYS = [
@@ -1051,8 +1098,8 @@ export default function ProductTemplateMobile() {
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
   const [productReviews, setProductReviews] = useState([]);
   const [multiOffer, setMultiOffer] = useState(null);
-  const [selectedSellerId, setSelectedSellerId] = useState(null);
-  const [otherSellersOpen, setOtherSellersOpen] = useState(false);
+  const [otherSellersOpen, setOtherSellersOpen] = useState(true);
+  const [otherSellerAddingId, setOtherSellerAddingId] = useState(null);
   const [categoryAncestors, setCategoryAncestors] = useState([]);
   const [categoryCurrentNode, setCategoryCurrentNode] = useState(null);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
@@ -1113,7 +1160,6 @@ export default function ProductTemplateMobile() {
           return;
         }
         setMultiOffer(data.multi_offer || null);
-        setSelectedSellerId(null);
         setProduct(data.product);
       } catch (err) {
         console.error("Failed to fetch product:", err);
@@ -1415,11 +1461,9 @@ export default function ProductTemplateMobile() {
 
   const storeName = (sellerStoreName || "").trim() || "Shop";
 
-  const selectedSellerOffer = selectedSellerId
-    ? (multiOffer?.other_sellers || []).find((o) => o.seller_id === selectedSellerId) || null
-    : null;
-  const effectiveDisplayCents = selectedSellerOffer != null ? Number(selectedSellerOffer.price_cents) : displayCents;
-  const effectiveStoreName = selectedSellerOffer?.store_name || storeName;
+  const otherSellersForVariant = resolveOtherSellersForVariant(multiOffer, variant, meta);
+  const effectiveDisplayCents = displayCents;
+  const effectiveStoreName = storeName;
   const returnDays = meta.return_days != null ? meta.return_days : 14;
   const returnCostRaw = meta.return_cost === false || meta.return_kostenlos === true ? "kostenlos" : (meta.return_cost || "kostenlos");
   const returnCost = returnCostRaw === "kostenlos" ? tp("returnFree") : returnCostRaw;
@@ -1476,7 +1520,7 @@ export default function ProductTemplateMobile() {
     const errorText = tp("addToCartFailed");
 
     try {
-      const ok = await addToCart(variantId, quantity, selectedSellerId);
+      const ok = await addToCart(variantId, quantity, product.seller_id || null);
       if (ok) openCartSidebar();
       setCartNotice({ text: ok ? successText : errorText, visible: true });
 
@@ -1494,6 +1538,32 @@ export default function ProductTemplateMobile() {
       cartNoticeTimersRef.current.clear = window.setTimeout(() => {
         setCartNotice({ text: "", visible: false });
       }, 4300);
+    }
+  };
+
+  const handleAddOtherSellerToCart = async (offer) => {
+    const variantId = variant?.id;
+    if (!variantId || !offer?.seller_id || !offer.in_stock || shippingUnavailable || isComingSoon) return;
+    if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);
+    if (cartNoticeTimersRef.current.clear) window.clearTimeout(cartNoticeTimersRef.current.clear);
+    const successText = tp("addedToCart");
+    const errorText = tp("addToCartFailed");
+    const key = String(offer.seller_id);
+    setOtherSellerAddingId(key);
+    try {
+      const ok = await addToCart(variantId, 1, offer.seller_id);
+      if (ok) openCartSidebar();
+      setCartNotice({ text: ok ? successText : errorText, visible: true });
+      cartNoticeTimersRef.current.hide = window.setTimeout(() => {
+        setCartNotice((s) => ({ ...s, visible: false }));
+      }, 3800);
+      cartNoticeTimersRef.current.clear = window.setTimeout(() => {
+        setCartNotice({ text: "", visible: false });
+      }, 4300);
+    } catch (_) {
+      setCartNotice({ text: errorText, visible: true });
+    } finally {
+      setOtherSellerAddingId(null);
     }
   };
 
@@ -1735,7 +1805,7 @@ export default function ProductTemplateMobile() {
           <ProductCampaignPriceBlock
             productId={product.id}
             variantId={variant?.id}
-            sellerId={selectedSellerId || product.seller_id}
+            sellerId={product.seller_id}
             effectiveDisplayCents={effectiveDisplayCents}
             discountPercent={discountPercent}
             hasSale={hasSale}
@@ -1942,19 +2012,12 @@ export default function ProductTemplateMobile() {
               {multiOffer?.canonical_ean ? (
                 <p style={{ fontSize: 12, color: "#047857", margin: "0 0 10px", fontWeight: 600, lineHeight: 1.35 }}>
                   {tp("featuredOffer")}
-                  {multiOffer.landed_product_id &&
-                  product?.id &&
-                  String(multiOffer.landed_product_id) !== String(product.id) ? (
-                    <span style={{ display: "block", fontWeight: 500, color: "#6b7280", marginTop: 4 }}>
-                      {tp("sellerUrlWarning")}
-                    </span>
-                  ) : null}
                 </p>
               ) : null}
               <ProductCampaignPriceBlock
                 productId={product.id}
                 variantId={variant?.id}
-                sellerId={selectedSellerId || product.seller_id}
+                sellerId={product.seller_id}
                 effectiveDisplayCents={effectiveDisplayCents}
                 discountPercent={discountPercent}
                 hasSale={hasSale}
@@ -2001,84 +2064,75 @@ export default function ProductTemplateMobile() {
             </BuyboxInner>
           </BuyboxCard>
 
-          {multiOffer?.other_sellers?.length > 0 ? (
+          {otherSellersForVariant.length > 0 ? (
             <OtherSellersCard>
               <button
                 type="button"
                 onClick={() => setOtherSellersOpen((v) => !v)}
-                style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, marginBottom: 6, cursor: "pointer", fontWeight: 700, fontSize: 14, color: "#111827" }}
+                style={{ width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, marginBottom: 8, cursor: "pointer", fontWeight: 700, fontSize: 14, color: "#111827" }}
               >
-                {`${tp("otherSellers")} (${multiOffer.other_sellers.length})`}
+                {`${tp("otherSellers")} (${otherSellersForVariant.length})`}
                 <span style={{ marginLeft: 8, fontSize: 12, color: "#6b7280" }}>{otherSellersOpen ? "▲" : "▼"}</span>
               </button>
-              <p style={{ fontSize: 11, color: "#6b7280", margin: "0 0 8px", lineHeight: 1.35 }}>
-                {tp("otherSellersHint")}
-              </p>
               {otherSellersOpen && (
                 <>
-              {selectedSellerId && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "6px 10px", marginBottom: 6, fontSize: 12 }}>
-                  <span style={{ color: "#166534", fontWeight: 600 }}>
-                    {tp("buyingFromSeller")}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSellerId(null)}
-                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: "#6b7280", textDecoration: "underline", padding: 0 }}
-                  >
-                    {tp("reset")}
-                  </button>
-                </div>
-              )}
-              {multiOffer.other_sellers.map((o) => {
-                const isSelected = selectedSellerId === o.seller_id;
+              {otherSellersForVariant.map((o) => {
+                const adding = otherSellerAddingId === String(o.seller_id);
+                const disabled = !o.in_stock || shippingUnavailable || isComingSoon || !!otherSellerAddingId;
+                const avg = Number(o.seller_review_avg) || 0;
+                const cnt = Number(o.seller_review_count) || 0;
                 return (
-                  <OtherSellerRow key={o.product_id} style={isSelected ? { background: "#f0fdf4", borderColor: "#86efac" } : {}}>
+                  <OtherSellerRow key={o.product_id || o.seller_id}>
                     {o.thumbnail ? (
                       <img
                         src={resolveImageUrl(o.thumbnail) || o.thumbnail}
                         alt=""
-                        width={44}
-                        height={44}
-                        style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, background: "#e5e7eb", flexShrink: 0 }}
+                        width={52}
+                        height={52}
+                        style={{ width: 52, height: 52, objectFit: "cover", borderRadius: 10, background: "#e5e7eb", flexShrink: 0 }}
                       />
                     ) : (
-                      <div style={{ width: 44, height: 44, borderRadius: 8, background: "#e5e7eb", flexShrink: 0 }} aria-hidden />
+                      <div style={{ width: 52, height: 52, borderRadius: 10, background: "#e5e7eb", flexShrink: 0 }} aria-hidden />
                     )}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{o.store_name}</div>
-                      <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        {o.seller_review_count > 0 && Number(o.seller_review_avg) > 0 ? (
-                          <StarRating average={Number(o.seller_review_avg) || 0} count={Number(o.seller_review_count) || 0} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 650, fontSize: 13, color: "#111827", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {o.store_name}
+                      </div>
+                      <div style={{ marginTop: 4 }}>
+                        {cnt > 0 ? (
+                          <StarRating average={avg} count={cnt} />
                         ) : (
-                          <span>{tp("noSellerReviews")}</span>
+                          <span style={{ fontSize: 11, color: "#9ca3af" }}>{tp("noSellerReviews")}</span>
                         )}
                       </div>
-                      <div style={{ marginTop: 6 }}>
-                        <button
-                          type="button"
-                          disabled={!o.in_stock}
-                          onClick={() => setSelectedSellerId(isSelected ? null : o.seller_id)}
-                          style={{
-                            fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, cursor: o.in_stock ? "pointer" : "not-allowed",
-                            background: isSelected ? "#16a34a" : o.in_stock ? "#111827" : "#d1d5db",
-                            color: isSelected || o.in_stock ? "#fff" : "#6b7280",
-                            border: "none",
-                          }}
-                        >
-                          {isSelected
-                            ? tp("sellerSelected")
-                            : !o.in_stock
-                              ? tp("sellerNoStock")
-                              : tp("buyFromSeller")}
-                        </button>
-                      </div>
+                      {!o.in_stock ? (
+                        <div style={{ marginTop: 4, fontSize: 11, color: "#b91c1c", fontWeight: 600 }}>{tp("sellerNoStock")}</div>
+                      ) : null}
                     </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
+                    <div style={{ textAlign: "right", flexShrink: 0, minWidth: 64 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", whiteSpace: "nowrap" }}>
                         {formatPriceCents(Number(o.price_cents) || 0)} €
                       </div>
                     </div>
+                    <OtherSellerCartBtn
+                      type="button"
+                      $disabled={disabled}
+                      disabled={disabled}
+                      title={o.in_stock ? tp("addToCart") : tp("sellerNoStock")}
+                      aria-label={o.in_stock ? tp("addToCart") : tp("sellerNoStock")}
+                      onClick={() => handleAddOtherSellerToCart(o)}
+                    >
+                      {adding ? (
+                        <span style={{ fontSize: 12, fontWeight: 700 }}>…</span>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M6 6h15l-1.5 9h-12L6 6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                          <path d="M6 6 5 3H2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="9" cy="20" r="1.4" fill="currentColor" />
+                          <circle cx="18" cy="20" r="1.4" fill="currentColor" />
+                        </svg>
+                      )}
+                    </OtherSellerCartBtn>
                   </OtherSellerRow>
                 );
               })}

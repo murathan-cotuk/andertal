@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import Link from "next/link";
@@ -488,7 +489,6 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
 function InventoryProductRow({
   product,
   locale,
-  router,
   selectedIds,
   setSelectedIds,
   menuOpenId,
@@ -498,14 +498,74 @@ function InventoryProductRow({
   setProducts,
   pendingChangeRequests,
   onOpenChangeRequests,
-  isSuperuser,
-  onClaimOwnership,
   ui,
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
+  const menuBtnRef = useRef(null);
+  const menuPanelRef = useRef(null);
+  const [menuPos, setMenuPos] = useState(null);
   const shopBaseUrl = getDefaultShopUrl();
   const l = String(locale || "en").toLowerCase();
+  const menuOpen = menuOpenId === product.id;
+
+  useLayoutEffect(() => {
+    if (!menuOpen) {
+      setMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const el = menuBtnRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const menuW = 180;
+      const menuH = 160;
+      const gap = 6;
+      let top = r.bottom + gap;
+      let left = r.right - menuW;
+      if (left < 8) left = 8;
+      if (left + menuW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuW - 8);
+      if (top + menuH > window.innerHeight - 8 && r.top > menuH + gap) {
+        top = r.top - menuH - gap;
+      }
+      setMenuPos({ top, left, width: menuW });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e) => {
+      const t = e.target;
+      if (!(t instanceof Node)) {
+        setMenuOpenId(null);
+        return;
+      }
+      if (menuBtnRef.current?.contains(t) || menuPanelRef.current?.contains(t)) return;
+      setMenuOpenId(null);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setMenuOpenId(null);
+    };
+    // Capture phase so Polaris / row handlers that stopPropagation still close the menu.
+    document.addEventListener("pointerdown", onDoc, true);
+    document.addEventListener("mousedown", onDoc, true);
+    document.addEventListener("touchstart", onDoc, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDoc, true);
+      document.removeEventListener("mousedown", onDoc, true);
+      document.removeEventListener("touchstart", onDoc, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen, setMenuOpenId]);
+
   const statusOn = isProductToggleOn(product.status);
   const statusValues = productToggleStatusValues(product);
   const i18n = {
@@ -692,14 +752,13 @@ function InventoryProductRow({
                 <path d="M15 3h6v6M10 14 21 3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </a>
-            <button
-              type="button"
-              onClick={() => router.push(`/products/${product.id}`)}
-              style={{ marginTop: 2, padding: 0, background: "none", border: "none", cursor: "pointer", color: "#4b5563", fontSize: 12, textDecoration: "underline" }}
+            <I18nLink
+              href={`/products/${product.id}`}
+              style={{ marginTop: 2, padding: 0, color: "#4b5563", fontSize: 12, textDecoration: "underline", display: "inline-block" }}
               title={lt(locale, "Open product edit page via SKU", "SKU ile ürün düzenleme sayfasına git", "Ouvrir la page produit via SKU", "Abrir edición de producto vía SKU", "Apri modifica prodotto tramite SKU", "SKU üzerinden ürün düzenleme sayfasına git")}
             >
               {i18n.sku}: {sku}
-            </button>
+            </I18nLink>
             <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2 }}>{i18n.ean}: {ean}</div>
           </div>
           <div style={{ fontSize: 13, color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{inv}</div>
@@ -708,12 +767,23 @@ function InventoryProductRow({
             {variationSummary || "—"}
           </div>
           <InlineStack gap="100" blockAlign="center" style={{ padding: "8px 6px", justifyContent: "flex-end" }}>
-          <Button
-            variant="tertiary"
-            onClick={() => router.push(`/products/${product.id}`)}
-            icon={EditPencilIcon}
-            accessibilityLabel="Edit product"
-          />
+          <I18nLink
+            href={`/products/${product.id}`}
+            aria-label="Edit product"
+            title="Edit product"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              color: "#374151",
+              textDecoration: "none",
+            }}
+          >
+            <EditPencilIcon />
+          </I18nLink>
           <Box position="relative">
             {pendingCount > 0 && (
               <span
@@ -731,29 +801,33 @@ function InventoryProductRow({
                 }}
               />
             )}
-            <Button
-              variant="tertiary"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpenId((prev) => (prev === product.id ? null : product.id));
-              }}
-            >
-              ⋯
-            </Button>
-            {menuOpenId === product.id && (
+            <div ref={menuBtnRef} style={{ display: "inline-flex" }}>
+              <Button
+                variant="tertiary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpenId((prev) => (prev === product.id ? null : product.id));
+                }}
+              >
+                ⋯
+              </Button>
+            </div>
+            {menuOpen && menuPos && typeof document !== "undefined" && createPortal(
               <div
+                ref={menuPanelRef}
                 style={{
-                  position: "absolute",
-                  right: 0,
-                  top: "calc(100% + 6px)",
-                  zIndex: 40,
-                  minWidth: 156,
+                  position: "fixed",
+                  top: menuPos.top,
+                  left: menuPos.left,
+                  zIndex: 10050,
+                  minWidth: menuPos.width,
                   background: "#fff",
                   border: "1px solid #e5e7eb",
                   borderRadius: 8,
                   boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                   overflow: "hidden",
                 }}
+                onClick={(e) => e.stopPropagation()}
               >
                 {pendingCount > 0 && (
                   <button
@@ -777,29 +851,6 @@ function InventoryProductRow({
                     title="View proposed changes"
                   >
                     {i18n.changeProposed} ({pendingCount})
-                  </button>
-                )}
-                {isSuperuser && !product.seller_id && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClaimOwnership(product.id);
-                    }}
-                    style={{
-                      width: "100%",
-                      height: 36,
-                      border: "none",
-                      background: "#fff",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      padding: "0 12px",
-                      fontSize: 13,
-                      color: "#111827",
-                    }}
-                    title={l === "tr" ? "Bu ürünü kendi satıcı hesabına ata" : l === "de" ? "Dieses Produkt deinem Verkäuferkonto zuordnen" : "Assign this product to your seller account"}
-                  >
-                    {l === "tr" ? "Sahipliğimi ata" : l === "de" ? "Inhaberschaft zuweisen" : l === "fr" ? "Revendiquer la propriété" : l === "es" ? "Reclamar propiedad" : l === "it" ? "Rivendica proprietà" : "Claim ownership"}
                   </button>
                 )}
                 <button
@@ -852,7 +903,8 @@ function InventoryProductRow({
                 >
                   {ui.delete}
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </Box>
           <ProductStatusToggle
@@ -980,9 +1032,9 @@ export default function InventoryPage() {
       style={{
         border: "1px solid #e5e7eb",
         borderRadius: 8,
-        overflow: "hidden",
         background: "#fff",
         maxHeight: "68vh",
+        overflowX: "auto",
         overflowY: "auto",
       }}
     >
@@ -1307,26 +1359,11 @@ export default function InventoryPage() {
     setDuplicateModalOpen(true);
   };
 
-  const claimOwnership = async (productId) => {
-    setMenuOpenId(null);
-    try {
-      await medusaClient.request(`/admin-hub/v1/products/${encodeURIComponent(productId)}/claim-owner`, {
-        method: 'POST',
-        body: JSON.stringify({ seller_id: mySellerId }),
-      });
-      const data = await medusaClient.getAdminHubProducts();
-      setProducts(data.products || []);
-    } catch (err) {
-      setError(userError(err, locale, 'Failed to claim ownership'));
-    }
-  };
-
   const renderRow = (product) => (
     <InventoryProductRow
       key={product.id}
       product={product}
       locale={locale}
-      router={router}
       selectedIds={selectedIds}
       setSelectedIds={setSelectedIds}
       menuOpenId={menuOpenId}
@@ -1339,8 +1376,6 @@ export default function InventoryPage() {
         setMenuOpenId(null);
         openChangeRequestsModal(pid);
       }}
-      isSuperuser={isSuperuser}
-      onClaimOwnership={claimOwnership}
       ui={ui}
     />
   );

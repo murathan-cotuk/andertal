@@ -3,6 +3,7 @@ const { Router } = require('express')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 const { chargeSellerForLabel } = require('../seller-billing')
+const { sqlOrderOwnedBySeller } = require('../seller-scope')
 
 // Dispatches order-related automation flow triggers via the queue, falling back to immediate execution.
 // (Mirrors the helper in orders.js — kept separate since these two route files aren't shared modules.)
@@ -51,10 +52,10 @@ module.exports = function createShipmentTrackingRouter({
       return null
     }
 
-    // Returns order row if the caller has access (direct seller_id match OR via seller listings)
+    // Returns order row if the caller sold a line on this order (not merely catalog-owns the SKU).
     const sellerOrderAccessSQL = (isSuperuser) => isSuperuser
       ? ''
-      : ` AND (seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=store_orders.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text=oi.product_id::text AND sl.seller_id=$2 AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text=oi.product_id::text)=1) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id::text AND ap.seller_id=$2))))`
+      : ` AND ${sqlOrderOwnedBySeller('store_orders', '$2')}`
 
     const adminHubShipmentEventsGET = async (req, res) => {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -137,7 +138,7 @@ module.exports = function createShipmentTrackingRouter({
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const sellerEventAccessSQL = isSuperuser ? '' : ` AND (o.seller_id=$2 OR EXISTS (SELECT 1 FROM store_order_items oi WHERE oi.order_id=o.id AND (EXISTS (SELECT 1 FROM admin_hub_seller_listings sl WHERE sl.product_id::text=oi.product_id::text AND sl.seller_id=$2 AND (SELECT COUNT(*) FROM admin_hub_seller_listings sl2 WHERE sl2.product_id::text=oi.product_id::text)=1) OR EXISTS (SELECT 1 FROM admin_hub_products ap WHERE ap.id::text=oi.product_id::text AND ap.seller_id=$2))))`
+        const sellerEventAccessSQL = isSuperuser ? '' : ` AND ${sqlOrderOwnedBySeller('o', '$2')}`
         const ownerCheck = await client.query(
           `SELECT e.id FROM store_shipment_events e JOIN store_orders o ON o.id=e.order_id WHERE e.id=$1::uuid` + sellerEventAccessSQL,
           isSuperuser ? [eventId] : [eventId, callerSellerId]
