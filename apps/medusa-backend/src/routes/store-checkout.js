@@ -3449,10 +3449,14 @@ const storeOrdersPOST = async (req, res) => {
     // Customer: angemeldet → immer Konto-E-Mail + customer_id (Bestellungen unter „Meine Bestellungen“)
     let customerId = null
     let isGuest = true
+    // B2B reverse-charge (BonusPunkte.md §6): a 'gewerbe' customer's VAT-ID, already collected on their
+    // account profile (register/account pages, store_customers.vat_number) — never a new checkout field.
+    // Snapshotted onto the order at creation time so later profile edits don't rewrite past invoices.
+    let customerVatId = null
     try {
       if (jwtCustomerId) {
         const accR = await client.query(
-          'SELECT id, account_type, first_name, last_name, phone, email FROM store_customers WHERE id = $1::uuid',
+          'SELECT id, account_type, first_name, last_name, phone, email, vat_number FROM store_customers WHERE id = $1::uuid',
           [jwtCustomerId],
         )
         const acc = accR.rows?.[0]
@@ -3464,12 +3468,16 @@ const storeOrdersPOST = async (req, res) => {
           if (!phone && acc.phone) phone = acc.phone
           if (acc.email) email = String(acc.email).trim()
           else if (jwtEmail) email = jwtEmail
+          if (acc.account_type === 'gewerbe' && acc.vat_number) customerVatId = String(acc.vat_number).trim() || null
         }
       } else if (email) {
-        const custRes = await client.query('SELECT id, account_type FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))', [email])
+        const custRes = await client.query('SELECT id, account_type, vat_number FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))', [email])
         if (custRes.rows && custRes.rows[0]) {
           customerId = custRes.rows[0].id
           isGuest = custRes.rows[0].account_type === 'gastkunde'
+          if (custRes.rows[0].account_type === 'gewerbe' && custRes.rows[0].vat_number) {
+            customerVatId = String(custRes.rows[0].vat_number).trim() || null
+          }
         } else {
           const insC = await client.query(
             `INSERT INTO store_customers (email, first_name, last_name, phone, account_type, address_line1, zip_code, city, country)
@@ -3679,12 +3687,12 @@ const storeOrdersPOST = async (req, res) => {
          stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
          checkout_payment_kind, seller_net_after_commission_cents,
          subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency, locale,
-         platform_bonus_funding_cents)
+         platform_bonus_funding_cents, customer_vat_id)
        VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'offen','bezahlt',
          '${stripeTransferInit}',$33,$23,'pending',
          $24,$25,
          $26,$27,$28,$29,$30,$31,$32,'eur',$34,
-         $35)
+         $35,$36)
        RETURNING id, order_number`,
       [cartId, paymentIntentForDb, sellerId, email, first_name, last_name, phone,
        address_line1, address_line2, city, postal_code, country,
@@ -3695,7 +3703,7 @@ const storeOrdersPOST = async (req, res) => {
        sellerNetMerchandiseCents,
        subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,
        piStripeAccountId || null, locale,
-       discountCentsFromBonusPoints(bonusPointsRedeemed)]
+       discountCentsFromBonusPoints(bonusPointsRedeemed), customerVatId]
     )
 
     const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null

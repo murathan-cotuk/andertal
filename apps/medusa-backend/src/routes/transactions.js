@@ -70,7 +70,7 @@ module.exports = function createTransactionsRouter({
           : `LEFT JOIN seller_users s ON s.seller_id = o.seller_id`
         const r = await client.query(
           `SELECT o.id, o.order_number, o.seller_id, o.customer_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
-                  o.coupon_discount_cents, o.country, o.bonus_points_redeemed,
+                  o.coupon_discount_cents, o.country, o.bonus_points_redeemed, o.customer_vat_id,
                   COALESCE(o.platform_bonus_funding_cents, 0)::bigint AS platform_bonus_funding_cents,
                   o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
                   o.stripe_transfer_status, o.stripe_transfer_id, o.stripe_transfer_error, o.stripe_transfer_at,
@@ -154,7 +154,8 @@ module.exports = function createTransactionsRouter({
           const bonusRedeemedCents = orderBonusDiscountCents(row)
           const orderValueCents = Math.max(0, customerPaid + bonusRedeemedCents)
           const sellerVatId = row.vat_id ? String(row.vat_id).trim() : ''
-          const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents })
+          const customerVatId = row.customer_vat_id ? String(row.customer_vat_id).trim() : ''
+          const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents, customerVatId })
           const commissionVatCents = PLATFORM_VAT_PERCENT > 0 ? Math.round(commission * PLATFORM_VAT_PERCENT / 100) : 0
           return {
             id: row.id,
@@ -182,7 +183,7 @@ module.exports = function createTransactionsRouter({
             platform_bonus_funding_cents: Number(row.platform_bonus_funding_cents || 0),
             refund_cents: Number(row.refund_cents || 0),
             destination_country: row.country ? String(row.country).trim().toUpperCase() : null,
-            vat_scheme: goodsVat.exempt ? 'kleinunternehmer_exempt' : 'destination_country_vat',
+            vat_scheme: goodsVat.scheme,
             goods_vat_rate_percent: goodsVat.exempt ? 0 : goodsVat.ratePercent,
             goods_net_cents: goodsVat.netCents,
             goods_vat_cents: goodsVat.vatCents,

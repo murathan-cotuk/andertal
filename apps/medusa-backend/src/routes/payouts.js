@@ -1,7 +1,8 @@
 'use strict'
 const { Router } = require('express')
 const { resolveSellerScope } = require('../seller-scope')
-const { resolveOrderPaidTotalCents } = require('../order-money')
+const { resolveOrderPaidTotalCents, orderBonusDiscountCents } = require('../order-money')
+const { salesInvoiceVat } = require('../goods-vat')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -254,7 +255,6 @@ module.exports = function createPayoutsRouter({
              LIMIT 2000`,
           params,
         )
-        await client.end()
         const rows = r.rows || []
         const totals = rows.reduce((acc, row) => {
           acc.gross_sale_cents += Number(row.total_cents || 0)
@@ -272,8 +272,60 @@ module.exports = function createPayoutsRouter({
         })
         totals.seller_count = new Set(rows.map((row) => row.seller_id)).size
         totals.invoice_count = rows.length
+
+        // OSS_Bestimmungsland: BonusPunkte.md §3.8 export sheet 3 — teslim ülkesi × net mal / KDV /
+        // oran. Bağımsız olarak store_orders'tan hesaplanır (seller_payouts'un seller/period toplamı
+        // dışında, AYRI bir kırılım boyutu) — aynı period_start/period_end filtresini kullanır.
+        // B2B reverse-charge (intra_b2b): bu sipariş grubu bu sheet'in (B2C OSS) DIŞINDA tutulur —
+        // ayrı `b2b_reverse_charge` toplamı olarak dönüyor (BonusPunkte.md §6: "OSS B2C toplamına karışmaz").
+        let ossByCountry = []
+        let b2bReverseCharge = { order_count: 0, net_cents: 0 }
+        try {
+          const ossWhere = [`o.payment_status = 'bezahlt'`]
+          const ossParams = []
+          if (period_start) { ossParams.push(period_start); ossWhere.push(`o.created_at >= $${ossParams.length}::date`) }
+          if (period_end) { ossParams.push(period_end); ossWhere.push(`o.created_at < ($${ossParams.length}::date + interval '1 day')`) }
+          if (seller_id) { ossParams.push(seller_id); ossWhere.push(`o.seller_id = $${ossParams.length}`) }
+          const oRes = await client.query(
+            `SELECT o.country, o.subtotal_cents, o.shipping_cents, o.discount_cents, o.coupon_discount_cents, o.total_cents,
+                    o.customer_vat_id, s.vat_id
+               FROM store_orders o
+               LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+               WHERE ${ossWhere.join(' AND ')}
+               LIMIT 20000`,
+            ossParams,
+          )
+          const byCountry = new Map()
+          for (const row of oRes.rows || []) {
+            const cc = row.country ? String(row.country).trim().toUpperCase().slice(0, 2) : 'DE'
+            const customerPaid = resolveOrderPaidTotalCents(row)
+            const bonus = orderBonusDiscountCents(row)
+            const orderValueCents = Math.max(0, customerPaid + bonus)
+            const sellerVatId = row.vat_id ? String(row.vat_id).trim() : ''
+            const customerVatId = row.customer_vat_id ? String(row.customer_vat_id).trim() : ''
+            const vat = salesInvoiceVat({ country: cc }, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents, customerVatId })
+            if (vat.scheme === 'intra_b2b') {
+              b2bReverseCharge.order_count += 1
+              b2bReverseCharge.net_cents += vat.netCents
+              continue
+            }
+            if (!byCountry.has(cc)) byCountry.set(cc, { country: cc, order_count: 0, gross_cents: 0, net_cents: 0, vat_cents: 0, rate_percent: vat.exempt ? 0 : vat.ratePercent })
+            const bucket = byCountry.get(cc)
+            bucket.order_count += 1
+            bucket.gross_cents += orderValueCents
+            bucket.net_cents += vat.netCents
+            bucket.vat_cents += vat.vatCents
+          }
+          ossByCountry = [...byCountry.values()].sort((a, b) => b.gross_cents - a.gross_cents)
+        } catch (_) {
+          ossByCountry = []
+        }
+        await client.end()
+
         res.json({
           totals,
+          oss_by_country: ossByCountry,
+          b2b_reverse_charge: b2bReverseCharge,
           sellers: rows.map((row) => ({
             payout_id: row.id,
             seller_id: row.seller_id,

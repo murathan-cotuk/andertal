@@ -19,7 +19,7 @@ const {
   discountCentsFromBonusPoints,
   clampCartBonusRedemption,
 } = require('./routes/store-checkout')
-const { getGoodsVatRatePercent, splitInclusiveVat } = require('./goods-vat')
+const { getGoodsVatRatePercent, splitInclusiveVat, salesInvoiceVat, isValidEuVatIdFormat } = require('./goods-vat')
 
 describe('1-4. §2 acceptance scenarios — earn/redeem/commission/seller-net', () => {
   test('1. 100€ paid, no bonus redeemed → 100 pts earned, 12% commission = 12€, seller net 88€', () => {
@@ -139,8 +139,35 @@ describe('10. Destination-country goods VAT (goods-vat.js) — rate lookup + spl
   )
 })
 
-test(
-  '11. B2B + FR VAT-ID → 0% goods VAT, intra_b2b scheme, excluded from the B2C OSS sheet',
-  { skip: 'No customer-VAT-ID / B2B reverse-charge branch exists in goods-vat.js (salesInvoiceVat only checks the SELLER\'s own vat_id) — part of the deferred §3.10 scope, see docs/BonusPunkte.md §7.' },
-  () => {},
-)
+describe('11. B2B + valid EU VAT-ID → 0% goods VAT, intra_b2b scheme (BonusPunkte.md §6, implemented after user confirmed the business need)', () => {
+  test('FR customer with a valid FR VAT-ID → 0% goods VAT, scheme intra_b2b', () => {
+    const vat = salesInvoiceVat({ country: 'FR' }, { sellerHasVatId: true, taxableGrossCents: 5000, customerVatId: 'FR12345678901' })
+    assert.equal(vat.exempt, true)
+    assert.equal(vat.scheme, 'intra_b2b')
+    assert.equal(vat.vatCents, 0)
+    assert.equal(vat.netCents, 5000)
+  })
+  test('same FR order WITHOUT a VAT-ID → normal 20% B2C VAT applies', () => {
+    const vat = salesInvoiceVat({ country: 'FR' }, { sellerHasVatId: true, taxableGrossCents: 5000, customerVatId: '' })
+    assert.equal(vat.exempt, false)
+    assert.equal(vat.scheme, 'standard')
+    assert.equal(vat.ratePercent, 20)
+  })
+  test('domestic DE customer with a DE VAT-ID does NOT get reverse-charge (not cross-border)', () => {
+    const vat = salesInvoiceVat({ country: 'DE' }, { sellerHasVatId: true, taxableGrossCents: 5000, customerVatId: 'DE123456789' })
+    assert.equal(vat.scheme, 'standard')
+    assert.equal(vat.exempt, false)
+  })
+  test('malformed / non-EU VAT-ID never triggers reverse-charge', () => {
+    assert.equal(isValidEuVatIdFormat('not-a-vat-id'), false)
+    assert.equal(isValidEuVatIdFormat('US123456789'), false)
+    assert.equal(isValidEuVatIdFormat('FR12345678901'), true)
+    const vat = salesInvoiceVat({ country: 'FR' }, { sellerHasVatId: true, taxableGrossCents: 5000, customerVatId: 'garbage' })
+    assert.equal(vat.scheme, 'standard')
+  })
+  test('Kleinunternehmer (no seller VAT-ID) still wins over B2B — no VAT to reverse-charge in the first place', () => {
+    const vat = salesInvoiceVat({ country: 'FR' }, { sellerHasVatId: false, taxableGrossCents: 5000, customerVatId: 'FR12345678901' })
+    assert.equal(vat.scheme, 'kleinunternehmer')
+    assert.equal(vat.exempt, true)
+  })
+})

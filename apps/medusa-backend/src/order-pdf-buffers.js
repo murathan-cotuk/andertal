@@ -38,7 +38,8 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
 
   const sellerVatId = sellerInfo?.vat_id ? String(sellerInfo.vat_id).trim() : ''
   const taxableGross = Math.max(0, orderValueCents)
-  const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: taxableGross })
+  const customerVatId = row.customer_vat_id ? String(row.customer_vat_id).trim() : ''
+  const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: taxableGross, customerVatId })
   const vatPctLabel = formatVatPercent(goodsVat.ratePercent)
   const totalsLines = []
   if (couponDisc > 0) totalsLines.push({ label: cc ? `${s.coupon} (${cc})` : s.coupon, value: `-${pdfCents(couponDisc, locale)}` })
@@ -47,6 +48,12 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   if (sellerVatId && !goodsVat.exempt) {
     totalsLines.push({ label: s.netTotal, value: pdfCents(goodsVat.netCents, locale) })
     totalsLines.push({ label: s.vatLine(vatPctLabel), value: pdfCents(goodsVat.vatCents, locale) })
+  } else if (goodsVat.scheme === 'intra_b2b') {
+    // Reverse-charge invoice: net-only line + the legally required note + the buyer's own VAT-ID
+    // (never the same wording/branch as the Kleinunternehmer §19 UStG exemption below).
+    totalsLines.push({ label: s.netTotal, value: pdfCents(goodsVat.netCents, locale) })
+    totalsLines.push({ label: s.reverseChargeNote, value: '', color: '#64748b', small: true })
+    if (customerVatId) totalsLines.push({ label: s.buyerVatIdLabel, value: customerVatId, small: true, color: '#64748b' })
   } else {
     totalsLines.push({ label: s.vatExempt, value: '', color: '#64748b', small: true })
   }

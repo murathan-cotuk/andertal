@@ -862,6 +862,10 @@ async function start() {
         // redemption value at order time), independent of coupon_discount_cents, so settlement/export
         // never has to re-derive "how much of discount_cents was bonus vs coupon" after the fact.
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS platform_bonus_funding_cents integer NOT NULL DEFAULT 0`).catch(() => {})
+        // BonusPunkte.md §6 B2B reverse-charge — snapshot of the 'gewerbe' customer's VAT-ID
+        // (store_customers.vat_number, already collected on account/register — NOT a new checkout
+        // field) at order time, so a later profile edit never rewrites a past invoice's tax basis.
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS customer_vat_id text`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_shipping_carriers (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),

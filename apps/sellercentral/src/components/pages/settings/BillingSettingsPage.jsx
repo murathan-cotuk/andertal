@@ -973,10 +973,41 @@ function FinanzamtTab() {
   const absPdfUrl = (u) => (/^https?:\/\//i.test(u) ? u : `${client.baseURL}${u}`);
   const t = data.totals;
 
+  const [exporting, setExporting] = useState(false);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("sellerToken") : null;
+      if (!token) throw new Error(lt(locale, "Please login again.", "Lütfen tekrar giriş yapın.", "Veuillez vous reconnecter.", "Inicia sesión de nuevo.", "Accedi di nuovo.", "Bitte erneut einloggen."));
+      const response = await fetch("/api/billing/finanzamt-export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sellerToken: token, period_start: periodStart || undefined, period_end: periodEnd || undefined }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body?.error || `${lt(locale, "Export failed", "Dışa aktarma başarısız", "Échec de l'export", "Exportación fallida", "Esportazione non riuscita", "Export fehlgeschlagen")} (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `andertal-finanzamt-${periodEnd || new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e?.message || lt(locale, "Export failed", "Dışa aktarma başarısız", "Échec de l'export", "Exportación fallida", "Esportazione non riuscita", "Export fehlgeschlagen"));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <BlockStack gap="400">
       <Card>
-        <InlineStack gap="200" wrap>
+        <InlineStack gap="200" wrap blockAlign="end">
           <TextField
             label={lt(locale, "From", "Başlangıç", "Du", "Desde", "Da", "Von")}
             type="date" value={periodStart} onChange={setPeriodStart} autoComplete="off"
@@ -985,6 +1016,9 @@ function FinanzamtTab() {
             label={lt(locale, "To", "Bitiş", "Au", "Hasta", "A", "Bis")}
             type="date" value={periodEnd} onChange={setPeriodEnd} autoComplete="off"
           />
+          <Button onClick={handleExport} loading={exporting} disabled={!t}>
+            {lt(locale, "Export Excel", "Excel'e aktar", "Exporter Excel", "Exportar Excel", "Esporta Excel", "Excel exportieren")}
+          </Button>
         </InlineStack>
       </Card>
       {loading ? (

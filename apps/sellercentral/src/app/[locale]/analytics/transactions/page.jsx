@@ -41,6 +41,7 @@ function getTransactionsCopy(locale) {
     pageTitleAdmin: t("Transactions (Admin)", "İşlemler (Admin)", "Transactions (Admin)", "Transacciones (Admin)", "Transazioni (Admin)", "Transaktionen (Admin)"),
     settlementPeriod: t("Settlement period", "Abrechnungszeitraum", "Période de règlement", "Periodo de liquidación", "Periodo di regolamento", "Abrechnungszeitraum"),
     refresh: t("Refresh", "Yenile", "Actualiser", "Actualizar", "Aggiorna", "Aktualisieren"),
+    exportExcel: t("Export Excel", "Excel'e aktar", "Exporter Excel", "Exportar Excel", "Esporta Excel", "Excel exportieren"),
     selectPeriod: t("Select period", "Dönem seç", "Sélectionner la période", "Seleccionar periodo", "Seleziona periodo", "Zeitraum auswählen"),
     overview: t("Overview", "Özet", "Aperçu", "Resumen", "Panoramica", "Übersicht"),
     totalRevenue: t("Total revenue", "Toplam ciro", "Chiffre d'affaires total", "Ingresos totales", "Ricavi totali", "Gesamtumsatz"),
@@ -106,6 +107,7 @@ function getTransactionsCopy(locale) {
     stillPendingAmount: t("Still pending", "Hâlâ bekliyor", "Toujours en attente", "Aún pendiente", "Ancora in sospeso", "Noch ausstehend"),
     sellerOverview: t("Seller overview", "Satıcı özeti", "Aperçu vendeurs", "Resumen vendedores", "Panoramica venditori", "Seller-Übersicht"),
     revenue: t("Revenue", "Ciro", "Chiffre d'affaires", "Ingresos", "Ricavi", "Umsatz"),
+    colCustomerPaid: t("Customer", "Müşteri", "Client", "Cliente", "Cliente", "Kunde"),
     payout: t("Payout", "Ödeme", "Versement", "Pago", "Pagamento", "Auszahlung"),
     status: t("Status", "Durum", "Statut", "Estado", "Stato", "Status"),
     ordersShort: (total, eligible) => t(
@@ -240,6 +242,30 @@ function generatePeriods(count = 14) {
 
 const PERIODS = generatePeriods(14);
 
+/** BonusPunkte.md §3.9: "işlem listesi" export — not a copy of the Billing Finanzamt PDF. */
+async function exportTransactionsExcel({ periodStart, periodEnd, sellerId, locale }) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("sellerToken") : null;
+  if (!token) throw new Error(lt(locale, "Please login again.", "Lütfen tekrar giriş yapın.", "Veuillez vous reconnecter.", "Inicia sesión de nuevo.", "Accedi di nuovo.", "Bitte erneut einloggen."));
+  const response = await fetch("/api/analytics/transactions-export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sellerToken: token, period_start: periodStart, period_end: periodEnd, seller_id: sellerId || undefined }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.error || `${lt(locale, "Export failed", "Dışa aktarma başarısız", "Échec de l'export", "Exportación fallida", "Esportazione non riuscita", "Export fehlgeschlagen")} (${response.status})`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `andertal-transactions-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function StatBox({ label, value, note, color }) {
   return (
     <div style={{
@@ -265,8 +291,20 @@ function SellerTransactionsView({ sellerId }) {
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportTransactionsExcel({ periodStart: selectedPeriod.start, periodEnd: selectedPeriod.end, sellerId, locale });
+    } catch (e) {
+      alert(e?.message || copy.loadError);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true); setErr("");
@@ -344,7 +382,10 @@ function SellerTransactionsView({ sellerId }) {
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center">
                 <Text variant="headingMd" as="h2">{copy.settlementPeriod}</Text>
-                <Button onClick={loadData} loading={loading} size="slim">{copy.refresh}</Button>
+                <InlineStack gap="200">
+                  <Button onClick={handleExport} loading={exporting} size="slim">{copy.exportExcel}</Button>
+                  <Button onClick={loadData} loading={loading} size="slim">{copy.refresh}</Button>
+                </InlineStack>
               </InlineStack>
               <div style={{ maxWidth: 340 }}>
                 <Select
@@ -455,8 +496,20 @@ function AdminTransactionsView() {
   const [adjNote, setAdjNote] = useState("");
   const [adjSaving, setAdjSaving] = useState(false);
   const [adjError, setAdjError] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await exportTransactionsExcel({ periodStart: selectedPeriod.start, periodEnd: selectedPeriod.end, sellerId: filterSeller, locale });
+    } catch (e) {
+      alert(e?.message || copy.error);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true); setErr("");
@@ -614,6 +667,7 @@ function AdminTransactionsView() {
                 <Text variant="headingMd" as="h2">{copy.settlementPeriod}</Text>
                 <InlineStack gap="200">
                   <Button onClick={openAdjModal} size="slim">{copy.addAdjustment}</Button>
+                  <Button onClick={handleExport} loading={exporting} size="slim">{copy.exportExcel}</Button>
                   <Button onClick={loadData} loading={loading} size="slim">{copy.refresh}</Button>
                 </InlineStack>
               </InlineStack>
@@ -798,8 +852,8 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
   );
 
   const cols = isSuperuser
-    ? "1.2fr 100px 90px 90px 75px 75px 90px 90px 90px"
-    : "1.5fr 90px 90px 75px 75px 90px 90px";
+    ? "1.2fr 100px 90px 90px 90px 75px 75px 90px 90px 90px"
+    : "1.5fr 90px 90px 90px 75px 75px 90px 90px";
 
   return (
     <div>
@@ -807,6 +861,7 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
         <div>{copy.colOrder}</div>
         {isSuperuser && <div>{copy.seller}</div>}
         <div style={{ textAlign: "right" }}>{copy.revenue}</div>
+        <div style={{ textAlign: "right" }}>{copy.colCustomerPaid}</div>
         <div style={{ textAlign: "right" }}>{copy.colShipping}</div>
         <div style={{ textAlign: "right" }}>{copy.colBonus}</div>
         <div style={{ textAlign: "right" }}>{copy.colCommissionVat}</div>
@@ -828,6 +883,7 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
           </div>
           {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
           <div style={{ textAlign: "right" }}>—</div>
+          <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
@@ -859,6 +915,7 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
           </div>
           {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
           <div style={{ textAlign: "right" }}>{fmt(tx.total_cents, tx.currency)}</div>
+          <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(tx.customer_paid_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(tx.shipping_cents || 0, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#2563eb" }}>{tx.bonus_redeemed_cents > 0 ? fmt(tx.bonus_redeemed_cents, tx.currency) : "—"}</div>
           <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{tx.commission_vat_cents > 0 ? fmt(tx.commission_vat_cents, tx.currency) : "—"}</div>

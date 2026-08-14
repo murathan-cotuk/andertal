@@ -109,22 +109,54 @@ function pickCountryMerchandiseCents(prices, country, opts = {}) {
   return null
 }
 
-function salesInvoiceVat(row, { sellerHasVatId, taxableGrossCents } = {}) {
+// EU member states (goods VAT / reverse-charge scope). NOT the same list as DEFAULT_STANDARD_RATES,
+// which also carries a few non-EU reference rates (CH/GB/TR/NO/US) that must NEVER trigger reverse-charge.
+const EU_COUNTRIES = new Set([
+  'AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT',
+  'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK',
+])
+
+/** Format check only (no live VIES lookup): 2-letter EU country prefix + 2-12 alphanumeric chars. */
+function isValidEuVatIdFormat(vatId) {
+  const v = String(vatId || '').trim().toUpperCase().replace(/[\s-]/g, '')
+  if (!/^[A-Z]{2}[A-Z0-9]{2,12}$/.test(v)) return false
+  return EU_COUNTRIES.has(v.slice(0, 2))
+}
+
+/**
+ * BonusPunkte.md §6 B2B reverse-charge: intra-EU B2B sale with a valid customer VAT-ID → goods VAT 0%,
+ * "Steuerschuldnerschaft des Leistungsempfängers". Seller's own home country is assumed DE (same
+ * simplification the rest of this codebase already makes — invoices are always issued as a German
+ * seller's documents). Format-only validation (no VIES API call) — documented limitation, not a bug.
+ */
+function isIntraCommunityB2B(row, { customerVatId } = {}) {
+  if (!customerVatId || !isValidEuVatIdFormat(customerVatId)) return false
+  const dest = destinationCountryFromOrder(row)
+  return dest !== 'DE' && EU_COUNTRIES.has(dest)
+}
+
+function salesInvoiceVat(row, { sellerHasVatId, taxableGrossCents, customerVatId } = {}) {
   if (!sellerHasVatId) {
-    return { ...splitInclusiveVat(taxableGrossCents, 0), ratePercent: 0, exempt: true }
+    return { ...splitInclusiveVat(taxableGrossCents, 0), ratePercent: 0, exempt: true, scheme: 'kleinunternehmer' }
+  }
+  if (isIntraCommunityB2B(row, { customerVatId })) {
+    return { ...splitInclusiveVat(taxableGrossCents, 0), ratePercent: 0, exempt: true, scheme: 'intra_b2b' }
   }
   const dest = destinationCountryFromOrder(row)
   const rate = getGoodsVatRatePercent(dest)
-  return { ...splitInclusiveVat(taxableGrossCents, rate), exempt: false, destination: dest }
+  return { ...splitInclusiveVat(taxableGrossCents, rate), exempt: false, destination: dest, scheme: 'standard' }
 }
 
 module.exports = {
   DEFAULT_STANDARD_RATES,
+  EU_COUNTRIES,
   normalizeCountryCode,
   getGoodsVatRatePercent,
   formatVatPercent,
   splitInclusiveVat,
   destinationCountryFromOrder,
   pickCountryMerchandiseCents,
+  isValidEuVatIdFormat,
+  isIntraCommunityB2B,
   salesInvoiceVat,
 }
