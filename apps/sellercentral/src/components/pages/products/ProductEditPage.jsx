@@ -1636,6 +1636,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     });
   }, [hiddenMetaDefKeys, addMetaDefSearch, metaDefs, locale]);
 
+  // Must run unconditionally, before the loading-guard's early return below (Rules of Hooks).
+  const productFiles = useMemo(() => {
+    const f = getMeta(product, "product_files");
+    return Array.isArray(f) ? f : [];
+  }, [product]);
+
   if (!product && !isNew) {
     return (
       <Page title="Product">
@@ -2045,11 +2051,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     // URLs verbatim (this used to just pass http(s) URLs through unchanged).
     return resolveImageUrl(url) || url;
   };
-
-  const productFiles = useMemo(() => {
-    const f = getMeta(product, "product_files");
-    return Array.isArray(f) ? f : [];
-  }, [product]);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];

@@ -571,7 +571,7 @@ export default function ProductsPage() {
     setFormData({ ...formData, variants: newVariants });
   };
 
-  const useCommonVariantOptions = (variantIndex, variantType) => {
+  const applyCommonVariantOptions = (variantIndex, variantType) => {
     const variantTypeData = VARIANT_TYPES.find((v) => v.name === variantType.name);
     if (variantTypeData) {
       updateVariant(variantIndex, "name", variantTypeData.name);
@@ -874,7 +874,7 @@ export default function ProductsPage() {
                         value=""
                         onChange={(e) => {
                           if (e.target.value) {
-                            useCommonVariantOptions(variantIndex, VARIANT_TYPES.find((v) => v.name === e.target.value));
+                            applyCommonVariantOptions(variantIndex, VARIANT_TYPES.find((v) => v.name === e.target.value));
                           }
                         }}
                         style={{ width: "200px" }}

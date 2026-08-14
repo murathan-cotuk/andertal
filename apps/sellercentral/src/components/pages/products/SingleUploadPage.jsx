@@ -146,7 +146,7 @@ export default function SingleUploadPage() {
     setFormData((prev) => ({ ...prev, variants: next }));
   };
 
-  const useCommonVariantOptions = (variantIndex, variantType) => {
+  const applyCommonVariantOptions = (variantIndex, variantType) => {
     const data = VARIANT_TYPES.find((v) => v.name === variantType?.name);
     if (data) {
       updateVariant(variantIndex, "name", data.name);
@@ -409,7 +409,7 @@ export default function SingleUploadPage() {
                               labelHidden
                               options={[{ label: copy.useCommonOptions, value: "" }, ...VARIANT_TYPES.map((vt) => ({ label: vt.name, value: vt.name }))]}
                               value=""
-                              onChange={(value) => useCommonVariantOptions(vIdx, VARIANT_TYPES.find((v) => v.name === value))}
+                              onChange={(value) => applyCommonVariantOptions(vIdx, VARIANT_TYPES.find((v) => v.name === value))}
                             />
                           </InlineStack>
                           <Button variant="plain" tone="critical" onClick={() => removeVariant(vIdx)}>

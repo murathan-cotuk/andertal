@@ -101,7 +101,6 @@ export default function AppStoreHub({ selectedTab, onTabChange, highlightHandle,
       setDetail(found);
       onFindStoreConsumed?.();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- open once when catalog + handle are ready
   }, [highlightHandle, apps]);
 
   const openConfigure = (inst) => {
