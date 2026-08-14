@@ -60,26 +60,36 @@ export async function POST(request) {
       return JSON.stringify(before) !== JSON.stringify(after);
     });
 
+    const errors = [];
+    let persisted = 0;
     for (const key of persistKeys) {
       const def = definitions[key];
-      await backendJson(`/admin-hub/metafield-definitions/${encodeURIComponent(key)}`, {
-        token,
-        method: "PUT",
-        body: {
-          label: def.label,
-          values: def.values || [],
-          label_i18n: def.label_i18n || null,
-          values_i18n: def.values_i18n || null,
-        },
-      });
+      try {
+        await backendJson(`/admin-hub/metafield-definitions/${encodeURIComponent(key)}`, {
+          token,
+          method: "PUT",
+          body: {
+            label: def.label,
+            values: def.values || [],
+            label_i18n: def.label_i18n || null,
+            values_i18n: def.values_i18n || null,
+          },
+        });
+        persisted += 1;
+      } catch (err) {
+        errors.push({ key, error: err.message || "save failed" });
+      }
     }
 
     return Response.json({
-      ok: true,
+      ok: errors.length === 0,
       created: summary.created,
       updated: summary.updated,
       valuesAdded: summary.valuesAdded,
-      persisted: persistKeys.length,
+      remapped: summary.remapped || [],
+      skipped: summary.skipped || [],
+      persisted,
+      errors,
     });
   } catch (e) {
     const status = e.status || 500;

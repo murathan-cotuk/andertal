@@ -134,6 +134,36 @@ const PREFIX_RULES = [
   { re: /^unknown brand/i, en: "Unknown brand", de: "Unbekannte Marke", tr: "Bilinmeyen marka" },
   { re: /^unknown category/i, en: "Unknown category", de: "Unbekannte Kategorie", tr: "Bilinmeyen kategori" },
   { re: /^unknown shipping group/i, en: "Unknown shipping group", de: "Unbekannte Versandgruppe", tr: "Bilinmeyen kargo grubu" },
+  {
+    re: /^gpsr required fields missing for variant/i,
+    en: "GPSR fields are incomplete for one or more variants. Fill manufacturer / manufacturer info / responsible person — or lock those fields to the parent.",
+    de: "GPSR-Pflichtfelder fehlen bei einer oder mehreren Varianten. Hersteller / Herstellerinfo / Verantwortliche Person ausfüllen — oder an den Hauptartikel koppeln.",
+    tr: "Bir veya daha fazla varyantta GPSR zorunlu alanları eksik. Üretici / üretici bilgisi / sorumlu kişi doldurun — veya ana ürüne kilitleyin.",
+  },
+  {
+    re: /^gpsr required fields missing/i,
+    en: "GPSR required fields are missing (manufacturer, manufacturer info, responsible person).",
+    de: "GPSR-Pflichtfelder fehlen (Hersteller, Herstellerinfo, Verantwortliche Person).",
+    tr: "GPSR zorunlu alanları eksik (üretici, üretici bilgisi, sorumlu kişi).",
+  },
+  {
+    re: /^ean validation failed/i,
+    en: "EAN validation failed. Check that every variant has a unique valid EAN.",
+    de: "EAN-Prüfung fehlgeschlagen. Jede Variante braucht eine gültige, eindeutige EAN.",
+    tr: "EAN doğrulaması başarısız. Her varyantta geçerli ve benzersiz EAN olmalı.",
+  },
+  {
+    re: /^ean cannot be changed/i,
+    en: "EAN cannot be changed once set.",
+    de: "Eine gesetzte EAN kann nicht geändert werden.",
+    tr: "Belirlenen EAN değiştirilemez.",
+  },
+  {
+    re: /^brand authorization pending/i,
+    en: "Brand is not approved yet. Publish is blocked until the brand is authorized.",
+    de: "Marke noch nicht freigegeben. Veröffentlichen ist gesperrt, bis die Marke autorisiert ist.",
+    tr: "Marka henüz onaylanmadı. Marka yetkilendirilene kadar yayınlama engellenir.",
+  },
 ];
 
 function pickLocalized(entry, locale) {

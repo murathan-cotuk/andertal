@@ -22,8 +22,53 @@ export function slugifyMetaKey(raw) {
     .replace(/ğ/g, "g")
     .replace(/ı/g, "i")
     .replace(/[^a-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
     .slice(0, 80);
+}
+
+/** Product-metadata reserved keys — must not be used as catalog metaobject keys. */
+export const SYSTEM_METAOBJECT_KEYS = new Set([
+  "media", "image_url", "image", "thumbnail", "ean", "sku", "handle", "title", "description", "status",
+  "inventory", "price", "type", "bullet_points", "bullet1", "bullet2", "bullet3", "bullet4", "bullet5",
+  "translations", "variation_groups", "metafields", "shipping_group_id", "collection_id", "collection_ids",
+  "admin_category_id", "category_id", "category_ids", "category_slug", "category",
+  "seller_id", "product_id", "brand_id", "brand_logo", "brand_handle",
+  "brand", "brand_name", "shop_name", "store_name", "seller_name", "hersteller", "hersteller_information",
+  "verantwortliche_person_information", "manufacturer", "manufacturer_information",
+  "responsible_person_information", "seo_keywords", "seo_meta_title", "seo_meta_description",
+  "publish_date", "return_days", "return_cost", "return_kostenlos", "related_product_ids",
+  "dimensions", "dimensions_length", "dimensions_width", "dimensions_height", "weight", "weight_grams",
+  "unit_type", "unit_value", "unit_reference", "sales_unit", "packaging_unit", "packaging_unit_plural",
+  "minimum_order_quantity", "shipping_info", "versand", "rabattpreis_cents",
+  "uvp_cents", "price_cents", "compare_at_price_cents", "sale_price_cents", "review_count",
+  "review_avg", "sold_last_month", "sold", "sales_count", "salescount", "sold_count",
+  "master_total_variants", "master_total_variant", "total_variants", "variant_count", "variants_count",
+  "is_new", "badge", "sale", "is_bestseller", "view_count", "views", "prices", "custom_badges",
+  "eu_origin_provider", "eu_origin_registry_id", "eu_origin_document_url", "eu_origin_status",
+  "eu_origin_verified_at", "eu_origin_country",
+  "weee_number", "wee_number", "weee", "wee", "eprel_number", "eprel", "eprel_id", "eprel_registration_number",
+  "product_files", "files",
+]);
+
+export function isSystemMetaobjectKey(raw) {
+  const key = slugifyMetaKey(raw);
+  if (!key || key.startsWith("_")) return true;
+  if (SYSTEM_METAOBJECT_KEYS.has(key)) return true;
+  if (key.endsWith("_id") || key.endsWith("_ids")) return true;
+  if (/(^|_)(weee?|eprel|bullet|hersteller|manufacturer|gpsr)(_|$)/i.test(key)) return true;
+  if (key.includes("bullet_point")) return true;
+  return false;
+}
+
+/** Slugify + if reserved, prefix with attr_ (e.g. type → attr_type). */
+export function resolveSafeMetaobjectKey(raw) {
+  let key = slugifyMetaKey(raw);
+  if (!key) return "";
+  if (!isSystemMetaobjectKey(key)) return key;
+  const prefixed = slugifyMetaKey(`attr_${key}`);
+  if (prefixed && !isSystemMetaobjectKey(prefixed)) return prefixed;
+  return "";
 }
 
 export function getMetaobjectsCopy(locale) {

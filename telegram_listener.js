@@ -319,7 +319,20 @@ async function processQueue() {
     // Oturum durumu bozulmuşsa otomatik onar ve bir kez tekrar dene.
     if (!res.ok && !cancelRequested) {
       const out = (res.output || '').toLowerCase()
-      if (/already in use|already exists/.test(out)) {
+      if (/oauth session expired|failed to authenticate|could not be refreshed|not logged in|please run.*auth login|authentication.*expired/.test(out)) {
+        // Claude CLI OAuth süresi dolmuş — bot bunu yenileyemez; kullanıcı bilgisayarda login olmalı.
+        logLine('CLAUDE AUTH', 'OAuth süresi dolmuş — claude auth login gerekli')
+        res = {
+          ok: false,
+          code: res.code,
+          output:
+            'Claude CLI oturumu süresi dolmuş (OAuth).\n\n' +
+            'Bu PC’de bir terminal açıp şunu çalıştır:\n' +
+            '  claude auth login\n\n' +
+            'Tarayıcıda giriş yap → kodu yapıştır → sonra Telegram’dan komutu tekrar gönder.\n' +
+            '(Listener’ı yeniden başlatmana gerek yok.)',
+        }
+      } else if (/already in use|already exists/.test(out)) {
         // --session-id ile oluşturmaya çalıştık ama oturum zaten var → --resume'a geç.
         logLine('OTURUM DÜZELTME', 'oturum zaten mevcut, --resume moduna geçiliyor')
         persistSession() // sessionExists=true yapar + dosyaya yazar

@@ -111,8 +111,28 @@ async function chargeSellerForLabel(client, { sellerId, orderId, amountCents, or
 
 /**
  * Period GMV for one seller (line-item ownership — store_orders.seller_id is often `default`).
- * Bruttoumsatz = merchandise subtotal, bonus is platform-funded and listed separately.
+ * Bruttoumsatz = merchandise subtotal (commission basis). Shipping and customer-paid are
+ * attributed to this seller only (prorated when the order is shared).
+ * Identity: Ware + Versand ≈ Vom Kunden gezahlt + Bonus (minus coupons).
  */
+function allocateSellerShareOfOrder(row, sellerMerchandiseCents) {
+  const orderMerch = sellerOrderRevenueBasisCents(row)
+  const orderPaid = resolveOrderPaidTotalCents(row)
+  const orderShip = Math.max(0, Number(row.shipping_cents || 0))
+  const orderBonus = Math.max(0, Number(row.platform_bonus_funding_cents || 0))
+  const mine = Math.max(0, Math.round(Number(sellerMerchandiseCents) || 0))
+  if (mine <= 0) return { shippingCents: 0, customerPaidCents: 0, bonusFundingCents: 0 }
+  if (orderMerch <= 0 || mine >= orderMerch) {
+    return { shippingCents: orderShip, customerPaidCents: orderPaid, bonusFundingCents: orderBonus }
+  }
+  const ratio = mine / orderMerch
+  return {
+    shippingCents: Math.round(orderShip * ratio),
+    customerPaidCents: Math.round(orderPaid * ratio),
+    bonusFundingCents: Math.round(orderBonus * ratio),
+  }
+}
+
 async function aggregateSellerPeriodSales(client, sellerId, periodStart, periodEnd) {
   const sid = String(sellerId || '').trim()
   const r = await client.query(
@@ -127,23 +147,29 @@ async function aggregateSellerPeriodSales(client, sellerId, periodStart, periodE
     [sid, periodStart, periodEnd],
   )
   let grossCents = 0
+  let shippingCents = 0
   let bonusFundingCents = 0
   let customerPaidCents = 0
   let orderCount = 0
   for (const row of r.rows || []) {
     orderCount += 1
-    bonusFundingCents += Number(row.platform_bonus_funding_cents || 0)
-    customerPaidCents += resolveOrderPaidTotalCents(row)
     const headerSid = String(row.seller_id || '').trim()
     const ownsWholeOrder = headerSid === sid && headerSid !== 'default'
+    let sellerMerch = 0
     if (ownsWholeOrder) {
-      grossCents += sellerOrderRevenueBasisCents(row)
-      continue
+      sellerMerch = sellerOrderRevenueBasisCents(row)
+    } else {
+      const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1', [row.id])
+      const enriched = await enrichOrderItemRows(client, iRes.rows || [])
+      const mine = filterItemsForSeller(enriched, sid, { isSuperuser: false, orderSellerId: row.seller_id })
+      sellerMerch = itemsSubtotalCents(mine)
     }
-    const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1', [row.id])
-    const enriched = await enrichOrderItemRows(client, iRes.rows || [])
-    const mine = filterItemsForSeller(enriched, sid, { isSuperuser: false, orderSellerId: row.seller_id })
-    grossCents += itemsSubtotalCents(mine)
+    if (sellerMerch <= 0) continue
+    grossCents += sellerMerch
+    const share = allocateSellerShareOfOrder(row, sellerMerch)
+    shippingCents += share.shippingCents
+    customerPaidCents += share.customerPaidCents
+    bonusFundingCents += share.bonusFundingCents
   }
 
   let refundCents = 0
@@ -162,6 +188,7 @@ async function aggregateSellerPeriodSales(client, sellerId, periodStart, periodE
 
   return {
     grossCents,
+    shippingCents,
     bonusFundingCents,
     customerPaidCents,
     orderCount,
@@ -269,4 +296,10 @@ async function aggregateMarketplacePeriodSales(client, periodStart, periodEnd) {
   }
 }
 
-module.exports = { chargeSellerForLabel, getSellerAvailableCents, aggregateSellerPeriodSales, aggregateMarketplacePeriodSales }
+module.exports = {
+  chargeSellerForLabel,
+  getSellerAvailableCents,
+  aggregateSellerPeriodSales,
+  aggregateMarketplacePeriodSales,
+  allocateSellerShareOfOrder,
+}

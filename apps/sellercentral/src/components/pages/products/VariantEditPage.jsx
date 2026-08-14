@@ -36,12 +36,83 @@ import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 
 /** Same shape as ProductEditPage's getMeta/updateMeta, but reads/writes the VARIANT's own
- * metadata — each variant is its own product for category/brand/shipping/compliance/EU-origin,
- * the parent product is just the collection that groups the variants together. */
+ * metadata — each variant is an independent sellable unit; the parent only groups them.
+ * Category/brand typically follow the parent via parent_locked_fields. */
 function getMeta(obj, key, fallback = "") {
   const m = obj?.metadata;
   if (!m || typeof m !== "object") return fallback;
   return m[key] != null && m[key] !== "" ? String(m[key]) : fallback;
+}
+
+/** Maße / Grundpreis fields copied together when "spezifikationen" is locked to parent. */
+const SPEZ_LOCK_KEYS = [
+  "dimensions_width",
+  "dimensions_height",
+  "dimensions_length",
+  "weight_grams",
+  "sales_unit",
+  "packaging_unit",
+  "packaging_unit_plural",
+  "unit_type",
+  "unit_value",
+  "unit_reference",
+];
+
+function copyMetaKey(target, source, key) {
+  if (source[key] === "" || source[key] == null) delete target[key];
+  else target[key] = source[key];
+}
+
+/** Re-apply locked fields from parent so save always mirrors live parent values. */
+function applyLockedParentValues(variant, parentProduct, locale = "de") {
+  const m = { ...(variant?.metadata && typeof variant.metadata === "object" ? variant.metadata : {}) };
+  const locks = Array.isArray(m.parent_locked_fields) ? m.parent_locked_fields : [];
+  if (!locks.length) return variant;
+  const pm = parentProduct?.metadata && typeof parentProduct.metadata === "object" ? parentProduct.metadata : {};
+  let next = { ...variant };
+
+  for (const key of locks) {
+    if (key === "title") {
+      if (locale === "de") {
+        next.title = parentProduct?.title ?? next.title;
+      } else {
+        const ptr = pm.translations?.[locale]?.title;
+        const tr = { ...(m.translations || {}) };
+        tr[locale] = { ...(tr[locale] || {}), title: ptr != null ? String(ptr) : "" };
+        m.translations = tr;
+      }
+    } else if (key === "description") {
+      const pDesc =
+        locale === "de"
+          ? parentProduct?.description || pm.description || ""
+          : pm.translations?.[locale]?.description || "";
+      if (locale === "de") {
+        m.description = pDesc;
+      } else {
+        const tr = { ...(m.translations || {}) };
+        tr[locale] = { ...(tr[locale] || {}), description: pDesc };
+        m.translations = tr;
+      }
+    } else if (key === "category_id") {
+      copyMetaKey(m, pm, "category_id");
+      copyMetaKey(m, pm, "admin_category_id");
+      copyMetaKey(m, pm, "category_ids");
+      copyMetaKey(m, pm, "category_slug");
+    } else if (key === "brand_id") {
+      copyMetaKey(m, pm, "brand_id");
+    } else if (key === "metafields") {
+      if (pm.metafields != null) m.metafields = structuredClone
+        ? structuredClone(pm.metafields)
+        : JSON.parse(JSON.stringify(pm.metafields));
+      else delete m.metafields;
+    } else if (key === "spezifikationen") {
+      for (const sk of SPEZ_LOCK_KEYS) copyMetaKey(m, pm, sk);
+    } else {
+      copyMetaKey(m, pm, key);
+    }
+  }
+  next.metadata = m;
+  return next;
 }
 
 const getDefaultBaseUrl = () => {
@@ -257,9 +328,13 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
   useEffect(() => {
     if (!v || descriptionMode !== "visual" || !descEditorRef.current) return;
-    const html = editingDescription || "";
+    const locks = Array.isArray(vm.parent_locked_fields) ? vm.parent_locked_fields : [];
+    const lockedDesc = locks.includes("description");
+    const html = (lockedDesc
+      ? (locale === "de" ? (product?.description || "") : (product?.metadata?.translations?.[locale]?.description || ""))
+      : editingDescription) || "";
     if (descEditorRef.current.innerHTML !== html) descEditorRef.current.innerHTML = html;
-  }, [v, descriptionMode, locale, editingDescription]);
+  }, [v, descriptionMode, locale, editingDescription, product, vm.parent_locked_fields]);
 
   const hasLocaleVariantMedia =
     locale !== "de" && Object.prototype.hasOwnProperty.call(vTr, "media");
@@ -289,89 +364,49 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
 
   const save = useCallback(async () => {
     if (!product || variantIndex < 0) return false;
-    const fallbackStatus = initialProduct?.status ?? "draft";
-    const nextStatus =
-      product.status != null && String(product.status).trim() !== ""
-        ? String(product.status).trim()
-        : fallbackStatus;
     try {
       setSaving(true);
       setMessage({ type: "", text: "" });
-      const metadata = { ...(product.metadata || {}) };
-      const storeName = (typeof window !== "undefined" ? (localStorage.getItem("storeName") || "").trim() : "") || "";
-      if (storeName) {
-        metadata.seller_name = storeName;
-        metadata.shop_name = storeName;
-      }
-      const allTranslations = { ...(metadata.translations || {}) };
-      if (!allTranslations.de?.title) {
-        allTranslations.de = {
-          ...(allTranslations.de || {}),
-          title: product.title || "Untitled",
-          description: product.description || "",
-        };
-      }
-      const canonicalHandle =
-        (product.handle || "").trim() ||
-        (allTranslations.de?.handle || "").trim() ||
-        "product";
-      allTranslations.de = { ...(allTranslations.de || {}), handle: canonicalHandle };
-      metadata.translations = allTranslations;
 
-      const vg = Array.isArray(metadata.variation_groups) ? metadata.variation_groups : [];
-      if (vg.length > 0) {
-        metadata.variation_groups = vg.map((g) => ({
-          name: (g.name || "Option").trim() || "Option",
-          options: (g.options || []).map((o) => {
-            const row = {
-              value: String(o.value ?? "").trim(),
-              ...(o.swatch_image ? { swatch_image: String(o.swatch_image).trim() } : {}),
-            };
-            if (o.labels && typeof o.labels === "object" && Object.keys(o.labels).length > 0) {
-              row.labels = o.labels;
-            }
-            return row;
-          }),
-        }));
-      }
+      // Variant-only PATCH — avoids full-product GPSR gate that blocked sibling variants.
+      const variantsToSave = (product.variants || []).map((row, i) => {
+        if (i !== variantIndex) return row;
+        let next = applyLockedParentValues(row, product, locale);
+        const nm = { ...(next.metadata && typeof next.metadata === "object" ? next.metadata : {}) };
+        const locks = Array.isArray(nm.parent_locked_fields) ? nm.parent_locked_fields : [];
+        const pm = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
+        // Category / brand: follow parent when locked OR when child left empty.
+        if (locks.includes("category_id") || !nm.category_id) {
+          copyMetaKey(nm, pm, "category_id");
+          copyMetaKey(nm, pm, "admin_category_id");
+          copyMetaKey(nm, pm, "category_ids");
+          copyMetaKey(nm, pm, "category_slug");
+        }
+        if (locks.includes("brand_id") || !nm.brand_id) {
+          copyMetaKey(nm, pm, "brand_id");
+        }
+        next = { ...next, metadata: nm };
+        return next;
+      });
 
-      const variantsToSave = product.variants || [];
-      const missingVariantEanIndex = variantsToSave.findIndex((row) => String(row?.ean || "").trim() === "");
-      if (missingVariantEanIndex >= 0) {
+      const current = variantsToSave[variantIndex];
+      if (String(current?.ean || "").trim() === "") {
         setMessage({
           type: "warning",
-          text:
-            locale === "tr"
-              ? "Kaydetmek için tüm varyantlarda EAN girilmelidir."
-              : locale === "de"
-                ? "Bitte EAN für alle Varianten eintragen, um zu speichern."
-                : "Enter EAN for all variants before saving.",
+          text: t(
+            "Enter an EAN for this variant before saving.",
+            "Kaydetmeden önce bu varyant için EAN girin.",
+            "Saisissez un EAN pour cette variante avant d'enregistrer.",
+            "Introduzca un EAN para esta variante antes de guardar.",
+            "Inserisci un EAN per questa variante prima di salvare.",
+            "Bitte EAN für diese Variante eintragen, um zu speichern.",
+          ),
         });
         return false;
       }
-      const collectionId = (metadata.collection_ids && metadata.collection_ids[0]) || product.collection_id || null;
-      const canonicalTitle = metadata.translations?.de?.title || product.title || "Untitled";
-      const dePriceCents =
-        metadata.prices?.DE?.brutto_cents != null
-          ? Number(metadata.prices.DE.brutto_cents)
-          : product.price != null
-            ? Math.round(Number(product.price) * 100)
-            : 0;
-      const canonicalDescription = metadata.translations?.de?.description || product.description || "";
-      const payload = {
-        title: canonicalTitle,
-        handle: canonicalHandle,
-        sku: product.sku || "",
-        description: canonicalDescription,
-        status: nextStatus,
-        price: dePriceCents / 100,
-        inventory: product.inventory ?? 0,
-        metadata,
-        variants: variantsToSave,
-        ...(collectionId !== undefined && { collection_id: collectionId }),
-      };
-      const updated = await client.updateAdminHubProduct(idOrHandle, payload);
-      const saved = updated || { ...product, ...payload };
+
+      const res = await client.patchProductVariants(idOrHandle, variantsToSave);
+      const saved = res?.product || { ...product, variants: variantsToSave };
       setProduct(saved);
       setBaselineSnapshot(JSON.stringify(normalizeForCompareProduct(saved)));
       unsaved?.setDirty(false);
@@ -379,12 +414,17 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       onReload?.();
       return true;
     } catch (err) {
-      setMessage({ type: "error", text: err?.message || t("Save failed", "Kaydetme başarısız", "Échec de l'enregistrement", "Error al guardar", "Salvataggio non riuscito", "Speichern fehlgeschlagen") });
+      setMessage({
+        type: "error",
+        text:
+          err?.message ||
+          t("Save failed", "Kaydetme başarısız", "Échec de l'enregistrement", "Error al guardar", "Salvataggio non riuscito", "Speichern fehlgeschlagen"),
+      });
       return false;
     } finally {
       setSaving(false);
     }
-  }, [product, variantIndex, idOrHandle, client, initialProduct?.status, onReload, unsaved, locale]);
+  }, [product, variantIndex, idOrHandle, client, onReload, unsaved, locale, t]);
 
   const saveRef = useRef(save);
   const discardRef = useRef(discard);
@@ -420,6 +460,26 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
    */
   const lockedFields = Array.isArray(vm.parent_locked_fields) ? vm.parent_locked_fields : [];
   const isFieldLocked = (key) => lockedFields.includes(key);
+  const parentMeta = product?.metadata && typeof product.metadata === "object" ? product.metadata : {};
+
+  const effectiveMeta = (key, fallback = "") => {
+    if (isFieldLocked(key)) return getMeta(product, key, fallback);
+    if (key === "category_id" || key === "brand_id") {
+      const own = getMeta(v, key, "");
+      return own || getMeta(product, key, fallback);
+    }
+    return getMeta(v, key, fallback);
+  };
+
+  const effectiveSpez = (key, fallback = "") => {
+    if (isFieldLocked("spezifikationen")) {
+      const pv = parentMeta[key];
+      return pv != null && pv !== "" ? String(pv) : fallback;
+    }
+    const ov = vm[key];
+    return ov != null && ov !== "" ? String(ov) : fallback;
+  };
+
   /** setValue: optional custom writer for fields not stored as a plain vm[key] (e.g. locale-translated description). */
   const toggleFieldLock = (key, parentValue, setValue) => {
     const nowLocked = isFieldLocked(key);
@@ -431,7 +491,22 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         return { ...cur, metadata: m };
       }
       m.parent_locked_fields = [...cf.filter((k) => k !== key), key];
-      if (!setValue) {
+      if (key === "spezifikationen") {
+        for (const sk of SPEZ_LOCK_KEYS) copyMetaKey(m, parentMeta, sk);
+      } else if (key === "metafields") {
+        if (parentMeta.metafields != null) {
+          m.metafields = structuredClone
+            ? structuredClone(parentMeta.metafields)
+            : JSON.parse(JSON.stringify(parentMeta.metafields));
+        } else delete m.metafields;
+      } else if (key === "category_id") {
+        copyMetaKey(m, parentMeta, "category_id");
+        copyMetaKey(m, parentMeta, "admin_category_id");
+        copyMetaKey(m, parentMeta, "category_ids");
+        copyMetaKey(m, parentMeta, "category_slug");
+      } else if (key === "brand_id") {
+        copyMetaKey(m, parentMeta, "brand_id");
+      } else if (!setValue) {
         if (parentValue === "" || parentValue == null) delete m[key];
         else m[key] = parentValue;
       }
@@ -458,6 +533,20 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       </button>
     );
   };
+
+  // Category / brand: empty child fields inherit parent on screen + on save (see effectiveMeta / save).
+
+  const parentTitleForLocale =
+    locale === "de"
+      ? product?.title || ""
+      : parentMeta.translations?.[locale]?.title || product?.title || "";
+  const displayTitle = isFieldLocked("title") ? parentTitleForLocale : editingTitle;
+
+  const parentDescForLocale =
+    locale === "de"
+      ? product?.description || ""
+      : parentMeta.translations?.[locale]?.description || "";
+  const displayDescription = isFieldLocked("description") ? parentDescForLocale : editingDescription;
 
   const updateVariantCategoryWithParents = useCallback((categoryId) => {
     const selected = String(categoryId || "").trim();
@@ -536,6 +625,16 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       ? Object.entries(vm.metafields).map(([k, val]) => ({ key: k, value: val }))
       : [];
 
+  const effectiveMetafieldsList = (() => {
+    if (isFieldLocked("metafields")) {
+      const pmf = parentMeta.metafields;
+      if (Array.isArray(pmf)) return pmf;
+      if (pmf && typeof pmf === "object") return Object.entries(pmf).map(([k, val]) => ({ key: k, value: val }));
+      return [];
+    }
+    return metafieldsList;
+  })();
+
   // For DE: prefer v.metadata.bullet_points, fall back to translations.de.bullet_points (set by Excel import)
   const bullets =
     locale === "de"
@@ -568,23 +667,24 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   return (
     <Page title="">
       <style>{`
-        .product-edit-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-        .product-edit-header .product-edit-title-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--p-color-text); font-size: 0.875rem; }
-        .product-edit-header .product-edit-name { margin: 0; font-size: 0.875rem; font-weight: 700; }
-        .product-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-width: 400px; }
-        .product-media-item { aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--p-color-bg-fill-secondary); position: relative; }
+        .product-edit-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .product-edit-header .product-edit-title-link { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--p-color-text); font-size: 0.8125rem; }
+        .product-edit-header .product-edit-name { margin: 0; font-size: 0.8125rem; font-weight: 700; }
+        .product-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; max-width: 400px; }
+        .product-media-item { aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--p-color-bg-fill-secondary); position: relative; }
         .product-media-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .product-media-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border: none; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; }
-        .product-media-add { aspect-ratio: 1; border-radius: 8px; border: 2px dashed var(--p-color-border); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .product-description-box { border: 1px solid var(--p-color-border); border-radius: 12px; overflow: hidden; background: var(--p-color-bg-surface); }
-        .product-description-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: var(--p-color-bg-surface-secondary); border-bottom: 1px solid var(--p-color-border); }
-        .product-description-toolbar .product-desc-btn { width: 32px; height: 32px; padding: 0; border: none; border-radius: 6px; cursor: pointer; background: transparent; }
-        .product-description-toolbar .product-desc-html-btn { width: 32px; height: 32px; padding: 0; border: none; border-radius: 6px; cursor: pointer; background: transparent; }
+        .product-media-remove { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: none; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; font-size: 13px; line-height: 1; cursor: pointer; }
+        .product-media-add { aspect-ratio: 1; border-radius: 6px; border: 2px dashed var(--p-color-border); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .product-description-box { border: 1px solid var(--p-color-border); border-radius: 8px; overflow: hidden; background: var(--p-color-bg-surface); }
+        .product-description-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--p-color-bg-surface-secondary); border-bottom: 1px solid var(--p-color-border); }
+        .product-description-toolbar .product-desc-btn { width: 28px; height: 28px; padding: 0; border: none; border-radius: 6px; cursor: pointer; background: transparent; }
+        .product-description-toolbar .product-desc-html-btn { width: 28px; height: 28px; padding: 0; border: none; border-radius: 6px; cursor: pointer; background: transparent; }
         .product-description-toolbar .product-desc-html-btn.active { background: var(--p-color-bg-surface-selected); }
-        .product-description-editor { min-height: 160px; padding: 16px; outline: none; font-size: 14px; line-height: 1.6; }
-        .product-description-html { min-height: 160px; width: 100%; padding: 16px; font-family: ui-monospace, monospace; font-size: 13px; border: none; resize: vertical; box-sizing: border-box; }
-        .product-edit-price-grid { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 16px; align-items: start; }
+        .product-description-editor { min-height: 120px; padding: 10px 12px; outline: none; font-size: 13px; line-height: 1.45; }
+        .product-description-html { min-height: 120px; width: 100%; padding: 10px 12px; font-family: ui-monospace, monospace; font-size: 12px; border: none; resize: vertical; box-sizing: border-box; }
+        .product-edit-price-grid { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 10px; align-items: start; }
         @media (max-width: 780px) { .product-edit-price-grid { grid-template-columns: 1fr; } }
+        .variant-lock-disabled { opacity: 0.65; pointer-events: none; }
         ${PRODUCT_SECTION_STYLES}
       `}</style>
 
@@ -630,17 +730,17 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         <Layout.Section>
           <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="500">
+            <BlockStack gap="300">
               <ProductSectionHeading>Variant options</ProductSectionHeading>
               <InlineStack gap="200" wrap>
                 {(v.option_values || []).map((val, i) => (
                   <span
                     key={i}
                     style={{
-                      padding: "6px 10px",
+                      padding: "4px 8px",
                       background: "var(--p-color-bg-fill-secondary)",
-                      borderRadius: 8,
-                      fontSize: 13,
+                      borderRadius: 6,
+                      fontSize: 12,
                       fontWeight: 600,
                     }}
                   >
@@ -649,39 +749,57 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 ))}
               </InlineStack>
               <Text as="p" variant="bodySm" tone="subdued">
-                Internal keys above; customer-facing labels follow your product variation translations. Edit groups on the main product page.
+                {t(
+                  "Option keys above; customer-facing labels follow the parent variation translations. Edit groups on the main product.",
+                  "Yukarıdaki seçenek anahtarları; müşteri etiketleri ana ürün varyasyon çevirilerinden gelir. Grupları ana üründe düzenleyin.",
+                  "Clés d'option ci-dessus ; les libellés clients suivent les traductions du produit parent.",
+                  "Claves de opción arriba; las etiquetas de cliente siguen las traducciones del producto principal.",
+                  "Chiavi opzione sopra; le etichette cliente seguono le traduzioni del prodotto principale.",
+                  "Options-Schlüssel oben; kundenbezogene Labels folgen den Variations-Übersetzungen des Hauptartikels. Gruppen dort bearbeiten.",
+                )}
               </Text>
 
               <ProductSectionRule />
 
-              <ProductSectionHeading>Title ({locale.toUpperCase()})</ProductSectionHeading>
+              <InlineStack gap="200" blockAlign="center" wrap={false}>
+                <ProductSectionHeading>Title ({locale.toUpperCase()})</ProductSectionHeading>
+                <LockToggle
+                  fieldKey="title"
+                  parentValue={parentTitleForLocale}
+                  setValue={(val) => {
+                    if (locale === "de") patchVariant({ title: val });
+                    else updateLocaleVariantField("title", val);
+                  }}
+                />
+              </InlineStack>
               <TextField
                 label="Title"
                 labelHidden
-                value={editingTitle}
-                onChange={(t) => {
-                  if (locale === "de") patchVariant({ title: t });
-                  else updateLocaleVariantField("title", t);
+                value={displayTitle}
+                onChange={(tVal) => {
+                  if (locale === "de") patchVariant({ title: tVal });
+                  else updateLocaleVariantField("title", tVal);
                 }}
                 autoComplete="off"
+                disabled={isFieldLocked("title")}
               />
 
-              <Divider />
+              <ProductSectionRule />
 
               <InlineStack gap="300" wrap>
-                <Box minWidth="240px" flex="1">
+                <Box minWidth="220px" flex="1">
                   <TextField
                     label="SKU"
                     value={v.sku ?? ""}
-                    onChange={(t) => patchVariant({ sku: t })}
+                    onChange={(tVal) => patchVariant({ sku: tVal })}
                     autoComplete="off"
                   />
                 </Box>
-                <Box minWidth="240px" flex="1">
+                <Box minWidth="220px" flex="1">
                   <TextField
                     label="EAN"
                     value={v.ean ?? ""}
-                    onChange={(t) => patchVariant({ ean: t || undefined })}
+                    onChange={(tVal) => patchVariant({ ean: tVal || undefined })}
                     autoComplete="off"
                     error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
                   />
@@ -691,49 +809,67 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               <ProductSectionRule />
 
               <ProductSectionHeading>
-                {locale === "en" ? "Shop assignment (this variant)" : locale === "tr" ? "Mağaza ataması (bu varyant)" : locale === "fr" ? "Attribution boutique (cette variante)" : locale === "es" ? "Asignación de tienda (esta variante)" : locale === "it" ? "Assegnazione negozio (questa variante)" : "Shop-Zuordnung (diese Variante)"}
+                {t("Shop assignment", "Mağaza ataması", "Attribution boutique", "Asignación de tienda", "Assegnazione negozio", "Shop-Zuordnung")}
               </ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
-                {locale === "en" ? "Each variant is its own product — category, brand and shipping group are set per variant, not shared with siblings." : locale === "tr" ? "Her varyant kendi ürünüdür — kategori, marka ve kargo grubu varyant başına ayarlanır, kardeş varyantlarla paylaşılmaz." : locale === "fr" ? "Chaque variante est son propre produit — catégorie, marque et groupe d'expédition sont définis par variante, non partagés." : locale === "es" ? "Cada variante es su propio producto — categoría, marca y grupo de envío se definen por variante, no compartidos." : locale === "it" ? "Ogni variante è un proprio prodotto — categoria, marca e gruppo di spedizione sono impostati per variante, non condivisi." : "Jede Variante ist ihr eigenes Produkt — Kategorie, Marke und Versandgruppe werden pro Variante gesetzt, nicht mit Geschwistern geteilt."}
+                {t(
+                  "Category and brand follow the parent by default (lock). Shipping group stays per variant.",
+                  "Kategori ve marka varsayılan olarak ana ürünü izler (kilit). Kargo grubu varyanta özel kalır.",
+                  "Catégorie et marque suivent le parent par défaut (cadenas). Groupe d'expédition par variante.",
+                  "Categoría y marca siguen al principal por defecto (candado). Grupo de envío por variante.",
+                  "Categoria e marca seguono il principale di default (lucchetto). Gruppo di spedizione per variante.",
+                  "Kategorie und Marke folgen standardmäßig dem Hauptartikel (Schloss). Versandgruppe bleibt pro Variante.",
+                )}
               </Text>
               <InlineStack gap="300" wrap>
-                <Box minWidth="240px" flex="1">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}</Text>
-                  <Box paddingBlockStart="150">
+                <Box minWidth="220px" flex="1">
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <Text as="p" variant="bodySm" fontWeight="semibold">{t("Category", "Kategori", "Catégorie", "Categoría", "Categoria", "Kategorie")}</Text>
+                    <LockToggle fieldKey="category_id" parentValue={getMeta(product, "category_id")} />
+                  </InlineStack>
+                  <Box paddingBlockStart="100" className={isFieldLocked("category_id") ? "variant-lock-disabled" : undefined}>
                     <CategoryDrilldownSelect
-                      label={locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}
+                      label={t("Category", "Kategori", "Catégorie", "Categoría", "Categoria", "Kategorie")}
                       labelHidden
                       categories={categories || []}
-                      value={getMeta(v, "category_id")}
+                      value={effectiveMeta("category_id")}
                       onChange={updateVariantCategoryWithParents}
-                      placeholder={locale === "en" ? "Select category" : locale === "tr" ? "Kategori seç" : locale === "fr" ? "Choisir une catégorie" : locale === "es" ? "Seleccionar categoría" : locale === "it" ? "Seleziona categoria" : "Kategorie wählen"}
+                      placeholder={t("Select category", "Kategori seç", "Choisir une catégorie", "Seleccionar categoría", "Seleziona categoria", "Kategorie wählen")}
                     />
                   </Box>
                 </Box>
-                <Box minWidth="240px" flex="1">
-                  <Select
-                    label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
-                    options={[
-                      { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" },
-                      ...(brands || [])
-                        .filter((b) => (b.status || "active") === "active" || b.id === getMeta(v, "brand_id"))
-                        .map((b) => {
-                          const pending = (b.status || "active") !== "active";
-                          const pendingSuffix = pending
-                            ? ` (${locale === "en" ? "pending authorization" : locale === "tr" ? "onay bekliyor" : locale === "fr" ? "autorisation en attente" : locale === "es" ? "autorización pendiente" : locale === "it" ? "autorizzazione in attesa" : "Autorisierung ausstehend"})`
-                            : "";
-                          return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
-                        }),
-                    ]}
-                    value={getMeta(v, "brand_id") || ""}
-                    onChange={(val) => updateVariantMeta("brand_id", val || undefined)}
-                  />
+                <Box minWidth="220px" flex="1">
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <Text as="span" variant="bodySm" fontWeight="semibold">{t("Brand", "Marka", "Marque", "Marca", "Marca", "Marke")}</Text>
+                    <LockToggle fieldKey="brand_id" parentValue={getMeta(product, "brand_id")} />
+                  </InlineStack>
+                  <Box paddingBlockStart="100">
+                    <Select
+                      label={t("Brand", "Marka", "Marque", "Marca", "Marca", "Marke")}
+                      labelHidden
+                      options={[
+                        { label: t("— None —", "— Yok —", "— Aucune —", "— Ninguna —", "— Nessuna —", "— Keine —"), value: "" },
+                        ...(brands || [])
+                          .filter((b) => (b.status || "active") === "active" || b.id === effectiveMeta("brand_id"))
+                          .map((b) => {
+                            const pending = (b.status || "active") !== "active";
+                            const pendingSuffix = pending
+                              ? ` (${t("pending authorization", "onay bekliyor", "autorisation en attente", "autorización pendiente", "autorizzazione in attesa", "Autorisierung ausstehend")})`
+                              : "";
+                            return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
+                          }),
+                      ]}
+                      value={effectiveMeta("brand_id") || ""}
+                      onChange={(val) => updateVariantMeta("brand_id", val || undefined)}
+                      disabled={isFieldLocked("brand_id")}
+                    />
+                  </Box>
                 </Box>
-                <Box minWidth="240px" flex="1">
+                <Box minWidth="220px" flex="1">
                   <Select
-                    label={locale === "en" ? "Shipping group" : locale === "tr" ? "Kargo grubu" : locale === "fr" ? "Groupe d'expédition" : locale === "es" ? "Grupo de envío" : locale === "it" ? "Gruppo di spedizione" : "Versandgruppe"}
+                    label={t("Shipping group", "Kargo grubu", "Groupe d'expédition", "Grupo de envío", "Gruppo di spedizione", "Versandgruppe")}
                     options={[
-                      { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucun —" : locale === "es" ? "— Ninguno —" : locale === "it" ? "— Nessuno —" : "— Keine —", value: "" },
+                      { label: t("— None —", "— Yok —", "— Aucun —", "— Ninguno —", "— Nessuno —", "— Keine —"), value: "" },
                       ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
                     ]}
                     value={vm.shipping_group_id ?? ""}
@@ -748,11 +884,11 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 <ProductSectionHeading>Description</ProductSectionHeading>
                 <LockToggle
                   fieldKey="description"
-                  parentValue={locale === "de" ? (product?.description || "") : (product?.metadata?.translations?.[locale]?.description || "")}
+                  parentValue={parentDescForLocale}
                   setValue={(val) => (locale === "de" ? updateVariantMeta("description", val) : updateLocaleVariantField("description", val))}
                 />
               </InlineStack>
-              <div className="product-description-box" style={isFieldLocked("description") ? { opacity: 0.6, pointerEvents: "none" } : undefined}>
+              <div className={`product-description-box${isFieldLocked("description") ? " variant-lock-disabled" : ""}`}>
                 <div className="product-description-toolbar">
                   <div />
                   <button
@@ -764,7 +900,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                         if (locale === "de") updateVariantMeta("description", html);
                         else updateLocaleVariantField("description", html);
                       } else if (descriptionMode !== "visual" && descEditorRef.current) {
-                        descEditorRef.current.innerHTML = editingDescription || "";
+                        descEditorRef.current.innerHTML = displayDescription || "";
                       }
                       setDescriptionMode(descriptionMode === "html" ? "visual" : "html");
                     }}
@@ -775,22 +911,22 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 {descriptionMode === "html" ? (
                   <textarea
                     className="product-description-html"
-                    value={editingDescription}
+                    value={displayDescription}
                     onChange={(e) => {
                       if (locale === "de") updateVariantMeta("description", e.target.value);
                       else updateLocaleVariantField("description", e.target.value);
                     }}
-                    rows={8}
+                    rows={6}
                     spellCheck={false}
                   />
                 ) : (
                   <div
                     ref={descEditorRef}
                     className="product-description-editor"
-                    contentEditable
+                    contentEditable={!isFieldLocked("description")}
                     suppressContentEditableWarning
                     onBlur={() => {
-                      if (!descEditorRef.current) return;
+                      if (!descEditorRef.current || isFieldLocked("description")) return;
                       const html = descriptionVisualToHtml(descEditorRef.current.innerHTML || "");
                       if (locale === "de") updateVariantMeta("description", html);
                       else updateLocaleVariantField("description", html);
@@ -977,7 +1113,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 label="Meta title"
                 value={vm.seo_meta_title ?? vTr.seo_title ?? ""}
                 onChange={(t) => updateVariantMeta("seo_meta_title", t || undefined)}
-                placeholder={editingTitle || product?.title || "Meta title"}
+                placeholder={displayTitle || product?.title || "Meta title"}
               />
               <TextField
                 label="Meta description"
@@ -1025,93 +1161,164 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         <Layout.Section>
           <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="400">
-              <ProductSectionHeading>{t("Dimensions & packaging", "Ölçüler ve ambalaj", "Dimensions et emballage", "Dimensiones y embalaje", "Dimensioni e imballaggio", "Maße & Verpackung")}</ProductSectionHeading>
+            <BlockStack gap="300">
+              <InlineStack gap="200" blockAlign="center" wrap={false}>
+                <ProductSectionHeading>{t("Dimensions & packaging", "Ölçüler ve ambalaj", "Dimensions et emballage", "Dimensiones y embalaje", "Dimensioni e imballaggio", "Maße & Verpackung")}</ProductSectionHeading>
+                <LockToggle fieldKey="spezifikationen" parentValue={null} />
+              </InlineStack>
+              <div className={isFieldLocked("spezifikationen") ? "variant-lock-disabled" : undefined}>
               <InlineStack gap="200" wrap>
-                <Box minWidth="140px" flex="1">
-                  <TextField label={`${t("Width", "Genişlik", "Largeur", "Ancho", "Larghezza", "Breite")} (cm)`} type="number" value={vm.dimensions_width != null ? String(vm.dimensions_width) : ""} onChange={(val) => updateVariantMeta("dimensions_width", val)} placeholder="0" />
+                <Box minWidth="130px" flex="1">
+                  <TextField label={`${t("Width", "Genişlik", "Largeur", "Ancho", "Larghezza", "Breite")} (cm)`} type="number" value={effectiveSpez("dimensions_width")} onChange={(val) => updateVariantMeta("dimensions_width", val)} placeholder="0" disabled={isFieldLocked("spezifikationen")} />
                 </Box>
-                <Box minWidth="140px" flex="1">
-                  <TextField label={`${t("Height", "Yükseklik", "Hauteur", "Alto", "Altezza", "Höhe")} (cm)`} type="number" value={vm.dimensions_height != null ? String(vm.dimensions_height) : ""} onChange={(val) => updateVariantMeta("dimensions_height", val)} placeholder="0" />
+                <Box minWidth="130px" flex="1">
+                  <TextField label={`${t("Height", "Yükseklik", "Hauteur", "Alto", "Altezza", "Höhe")} (cm)`} type="number" value={effectiveSpez("dimensions_height")} onChange={(val) => updateVariantMeta("dimensions_height", val)} placeholder="0" disabled={isFieldLocked("spezifikationen")} />
                 </Box>
-                <Box minWidth="140px" flex="1">
-                  <TextField label={`${t("Length", "Uzunluk", "Longueur", "Largo", "Lunghezza", "Länge")} (cm)`} type="number" value={vm.dimensions_length != null ? String(vm.dimensions_length) : ""} onChange={(val) => updateVariantMeta("dimensions_length", val)} placeholder="0" />
+                <Box minWidth="130px" flex="1">
+                  <TextField label={`${t("Length", "Uzunluk", "Longueur", "Largo", "Lunghezza", "Länge")} (cm)`} type="number" value={effectiveSpez("dimensions_length")} onChange={(val) => updateVariantMeta("dimensions_length", val)} placeholder="0" disabled={isFieldLocked("spezifikationen")} />
                 </Box>
-                <Box minWidth="140px" flex="1">
-                  <TextField label={`${t("Weight", "Ağırlık", "Poids", "Peso", "Peso", "Gewicht")} (g)`} type="number" value={vm.weight_grams != null ? String(vm.weight_grams) : ""} onChange={(val) => updateVariantMeta("weight_grams", val === "" ? "" : parseInt(val, 10))} placeholder="0" />
+                <Box minWidth="130px" flex="1">
+                  <TextField label={`${t("Weight", "Ağırlık", "Poids", "Peso", "Peso", "Gewicht")} (g)`} type="number" value={effectiveSpez("weight_grams")} onChange={(val) => updateVariantMeta("weight_grams", val === "" ? "" : parseInt(val, 10))} placeholder="0" disabled={isFieldLocked("spezifikationen")} />
                 </Box>
               </InlineStack>
+              <Box paddingBlockStart="200">
               <InlineStack gap="200" wrap>
-                <Box minWidth="180px" flex="1">
-                  <TextField label={t("Sales unit","Satış birimi","Unité de vente","Unidad de venta","Unità di vendita","Verkaufseinheit")} value={vm.sales_unit ?? ""} onChange={(val) => updateVariantMeta("sales_unit", val)} autoComplete="off" />
+                <Box minWidth="160px" flex="1">
+                  <TextField
+                    label={t("Sales unit","Satış birimi","Unité de vente","Unidad de venta","Unità di vendita","Verkaufseinheit")}
+                    value={effectiveSpez("sales_unit")}
+                    onChange={(val) => updateVariantMeta("sales_unit", val)}
+                    placeholder={t("e.g. piece", "örn. adet", "ex. pièce", "ej. unidad", "es. pezzo", "z. B. Stück")}
+                    helpText={t(
+                      "How the item is sold (e.g. piece, pack) — not the base-price content.",
+                      "Ürünün nasıl satıldığı (örn. adet, paket) — birim fiyat içeriği değil.",
+                      "Comment l'article est vendu (ex. pièce) — pas le contenu du prix unitaire.",
+                      "Cómo se vende (ej. unidad) — no el contenido del precio unitario.",
+                      "Come si vende (es. pezzo) — non il contenuto del prezzo unitario.",
+                      "Wie verkauft wird (z. B. Stück, Packung) — nicht der Grundpreis-Inhalt.",
+                    )}
+                    autoComplete="off"
+                    disabled={isFieldLocked("spezifikationen")}
+                  />
                 </Box>
-                <Box minWidth="180px" flex="1">
-                  <TextField label={t("Packaging unit","Ambalaj birimi","Unité d'emballage","Unidad de embalaje","Unità di imballaggio","Verpackungseinheit")} value={vm.packaging_unit ?? ""} onChange={(val) => updateVariantMeta("packaging_unit", val)} autoComplete="off" />
+                <Box minWidth="160px" flex="1">
+                  <Select
+                    label={t("Unit of measure", "Ölçü birimi", "Unité de mesure", "Unidad de medida", "Unità di misura", "Maßeinheit")}
+                    options={UNIT_TYPE_OPTIONS(locale)}
+                    value={effectiveSpez("unit_type")}
+                    onChange={(val) => updateVariantMeta("unit_type", val)}
+                    disabled={isFieldLocked("spezifikationen")}
+                  />
                 </Box>
-                <Box minWidth="180px" flex="1">
-                  <TextField label={t("Packaging unit (plural)","Ambalaj birimi (çoğul)","Unité d'emballage (pluriel)","Unidad de embalaje (plural)","Unità di imballaggio (plurale)","Verpackungseinheit (Mehrzahl)")} value={vm.packaging_unit_plural ?? ""} onChange={(val) => updateVariantMeta("packaging_unit_plural", val)} autoComplete="off" />
+                <Box minWidth="160px" flex="1">
+                  <TextField
+                    label={t("Packaging unit","Ambalaj birimi","Unité d'emballage","Unidad de embalaje","Unità di imballaggio","Verpackungseinheit")}
+                    value={effectiveSpez("packaging_unit")}
+                    onChange={(val) => updateVariantMeta("packaging_unit", val)}
+                    placeholder={t("e.g. carton", "örn. koli", "ex. carton", "ej. cartón", "es. cartone", "z. B. Karton")}
+                    autoComplete="off"
+                    disabled={isFieldLocked("spezifikationen")}
+                  />
                 </Box>
               </InlineStack>
+              </Box>
+              <Box paddingBlockStart="200">
+              <InlineStack gap="200" wrap>
+                <Box minWidth="160px" flex="1">
+                  <TextField
+                    label={t("Packaging unit (plural)","Ambalaj birimi (çoğul)","Unité d'emballage (pluriel)","Unidad de embalaje (plural)","Unità di imballaggio (plurale)","Verpackungseinheit (Mehrzahl)")}
+                    value={effectiveSpez("packaging_unit_plural")}
+                    onChange={(val) => updateVariantMeta("packaging_unit_plural", val)}
+                    placeholder={t("e.g. cartons", "örn. koliler", "ex. cartons", "ej. cartones", "es. cartoni", "z. B. Kartons")}
+                    autoComplete="off"
+                    disabled={isFieldLocked("spezifikationen")}
+                  />
+                </Box>
+                <Box minWidth="160px" flex="1">
+                  <TextField
+                    label={t("Base unit", "Temel birim", "Unité de base", "Unidad base", "Unità base", "Grundeinheit")}
+                    type="number"
+                    value={effectiveSpez("unit_reference", "1")}
+                    onChange={(val) => updateVariantMeta("unit_reference", val)}
+                    placeholder="1"
+                    helpText={t(
+                      "Reference for price/unit (e.g. 1 = per 1 kg).",
+                      "Birim fiyat referansı (örn. 1 = 1 kg başına).",
+                      "Référence prix/unité (ex. 1 = par 1 kg).",
+                      "Referencia precio/unidad (ej. 1 = por 1 kg).",
+                      "Riferimento prezzo/unità (es. 1 = per 1 kg).",
+                      "Bezug für Preis/Einheit (z. B. 1 = je 1 kg).",
+                    )}
+                    disabled={isFieldLocked("spezifikationen")}
+                  />
+                </Box>
+                <Box minWidth="160px" flex="1">
+                  <TextField
+                    label={t("Amount", "Miktar", "Quantité", "Cantidad", "Quantità", "Menge")}
+                    type="number"
+                    value={effectiveSpez("unit_value")}
+                    onChange={(val) => updateVariantMeta("unit_value", val)}
+                    placeholder="e.g. 200"
+                    helpText={t(
+                      "Net content for base price, e.g. 200 with unit g.",
+                      "Birim fiyat için net içerik, örn. birim g iken 200.",
+                      "Contenu net pour le prix unitaire, ex. 200 avec unité g.",
+                      "Contenido neto para precio unitario, ej. 200 con unidad g.",
+                      "Contenuto netto per prezzo unitario, es. 200 con unità g.",
+                      "Nettoinhalt für den Grundpreis, z. B. 200 bei Einheit g.",
+                    )}
+                    disabled={isFieldLocked("spezifikationen")}
+                  />
+                </Box>
+              </InlineStack>
+              </Box>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {t(
+                  'Shown on the product, e.g. "Content: 200 g (€5.00* / 1 kg)". Verkaufseinheit = sell-as label; Maßeinheit + Menge + Grundeinheit = base-price math.',
+                  'Üründe gösterilir, örn. "İçerik: 200 g (€5,00* / 1 kg)". Verkaufseinheit = satış etiketi; Maßeinheit + Menge + Grundeinheit = birim fiyat hesabı.',
+                  'Affiché sur le produit, ex. « Contenu : 200 g (5,00 €* / 1 kg) ».',
+                  'Se muestra en el producto, ej. « Contenido: 200 g (5,00 €* / 1 kg) ».',
+                  'Mostrato sul prodotto, es. « Contenuto: 200 g (5,00 €* / 1 kg) ».',
+                  'Wird auf dem Produkt angezeigt, z. B. „Inhalt: 200 g (5,00 €* / 1 kg)“. Verkaufseinheit = Verkaufsbezeichnung; Maßeinheit + Menge + Grundeinheit = Grundpreis-Berechnung.',
+                )}
+              </Text>
+              </div>
 
               <ProductSectionRule />
-              <ProductSectionRule />
 
-              <ProductSectionHeading>Content per unit</ProductSectionHeading>
-
-              <TextField
-                label="Amount"
-                labelHidden
-                type="number"
-                value={vm.unit_value != null ? String(vm.unit_value) : ""}
-                onChange={(v) => updateVariantMeta("unit_value", v)}
-                placeholder="e.g. 200"
-                helpText="Numeric amount (e.g. 200 for 200 g)"
-              />
-
-              <Select
-                label="Unit"
-                options={UNIT_TYPE_OPTIONS(locale)}
-                value={vm.unit_type ?? ""}
-                onChange={(v) => updateVariantMeta("unit_type", v)}
-              />
-
-              <TextField
-                label="Reference quantity"
-                labelHidden
-                type="number"
-                value={vm.unit_reference != null ? String(vm.unit_reference) : "1"}
-                onChange={(v) => updateVariantMeta("unit_reference", v)}
-                placeholder="1"
-                helpText="Reference for price per unit (e.g. 1 = per 1 kg when unit is kg)"
-              />
-
-              <ProductSectionRule />
-
-              <BlockStack gap="400">
-                <BlockStack gap="150">
-                  <ProductSectionHeading>Metafelder (Variante)</ProductSectionHeading>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Optionale Key/Value-Paare nur für diese Variante (z. B. shop-spezifische Attribute).
-                  </Text>
-                </BlockStack>
-                <Box padding="400" background="bg-surface-secondary" borderRadius="300">
-                  <BlockStack gap="300">
-                    {metafieldsList.map((item, i) => (
+              <BlockStack gap="200">
+                <InlineStack gap="200" blockAlign="center" wrap={false}>
+                  <ProductSectionHeading>{t("Attributes", "Özellikler", "Attributs", "Atributos", "Attributi", "Eigenschaften")}</ProductSectionHeading>
+                  <LockToggle fieldKey="metafields" parentValue={parentMeta.metafields} />
+                </InlineStack>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {t(
+                    "Optional key/value pairs for this variant (shop attributes).",
+                    "Bu varyant için isteğe bağlı anahtar/değer çiftleri (mağaza özellikleri).",
+                    "Paires clé/valeur optionnelles pour cette variante.",
+                    "Pares clave/valor opcionales para esta variante.",
+                    "Coppie chiave/valore opzionali per questa variante.",
+                    "Optionale Key/Value-Paare nur für diese Variante (shop-spezifische Attribute).",
+                  )}
+                </Text>
+                <Box padding="300" background="bg-surface-secondary" borderRadius="200" className={isFieldLocked("metafields") ? "variant-lock-disabled" : undefined}>
+                  <BlockStack gap="200">
+                    {effectiveMetafieldsList.map((item, i) => (
                       <Box
                         key={i}
-                        padding="400"
+                        padding="300"
                         background="bg-surface"
                         borderRadius="200"
                         borderWidth="025"
                         borderColor="border"
                       >
-                        <InlineStack gap="400" wrap blockAlign="start">
-                          <Box minWidth="160px" flex="1">
+                        <InlineStack gap="300" wrap blockAlign="start">
+                          <Box minWidth="140px" flex="1">
                             <TextField
                               label="Key"
                               value={item.key || ""}
                               onChange={(keyVal) => {
-                                const arr = [...metafieldsList];
+                                const arr = [...effectiveMetafieldsList];
                                 arr[i] = { ...arr[i], key: keyVal };
                                 patchVariant((cur) => ({
                                   ...cur,
@@ -1119,14 +1326,15 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                                 }));
                               }}
                               autoComplete="off"
+                              disabled={isFieldLocked("metafields")}
                             />
                           </Box>
-                          <Box minWidth="200px" flex="2">
+                          <Box minWidth="180px" flex="2">
                             <TextField
                               label="Value"
                               value={String(item.value ?? "")}
                               onChange={(val) => {
-                                const arr = [...metafieldsList];
+                                const arr = [...effectiveMetafieldsList];
                                 arr[i] = { ...arr[i], value: val };
                                 patchVariant((cur) => ({
                                   ...cur,
@@ -1134,6 +1342,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                                 }));
                               }}
                               autoComplete="off"
+                              disabled={isFieldLocked("metafields")}
                             />
                           </Box>
                         </InlineStack>
@@ -1143,17 +1352,18 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                       <Button
                         size="slim"
                         variant="secondary"
+                        disabled={isFieldLocked("metafields")}
                         onClick={() =>
                           patchVariant((cur) => ({
                             ...cur,
                             metadata: {
                               ...(cur.metadata || {}),
-                              metafields: [...metafieldsList, { key: "", value: "" }],
+                              metafields: [...effectiveMetafieldsList, { key: "", value: "" }],
                             },
                           }))
                         }
                       >
-                        + Metafeld hinzufügen
+                        {t("+ Add attribute", "+ Özellik ekle", "+ Ajouter un attribut", "+ Añadir atributo", "+ Aggiungi attributo", "+ Metafeld hinzufügen")}
                       </Button>
                     </InlineStack>
                   </BlockStack>
@@ -1171,7 +1381,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
         <Layout.Section>
           <Card>
             <div className="product-edit-sections">
-            <BlockStack gap="400">
+            <BlockStack gap="300">
               <ProductSectionHeading>
                 {locale === "en" ? "Compliance / manufacturer (this variant)" : locale === "tr" ? "Uyumluluk / üretici (bu varyant)" : locale === "fr" ? "Conformité / fabricant (cette variante)" : locale === "es" ? "Cumplimiento / fabricante (esta variante)" : locale === "it" ? "Conformità / produttore (questa variante)" : "Compliance / Hersteller (diese Variante)"}
               </ProductSectionHeading>
@@ -1205,7 +1415,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     <LockToggle fieldKey="hersteller" parentValue={getMeta(product, "hersteller")} />
                   </InlineStack>
                 }
-                value={getMeta(v, "hersteller")}
+                value={effectiveMeta("hersteller")}
                 onChange={(val) => updateVariantMeta("hersteller", val || undefined)}
                 placeholder={locale === "en" ? "e.g. Acme GmbH" : "z. B. Acme GmbH"}
                 autoComplete="off"
@@ -1228,7 +1438,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     <LockToggle fieldKey="hersteller_information" parentValue={getMeta(product, "hersteller_information")} />
                   </InlineStack>
                 }
-                value={getMeta(v, "hersteller_information")}
+                value={effectiveMeta("hersteller_information")}
                 onChange={(val) => updateVariantMeta("hersteller_information", val || undefined)}
                 placeholder={locale === "en" ? "Street, city, country, email/phone" : "Straße, Ort, Land, E-Mail/Telefon"}
                 multiline={2}
@@ -1252,7 +1462,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     <LockToggle fieldKey="verantwortliche_person_information" parentValue={getMeta(product, "verantwortliche_person_information")} />
                   </InlineStack>
                 }
-                value={getMeta(v, "verantwortliche_person_information")}
+                value={effectiveMeta("verantwortliche_person_information")}
                 onChange={(val) => updateVariantMeta("verantwortliche_person_information", val || undefined)}
                 placeholder={locale === "en" ? "Name, EU address, email/phone" : "Name, EU-Adresse, E-Mail/Telefon"}
                 multiline={2}
@@ -1261,11 +1471,14 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               />
               <ComplianceFieldsSection
                 client={client}
-                categoryId={getMeta(v, "category_id")}
+                categoryId={effectiveMeta("category_id")}
                 marketplace="DE"
                 locale={locale}
                 product={v}
-                getMeta={getMeta}
+                getMeta={(obj, key, fb) => {
+                  if (obj === v && isFieldLocked(key)) return getMeta(product, key, fb);
+                  return getMeta(obj, key, fb);
+                }}
                 updateMeta={updateVariantMeta}
               />
 
@@ -1283,7 +1496,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     <LockToggle fieldKey="eu_origin_country" parentValue={getMeta(product, "eu_origin_country")} />
                   </InlineStack>
                 }
-                value={vm.eu_origin_country ?? ""}
+                value={isFieldLocked("eu_origin_country") ? getMeta(product, "eu_origin_country") : (vm.eu_origin_country ?? "")}
                 onChange={(val) => updateVariantMeta("eu_origin_country", val || undefined)}
                 placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
                 autoComplete="off"
@@ -1296,7 +1509,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     <LockToggle fieldKey="eu_origin_registry_id" parentValue={getMeta(product, "eu_origin_registry_id")} />
                   </InlineStack>
                 }
-                value={vm.eu_origin_registry_id ?? ""}
+                value={isFieldLocked("eu_origin_registry_id") ? getMeta(product, "eu_origin_registry_id") : (vm.eu_origin_registry_id ?? "")}
                 onChange={(val) => updateVariantMeta("eu_origin_registry_id", val || undefined)}
                 placeholder={locale === "en" ? "EU registry / certificate number" : locale === "tr" ? "AB kayıt / sertifika numarası" : locale === "fr" ? "Registre UE / numéro de certificat" : locale === "es" ? "Registro UE / número de certificado" : locale === "it" ? "Registro UE / numero di certificato" : "EU-Registry / Zertifikatsnummer"}
                 autoComplete="off"
@@ -1309,7 +1522,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     <LockToggle fieldKey="eu_origin_document_url" parentValue={getMeta(product, "eu_origin_document_url")} />
                   </InlineStack>
                 }
-                value={vm.eu_origin_document_url ?? ""}
+                value={isFieldLocked("eu_origin_document_url") ? getMeta(product, "eu_origin_document_url") : (vm.eu_origin_document_url ?? "")}
                 onChange={(val) => updateVariantMeta("eu_origin_document_url", val || undefined)}
                 placeholder="https://…"
                 autoComplete="off"

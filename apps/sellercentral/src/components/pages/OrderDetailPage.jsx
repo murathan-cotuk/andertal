@@ -118,6 +118,19 @@ export default function OrderDetailPage() {
   const [isSuperuser, setIsSuperuser] = useState(false);
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
+  const [flowLogs, setFlowLogs] = useState(null); // null = not loaded yet
+  const [flowLogsLoading, setFlowLogsLoading] = useState(false);
+  useEffect(() => {
+    if (!isSuperuser || !id) return;
+    let cancelled = false;
+    setFlowLogsLoading(true);
+    getMedusaAdminClient().getOrderFlowLogs(id)
+      .then((d) => { if (!cancelled) setFlowLogs(Array.isArray(d?.logs) ? d.logs : []); })
+      .catch(() => { if (!cancelled) setFlowLogs([]); })
+      .finally(() => { if (!cancelled) setFlowLogsLoading(false); });
+    return () => { cancelled = true; };
+  }, [isSuperuser, id]);
+
   const [orderStatus, setOrderStatus] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
   const [deliveryStatus, setDeliveryStatus] = useState("");
@@ -453,6 +466,60 @@ export default function OrderDetailPage() {
           <Section title={c.paymentInfo}>
             <InfoRow label={ui.paymentMethod} value={formatPaymentMethod(order?.payment_method)} />
           </Section>
+
+          {/* Flows — superuser only: did the automation emails for this order actually send? */}
+          {isSuperuser && (
+            <Section title={c.flows}>
+              <p style={{ margin: "0 0 12px", fontSize: 12, color: "#6b7280" }}>{c.flowsSub}</p>
+              {flowLogsLoading ? (
+                <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{c.flowsLoading}</p>
+              ) : !flowLogs || flowLogs.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{c.flowsEmpty}</p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11, textTransform: "uppercase" }}>
+                      <th style={{ textAlign: "left", padding: "4px 8px 8px 0" }}>{c.flows}</th>
+                      <th style={{ textAlign: "left", padding: "4px 8px 8px" }}>{c.flowRecipient}</th>
+                      <th style={{ textAlign: "left", padding: "4px 8px 8px" }}>{ui.colDate}</th>
+                      <th style={{ textAlign: "right", padding: "4px 0 8px 8px" }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {flowLogs.map((log) => {
+                      const badge =
+                        log.status === "sent"
+                          ? { bg: "#f0fdf4", color: "#15803d", label: c.flowStatusSent }
+                          : log.status === "failed"
+                          ? { bg: "#fef2f2", color: "#b91c1c", label: c.flowStatusFailed }
+                          : log.status === "skipped"
+                          ? { bg: "#f3f4f6", color: "#6b7280", label: c.flowStatusSkipped }
+                          : { bg: "#fff7ed", color: "#c2410c", label: c.flowStatusPending };
+                      const audienceLabel = log.audience === "seller" ? c.flowAudienceSeller : c.flowAudienceCustomer;
+                      return (
+                        <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                          <td style={{ padding: "8px 8px 8px 0" }}>
+                            <div style={{ fontWeight: 500 }}>{log.flow_name || log.trigger_key}</div>
+                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{log.trigger_key} · {audienceLabel}</div>
+                            {log.status === "failed" && log.error_message && (
+                              <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 2 }}>{log.error_message}</div>
+                            )}
+                          </td>
+                          <td style={{ padding: "8px", color: "#374151" }}>{log.recipient_email || "—"}</td>
+                          <td style={{ padding: "8px", color: "#6b7280", fontSize: 12 }}>{fmtDate(log.sent_at || log.created_at, locale)}</td>
+                          <td style={{ padding: "8px 0 8px 8px", textAlign: "right" }}>
+                            <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: badge.bg, color: badge.color }}>
+                              {badge.label}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </Section>
+          )}
         </div>
 
         {/* Right column */}

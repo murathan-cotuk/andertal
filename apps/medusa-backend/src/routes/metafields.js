@@ -243,9 +243,15 @@ const storeMetafieldDefinitionsGET = async (req, res) => {
 
 const metafieldDefinitionsPUT = async (req, res) => {
   try {
-    const key = (req.params.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+    let key = (req.params.key || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
     if (!key) return res.status(400).json({ error: 'key required' })
-    if (isSystemCatalogKey(key)) return res.status(400).json({ error: 'system key not allowed' })
+    if (isSystemCatalogKey(key)) {
+      const remapped = normalizeMetaKey(`attr_${key}`)
+      if (!remapped || isSystemCatalogKey(remapped)) {
+        return res.status(400).json({ error: `system key not allowed: ${key}` })
+      }
+      key = remapped
+    }
     const { label, values, label_i18n, values_i18n } = req.body || {}
     const safeValues = (Array.isArray(values) ? values : []).map((v) => String(v).trim()).filter(Boolean)
     const safeLabel = (label || key).toString().trim()
@@ -317,7 +323,13 @@ const metafieldProposalsPOST = async (req, res) => {
     if (!labelIn) return res.status(400).json({ message: 'label required' })
     if (!key) key = normalizeMetaKey(labelIn.replace(/\s+/g, '_'))
     if (!key) return res.status(400).json({ message: 'could not derive key' })
-    if (isSystemCatalogKey(key)) return res.status(400).json({ message: 'system key not allowed' })
+    if (isSystemCatalogKey(key)) {
+      const remapped = normalizeMetaKey(`attr_${key}`)
+      if (!remapped || isSystemCatalogKey(remapped)) {
+        return res.status(400).json({ message: `system key not allowed: ${key}` })
+      }
+      key = remapped
+    }
     const proposed = metafieldProposalNormalizeValues(body.values)
     if (proposed.length === 0) return res.status(400).json({ message: 'values required' })
 

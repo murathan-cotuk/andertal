@@ -1316,6 +1316,7 @@ function FinanzamtTab() {
               {[
                 { label: lt(locale, "Gross merchandise", "Brüt mal satışı", "Vente brute (marchandises)", "Venta bruta (mercancía)", "Vendita lorda (merci)", "Bruttoumsatz (Ware)"), value: fmtCents(t.gross_sale_cents, locale) },
                 { label: lt(locale, "Shipping", "Kargo", "Livraison", "Envío", "Spedizione", "Versand"), value: fmtCents(t.shipping_cents, locale) },
+                { label: lt(locale, "Order value (goods + shipping)", "Sipariş değeri (mal + kargo)", "Valeur commande (marchandises + livraison)", "Valor pedido (mercancía + envío)", "Valore ordine (merci + spedizione)", "Bestellwert (Ware + Versand)"), value: fmtCents((t.gross_sale_cents || 0) + (t.shipping_cents || 0), locale) },
                 { label: lt(locale, "Paid by customer", "Müşteri ödedi", "Payé par le client", "Pagado por el cliente", "Pagato dal cliente", "Vom Kunden gezahlt"), value: fmtCents(t.customer_paid_cents, locale) },
                 { label: lt(locale, "Paid via bonus points (Andertal)", "Bonus puanla ödendi (Andertal)", "Payé en points bonus (Andertal)", "Pagado con puntos bonus (Andertal)", "Pagato con punti bonus (Andertal)", "Von Bonuspunkten gezahlt (Andertal)"), value: fmtCents(t.bonus_funding_cents, locale) },
                 { label: lt(locale, "Commission (net)", "Komisyon (net)", "Commission (net)", "Comisión (neta)", "Commissione (netta)", "Provision (netto)"), value: fmtCents(t.commission_net_cents, locale) },

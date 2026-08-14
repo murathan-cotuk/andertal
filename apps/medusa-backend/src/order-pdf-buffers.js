@@ -549,6 +549,7 @@ async function buildSellerPayoutPdfBuffer(pgClient, payoutId) {
       payout.payout_cents = Math.max(0, live.grossCents - payout.commission_cents)
       payout.bonus_funding_cents = live.bonusFundingCents
       payout.customer_paid_cents = live.customerPaidCents
+      payout.shipping_cents = live.shippingCents
       payout.refund_cents = live.refundCents
       payout.order_count = live.orderCount
     }

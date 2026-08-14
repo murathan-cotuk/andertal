@@ -36,5 +36,23 @@ export function getOrderDetailCopy(locale) {
     add: t("Add", "Ekle", "Ajouter", "Anadir", "Aggiungi", "Hinzufugen"),
     addProductFailed: t("Could not add product", "Urun eklenemedi", "Impossible d'ajouter le produit", "No se pudo anadir el producto", "Impossibile aggiungere il prodotto", "Produkt konnte nicht hinzugefugt werden"),
     selectProductFirst: t("Select a product first", "Once bir urun secin", "Selectionnez d'abord un produit", "Seleccione primero un producto", "Seleziona prima un prodotto", "Wahlen Sie zuerst ein Produkt"),
+    flows: t("Flows", "Flow'lar", "Flux", "Flujos", "Flussi", "Flows"),
+    flowsSub: t(
+      "Every automation email triggered for this order, and whether it actually sent.",
+      "Bu siparis icin tetiklenen tum otomasyon e-postalari ve gercekten gonderilip gonderilmedigi.",
+      "Chaque e-mail d'automatisation declenche pour cette commande, et s'il a bien ete envoye.",
+      "Todos los correos de automatizacion activados para este pedido, y si realmente se enviaron.",
+      "Ogni email di automazione attivata per questo ordine, e se e stata effettivamente inviata.",
+      "Jede fuer diese Bestellung ausgeloeste Automatisierungs-E-Mail und ob sie tatsaechlich versendet wurde.",
+    ),
+    flowsEmpty: t("No flow has triggered for this order yet.", "Bu siparis icin henuz bir flow tetiklenmedi.", "Aucun flux n'a encore ete declenche pour cette commande.", "Aun no se ha activado ningun flujo para este pedido.", "Nessun flusso e stato ancora attivato per questo ordine.", "Fuer diese Bestellung wurde noch kein Flow ausgeloest."),
+    flowsLoading: t("Loading flows…", "Flow'lar yukleniyor…", "Chargement des flux…", "Cargando flujos…", "Caricamento flussi…", "Flows werden geladen…"),
+    flowStatusSent: t("Sent", "Gonderildi", "Envoye", "Enviado", "Inviato", "Gesendet"),
+    flowStatusFailed: t("Failed", "Basarisiz", "Echec", "Fallido", "Fallito", "Fehlgeschlagen"),
+    flowStatusSkipped: t("Skipped", "Atlandi", "Ignore", "Omitido", "Saltato", "Uebersprungen"),
+    flowStatusPending: t("Pending", "Beklemede", "En attente", "Pendiente", "In attesa", "Ausstehend"),
+    flowRecipient: t("Recipient", "Alici", "Destinataire", "Destinatario", "Destinatario", "Empfaenger"),
+    flowAudienceCustomer: t("Customer", "Musteri", "Client", "Cliente", "Cliente", "Kunde"),
+    flowAudienceSeller: t("Seller", "Satici", "Vendeur", "Vendedor", "Venditore", "Verkaeufer"),
   };
 }

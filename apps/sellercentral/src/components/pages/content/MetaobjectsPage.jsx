@@ -7,7 +7,7 @@ import {
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useLocale } from "next-intl";
-import { getMetaobjectsCopy, METAOBJECT_LANGS, slugifyMetaKey } from "@/lib/metaobjects-i18n";
+import { getMetaobjectsCopy, METAOBJECT_LANGS, slugifyMetaKey, resolveSafeMetaobjectKey } from "@/lib/metaobjects-i18n";
 import { getLandingEditorCopy } from "@/lib/landing-page-editor-i18n";
 import { getUI } from "@/lib/ui-strings";
 import { confirmDelete } from "@/lib/confirm-delete";
@@ -219,7 +219,9 @@ export default function MetaobjectsPage() {
   const saveTitleModal = async () => {
     const deLabel = (titleDraft.de || Object.values(titleDraft).find(Boolean) || "").trim();
     if (!deLabel) return;
-    let key = titleModal?.isNew ? (slugifyMetaKey(titleKey || deLabel) || slugifyMetaKey(deLabel)) : titleModal.key;
+    let key = titleModal?.isNew
+      ? (resolveSafeMetaobjectKey(titleKey || deLabel) || resolveSafeMetaobjectKey(deLabel))
+      : titleModal.key;
     if (!key) { setTitleKeyErr(c.keyRequired); return; }
     if (titleModal?.isNew && definitions[key]) { setTitleKeyErr(c.keyExists); return; }
     const label_i18n = {};
@@ -384,7 +386,17 @@ export default function MetaobjectsPage() {
       const res = await fetch("/api/metaobjects/import", { method: "POST", body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || c.importFail);
-      setImportMsg({ tone: "success", text: c.importOk(data.created || 0, data.updated || 0, data.valuesAdded || 0) });
+      let text = c.importOk(data.created || 0, data.updated || 0, data.valuesAdded || 0);
+      if (Array.isArray(data.remapped) && data.remapped.length) {
+        text += ` ${data.remapped.map((r) => `${r.from}→${r.to}`).join(", ")}`;
+      }
+      if (Array.isArray(data.errors) && data.errors.length) {
+        text += ` — ${data.errors.map((e) => e.key + ": " + e.error).join("; ")}`;
+      }
+      setImportMsg({
+        tone: data.ok === false || (data.errors && data.errors.length) ? "warning" : "success",
+        text,
+      });
       await load();
     } catch (e) {
       setImportMsg({ tone: "critical", text: e?.message || c.importFail });

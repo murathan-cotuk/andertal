@@ -918,6 +918,11 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/v1/orders/${id}/items`, { method: 'POST', body: JSON.stringify({ product_id, quantity }) })
   }
 
+  /** Superuser: which flow emails fired for this order and whether they actually sent. */
+  async getOrderFlowLogs(id) {
+    return this.request(`/admin-hub/v1/orders/${id}/flow-logs`)
+  }
+
   /** Superuser: aktive Shop-Besucher (Live View) */
   async getLiveVisitors(params = {}) {
     const queryParams = new URLSearchParams(

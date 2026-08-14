@@ -1145,6 +1145,7 @@ function renderCommissionSettlementDocument(doc, {
   orderRef = null,
   bonusFundingCents = 0,
   customerPaidCents = 0,
+  shippingCents = 0,
   orderCount = null,
   refundCents = 0,
 }) {
@@ -1154,6 +1155,8 @@ function renderCommissionSettlementDocument(doc, {
   const { left, right, contentWidth } = pageMetrics(doc)
   const rate = Number.isFinite(commissionRatePct) && commissionRatePct > 0 ? commissionRatePct : 12
   const gross = Number(grossSalesCents || 0)
+  const shipping = Math.max(0, Number(shippingCents || 0))
+  const orderValue = gross + shipping
   const commission = Number(commissionCents || 0)
   const payout = Number.isFinite(payoutCents) ? Number(payoutCents) : Math.max(0, gross - commission)
   const vatPercent = Number(platformVatPercent) > 0 ? Number(platformVatPercent) : 19
@@ -1219,7 +1222,7 @@ function renderCommissionSettlementDocument(doc, {
   const cardsTop = boxTop + boxH + 16
   const cardW = Math.floor((contentWidth - 24) / 3)
   const cards = [
-    { label: 'BRUTTOUMSATZ', value: pdfCents(gross), sub: 'Summe der Warenverkäufe' },
+    { label: 'BRUTTOUMSATZ', value: pdfCents(gross), sub: 'Warenverkäufe (Provisionsbasis)' },
     { label: `PROVISION (${rate} %)`, value: pdfCents(commission), sub: 'Marktplatzgebühr (netto)' },
     { label: 'AUSZAHLUNG AN VERKÄUFER', value: pdfCents(payout), sub: 'Bruttoumsatz abzüglich Provision (netto)' },
   ]
@@ -1246,7 +1249,9 @@ function renderCommissionSettlementDocument(doc, {
 
   const refund = Math.max(0, Number(refundCents || 0))
   const detailRows = [
-    { label: 'Bruttoumsatz (Warenverkäufe)', amount: gross },
+    { label: 'Bruttoumsatz (Warenverkäufe — Provisionsbasis)', amount: gross },
+    shipping > 0 ? { label: 'zzgl. Versand', amount: shipping } : null,
+    shipping > 0 ? { label: 'Bestellwert (Ware + Versand)', amount: orderValue } : null,
     { label: 'Vom Kunden gezahlt', amount: customerPaid },
     { label: 'Von Bonuspunkten gezahlt (Andertal)', amount: bonus, info: true },
     { label: `Provision ${rate} % (netto)`, amount: commission },
@@ -1271,7 +1276,7 @@ function renderCommissionSettlementDocument(doc, {
 
   doc.y = rowY + 16
   doc.fillColor('#64748b').font(REG).fontSize(8)
-    .text(t('Diese Provisionsfaktura rechnet den Gesamtumsatz des Zeitraums ab — nicht einzelne Bestellpositionen. Die Marktplatzprovision zuzüglich Umsatzsteuer wird dem Verkäufer belastet. Andertal versteuert ausschließlich diese Provision, nicht den Warenumsatz des Verkäufers.'), left, doc.y, { width: contentWidth })
+    .text(t('Bruttoumsatz ist der Warenwert (Provisionsbasis) — ohne Versand. Bestellwert = Ware + Versand. Vom Kunden gezahlt + Bonuspunkte decken den Bestellwert (abzüglich ggf. Coupons). Die Marktplatzprovision zuzüglich Umsatzsteuer wird dem Verkäufer belastet. Andertal versteuert ausschließlich diese Provision, nicht den Warenumsatz des Verkäufers.'), left, doc.y, { width: contentWidth })
   doc.rect(left, doc.page.height - doc.page.margins.bottom + 8, contentWidth, 3).fill(COMMISSION_ACCENT)
 }
 
@@ -1294,6 +1299,7 @@ function renderCommissionInvoiceDocument(doc, opts) {
     orderRef: on,
     bonusFundingCents: opts.bonusFundingCents || opts.order?.platform_bonus_funding_cents || 0,
     customerPaidCents: opts.customerPaidCents || 0,
+    shippingCents: opts.shippingCents || opts.order?.shipping_cents || 0,
     refundCents: opts.refundCents || 0,
   })
 }
@@ -1331,6 +1337,7 @@ function renderPeriodCommissionInvoiceDocument(doc, {
     dateValue: new Date(),
     bonusFundingCents: Number(payout.bonus_funding_cents || 0),
     customerPaidCents: Number(payout.customer_paid_cents || 0),
+    shippingCents: Number(payout.shipping_cents || 0),
     orderCount: payout.order_count != null ? Number(payout.order_count) : null,
     refundCents: Number(payout.refund_cents || 0),
   })

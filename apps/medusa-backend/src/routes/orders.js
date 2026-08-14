@@ -616,6 +616,39 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       }
     }
 
+    // GET /admin-hub/v1/orders/:id/flow-logs — superuser only. Every flow email step logged
+    // for this order (store_flow_execution_logs), newest first, with the flow's display name
+    // and whether it actually sent — so "did the shipped-confirmation email go out?" is
+    // answerable without grepping server logs.
+    const adminHubOrderFlowLogsGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) {
+        return res.status(403).json({ message: 'Superuser access required' })
+      }
+      const id = (req.params.id || '').trim()
+      if (!id) return res.status(400).json({ message: 'id required' })
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      let client
+      try {
+        const { Client } = require('pg')
+        client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+        await client.connect()
+        const r = await client.query(
+          `SELECT l.id, l.trigger_key, l.flow_id, f.name AS flow_name, l.audience, l.recipient_email,
+                  l.status, l.attempts, l.error_message, l.metadata, l.sent_at, l.created_at, l.updated_at
+             FROM store_flow_execution_logs l
+             LEFT JOIN admin_hub_flows f ON f.id = l.flow_id
+            WHERE l.order_id = $1::uuid
+            ORDER BY l.created_at DESC`,
+          [id],
+        )
+        await client.end()
+        res.json({ logs: r.rows })
+      } catch (e) {
+        if (client) try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error', logs: [] })
+      }
+    }
+
     const adminHubOrderDELETE = async (req, res) => {
       if (!req.sellerUser?.is_superuser) {
         return res.status(403).json({ message: 'Superuser access required' })
@@ -948,6 +981,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
       }
     })
+  router.get('/admin-hub/v1/orders/:id/flow-logs', adminHubOrderFlowLogsGET)
   router.get('/admin-hub/v1/orders/:id', adminHubOrderByIdGET)
   router.patch('/admin-hub/v1/orders/:id', adminHubOrderPATCH)
   router.post('/admin-hub/v1/orders/:id/items', adminHubOrderAddItemPOST)

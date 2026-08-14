@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
-import { METAOBJECT_LANGS, slugifyMetaKey } from "@/lib/metaobjects-i18n";
+import { METAOBJECT_LANGS, slugifyMetaKey, resolveSafeMetaobjectKey } from "@/lib/metaobjects-i18n";
 
-export { METAOBJECT_LANGS, slugifyMetaKey };
+export { METAOBJECT_LANGS, slugifyMetaKey, resolveSafeMetaobjectKey };
 
 const HEADER_WORDS = new Set([
   "title", "value", "titles", "values",
@@ -172,7 +172,7 @@ export function groupImportRows(rows) {
 
 export function applyImportGroups(definitions, groups) {
   const next = { ...(definitions || {}) };
-  const summary = { created: 0, updated: 0, valuesAdded: 0 };
+  const summary = { created: 0, updated: 0, valuesAdded: 0, remapped: [], skipped: [] };
   for (const g of groups) {
     const deTitle = String(g.titles.de || "").trim()
       || Object.values(g.titles).map((t) => String(t || "").trim()).find(Boolean)
@@ -181,8 +181,15 @@ export function applyImportGroups(definitions, groups) {
     let key = findExistingDefinitionKey(next, g.titles);
     let created = false;
     if (!key) {
-      key = slugifyMetaKey(deTitle);
-      if (!key) continue;
+      const rawKey = slugifyMetaKey(deTitle);
+      key = resolveSafeMetaobjectKey(deTitle);
+      if (!key) {
+        summary.skipped.push({ title: deTitle, reason: "system_key" });
+        continue;
+      }
+      if (rawKey && key !== rawKey) {
+        summary.remapped.push({ title: deTitle, from: rawKey, to: key });
+      }
       if (!next[key]) {
         next[key] = { label: deTitle, values: [], label_i18n: null, values_i18n: null };
         created = true;
