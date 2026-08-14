@@ -1,7 +1,7 @@
 'use strict'
 const { Router } = require('express')
 const { resolveOrderPaidTotalCents, orderBonusDiscountCents } = require('../order-money')
-const { renderPeriodCommissionInvoiceDocument } = require('../order-pdf-layout')
+const { buildSellerPayoutPdfBuffer } = require('../order-pdf-buffers')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 const { resolveSellerScope, sqlOrderOwnedBySeller } = require('../seller-scope')
 const { salesInvoiceVat } = require('../goods-vat')
@@ -408,63 +408,23 @@ module.exports = function createTransactionsRouter({
       const isSuperuser = req.sellerUser?.is_superuser || false
       let client
       try {
-        const PDFDocument = require('pdfkit')
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const pRes = await client.query(
-          `SELECT p.*, s.store_name, s.company_name, s.first_name, s.last_name,
-                  s.vat_id, s.email, s.business_address, s.commission_rate, s.iban
-             FROM seller_payouts p
-             LEFT JOIN seller_users s ON s.seller_id = p.seller_id
-             WHERE p.id = $1::uuid LIMIT 1`,
-          [id]
-        )
-        const payout = pRes.rows?.[0]
-        if (!payout) { await client.end(); return res.status(404).json({ message: 'Payout not found' }) }
-        if (!isSuperuser && loggedSellerId && payout.seller_id !== loggedSellerId) {
+        // Ownership check needs the payout row's seller_id before we build the PDF —
+        // buildSellerPayoutPdfBuffer doesn't do auth, it's a pure "id in → pdf out" helper.
+        const ownerCheck = await client.query('SELECT seller_id FROM seller_payouts WHERE id = $1::uuid LIMIT 1', [id])
+        const ownerSellerId = ownerCheck.rows?.[0]?.seller_id
+        if (!ownerSellerId) { await client.end(); return res.status(404).json({ message: 'Payout not found' }) }
+        if (!isSuperuser && loggedSellerId && ownerSellerId !== loggedSellerId) {
           await client.end(); return res.status(403).json({ message: 'Access denied' })
         }
-
-        // Load orders for this period
-        const oRes = await client.query(
-          `SELECT order_number, created_at, subtotal_cents, stripe_application_fee_cents, seller_net_after_commission_cents
-             FROM store_orders
-             WHERE seller_id = $1
-               AND created_at >= $2::date
-               AND created_at < ($3::date + interval '1 day')
-               AND payment_status != 'storniert'
-             ORDER BY created_at ASC LIMIT 200`,
-          [payout.seller_id, payout.period_start, payout.period_end]
-        )
-        const orders = oRes.rows || []
+        const result = await buildSellerPayoutPdfBuffer(client, id)
         await client.end(); client = null
-
-        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal Marktplatz'
-        const platformAddress = process.env.PLATFORM_INVOICE_ADDRESS || ''
-        const platformVatId = process.env.PLATFORM_VAT_ID || ''
-        const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
-
-        const ps = new Date(payout.period_start)
-        const pe = new Date(payout.period_end)
-        const periodLabel = `${ps.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} – ${pe.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
-        const invoiceNum = `PROV-${String(payout.period_start).slice(0, 7).replace('-', '')}`
-
-        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
+        if (!result) return res.status(404).json({ message: 'Payout not found' })
         res.setHeader('Content-Type', 'application/pdf')
-        res.setHeader('Content-Disposition', `attachment; filename="Provisionsfaktur-${invoiceNum}.pdf"`)
-        doc.pipe(res)
-        renderPeriodCommissionInvoiceDocument(doc, {
-          payout,
-          orders,
-          shopName,
-          platformAddress,
-          platformVatId,
-          platformVatPercent,
-          invoiceNumber: invoiceNum,
-          periodLabel,
-        })
-        doc.end()
+        res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`)
+        res.send(result.content)
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })

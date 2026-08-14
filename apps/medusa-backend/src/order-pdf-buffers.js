@@ -12,6 +12,7 @@ const {
   renderRetourenscheinDocument,
   renderVersandlabelDocument,
   renderCommissionInvoiceDocument,
+  renderPeriodCommissionInvoiceDocument,
 } = require('./order-pdf-layout')
 
 /** Legal documents (Rechnung/Lieferschein) follow the recipient's billing/shipping country, not the storefront UI language. */
@@ -368,6 +369,55 @@ async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {
   return { filename: `Provisionsfaktur-${on}.pdf`, content: buf }
 }
 
+/**
+ * Period commission invoice (seller_payouts row → PDF) — shared by the download endpoint
+ * (GET /admin-hub/v1/seller-payouts/:id/pdf) and the "invoice created" notification email,
+ * so both always render identically instead of duplicating this query+render logic.
+ */
+async function buildSellerPayoutPdfBuffer(pgClient, payoutId) {
+  const id = String(payoutId || '').trim()
+  const pRes = await pgClient.query(
+    `SELECT p.*, s.store_name, s.company_name, s.first_name, s.last_name,
+            s.vat_id, s.email, s.business_address, s.commission_rate, s.iban
+       FROM seller_payouts p
+       LEFT JOIN seller_users s ON s.seller_id = p.seller_id
+       WHERE p.id = $1::uuid LIMIT 1`,
+    [id],
+  )
+  const payout = pRes.rows?.[0]
+  if (!payout) return null
+
+  const oRes = await pgClient.query(
+    `SELECT order_number, created_at, subtotal_cents, stripe_application_fee_cents, seller_net_after_commission_cents
+       FROM store_orders
+       WHERE seller_id = $1
+         AND created_at >= $2::date
+         AND created_at < ($3::date + interval '1 day')
+         AND payment_status != 'storniert'
+       ORDER BY created_at ASC LIMIT 200`,
+    [payout.seller_id, payout.period_start, payout.period_end],
+  )
+  const orders = oRes.rows || []
+
+  const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal Marktplatz'
+  const platformAddress = process.env.PLATFORM_INVOICE_ADDRESS || ''
+  const platformVatId = process.env.PLATFORM_VAT_ID || ''
+  const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
+
+  const ps = new Date(payout.period_start)
+  const pe = new Date(payout.period_end)
+  const periodLabel = `${ps.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })} – ${pe.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+  const invoiceNum = `PROV-${String(payout.period_start).slice(0, 7).replace('-', '')}`
+
+  const buf = await pdfDocToBuffer((doc) =>
+    renderPeriodCommissionInvoiceDocument(doc, {
+      payout, orders, shopName, platformAddress, platformVatId, platformVatPercent,
+      invoiceNumber: invoiceNum, periodLabel,
+    }),
+  )
+  return { filename: `Provisionsfaktur-${invoiceNum}.pdf`, content: buf, payout }
+}
+
 const ALLOWED_ATTACH_KEYS = new Set(['invoice_pdf', 'lieferschein_pdf', 'return_label_pdf'])
 
 /** Fetches the already-generated Sendcloud/DHL return label PDF (see return-label.js) for this order. */
@@ -408,6 +458,7 @@ module.exports = {
   buildLieferscheinPdfBuffer,
   buildReturnLabelPdfAttachment,
   buildProvisionsfakturPdfBuffer,
+  buildSellerPayoutPdfBuffer,
   renderInvoicePdfDocument,
   renderLieferscheinPdfDocument,
   renderRetourenscheinPdfDocument,

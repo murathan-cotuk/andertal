@@ -34,6 +34,70 @@ function customerName(o) {
   return [o?.first_name, o?.last_name].filter(Boolean).join(" ") || o?.email || "—";
 }
 
+/**
+ * Billing period = calendar month (matches the actual Provisionsrechnung cadence — seller_payouts
+ * rows are generated per month, see payouts.js generateCommissionInvoicesForMonth). Most recent
+ * first, current (in-progress) month included so sellers can preview this month's orders.
+ */
+function generateMonthlyPeriods(count = 30) {
+  const periods = [];
+  const now = new Date();
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth();
+  for (let i = 0; i < count; i++) {
+    const monthStart = new Date(Date.UTC(year, month, 1));
+    const monthEnd = new Date(Date.UTC(year, month + 1, 0));
+    periods.push({
+      key: `${year}-${String(month + 1).padStart(2, "0")}`,
+      year,
+      label: monthStart.toLocaleDateString("de-DE", { month: "long" }),
+      start: monthStart.toISOString().slice(0, 10),
+      end: monthEnd.toISOString().slice(0, 10),
+    });
+    month -= 1;
+    if (month < 0) { month = 11; year -= 1; }
+  }
+  return periods;
+}
+
+const MONTHLY_PERIODS = generateMonthlyPeriods(30);
+
+/** Year select + period-within-year select — parent owns `selectedKey`, this is fully controlled. */
+const PERIOD_ALL_KEY = "__all__";
+
+/**
+ * Year select + period-within-year select — parent owns `selectedKey`, fully controlled.
+ * `allowAllLabel`: when set, prepends an "All periods" option (key PERIOD_ALL_KEY) so callers
+ * that don't want a default single-month filter (e.g. Tab 2/3, which show history across periods)
+ * can offer an explicit unfiltered state instead of silently falling back to the current month.
+ */
+function PeriodFilter({ periods, selectedKey, onSelect, yearLabel, periodLabel, allowAllLabel = null }) {
+  const isAll = allowAllLabel && selectedKey === PERIOD_ALL_KEY;
+  const years = useMemo(() => [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a), [periods]);
+  const selected = periods.find((p) => p.key === selectedKey) || periods[0];
+  const year = isAll ? years[0] : (selected?.year ?? years[0]);
+  const periodsInYear = useMemo(() => periods.filter((p) => p.year === year), [periods, year]);
+  const handleYearChange = (v) => {
+    const y = Number(v);
+    const first = periods.find((p) => p.year === y);
+    if (first) onSelect(first.key);
+  };
+  const periodOptions = [
+    ...(allowAllLabel ? [{ label: allowAllLabel, value: PERIOD_ALL_KEY }] : []),
+    ...periodsInYear.map((p) => ({ label: p.label, value: p.key })),
+  ];
+  return (
+    <InlineStack gap="200">
+      <div style={{ minWidth: 110 }}>
+        <Select label={yearLabel} options={years.map((y) => ({ label: String(y), value: String(y) }))} value={String(year)} onChange={handleYearChange} />
+      </div>
+      <div style={{ minWidth: 160 }}>
+        <Select label={periodLabel} options={periodOptions} value={isAll ? PERIOD_ALL_KEY : (selectedKey || "")} onChange={onSelect} />
+      </div>
+    </InlineStack>
+  );
+}
+
 const DOC_TYPE_KEYS = [
   { key: "invoice",     uiKey: "invoiceDoc" },
   { key: "lieferschein",uiKey: "deliveryNoteDoc" },
@@ -249,8 +313,8 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
   const [error, setError] = useState(null);
 
   const [search, setSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [periodKey, setPeriodKey] = useState(MONTHLY_PERIODS[0].key);
+  const selectedPeriod = MONTHLY_PERIODS.find((p) => p.key === periodKey) || MONTHLY_PERIODS[0];
   const [docFilter, setDocFilter] = useState("all");
   const [sort, setSort] = useState({ field: "created_at", dir: "desc" });
   const [selected, setSelected] = useState(new Set());
@@ -307,14 +371,14 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
       );
     }
 
-    // Date range
-    if (dateFrom) {
-      const from = new Date(dateFrom).getTime();
-      list = list.filter((o) => new Date(o.created_at).getTime() >= from);
-    }
-    if (dateTo) {
-      const to = new Date(dateTo + "T23:59:59").getTime();
-      list = list.filter((o) => new Date(o.created_at).getTime() <= to);
+    // Payment period (calendar month, matches the Provisionsrechnung cadence)
+    if (selectedPeriod) {
+      const from = new Date(`${selectedPeriod.start}T00:00:00Z`).getTime();
+      const to = new Date(`${selectedPeriod.end}T23:59:59Z`).getTime();
+      list = list.filter((o) => {
+        const t = new Date(o.created_at).getTime();
+        return t >= from && t <= to;
+      });
     }
 
     // Doc type filter
@@ -355,7 +419,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
     });
 
     return list;
-  }, [orders, search, dateFrom, dateTo, docFilter, sort, returnsSet]);
+  }, [orders, search, selectedPeriod, docFilter, sort, returnsSet]);
 
   const { ownOrders, sellerGroups } = useMemo(() => {
     if (!isSuperuser) return { ownOrders: filteredOrders, sellerGroups: [] };
@@ -453,24 +517,13 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                 autoComplete="off"
               />
             </Box>
-            <Box minWidth="140px">
-              <TextField
-                label={ui.from}
-                type="date"
-                value={dateFrom}
-                onChange={setDateFrom}
-                autoComplete="off"
-              />
-            </Box>
-            <Box minWidth="140px">
-              <TextField
-                label={ui.to}
-                type="date"
-                value={dateTo}
-                onChange={setDateTo}
-                autoComplete="off"
-              />
-            </Box>
+            <PeriodFilter
+              periods={MONTHLY_PERIODS}
+              selectedKey={periodKey}
+              onSelect={setPeriodKey}
+              yearLabel={lt(locale, "Year", "Yıl", "Année", "Año", "Anno", "Jahr")}
+              periodLabel={lt(locale, "Period", "Dönem", "Période", "Período", "Periodo", "Zeitraum")}
+            />
             <Box minWidth="160px">
               <Select
                 label={ui.documentType}
@@ -611,6 +664,8 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(new Set());
   const [sort, setSort] = useState({ field: "period_start", dir: "desc" });
+  const [periodKey, setPeriodKey] = useState(PERIOD_ALL_KEY);
+  const [sellerFilter, setSellerFilter] = useState("");
   const toggleSort = (field) => {
     setSort((s) =>
       s.field === field ? { field, dir: s.dir === "asc" ? "desc" : "asc" } : { field, dir: "desc" }
@@ -647,8 +702,20 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     return m;
   }, [sellers]);
 
+  const filteredInvoices = useMemo(() => {
+    let list = invoices;
+    if (periodKey && periodKey !== PERIOD_ALL_KEY) {
+      const p = MONTHLY_PERIODS.find((x) => x.key === periodKey);
+      if (p) list = list.filter((i) => String(i.period_start || "").slice(0, 10) === p.start);
+    }
+    if (isSuperuser && sellerFilter) {
+      list = list.filter((i) => String(i.seller_id || "") === sellerFilter);
+    }
+    return list;
+  }, [invoices, periodKey, sellerFilter, isSuperuser]);
+
   const sortedInvoices = useMemo(() => {
-    const list = [...invoices];
+    const list = [...filteredInvoices];
     list.sort((a, b) => {
       let va, vb;
       if (sort.field === "period_start") {
@@ -669,7 +736,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
       return 0;
     });
     return list;
-  }, [invoices, sort]);
+  }, [filteredInvoices, sort]);
 
   const { ownInvoices, sellerGroups } = useMemo(() => {
     if (!isSuperuser) return { ownInvoices: sortedInvoices, sellerGroups: [] };
@@ -691,7 +758,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
   const toggleAll = () => {
-    const allIds = invoices.map((i) => i.id);
+    const allIds = sortedInvoices.map((i) => i.id);
     const allSel = allIds.length > 0 && allIds.every((id) => selected.has(id));
     setSelected(allSel ? new Set() : new Set(allIds));
   };
@@ -702,8 +769,8 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
 
   const handleBulkDownload = async () => {
     const targets = selected.size > 0
-      ? invoices.filter((i) => selected.has(i.id))
-      : invoices;
+      ? sortedInvoices.filter((i) => selected.has(i.id))
+      : sortedInvoices;
     for (const inv of targets) {
       if (inv.pdf_url) await downloadAuthenticatedPdf(absPdfUrl(inv.pdf_url), `commission-invoice-${inv.id}.pdf`).catch(() => {});
     }
@@ -824,7 +891,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
         <th style={{ padding: "10px 12px", width: 32, background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
           <input
             type="checkbox"
-            checked={invoices.length > 0 && invoices.every((i) => selected.has(i.id))}
+            checked={sortedInvoices.length > 0 && sortedInvoices.every((i) => selected.has(i.id))}
             onChange={toggleAll}
             style={{ cursor: "pointer" }}
           />
@@ -854,7 +921,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   return (
     <BlockStack gap="300">
       <InlineStack gap="200" blockAlign="center">
-        <Button size="slim" onClick={handleBulkDownload} disabled={invoices.length === 0}>
+        <Button size="slim" onClick={handleBulkDownload} disabled={sortedInvoices.length === 0}>
           {ui.downloadAll} {selected.size > 0 ? `(${selected.size})` : ""}
         </Button>
         {isSuperuser && (
@@ -863,13 +930,36 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
           </Button>
         )}
         <Text as="span" tone="subdued" variant="bodySm">
-          {invoices.length} {ui.commissionInvoices}
+          {sortedInvoices.length} {ui.commissionInvoices}
         </Text>
+      </InlineStack>
+      <InlineStack gap="200" blockAlign="end" wrap>
+        <PeriodFilter
+          periods={MONTHLY_PERIODS}
+          selectedKey={periodKey}
+          onSelect={setPeriodKey}
+          yearLabel={lt(locale, "Year", "Yıl", "Année", "Año", "Anno", "Jahr")}
+          periodLabel={lt(locale, "Period", "Dönem", "Période", "Período", "Periodo", "Zeitraum")}
+          allowAllLabel={lt(locale, "All periods", "Tüm dönemler", "Toutes périodes", "Todos los períodos", "Tutti i periodi", "Alle Zeiträume")}
+        />
+        {isSuperuser && (
+          <div style={{ minWidth: 200 }}>
+            <Select
+              label={ui.seller}
+              value={sellerFilter}
+              onChange={setSellerFilter}
+              options={[
+                { label: lt(locale, "All sellers", "Tüm satıcılar", "Tous les vendeurs", "Todos los vendedores", "Tutti i venditori", "Alle Verkäufer"), value: "" },
+                ...sellers.map((s) => ({ label: s.store_name || s.company_name || s.email || s.seller_id, value: s.seller_id })),
+              ]}
+            />
+          </div>
+        )}
       </InlineStack>
 
       <Card padding="0">
         <div style={{ overflowX: "auto" }}>
-          {invoices.length === 0 ? (
+          {sortedInvoices.length === 0 ? (
             <div style={{ padding: "48px 16px", textAlign: "center", color: "#9ca3af" }}>
               <Text as="p" tone="subdued">
                 {ui.noInvoices}
@@ -928,7 +1018,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                     ))}
                   </>
                 ) : (
-                  renderRows(invoices)
+                  renderRows(sortedInvoices)
                 )}
               </tbody>
             </table>
@@ -948,8 +1038,10 @@ function FinanzamtTab() {
   const locale = localeFromIntl || "de";
   const ui = getUI(locale);
   const client = getMedusaAdminClient();
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState("");
+  const [periodKey, setPeriodKey] = useState(PERIOD_ALL_KEY);
+  const selectedPeriod = periodKey !== PERIOD_ALL_KEY ? MONTHLY_PERIODS.find((p) => p.key === periodKey) : null;
+  const periodStart = selectedPeriod?.start || "";
+  const periodEnd = selectedPeriod?.end || "";
   const [data, setData] = useState({ totals: null, sellers: [] });
   const [loading, setLoading] = useState(true);
 
@@ -1008,13 +1100,13 @@ function FinanzamtTab() {
     <BlockStack gap="400">
       <Card>
         <InlineStack gap="200" wrap blockAlign="end">
-          <TextField
-            label={lt(locale, "From", "Başlangıç", "Du", "Desde", "Da", "Von")}
-            type="date" value={periodStart} onChange={setPeriodStart} autoComplete="off"
-          />
-          <TextField
-            label={lt(locale, "To", "Bitiş", "Au", "Hasta", "A", "Bis")}
-            type="date" value={periodEnd} onChange={setPeriodEnd} autoComplete="off"
+          <PeriodFilter
+            periods={MONTHLY_PERIODS}
+            selectedKey={periodKey}
+            onSelect={setPeriodKey}
+            yearLabel={lt(locale, "Year", "Yıl", "Année", "Año", "Anno", "Jahr")}
+            periodLabel={lt(locale, "Period", "Dönem", "Période", "Período", "Periodo", "Zeitraum")}
+            allowAllLabel={lt(locale, "All periods", "Tüm dönemler", "Toutes périodes", "Todos los períodos", "Tutti i periodi", "Alle Zeiträume")}
           />
           <Button onClick={handleExport} loading={exporting} disabled={!t}>
             {lt(locale, "Export Excel", "Excel'e aktar", "Exporter Excel", "Exportar Excel", "Esporta Excel", "Excel exportieren")}

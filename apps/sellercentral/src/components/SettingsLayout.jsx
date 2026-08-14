@@ -76,7 +76,7 @@ export default function SettingsLayout({ children }) {
         { href: "/settings/integrations",      label: ui.settingsIntegrations,  icon: "integrations" },
         { href: "/notifications",               label: ui.settingsNotifications, icon: "notifications" },
         { href: "/settings/dac7",              label: "DAC7 / PStTG",           icon: "dac7", superuserOnly: true },
-        { href: "/settings/bonus-points",      label: "Bonus Puan",             icon: "bonus", superuserOnly: true },
+        { href: "/settings/bonus-points",      label: "Bonus puan takibi",      icon: "bonus", superuserOnly: true },
       ],
     },
   ];

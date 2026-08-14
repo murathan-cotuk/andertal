@@ -2294,6 +2294,9 @@ async function start() {
     const createCustomersRouter = require('./src/routes/customers')
     httpApp.use('/', createCustomersRouter())
 
+    const createBonusPointsAdminRouter = require('./src/routes/bonus-points-admin')
+    httpApp.use('/', createBonusPointsAdminRouter())
+
     // --- Integrations (trustpilot, generic integrations, billbee credentials/test/webhook, marketplace connection): extracted to src/routes/integrations.js ---
     const createIntegrationsRouter = require('./src/routes/integrations')
     httpApp.use('/', createIntegrationsRouter({ verifySellerToken, requireSuperuser, getSellerDbClient }))

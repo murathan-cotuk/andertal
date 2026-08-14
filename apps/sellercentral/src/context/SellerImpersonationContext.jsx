@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from "react";
+import { setTabAuthOverlay } from "@/lib/tab-scoped-auth-storage";
 
 /**
  * Seller Impersonation Context
@@ -29,6 +30,7 @@ function _snapshot() {
 }
 
 function _applyContext(tab) {
+  setTabAuthOverlay(true);
   localStorage.setItem("sellerToken", tab.token || "");
   localStorage.setItem("sellerId", tab.sellerId || "");
   localStorage.setItem("storeName", tab.storeName || "");
@@ -39,6 +41,7 @@ function _applyContext(tab) {
 
 function _restoreSuperuserFrom(ctx) {
   if (!ctx) return;
+  setTabAuthOverlay(false);
   localStorage.setItem("sellerToken", ctx.sellerToken || "");
   localStorage.setItem("sellerId", ctx.sellerId || "");
   localStorage.setItem("storeName", ctx.storeName || "");

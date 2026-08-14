@@ -263,7 +263,7 @@ module.exports = function createNotificationsRouter() {
           SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
           LEFT JOIN seller_hub_notification_state s
             ON s.recipient_key = $1 AND s.source_type = 'seller_notice' AND s.source_id = n.id
-          WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed')
+          WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed', 'commission_invoice_created')
             AND n.seller_id = $2
             AND (s.id IS NULL OR s.deleted_at IS NULL)
             AND (s.id IS NULL OR s.read_at IS NULL)`
@@ -470,7 +470,7 @@ module.exports = function createNotificationsRouter() {
              FROM admin_hub_notifications n
              LEFT JOIN seller_hub_notification_state s
                ON s.recipient_key = $1 AND s.source_type = 'seller_notice' AND s.source_id = n.id
-             WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed')
+             WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed', 'commission_invoice_created')
                AND n.seller_id = $2
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 8`,
@@ -752,7 +752,7 @@ module.exports = function createNotificationsRouter() {
              FROM admin_hub_notifications n
              LEFT JOIN seller_hub_notification_state s
                ON s.recipient_key = $1 AND s.source_type = 'seller_notice' AND s.source_id = n.id
-             WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed')
+             WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed', 'commission_invoice_created')
                AND n.seller_id = $2
                AND (s.id IS NULL OR s.deleted_at IS NULL)
              ORDER BY n.created_at DESC LIMIT 500`,
@@ -1229,7 +1229,7 @@ module.exports = function createNotificationsRouter() {
               `INSERT INTO seller_hub_notification_state (recipient_key, source_type, source_id, deleted_at)
                SELECT $1::varchar, 'seller_notice', n.id, now()
                FROM admin_hub_notifications n
-               WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed')
+               WHERE n.type IN ('product_change_request_reviewed', 'metafield_proposal_reviewed', 'brand_authorization_reviewed', 'commission_invoice_created')
                  AND n.seller_id = $2
                ON CONFLICT (recipient_key, source_type, source_id) DO UPDATE SET deleted_at = now()`,
               [rk, sid],

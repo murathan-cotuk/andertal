@@ -827,3 +827,36 @@ Kullanıcıya B2B özelliğinin 5 adımını (yeni checkout alanı, DB kolonu, f
 3. Yukarıdaki "§3.10 KRİTİK KEŞİF" bölümündeki doğrulamayı YAP — bu en yüksek öncelik, çünkü kullanıcının en son verdiği net talimat bu.
 4. Sonra §3.8/§3.9'un checkbox listesindeki `[ ]` işaretli maddelere geç.
 5. DB migration'ları (`server.js`'teki yeni `ALTER TABLE`'lar) canlı ortamda deploy olunca otomatik çalışır, ekstra işlem gerekmez. TEK istisna: `scripts/backfill-platform-bonus-funding.js` ve `POST /admin-hub/v1/payouts/backfill` kullanıcı tarafından bir kez elle çalıştırılmalı (önce `--dry-run`).
+
+### Oturum — Settings/bonus-points operasyon paneli (kullanıcı: kılavuz değil, mali takip)
+Kullanıcı `settings/bonus-points` sayfasındaki "nasıl çalışır" metnini istemedi. Sayfa artık superuser bonus **yönetim ve Finanzamt raporu**:
+- **Backend:** `apps/medusa-backend/src/routes/bonus-points-admin.js` — `GET /admin-hub/v1/bonus-points/{overview,customers,redemptions,ledger,earnings,reversals,manual,orders/:id,report,report.pdf,payment-methods}`. Superuser-only. Mevcut tablolar (`store_customers`, `store_customer_bonus_ledger`, `store_orders`) — yeni tablo yok.
+- **UI:** `BonusPointsPage.jsx` 8 tab: Özet, müşteri bakiyeleri, Andertal kasası (hangi siparişte platform kendi bakiyesinden ödedi), kazanımlar, ledger, iptal/iade, manuel/kayıt, raporlar.
+- Filtre: tarih aralığı + ödeme yöntemi + arama. Satır seçimi ile kısmi rapor.
+- **Excel:** `apps/sellercentral/src/app/api/bonus-points/export/route.js` (Uebersicht / Andertal-Finanzierung / Kunden-Salden / Ledger).
+- **PDF:** tekil sipariş belgesi + toplu rapor; Almanca Finanzamt açıklaması (Bonus = Andertal kendi kasası, satıcı indirimi değil, ek ciro değil).
+- 50 puan = 1 €, sipariş değeri = müşteri ödemesi + Andertal finansmanı — Billing/Transactions ile aynı formüller (`order-money.js`).
+- Kılavuz metin kaldırıldı. Canlı payout cron'una dokunulmadı.
+
+### Oturum — Billing Tab 2/3 filtreleri, PDF indirme, geriye dönük fatura + otomatik aylık üretim + email/bildirim (kullanıcı: "yap şunları artık hallet")
+Kullanıcı somut şikayetler bildirdi: Tab2'de PDF indirilemiyor, seller/dönem filtresi yok; Tab3'te dönem seçimi istenen şekilde değil, PDF indirilemiyor; son fatura 30.04.2026'dan, sonraki dönemler geriye dönük eksik; her dönemde otomatik fatura + email + bildirim istendi; 0€ satışta bile fatura kesilmeli (zaten §3.8'de vardı, teyit edildi).
+
+**Kök neden (dönem uyuşmazlığı):** Mevcut kod aslında İKİ FARKLI dönem takvimi kullanıyordu — `runAutomaticPayoutsIfDue` (canlı cron) 2./4. Cuma'ya göre 2 haftalık dönem üretiyordu, ama gerçek fatura geçmişi (30.04.2026'ya kadar) AYLIK dönemlerle oluşmuş (muhtemelen eski/elle çalıştırılan bir süreçle). Bu tutarsızlık yüzünden hem "eksik dönem" hem "filtre neye göre?" sorunları çıkıyordu. **Karar: AYLIK dönem kanonik hale getirildi** (mevcut 15+ aylık fatura geçmişiyle uyumlu, benim §3.8'deki backfill'im zaten aylıktı).
+
+**Backend (`payouts.js`):**
+- `generateCommissionInvoicesForMonth(client, monthStart, monthEnd, approvedSellers, platformVatPercent)` — TEK ay için, TÜM onaylı seller'lar (0€ dahil) satır üretimi, ortak fonksiyona çıkarıldı (eskiden sadece backfill endpoint'inin içindeydi).
+- `notifySellerOfNewCommissionInvoice(payoutId)` — kendi DB bağlantısını açan, fire-and-forget fonksiyon: `buildSellerPayoutPdfBuffer` ile PDF üretir, `admin_hub_notifications`'a `commission_invoice_created` tipi ile satır ekler (`insertAdminHubNotificationSafe`), ve `sendFlowOutboundEmail` ile seller'ın email'ine PDF EKLİ mail atar (Resend/SMTP, mevcut altyapı — yeni email servisi kurulmadı).
+- **`adminHubPayoutsBackfillPOST` yeniden yazıldı:** artık `store_orders`'ta o ay sipariş olup olmamasından BAĞIMSIZ, en eski (sipariş VEYA mevcut seller_payouts) ayından bugünün ayına kadar (bugünkü ay HARİÇ, henüz bitmedi) HER ayı işliyor — böylece siparişi sıfır olan aylar da dahil oluyor. Yeni oluşan her satır için `notifySellerOfNewCommissionInvoice` çağrılıyor.
+- **YENİ: `runMonthlyCommissionInvoicesIfDue()`** — mevcut `runAutomaticPayoutsIfDue`/`runSellerIbanPayoutsIfDue` ile AYNI güvenli desen (boot + saatte bir `setInterval`, ucuz "işim var mı" kontrolü): `seller_payouts`'taki EN SON dönemden bugüne kadar eksik TÜM ayları otomatik yakalar (30.04.2026'dan sonraki boşluğu bir kere otomatik kapatacak, sonrasında her ay biteninde otomatik yeni fatura üretecek), yeni satırlar için bildirim+email gönderir. **Bu, önceki oturumda kasıtlı dokunmadığım canlı cron alanına kullanıcının açık "hallet" talimatıyla şimdi eklendi.**
+- `order-pdf-buffers.js`: `buildSellerPayoutPdfBuffer(pgClient, payoutId)` — `/admin-hub/v1/seller-payouts/:id/pdf` (indirme) VE email-ekinde AYNI fonksiyon kullanılıyor (kod tekrarı kaldırıldı, ikisi asla birbirinden farklı çıktı üretemez). PDF üretimi izole test edildi (`pdfkit` ile gerçek buffer üretildi, hatasız).
+- `notifications.js`: `commission_invoice_created` tipi 4 yerde (unread count, recent list, mark-all-read — hepsi `n.type IN (...)` listesi) eklendi — bildirim artık seller'ın zil ikonunda GERÇEKTEN görünür (sadece DB'ye yazıp UI'da hiç görünmemek gibi bir eksiklik olmasın diye).
+- **PDF indirme "çalışmıyor" şikayeti için:** Kodda bariz bir hata BULAMADIM (izole render testi başarılı) — en olası açıklama, o dönemler için hiç `seller_payouts` satırı YOKTU (404 dönüyordu). Geriye dönük üretim + otomatik aylık üretim bunu kapatmalı. Eğer hâlâ inmiyor olursa, bu muhtemelen önceki turda bahsedilen "tüm sayfalarda Unauthorized" sorunuyla aynı kök nedene bağlı (deploy/env, kod değil).
+
+**Frontend (`BillingSettingsPage.jsx`):**
+- Ortak `generateMonthlyPeriods()` + `PeriodFilter` component'i (Yıl seçimi + o yıl içindeki Dönem seçimi, iki ayrı dropdown, en son ay en üstte) — kullanıcının tam istediği şekil ("yıl seçilsin, yanında o yıl içindeki ödeme dönemleri dropdown olarak gözüksün, en üstte son dönem").
+- **Tab 1 (Bestelldokumente):** serbest `dateFrom`/`dateTo` TextField'ları KALDIRILDI, yerine `PeriodFilter` — varsayılan: içinde bulunulan ay.
+- **Tab 2 (Provisionsrechnungen):** `PeriodFilter` (varsayılan: "Alle Zeiträume") + Seller `<Select>` (superuser-only, "Alle Verkäufer" dahil) eklendi. Tüm sayaç/checkbox/indirme-hedefi referansları (`toggleAll`, `handleBulkDownload`, boş-durum, satır sayısı) artık FİLTRELENMİŞ listeyi kullanıyor (eskiden ham `invoices`'a bakıyorlardı — filtre olsa bile "tümünü indir" filtrelenmemiş hepsini indirirdi, bu da düzeltildi).
+- **Tab 3 (Finanzamt):** serbest tarih TextField'ları KALDIRILDI, yerine aynı `PeriodFilter` ("Alle Zeiträume" dahil).
+- TS/JSX check + `node --check` (5 backend dosyası) + `bonus-settlement.test.js` (22 test, 20 pass/0 fail/2 skip) hepsi temiz, regresyon yok.
+
+**Bilinçli sınır (yeni bir şey eklemedim, kapsam netliği için):** Canlı cron artık AYRICA aylık fatura üretiyor — ama para transferi (`runSellerIbanPayoutsIfDue`, gerçek SEPA/IBAN ödemesi) HÂLÂ AYRI ve dokunulmadı; kullanıcı sadece "fatura oluşsun + bildirilsin" istedi, "otomatik para gönder" demedi.
