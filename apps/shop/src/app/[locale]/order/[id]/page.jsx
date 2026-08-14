@@ -628,24 +628,73 @@ export default function OrderDetailPage() {
 
   const loadOrder = useCallback(async () => {
     if (!orderId) return;
+    const previewKey = `andertal_order_preview_${orderId}`;
+    let shownFromPreview = false;
     try {
-      const token = getToken("customer");
-      if (token) {
-        const res = await getMedusaClient().request("/store/orders/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const found = (res?.orders || []).find(o => o.id === orderId);
-        if (found) { setOrder(found); setLoading(false); return; }
+      const raw = sessionStorage.getItem(previewKey);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached?.id === orderId) {
+          setOrder(cached);
+          setError(null);
+          setLoading(false);
+          shownFromPreview = true;
+          try { sessionStorage.removeItem(previewKey); } catch (_) {}
+        }
       }
-      const res = await fetch(`/api/store-orders/${orderId}`);
-      const data = await res.json();
-      if (data?.order) setOrder(data.order);
-      else setError(t("notFound"));
-    } catch (e) {
-      setError(e?.message || t("loadError"));
+    } catch (_) {}
+
+    const apply = (row) => {
+      if (!row) return false;
+      setOrder(row);
+      setError(null);
+      setLoading(false);
+      return true;
+    };
+
+    const attempts = shownFromPreview ? 1 : 6;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const token = getToken("customer");
+        if (token) {
+          const res = await getMedusaClient().request("/store/orders/me", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const found = (res?.orders || []).find((o) => o.id === orderId);
+          if (found) {
+            apply(found);
+            return;
+          }
+        }
+        // Forward the token here too (not just the /orders/me lookup above) — a logged-in customer
+        // pasting another customer's order id into the URL must still be rejected by the ownership
+        // check in storeOrdersGET, not silently fall through to the unauthenticated guest path.
+        const res = await fetch(`/api/store-orders/${orderId}`, {
+          cache: "no-store",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await res.json();
+        if (data?.order) {
+          apply(data.order);
+          return;
+        }
+        if (shownFromPreview) return;
+      } catch (e) {
+        if (i === attempts - 1 && !shownFromPreview) {
+          setError(e?.message || t("loadError"));
+          setLoading(false);
+          return;
+        }
+      }
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+      }
     }
-    setLoading(false);
-  }, [orderId]);
+    if (!shownFromPreview) {
+      setError(t("notFound"));
+      setLoading(false);
+    }
+  }, [orderId, t]);
 
   useEffect(() => { loadOrder(); }, [loadOrder]);
 

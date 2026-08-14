@@ -1,6 +1,8 @@
 /**
- * 15-Tage-Abrechnungszeiträume (1–15 / 16–Monatsende) — wie Zahlungen & Auszahlungen.
+ * 15-Tage-Abrechnungszeiträume (1–15 / 16–Monatsende).
  */
+
+export const ALL_PAYOUT_PERIODS_KEY = "__all__";
 
 export function generatePayoutPeriods(count = 12) {
   const periods = [];
@@ -11,17 +13,27 @@ export function generatePayoutPeriods(count = 12) {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const mm = String(month + 1).padStart(2, "0");
     const ym = `${year}-${mm}`;
+    const secondStart = `${ym}-16`;
+    const secondEnd = `${ym}-${String(daysInMonth).padStart(2, "0")}`;
+    const firstStart = `${ym}-01`;
+    const firstEnd = `${ym}-15`;
     periods.push({
       label: `16.${mm}.${year} – ${String(daysInMonth).padStart(2, "0")}.${mm}.${year}`,
-      startDate: `${ym}-16`,
-      endDate: `${ym}-${String(daysInMonth).padStart(2, "0")}`,
+      startDate: secondStart,
+      endDate: secondEnd,
+      start: secondStart,
+      end: secondEnd,
       key: `${ym}-2`,
+      year,
     });
     periods.push({
       label: `01.${mm}.${year} – 15.${mm}.${year}`,
-      startDate: `${ym}-01`,
-      endDate: `${ym}-15`,
+      startDate: firstStart,
+      endDate: firstEnd,
+      start: firstStart,
+      end: firstEnd,
       key: `${ym}-1`,
+      year,
     });
     month -= 1;
     if (month < 0) {
@@ -73,7 +85,7 @@ export function buildPeriodRevenueChart(period, orders, getOrderCents) {
   const days = eachDayInPeriod(period).map((d) => ({ ...d, revenue: 0, orders: 0 }));
   for (const o of orders) {
     if (!isOrderInPayoutPeriod(o, period)) continue;
-    const day = toLocalDateKey(o?.delivery_date || o?.created_at);
+    const day = toLocalDateKey(o?.created_at);
     const bucket = days.find((d) => d.key === day);
     if (bucket) {
       bucket.revenue += getOrderCents(o);
@@ -91,10 +103,10 @@ export function toLocalDateKey(d) {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
 
-/** Order in period: COALESCE(delivery_date, created_at) — backend transactions rule. */
+/** Order in period by order date (same as billing / seller ledger). */
 export function isOrderInPayoutPeriod(order, period) {
   if (!period?.startDate || !period?.endDate) return false;
-  const day = toLocalDateKey(order?.delivery_date || order?.created_at);
+  const day = toLocalDateKey(order?.created_at);
   if (!day) return false;
   return day >= period.startDate && day <= period.endDate;
 }

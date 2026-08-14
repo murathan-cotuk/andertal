@@ -52,11 +52,12 @@ async function saveDocumentBuffer(buffer, sellerId, orderId, documentType) {
 
 /**
  * If the seller has opted this document type into "customer_api" sourcing and the
- * customer's system has actually pushed a document for this order, return its file_url —
- * the platform-generated PDF should be skipped in favor of it. Returns null otherwise
- * (fall back to platform generation, same as before this feature existed).
+ * customer's system has actually pushed a document for this order, return its file_url.
+ * Invoices are never substituted: bonus points / payment split only exist on the
+ * platform-generated Rechnung, which is always sent to customer and seller.
  */
 async function resolveCustomerSuppliedDocumentUrl(client, orderId, sellerId, documentType) {
+  if (String(documentType || '').trim() === 'invoice') return null
   if (!sellerId || !orderId) return null
   const prefR = await client.query(
     `SELECT document_sources FROM admin_hub_seller_settings WHERE seller_id = $1`,

@@ -12,6 +12,13 @@ const { resolveFlowMailProvider, sendFlowOutboundEmail } = require('./email-prov
 const { consumeFlowEmailSlot } = require('./flow-email-rate-limit')
 const { SUPPORTED_LOCALES: FLOW_EMAIL_LOCALES, resolveLocaleFromCountry: resolveEmailLocaleFromCountry } = require('./locale-from-country')
 const { enrichOrderItemRows } = require('./order-items-seller')
+const {
+  isOrderDispatcherTrigger,
+  isMessageDispatcherTrigger,
+  isSellerLifecycleTrigger,
+  isCustomerAccountTrigger,
+  shouldSkipOrderFlowTemplate,
+} = require('./flow-triggers')
 
 /** Mirrors apps/shop/src/lib/shop-market.js — URL language segment from market country. */
 function storefrontLangFromMarketCountry(market) {
@@ -977,7 +984,7 @@ async function sendImmediateStepsForFlow({
     )
   }
   if (emailsSent > 0) {
-    await client.query(`UPDATE admin_hub_flows SET sent_count = sent_count + 1, updated_at = now() WHERE id = $1::uuid`, [flowId])
+    await client.query(`UPDATE admin_hub_flows SET sent_count = sent_count + 1 WHERE id = $1::uuid`, [flowId])
   }
   return emailsSent
 }
@@ -995,6 +1002,10 @@ async function runAutomationFlowsForOrder(opts) {
   const triggerKey = String(opts.triggerKey || '').trim()
   const orderId = String(opts.orderId || '').trim()
   if (!triggerKey || !orderId) return
+  if (!isOrderDispatcherTrigger(triggerKey)) {
+    logger.warn(`[flow-automation] refusing non-order trigger "${triggerKey}" on order dispatcher (order=${orderId})`)
+    return
+  }
 
   let client
   try {
@@ -1091,6 +1102,12 @@ async function runAutomationFlowsForOrder(opts) {
         [flowId],
       )
       const steps = sr.rows || []
+      if (shouldSkipOrderFlowTemplate(triggerKey, steps)) {
+        logger.warn(
+          `[flow-automation] skip flow ${flowId} on "${triggerKey}": template is inbox/support, not an order email`,
+        )
+        continue
+      }
 
       if (audience === 'customer' || audience === 'admin') {
         const toEmail = audience === 'admin'
@@ -1185,6 +1202,10 @@ async function runAutomationFlowsForSellerEvent(opts) {
   const triggerKey = String(opts.triggerKey || '').trim()
   const sellerUserId = String(opts.sellerUserId || '').trim()
   if (!triggerKey || !sellerUserId) return
+  if (!isSellerLifecycleTrigger(triggerKey)) {
+    logger.warn(`[flow-automation] refusing non-lifecycle trigger "${triggerKey}" on seller dispatcher`)
+    return
+  }
 
   let client
   try {
@@ -1318,6 +1339,10 @@ async function runAutomationFlowsForCustomerEvent(opts) {
   const customerId = String(opts.customerId || '').trim()
   const fallbackEmail = String(opts.email || '').trim().toLowerCase()
   if (!triggerKey) return
+  if (!isCustomerAccountTrigger(triggerKey)) {
+    logger.warn(`[flow-automation] refusing non-customer trigger "${triggerKey}" on customer dispatcher`)
+    return
+  }
 
   let client
   try {
@@ -1485,6 +1510,10 @@ async function runAutomationFlowsForMessageEvent(opts) {
   const triggerKey = String(opts.triggerKey || '').trim()
   const toEmail = String(opts.toEmail || '').trim()
   if (!triggerKey || !toEmail) return 0
+  if (!isMessageDispatcherTrigger(triggerKey)) {
+    logger.warn(`[flow-automation] refusing non-message trigger "${triggerKey}" on message dispatcher`)
+    return 0
+  }
 
   let client
   try {

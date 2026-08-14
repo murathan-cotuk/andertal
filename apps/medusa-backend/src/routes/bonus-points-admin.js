@@ -101,6 +101,33 @@ const applyDateRange = (parts, params, from, to, col) => {
   }
 }
 
+/** Order created in range, or bonus was redeemed on that order in range. */
+const applyOrderOrRedeemDateRange = (parts, params, from, to) => {
+  if (!from && !to) return
+  const created = []
+  const led = []
+  if (from) {
+    params.push(from)
+    const n = params.length
+    created.push(`o.created_at >= $${n}::date`)
+    led.push(`l2.occurred_at >= $${n}::date`)
+  }
+  if (to) {
+    params.push(to)
+    const n = params.length
+    created.push(`o.created_at < ($${n}::date + interval '1 day')`)
+    led.push(`l2.occurred_at < ($${n}::date + interval '1 day')`)
+  }
+  parts.push(`(
+    (${created.join(' AND ')})
+    OR EXISTS (
+      SELECT 1 FROM store_customer_bonus_ledger l2
+      WHERE l2.order_id = o.id AND l2.source = 'order_redeem'
+        AND ${led.join(' AND ')}
+    )
+  )`)
+}
+
 const applyPaymentMethodFilter = (parts, params, pmRaw) => {
   const v = String(pmRaw || '').trim().toLowerCase()
   if (!v || v === 'all') return
@@ -196,8 +223,15 @@ const ORDER_SELECT = `
   o.subtotal_cents, COALESCE(o.shipping_cents,0) AS shipping_cents,
   COALESCE(o.discount_cents,0) AS discount_cents,
   COALESCE(o.coupon_discount_cents,0) AS coupon_discount_cents, o.coupon_code,
-  COALESCE(o.bonus_points_redeemed,0) AS bonus_points_redeemed,
-  COALESCE(o.platform_bonus_funding_cents,0) AS platform_bonus_funding_cents,
+  GREATEST(
+    COALESCE(o.bonus_points_redeemed,0),
+    COALESCE(ABS(led.redeem_points),0)
+  )::int AS bonus_points_redeemed,
+  GREATEST(
+    COALESCE(o.platform_bonus_funding_cents,0),
+    GREATEST(0, COALESCE(o.discount_cents,0) - COALESCE(o.coupon_discount_cents,0)),
+    FLOOR(GREATEST(COALESCE(o.bonus_points_redeemed,0), COALESCE(ABS(led.redeem_points),0))::numeric / 50 * 100)
+  )::int AS platform_bonus_funding_cents,
   o.total_cents, COALESCE(o.seller_net_after_commission_cents,0) AS seller_net_after_commission_cents,
   COALESCE(o.stripe_application_fee_cents,0) AS stripe_application_fee_cents,
   o.payment_intent_id, o.currency, o.seller_id,
@@ -208,13 +242,39 @@ const ORDER_SELECT = `
 const ORDER_FROM = `
   FROM store_orders o
   LEFT JOIN store_customers c ON c.id = o.customer_id
-  LEFT JOIN seller_users s ON s.seller_id = o.seller_id
+  LEFT JOIN LATERAL (
+    SELECT store_name FROM seller_users su WHERE su.seller_id = o.seller_id LIMIT 1
+  ) s ON true
+  LEFT JOIN LATERAL (
+    SELECT COALESCE(SUM(points_delta),0)::int AS redeem_points
+    FROM store_customer_bonus_ledger l
+    WHERE l.order_id = o.id AND l.source = 'order_redeem'
+  ) led ON true
 `
 
+const ANDERTAL_CASH_WHERE = `(
+  COALESCE(o.bonus_points_redeemed,0) > 0
+  OR COALESCE(o.platform_bonus_funding_cents,0) > 0
+  OR GREATEST(0, COALESCE(o.discount_cents,0) - COALESCE(o.coupon_discount_cents,0)) > 0
+  OR EXISTS (
+    SELECT 1 FROM store_customer_bonus_ledger l
+    WHERE l.order_id = o.id AND l.source = 'order_redeem' AND l.points_delta <> 0
+  )
+)`
+
+const DERIVED_FUNDING_CENTS = `GREATEST(
+  COALESCE(o.platform_bonus_funding_cents,0),
+  GREATEST(0, COALESCE(o.discount_cents,0) - COALESCE(o.coupon_discount_cents,0)),
+  FLOOR(GREATEST(
+    COALESCE(o.bonus_points_redeemed,0),
+    COALESCE((SELECT ABS(SUM(l.points_delta)) FROM store_customer_bonus_ledger l WHERE l.order_id = o.id AND l.source = 'order_redeem'), 0)
+  )::numeric / 50 * 100)
+)`
+
 async function fetchRedemptions(client, q, { limit, offset, ids } = {}) {
-  const parts = [`(COALESCE(o.bonus_points_redeemed,0) > 0 OR COALESCE(o.platform_bonus_funding_cents,0) > 0)`]
+  const parts = [ANDERTAL_CASH_WHERE]
   const params = []
-  applyDateRange(parts, params, q.from, q.to, 'o.created_at')
+  applyOrderOrRedeemDateRange(parts, params, q.from, q.to)
   applyPaymentMethodFilter(parts, params, q.payment_method)
   applySearch(parts, params, q.search)
   if (q.customer_id) {
@@ -256,7 +316,7 @@ async function fetchRedemptions(client, q, { limit, offset, ids } = {}) {
 async function fetchOverview(client, q) {
   const dateParts = []
   const dateParams = []
-  applyDateRange(dateParts, dateParams, q.from, q.to, 'o.created_at')
+  applyOrderOrRedeemDateRange(dateParts, dateParams, q.from, q.to)
   applyPaymentMethodFilter(dateParts, dateParams, q.payment_method)
   const orderWhere = dateParts.length ? `WHERE ${dateParts.join(' AND ')}` : ''
 
@@ -271,15 +331,13 @@ async function fetchOverview(client, q) {
   const periodOrders = await client.query(
     `SELECT
        COUNT(*)::int AS orders_total,
-       COUNT(*) FILTER (WHERE COALESCE(o.bonus_points_redeemed,0) > 0 OR COALESCE(o.platform_bonus_funding_cents,0) > 0)::int AS orders_with_bonus,
+       COUNT(*) FILTER (WHERE ${ANDERTAL_CASH_WHERE})::int AS orders_with_bonus,
        COUNT(*) FILTER (WHERE o.checkout_payment_kind = 'platform_loyalty')::int AS orders_zero_pay,
-       COALESCE(SUM(COALESCE(o.bonus_points_redeemed,0)),0)::bigint AS points_redeemed,
-       COALESCE(SUM(
-         CASE
-           WHEN COALESCE(o.platform_bonus_funding_cents,0) > 0 THEN o.platform_bonus_funding_cents
-           ELSE GREATEST(0, COALESCE(o.discount_cents,0) - COALESCE(o.coupon_discount_cents,0))
-         END
-       ),0)::bigint AS funding_cents
+       COALESCE(SUM(CASE WHEN ${ANDERTAL_CASH_WHERE} THEN GREATEST(
+         COALESCE(o.bonus_points_redeemed,0),
+         COALESCE((SELECT ABS(SUM(l.points_delta)) FROM store_customer_bonus_ledger l WHERE l.order_id = o.id AND l.source = 'order_redeem'), 0)
+       ) ELSE 0 END),0)::bigint AS points_redeemed,
+       COALESCE(SUM(CASE WHEN ${ANDERTAL_CASH_WHERE} THEN ${DERIVED_FUNDING_CENTS} ELSE 0 END),0)::bigint AS funding_cents
      FROM store_orders o
      ${orderWhere}`,
     dateParams,

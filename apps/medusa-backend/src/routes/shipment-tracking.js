@@ -690,13 +690,21 @@ module.exports = function createShipmentTrackingRouter({
         const trackingNumber = parcel.tracking_number || ''
         const labelUrl = parcel.label?.label_printer || parcel.label?.normal_printer || ''
         const carrierName = carrier || service_name || 'Sendcloud'
-        const updRes = await client.query(
-          `UPDATE store_orders SET tracking_number=$1, carrier_name=$2, sendcloud_label_url=$3, delivery_status='versendet', shipped_at=COALESCE(shipped_at,now()), updated_at=now() WHERE id=$4::uuid AND delivery_status NOT IN ('versendet','zugestellt')`,
+        const prevStatus = String(order.delivery_status || '')
+        await client.query(
+          `UPDATE store_orders SET
+             tracking_number = COALESCE(NULLIF($1, ''), tracking_number),
+             carrier_name = COALESCE(NULLIF($2, ''), carrier_name),
+             sendcloud_label_url = COALESCE(NULLIF($3, ''), sendcloud_label_url),
+             delivery_status = CASE WHEN delivery_status = 'zugestellt' THEN delivery_status ELSE 'versendet' END,
+             shipped_at = COALESCE(shipped_at, now()),
+             updated_at = now()
+           WHERE id = $4::uuid`,
           [trackingNumber, carrierName, labelUrl, id]
         )
         await client.end()
         res.json({ label_url: labelUrl, tracking_number: trackingNumber, carrier_name: carrierName, charge_method: chargeResult.charge_method })
-        if (updRes.rowCount > 0) void dispatchOrderFlowEvent('order_shipped', id)
+        if (prevStatus !== 'versendet' && prevStatus !== 'zugestellt') void dispatchOrderFlowEvent('order_shipped', id)
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         return respondSellerSystemError(req, res, {

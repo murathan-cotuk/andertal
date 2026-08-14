@@ -1167,6 +1167,12 @@ async function start() {
         } catch (e) {
           console.warn('[seed-return-requested-customer-ships-flow]', e?.message || e)
         }
+        try {
+          const { dedupeAndNormalizeFlows } = require('./src/flow-catalog')
+          await dedupeAndNormalizeFlows(client)
+        } catch (e) {
+          console.warn('[flow-catalog]', e?.message || e)
+        }
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_flow_snapshots (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

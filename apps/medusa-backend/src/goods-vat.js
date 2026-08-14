@@ -135,6 +135,15 @@ function isIntraCommunityB2B(row, { customerVatId } = {}) {
   return dest !== 'DE' && EU_COUNTRIES.has(dest)
 }
 
+function resolvePlatformCommissionVatPercent() {
+  const raw = process.env.PLATFORM_VAT_PERCENT
+  if (raw == null || String(raw).trim() === '') return 19
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return 19
+  if (n === 0) return 19
+  return n
+}
+
 function salesInvoiceVat(row, { sellerHasVatId, taxableGrossCents, customerVatId } = {}) {
   if (!sellerHasVatId) {
     return { ...splitInclusiveVat(taxableGrossCents, 0), ratePercent: 0, exempt: true, scheme: 'kleinunternehmer' }
@@ -159,4 +168,5 @@ module.exports = {
   isValidEuVatIdFormat,
   isIntraCommunityB2B,
   salesInvoiceVat,
+  resolvePlatformCommissionVatPercent,
 }

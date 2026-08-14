@@ -14,10 +14,6 @@ import { dateLocaleFor, lt } from "@/lib/locale-text";
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
-function monthStartISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
 function fmtDate(d, locale) {
   if (!d) return "—";
   const loc = dateLocaleFor(locale);
@@ -88,8 +84,8 @@ export default function BonusPointsPage() {
 
   const [isSuperuser, setIsSuperuser] = useState(null);
   const [tab, setTab] = useState(0);
-  const [from, setFrom] = useState(monthStartISO);
-  const [to, setTo] = useState(todayISO);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("all");
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
@@ -313,10 +309,23 @@ export default function BonusPointsPage() {
         <BlockStack gap="300">
           <InlineStack gap="300" wrap blockAlign="end">
             <div style={{ minWidth: 150 }}>
-              <TextField label={lt(locale, "From", "Başlangıç", "Du", "Desde", "Da", "Von")} type="date" value={from} onChange={setFrom} autoComplete="off" />
+              <TextField
+                label={lt(locale, "From", "Başlangıç", "Du", "Desde", "Da", "Von")}
+                type="date"
+                value={from}
+                onChange={setFrom}
+                autoComplete="off"
+                helpText={lt(locale, "Empty = all time", "Boş = tüm zamanlar", "Vide = tout", "Vacío = todo", "Vuoto = tutto", "Leer = gesamter Zeitraum")}
+              />
             </div>
             <div style={{ minWidth: 150 }}>
-              <TextField label={lt(locale, "To", "Bitiş", "Au", "Hasta", "A", "Bis")} type="date" value={to} onChange={setTo} autoComplete="off" />
+              <TextField
+                label={lt(locale, "To", "Bitiş", "Au", "Hasta", "A", "Bis")}
+                type="date"
+                value={to}
+                onChange={setTo}
+                autoComplete="off"
+              />
             </div>
             <div style={{ minWidth: 220 }}>
               <Select
@@ -491,7 +500,7 @@ export default function BonusPointsPage() {
                     </InlineStack>
                   )}
                   <Card padding="0">
-                    {orders.length === 0 ? <Empty>{lt(locale, "No bonus redemptions in this filter", "Bu filtrede bonus kullanımı yok", "Aucune utilisation", "Sin canjes", "Nessun utilizzo", "Keine Einlösungen in diesem Filter")}</Empty> : (
+                    {orders.length === 0 ? <Empty>{lt(locale, "No orders where Andertal paid from its own cash. Clear the date filter to include older redemptions.", "Andertal kasasından tamamlanan sipariş yok. Eski kullanımlar için tarih filtresini boş bırakın.", "Aucune commande financée par Andertal. Videz les dates pour voir l’historique.", "No hay pedidos cubiertos por Andertal. Deja las fechas vacías para ver el historial.", "Nessun ordine coperto da Andertal. Svuota le date per vedere lo storico.", "Keine Bestellungen mit Andertal-Kasse. Datumsfilter leeren, um ältere Einlösungen zu sehen.")}</Empty> : (
                       <div style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                           <thead>

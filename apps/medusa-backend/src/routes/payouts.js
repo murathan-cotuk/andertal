@@ -2,7 +2,8 @@
 const { Router } = require('express')
 const { resolveSellerScope } = require('../seller-scope')
 const { resolveOrderPaidTotalCents, orderBonusDiscountCents } = require('../order-money')
-const { salesInvoiceVat } = require('../goods-vat')
+const { salesInvoiceVat, resolvePlatformCommissionVatPercent } = require('../goods-vat')
+const { aggregateSellerPeriodSales, aggregateMarketplacePeriodSales } = require('../seller-billing')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -146,59 +147,36 @@ module.exports = function createPayoutsRouter({
      * Returns the list of newly created payout ids (for notification/email).
      */
     const generateCommissionInvoicesForMonth = async (client, monthStart, monthEnd, approvedSellers, platformVatPercent) => {
-      const ordersR = await client.query(
-        `SELECT o.seller_id, o.subtotal_cents, o.shipping_cents, o.discount_cents, o.coupon_discount_cents, o.total_cents,
-                COALESCE(o.platform_bonus_funding_cents, 0) AS platform_bonus_funding_cents
-         FROM store_orders o
-         WHERE o.payment_status = 'bezahlt'
-           AND o.created_at >= $1::date AND o.created_at < ($1::date + interval '1 month')
-           AND o.seller_id IS NOT NULL`,
-        [monthStart],
-      )
-      const bySeller = new Map()
-      for (const o of ordersR.rows || []) {
-        const sid = String(o.seller_id || '').trim()
-        if (!sid) continue
-        if (!bySeller.has(sid)) bySeller.set(sid, { subtotal: 0, customerPaid: 0, bonusFunding: 0, orderCount: 0 })
-        const agg = bySeller.get(sid)
-        agg.subtotal += Math.max(0, Number(o.subtotal_cents || 0))
-        agg.customerPaid += resolveOrderPaidTotalCents(o)
-        agg.bonusFunding += Number(o.platform_bonus_funding_cents || 0)
-        agg.orderCount += 1
-      }
-      const refundR = await client.query(
-        `SELECT o.seller_id, COALESCE(SUM(rr.refund_amount_cents), 0)::bigint AS refund_cents
-         FROM store_returns rr JOIN store_orders o ON o.id = rr.order_id
-         WHERE rr.created_at >= $1::date AND rr.created_at < ($1::date + interval '1 month') AND o.seller_id IS NOT NULL
-         GROUP BY o.seller_id`,
-        [monthStart],
-      )
-      const refundBySeller = new Map((refundR.rows || []).map((rr) => [String(rr.seller_id).trim(), Number(rr.refund_cents || 0)]))
-
+      const vatPct = Number(platformVatPercent) > 0 ? Number(platformVatPercent) : resolvePlatformCommissionVatPercent()
       const createdIds = []
       let skipped = 0
       for (const s of approvedSellers) {
         const sellerId = String(s.seller_id || '').trim()
-        if (!sellerId) continue
+        if (!sellerId || sellerId === 'default') continue
         const ex = await client.query(
-          `SELECT id FROM seller_payouts WHERE seller_id = $1 AND period_start = $2::date AND period_end = $3::date LIMIT 1`,
+          `SELECT id FROM seller_payouts
+            WHERE seller_id = $1
+              AND (
+                (period_start = $2::date AND period_end = $3::date)
+                OR (period_start <= $2::date AND period_end >= $3::date)
+              )
+            LIMIT 1`,
           [sellerId, monthStart, monthEnd],
         )
         if (ex.rows.length) { skipped++; continue }
-        const agg = bySeller.get(sellerId) || { subtotal: 0, customerPaid: 0, bonusFunding: 0, orderCount: 0 }
+        const agg = await aggregateSellerPeriodSales(client, sellerId, monthStart, monthEnd)
         const rate = Number(s.commission_rate) >= 0 ? Number(s.commission_rate) : 0.12
-        const commissionCents = Math.round(agg.subtotal * rate)
-        const payoutCents = Math.max(0, agg.subtotal - commissionCents)
-        const commissionVatCents = platformVatPercent > 0 ? Math.round(commissionCents * platformVatPercent / 100) : 0
-        const refundCents = refundBySeller.get(sellerId) || 0
+        const commissionCents = Math.round(agg.grossCents * rate)
+        const payoutCents = Math.max(0, agg.grossCents - commissionCents)
+        const commissionVatCents = Math.round(commissionCents * vatPct / 100)
         const insRes = await client.query(
           `INSERT INTO seller_payouts
            (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents,
             customer_paid_cents, bonus_funding_cents, commission_vat_cents, refund_cents, order_count, notes, status)
-           VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, 'Automatisch erstellt (Monatsabrechnung)', 'offen')
+           VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, 'Automatisch erstellt (Abrechnungszeitraum)', 'offen')
            RETURNING id`,
-          [sellerId, monthStart, monthEnd, agg.subtotal, commissionCents, payoutCents,
-            agg.customerPaid, agg.bonusFunding, commissionVatCents, refundCents, agg.orderCount],
+          [sellerId, monthStart, monthEnd, agg.grossCents, commissionCents, payoutCents,
+            agg.customerPaidCents, agg.bonusFundingCents, commissionVatCents, agg.refundCents, agg.orderCount],
         )
         createdIds.push(insRes.rows[0].id)
       }
@@ -270,10 +248,44 @@ module.exports = function createPayoutsRouter({
       return new Date(nextMonth.getTime() - 86400000)
     }
 
-    // POST /admin-hub/v1/payouts/backfill — superuser generates missing payout records for all past
-    // months, from the earliest month with any paid order through last month (current month excluded,
-    // still in progress). Every approved seller gets a row — even 0 € (period proof) — using the exact
-    // same generator the automatic monthly job (below) uses, so manual and automatic runs never diverge.
+    /** Inclusive 15-day windows (1–15 / 16–month end) with period_end < untilExclusive. */
+    const halfPeriodsUntil = (fromDate, untilExclusive) => {
+      const out = []
+      const from = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), 1))
+      let y = from.getUTCFullYear()
+      let m = from.getUTCMonth()
+      const stop = new Date(untilExclusive.getTime())
+      while (true) {
+        const monthStart = new Date(Date.UTC(y, m, 1))
+        if (monthStart >= stop) break
+        const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+        const firstEnd = new Date(Date.UTC(y, m, 15))
+        const secondStart = new Date(Date.UTC(y, m, 16))
+        const secondEnd = new Date(Date.UTC(y, m, daysInMonth))
+        if (firstEnd < stop) {
+          out.push({ start: isoDate(monthStart), end: isoDate(firstEnd) })
+        }
+        if (secondEnd < stop) {
+          out.push({ start: isoDate(secondStart), end: isoDate(secondEnd) })
+        }
+        m += 1
+        if (m > 11) { m = 0; y += 1 }
+        if (y > stop.getUTCFullYear() + 1) break
+      }
+      return out
+    }
+
+    const currentHalfStartUtc = () => {
+      const now = new Date()
+      const y = now.getUTCFullYear()
+      const m = now.getUTCMonth()
+      const d = now.getUTCDate()
+      return d <= 15 ? new Date(Date.UTC(y, m, 1)) : new Date(Date.UTC(y, m, 16))
+    }
+
+    // POST /admin-hub/v1/payouts/backfill — superuser generates missing payout records for all
+    // completed 15-day periods (current half-month excluded). Existing monthly invoices that
+    // already cover a window are skipped (see generateCommissionInvoicesForMonth).
     const adminHubPayoutsBackfillPOST = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const client = getDbClient()
@@ -287,20 +299,18 @@ module.exports = function createPayoutsRouter({
            )::date AS earliest_month`
         )
         const earliestMonth = earliestR.rows[0]?.earliest_month ? new Date(earliestR.rows[0].earliest_month) : new Date()
-        const nowMonthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1))
         const approvedR = await client.query(
           `SELECT seller_id, commission_rate FROM seller_users
            WHERE LOWER(COALESCE(approval_status, 'approved')) = 'approved' AND seller_id IS NOT NULL`
         )
         const approvedSellers = approvedR.rows || []
-        const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
+        const platformVatPercent = resolvePlatformCommissionVatPercent()
         let created = 0
         let skipped = 0
         const newlyCreatedIds = []
-        for (const monthStart of monthsBetween(earliestMonth, nowMonthStart)) {
-          const monthEnd = monthEndOf(monthStart)
+        for (const half of halfPeriodsUntil(earliestMonth, currentHalfStartUtc())) {
           const { createdIds, skipped: sk } = await generateCommissionInvoicesForMonth(
-            client, isoDate(monthStart), isoDate(monthEnd), approvedSellers, platformVatPercent,
+            client, half.start, half.end, approvedSellers, platformVatPercent,
           )
           created += createdIds.length
           skipped += sk
@@ -346,7 +356,7 @@ module.exports = function createPayoutsRouter({
           params,
         )
         const rows = r.rows || []
-        const totals = rows.reduce((acc, row) => {
+        let totals = rows.reduce((acc, row) => {
           acc.gross_sale_cents += Number(row.total_cents || 0)
           acc.customer_paid_cents += Number(row.customer_paid_cents || 0)
           acc.bonus_funding_cents += Number(row.bonus_funding_cents || 0)
@@ -357,11 +367,33 @@ module.exports = function createPayoutsRouter({
           acc.order_count += Number(row.order_count || 0)
           return acc
         }, {
-          gross_sale_cents: 0, customer_paid_cents: 0, bonus_funding_cents: 0, commission_net_cents: 0,
+          gross_sale_cents: 0, shipping_cents: 0, customer_paid_cents: 0, bonus_funding_cents: 0, commission_net_cents: 0,
           commission_vat_cents: 0, seller_payout_cents: 0, refund_cents: 0, order_count: 0,
         })
         totals.seller_count = new Set(rows.map((row) => row.seller_id)).size
         totals.invoice_count = rows.length
+        try {
+          const live = await aggregateMarketplacePeriodSales(client, period_start || null, period_end || null)
+          if (live.orderCount > 0 || live.grossCents > 0) {
+            const vatPct = resolvePlatformCommissionVatPercent()
+            totals = {
+              ...totals,
+              gross_sale_cents: live.grossCents,
+              shipping_cents: live.shippingCents,
+              customer_paid_cents: live.customerPaidCents,
+              bonus_funding_cents: live.bonusFundingCents,
+              commission_net_cents: live.commissionCents,
+              commission_vat_cents: Math.round(live.commissionCents * vatPct / 100),
+              seller_payout_cents: Math.max(0, live.grossCents - live.commissionCents),
+              refund_cents: live.refundCents,
+              order_count: live.orderCount,
+              seller_count: live.sellerCount || totals.seller_count,
+            }
+          }
+        } catch (_) {}
+        if (!totals.commission_vat_cents) {
+          totals.commission_vat_cents = Math.round(Number(totals.commission_net_cents || 0) * resolvePlatformCommissionVatPercent() / 100)
+        }
 
         // OSS_Bestimmungsland: BonusPunkte.md §3.8 export sheet 3 — teslim ülkesi × net mal / KDV /
         // oran. Bağımsız olarak store_orders'tan hesaplanır (seller_payouts'un seller/period toplamı
@@ -437,6 +469,29 @@ module.exports = function createPayoutsRouter({
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
+    // GET /admin-hub/v1/billing/finanzamt/pdf — platform-level Gesamtabrechnung (all sellers), not per-seller Provisionsfaktur.
+    const adminHubBillingFinanzamtPdfGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { buildPlatformFinanzamtPdfBuffer } = require('../order-pdf-buffers')
+        const result = await buildPlatformFinanzamtPdfBuffer(client, {
+          periodStart: String(req.query.period_start || '').trim(),
+          periodEnd: String(req.query.period_end || '').trim(),
+        })
+        await client.end()
+        if (!result) return res.status(404).json({ message: 'PDF not available' })
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`)
+        res.send(result.content)
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
       }
     }
 
@@ -921,47 +976,45 @@ module.exports = function createPayoutsRouter({
      * "her ödeme döneminde otomatik tüm bu faturalar oluşmalı ve satıcıya ... email hem bildirim
      * olarak atılmalı"). Runs on every boot + hourly tick (same idempotent "IsDue" pattern as
      * runAutomaticPayoutsIfDue below — cheap to call repeatedly, no-ops when nothing is due):
-     * catches up EVERY calendar month between the last month that already has ANY seller_payouts row
-     * and last month (current month excluded, still in progress), notifying sellers only for genuinely
-     * new invoices. This is what backfills months that were missed (e.g. a gap since 30.04.2026) AND
-     * keeps generating automatically going forward, without a human needing to click "Backfill" again.
+     * catches up every completed 15-day payout window after the latest seller_payouts.period_end
+     * (current half-month excluded, still in progress), notifying sellers only for genuinely
+     * new invoices. Existing monthly rows that already cover a window are skipped.
      */
     const runMonthlyCommissionInvoicesIfDue = async () => {
       const client = getDbClient()
       if (!client) return
       try {
         await client.connect()
-        const nowMonthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1))
-        const lastR = await client.query(`SELECT MAX(period_start) AS last_month FROM seller_payouts`)
-        let startMonth
-        if (lastR.rows[0]?.last_month) {
-          const last = new Date(lastR.rows[0].last_month)
-          startMonth = new Date(Date.UTC(last.getUTCFullYear(), last.getUTCMonth() + 1, 1))
+        const until = currentHalfStartUtc()
+        const lastR = await client.query(`SELECT MAX(period_end) AS last_end FROM seller_payouts`)
+        let fromDate
+        if (lastR.rows[0]?.last_end) {
+          const lastEnd = new Date(lastR.rows[0].last_end)
+          fromDate = new Date(Date.UTC(lastEnd.getUTCFullYear(), lastEnd.getUTCMonth(), lastEnd.getUTCDate() + 1))
         } else {
           const earliestR = await client.query(
             `SELECT MIN(date_trunc('month', created_at))::date AS earliest_month FROM store_orders WHERE payment_status = 'bezahlt'`
           )
-          startMonth = earliestR.rows[0]?.earliest_month ? new Date(earliestR.rows[0].earliest_month) : nowMonthStart
+          fromDate = earliestR.rows[0]?.earliest_month ? new Date(earliestR.rows[0].earliest_month) : until
         }
-        const months = monthsBetween(startMonth, nowMonthStart)
-        if (!months.length) { await client.end(); return }
+        const halves = halfPeriodsUntil(fromDate, until)
+        if (!halves.length) { await client.end(); return }
         const approvedR = await client.query(
           `SELECT seller_id, commission_rate FROM seller_users
            WHERE LOWER(COALESCE(approval_status, 'approved')) = 'approved' AND seller_id IS NOT NULL`
         )
         const approvedSellers = approvedR.rows || []
-        const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
+        const platformVatPercent = resolvePlatformCommissionVatPercent()
         const newlyCreatedIds = []
-        for (const monthStart of months) {
-          const monthEnd = monthEndOf(monthStart)
+        for (const half of halves) {
           const { createdIds } = await generateCommissionInvoicesForMonth(
-            client, isoDate(monthStart), isoDate(monthEnd), approvedSellers, platformVatPercent,
+            client, half.start, half.end, approvedSellers, platformVatPercent,
           )
           newlyCreatedIds.push(...createdIds)
         }
         await client.end()
         if (newlyCreatedIds.length) {
-          console.log(`runMonthlyCommissionInvoicesIfDue: created ${newlyCreatedIds.length} invoice(s) across ${months.length} month(s)`)
+          console.log(`runMonthlyCommissionInvoicesIfDue: created ${newlyCreatedIds.length} invoice(s) across ${halves.length} period(s)`)
         }
         Promise.all(newlyCreatedIds.map((id) => notifySellerOfNewCommissionInvoice(id))).catch(() => {})
       } catch (e) {
@@ -1132,6 +1185,7 @@ module.exports = function createPayoutsRouter({
   router.post('/admin-hub/v1/payouts/mark-paid', adminHubPayoutsMarkPaidPOST)
   router.post('/admin-hub/v1/payouts/backfill', adminHubPayoutsBackfillPOST)
   router.get('/admin-hub/v1/billing/finanzamt', adminHubBillingFinanzamtGET)
+  router.get('/admin-hub/v1/billing/finanzamt/pdf', adminHubBillingFinanzamtPdfGET)
   router.get('/admin-hub/v1/payout-summary', adminHubPayoutSummaryGET)
   router.get('/admin-hub/v1/analytics/marketing', adminHubAnalyticsMarketingGET)
   router.get('/admin-hub/v1/payout-overview', adminHubPayoutOverviewGET)

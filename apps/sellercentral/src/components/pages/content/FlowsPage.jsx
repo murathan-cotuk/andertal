@@ -132,6 +132,19 @@ const T = {
     howSteps: "Steps → Send email, wait (e.g. 2 days), check condition.",
     howEmail: "Email sending is configured via Settings > Apps & Integrations (SMTP).",
     howEmailSeller: "Outgoing email is configured by the platform superuser under Settings > Apps & Integrations (SMTP).",
+    triggerGroupOrders: "Orders",
+    triggerGroupReturns: "Returns",
+    triggerGroupInbox: "Customer inbox",
+    triggerGroupSellerSupport: "Seller → Andertal support",
+    triggerGroupSupportCases: "Support cases",
+    triggerGroupSellerAccount: "Seller account",
+    triggerGroupCustomers: "Customers",
+    triggerGroupMarketing: "Marketing",
+    triggerGroupCustomer: "Customers & marketing",
+    triggerGroupOther: "Other",
+    triggerHelpOrderPlaced: "Fires once when checkout completes. Use this only for order confirmation — never for support tickets.",
+    triggerHelpSupportSent: "Fires only when a seller writes to Andertal support (Inbox → Support). Does not run on a new order.",
+    triggerHelpSupportReplied: "Fires only when Andertal support replies to the seller's ticket. Does not run on a new order.",
     triggers: {
       new_subscriber: "New newsletter subscriber",
       customer_signup: "New customer registration",
@@ -157,6 +170,9 @@ const T = {
       customer_message_replied: "Seller/support replied to customer",
       seller_support_ticket_sent: "Seller opened a support ticket (copy to seller)",
       seller_support_ticket_replied: "Support replied to seller's ticket",
+      customer_support_case_updated: "Support case updated (customer)",
+      seller_support_case_updated: "Support case updated (seller)",
+      admin_support_case_updated: "Support case updated (support team)",
     },
     audienceLabel: "Recipients",
     audienceCustomer: "Customers",
@@ -276,6 +292,19 @@ const T = {
     howSteps: "Schritte → E-Mail senden, warten (z. B. 2 Tage), Bedingung prüfen.",
     howEmail: "E-Mail-Versand wird über Einstellungen > Apps & Integrationen (SMTP) konfiguriert.",
     howEmailSeller: "Der E-Mail-Versand wird vom Plattform-Superuser unter Einstellungen > Apps & Integrationen (SMTP) konfiguriert.",
+    triggerGroupOrders: "Bestellungen",
+    triggerGroupReturns: "Retouren",
+    triggerGroupInbox: "Kunden-Posteingang",
+    triggerGroupSellerSupport: "Seller → Andertal-Support",
+    triggerGroupSupportCases: "Supportfälle",
+    triggerGroupSellerAccount: "Seller-Konto",
+    triggerGroupCustomers: "Kunden",
+    triggerGroupMarketing: "Marketing",
+    triggerGroupCustomer: "Kunden & Marketing",
+    triggerGroupOther: "Weitere",
+    triggerHelpOrderPlaced: "Einmalig nach Abschluss der Bestellung. Nur für die Bestellbestätigung — nicht für Support-Tickets.",
+    triggerHelpSupportSent: "Nur wenn ein Seller an den Andertal-Support schreibt (Posteingang → Support). Nicht bei einer neuen Bestellung.",
+    triggerHelpSupportReplied: "Nur wenn der Andertal-Support auf das Seller-Ticket antwortet. Nicht bei einer neuen Bestellung.",
     triggers: {
       new_subscriber: "Neuer Newsletter-Abonnent",
       customer_signup: "Neue Kundenregistrierung",
@@ -301,6 +330,9 @@ const T = {
       customer_message_replied: "Seller/Support hat Kunde geantwortet",
       seller_support_ticket_sent: "Seller hat Support-Ticket eröffnet (Kopie an Seller)",
       seller_support_ticket_replied: "Support hat auf Seller-Ticket geantwortet",
+      customer_support_case_updated: "Supportfall aktualisiert (Kunde)",
+      seller_support_case_updated: "Supportfall aktualisiert (Seller)",
+      admin_support_case_updated: "Supportfall aktualisiert (Support-Team)",
     },
     audienceLabel: "Empfänger",
     audienceCustomer: "Kundinnen & Kunden",
@@ -420,6 +452,19 @@ const T = {
     howSteps: "Adımlar → E-posta gönder, bekle (ör. 2 gün), koşul kontrol et.",
     howEmail: "E-posta gönderimi Ayarlar > Apps & Entegrasyonlar (SMTP) üzerinden yapılandırılır.",
     howEmailSeller: "Giden e-posta, süper kullanıcı tarafından Ayarlar > Apps & Entegrasyonlar (SMTP) üzerinden yapılandırılır.",
+    triggerGroupOrders: "Siparişler",
+    triggerGroupReturns: "İadeler",
+    triggerGroupInbox: "Müşteri gelen kutusu",
+    triggerGroupSellerSupport: "Satıcı → Andertal destek",
+    triggerGroupSupportCases: "Destek talepleri",
+    triggerGroupSellerAccount: "Satıcı hesabı",
+    triggerGroupCustomers: "Müşteriler",
+    triggerGroupMarketing: "Pazarlama",
+    triggerGroupCustomer: "Müşteriler ve pazarlama",
+    triggerGroupOther: "Diğer",
+    triggerHelpOrderPlaced: "Ödeme tamamlanınca bir kez çalışır. Yalnızca sipariş onayı için — destek talebi için değil.",
+    triggerHelpSupportSent: "Yalnızca satıcı Andertal desteğine yazınca (Gelen kutusu → Destek). Yeni siparişte çalışmaz.",
+    triggerHelpSupportReplied: "Yalnızca Andertal desteği satıcının talebine cevap verince. Yeni siparişte çalışmaz.",
     triggers: {
       new_subscriber: "Yeni bülten abonesi",
       customer_signup: "Yeni müşteri kaydı",
@@ -445,6 +490,9 @@ const T = {
       customer_message_replied: "Satıcı/destek müşteriye cevap verdi",
       seller_support_ticket_sent: "Satıcı destek talebi açtı (satıcıya kopya)",
       seller_support_ticket_replied: "Destek satıcının talebine cevap verdi",
+      customer_support_case_updated: "Destek talebi güncellendi (müşteri)",
+      seller_support_case_updated: "Destek talebi güncellendi (satıcı)",
+      admin_support_case_updated: "Destek talebi güncellendi (destek ekibi)",
     },
     audienceLabel: "Alıcılar",
     audienceCustomer: "Müşteriler",
@@ -564,6 +612,19 @@ const T = {
     howSteps: "Étapes → Envoyer e-mail, attendre (ex. 2 jours), vérifier condition.",
     howEmail: "L'envoi d'e-mails est configuré via Paramètres > Apps & Intégrations (SMTP).",
     howEmailSeller: "L'e-mail sortant est configuré par le super-utilisateur via Paramètres > Apps & Intégrations (SMTP).",
+    triggerGroupOrders: "Commandes",
+    triggerGroupReturns: "Retours",
+    triggerGroupInbox: "Messagerie client",
+    triggerGroupSellerSupport: "Vendeur → support Andertal",
+    triggerGroupSupportCases: "Dossiers support",
+    triggerGroupSellerAccount: "Compte vendeur",
+    triggerGroupCustomers: "Clients",
+    triggerGroupMarketing: "Marketing",
+    triggerGroupCustomer: "Clients et marketing",
+    triggerGroupOther: "Autres",
+    triggerHelpOrderPlaced: "Une fois le paiement terminé. Uniquement pour la confirmation de commande — pas pour les tickets support.",
+    triggerHelpSupportSent: "Uniquement lorsqu'un vendeur écrit au support Andertal. Pas lors d'une nouvelle commande.",
+    triggerHelpSupportReplied: "Uniquement lorsque le support Andertal répond au ticket du vendeur. Pas lors d'une nouvelle commande.",
     triggers: {
       new_subscriber: "Nouvel abonné à la newsletter",
       customer_signup: "Nouvelle inscription client",
@@ -589,6 +650,9 @@ const T = {
       customer_message_replied: "Le vendeur/support a répondu au client",
       seller_support_ticket_sent: "Le vendeur a ouvert un ticket support (copie au vendeur)",
       seller_support_ticket_replied: "Le support a répondu au ticket du vendeur",
+      customer_support_case_updated: "Dossier support mis à jour (client)",
+      seller_support_case_updated: "Dossier support mis à jour (vendeur)",
+      admin_support_case_updated: "Dossier support mis à jour (équipe support)",
     },
     audienceLabel: "Destinataires",
     audienceCustomer: "Clients",
@@ -708,6 +772,19 @@ const T = {
     howSteps: "Passi → Invia e-mail, aspetta (es. 2 giorni), controlla condizione.",
     howEmail: "L'invio di e-mail è configurato tramite Impostazioni > App e Integrazioni (SMTP).",
     howEmailSeller: "L'e-mail in uscita è configurata dal superuser in Impostazioni > App e Integrazioni (SMTP).",
+    triggerGroupOrders: "Ordini",
+    triggerGroupReturns: "Resi",
+    triggerGroupInbox: "Inbox cliente",
+    triggerGroupSellerSupport: "Seller → supporto Andertal",
+    triggerGroupSupportCases: "Casi di supporto",
+    triggerGroupSellerAccount: "Account seller",
+    triggerGroupCustomers: "Clienti",
+    triggerGroupMarketing: "Marketing",
+    triggerGroupCustomer: "Clienti e marketing",
+    triggerGroupOther: "Altri",
+    triggerHelpOrderPlaced: "Una volta completato il checkout. Solo per la conferma d'ordine — non per i ticket di supporto.",
+    triggerHelpSupportSent: "Solo quando un seller scrive al supporto Andertal. Non su un nuovo ordine.",
+    triggerHelpSupportReplied: "Solo quando il supporto Andertal risponde al ticket del seller. Non su un nuovo ordine.",
     triggers: {
       new_subscriber: "Nuovo iscritto alla newsletter",
       customer_signup: "Nuova registrazione cliente",
@@ -733,6 +810,9 @@ const T = {
       customer_message_replied: "Seller/supporto ha risposto al cliente",
       seller_support_ticket_sent: "Il seller ha aperto un ticket di supporto (copia al seller)",
       seller_support_ticket_replied: "Il supporto ha risposto al ticket del seller",
+      customer_support_case_updated: "Caso di supporto aggiornato (cliente)",
+      seller_support_case_updated: "Caso di supporto aggiornato (seller)",
+      admin_support_case_updated: "Caso di supporto aggiornato (team supporto)",
     },
     audienceLabel: "Destinatari",
     audienceCustomer: "Clienti",
@@ -851,6 +931,19 @@ const T = {
     howSteps: "Pasos → Enviar correo, esperar (ej. 2 días), verificar condición.",
     howEmail: "El envío de correos se configura en Ajustes > Apps e Integraciones (SMTP).",
     howEmailSeller: "El correo saliente lo configura el superusuario en Ajustes > Apps e Integraciones (SMTP).",
+    triggerGroupOrders: "Pedidos",
+    triggerGroupReturns: "Devoluciones",
+    triggerGroupInbox: "Bandeja del cliente",
+    triggerGroupSellerSupport: "Vendedor → soporte Andertal",
+    triggerGroupSupportCases: "Casos de soporte",
+    triggerGroupSellerAccount: "Cuenta de vendedor",
+    triggerGroupCustomers: "Clientes",
+    triggerGroupMarketing: "Marketing",
+    triggerGroupCustomer: "Clientes y marketing",
+    triggerGroupOther: "Otros",
+    triggerHelpOrderPlaced: "Una vez al completar el pago. Solo para la confirmación del pedido — no para tickets de soporte.",
+    triggerHelpSupportSent: "Solo cuando un vendedor escribe al soporte de Andertal. No en un pedido nuevo.",
+    triggerHelpSupportReplied: "Solo cuando el soporte de Andertal responde al ticket del vendedor. No en un pedido nuevo.",
     triggers: {
       new_subscriber: "Nuevo suscriptor de newsletter",
       customer_signup: "Nuevo registro de cliente",
@@ -876,6 +969,9 @@ const T = {
       customer_message_replied: "El vendedor/soporte respondió al cliente",
       seller_support_ticket_sent: "El vendedor abrió un ticket de soporte (copia al vendedor)",
       seller_support_ticket_replied: "Soporte respondió al ticket del vendedor",
+      customer_support_case_updated: "Caso de soporte actualizado (cliente)",
+      seller_support_case_updated: "Caso de soporte actualizado (vendedor)",
+      admin_support_case_updated: "Caso de soporte actualizado (equipo de soporte)",
     },
     audienceLabel: "Destinatarios",
     audienceCustomer: "Clientes",
@@ -1065,6 +1161,55 @@ function FlowMergeFieldsPanel({ t, catalog, loading, errorText, stepIdx, onAppen
   );
 }
 
+const TRIGGER_GROUPS = [
+  { id: "orders", keys: ["order_placed", "order_processing", "order_shipped", "order_delivered"] },
+  { id: "returns", keys: ["return_requested", "return_requested_customer_ships"] },
+  { id: "inbox", keys: ["customer_message_sent", "seller_new_customer_message", "customer_message_replied"] },
+  { id: "sellerSupport", keys: ["seller_support_ticket_sent", "seller_support_ticket_replied"] },
+  { id: "supportCases", keys: ["customer_support_case_updated", "seller_support_case_updated", "admin_support_case_updated"] },
+  { id: "sellerAccount", keys: ["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required"] },
+  { id: "customers", keys: ["customer_signup", "new_subscriber"] },
+  { id: "marketing", keys: ["abandoned_cart", "review_request", "win_back", "customer_birthday", "favorite_low_stock", "favorite_price_drop"] },
+];
+
+const TRIGGER_CATEGORY = new Map();
+for (const g of TRIGGER_GROUPS) {
+  for (const k of g.keys) TRIGGER_CATEGORY.set(k, g.id);
+}
+
+const FLOW_LIST_GROUP_IDS = [...TRIGGER_GROUPS.map((g) => g.id), "other"];
+
+function listCategoryForFlow(flow) {
+  const fromApi = String(flow?.category || "").trim();
+  if (fromApi && fromApi !== "other") return fromApi;
+  return TRIGGER_CATEGORY.get(String(flow?.trigger || "").trim()) || "other";
+}
+
+function groupedTriggerOptions(flatOptions, allowedSet, titles) {
+  const byValue = new Map(flatOptions.map((o) => [o.value, o]));
+  const used = new Set();
+  const groups = [];
+  for (const g of TRIGGER_GROUPS) {
+    const options = g.keys
+      .filter((k) => !allowedSet || allowedSet.has(k))
+      .map((k) => byValue.get(k))
+      .filter(Boolean);
+    if (!options.length) continue;
+    options.forEach((o) => used.add(o.value));
+    groups.push({ title: titles[g.id] || g.id, options });
+  }
+  const rest = flatOptions.filter((o) => !used.has(o.value) && (!allowedSet || allowedSet.has(o.value)));
+  if (rest.length) groups.push({ title: titles.other, options: rest });
+  return groups;
+}
+
+function triggerHelpFor(t, key) {
+  if (key === "order_placed") return t.triggerHelpOrderPlaced;
+  if (key === "seller_support_ticket_sent") return t.triggerHelpSupportSent;
+  if (key === "seller_support_ticket_replied") return t.triggerHelpSupportReplied;
+  return t.howTrigger;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function FlowsPage() {
@@ -1075,7 +1220,20 @@ export default function FlowsPage() {
     () => Object.entries(t.triggers).map(([value, label]) => ({ label, value })),
     [t],
   );
-  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested", "return_requested_customer_ships", "seller_new_customer_message", "seller_support_ticket_sent", "seller_support_ticket_replied"]), []);
+  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested", "return_requested_customer_ships", "seller_new_customer_message", "seller_support_ticket_sent", "seller_support_ticket_replied", "seller_support_case_updated"]), []);
+
+  const triggerGroupTitles = useMemo(() => ({
+    orders: t.triggerGroupOrders,
+    returns: t.triggerGroupReturns,
+    inbox: t.triggerGroupInbox,
+    sellerSupport: t.triggerGroupSellerSupport,
+    supportCases: t.triggerGroupSupportCases,
+    sellerAccount: t.triggerGroupSellerAccount,
+    customers: t.triggerGroupCustomers,
+    marketing: t.triggerGroupMarketing,
+    customer: t.triggerGroupCustomer,
+    other: t.triggerGroupOther,
+  }), [t]);
 
   const [newAudience, setNewAudience] = useState("customer");
   const [editAudience, setEditAudience] = useState("customer");
@@ -1084,14 +1242,14 @@ export default function FlowsPage() {
   const [translateBusyIdx, setTranslateBusyIdx] = useState(null);
 
   const triggerOptionsForCreate = useMemo(() => {
-    if (newAudience === "seller") return allTriggerOptions.filter((o) => sellerTriggerValues.has(o.value));
-    return allTriggerOptions;
-  }, [allTriggerOptions, newAudience, sellerTriggerValues]);
+    const allowed = newAudience === "seller" ? sellerTriggerValues : null;
+    return groupedTriggerOptions(allTriggerOptions, allowed, triggerGroupTitles);
+  }, [allTriggerOptions, newAudience, sellerTriggerValues, triggerGroupTitles]);
 
   const triggerOptionsForEdit = useMemo(() => {
-    if (editAudience === "seller") return allTriggerOptions.filter((o) => sellerTriggerValues.has(o.value));
-    return allTriggerOptions;
-  }, [allTriggerOptions, editAudience, sellerTriggerValues]);
+    const allowed = editAudience === "seller" ? sellerTriggerValues : null;
+    return groupedTriggerOptions(allTriggerOptions, allowed, triggerGroupTitles);
+  }, [allTriggerOptions, editAudience, sellerTriggerValues, triggerGroupTitles]);
 
   const statusEditOptions = [
     { label: t.statuses.draft, value: "draft" },
@@ -1155,6 +1313,25 @@ export default function FlowsPage() {
     }
     return flows;
   }, [flows, flowAudienceFilter]);
+
+  const groupedFilteredFlows = useMemo(() => {
+    const buckets = new Map(FLOW_LIST_GROUP_IDS.map((id) => [id, []]));
+    for (const flow of filteredFlows) {
+      const cat = listCategoryForFlow(flow);
+      const key = buckets.has(cat) ? cat : "other";
+      buckets.get(key).push(flow);
+    }
+    for (const list of buckets.values()) {
+      list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }));
+    }
+    return FLOW_LIST_GROUP_IDS
+      .filter((id) => buckets.get(id).length)
+      .map((id) => ({
+        id,
+        title: triggerGroupTitles[id] || id,
+        flows: buckets.get(id),
+      }));
+  }, [filteredFlows, triggerGroupTitles]);
 
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState("");
@@ -1745,29 +1922,6 @@ export default function FlowsPage() {
     }
   };
 
-  const duplicateFlow = async (flow) => {
-    setTogglingId(flow.id);
-    try {
-      const full = await client.getFlow(flow.id);
-      const steps = Array.isArray(full?.steps) ? full.steps : [];
-      const res = await client.createFlow({
-        name: `${flow.name} ${t.duplicateSuffix}`.trim(),
-        trigger: flow.trigger,
-        status: "draft",
-        audience: flow.audience,
-      });
-      const newFlow = res?.flow;
-      if (newFlow && steps.length) {
-        await client.updateFlow(newFlow.id, { steps });
-      }
-      await load();
-    } catch (e) {
-      setError(e?.message || t.duplicateErr);
-    } finally {
-      setTogglingId("");
-    }
-  };
-
   const toggleStatus = async (flow) => {
     setTogglingId(flow.id);
     const nextStatus = flow.status === "active" ? "paused" : "active";
@@ -1868,51 +2022,55 @@ export default function FlowsPage() {
                     <Text as="p" variant="bodyMd" tone="subdued">{t.filterEmpty}</Text>
                   </Box>
                 </Card>
-              ) : filteredFlows.map((flow) => {
-                const statusLabel = t.statuses[flow.status] ?? flow.status;
-                const badgeTone   = statusBadgeTone[flow.status] ?? "default";
-                const isToggling  = togglingId === flow.id;
-                const flowAudience = String(flow.audience || "customer");
-                const audienceLabel = flowAudience === "seller" ? t.audienceSeller : flowAudience === "admin" ? t.audienceAdmin : t.audienceCustomer;
-                const audienceTone = flowAudience === "seller" ? "attention" : flowAudience === "admin" ? "critical" : "info";
-                return (
-                  <Card key={flow.id}>
-                    <InlineStack align="space-between" blockAlign="center" wrap={false}>
-                      <BlockStack gap="100">
-                        <InlineStack gap="200" blockAlign="center" wrap>
-                          <Text as="h2" variant="headingSm">{flow.name}</Text>
-                          <Badge tone={badgeTone}>{statusLabel}</Badge>
-                          <Badge tone={audienceTone}>{audienceLabel}</Badge>
+              ) : groupedFilteredFlows.map((group) => (
+                <BlockStack key={group.id} gap="200">
+                  <Box paddingBlockStart="200">
+                    <Text as="h2" variant="headingSm">{group.title}</Text>
+                  </Box>
+                  {group.flows.map((flow) => {
+                    const statusLabel = t.statuses[flow.status] ?? flow.status;
+                    const badgeTone   = statusBadgeTone[flow.status] ?? "default";
+                    const isToggling  = togglingId === flow.id;
+                    const flowAudience = String(flow.audience || "customer");
+                    const audienceLabel = flowAudience === "seller" ? t.audienceSeller : flowAudience === "admin" ? t.audienceAdmin : t.audienceCustomer;
+                    const audienceTone = flowAudience === "seller" ? "attention" : flowAudience === "admin" ? "critical" : "info";
+                    return (
+                      <Card key={flow.id}>
+                        <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                          <BlockStack gap="100">
+                            <InlineStack gap="200" blockAlign="center" wrap>
+                              <Text as="h2" variant="headingSm">{flow.name}</Text>
+                              <Badge tone={badgeTone}>{statusLabel}</Badge>
+                              <Badge tone={audienceTone}>{audienceLabel}</Badge>
+                            </InlineStack>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {t.trigger}: {t.triggers[flow.trigger] ?? flow.trigger}
+                              {flow.step_count != null && <> · {flow.step_count} {t.steps}</>}
+                              {flow.sent_count != null && <> · {flow.sent_count.toLocaleString()} {t.sent}</>}
+                            </Text>
+                          </BlockStack>
+                          <InlineStack gap="200" wrap={false}>
+                            <Button size="slim" disabled={isToggling} onClick={() => openEditModal(flow)}>
+                              {t.editBtn}
+                            </Button>
+                            <Button
+                              size="slim"
+                              variant={flow.status === "active" ? "secondary" : "primary"}
+                              loading={isToggling}
+                              onClick={() => toggleStatus(flow)}
+                            >
+                              {flow.status === "active" ? t.pause : t.activate}
+                            </Button>
+                            <Button size="slim" tone="critical" variant="plain" disabled={isToggling} onClick={() => deleteFlow(flow.id)}>
+                              {t.delete}
+                            </Button>
+                          </InlineStack>
                         </InlineStack>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {t.trigger}: {t.triggers[flow.trigger] ?? flow.trigger}
-                          {flow.step_count != null && <> · {flow.step_count} {t.steps}</>}
-                          {flow.sent_count != null && <> · {flow.sent_count.toLocaleString()} {t.sent}</>}
-                        </Text>
-                      </BlockStack>
-                      <InlineStack gap="200" wrap={false}>
-                        <Button size="slim" disabled={isToggling} onClick={() => openEditModal(flow)}>
-                          {t.editBtn}
-                        </Button>
-                        <Button size="slim" disabled={isToggling} onClick={() => duplicateFlow(flow)}>
-                          {t.duplicateBtn}
-                        </Button>
-                        <Button
-                          size="slim"
-                          variant={flow.status === "active" ? "secondary" : "primary"}
-                          loading={isToggling}
-                          onClick={() => toggleStatus(flow)}
-                        >
-                          {flow.status === "active" ? t.pause : t.activate}
-                        </Button>
-                        <Button size="slim" tone="critical" variant="plain" disabled={isToggling} onClick={() => deleteFlow(flow.id)}>
-                          {t.delete}
-                        </Button>
-                      </InlineStack>
-                    </InlineStack>
-                  </Card>
-                );
-              })}
+                      </Card>
+                    );
+                  })}
+                </BlockStack>
+              ))}
             </BlockStack>
           )}
         </Layout.Section>
@@ -1985,6 +2143,7 @@ export default function FlowsPage() {
               options={triggerOptionsForCreate}
               value={newTrigger}
               onChange={setNewTrigger}
+              helpText={triggerHelpFor(t, newTrigger)}
             />
           </BlockStack>
         </Modal.Section>
@@ -2018,7 +2177,7 @@ export default function FlowsPage() {
                 value={editAudience}
                 onChange={setEditAudience}
               />
-              <Select label={t.triggerLabel} options={triggerOptionsForEdit} value={editTrigger} onChange={setEditTrigger} />
+              <Select label={t.triggerLabel} options={triggerOptionsForEdit} value={editTrigger} onChange={setEditTrigger} helpText={triggerHelpFor(t, editTrigger)} />
               <Select label={t.flowStatusLabel} options={statusEditOptions} value={editStatus} onChange={setEditStatus} />
               <Divider />
               <Text as="h3" variant="headingSm">{t.stepsHeading}</Text>

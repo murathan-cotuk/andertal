@@ -182,7 +182,55 @@ export function getPaymentsCopy(locale) {
     ),
     genericError: t("Error", "Hata", "Erreur", "Error", "Errore", "Fehler"),
     paymentsTitle: t("Payments", "Ödemeler", "Paiements", "Pagos", "Pagamenti", "Zahlungen"),
+    balance: t("Balance", "Bakiye", "Solde", "Saldo", "Saldo", "Guthaben"),
+    periodMovement: t("This period", "Bu dönem", "Cette période", "Este período", "Questo periodo", "Dieser Zeitraum"),
+    allPeriods: t("All periods", "Tüm dönemler", "Toutes les périodes", "Todos los períodos", "Tutti i periodi", "Alle Zeiträume"),
+    colDescription: t("Description", "Açıklama", "Description", "Descripción", "Descrizione", "Beschreibung"),
+    colAmount: t("Amount", "Tutar", "Montant", "Importe", "Importo", "Betrag"),
+    noLedger: t("No movements in this period.", "Bu dönemde hareket yok.", "Aucun mouvement sur cette période.", "Sin movimientos en este período.", "Nessun movimento in questo periodo.", "Keine Bewegungen in diesem Zeitraum."),
+    chargedCard: t("Card", "Kart", "Carte", "Tarjeta", "Carta", "Karte"),
+    csvLedgerPrefix: t("account-movements", "hesap-hareketleri", "mouvements-compte", "movimientos-cuenta", "movimenti-conto", "kontobewegungen"),
     statusLabel: (s) => payoutStatusLabel(locale, s),
     ibanErrors: validateIbanMessages(locale),
   };
+}
+
+export function ledgerEntryLabel(entry, locale) {
+  const p = entry?.description_params || {};
+  const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
+  const type = entry?.type;
+  if (type === "order_received") {
+    return t("Order received", "Sipariş alındı", "Commande reçue", "Pedido recibido", "Ordine ricevuto", "Bestellung eingegangen");
+  }
+  if (type === "commission") {
+    const rate = p.rate_pct != null ? String(p.rate_pct).replace(/\.0$/, "") : "12";
+    return t(
+      `Commission ${rate} % incl. VAT`,
+      `Komisyon ${rate} % KDV dahil`,
+      `Commission ${rate} % TTC`,
+      `Comisión ${rate} % IVA incl.`,
+      `Commissione ${rate} % IVA incl.`,
+      `Provision ${rate} % inkl. MwSt.`,
+    );
+  }
+  if (type === "commission_refund") {
+    return t("Commission refunded", "Komisyon iade edildi", "Commission remboursée", "Comisión reembolsada", "Commissione rimborsata", "Provision erstattet");
+  }
+  if (type === "refund") {
+    return t("Refund", "İade", "Remboursement", "Reembolso", "Rimborso", "Erstattung");
+  }
+  if (type === "shipping_label" || entry?.description_key === "shipping_label_for_order") {
+    return t("Shipping label (Andertal)", "Kargo etiketi (Andertal)", "Étiquette d'expédition (Andertal)", "Etiqueta de envío (Andertal)", "Etichetta di spedizione (Andertal)", "Versandetikett (Andertal)");
+  }
+  if (type === "payout") {
+    return t("Payout", "Ödeme", "Versement", "Pago", "Pagamento", "Auszahlung");
+  }
+  if (type === "advertising") {
+    return t("Advertising", "Reklam", "Publicité", "Publicidad", "Pubblicità", "Werbung");
+  }
+  if (entry?.description_key === "manual_note" && p.note) return String(p.note);
+  if (type === "manual_adjustment") {
+    return t("Adjustment", "Düzeltme", "Ajustement", "Ajuste", "Rettifica", "Anpassung");
+  }
+  return type || "—";
 }

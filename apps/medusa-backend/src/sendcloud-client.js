@@ -37,4 +37,45 @@ const sendcloudRequest = async (path, { public_key, secret_key }, opts = {}) => 
   })
 }
 
-module.exports = { getSendcloudCredentials, sendcloudRequest }
+function isSendcloudHost(hostname) {
+  const h = String(hostname || '').toLowerCase()
+  return h === 'panel.sendcloud.sc' || h.endsWith('.sendcloud.sc') || h.endsWith('.sendcloud.com')
+}
+
+/** Fetch a Sendcloud/DHL label PDF (follows redirects; Basic-auth on Sendcloud hosts). */
+async function fetchLabelPdfBuffer(labelUrl, creds = {}, hops = 0) {
+  if (!labelUrl || !String(labelUrl).startsWith('http') || hops > 5) return null
+  const https = require('https')
+  const http = require('http')
+  let parsed
+  try { parsed = new URL(labelUrl) } catch (_) { return null }
+  const lib = parsed.protocol === 'https:' ? https : http
+  const headers = { Accept: 'application/pdf,*/*' }
+  if (creds.public_key && creds.secret_key && isSendcloudHost(parsed.hostname)) {
+    headers.Authorization = `Basic ${Buffer.from(`${creds.public_key}:${creds.secret_key}`).toString('base64')}`
+  }
+  return await new Promise((resolve) => {
+    const req = lib.get({
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      headers,
+      timeout: 20000,
+    }, (resp) => {
+      const code = resp.statusCode || 0
+      if (code >= 300 && code < 400 && resp.headers.location) {
+        resp.resume()
+        const next = new URL(resp.headers.location, parsed).toString()
+        return resolve(fetchLabelPdfBuffer(next, creds, hops + 1))
+      }
+      if (code !== 200) { resp.resume(); return resolve(null) }
+      const chunks = []
+      resp.on('data', (c) => chunks.push(c))
+      resp.on('end', () => resolve(Buffer.concat(chunks)))
+      resp.on('error', () => resolve(null))
+    })
+    req.on('error', () => resolve(null))
+    req.on('timeout', () => { req.destroy(); resolve(null) })
+  })
+}
+
+module.exports = { getSendcloudCredentials, sendcloudRequest, fetchLabelPdfBuffer }

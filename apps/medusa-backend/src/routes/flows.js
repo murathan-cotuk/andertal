@@ -1,6 +1,8 @@
 'use strict'
 const { Router } = require('express')
 const { resolveSmtpSenderIdentity } = require('../smtp-sender-resolve')
+const { ALL_FLOW_TRIGGER_KEYS, ORDER_SET, flowTemplateLooksLikeInboxOrSupport } = require('../flow-triggers')
+const { flowCategory, canonicalFlowName } = require('../flow-catalog')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -947,32 +949,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
         .replace(/\n{3,}/g, '\n\n')
         .trim()
 
-    const FLOW_TRIGGER_KEYS = new Set([
-      'new_subscriber',
-      'customer_signup',
-      'seller_signup',
-      'seller_docs_submitted',
-      'seller_verification_approved',
-      'seller_verification_rejected',
-      'seller_documents_required',
-      'abandoned_cart',
-      'order_placed',
-      'order_processing',
-      'order_shipped',
-      'order_delivered',
-      'return_requested',
-      'return_requested_customer_ships',
-      'review_request',
-      'win_back',
-      'customer_birthday',
-      'favorite_low_stock',
-      'favorite_price_drop',
-      'customer_message_sent',
-      'seller_new_customer_message',
-      'customer_message_replied',
-      'seller_support_ticket_sent',
-      'seller_support_ticket_replied',
-    ])
+    const FLOW_TRIGGER_KEYS = ALL_FLOW_TRIGGER_KEYS
     const mapFlowRow = (row) =>
       row
         ? {
@@ -983,6 +960,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
             status: row.status,
             sent_count: row.sent_count != null ? Number(row.sent_count) : 0,
             step_count: row.step_count != null ? Number(row.step_count) : undefined,
+            category: flowCategory(row.trigger_key, row.audience),
             created_at: row.created_at,
             updated_at: row.updated_at,
           }
@@ -1009,7 +987,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
             SELECT COUNT(*)::int FROM admin_hub_flow_steps s WHERE s.flow_id = f.id
           ) AS step_count
           FROM admin_hub_flows f
-          ORDER BY f.updated_at DESC
+          ORDER BY f.created_at ASC, f.name ASC
         `)
         await client.end()
         res.json({ flows: (r.rows || []).map(mapFlowRow), count: r.rows?.length || 0 })
@@ -1036,10 +1014,19 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       if (!FLOW_TRIGGER_KEYS.has(triggerKey)) return res.status(400).json({ message: 'invalid trigger' })
       try {
         await client.connect()
+        const clash = await client.query(
+          `SELECT id FROM admin_hub_flows WHERE trigger_key = $1 AND audience = $2 LIMIT 1`,
+          [triggerKey, audience],
+        )
+        if (clash.rows[0]) {
+          await client.end()
+          return res.status(409).json({ message: 'A flow for this trigger already exists. Edit that flow instead of creating a copy.' })
+        }
+        const flowName = name || canonicalFlowName(triggerKey, audience) || name
         const ins = await client.query(
           `INSERT INTO admin_hub_flows (name, trigger_key, status, audience) VALUES ($1, $2, $3, $4)
            RETURNING id, name, trigger_key, status, audience, sent_count, created_at, updated_at`,
-          [name, triggerKey, status, audience],
+          [flowName, triggerKey, status, audience],
         )
         await client.end()
         const flow = mapFlowRow({ ...ins.rows[0], step_count: 0 })
@@ -1048,6 +1035,9 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
         try {
           await client.end()
         } catch (_) {}
+        if (e?.code === '23505') {
+          return res.status(409).json({ message: 'A flow for this trigger already exists. Edit that flow instead of creating a copy.' })
+        }
         res.status(500).json({ message: e?.message || 'Error' })
       }
     }
@@ -1110,7 +1100,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       }
     }
 
-    const adminHubFlowPATCH = async (req, res) => {
+        const adminHubFlowPATCH = async (req, res) => {
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       const id = String(req.params.id || '').trim()
@@ -1118,10 +1108,41 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       const body = req.body || {}
       try {
         await client.connect()
-        const ex = await client.query(`SELECT id FROM admin_hub_flows WHERE id = $1`, [id])
+        const ex = await client.query(`SELECT id, trigger_key, audience, status FROM admin_hub_flows WHERE id = $1`, [id])
         if (!ex.rows[0]) {
           await client.end()
           return res.status(404).json({ message: 'Flow not found' })
+        }
+
+        const nextTrigger = (body.trigger !== undefined || body.trigger_key !== undefined)
+          ? String(body.trigger || body.trigger_key || '').trim()
+          : String(ex.rows[0].trigger_key || '').trim()
+        const nextAudience = body.audience !== undefined
+          ? (String(body.audience || 'customer').toLowerCase() === 'seller'
+            ? 'seller'
+            : String(body.audience).toLowerCase() === 'admin' ? 'admin' : 'customer')
+          : String(ex.rows[0].audience || 'customer')
+        const clash = await client.query(
+          `SELECT id FROM admin_hub_flows WHERE trigger_key = $1 AND audience = $2 AND id <> $3::uuid LIMIT 1`,
+          [nextTrigger, nextAudience, id],
+        )
+        if (clash.rows[0]) {
+          await client.end()
+          return res.status(409).json({
+            message: 'A flow for this trigger already exists. Edit that flow instead of creating a copy.',
+          })
+        }
+        const stepsForGuard = Array.isArray(body.steps)
+          ? body.steps
+          : (await client.query(
+            `SELECT email_subject, email_body, email_i18n FROM admin_hub_flow_steps WHERE flow_id = $1::uuid`,
+            [id],
+          )).rows
+        if (ORDER_SET.has(nextTrigger) && flowTemplateLooksLikeInboxOrSupport(stepsForGuard)) {
+          await client.end()
+          return res.status(400).json({
+            message: 'Inbox/support templates cannot use an order trigger. Use seller_support_ticket_sent or seller_support_ticket_replied — they must not run when a customer places an order.',
+          })
         }
 
         const sets = []
@@ -1353,6 +1374,9 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       } catch (e) {
         try { await client.query('ROLLBACK') } catch (_) {}
         try { await client.end() } catch (_) {}
+        if (e?.code === '23505') {
+          return res.status(409).json({ message: 'A flow for this trigger already exists. Edit that flow instead of creating a copy.' })
+        }
         res.status(500).json({ message: e?.message || 'Error' })
       }
     }

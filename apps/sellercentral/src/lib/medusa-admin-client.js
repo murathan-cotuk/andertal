@@ -1428,6 +1428,10 @@ class MedusaAdminClient {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/payout-summary${qs}`)
   }
+  async getSellerLedger(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/seller-ledger${qs}`)
+  }
   async getAdminPayoutOverview(params = {}) {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/payout-overview${qs}`)

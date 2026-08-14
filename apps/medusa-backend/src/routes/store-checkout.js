@@ -8,7 +8,7 @@ const { normalizeHubCountryCode } = require('./seller-settings')
 const { requireSellerAuth, requireSuperuser } = require('./seller-auth')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
-const { renderInvoicePdfDocument, renderRetourenscheinPdfDocument, querySellerInfoForInvoice } = require('../order-pdf-buffers')
+const { renderInvoicePdfDocument, renderRetourenscheinPdfDocument, querySellerInfoForOrderDocuments } = require('../order-pdf-buffers')
 const { getOrderPdfFilename } = require('../order-pdf-i18n')
 const { resolveLocaleFromCountry } = require('../locale-from-country')
 const { createReturnLabelForOrder } = require('../return-label')
@@ -2239,7 +2239,7 @@ const storeOrderInvoicePdfGET = async (req, res) => {
     const itemRows = iRes.rows || []
     let sellerInfo = null
     try {
-      sellerInfo = await querySellerInfoForInvoice(client, row.seller_id)
+      sellerInfo = await querySellerInfoForOrderDocuments(client, row, itemRows)
     } catch (_) {}
     await client.end(); client = null
     const on = row.order_number != null ? String(row.order_number) : String(orderId).slice(0, 8)
@@ -2312,10 +2312,12 @@ const storeOrderReturnRetourenscheinGET = async (req, res) => {
     )
     const ret = rRes.rows?.[0]
     if (!ret) { await client.end(); return res.status(404).json({ message: 'Keine genehmigte Retoure' }) }
+    const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [orderId])
+    const itemRows = iRes.rows || []
     let sellerInfo = null
     let logoUrl = ''
     try {
-      sellerInfo = await querySellerInfoForInvoice(client, row.seller_id)
+      sellerInfo = await querySellerInfoForOrderDocuments(client, row, itemRows)
       const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
       logoUrl = lr.rows?.[0]?.shop_logo_url || ''
     } catch (_) {}
@@ -3824,11 +3826,31 @@ const storeOrdersPOST = async (req, res) => {
   }
 }
 
+/**
+ * Ownership check applied ONLY when a Bearer token is present. A logged-in customer must own the
+ * order (same email or customer_id) — no more paging through other people's orders by editing the
+ * URL. Requests WITHOUT a token (guest post-checkout redirect, order-status links in confirmation
+ * emails — flow-automation.js builds these for guests who never get a token) still resolve by ID
+ * alone, same as before. This is a deliberate, narrower fix: order.id is a random UUID (not
+ * enumerable), so treating it as a capability URL for the guest case is an accepted trade-off,
+ * not an oversight — see docs/BonusPunkte.md-adjacent security note in this session's summary if
+ * this needs revisiting (a signed short-lived guest access token would close the remaining gap).
+ */
 const storeOrdersGET = async (req, res) => {
   const orderId = (req.params.id || '').toString().trim()
   if (!orderId) return res.status(400).json({ message: 'Order id required' })
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   if (!dbUrl || !dbUrl.startsWith('postgres')) return res.status(503).json({ message: 'Database not configured' })
+
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  let requireOwnership = false
+  let payload = null
+  if (token) {
+    payload = verifyCustomerToken(token)
+    if (!payload?.email) return res.status(401).json({ message: 'Invalid token' })
+    requireOwnership = true
+  }
 
   let client
   try {
@@ -3838,6 +3860,11 @@ const storeOrdersGET = async (req, res) => {
     const order = await getOrderWithItems(client, orderId)
     await client.end()
     if (!order) return res.status(404).json({ message: 'Order not found' })
+    if (requireOwnership) {
+      const emailMatch = order.email && String(order.email).trim().toLowerCase() === String(payload.email).trim().toLowerCase()
+      const customerMatch = order.customer_id && payload.id && String(order.customer_id) === String(payload.id)
+      if (!emailMatch && !customerMatch) return res.status(404).json({ message: 'Order not found' })
+    }
     res.json({ order })
   } catch (err) {
     if (client) try { await client.end() } catch (_) {}

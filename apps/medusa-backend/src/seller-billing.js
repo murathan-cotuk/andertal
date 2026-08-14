@@ -2,6 +2,8 @@
 
 const { sellerOrderRevenueBasisCents } = require('./routes/store-checkout')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('./order-items-seller')
+const { sqlOrderOwnedBySeller } = require('./seller-scope')
+const { resolveOrderPaidTotalCents } = require('./order-money')
 
 /**
  * Seller's currently available (unpaid) revenue basis minus any ledger adjustments not yet
@@ -107,4 +109,164 @@ async function chargeSellerForLabel(client, { sellerId, orderId, amountCents, or
   return { charge_method: 'card', ledger_id: r.rows[0].id, stripe_payment_intent_id: paymentIntent.id }
 }
 
-module.exports = { chargeSellerForLabel, getSellerAvailableCents }
+/**
+ * Period GMV for one seller (line-item ownership — store_orders.seller_id is often `default`).
+ * Bruttoumsatz = merchandise subtotal, bonus is platform-funded and listed separately.
+ */
+async function aggregateSellerPeriodSales(client, sellerId, periodStart, periodEnd) {
+  const sid = String(sellerId || '').trim()
+  const r = await client.query(
+    `SELECT o.id, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
+            o.coupon_discount_cents, o.bonus_points_redeemed,
+            COALESCE(o.platform_bonus_funding_cents, 0) AS platform_bonus_funding_cents
+       FROM store_orders o
+      WHERE o.payment_status = 'bezahlt'
+        AND o.created_at >= $2::date
+        AND o.created_at < ($3::date + interval '1 day')
+        AND ${sqlOrderOwnedBySeller('o', '$1')}`,
+    [sid, periodStart, periodEnd],
+  )
+  let grossCents = 0
+  let bonusFundingCents = 0
+  let customerPaidCents = 0
+  let orderCount = 0
+  for (const row of r.rows || []) {
+    orderCount += 1
+    bonusFundingCents += Number(row.platform_bonus_funding_cents || 0)
+    customerPaidCents += resolveOrderPaidTotalCents(row)
+    const headerSid = String(row.seller_id || '').trim()
+    const ownsWholeOrder = headerSid === sid && headerSid !== 'default'
+    if (ownsWholeOrder) {
+      grossCents += sellerOrderRevenueBasisCents(row)
+      continue
+    }
+    const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1', [row.id])
+    const enriched = await enrichOrderItemRows(client, iRes.rows || [])
+    const mine = filterItemsForSeller(enriched, sid, { isSuperuser: false, orderSellerId: row.seller_id })
+    grossCents += itemsSubtotalCents(mine)
+  }
+
+  let refundCents = 0
+  try {
+    const refundR = await client.query(
+      `SELECT COALESCE(SUM(rr.refund_amount_cents), 0)::bigint AS refund_cents
+         FROM store_returns rr
+         JOIN store_orders o ON o.id = rr.order_id
+        WHERE rr.created_at >= $2::date
+          AND rr.created_at < ($3::date + interval '1 day')
+          AND ${sqlOrderOwnedBySeller('o', '$1')}`,
+      [sid, periodStart, periodEnd],
+    )
+    refundCents = Number(refundR.rows[0]?.refund_cents || 0)
+  } catch (_) {}
+
+  return {
+    grossCents,
+    bonusFundingCents,
+    customerPaidCents,
+    orderCount,
+    refundCents,
+  }
+}
+
+/**
+ * Platform-level GMV for a period: each paid order counted once (no per-seller double count).
+ * Bruttoumsatz = merchandise. Customer paid includes shipping — they are not a "Davon" split.
+ */
+async function aggregateMarketplacePeriodSales(client, periodStart, periodEnd) {
+  const where = [`o.payment_status = 'bezahlt'`]
+  const params = []
+  if (periodStart) {
+    params.push(periodStart)
+    where.push(`o.created_at >= $${params.length}::date`)
+  }
+  if (periodEnd) {
+    params.push(periodEnd)
+    where.push(`o.created_at < ($${params.length}::date + interval '1 day')`)
+  }
+  const r = await client.query(
+    `SELECT o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.coupon_discount_cents,
+            COALESCE(o.platform_bonus_funding_cents, 0) AS platform_bonus_funding_cents,
+            o.stripe_application_fee_cents
+       FROM store_orders o
+      WHERE ${where.join(' AND ')}`,
+    params,
+  )
+  let grossCents = 0
+  let shippingCents = 0
+  let bonusFundingCents = 0
+  let customerPaidCents = 0
+  let commissionCents = 0
+  let orderCount = 0
+  for (const row of r.rows || []) {
+    orderCount += 1
+    const g = sellerOrderRevenueBasisCents(row)
+    grossCents += g
+    shippingCents += Math.max(0, Number(row.shipping_cents || 0))
+    bonusFundingCents += Number(row.platform_bonus_funding_cents || 0)
+    customerPaidCents += resolveOrderPaidTotalCents(row)
+    const storedFee = Number(row.stripe_application_fee_cents)
+    commissionCents += Number.isFinite(storedFee) && storedFee > 0 ? storedFee : Math.round(g * 0.12)
+  }
+
+  let refundCents = 0
+  try {
+    const refundWhere = []
+    const refundParams = []
+    if (periodStart) {
+      refundParams.push(periodStart)
+      refundWhere.push(`rr.created_at >= $${refundParams.length}::date`)
+    }
+    if (periodEnd) {
+      refundParams.push(periodEnd)
+      refundWhere.push(`rr.created_at < ($${refundParams.length}::date + interval '1 day')`)
+    }
+    const refundSql = refundWhere.length ? `WHERE ${refundWhere.join(' AND ')}` : ''
+    const refundR = await client.query(
+      `SELECT COALESCE(SUM(rr.refund_amount_cents), 0)::bigint AS refund_cents FROM store_returns rr ${refundSql}`,
+      refundParams,
+    )
+    refundCents = Number(refundR.rows[0]?.refund_cents || 0)
+  } catch (_) {}
+
+  let sellerCount = 0
+  try {
+    const sidWhere = [`o.payment_status = 'bezahlt'`]
+    const sidParams = []
+    if (periodStart) {
+      sidParams.push(periodStart)
+      sidWhere.push(`o.created_at >= $${sidParams.length}::date`)
+    }
+    if (periodEnd) {
+      sidParams.push(periodEnd)
+      sidWhere.push(`o.created_at < ($${sidParams.length}::date + interval '1 day')`)
+    }
+    const sRes = await client.query(
+      `SELECT COUNT(DISTINCT sid)::int AS n FROM (
+         SELECT NULLIF(oi.seller_id, 'default') AS sid
+           FROM store_order_items oi
+           JOIN store_orders o ON o.id = oi.order_id
+          WHERE ${sidWhere.join(' AND ')}
+         UNION
+         SELECT NULLIF(o.seller_id, 'default')
+           FROM store_orders o
+          WHERE ${sidWhere.join(' AND ')}
+       ) x WHERE sid IS NOT NULL`,
+      sidParams,
+    )
+    sellerCount = Number(sRes.rows[0]?.n || 0)
+  } catch (_) {}
+
+  return {
+    grossCents,
+    shippingCents,
+    bonusFundingCents,
+    customerPaidCents,
+    commissionCents,
+    orderCount,
+    refundCents,
+    sellerCount,
+  }
+}
+
+module.exports = { chargeSellerForLabel, getSellerAvailableCents, aggregateSellerPeriodSales, aggregateMarketplacePeriodSales }

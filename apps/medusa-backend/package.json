@@ -25,7 +25,7 @@
     "patch": "node scripts/patch-link-modules.js",
     "test:eu-origin": "node --test src/eu-origin/metadata.test.js",
     "test:media-filename": "node --test src/media-filename.test.js",
-    "test": "node --test --test-reporter=spec src/eu-origin/metadata.test.js src/media-filename.test.js src/support-case-core.test.js src/goods-vat.test.js src/bonus-settlement.test.js",
+    "test": "node --test --test-reporter=spec src/eu-origin/metadata.test.js src/media-filename.test.js src/support-case-core.test.js src/goods-vat.test.js src/bonus-settlement.test.js src/flow-triggers.test.js src/flow-catalog.test.js",
     "test:support-cases": "node --test --test-reporter=spec src/support-case-core.test.js",
     "typecheck": "node --check server.js && node --check medusa-config.js && node --check src/support-case-core.js && node --check src/support-case-schema.js && node --check src/routes/support-cases.js && node --check src/routes/messages.js && node --check src/routes/pages.js && node --check src/seed-support-case-flows.js && node --check src/flow-automation.js && node --check scripts/setup-support-cases.js"
   },

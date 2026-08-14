@@ -318,7 +318,6 @@ export default function CustomerDetailPage() {
       ]);
       setCustomer(res?.customer || null);
       setNotesVal(res?.customer?.notes || "");
-      setBonusVal(String(res?.customer?.bonus_points || 0));
       const map = {};
       for (const r of (returnsData?.returns || [])) {
         if (r.order_id && r.status !== "abgelehnt" && r.status !== "abgeschlossen") {

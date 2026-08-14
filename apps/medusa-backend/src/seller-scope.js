@@ -109,6 +109,52 @@ function sqlOrderVisibleToActor(oAlias, superParam, sellerParam) {
   return `(${superParam}::boolean OR ${sqlOrderOwnedBySeller(oAlias, sellerParam)})`
 }
 
+/**
+ * Distinct real merchant ids on an order's lines (stamped item.seller_id, else catalog /
+ * unique listing fallback). Used by superuser order list grouping — header
+ * store_orders.seller_id is always the platform (`default`) after marketplace checkout.
+ */
+function sqlOrderItemSellerIdsAgg(oAlias) {
+  const o = oAlias || 'o'
+  return `(
+    SELECT COALESCE(array_agg(DISTINCT sid), ARRAY[]::text[])
+    FROM (
+      SELECT ${sqlRealSellerId('oi.seller_id')} AS sid
+      FROM store_order_items oi
+      WHERE oi.order_id = ${o}.id
+      UNION
+      SELECT ${sqlRealSellerId('ap.seller_id')}
+      FROM store_order_items oi
+      INNER JOIN admin_hub_products ap ON ap.id::text = oi.product_id::text
+      WHERE oi.order_id = ${o}.id
+        AND ${sqlRealSellerId('oi.seller_id')} IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM admin_hub_seller_listings sl
+          WHERE sl.product_id::text = oi.product_id::text
+            AND ${sqlRealSellerId('sl.seller_id')} IS NOT NULL
+            AND ${sqlRealSellerId('sl.seller_id')} IS DISTINCT FROM ${sqlRealSellerId('ap.seller_id')}
+        )
+      UNION
+      SELECT ${sqlRealSellerId('sl.seller_id')}
+      FROM store_order_items oi
+      INNER JOIN admin_hub_seller_listings sl ON sl.product_id::text = oi.product_id::text
+      WHERE oi.order_id = ${o}.id
+        AND ${sqlRealSellerId('oi.seller_id')} IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM admin_hub_products ap
+          WHERE ap.id::text = oi.product_id::text
+            AND ${sqlRealSellerId('ap.seller_id')} IS NOT NULL
+        )
+        AND (
+          SELECT COUNT(*) FROM admin_hub_seller_listings sl2
+          WHERE sl2.product_id::text = oi.product_id::text
+            AND ${sqlRealSellerId('sl2.seller_id')} IS NOT NULL
+        ) = 1
+    ) resolved
+    WHERE sid IS NOT NULL
+  )`
+}
+
 module.exports = {
   isStrictSuperuser,
   sellerIdOf,
@@ -117,4 +163,5 @@ module.exports = {
   sqlOrderItemOwnedBySeller,
   sqlOrderOwnedBySeller,
   sqlOrderVisibleToActor,
+  sqlOrderItemSellerIdsAgg,
 }

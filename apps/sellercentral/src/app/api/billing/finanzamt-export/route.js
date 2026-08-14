@@ -85,9 +85,11 @@ export async function POST(request) {
         ["Zeitraum von", body.period_start || "—"],
         ["Zeitraum bis", body.period_end || "—"],
         ["Erstellt am", stamp],
-        ["Bruttoumsatz (alle Verkäufer)", eur(t.gross_sale_cents)],
-        ["Davon vom Kunden gezahlt", eur(t.customer_paid_cents)],
-        ["Davon von Andertal (Bonuspunkte)", eur(t.bonus_funding_cents)],
+        ["Bruttoumsatz (Warenverkäufe)", eur(t.gross_sale_cents)],
+        ["Versand", eur(t.shipping_cents)],
+        ["Bestellwert (Ware + Versand)", eur((t.gross_sale_cents || 0) + (t.shipping_cents || 0))],
+        ["Vom Kunden gezahlt", eur(t.customer_paid_cents)],
+        ["Von Bonuspunkten gezahlt (Andertal)", eur(t.bonus_funding_cents)],
         ["Provision netto", eur(t.commission_net_cents)],
         ["Provision USt", eur(t.commission_vat_cents)],
         ["Auszahlung an Verkäufer", eur(t.seller_payout_cents)],
@@ -105,7 +107,7 @@ export async function POST(request) {
       "Je_Seller",
       [
         "Verkäufer", "Verkäufer-ID", "Zeitraum von", "Zeitraum bis", "Status",
-        "Bruttoumsatz", "Kunde gezahlt", "Andertal Bonus", "Provision netto",
+        "Bruttoumsatz", "Vom Kunden gezahlt", "Von Bonuspunkten gezahlt", "Provision netto",
         "Provision USt", "Auszahlung", "Erstattung", "Bestellungen",
       ],
       sellers.map((s) => [

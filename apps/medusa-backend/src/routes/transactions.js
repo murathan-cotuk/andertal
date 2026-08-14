@@ -4,9 +4,7 @@ const { resolveOrderPaidTotalCents, orderBonusDiscountCents } = require('../orde
 const { buildSellerPayoutPdfBuffer } = require('../order-pdf-buffers')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 const { resolveSellerScope, sqlOrderOwnedBySeller } = require('../seller-scope')
-const { salesInvoiceVat } = require('../goods-vat')
-
-const PLATFORM_VAT_PERCENT = Number(process.env.PLATFORM_VAT_PERCENT || '0')
+const { salesInvoiceVat, resolvePlatformCommissionVatPercent } = require('../goods-vat')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -156,7 +154,7 @@ module.exports = function createTransactionsRouter({
           const sellerVatId = row.vat_id ? String(row.vat_id).trim() : ''
           const customerVatId = row.customer_vat_id ? String(row.customer_vat_id).trim() : ''
           const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents, customerVatId })
-          const commissionVatCents = PLATFORM_VAT_PERCENT > 0 ? Math.round(commission * PLATFORM_VAT_PERCENT / 100) : 0
+          const commissionVatCents = Math.round(commission * resolvePlatformCommissionVatPercent() / 100)
           return {
             id: row.id,
             order_id: row.id,
@@ -347,6 +345,30 @@ module.exports = function createTransactionsRouter({
       }
     }
 
+    // GET /admin-hub/v1/seller-ledger — Amazon-style money movements for the signed-in seller
+    const adminHubSellerLedgerGET = async (req, res) => {
+      const scope = resolveSellerScope(req.sellerUser)
+      if (!scope) return res.status(403).json({ message: 'Forbidden' })
+      const sellerId = scope.isSuperuser
+        ? (String(req.query.seller_id || '').trim() || scope.sellerId)
+        : scope.sellerId
+      if (!sellerId) return res.status(400).json({ message: 'seller_id required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const { buildSellerLedger } = require('../seller-ledger')
+        const periodStart = String(req.query.period_start || '').trim() || null
+        const periodEnd = String(req.query.period_end || '').trim() || null
+        const result = await buildSellerLedger(client, sellerId, { periodStart, periodEnd })
+        await client.end()
+        res.json(result)
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // GET /admin-hub/v1/commission-invoices — billing tab: lists seller_payouts as commission invoices
     const adminHubCommissionInvoicesGET = async (req, res) => {
       const client = getDbClient()
@@ -379,7 +401,7 @@ module.exports = function createTransactionsRouter({
             seller_id: row.seller_id,
             store_name: row.store_name || null,
             period: `${fmtD(ps)} – ${fmtD(pe)}`,
-            period_label: `${ps.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}`,
+            period_label: `${fmtD(ps)} – ${fmtD(pe)}`,
             period_start: row.period_start,
             period_end: row.period_end,
             amount_cents: Number(row.commission_cents || 0),
@@ -433,6 +455,7 @@ module.exports = function createTransactionsRouter({
 
   const router = Router()
   router.get('/admin-hub/v1/transactions', adminHubTransactionsGET)
+  router.get('/admin-hub/v1/seller-ledger', adminHubSellerLedgerGET)
   router.post('/admin-hub/v1/transactions/manual-adjustment', adminHubManualAdjustmentPOST)
   router.delete('/admin-hub/v1/transactions/manual-adjustment/:id', adminHubManualAdjustmentDELETE)
   router.get('/admin-hub/v1/commission-invoices', adminHubCommissionInvoicesGET)

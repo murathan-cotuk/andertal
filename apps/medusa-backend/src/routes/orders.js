@@ -1,11 +1,11 @@
 'use strict'
 const { Router } = require('express')
 const { resolveOrderPaidTotalCents } = require('../order-money')
-const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderRetourenscheinPdfDocument, renderVersandlabelPdfDocument, renderProvisionsfakturPdfDocument, getOrderPdfFilename, querySellerInfoForInvoice } = require('../order-pdf-buffers')
+const { renderInvoicePdfDocument, renderLieferscheinPdfDocument, renderRetourenscheinPdfDocument, renderVersandlabelPdfDocument, buildProvisionsfakturPdfBuffer, getOrderPdfFilename, querySellerInfoForOrderDocuments, prepareRetailPdfContext } = require('../order-pdf-buffers')
 const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
-const { sqlOrderOwnedBySeller, sqlOrderItemOwnedBySeller } = require('../seller-scope')
+const { sqlOrderOwnedBySeller, sqlOrderItemOwnedBySeller, sqlOrderItemSellerIdsAgg } = require('../seller-scope')
 
 function getClientIpFromRequest(req) {
   const xff = req.headers['x-forwarded-for']
@@ -99,7 +99,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
               WHERE oi.order_id = o.id AND ${sqlOrderItemOwnedBySeller('oi', `$${params.length}`)}
             )::bigint AS seller_items_subtotal_cents`
           : ', NULL::bigint AS seller_items_subtotal_cents'
-        const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, o.sendcloud_label_url, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered${sellerSubtotalSelect} FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
+        const r = await client.query(`SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status, o.seller_id, o.email, o.first_name, o.last_name, o.phone, o.address_line1, o.address_line2, o.city, o.postal_code, o.country, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents, o.currency, o.payment_intent_id, o.cart_id, o.created_at, o.is_guest, o.tracking_number, o.carrier_name, o.shipped_at, o.sendcloud_label_url, c.customer_number, c.id AS customer_id, (c.password_hash IS NOT NULL) AS c_is_registered, ${sqlOrderItemSellerIdsAgg('o')} AS item_seller_ids${sellerSubtotalSelect} FROM store_orders o LEFT JOIN store_customers c ON LOWER(c.email) = LOWER(o.email) ${where} ORDER BY ${orderBy} LIMIT $${params.length+1} OFFSET $${params.length+2}`, [...params, lim, off])
         const countR = await client.query(`SELECT COUNT(*) FROM store_orders o ${where}`, params)
         const orders = (r.rows || []).map(row => {
           const paidTotal = resolveOrderPaidTotalCents(row)
@@ -112,6 +112,9 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           order_status: row.order_status || 'offen', payment_status: row.payment_status || 'bezahlt',
           delivery_status: row.delivery_status || 'offen',
           seller_id: row.seller_id || 'default',
+          item_seller_ids: Array.isArray(row.item_seller_ids)
+            ? row.item_seller_ids.map((s) => String(s || '').trim()).filter((s) => s && s !== 'default')
+            : [],
           email: row.email, first_name: row.first_name, last_name: row.last_name, phone: row.phone,
           address_line1: row.address_line1, address_line2: row.address_line2, city: row.city,
           postal_code: row.postal_code, country: row.country,
@@ -238,11 +241,13 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           }
         } catch (_) {}
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
-        const itemRows = iRes.rows || []
+        const preparedInv = await prepareRetailPdfContext(client, row, iRes.rows || [])
+        const itemRows = preparedInv.itemRows
+        const orderRow = preparedInv.row
         let sellerInfoHub = null
         let shopLogoUrl = ''
         try {
-          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
+          sellerInfoHub = await querySellerInfoForOrderDocuments(client, orderRow, itemRows)
           const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
           shopLogoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}
@@ -261,7 +266,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
             })
           } catch (_) {}
         }
-        const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
+        const on = orderRow.order_number != null ? String(orderRow.order_number) : String(id).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
         res.setHeader('Content-Type', 'application/pdf')
@@ -269,7 +274,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         doc.pipe(res)
         renderInvoicePdfDocument(doc, {
-          row,
+          row: orderRow,
           itemRows,
           orderId: id,
           invoiceNumber: on,
@@ -312,11 +317,13 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
           }
         } catch (_) {}
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id = $1 ORDER BY created_at', [id])
-        const itemRows = iRes.rows || []
+        const preparedLs = await prepareRetailPdfContext(client, row, iRes.rows || [])
+        const itemRows = preparedLs.itemRows
+        const orderRow = preparedLs.row
         let sellerInfoHub = null
         let lieferscheinLogoUrl = ''
         try {
-          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
+          sellerInfoHub = await querySellerInfoForOrderDocuments(client, orderRow, itemRows)
           const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
           lieferscheinLogoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}
@@ -335,7 +342,7 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
             })
           } catch (_) {}
         }
-        const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
+        const on = orderRow.order_number != null ? String(orderRow.order_number) : String(id).slice(0, 8)
         const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal'
         const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
         // Versand may pass not-yet-saved carrier/tracking as query overrides
@@ -346,15 +353,15 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
         doc.pipe(res)
         renderLieferscheinPdfDocument(doc, {
-          row,
+          row: orderRow,
           itemRows,
           invoiceNumber: on,
           shopName,
           sellerInfo: sellerInfoHub,
           shopLogoBuffer: lieferscheinLogoBuffer,
           locale: pdfLocale,
-          carrierName: carrierOverride || row.carrier_name || null,
-          trackingNumber: trackingOverride || row.tracking_number || null,
+          carrierName: carrierOverride || orderRow.carrier_name || null,
+          trackingNumber: trackingOverride || orderRow.tracking_number || null,
         })
         doc.end()
       } catch (e) {
@@ -374,63 +381,28 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       if (!dbUrl) return res.status(503).json({ message: 'Database not configured' })
       const loggedSellerId = req.sellerUser?.seller_id || null
+      const isSuper = !!req.sellerUser?.is_superuser
       let client
       try {
-        const PDFDocument = require('pdfkit')
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
-        const oRes = await client.query(
-          `SELECT id, order_number, seller_id, created_at, subtotal_cents, total_cents,
-                  stripe_application_fee_cents, seller_net_after_commission_cents
-             FROM store_orders WHERE id = $1::uuid`,
-          [id],
-        )
-        const order = oRes.rows?.[0]
-        if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
-        if (loggedSellerId && order.seller_id !== loggedSellerId) {
-          await client.end()
-          return res.status(403).json({ message: 'Access denied' })
+        if (!isSuper && loggedSellerId) {
+          const own = await client.query(
+            `SELECT 1 FROM store_orders o WHERE o.id = $1::uuid AND ${sqlOrderOwnedBySeller('o', '$2')} LIMIT 1`,
+            [id, loggedSellerId],
+          )
+          if (!own.rows.length) {
+            await client.end()
+            return res.status(403).json({ message: 'Access denied' })
+          }
         }
-
-        let sellerInfo = null
-        try {
-          sellerInfo = await querySellerInfoForInvoice(client, order.seller_id)
-        } catch (_) {}
-
+        const pdf = await buildProvisionsfakturPdfBuffer(client, id)
         await client.end(); client = null
-
-        const storedFee = Number(order.stripe_application_fee_cents)
-        const subtotal = Number(order.subtotal_cents || order.total_cents || 0)
-        const commissionCents = Number.isFinite(storedFee) && storedFee > 0
-          ? storedFee
-          : Math.round(subtotal * 0.12)
-        let commissionRatePct = null
-        if (subtotal > 0 && commissionCents > 0) {
-          commissionRatePct = Math.round((commissionCents / subtotal) * 100 * 10) / 10
-        }
-
-        const shopName = process.env.SHOP_INVOICE_NAME || 'Andertal Marktplatz'
-        const platformAddress = process.env.PLATFORM_INVOICE_ADDRESS || ''
-        const platformVatId = process.env.PLATFORM_VAT_ID || ''
-        const platformVatPercent = Number(process.env.PLATFORM_VAT_PERCENT || '0')
-        const on = order.order_number != null ? String(order.order_number) : String(id).slice(0, 8)
-
+        if (!pdf) return res.status(404).json({ message: 'Order not found' })
         res.setHeader('Content-Type', 'application/pdf')
-        res.setHeader('Content-Disposition', `attachment; filename="Provisionsfaktur-${on}.pdf"`)
-        const doc = new PDFDocument({ margin: 42, size: 'A4', compress: false, pdfVersion: '1.7' })
-        doc.pipe(res)
-        renderProvisionsfakturPdfDocument(doc, {
-          order,
-          sellerInfo,
-          shopName,
-          commissionCents,
-          commissionRatePct,
-          platformAddress,
-          platformVatId,
-          platformVatPercent,
-        })
-        doc.end()
+        res.setHeader('Content-Disposition', `attachment; filename="${pdf.filename}"`)
+        res.send(pdf.content)
       } catch (e) {
         if (client) try { await client.end() } catch (_) {}
         if (!res.headersSent) res.status(500).json({ message: e?.message || 'PDF error' })
@@ -853,12 +825,27 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const oRes = await client.query('SELECT * FROM store_orders WHERE id=$1::uuid', [id])
         const row = oRes.rows?.[0]
         if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        const carrierLabelUrl = String(row.sendcloud_label_url || '').trim()
+        if (carrierLabelUrl) {
+          const { getSendcloudCredentials, fetchLabelPdfBuffer } = require('../sendcloud-client')
+          const sc = await getSendcloudCredentials(client)
+          const on = row.order_number != null ? String(row.order_number) : String(id).slice(0, 8)
+          const pdfLocale = String(req.query?.locale || 'de').slice(0, 2).toLowerCase()
+          await client.end(); client = null
+          const buf = await fetchLabelPdfBuffer(carrierLabelUrl, sc)
+          if (buf && buf.slice(0, 4).toString('latin1') === '%PDF') {
+            res.setHeader('Content-Type', 'application/pdf')
+            res.setHeader('Content-Disposition', `attachment; filename="${getOrderPdfFilename('versandlabel', on, pdfLocale)}"`)
+            return res.end(buf)
+          }
+          return res.status(502).json({ message: 'DHL-Etikett konnte nicht geladen werden. Bitte unter Versand das gekaufte Etikett öffnen.' })
+        }
         const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id=$1 ORDER BY created_at', [id])
         const itemRows = iRes.rows || []
         let sellerInfoHub = null
         let logoUrl = ''
         try {
-          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
+          sellerInfoHub = await querySellerInfoForOrderDocuments(client, row, itemRows)
           const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
           logoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}
@@ -917,10 +904,12 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         if (!row) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
         const rRes = await client.query('SELECT * FROM store_returns WHERE order_id=$1 ORDER BY created_at DESC LIMIT 1', [id])
         const returnRow = rRes.rows?.[0] || null
+        const iRes = await client.query('SELECT * FROM store_order_items WHERE order_id=$1 ORDER BY created_at', [id])
+        const itemRows = iRes.rows || []
         let sellerInfoHub = null
         let logoUrl = ''
         try {
-          sellerInfoHub = await querySellerInfoForInvoice(client, row.seller_id)
+          sellerInfoHub = await querySellerInfoForOrderDocuments(client, row, itemRows)
           const lr = await client.query("SELECT shop_logo_url FROM admin_hub_seller_settings WHERE seller_id='default' LIMIT 1")
           logoUrl = lr.rows?.[0]?.shop_logo_url || ''
         } catch (_) {}

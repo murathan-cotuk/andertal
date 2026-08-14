@@ -18,7 +18,6 @@ import {
   Modal,
   Banner,
 } from "@shopify/polaris";
-import { MenuHorizontalIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
@@ -66,10 +65,14 @@ function getVatInfo(country) {
   return COUNTRY_VAT[c] || { rate: 19, label: "MwSt." };
 }
 
-function isOwnSellerOrder(order, mySellerId) {
-  const s = String(order?.seller_id ?? "default").trim();
-  if (!s || s === "default") return true;
-  return s === String(mySellerId || "").trim();
+function orderMerchantSellerIds(order) {
+  const fromItems = Array.isArray(order?.item_seller_ids)
+    ? order.item_seller_ids.map((s) => String(s || "").trim()).filter((s) => s && s !== "default")
+    : [];
+  if (fromItems.length) return [...new Set(fromItems)];
+  const header = String(order?.seller_id || "").trim();
+  if (header && header !== "default") return [header];
+  return [];
 }
 
 const STATUS_COLORS = {
@@ -91,18 +94,29 @@ function StatusBadge({ value }) {
   const locale = useLocale();
   const s = STATUS_COLORS[value] || { bg: "#f3f4f6", color: "#6b7280" };
   return (
-    <span style={{ display: "inline-block", padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
+    <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600, lineHeight: 1.3, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
       {value ? statusLabel(locale, value) : "—"}
     </span>
   );
 }
 
-/* ── Layout (Produkte-Seite: Container + Card + Raster) ───────── */
+function fmtAddressOneLine(order) {
+  const parts = [
+    order.address_line1,
+    [order.postal_code, order.city].filter(Boolean).join(" "),
+    order.country,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+const CELL = { padding: "2px 8px", borderRight: "1px solid #e5e7eb", verticalAlign: "middle", fontSize: 12, lineHeight: 1.25, whiteSpace: "nowrap" };
+
+/* ── Layout ───────── */
 const PageContainer = styled.div`
   width: 100%;
   max-width: 100%;
   margin: 0;
-  padding: 8px 0 24px;
+  padding: 4px 0 16px;
   min-height: 100%;
   background: transparent;
 `;
@@ -112,12 +126,12 @@ const PageHeader = styled.div`
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 8px;
 `;
 
 const PageTitle = styled.h1`
-  font-size: 26px;
+  font-size: 18px;
   font-weight: 650;
   margin: 0;
   color: #111827;
@@ -127,59 +141,33 @@ const HeaderMeta = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 `;
 
-const Section = styled(Card)`
-  padding: 16px;
-  margin-bottom: 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-`;
-
-const SectionHeading = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 12px;
-`;
-
-const FilterGrid = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  align-items: end;
-
-  @media (max-width: 1024px) {
-    grid-template-columns: 1fr 1fr;
-  }
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const FilterField = styled.div`
+const FilterBar = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const FieldLabel = styled.span`
-  font-size: 12px;
-  font-weight: 600;
-  color: #4b5563;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 `;
 
 const FilterInput = styled.input`
-  width: 100%;
-  padding: 9px 12px;
+  flex: 1 1 160px;
+  min-width: 140px;
+  max-width: 260px;
+  height: 28px;
+  padding: 0 8px;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: 6px;
+  font-size: 12px;
   color: #1f2937;
   background: #fff;
   box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
   &:focus {
     outline: none;
@@ -192,16 +180,16 @@ const FilterInput = styled.input`
 `;
 
 const FilterSelect = styled.select`
-  width: 100%;
-  padding: 9px 12px;
+  height: 28px;
+  max-width: 150px;
+  padding: 0 6px;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: 6px;
+  font-size: 12px;
   color: #1f2937;
   background: #fff;
   cursor: pointer;
   box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 
   &:focus {
     outline: none;
@@ -212,9 +200,9 @@ const FilterSelect = styled.select`
 
 const TableCard = styled(Card)`
   padding: 0;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   overflow: clip;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid #e5e7eb;
 `;
 
@@ -222,32 +210,31 @@ const BulkBar = styled.div`
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
+  gap: 8px;
+  padding: 5px 10px;
+  margin-bottom: 8px;
   background: #f8fafc;
   border: 1px solid #dbeafe;
-  border-radius: 12px;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
 `;
 
 const SuperuserSectionLabel = styled.td`
-  padding: 12px 20px !important;
+  padding: 4px 10px !important;
   background: #eff6ff !important;
   border-bottom: 1px solid #bfdbfe !important;
   font-weight: 700 !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   color: #1e40af !important;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 `;
 
 const SellerOrdersSectionLabel = styled.td`
-  padding: 12px 20px !important;
+  padding: 4px 10px !important;
   background: #f3f4f6 !important;
   border-bottom: 1px solid #e5e7eb !important;
   font-weight: 700 !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   color: #374151 !important;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -526,25 +513,25 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
   const label = isSuperuser && order.customer_number ? `${order.customer_number} – ${name}` : name;
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap" }}>
-        {isSuperuser ? (
-          <button
-            onClick={handleClick}
-            style={{ background: "none", border: "none", padding: 0, cursor: navigating ? "wait" : "pointer", textAlign: "left", fontWeight: 600, fontSize: 13, color: navigating ? "#9ca3af" : "#111827", textDecoration: "underline" }}
-          >
-            {label}
-          </button>
-        ) : (
-          <span style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{label}</span>
-        )}
-        {isSuperuser && order.is_guest && (
-          <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600, flexShrink: 0 }}>
-            {_ui.guestBadge}
-          </span>
-        )}
-      </div>
-      {isSuperuser && <div style={{ fontSize: 11, color: "#9ca3af" }}>{order.email || ""}</div>}
+    <div
+      title={[label, isSuperuser ? (order.email || "") : ""].filter(Boolean).join(" · ")}
+      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, lineHeight: 1.25 }}
+    >
+      {isSuperuser ? (
+        <button
+          onClick={handleClick}
+          style={{ background: "none", border: "none", padding: 0, cursor: navigating ? "wait" : "pointer", textAlign: "left", fontWeight: 600, fontSize: 12, color: navigating ? "#9ca3af" : "#111827", textDecoration: "underline", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
+          {label}
+        </button>
+      ) : (
+        <span style={{ fontWeight: 600, fontSize: 12, color: "#111827" }}>{label}</span>
+      )}
+      {isSuperuser && order.is_guest && (
+        <span style={{ fontSize: 9, padding: "0 4px", marginLeft: 4, borderRadius: 4, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>
+          {_ui.guestBadge}
+        </span>
+      )}
     </div>
   );
 }
@@ -609,12 +596,29 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser, showS
         autofocusTarget="first-node"
         onClose={() => setOpen(false)}
         activator={
-          <Button
-            size="slim"
-            icon={MenuHorizontalIcon}
+          <button
+            type="button"
             onClick={() => setOpen((o) => !o)}
-            accessibilityLabel={ui.actions || "Actions"}
-          />
+            aria-label={ui.actions || "Actions"}
+            style={{
+              width: 22,
+              height: 22,
+              padding: 0,
+              border: "1px solid #e5e7eb",
+              borderRadius: 4,
+              background: "#fff",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#6b7280",
+              fontSize: 14,
+              lineHeight: 1,
+              fontWeight: 700,
+            }}
+          >
+            ⋯
+          </button>
         }
       >
         <ActionList items={items} />
@@ -1207,10 +1211,13 @@ export default function OrdersPage() {
   const { ownOrdersList, sellerOrderGroups } = useMemo(() => {
     const own = [];
     const g = new Map();
+    const mine = String(mySellerId || "").trim();
+    const mineIsReal = Boolean(mine && mine !== "default");
     for (const o of visibleOrders) {
-      if (isOwnSellerOrder(o, mySellerId)) own.push(o);
-      else {
-        const sid = String(o.seller_id || "unknown");
+      const ids = orderMerchantSellerIds(o);
+      const otherSellers = ids.filter((id) => !mineIsReal || id !== mine);
+      if (!ids.length || (mineIsReal && otherSellers.length === 0)) own.push(o);
+      for (const sid of otherSellers) {
         if (!g.has(sid)) g.set(sid, []);
         g.get(sid).push(o);
       }
@@ -1251,71 +1258,58 @@ export default function OrdersPage() {
   const renderOrderRows = (list) =>
     sortOrdersClient(list).map((order) => (
       <React.Fragment key={order.id}>
-        <tr style={{ borderBottom: "1px solid #e5e7eb", cursor: "default", background: selected.has(order.id) ? "#eff6ff" : "#fff", transition: "background 0.15s ease" }}
+        <tr style={{ borderBottom: "1px solid #e5e7eb", cursor: "default", background: selected.has(order.id) ? "#eff6ff" : "#fff", height: 32 }}
           onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#f9fafb"; }}
           onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
-          <td style={{ padding: "7px 6px 7px 12px", width: 32, borderRight: "1px solid #e5e7eb" }} onClick={e => e.stopPropagation()}>
-            <CustomCheckbox checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} size={18} />
+          <td style={{ ...CELL, padding: "2px 6px 2px 8px", width: 28 }} onClick={e => e.stopPropagation()}>
+            <CustomCheckbox checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} size={14} />
           </td>
-          <td style={{ padding: "7px 8px 7px 8px", width: 32, borderRight: "1px solid #e5e7eb" }}>
-            <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
+          <td style={{ ...CELL, padding: "2px 4px", width: 24, textAlign: "center" }}>
+            <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "#6b7280", padding: 0, lineHeight: 1 }}>
               {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
             </button>
           </td>
           {!hc.has("order_number") && (
-            <td style={{ padding: "7px 10px", fontWeight: 600, fontSize: 13, borderRight: "1px solid #e5e7eb" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <button
-                  onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
-                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 13, color: "#111827", textDecoration: "underline" }}
-                >
-                  #{order.order_number || "—"}
-                </button>
-              </div>
+            <td style={{ ...CELL, fontWeight: 600 }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); router.push(`/${locale}/orders/${order.id}`); }}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 12, color: "#111827", textDecoration: "underline" }}
+              >
+                #{order.order_number || "—"}
+              </button>
             </td>
           )}
           {!hc.has("customer") && (
-            <td style={{ padding: "7px 10px", minWidth: 180, borderRight: "1px solid #e5e7eb" }}>
+            <td style={{ ...CELL, minWidth: 120, overflow: "hidden" }}>
               <CustomerCell order={order} locale={locale} router={router} isSuperuser={isSuperuser} />
             </td>
           )}
           {!hc.has("address") && (
-            <td style={{ padding: "7px 10px", color: "#6b7280", fontSize: 12, lineHeight: 1.45, borderRight: "1px solid #e5e7eb" }}>
-              {order.address_line1 ? (
-                <>
-                  <div>{order.address_line1}</div>
-                  <div>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
-                  {order.country && <div>{order.country}</div>}
-                </>
-              ) : "—"}
+            <td
+              title={fmtAddressOneLine(order) || undefined}
+              style={{ ...CELL, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            >
+              {fmtAddressOneLine(order) || "—"}
             </td>
           )}
           {!hc.has("amount") && (
-            <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: 600, borderRight: "1px solid #e5e7eb" }}>
-              {(() => {
+            <td
+              style={{ ...CELL, textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}
+              title={(() => {
                 const vat = getVatInfo(order.country);
                 const brutto = order.total_cents || 0;
                 const netto = vat.rate > 0 ? Math.round(brutto / (1 + vat.rate / 100)) : brutto;
-                return (
-                  <>
-                    <div>{fmtCents(brutto)}</div>
-                    {vat.rate > 0 && (
-                      <div style={{ fontSize: 10, fontWeight: 400, color: "#9ca3af", lineHeight: 1.3 }}>
-                        {fmtCents(netto)} {ui.net}<br />
-                        +{vat.rate}% {vat.label}
-                      </div>
-                    )}
-                  </>
-                );
+                return vat.rate > 0 ? `${fmtCents(netto)} ${ui.net} · +${vat.rate}% ${vat.label}` : undefined;
               })()}
+            >
+              {fmtCents(order.total_cents || 0)}
             </td>
           )}
           {!hc.has("order_status") && (
-            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
+            <td style={{ ...CELL, textAlign: "center" }}>
               {returnsMap[order.id] ? (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#fef2f2", color: "#b91c1c", whiteSpace: "nowrap" }}>
                   {ui.retoure}
                 </span>
               ) : (
@@ -1324,30 +1318,30 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("payment_status") && (
-            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
+            <td style={{ ...CELL, textAlign: "center" }}>
               <StatusBadge value={order.payment_status} />
             </td>
           )}
           {!hc.has("delivery_status") && (
-            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
+            <td style={{ ...CELL, textAlign: "center" }}>
               <StatusBadge value={order.delivery_status} />
             </td>
           )}
           {!hc.has("date") && (
-            <td style={{ padding: "7px 10px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap", borderRight: "1px solid #e5e7eb" }}>
+            <td style={{ ...CELL, color: "#6b7280", whiteSpace: "nowrap" }}>
               {fmtDate(order.created_at)}
             </td>
           )}
           {!hc.has("country") && (
-            <td style={{ padding: "7px 10px", textAlign: "center", fontWeight: 500, borderRight: "1px solid #e5e7eb" }}>
+            <td style={{ ...CELL, textAlign: "center", fontWeight: 500 }}>
               {order.country || "—"}
             </td>
           )}
           {!hc.has("review") && (
-            <td style={{ padding: "7px 10px", textAlign: "center", borderRight: "1px solid #e5e7eb" }}>
+            <td style={{ ...CELL, textAlign: "center" }}>
               {(() => {
                 const orderReviews = allReviews.filter((r) => r.order_id === order.id);
-                if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 14 }}>★★★★★</span>;
+                if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 11 }}>★★★★★</span>;
                 const avg = orderReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / orderReviews.length;
                 return (
                   <button
@@ -1370,7 +1364,7 @@ export default function OrdersPage() {
               })()}
             </td>
           )}
-          <td style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap", overflow: "visible" }}>
+          <td style={{ ...CELL, borderRight: "none", textAlign: "right", whiteSpace: "nowrap", overflow: "visible" }}>
             {(() => {
               const canShip = order.delivery_status !== "zugestellt" && order.delivery_status !== "versendet";
               return (
@@ -1379,7 +1373,7 @@ export default function OrdersPage() {
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); startPacking([order]); }}
-                      style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #2563eb", background: "#eff6ff", color: "#1d4ed8", fontSize: 11, fontWeight: 650, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1.25, flexShrink: 0 }}
+                      style={{ padding: "1px 6px", borderRadius: 4, border: "1px solid #2563eb", background: "#eff6ff", color: "#1d4ed8", fontSize: 10, fontWeight: 650, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1.3, flexShrink: 0 }}
                     >
                       {ui.ship}
                     </button>
@@ -1420,11 +1414,11 @@ export default function OrdersPage() {
       <PageHeader>
         <PageTitle>{ui.orders}</PageTitle>
         <HeaderMeta>
-          <span style={{ fontSize: 14, color: "#6b7280" }}>{orders.length} {ui.orders}</span>
+          <span style={{ fontSize: 12, color: "#6b7280" }}>{orders.length} {ui.orders}</span>
           <div ref={colMenuRef} style={{ position: "relative" }}>
             <button
               onClick={() => setShowColMenu(v => !v)}
-              style={{ padding: "8px 13px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#374151", lineHeight: 1 }}
+              style={{ padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 500, color: "#374151", lineHeight: 1, height: 28 }}
             >
               {ui.colColumns} {hiddenCols.size > 0 ? `(${COL_DEFS.filter(c => c.hideable).length - hiddenCols.size}/${COL_DEFS.filter(c => c.hideable).length})` : ""}
             </button>
@@ -1444,7 +1438,7 @@ export default function OrdersPage() {
               </div>
             )}
           </div>
-          <Button variant="primary" onClick={() => setShowNewOrder(true)}>
+          <Button variant="primary" size="slim" onClick={() => setShowNewOrder(true)}>
             {ui.addOrder}
           </Button>
         </HeaderMeta>
@@ -1452,91 +1446,71 @@ export default function OrdersPage() {
 
       {selected.size > 0 && (
         <BulkBar>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#1e3a8a" }}>{selected.size} {ui.selected}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#1e3a8a" }}>{selected.size} {ui.selected}</span>
           <InlineStack gap="200" wrap blockAlign="center">
-            <Button variant="primary" onClick={() => startPacking(selectedOrders)}>
+            <Button variant="primary" size="slim" onClick={() => startPacking(selectedOrders)}>
               {ui.bulkShip}
             </Button>
-            <Button variant="plain" onClick={() => setSelected(new Set())}>
+            <Button variant="plain" size="slim" onClick={() => setSelected(new Set())}>
               {ui.clearSelection}
             </Button>
           </InlineStack>
         </BulkBar>
       )}
 
-      <Section>
-        <SectionHeading>{ui.filterAndSort}</SectionHeading>
-        <FilterGrid>
-          <FilterField>
-            <FieldLabel>{ui.search}</FieldLabel>
-            <FilterInput
-              placeholder={ui.searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </FilterField>
-          <FilterField>
-            <FieldLabel>{ui.orderStatus}</FieldLabel>
-            <FilterSelect value={filterOrderStatus} onChange={(e) => setFilterOrderStatus(e.target.value)}>
-              <option value="">{ui.allStatuses}</option>
-              <option value="retoure">{ui.activeReturn}</option>
-              {ORDER_STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </FilterSelect>
-          </FilterField>
-          <FilterField>
-            <FieldLabel>{ui.paymentStatus}</FieldLabel>
-            <FilterSelect value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)}>
-              <option value="">{ui.allPayments}</option>
-              {PAYMENT_STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </FilterSelect>
-          </FilterField>
-          <FilterField>
-            <FieldLabel>{ui.deliveryStatus}</FieldLabel>
-            <FilterSelect value={filterDelivery} onChange={(e) => setFilterDelivery(e.target.value)}>
-              <option value="">{ui.allDeliveries}</option>
-              {DELIVERY_STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </FilterSelect>
-          </FilterField>
-        </FilterGrid>
-
+      <FilterBar>
+        <FilterInput
+          placeholder={ui.searchPlaceholder || ui.search}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label={ui.search}
+        />
+        <FilterSelect value={filterOrderStatus} onChange={(e) => setFilterOrderStatus(e.target.value)} aria-label={ui.orderStatus} title={ui.orderStatus}>
+          <option value="">{ui.allStatuses}</option>
+          <option value="retoure">{ui.activeReturn}</option>
+          {ORDER_STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </FilterSelect>
+        <FilterSelect value={filterPayStatus} onChange={(e) => setFilterPayStatus(e.target.value)} aria-label={ui.paymentStatus} title={ui.paymentStatus}>
+          <option value="">{ui.allPayments}</option>
+          {PAYMENT_STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </FilterSelect>
+        <FilterSelect value={filterDelivery} onChange={(e) => setFilterDelivery(e.target.value)} aria-label={ui.deliveryStatus} title={ui.deliveryStatus}>
+          <option value="">{ui.allDeliveries}</option>
+          {DELIVERY_STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </FilterSelect>
         {isSuperuser && (
-          <div style={{ marginTop: 20, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.2fr)", gap: 16, alignItems: "end" }}>
-            <FilterField>
-              <FieldLabel>{ui.sellerGroups}</FieldLabel>
-              <FilterSelect value={sellerGroupSort} onChange={(e) => setSellerGroupSort(e.target.value)}>
-                <option value="created_at_desc">{ui.sortNewestFirst}</option>
-                <option value="created_at_asc">{ui.sortOldestFirst}</option>
-                <option value="total_desc">{ui.amountDesc}</option>
-                <option value="total_asc">{ui.amountAsc}</option>
-              </FilterSelect>
-            </FilterField>
-            <FilterField>
-              <FieldLabel>{ui.searchSeller}</FieldLabel>
-              <FilterInput
-                placeholder={lt(locale, "Name / ID…", "Ad / ID…", "Nom / ID…", "Nombre / ID…", "Nome / ID…", "Name / ID…")}
-                value={sellerSearchFilter}
-                onChange={(e) => setSellerSearchFilter(e.target.value)}
-              />
-            </FilterField>
-          </div>
+          <>
+            <FilterSelect value={sellerGroupSort} onChange={(e) => setSellerGroupSort(e.target.value)} aria-label={ui.sellerGroups} title={ui.sellerGroups}>
+              <option value="created_at_desc">{ui.sortNewestFirst}</option>
+              <option value="created_at_asc">{ui.sortOldestFirst}</option>
+              <option value="total_desc">{ui.amountDesc}</option>
+              <option value="total_asc">{ui.amountAsc}</option>
+            </FilterSelect>
+            <FilterInput
+              placeholder={ui.searchSeller || lt(locale, "Name / ID…", "Ad / ID…", "Nom / ID…", "Nombre / ID…", "Nome / ID…", "Name / ID…")}
+              value={sellerSearchFilter}
+              onChange={(e) => setSellerSearchFilter(e.target.value)}
+              aria-label={ui.searchSeller}
+            />
+          </>
         )}
-      </Section>
+      </FilterBar>
 
       <TableCard>
         <div style={{ overflowX: "auto", width: "100%" }}>
-        <table style={{ width: "100%", minWidth: visibleCols.reduce((s, c) => s + colWidths[COL_DEFS.indexOf(c)], 0), borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
+        <table style={{ width: "100%", minWidth: visibleCols.reduce((s, c) => s + colWidths[COL_DEFS.indexOf(c)], 0), borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
           <colgroup>
             {visibleCols.map(col => (
               <col key={col.key} style={{ width: colWidths[COL_DEFS.indexOf(col)] }} />
@@ -1552,7 +1526,7 @@ export default function OrdersPage() {
                     key={col.key}
                     onClick={isSortable ? () => handleColSort(col.sortKey) : undefined}
                     style={{
-                      padding: "7px 10px",
+                      padding: "4px 8px",
                       textAlign: col.align,
                       fontWeight: 600,
                       fontSize: 11,
@@ -1573,7 +1547,7 @@ export default function OrdersPage() {
                   >
                     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
                       {col.key === "sel" ? (
-                        <CustomCheckbox checked={allSelected} onChange={toggleAll} size={18} />
+                        <CustomCheckbox checked={allSelected} onChange={toggleAll} size={14} />
                       ) : (
                         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
                           {col.labelKey ? (ui[col.labelKey] || col.label || col.labelKey) : col.label}
@@ -1600,10 +1574,10 @@ export default function OrdersPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={visibleColCount} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
+              <tr><td colSpan={visibleColCount} style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>{ui.loading}</td></tr>
             )}
             {!loading && orders.length === 0 && (
-              <tr><td colSpan={visibleColCount} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.noOrders}</td></tr>
+              <tr><td colSpan={visibleColCount} style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>{ui.noOrders}</td></tr>
             )}
             {!loading && orders.length > 0 && !isSuperuser && renderOrderRows(visibleOrders)}
             {!loading && orders.length > 0 && isSuperuser && (
@@ -1615,7 +1589,7 @@ export default function OrdersPage() {
                 </tr>
                 {ownOrdersList.length === 0 ? (
                   <tr>
-                    <td colSpan={visibleColCount} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                    <td colSpan={visibleColCount} style={{ padding: "8px 12px", color: "#9ca3af", fontSize: 12 }}>
                       {ui.noOrdersInSection}
                     </td>
                   </tr>
@@ -1629,7 +1603,7 @@ export default function OrdersPage() {
                 </tr>
                 {filteredSellerOrderGroups.length === 0 ? (
                   <tr>
-                    <td colSpan={visibleColCount} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                    <td colSpan={visibleColCount} style={{ padding: "8px 12px", color: "#9ca3af", fontSize: 12 }}>
                       {ui.noSellerOrders}{sellerSearchFilter.trim() ? lt(locale, " (filter)", " (filtre)", " (filtre)", " (filtro)", " (filtro)", " (Filter)") : ""}.
                     </td>
                   </tr>
@@ -1645,11 +1619,11 @@ export default function OrdersPage() {
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "space-between",
-                              padding: "12px 20px",
+                              padding: "4px 10px",
                             }}
                           >
-                            <span style={{ fontWeight: 600, fontSize: 15, color: "#111827" }}>{label}</span>
-                            <span style={{ fontSize: 13, color: "#6b7280" }}>
+                            <span style={{ fontWeight: 600, fontSize: 12, color: "#111827" }}>{label}</span>
+                            <span style={{ fontSize: 11, color: "#6b7280" }}>
                               {items.length} {ui.orders}
                             </span>
                           </div>
@@ -1674,7 +1648,7 @@ const selStyle = { padding: "7px 10px", border: "1px solid #e5e7eb", borderRadiu
 function MiniStars({ rating }) {
   const r = Math.round(Number(rating) || 0);
   return (
-    <span style={{ fontSize: 14, letterSpacing: 1, lineHeight: 1 }}>
+    <span style={{ fontSize: 11, letterSpacing: 0, lineHeight: 1 }}>
       {[1,2,3,4,5].map((n) => (
         <span key={n} style={{ color: r >= n ? "#f59e0b" : "#d1d5db" }}>★</span>
       ))}

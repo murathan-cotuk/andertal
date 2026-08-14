@@ -35,6 +35,28 @@ import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
 const CHECKOUT_SNAPSHOT_KEY = "andertal_checkout_snapshot";
+const orderPreviewKey = (orderId) => `andertal_order_preview_${orderId}`;
+
+/** Full document navigation so /{country}/{locale}/order/:id goes through proxy rewrite. */
+function goToOrderConfirmation(order, locale) {
+  const orderId = order?.id;
+  if (!orderId || typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(orderPreviewKey(orderId), JSON.stringify(order));
+  } catch (_) {}
+  try {
+    sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
+  } catch (_) {}
+  try {
+    window.localStorage.removeItem("andertal_cart_id");
+  } catch (_) {}
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  let prefix = "";
+  if (parts.length >= 2) prefix = `/${parts[0]}/${parts[1]}`;
+  else if (parts.length === 1) prefix = `/${parts[0]}`;
+  else prefix = `/${locale || "de"}`;
+  window.location.replace(`${prefix}/order/${orderId}?confirmed=1`);
+}
 
 async function readResponseJson(res) {
   const text = await res.text();
@@ -655,10 +677,8 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
   const t = useTranslations("checkout");
   const stripe = useStripe();
   const elements = useElements();
-  const router = useRouter();
   const params = useParams();
   const locale = params?.locale || "de";
-  const { setCart } = useCart();
   const { user } = useCustomerAuthHook();
   const [paymentElementReady, setPaymentElementReady] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -911,11 +931,8 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
           try {
             sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
           } catch (_) {}
-          if (typeof window !== "undefined") {
-            try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
-          }
-          setCart(null);
-          router.push(`/${locale}/order/${orderId}?confirmed=1`);
+          goToOrderConfirmation(data?.order || { id: orderId }, locale);
+          return;
         }
       } catch (err) {
         setError(err?.message || t("paymentError"));
@@ -1289,10 +1306,8 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
   const shipListRef = useRef(shipList);
   shipListRef.current = shipList;
   const t = useTranslations("checkout");
-  const router = useRouter();
   const params = useParams();
   const locale = params?.locale || "de";
-  const { setCart } = useCart();
   const { user } = useCustomerAuthHook();
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [shipAddrId, setShipAddrId] = useState("");
@@ -1494,11 +1509,8 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
         try {
           sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY);
         } catch (_) {}
-        if (typeof window !== "undefined") {
-          try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
-        }
-        setCart(null);
-        router.push(`/${locale}/order/${orderId}?confirmed=1`);
+        goToOrderConfirmation(data?.order || { id: orderId }, locale);
+        return;
       }
     } catch (err) {
       setError(err?.message || t("paymentError"));
@@ -2258,10 +2270,8 @@ export default function CheckoutPage() {
             } catch (_) {}
           }
           sessionStorage.setItem(`andertal_pi_done_${piId}`, "1");
-          try { sessionStorage.removeItem(CHECKOUT_SNAPSHOT_KEY); } catch (_) {}
-          try { window.localStorage.removeItem("andertal_cart_id"); } catch (_) {}
-          setCart(null);
-          router.replace(`/${locale}/order/${orderId}?confirmed=1`);
+          goToOrderConfirmation(data?.order || { id: orderId }, locale);
+          return;
         } else {
           returnRecoveryStartedRef.current = false;
           setReturnRecoveryError(data?.message || t("orderCompletionFailed"));
