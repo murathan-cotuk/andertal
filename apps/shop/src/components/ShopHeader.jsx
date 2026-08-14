@@ -43,6 +43,7 @@ import { buildHeaderSurfaceCssVarsFromRoute, effectiveGradientEnabled, resolveSe
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import { getLocalizedCategory } from "@/lib/format";
@@ -1207,8 +1208,8 @@ export default function ShopHeader() {
       setSecondMenuItems(second ? rootItems(second.items) : []);
     };
     Promise.all([
-      fetch("/api/store-menu-locations").then((r) => r.json()).catch(() => ({ locations: [] })),
-      fetch(`/api/store-menus?locale=${encodeURIComponent(locale)}`).then((r) => r.json()).catch(() => ({ menus: [] })),
+      cachedJsonFetch("/api/store-menu-locations", { ttlMs: 300000 }).catch(() => ({ locations: [] })),
+      cachedJsonFetch(`/api/store-menus?locale=${encodeURIComponent(locale)}`, { ttlMs: 60000 }).catch(() => ({ menus: [] })),
     ]).then(([locData, menuData]) => {
       const hasMenus = Array.isArray(menuData?.menus) && menuData.menus.length > 0;
       if (hasMenus) {
@@ -1225,8 +1226,7 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`)
-      .then((r) => r.json())
+    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 })
       .catch(() => ({ tree: [] }))
       .then((catRes) => {
         if (cancelled) return;

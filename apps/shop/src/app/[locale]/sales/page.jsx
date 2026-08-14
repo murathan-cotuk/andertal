@@ -11,6 +11,7 @@ import { useLocale } from "next-intl";
 import { isDiscountedProduct } from "@/lib/catalog-listing";
 import { getLocalizedCategory } from "@/lib/format";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 
 /* ── Two-column layout ───────────────────────────────── */
 const Inner = styled.div`
@@ -248,13 +249,14 @@ export default function SalesPage() {
       try {
         setLoading(true);
         setError("");
-        const [catRes, prRes, settingsRes] = await Promise.all([
+        const [catRes, prData, settingsRes] = await Promise.all([
           fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`),
-          fetch("/api/store-products?limit=1200"),
+          // Large catalog snapshot (up to 1200 products) — cached client-side for 2 min so
+          // revisits/back-navigation don't re-pull the full payload from the backend each time.
+          cachedJsonFetch("/api/store-products?limit=1200", { ttlMs: 120000 }).catch(() => ({ products: [] })),
           fetch("/api/store-api-page-settings/sales").catch(() => null),
         ]);
         const catData = catRes.ok ? await catRes.json() : { tree: [] };
-        const prData = prRes.ok ? await prRes.json() : { products: [] };
         const settingsData = settingsRes && settingsRes.ok ? await settingsRes.json().catch(() => null) : null;
         if (!cancelled) {
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);

@@ -31,7 +31,7 @@ export async function GET(request) {
     const url = qs ? `${base}/store/products?${qs}` : `${base}/store/products`;
     // Fetch products and approved seller IDs in parallel
     const [res, approved] = await Promise.all([
-      fetch(url, { headers: { "Content-Type": "application/json" }, next: { revalidate: 30 } }),
+      fetch(url, { headers: { "Content-Type": "application/json" }, next: { revalidate: 60 } }),
       getApprovedSellerIds(base),
     ]);
     if (!res.ok) return NextResponse.json({ products: [], count: 0 }, { status: 200 });
@@ -44,7 +44,7 @@ export async function GET(request) {
     });
     return NextResponse.json(
       { ...data, products: filtered, count: filtered.length },
-      { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
+      { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=180" } },
     );
   } catch {
     return NextResponse.json({ products: [], count: 0 }, { status: 200 });

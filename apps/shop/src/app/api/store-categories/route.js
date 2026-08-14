@@ -4,7 +4,7 @@ const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 const categoriesCache = new Map();
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+const CACHE_TTL_MS = 300 * 1000; // 5 minutes — category tree rarely changes
 
 function emptyCategoriesResponse() {
   return NextResponse.json({ categories: [], tree: [], count: 0 }, { status: 200 });
@@ -25,7 +25,7 @@ export async function GET(request) {
       const cached = categoriesCache.get(cacheKey);
       if (cached && cached.expiresAt > now) {
         return NextResponse.json(cached.data, {
-          headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" },
+          headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
         });
       }
     }
@@ -33,7 +33,7 @@ export async function GET(request) {
     const fetchOpts =
       isDev
         ? { cache: "no-store" }
-        : { next: { revalidate: 30 } };
+        : { next: { revalidate: 300 } };
 
     const res = await fetch(`${base}/store/categories${qs ? `?${qs}` : ""}`, {
       headers: { "Content-Type": "application/json" },
@@ -68,7 +68,7 @@ export async function GET(request) {
     }
     return NextResponse.json(
       data,
-      isDev ? undefined : { headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" } },
+      isDev ? undefined : { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
     );
   } catch (e) {
     if (isDev) {
