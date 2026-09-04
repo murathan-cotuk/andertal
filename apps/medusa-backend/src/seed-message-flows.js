@@ -338,4 +338,60 @@ async function seedMessageFlows(client) {
   }
 }
 
+async function reconcileMessageFlowTriggers(client) {
+  for (const flow of FLOWS) {
+    const hints = []
+    const deSubject = flow.content?.de?.subject
+    const enSubject = flow.content?.en?.subject
+    if (deSubject) hints.push(deSubject)
+    if (enSubject) hints.push(enSubject)
+    if (flow.trigger_key === 'seller_support_ticket_sent') {
+      hints.push('Anfrage an den Support wurde empfangen', 'We received your support request', 'Destek talebiniz alındı')
+    }
+    if (flow.trigger_key === 'seller_support_ticket_replied') {
+      hints.push('Antwort auf Ihre Support-Anfrage', 'Antwort auf deine Support', 'Reply to your support request', 'Destek talebinize yanıt')
+    }
+    if (!hints.length) continue
+    const likePatterns = [...new Set(hints)].map((h) => `%${h}%`)
+    const canonical = await client.query(
+      `SELECT id FROM admin_hub_flows WHERE trigger_key = $1 ORDER BY created_at ASC LIMIT 1`,
+      [flow.trigger_key],
+    )
+    const canonicalId = canonical.rows[0]?.id || null
+    const mis = await client.query(
+      `SELECT DISTINCT f.id, f.trigger_key, f.name, f.status
+       FROM admin_hub_flows f
+       LEFT JOIN admin_hub_flow_steps s ON s.flow_id = f.id
+       WHERE f.trigger_key IS DISTINCT FROM $1
+         AND (
+           f.name = $2
+           OR s.email_subject ILIKE ANY($3::text[])
+           OR COALESCE(s.email_i18n::text, '') ILIKE ANY($3::text[])
+         )`,
+      [flow.trigger_key, flow.name, likePatterns],
+    )
+    for (const row of mis.rows || []) {
+      if (canonicalId && String(canonicalId) !== String(row.id)) {
+        if (row.status === 'active') {
+          await client.query(
+            `UPDATE admin_hub_flows SET status = 'paused', updated_at = now() WHERE id = $1::uuid AND status = 'active'`,
+            [row.id],
+          )
+          console.warn(
+            `[seed-message-flows] paused mis-keyed flow ${row.id} "${row.name}" (was ${row.trigger_key}; canonical ${flow.trigger_key} already exists)`,
+          )
+        }
+      } else {
+        await client.query(
+          `UPDATE admin_hub_flows SET trigger_key = $2, audience = $3, updated_at = now() WHERE id = $1::uuid`,
+          [row.id, flow.trigger_key, flow.audience],
+        )
+        console.warn(
+          `[seed-message-flows] repaired flow ${row.id} "${row.name}" trigger ${row.trigger_key} → ${flow.trigger_key}`,
+        )
+      }
+    }
+  }
+}
+
 module.exports = { seedMessageFlows }

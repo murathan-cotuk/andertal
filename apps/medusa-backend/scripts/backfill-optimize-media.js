@@ -63,15 +63,34 @@ function s3BaseUrl() {
   return (process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`).replace(/\/$/, '')
 }
 
+/** Pathname of a URL string, or null if not parseable. */
+function urlPathname(v) {
+  if (typeof v !== 'string' || !v) return null
+  if (v.startsWith('/')) return v.split('?')[0].split('#')[0]
+  try {
+    return new URL(v).pathname
+  } catch (_) {
+    return null
+  }
+}
+
 /** Is this string one of OUR stored image URLs (not an external/seller-hotlinked image), and a
  * format the generic pipeline would actually touch (png/jpg — webp/svg/gif are pre-filtered here
- * so we don't even bother fetching them)? */
+ * so we don't even bother fetching them)?
+ * Accepts relative `/uploads/...` and absolute hosts that still serve `/uploads/...`
+ * (api.andertal.com, *.onrender.com, etc.). */
 function isCandidateImageUrl(v) {
   if (typeof v !== 'string' || !v) return false
   if (!IMAGE_EXT_RE.test(v)) return false
   if (v.startsWith('/uploads/')) return true
   const s3Base = s3BaseUrl()
   if (s3Base && v.startsWith(s3Base + '/')) return true
+  const pathname = urlPathname(v)
+  if (pathname && pathname.startsWith('/uploads/') && /^https?:\/\//i.test(v)) {
+    // Skip clearly foreign CDNs (Envato etc.) even if path somehow matches.
+    if (/s3\.envato\.com|envato\.com/i.test(v)) return false
+    return true
+  }
   return false
 }
 
@@ -98,9 +117,11 @@ function rewriteImageUrls(node, urlMap) {
   return node
 }
 
-function diskPathForUrl(url) {
-  // url like "/uploads/media/_platform/169....png" -> uploadDir already ends in ".../uploads"
-  const rel = url.replace(/^\/uploads\//, '')
+function diskPathForUrl(urlOrPath) {
+  // "/uploads/media/_platform/x.png" or "https://host/uploads/media/_platform/x.png"
+  // -> file under uploadDir (which already ends in ".../uploads")
+  const pathname = urlPathname(urlOrPath) || String(urlOrPath || '')
+  const rel = pathname.replace(/^\/uploads\//, '').replace(/^uploads\//, '')
   return path.join(uploadDir, rel)
 }
 
@@ -109,12 +130,32 @@ function s3KeyForUrl(url) {
   return url.slice(base.length + 1)
 }
 
-async function fetchOriginalBuffer(url) {
-  if (url.startsWith('/uploads/')) {
-    return fs.readFileSync(diskPathForUrl(url))
+function publicUrlAfterStore(originalUrl, newRelUploadsPath) {
+  // Keep absolute host if the CMS stored an absolute URL; otherwise relative /uploads/...
+  if (/^https?:\/\//i.test(originalUrl)) {
+    try {
+      const u = new URL(originalUrl)
+      return `${u.origin}${newRelUploadsPath}`
+    } catch (_) {}
   }
-  // S3-hosted: no AWS SDK "get object as buffer" shortcut needed beyond what's already a
-  // dependency — fetch via plain HTTPS since these are public URLs (same as a visitor's browser).
+  return newRelUploadsPath
+}
+
+async function fetchOriginalBuffer(url) {
+  const pathname = urlPathname(url) || ''
+  // On Render Shell, files live on disk even when CMS URLs are absolute https://…/uploads/…
+  if (pathname.startsWith('/uploads/')) {
+    const p = diskPathForUrl(pathname)
+    if (fs.existsSync(p)) return fs.readFileSync(p)
+  }
+  if (url.startsWith('/uploads/')) {
+    const p = diskPathForUrl(url)
+    if (fs.existsSync(p)) return fs.readFileSync(p)
+    throw new Error(`Local file missing: ${p}`)
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error(`Unsupported URL: ${url}`)
+  }
   const res = await fetch(url)
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`)
   return Buffer.from(await res.arrayBuffer())
@@ -122,16 +163,32 @@ async function fetchOriginalBuffer(url) {
 
 async function storeProcessedBuffer(originalUrl, buffer) {
   const newFilename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-content.webp`
-  if (originalUrl.startsWith('/uploads/')) {
-    const origDir = path.dirname(diskPathForUrl(originalUrl))
-    const newPath = path.join(origDir, newFilename)
-    fs.writeFileSync(newPath, buffer)
-    // Rebuild the public URL the same way the dir was derived (preserve the /media/<seg>/ prefix).
-    const relDir = path.dirname(originalUrl.replace(/^\/uploads\//, ''));
-    return `/uploads/${relDir}/${newFilename}`
+  const pathname = urlPathname(originalUrl) || ''
+
+  if (useS3) {
+    let keyDir = 'uploads/media/_platform'
+    if (pathname.startsWith('/uploads/')) {
+      keyDir = path.dirname(pathname.replace(/^\//, '')).replace(/\\/g, '/')
+    }
+    const key = `${keyDir}/${newFilename}`
+    return uploadBufferToS3(buffer, key, 'image/webp')
   }
-  const key = `${path.dirname(s3KeyForUrl(originalUrl))}/${newFilename}`
-  return uploadBufferToS3(buffer, key, 'image/webp')
+
+  // Local disk (Render): write next to the original under /uploads/...
+  if (pathname.startsWith('/uploads/') || originalUrl.startsWith('/uploads/')) {
+    const pathForDisk = pathname.startsWith('/uploads/') ? pathname : originalUrl
+    const origDir = path.dirname(diskPathForUrl(pathForDisk))
+    const newPath = path.join(origDir, newFilename)
+    fs.mkdirSync(origDir, { recursive: true })
+    fs.writeFileSync(newPath, buffer)
+    const relDir = path.posix.dirname(pathForDisk.replace(/^\/uploads\//, ''))
+    const newRel = relDir === '.' ? `/uploads/${newFilename}` : `/uploads/${relDir}/${newFilename}`
+    return publicUrlAfterStore(originalUrl, newRel)
+  }
+
+  throw new Error(
+    'Cannot write optimized file: not an /uploads/ URL and S3/R2 is not configured.',
+  )
 }
 
 async function main() {
