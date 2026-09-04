@@ -70,6 +70,7 @@
     "content": "Contenido",
     "marketing": "Marketing",
     "settings": "Configuración",
+    "help": "Ayuda y guías",
     "language": "Idioma",
     "drafts": "Borradores",
     "abandonedCheckouts": "Carritos abandonados",
@@ -797,5 +798,14 @@
       "empty": "No se encontraron archivos de medios.",
       "searchPlaceholder": "Buscar medios…"
     }
+  },
+  "helpCenter": {
+    "title": "Ayuda y guías",
+    "subtitle": "Respuestas y guías sobre todo lo relacionado con Andertal — desde la aprobación hasta la facturación.",
+    "searchPlaceholder": "Buscar artículos de ayuda…",
+    "allCategories": "Todos los temas",
+    "noResults": "No se encontraron artículos. Prueba con otro término de búsqueda.",
+    "back": "Volver al resumen",
+    "readArticle": "Leer artículo"
   }
 }

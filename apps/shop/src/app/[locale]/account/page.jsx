@@ -603,6 +603,9 @@ export default function AccountPage() {
                           <div>
                             <label htmlFor="acc-vat_number" style={lbl}>{tAuth("vatNumber")}</label>
                             <input id="acc-vat_number" style={inp} value={form.vat_number} onChange={(e) => set("vat_number", e.target.value)} />
+                            {saving && form.vat_number.trim() && (
+                              <div style={{ fontSize: 12, color: GRAY, marginTop: 4 }}>{tAuth("vatChecking")}</div>
+                            )}
                           </div>
                         </>
                       )}
@@ -626,7 +629,26 @@ export default function AccountPage() {
                     <InfoRow label={tAuth("phone")} value={customer?.phone} />
                     <InfoRow label={tAuth("accountType")} value={accountTypeLabel(customer?.account_type)} />
                     {customer?.company_name && <InfoRow label={ta("company")} value={customer.company_name} />}
-                    {customer?.vat_number && <InfoRow label={tAuth("vatNumber")} value={customer.vat_number} />}
+                    {customer?.vat_number && (
+                      <InfoRow
+                        label={tAuth("vatNumber")}
+                        value={
+                          <>
+                            {customer.vat_number}
+                            {customer.vies_valid === true && (
+                              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: "#059669" }}>
+                                ✓ {tAuth("vatVerified")}
+                              </span>
+                            )}
+                            {customer.vies_valid === false && (
+                              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: "#d97706" }}>
+                                ⚠ {tAuth("vatNotVerified")}
+                              </span>
+                            )}
+                          </>
+                        }
+                      />
+                    )}
                   </InfoGrid>
                 )}
               </Section>

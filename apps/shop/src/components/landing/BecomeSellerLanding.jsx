@@ -2,11 +2,25 @@
 
 import { useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
+import { Instrument_Serif, Manrope } from "next/font/google";
 import styles from "./BecomeSellerLanding.module.css";
 import { BecomeSellerSection } from "./BecomeSellerSections";
 
-const FONT_HREF =
-  "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap";
+// Self-hosted via next/font instead of a runtime-injected <link> (which used to fetch fonts
+// AFTER mount, i.e. after hydration — guaranteed FOUC/CLS on this route every load).
+const instrumentSerif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-instrument-serif",
+});
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-manrope",
+});
 
 function useReveal(rootRef) {
   useEffect(() => {
@@ -38,23 +52,15 @@ export default function BecomeSellerLanding({ containers } = {}) {
   const rootRef = useRef(null);
   useReveal(rootRef);
 
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-    const existing = document.querySelector(`link[data-become-seller-fonts="1"]`);
-    if (existing) return undefined;
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = FONT_HREF;
-    link.setAttribute("data-become-seller-fonts", "1");
-    document.head.appendChild(link);
-    return undefined;
-  }, []);
-
   const list = Array.isArray(containers) ? containers.filter((c) => c && c.visible !== false) : [];
   let gridIndex = 0;
 
   return (
-    <div className={styles.root} ref={rootRef} data-become-seller-landing="1">
+    <div
+      className={`${styles.root} ${instrumentSerif.variable} ${manrope.variable}`}
+      ref={rootRef}
+      data-become-seller-landing="1"
+    >
       {list.map((container) => {
         const idx = container.type === "feature_grid" ? gridIndex++ : 0;
         return (

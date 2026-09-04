@@ -866,6 +866,14 @@ async function start() {
         // (store_customers.vat_number, already collected on account/register — NOT a new checkout
         // field) at order time, so a later profile edit never rewrites a past invoice's tax basis.
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS customer_vat_id text`).catch(() => {})
+        // Live VIES lookup result (see src/vies-check.js), snapshotted at order time from the
+        // customer's profile check — null = never checked / VIES unreachable (falls back to the
+        // existing format-only reverse-charge logic, unchanged). Informational only, shown on the
+        // invoice's reverse-charge note; does NOT itself decide the 0%-VAT scheme.
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS customer_vat_id_verified boolean`).catch(() => {})
+        await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS vies_valid boolean`).catch(() => {})
+        await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS vies_checked_at timestamptz`).catch(() => {})
+        await client.query(`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS vies_company_name text`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS store_shipping_carriers (
             id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -99,6 +99,30 @@ const mapMediaRowForApi = (row) => {
   return { ...row, filename: decodeMultipartFilename(row.filename) }
 }
 
+/** Shared S3 PutObject helper — used by the product-image path, the generic content-image path,
+ * and the raw (unprocessed) fallback path below, so all three stay behaviorally identical. */
+const uploadBufferToS3 = async (buffer, key, contentType) => {
+  const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
+  const bucket = process.env.S3_UPLOAD_BUCKET
+  const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
+  const s3 = new S3Client({
+    region,
+    ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
+    ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
+      ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
+      : {})
+  })
+  await s3.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+    ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL })
+  }))
+  const baseUrl = process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`
+  return `${baseUrl.replace(/\/$/, '')}/${key}`
+}
+
 /** Product gallery / variant images: min 1000px edge, center square crop, store as WebP (JPEG/PNG in). */
 const PRODUCT_IMAGE_MIN_EDGE = 1000
 const PRODUCT_IMAGE_OUT_SIZE = 1000
@@ -133,6 +157,63 @@ const processProductImageToSquareWebp = async (inputBuffer, mimetype) => {
     .resize(PRODUCT_IMAGE_OUT_SIZE, PRODUCT_IMAGE_OUT_SIZE, { fit: 'fill' })
     .webp({ quality: 85 })
     .toBuffer()
+}
+
+/**
+ * Generic content images (landing hero/banners, category/collection/brand/blog covers, style
+ * assets, etc.) — everything that isn't a product-gallery upload. Unlike the product path, this
+ * does NOT force a square crop; it only caps the longest edge and re-encodes as WebP, so a wide
+ * banner stays wide. This closes the gap where every non-product upload used to be written to
+ * disk/S3 byte-for-byte exactly as the seller/admin uploaded it (the direct cause of multi-MB
+ * PNG landing banners — see PageSpeed investigation).
+ *
+ * Returns `null` (meaning "pass through unmodified, use the original upload as-is") for:
+ *  - SVG (vector — rasterizing a logo/icon upload is wrong)
+ *  - GIF (may be animated; sharp only reads the first frame by default, converting would
+ *    silently kill the animation)
+ *  - already-WebP files already under the size cap (skip pointless re-encode/generation loss)
+ *  - anything sharp can't decode as a raster image, or if the sharp module itself is unavailable
+ * Throws only for `IMAGE_TOO_LARGE` (caller returns 400) — every other failure mode degrades to
+ * "store the original" rather than blocking the upload.
+ */
+const GENERIC_IMAGE_MAX_EDGE = 1920
+const GENERIC_IMAGE_MAX_INPUT_BYTES = 30 * 1024 * 1024
+const GENERIC_IMAGE_SKIP_MIMETYPES = new Set(['image/svg+xml', 'image/gif'])
+const processGenericImageToWebp = async (inputBuffer, mimetype) => {
+  const mt = String(mimetype || '').toLowerCase()
+  if (GENERIC_IMAGE_SKIP_MIMETYPES.has(mt)) return null
+  if (inputBuffer.length > GENERIC_IMAGE_MAX_INPUT_BYTES) {
+    const err = new Error('IMAGE_TOO_LARGE')
+    err.code = 'IMAGE_TOO_LARGE'
+    throw err
+  }
+  let sharp
+  try {
+    sharp = require('sharp')
+  } catch (_) {
+    return null
+  }
+  let meta
+  try {
+    meta = await sharp(inputBuffer).metadata()
+  } catch (_) {
+    return null
+  }
+  const w = meta.width || 0
+  const h = meta.height || 0
+  if (!w || !h) return null
+  const alreadySmallWebp = mt === 'image/webp' && w <= GENERIC_IMAGE_MAX_EDGE && h <= GENERIC_IMAGE_MAX_EDGE
+  if (alreadySmallWebp) return null
+  let pipeline = sharp(inputBuffer)
+  if (Math.max(w, h) > GENERIC_IMAGE_MAX_EDGE) {
+    pipeline = pipeline.resize({
+      width: w >= h ? GENERIC_IMAGE_MAX_EDGE : null,
+      height: h > w ? GENERIC_IMAGE_MAX_EDGE : null,
+      fit: 'inside',
+      withoutEnlargement: true,
+    })
+  }
+  return pipeline.webp({ quality: 82 }).toBuffer()
 }
 
 const mediaUploadPOST = async (req, res) => {
@@ -226,34 +307,67 @@ const mediaUploadPOST = async (req, res) => {
       fs.writeFileSync(diskPathWritten, outBuffer)
       fileUrl = `/uploads/media/${mediaSeg}/${outFilename}`
     }
-  } else if (useS3 && req.file.buffer && process.env.S3_UPLOAD_BUCKET) {
-    try {
-      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
-      const bucket = process.env.S3_UPLOAD_BUCKET
-      const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
-      const key = `media/${mediaSeg}/${storageFilenameWithPrefix(req.file.originalname || 'file')}`
-      const s3 = new S3Client({
-        region,
-        ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
-        ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
-          ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
-          : {})
-      })
-      await s3.send(new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: req.file.buffer,
-        ContentType: req.file.mimetype || 'application/octet-stream',
-        ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL })
-      }))
-      const baseUrl = process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`
-      fileUrl = `${baseUrl.replace(/\/$/, '')}/${key}`
-    } catch (s3Err) {
-      console.error('S3 upload error:', s3Err)
-      return res.status(500).json({ message: 'Upload to storage failed' })
-    }
   } else {
-    fileUrl = `/uploads/media/${mediaSeg}/${req.file.filename}`
+    // Non-product upload (landing banners, category/collection/brand/blog images, style assets,
+    // etc.) — try the generic resize+WebP pass first; `null` means "skip" (SVG/GIF/already-small-
+    // WebP/undecodable) and we fall through to the exact raw-upload behavior that existed before.
+    let processedBuffer = null
+    try {
+      let inputBuffer = outBuffer
+      if (!inputBuffer && req.file.path) {
+        inputBuffer = fs.readFileSync(req.file.path)
+      }
+      if (inputBuffer) {
+        processedBuffer = await processGenericImageToWebp(inputBuffer, req.file.mimetype)
+      }
+    } catch (ge) {
+      if (ge.code === 'IMAGE_TOO_LARGE') {
+        if (req.file.path && fs.existsSync(req.file.path)) {
+          try { fs.unlinkSync(req.file.path) } catch (_) {}
+        }
+        return res.status(400).json({ message: 'Datei zu groß (max. 30 MB).' })
+      }
+      console.error('processGenericImageToWebp (non-fatal, storing original):', ge)
+    }
+
+    if (processedBuffer) {
+      outBuffer = processedBuffer
+      outMime = 'image/webp'
+      outSize = outBuffer.length
+      outFilename = `${Date.now()}-content.webp`
+      if (req.file.path && fs.existsSync(req.file.path)) {
+        try { fs.unlinkSync(req.file.path) } catch (_) {}
+      }
+      if (useS3 && process.env.S3_UPLOAD_BUCKET) {
+        try {
+          const key = `media/${mediaSeg}/${outFilename}`
+          fileUrl = await uploadBufferToS3(outBuffer, key, 'image/webp')
+        } catch (s3Err) {
+          console.error('S3 upload error (generic webp):', s3Err)
+          return res.status(500).json({ message: 'Upload to storage failed' })
+        }
+      } else {
+        const destDir = path.join(uploadDir, 'media', mediaSeg)
+        try {
+          fs.mkdirSync(destDir, { recursive: true })
+        } catch (e) {
+          return res.status(500).json({ message: 'Could not create upload directory' })
+        }
+        diskPathWritten = path.join(destDir, outFilename)
+        fs.writeFileSync(diskPathWritten, outBuffer)
+        fileUrl = `/uploads/media/${mediaSeg}/${outFilename}`
+      }
+    } else if (useS3 && req.file.buffer && process.env.S3_UPLOAD_BUCKET) {
+      try {
+        const key = `media/${mediaSeg}/${storageFilenameWithPrefix(req.file.originalname || 'file')}`
+        fileUrl = await uploadBufferToS3(req.file.buffer, key, req.file.mimetype || 'application/octet-stream')
+      } catch (s3Err) {
+        console.error('S3 upload error:', s3Err)
+        return res.status(500).json({ message: 'Upload to storage failed' })
+      }
+    } else {
+      fileUrl = `/uploads/media/${mediaSeg}/${req.file.filename}`
+    }
   }
 
   const alt = (req.body && req.body.alt) || null
@@ -567,3 +681,12 @@ module.exports = function createMediaRouter() {
 
   return router
 }
+
+// Reused by scripts/backfill-optimize-media.js (one-off backfill for images uploaded before this
+// pipeline existed) so both the live upload path and the backfill use the exact same processing.
+module.exports.processGenericImageToWebp = processGenericImageToWebp
+module.exports.uploadBufferToS3 = uploadBufferToS3
+module.exports.uploadDir = uploadDir
+module.exports.useS3 = useS3
+module.exports.GENERIC_IMAGE_MAX_EDGE = GENERIC_IMAGE_MAX_EDGE
+module.exports.GENERIC_IMAGE_SKIP_MIMETYPES = GENERIC_IMAGE_SKIP_MIMETYPES

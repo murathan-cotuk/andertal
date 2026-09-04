@@ -35,6 +35,7 @@ import {
   ImportIcon,
   StoreIcon,
   EditIcon,
+  QuestionCircleIcon,
 } from "@shopify/polaris-icons";
 import dynamic from "next/dynamic";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
@@ -353,11 +354,26 @@ function getMenuItemsMain(t, isSuperuser = false) {
 }
 
 function getMenuItemsSettings(t, isSuperuser = false) {
-  return [{
-    url: "/settings",
-    label: t("settings"),
-    icon: SettingsIcon,
-  }];
+  const tx = (key, fallback) => {
+    try {
+      if (typeof t.has === "function" && !t.has(key)) return fallback;
+      return t(key);
+    } catch {
+      return fallback;
+    }
+  };
+  return [
+    {
+      url: "/help",
+      label: tx("help", "Hilfe & Leitfäden"),
+      icon: QuestionCircleIcon,
+    },
+    {
+      url: "/settings",
+      label: t("settings"),
+      icon: SettingsIcon,
+    },
+  ];
 }
 
 // Parent nav URLs that should expand/collapse sub-menus on click (no page navigation)

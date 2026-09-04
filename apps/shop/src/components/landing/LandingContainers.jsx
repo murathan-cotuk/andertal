@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
 import { useLandingChrome } from "@/context/LandingChromeContext";
@@ -445,7 +446,15 @@ function HeroBanner({ container, locale = "de" }) {
                   {videoSrc ? (
                     <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
                   ) : (
-                    <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", userSelect: "none" }} draggable="false" />
+                    <Image
+                      src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))}
+                      alt={s.title || ""}
+                      fill
+                      sizes="100vw"
+                      priority={i === 0}
+                      style={{ objectFit: "cover", userSelect: "none" }}
+                      draggable="false"
+                    />
                   )}
                   <Overlay s={s} mobile />
                 </>
@@ -479,7 +488,16 @@ function HeroBanner({ container, locale = "de" }) {
               <>
                 {videoSrc
                   ? <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
-                  : <img src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))} alt={s.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />}
+                  : (
+                    <Image
+                      src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))}
+                      alt={s.title || ""}
+                      fill
+                      sizes="100vw"
+                      priority={i === 0}
+                      style={{ objectFit: "cover" }}
+                    />
+                  )}
               </>
             );
             const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease", pointerEvents: i === current ? "auto" : "none" };
@@ -690,7 +708,11 @@ function ImageText({ container, locale = "de" }) {
             {videoSrc ? (
               <video src={videoSrc} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} autoPlay muted loop playsInline />
             ) : (
-              <img src={imgSrc} alt={title || ""} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
+              // No fixed aspect-ratio config exists for this container type (unlike the mosaic/grid
+              // blocks above), so next/image's fill/width+height sizing can't be applied here
+              // without guessing a crop ratio and changing how editors' images render — lazy-load
+              // is still a free win.
+              <img src={imgSrc} alt={title || ""} loading="lazy" style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
             )}
           </div>
         )}
@@ -867,7 +889,9 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
     ) : null;
     const card = (
       <div>
-        <img src={src} alt={imgTitle || ""} style={{ width: "100%", aspectRatio: r, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />
+        <div style={{ position: "relative", width: "100%", aspectRatio: r, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+          <Image src={src} alt={imgTitle || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: "cover" }} />
+        </div>
         {below}
       </div>
     );
@@ -902,7 +926,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
         }}
       >
         {image ? (
-          <img src={image} alt={c.title || ""} style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }} />
+          <Image src={image} alt={c.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>{tNav("collection")}</div>
         )}
@@ -980,7 +1004,11 @@ function ImageGrid({ container, locale = "de" }) {
           const ratio = img.aspect_ratio || "1/1";
           const imgTitle = lt(img, "title", locale);
           const imgText = lt(img, "text", locale);
-          const imgEl = <img src={resolveUrl(lt(img, "url", locale))} alt={imgTitle || ""} style={{ width: "100%", aspectRatio: ratio, objectFit: "cover", borderRadius: 10, display: "block", border: "1px solid #e5e7eb" }} />;
+          const imgEl = (
+            <div style={{ position: "relative", width: "100%", aspectRatio: ratio, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+              <Image src={resolveUrl(lt(img, "url", locale))} alt={imgTitle || ""} fill sizes={`(max-width: 768px) 100vw, ${Math.round(100 / cols)}vw`} style={{ objectFit: "cover" }} />
+            </div>
+          );
           const hasTitle = !!(imgTitle && String(imgTitle).trim());
           const hasBody = !!(imgText && String(imgText).trim());
           const caption = (hasTitle || hasBody) ? (
@@ -1445,7 +1473,7 @@ function SellerCarousel({ container, locale = "de" }) {
                   style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 12px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fafafa", textDecoration: "none", color: "inherit", textAlign: "center" }}
                 >
                   {logoUrl ? (
-                    <img src={logoUrl} alt={name} style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 8 }} />
+                    <Image src={logoUrl} alt={name} width={64} height={64} style={{ objectFit: "contain", borderRadius: 8 }} />
                   ) : (
                     <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#6b7280" }}>
                       {(name[0] || "S").toUpperCase()}
@@ -1776,8 +1804,8 @@ function BlogCarousel({ container, locale = "de" }) {
               }}
             >
               {img ? (
-                <div style={{ aspectRatio: "16/10", overflow: "hidden", background: "#eee" }}>
-                  <img src={img} alt={post.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <div style={{ position: "relative", aspectRatio: "16/10", overflow: "hidden", background: "#eee" }}>
+                  <Image src={img} alt={post.title || ""} fill sizes="(max-width: 768px) 90vw, 360px" style={{ objectFit: "cover" }} />
                 </div>
               ) : null}
               <div style={{ padding: 16, flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -2564,6 +2592,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     const minH = isNarrow && (container.min_height_mobile != null) && String(container.min_height_mobile).trim() !== "";
     const maxH = isNarrow ? (maxHMobile || maxHDesktop) : maxHDesktop;
     const boxStyle = {
+      position: "relative",
       width: "100%",
       aspectRatio: ratio,
       overflow: "hidden",
@@ -2585,7 +2614,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     const block = (
       <>
         <div style={boxStyle}>
-          <img src={src} alt={imgTitle || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <Image src={src} alt={imgTitle || ""} fill sizes="(max-width: 768px) 90vw, 400px" style={{ objectFit: "cover" }} />
         </div>
         {cap}
       </>
@@ -2692,22 +2721,45 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
 }
 
 // ── Renderer ──────────────────────────────────────────────────────────────────
+// Container types with their own independent data fetch (not covered by the shared collection/
+// single-product preload in LandingContainers' second useEffect) — kept on the old JS-hook-gated
+// mount below so an off-device visitor never pays for a request whose result they'll never see.
+// Every other type either has zero fetch cost (its content is embedded in the containers JSON) or
+// is already fetched unconditionally by the shared preload regardless of device, so switching them
+// to always-mounted/CSS-hidden (see landing-vis-* in globals.css) costs nothing extra and removes
+// the post-hydration whole-section mount/unmount that was a major CLS contributor.
+const FETCH_GATED_CONTAINER_TYPES = new Set([
+  "bestseller_carousel",
+  "collections_carousel",
+  "brands_directory",
+  "seller_carousel",
+  "blog_carousel",
+  "personalized_product_row",
+]);
+
 function renderContainer(c, preload = {}, ctx = {}) {
   if (!c.visible) return null;
   const v = c.visible_on || "desktop";
-  // Strict device isolation: each container only renders on its designated device range.
-  // mobile (< 600px), tablet (600–1199px), desktop (≥ 1200px)
-  if (v === "tablet") {
-    if (!ctx.isTablet) return null;
-  } else if (v === "desktop") {
-    if (ctx.isNarrow || ctx.isTablet) return null;
-  } else if (v === "mobile") {
-    // Show only on true mobile (isNarrow but NOT tablet, i.e. < 600px)
-    if (!ctx.isNarrow || ctx.isTablet) return null;
-  } else if (v === "both") {
-    // Legacy "both": desktop + mobile, never tablet
-    if (ctx.isTablet) return null;
+  const isFetchGated = FETCH_GATED_CONTAINER_TYPES.has(c.type);
+  if (isFetchGated) {
+    // Strict device isolation via JS: mobile (< 600px), tablet (600–1199px), desktop (≥ 1200px)
+    if (v === "tablet") {
+      if (!ctx.isTablet) return null;
+    } else if (v === "desktop") {
+      if (ctx.isNarrow || ctx.isTablet) return null;
+    } else if (v === "mobile") {
+      if (!ctx.isNarrow || ctx.isTablet) return null;
+    } else if (v === "both") {
+      if (ctx.isTablet) return null;
+    }
   }
+  const visClass = isFetchGated
+    ? ""
+    : v === "tablet" ? "landing-vis-tablet"
+    : v === "desktop" ? "landing-vis-desktop"
+    : v === "mobile" ? "landing-vis-mobile"
+    : v === "both" ? "landing-vis-both"
+    : "";
   const locale = ctx.locale || "de";
   let inner = null;
   const collectionKey = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
@@ -2749,13 +2801,19 @@ function renderContainer(c, preload = {}, ctx = {}) {
     ...(m.right  ? { marginRight:  m.right }  : {}),
   };
   const hasMargin = Object.keys(marginStyle).length > 0;
-  return <div key={c.id} style={hasMargin ? marginStyle : undefined}>{inner}</div>;
+  return <div key={c.id} className={visClass || undefined} style={hasMargin ? marginStyle : undefined}>{inner}</div>;
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
-export default function LandingContainers({ pageId, categoryId }) {
-  const [containers, setContainers] = useState(null);
-  const [landingSettings, setLandingSettings] = useState({});
+/**
+ * `initialContainers`/`initialSettings` are server-fetched props from the plain homepage route
+ * (apps/shop/src/app/[locale]/page.jsx) — every other call site (CMS pages, category templates)
+ * doesn't pass them and behaves exactly as before, unaffected.
+ */
+export default function LandingContainers({ pageId, categoryId, initialContainers = null, initialSettings = null }) {
+  const hasSsrData = !pageId && !categoryId && Array.isArray(initialContainers);
+  const [containers, setContainers] = useState(hasSsrData ? initialContainers : null);
+  const [landingSettings, setLandingSettings] = useState(hasSsrData && initialSettings ? initialSettings : {});
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
   const [sidebarCategoryLinks, setSidebarCategoryLinks] = useState([]);
   const { setLandingHeaderFilterBar, setSecondNavDesktopClassic } = useLandingChrome();
@@ -2764,6 +2822,15 @@ export default function LandingContainers({ pageId, categoryId }) {
   const locale = useLocale();
 
   useEffect(() => {
+    // SSR already resolved the plain homepage's containers — mirror exactly what the fetch
+    // success/error branches below would have done for the header-chrome context setters, and
+    // skip the otherwise-duplicate client fetch entirely.
+    if (hasSsrData) {
+      const showBar = initialSettings?.show_filter_bar !== false;
+      setLandingHeaderFilterBar(showBar);
+      setSecondNavDesktopClassic(initialSettings?.second_nav_desktop_classic === true);
+      return;
+    }
     let endpoint = "/api/store-landing-page";
     if (categoryId) {
       endpoint = `/api/store-landing-page/category/${encodeURIComponent(categoryId)}`;
@@ -2801,7 +2868,7 @@ export default function LandingContainers({ pageId, categoryId }) {
         setSecondNavDesktopClassic(false);
         setContainers([]);
       });
-  }, [pageId, categoryId, setLandingHeaderFilterBar, setSecondNavDesktopClassic]);
+  }, [pageId, categoryId, hasSsrData, initialSettings, setLandingHeaderFilterBar, setSecondNavDesktopClassic]);
 
   useEffect(() => {
     let cancelled = false;

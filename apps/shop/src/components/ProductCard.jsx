@@ -1035,7 +1035,7 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: _is
     <ListCard>
       <Link href={productUrl} style={{ flexShrink: 0, textDecoration: "none" }}>
         <ListImgWrap>
-          {imgSrc ? <img src={imgSrc} alt={displayTitle} loading="lazy" /> : null}
+          {imgSrc ? <Image src={imgSrc} alt={displayTitle} fill sizes="110px" style={{ objectFit: "contain" }} /> : null}
           <CustomProductBadges badges={product?.metadata?.custom_badges} locale={locale} />
         </ListImgWrap>
       </Link>

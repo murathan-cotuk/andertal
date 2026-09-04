@@ -1,8 +1,11 @@
 import Link from "next/link";
+import { Montserrat } from "next/font/google";
+
+const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "700"], display: "swap" });
 
 export default function NotFound() {
   return (
-    <div style={{ margin: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fff", fontFamily: "Montserrat, sans-serif" }}>
+    <div style={{ margin: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fff", fontFamily: montserrat.style.fontFamily }}>
         <div className="main_wrapper">
           <div className="main">
             <div className="antenna">
@@ -66,8 +69,6 @@ export default function NotFound() {
           Zur Startseite
         </Link>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
-
           .main_wrapper {
             display: flex;
             align-items: center;

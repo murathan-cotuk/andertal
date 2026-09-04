@@ -248,7 +248,18 @@
       "Bash(xargs -I{} basename {})",
       "Bash(curl -s \"https://www.andertal.com/de/en\")",
       "Read(//c/Users/murat/AppData/Local/Temp/claude/**)",
-      "Bash(git show *)"
+      "Bash(git show *)",
+      "Bash(disown)",
+      "Bash(echo \"started, pid: $!\")",
+      "Bash(xargs -I{} sh -c 'echo \"== {} ==\"; grep -m1 \"^description:\" \"{}\"')",
+      "Bash(lsof -ti:3002 -sTCP:LISTEN)",
+      "Bash(xargs -r kill)",
+      "PowerShell(node \"C:\\\\Users\\\\murat\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-murat-Desktop-MC-MC-EC-EC-ECProjeleri-andertal\\\\69341d56-e310-4a2a-8210-0f6012fe28a8\\\\scratchpad\\\\gen-sample-invoice.js\")",
+      "Bash(cp -r .next/static .next/standalone/apps/shop/.next/static)",
+      "Bash(cp -r public .next/standalone/apps/shop/public)",
+      "Bash(lsof -ti:3000 -sTCP:LISTEN)",
+      "Bash(echo \"BUILD EXIT:$?\")",
+      "Bash(PORT=3000 NODE_ENV=production NEXT_PUBLIC_MEDUSA_BACKEND_URL=https://api.andertal.com node server.js)"
     ]
   }
 }

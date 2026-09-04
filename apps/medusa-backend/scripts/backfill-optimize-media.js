@@ -1,0 +1,232 @@
+/**
+ * One-off backfill: re-processes images that were uploaded BEFORE the generic resize+WebP
+ * pipeline existed (media.js's processGenericImageToWebp, added alongside the PageSpeed
+ * performance work — see docs, "Shop homepage performance fix"). Every new non-product upload
+ * already goes through that pipeline automatically; this script catches the pre-existing landing
+ * banners / category / collection images that were stored raw (multi-MB PNGs etc.) and are still
+ * being served byte-for-byte to every visitor.
+ *
+ * Scope: image URLs embedded inside the landing-page "containers" JSON blobs —
+ *   admin_hub_landing_page.containers      (the homepage)
+ *   admin_hub_landing_categories.containers
+ *   admin_hub_landing_pages.containers
+ * These are recursively scanned for string values that look like our own local-disk-hosted
+ * (/uploads/...) or S3-hosted image URLs. Category/collection/brand cover images stored in their
+ * own dedicated columns are NOT covered by this pass — the containers JSON is where the huge
+ * hero/banner PNGs the PageSpeed audit flagged actually live.
+ *
+ * Safety:
+ *   - Defaults to --dry-run (no writes, no new files, no DB changes) unless --dry-run is REMOVED.
+ *   - Never deletes the original file — writes a new file alongside it and only rewrites the URL
+ *     reference in the JSON. Originals can be cleaned up separately once verified.
+ *   - Per row, the whole `containers` array is rewritten in ONE atomic UPDATE — never partial.
+ *   - Skips SVG/GIF/already-WebP-under-cap, same exclusions as the live upload pipeline.
+ *
+ * Usage (from apps/medusa-backend):
+ *   node scripts/backfill-optimize-media.js               # dry run (default), prints a report
+ *   node scripts/backfill-optimize-media.js --apply        # actually processes + writes
+ *
+ * Env: DATABASE_URL, UPLOAD_DIR (optional), S3_UPLOAD_* (optional) — same as the live server.
+ */
+require('dotenv').config()
+try {
+  require('dotenv').config({ path: require('path').join(__dirname, '..', '.env.local') })
+} catch (_) {}
+
+const path = require('path')
+const fs = require('fs')
+const { Client } = require('pg')
+const {
+  processGenericImageToWebp,
+  uploadBufferToS3,
+  uploadDir,
+  useS3,
+  GENERIC_IMAGE_MAX_EDGE,
+} = require('../src/routes/media')
+
+const DATABASE_URL = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+const APPLY = process.argv.includes('--apply')
+const DRY_RUN = !APPLY
+
+const TABLES = [
+  { table: 'admin_hub_landing_page', idCol: 'id', label: 'homepage' },
+  { table: 'admin_hub_landing_categories', idCol: 'category_id', label: 'category landing' },
+  { table: 'admin_hub_landing_pages', idCol: 'page_id', label: 'CMS page landing' },
+]
+
+const IMAGE_EXT_RE = /\.(png|jpe?g)(\?|#|$)/i
+
+function s3BaseUrl() {
+  if (!useS3 || !process.env.S3_UPLOAD_BUCKET) return null
+  const bucket = process.env.S3_UPLOAD_BUCKET
+  const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
+  return (process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`).replace(/\/$/, '')
+}
+
+/** Is this string one of OUR stored image URLs (not an external/seller-hotlinked image), and a
+ * format the generic pipeline would actually touch (png/jpg — webp/svg/gif are pre-filtered here
+ * so we don't even bother fetching them)? */
+function isCandidateImageUrl(v) {
+  if (typeof v !== 'string' || !v) return false
+  if (!IMAGE_EXT_RE.test(v)) return false
+  if (v.startsWith('/uploads/')) return true
+  const s3Base = s3BaseUrl()
+  if (s3Base && v.startsWith(s3Base + '/')) return true
+  return false
+}
+
+/** Recursively collect every distinct candidate image URL referenced anywhere in the JSON. */
+function collectImageUrls(node, out) {
+  if (Array.isArray(node)) {
+    for (const item of node) collectImageUrls(item, out)
+  } else if (node && typeof node === 'object') {
+    for (const v of Object.values(node)) collectImageUrls(v, out)
+  } else if (isCandidateImageUrl(node)) {
+    out.add(node)
+  }
+}
+
+/** Replace every occurrence of `urlMap`'s keys with their mapped new URL, anywhere in the JSON. */
+function rewriteImageUrls(node, urlMap) {
+  if (Array.isArray(node)) return node.map((item) => rewriteImageUrls(item, urlMap))
+  if (node && typeof node === 'object') {
+    const next = {}
+    for (const [k, v] of Object.entries(node)) next[k] = rewriteImageUrls(v, urlMap)
+    return next
+  }
+  if (typeof node === 'string' && urlMap.has(node)) return urlMap.get(node)
+  return node
+}
+
+function diskPathForUrl(url) {
+  // url like "/uploads/media/_platform/169....png" -> uploadDir already ends in ".../uploads"
+  const rel = url.replace(/^\/uploads\//, '')
+  return path.join(uploadDir, rel)
+}
+
+function s3KeyForUrl(url) {
+  const base = s3BaseUrl()
+  return url.slice(base.length + 1)
+}
+
+async function fetchOriginalBuffer(url) {
+  if (url.startsWith('/uploads/')) {
+    return fs.readFileSync(diskPathForUrl(url))
+  }
+  // S3-hosted: no AWS SDK "get object as buffer" shortcut needed beyond what's already a
+  // dependency — fetch via plain HTTPS since these are public URLs (same as a visitor's browser).
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`)
+  return Buffer.from(await res.arrayBuffer())
+}
+
+async function storeProcessedBuffer(originalUrl, buffer) {
+  const newFilename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-content.webp`
+  if (originalUrl.startsWith('/uploads/')) {
+    const origDir = path.dirname(diskPathForUrl(originalUrl))
+    const newPath = path.join(origDir, newFilename)
+    fs.writeFileSync(newPath, buffer)
+    // Rebuild the public URL the same way the dir was derived (preserve the /media/<seg>/ prefix).
+    const relDir = path.dirname(originalUrl.replace(/^\/uploads\//, ''));
+    return `/uploads/${relDir}/${newFilename}`
+  }
+  const key = `${path.dirname(s3KeyForUrl(originalUrl))}/${newFilename}`
+  return uploadBufferToS3(buffer, key, 'image/webp')
+}
+
+async function main() {
+  if (!DATABASE_URL) {
+    console.error('DATABASE_URL not set.')
+    process.exit(1)
+  }
+  console.log(DRY_RUN
+    ? 'DRY RUN — no files will be written, no DB rows will change. Pass --apply to actually run.'
+    : 'APPLY MODE — this will write new image files and update DB rows.')
+
+  const client = new Client({
+    connectionString: DATABASE_URL,
+    ssl: DATABASE_URL.includes('render.com') ? { rejectUnauthorized: false } : false,
+  })
+  await client.connect()
+
+  const summary = { rowsScanned: 0, rowsChanged: 0, imagesProcessed: 0, imagesSkipped: 0, bytesBefore: 0, bytesAfter: 0, errors: [] }
+
+  try {
+    for (const { table, idCol, label } of TABLES) {
+      let rows
+      try {
+        rows = (await client.query(`SELECT ${idCol} AS row_id, containers FROM ${table}`)).rows
+      } catch (e) {
+        console.log(`  [${table}] query failed (table may not exist here): ${e.message}`)
+        continue
+      }
+      console.log(`\n[${label} — ${table}] ${rows.length} row(s)`)
+
+      for (const row of rows) {
+        summary.rowsScanned += 1
+        const containers = Array.isArray(row.containers) ? row.containers : []
+        if (!containers.length) continue
+
+        const urls = new Set()
+        collectImageUrls(containers, urls)
+        if (!urls.size) continue
+
+        const urlMap = new Map()
+        for (const url of urls) {
+          try {
+            const original = await fetchOriginalBuffer(url)
+            const mimetype = /\.png/i.test(url) ? 'image/png' : 'image/jpeg'
+            const processed = await processGenericImageToWebp(original, mimetype)
+            if (!processed) {
+              summary.imagesSkipped += 1
+              continue
+            }
+            summary.imagesProcessed += 1
+            summary.bytesBefore += original.length
+            summary.bytesAfter += processed.length
+            console.log(`  ${url}`);
+            console.log(`    ${(original.length / 1024).toFixed(0)} KB -> ${(processed.length / 1024).toFixed(0)} KB (max edge ${GENERIC_IMAGE_MAX_EDGE}px)`)
+            if (!DRY_RUN) {
+              const newUrl = await storeProcessedBuffer(url, processed)
+              urlMap.set(url, newUrl)
+            }
+          } catch (e) {
+            summary.errors.push(`${table}#${row.row_id}: ${url} -> ${e.message}`)
+            console.log(`    ERROR: ${e.message}`)
+          }
+        }
+
+        if (!DRY_RUN && urlMap.size > 0) {
+          const rewritten = rewriteImageUrls(containers, urlMap)
+          await client.query(`UPDATE ${table} SET containers = $1 WHERE ${idCol} = $2`, [JSON.stringify(rewritten), row.row_id])
+          summary.rowsChanged += 1
+        }
+      }
+    }
+
+    console.log('\n--- Summary ---')
+    console.log(`Rows scanned:     ${summary.rowsScanned}`)
+    console.log(`Rows updated:     ${summary.rowsChanged}${DRY_RUN ? ' (dry run — would update)' : ''}`)
+    console.log(`Images processed: ${summary.imagesProcessed}`)
+    console.log(`Images skipped:   ${summary.imagesSkipped} (svg/gif/already-optimized)`)
+    if (summary.imagesProcessed > 0) {
+      const savedMb = (summary.bytesBefore - summary.bytesAfter) / (1024 * 1024)
+      const pct = ((1 - summary.bytesAfter / summary.bytesBefore) * 100).toFixed(1)
+      console.log(`Size before:      ${(summary.bytesBefore / (1024 * 1024)).toFixed(1)} MB`)
+      console.log(`Size after:       ${(summary.bytesAfter / (1024 * 1024)).toFixed(1)} MB`)
+      console.log(`Saved:            ${savedMb.toFixed(1)} MB (${pct}%)`)
+    }
+    if (summary.errors.length) {
+      console.log(`\nErrors (${summary.errors.length}):`)
+      summary.errors.forEach((e) => console.log(`  ${e}`))
+    }
+    console.log(DRY_RUN ? '\nDry run complete. Re-run with --apply to write changes.' : '\nDone.')
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
+
+main().catch((e) => {
+  console.error('Fatal:', e)
+  process.exit(1)
+})

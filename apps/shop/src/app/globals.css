@@ -3,11 +3,30 @@
  * Inter font, design token variables.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* —— Landing page responsive container visibility (LandingContainers.jsx renderContainer) ——
+ * CSS-driven instead of the useIsNarrow/useIsTablet JS hooks, which only resolve their real value
+ * inside a useEffect (i.e. AFTER first paint) — gating whole sections' mount/unmount on that hook
+ * state caused a large post-hydration layout shift (desktop containers appearing, then being
+ * replaced by the mobile set, or vice versa). These classes render identically on server and
+ * client and let the browser's own media-query evaluation — which happens at layout time, not on
+ * a later JS tick — decide visibility instead. Breakpoints match useIsNarrow(1023)/useIsTablet()
+ * exactly: mobile < 600px, tablet 600–1199px, desktop ≥ 1200px. */
+@media (max-width: 1199px) {
+  .landing-vis-desktop { display: none !important; }
+}
+@media (max-width: 599px), (min-width: 1200px) {
+  .landing-vis-tablet { display: none !important; }
+}
+@media (min-width: 600px) {
+  .landing-vis-mobile { display: none !important; }
+}
+@media (min-width: 600px) and (max-width: 1199px) {
+  .landing-vis-both { display: none !important; }
+}
 
 /* —— Design token CSS variables (styled-components / non-Tailwind) —— */
 :root {
@@ -48,7 +67,7 @@
   --container-padding: 24px;
 
   /* Typography */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --text-h1: 40px;
   --text-h2: 32px;
   --text-h3: 24px;

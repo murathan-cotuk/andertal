@@ -70,6 +70,7 @@
     "content": "İçerik",
     "marketing": "Pazarlama",
     "settings": "Ayarlar",
+    "help": "Yardım & Rehberler",
     "language": "Dil",
     "drafts": "Taslaklar",
     "abandonedCheckouts": "Terk edilen sepetler",
@@ -797,5 +798,14 @@
       "empty": "Medya dosyası bulunamadı.",
       "searchPlaceholder": "Medya ara…"
     }
+  },
+  "helpCenter": {
+    "title": "Yardım & Rehberler",
+    "subtitle": "Andertal ile ilgili her şey için yanıtlar ve nasıl yapılır rehberleri — onaydan faturalandırmaya kadar.",
+    "searchPlaceholder": "Yardım makalelerinde ara…",
+    "allCategories": "Tüm konular",
+    "noResults": "Makale bulunamadı. Farklı bir arama terimi deneyin.",
+    "back": "Genel bakışa dön",
+    "readArticle": "Makaleyi oku"
   }
 }

@@ -12,7 +12,21 @@ const { renderInvoicePdfDocument, renderRetourenscheinPdfDocument, querySellerIn
 const { getOrderPdfFilename } = require('../order-pdf-i18n')
 const { resolveLocaleFromCountry } = require('../locale-from-country')
 const { createReturnLabelForOrder } = require('../return-label')
-const { pickCountryMerchandiseCents, normalizeCountryCode } = require('../goods-vat')
+const { pickCountryMerchandiseCents, normalizeCountryCode, isValidEuVatIdFormat } = require('../goods-vat')
+const { checkVatIdViaVies } = require('../vies-check')
+
+/**
+ * Runs the live VIES lookup for a 'gewerbe' customer's VAT-ID and returns the row values to
+ * snapshot alongside it. Never throws: VIES being slow/down just means "not verified yet"
+ * (columns stay null), it must never block registration/profile-save/checkout.
+ */
+async function resolveViesVerification(vatNumber) {
+  const v = String(vatNumber || '').trim().toUpperCase().replace(/[\s-]/g, '')
+  if (!isValidEuVatIdFormat(v)) return { vies_valid: null, vies_checked_at: null, vies_company_name: null }
+  const result = await checkVatIdViaVies({ countryCode: v.slice(0, 2), vatNumber: v.slice(2) }).catch(() => ({ ok: false }))
+  if (!result.ok) return { vies_valid: null, vies_checked_at: null, vies_company_name: null }
+  return { vies_valid: result.valid, vies_checked_at: new Date().toISOString(), vies_company_name: result.name }
+}
 
 const dispatchOrderFlowEvent = async (triggerKey, orderId) => {
   const tk = String(triggerKey || '').trim()
@@ -1498,6 +1512,20 @@ const storeCustomerRegisterPOST = async (req, res) => {
       locale: r.rows[0].locale || preferredLocale || null,
     }
     const cid = r.rows[0].id
+    if (vat_number) {
+      // Follow-up UPDATE (not folded into the INSERT/UPDATE above) so a slow/unreachable VIES
+      // service can never delay account creation — registration always completes immediately.
+      try {
+        const viesResult = await resolveViesVerification(vat_number)
+        await client.query(
+          `UPDATE store_customers SET vies_valid=$1, vies_checked_at=$2, vies_company_name=$3 WHERE id=$4::uuid`,
+          [viesResult.vies_valid, viesResult.vies_checked_at, viesResult.vies_company_name, cid],
+        )
+        Object.assign(customer, viesResult)
+      } catch (ve) {
+        console.warn('vies check on register:', ve?.message || ve)
+      }
+    }
     try {
       await appendBonusLedger(client, {
         customerId: cid,
@@ -1571,6 +1599,18 @@ const storeCustomerMePATCH = async (req, res) => {
     sets.push(`${key} = $${vals.length}`)
   }
   if (!sets.length) return res.status(400).json({ message: 'Nothing to update' })
+
+  // Live VIES re-verification whenever the VAT-ID itself changes (not on every unrelated profile
+  // edit) — a cleared field resets the stored verification instead of leaving a stale badge.
+  if ('vat_number' in body) {
+    const nextVat = String(body.vat_number || '').trim()
+    const viesResult = nextVat ? await resolveViesVerification(nextVat) : { vies_valid: null, vies_checked_at: null, vies_company_name: null }
+    for (const [col, val] of Object.entries(viesResult)) {
+      vals.push(val)
+      sets.push(`${col} = $${vals.length}`)
+    }
+  }
+
   vals.push(payload.id)
   let client
   try {
@@ -1579,7 +1619,7 @@ const storeCustomerMePATCH = async (req, res) => {
     await client.connect()
     const r = await client.query(
       `UPDATE store_customers SET ${sets.join(', ')}, updated_at=NOW() WHERE id=$${vals.length}::uuid
-       RETURNING id, customer_number, email, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, locale, COALESCE(bonus_points,0) AS bonus_points, created_at`,
+       RETURNING id, customer_number, email, first_name, last_name, phone, account_type, gender, birth_date, address_line1, address_line2, zip_code, city, country, company_name, vat_number, locale, COALESCE(bonus_points,0) AS bonus_points, created_at, vies_valid, vies_checked_at, vies_company_name`,
       vals
     )
     await client.end()
@@ -3455,10 +3495,11 @@ const storeOrdersPOST = async (req, res) => {
     // account profile (register/account pages, store_customers.vat_number) — never a new checkout field.
     // Snapshotted onto the order at creation time so later profile edits don't rewrite past invoices.
     let customerVatId = null
+    let customerVatIdVerified = null
     try {
       if (jwtCustomerId) {
         const accR = await client.query(
-          'SELECT id, account_type, first_name, last_name, phone, email, vat_number FROM store_customers WHERE id = $1::uuid',
+          'SELECT id, account_type, first_name, last_name, phone, email, vat_number, vies_valid FROM store_customers WHERE id = $1::uuid',
           [jwtCustomerId],
         )
         const acc = accR.rows?.[0]
@@ -3470,15 +3511,20 @@ const storeOrdersPOST = async (req, res) => {
           if (!phone && acc.phone) phone = acc.phone
           if (acc.email) email = String(acc.email).trim()
           else if (jwtEmail) email = jwtEmail
-          if (acc.account_type === 'gewerbe' && acc.vat_number) customerVatId = String(acc.vat_number).trim() || null
+          if (acc.account_type === 'gewerbe' && acc.vat_number) {
+            customerVatId = String(acc.vat_number).trim() || null
+            customerVatIdVerified = acc.vies_valid === true ? true : (acc.vies_valid === false ? false : null)
+          }
         }
       } else if (email) {
-        const custRes = await client.query('SELECT id, account_type, vat_number FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))', [email])
+        const custRes = await client.query('SELECT id, account_type, vat_number, vies_valid FROM store_customers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))', [email])
         if (custRes.rows && custRes.rows[0]) {
           customerId = custRes.rows[0].id
           isGuest = custRes.rows[0].account_type === 'gastkunde'
           if (custRes.rows[0].account_type === 'gewerbe' && custRes.rows[0].vat_number) {
             customerVatId = String(custRes.rows[0].vat_number).trim() || null
+            const vv = custRes.rows[0].vies_valid
+            customerVatIdVerified = vv === true ? true : (vv === false ? false : null)
           }
         } else {
           const insC = await client.query(
@@ -3689,12 +3735,12 @@ const storeOrdersPOST = async (req, res) => {
          stripe_account_id, stripe_application_fee_cents, stripe_payout_status,
          checkout_payment_kind, seller_net_after_commission_cents,
          subtotal_cents, discount_cents, coupon_code, coupon_discount_cents, shipping_cents, bonus_points_redeemed, total_cents, currency, locale,
-         platform_bonus_funding_cents, customer_vat_id)
+         platform_bonus_funding_cents, customer_vat_id, customer_vat_id_verified)
        VALUES ($1,$2,'paid',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,'offen','bezahlt',
          '${stripeTransferInit}',$33,$23,'pending',
          $24,$25,
          $26,$27,$28,$29,$30,$31,$32,'eur',$34,
-         $35,$36)
+         $35,$36,$37)
        RETURNING id, order_number`,
       [cartId, paymentIntentForDb, sellerId, email, first_name, last_name, phone,
        address_line1, address_line2, city, postal_code, country,
@@ -3705,7 +3751,7 @@ const storeOrdersPOST = async (req, res) => {
        sellerNetMerchandiseCents,
        subtotalCents, discountCents, cart.coupon_code || null, couponDiscountCents, shippingCentsOrder, bonusPointsRedeemed, orderPaidTotalCents,
        piStripeAccountId || null, locale,
-       discountCentsFromBonusPoints(bonusPointsRedeemed), customerVatId]
+       discountCentsFromBonusPoints(bonusPointsRedeemed), customerVatId, customerVatIdVerified]
     )
 
     const orderId = ins.rows && ins.rows[0] ? ins.rows[0].id : null

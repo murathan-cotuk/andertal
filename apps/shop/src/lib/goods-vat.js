@@ -44,3 +44,14 @@ export function splitInclusiveVat(grossCents, ratePercent) {
 export function destinationCountryFromOrder(order) {
   return normalizeCountryCode((order && (order.country || order.billing_country)) || "") || "DE";
 }
+
+/** Coupon portion of order.discount_cents. Mirrors medusa-backend/src/order-money.js. */
+export function orderCouponDiscountCents(order) {
+  return Math.max(0, Number(order?.coupon_discount_cents) || 0);
+}
+
+/** Bonus (loyalty-points) portion of order.discount_cents — the remainder after coupon. */
+export function orderBonusDiscountCents(order) {
+  const discount = Math.max(0, Number(order?.discount_cents) || 0);
+  return Math.max(0, discount - orderCouponDiscountCents(order));
+}

@@ -21,11 +21,11 @@ Sentry.init({
     Sentry.browserTracingIntegration(),
   ],
 
-  // Set tracesSampleRate to 1.0 to capture 100%
-  // of transactions for performance monitoring.
-  // We recommend adjusting this value in production.
+  // 100% trace sampling adds real per-navigation tracing overhead on every single page load
+  // (PageSpeed audit flagged this as part of the main-thread cost). 10% is still plenty for
+  // spotting perf regressions/error correlation without paying the cost on every visitor.
   // Learn more: https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#tracessamplerate
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.1,
 
   // Distributed Tracing Configuration
   // Define which URLs should have trace propagation headers attached

@@ -480,7 +480,11 @@ function renderRetailOrderDocument(doc, {
 
   let y = Math.max(leftY, rightY) + 16
   const heading = `${docTitle} ${rawNum}`.trim()
-  doc.fillColor(INK).font(BOLD).fontSize(16)
+  // A short accent-colored rule above the title is the one deliberate brand touch on an otherwise
+  // strictly black/gray legal document — cheap to draw, doesn't touch any surrounding spacing math.
+  doc.moveTo(left, y).lineTo(left + 34, y).lineWidth(2.5).strokeColor(ACCENT).stroke()
+  y += 8
+  doc.fillColor(ACCENT).font(BOLD).fontSize(16)
     .text(txt(heading, hasUnicode), left, y, { width: contentWidth, lineBreak: false })
   y = doc.y + 10
 
@@ -639,7 +643,13 @@ function renderRetailOrderDocument(doc, {
       const ty = doc.y
       const fs = bold ? 10 : small ? 7.5 : 9
       const hasVal = value != null && value !== ''
-      doc.font(bold ? BOLD : REG).fontSize(fs).fillColor(color || INK)
+      const rowH = bold ? 15 : small ? 11 : 13
+      // The grand-total row (the one line marked bold — always exactly one, "Gesamt") gets a soft
+      // highlight box so it reads at a glance without changing its position or the rows around it.
+      if (bold) {
+        doc.rect(totalsX - 8, ty - 3, totalsW + 8, rowH + 2).fill(ROW_ALT)
+      }
+      doc.font(bold ? BOLD : REG).fontSize(fs).fillColor(color || (bold ? ACCENT : INK))
       doc.text(txt(label, hasUnicode), totalsX, ty, {
         width: hasVal ? totalsW * 0.62 : totalsW,
         lineBreak: false,
@@ -651,7 +661,7 @@ function renderRetailOrderDocument(doc, {
           lineBreak: false,
         })
       }
-      doc.y = ty + (bold ? 15 : small ? 11 : 13)
+      doc.y = ty + rowH
     })
   }
 

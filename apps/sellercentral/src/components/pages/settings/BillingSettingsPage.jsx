@@ -165,7 +165,7 @@ function ColHeader({ label, field, sort, onSort, align = "left" }) {
     <th
       onClick={() => onSort(field)}
       style={{
-        padding: "10px 12px",
+        padding: "7px 10px",
         textAlign: align,
         fontWeight: 600,
         color: "#6d7175",
@@ -173,7 +173,7 @@ function ColHeader({ label, field, sort, onSort, align = "left" }) {
         userSelect: "none",
         background: "#f6f6f7",
         whiteSpace: "nowrap",
-        fontSize: 13,
+        fontSize: 11,
         borderBottom: "1px solid #e1e3e5",
       }}
     >
@@ -238,10 +238,10 @@ function SellerGroupHeader({ label }) {
       <td
         colSpan={9}
         style={{
-          padding: "8px 12px",
+          padding: "6px 10px",
           background: "#f0f5ff",
           fontWeight: 700,
-          fontSize: 12,
+          fontSize: 11,
           color: "#1d4ed8",
           borderTop: "2px solid #bfdbfe",
           borderBottom: "1px solid #bfdbfe",
@@ -262,9 +262,10 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
       style={{
         borderBottom: "1px solid #f1f1f1",
         background: selected ? "#eff6ff" : "#fff",
+        minHeight: 32,
       }}
     >
-      <td style={{ padding: "8px 12px", width: 32 }}>
+      <td style={{ padding: "6px 10px", width: 32 }}>
         <input
           type="checkbox"
           checked={selected}
@@ -272,7 +273,7 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
           style={{ cursor: "pointer" }}
         />
       </td>
-      <td style={{ padding: "8px 12px", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
+      <td style={{ padding: "6px 10px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
         <a
           href={`/${locale}/orders/${order.id}`}
           style={{ color: "#1d4ed8", textDecoration: "none" }}
@@ -280,25 +281,25 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
           #{order.order_number || order.id?.slice(0, 8)}
         </a>
       </td>
-      <td style={{ padding: "8px 12px", fontSize: 13, color: "#374151", whiteSpace: "nowrap" }}>
+      <td style={{ padding: "6px 10px", fontSize: 12, color: "#374151", whiteSpace: "nowrap" }}>
         {fmtDate(order.created_at, locale)}
       </td>
-      <td style={{ padding: "8px 12px", fontSize: 13, color: "#374151" }}>
+      <td style={{ padding: "6px 10px", fontSize: 12, color: "#374151" }}>
         {customerName(order)}
       </td>
-      <td style={{ padding: "8px 12px", fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>
+      <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right", whiteSpace: "nowrap" }}>
         {fmtCents(orderTotal(order), locale)}
       </td>
-      <td style={{ padding: "8px 12px", textAlign: "center" }}>
+      <td style={{ padding: "6px 10px", textAlign: "center" }}>
         <DocBtn orderId={order.id} kind="invoice" label={ui.invoiceDoc} available locale={locale} />
       </td>
-      <td style={{ padding: "8px 12px", textAlign: "center" }}>
+      <td style={{ padding: "6px 10px", textAlign: "center" }}>
         <DocBtn orderId={order.id} kind="lieferschein" label={ui.deliveryNoteDoc} available locale={locale} />
       </td>
-      <td style={{ padding: "8px 12px", textAlign: "center" }}>
+      <td style={{ padding: "6px 10px", textAlign: "center" }}>
         <DocBtn orderId={order.id} kind="versandlabel" label={ui.shippingLabel} available={hasShipDoc} locale={locale} />
       </td>
-      <td style={{ padding: "8px 12px", textAlign: "center" }}>
+      <td style={{ padding: "6px 10px", textAlign: "center" }}>
         <DocBtn orderId={order.id} kind="retoure" label={ui.returnDoc} available={hasReturn} locale={locale} />
       </td>
     </tr>
@@ -650,11 +651,11 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
       {/* Table */}
       <Card padding="0">
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr>
                 <th
-                  style={{ padding: "10px 12px", width: 32, background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}
+                  style={{ padding: "7px 10px", width: 32, background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}
                 >
                   <input
                     type="checkbox"
@@ -671,12 +672,12 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                   <th
                     key={dt.key}
                     style={{
-                      padding: "10px 12px",
+                      padding: "7px 10px",
                       textAlign: "center",
                       fontWeight: 600,
                       color: "#6d7175",
                       background: "#f6f6f7",
-                      fontSize: 13,
+                      fontSize: 11,
                       borderBottom: "1px solid #e1e3e5",
                       whiteSpace: "nowrap",
                     }}
@@ -961,7 +962,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
         key={inv.id}
         style={{ borderBottom: "1px solid #f1f1f1", background: selected.has(inv.id) ? "#eff6ff" : "#fff" }}
       >
-        <td style={{ padding: "10px 12px", width: 32 }}>
+        <td style={{ padding: "6px 10px", width: 32 }}>
           <input
             type="checkbox"
             checked={selected.has(inv.id)}
@@ -969,10 +970,10 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
             style={{ cursor: "pointer" }}
           />
         </td>
-        <td style={{ padding: "10px 12px", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+        <td style={{ padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "#374151" }}>
           {inv.period || inv.period_label || "—"}
         </td>
-        <td style={{ padding: "10px 12px", fontSize: 13, color: "#374151" }}>
+        <td style={{ padding: "6px 10px", fontSize: 12, color: "#374151" }}>
           <span
             style={{
               display: "inline-block",
@@ -981,22 +982,22 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
               background: "#eff6ff",
               color: "#1d4ed8",
               fontWeight: 600,
-              fontSize: 12,
+              fontSize: 11,
             }}
           >
             {ui.invoiceDoc}
           </span>
         </td>
-        <td style={{ padding: "10px 12px", fontSize: 13, textAlign: "right" }}>
+        <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right" }}>
           {fmtCents(inv.total_cents, locale)}
         </td>
-        <td style={{ padding: "10px 12px", fontSize: 13, textAlign: "right", color: "#dc2626" }}>
+        <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right", color: "#dc2626" }}>
           – {fmtCents(inv.amount_cents, locale)}
         </td>
-        <td style={{ padding: "10px 12px", fontSize: 13, textAlign: "right", fontWeight: 600, color: "#059669" }}>
+        <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right", fontWeight: 600, color: "#059669" }}>
           {fmtCents(inv.payout_cents, locale)}
         </td>
-        <td style={{ padding: "10px 12px", textAlign: "center" }}>
+        <td style={{ padding: "6px 10px", textAlign: "center" }}>
           {inv.pdf_url ? (
             <button
               type="button"
@@ -1005,12 +1006,12 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 4,
-                padding: "4px 10px",
+                padding: "3px 9px",
                 borderRadius: 4,
                 border: "1px solid #e5e7eb",
                 background: "#f9fafb",
                 color: "#374151",
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: 500,
                 textDecoration: "none",
                 cursor: "pointer",
@@ -1019,7 +1020,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
               ↓ PDF
             </button>
           ) : (
-            <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>
+            <span style={{ color: "#d1d5db", fontSize: 11 }}>—</span>
           )}
         </td>
       </tr>
@@ -1028,7 +1029,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   const tableHead = (
     <thead>
       <tr>
-        <th style={{ padding: "10px 12px", width: 32, background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+        <th style={{ padding: "7px 10px", width: 32, background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
           <input
             type="checkbox"
             checked={sortedInvoices.length > 0 && sortedInvoices.every((i) => selected.has(i.id))}
@@ -1043,8 +1044,8 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
         <ColHeader label={lt(locale, "Payout", "Ödeme", "Paiement", "Pago", "Pagamento", "Auszahlung")} field="payout_cents" sort={sort} onSort={toggleSort} align="right" />
         <th
           style={{
-            padding: "10px 12px", textAlign: "center", fontWeight: 600, color: "#6d7175",
-            background: "#f6f6f7", fontSize: 13, borderBottom: "1px solid #e1e3e5",
+            padding: "7px 10px", textAlign: "center", fontWeight: 600, color: "#6d7175",
+            background: "#f6f6f7", fontSize: 11, borderBottom: "1px solid #e1e3e5",
           }}
         >
           PDF
@@ -1115,7 +1116,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
               </Text>
             </div>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               {tableHead}
               <tbody>
                 {isSuperuser ? (
@@ -1126,10 +1127,10 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                           <td
                             colSpan={7}
                             style={{
-                              padding: "8px 12px",
+                              padding: "6px 10px",
                               background: "#f0f5ff",
                               fontWeight: 700,
-                              fontSize: 12,
+                              fontSize: 11,
                               color: "#1d4ed8",
                               borderTop: "2px solid #bfdbfe",
                               borderBottom: "1px solid #bfdbfe",
@@ -1147,10 +1148,10 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                           <td
                             colSpan={7}
                             style={{
-                              padding: "8px 12px",
+                              padding: "6px 10px",
                               background: "#f0f5ff",
                               fontWeight: 700,
-                              fontSize: 12,
+                              fontSize: 11,
                               color: "#1d4ed8",
                               borderTop: "2px solid #bfdbfe",
                               borderBottom: "1px solid #bfdbfe",
@@ -1167,12 +1168,12 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                   renderRows(sortedInvoices)
                 )}
                 <tr style={{ background: "#f9fafb", borderTop: "2px solid #e5e7eb", fontWeight: 700 }}>
-                  <td style={{ padding: "10px 12px" }} colSpan={3}>
+                  <td style={{ padding: "7px 10px" }} colSpan={3}>
                     {lt(locale, "Sum", "Toplam", "Somme", "Suma", "Somma", "Summe")}
                   </td>
-                  <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(invoiceTotals.gross, locale)}</td>
-                  <td style={{ padding: "10px 12px", textAlign: "right", color: "#dc2626" }}>– {fmtCents(invoiceTotals.commission, locale)}</td>
-                  <td style={{ padding: "10px 12px", textAlign: "right", color: "#059669" }}>{fmtCents(invoiceTotals.payout, locale)}</td>
+                  <td style={{ padding: "7px 10px", textAlign: "right" }}>{fmtCents(invoiceTotals.gross, locale)}</td>
+                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#dc2626" }}>– {fmtCents(invoiceTotals.commission, locale)}</td>
+                  <td style={{ padding: "7px 10px", textAlign: "right", color: "#059669" }}>{fmtCents(invoiceTotals.payout, locale)}</td>
                   <td />
                 </tr>
               </tbody>

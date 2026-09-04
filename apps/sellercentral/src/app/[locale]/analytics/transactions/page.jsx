@@ -707,7 +707,7 @@ function AdminTransactionsView() {
                 <div style={{ padding: "14px 18px", borderBottom: "1px solid #f3f4f6" }}>
                   <Text variant="headingMd" as="h2">{copy.sellerOverview} — {selectedPeriod.label}</Text>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 110px 80px auto", gap: 8, padding: "9px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 110px 80px auto", gap: 8, padding: "7px 14px", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 600, color: "#6b7280" }}>
                   <div>{copy.seller}</div>
                   <div style={{ textAlign: "right" }}>{copy.revenue}</div>
                   <div style={{ textAlign: "right" }}>{copy.colCommission}</div>
@@ -718,15 +718,15 @@ function AdminTransactionsView() {
                 {sellerList.map((s, i) => {
                   const paid = isPaidForPeriod(s.seller_id);
                   return (
-                    <div key={s.seller_id} style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 110px 80px auto", gap: 8, padding: "11px 16px", borderBottom: i < sellerList.length - 1 ? "1px solid #f9fafb" : "none", alignItems: "center" }}>
+                    <div key={s.seller_id} style={{ display: "grid", gridTemplateColumns: "1.5fr 100px 100px 110px 80px auto", gap: 8, padding: "7px 14px", minHeight: 32, borderBottom: i < sellerList.length - 1 ? "1px solid #f9fafb" : "none", alignItems: "center" }}>
                       <div>
-                        <Text variant="bodyMd" fontWeight="semibold">{s.store_name}</Text>
-                        <Text variant="bodySm" tone="subdued">{copy.ordersShort(s.orders, s.eligibleOrders)}</Text>
-                        <div style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{s.seller_id}-{periodKey}</div>
+                        <Text variant="bodySm" fontWeight="semibold">{s.store_name}</Text>
+                        <Text variant="bodyXs" tone="subdued">{copy.ordersShort(s.orders, s.eligibleOrders)}</Text>
+                        <div style={{ fontSize: 10.5, color: "#9ca3af", fontFamily: "monospace" }}>{s.seller_id}-{periodKey}</div>
                       </div>
-                      <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(s.total)}</div>
-                      <div style={{ textAlign: "right", fontSize: 13, color: "#059669", fontWeight: 600 }}>+{fmt(s.commission)}</div>
-                      <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: paid ? "#6b7280" : "#dc2626" }}>{fmt(s.payout)}</div>
+                      <div style={{ textAlign: "right", fontSize: 12 }}>{fmt(s.total)}</div>
+                      <div style={{ textAlign: "right", fontSize: 12, color: "#059669", fontWeight: 600 }}>+{fmt(s.commission)}</div>
+                      <div style={{ textAlign: "right", fontSize: 12, fontWeight: 700, color: paid ? "#6b7280" : "#dc2626" }}>{fmt(s.payout)}</div>
                       <div style={{ textAlign: "center" }}>
                         <Badge tone={paid ? "success" : s.payout > 0 ? "warning" : "new"}>
                           {paid ? copy.paid : s.payout > 0 ? copy.open : "—"}
@@ -857,7 +857,7 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "9px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+      <div style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "7px 14px", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 600, color: "#6b7280" }}>
         <div>{copy.colOrder}</div>
         {isSuperuser && <div>{copy.seller}</div>}
         <div style={{ textAlign: "right" }}>{copy.revenue}</div>
@@ -870,18 +870,18 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
         <div style={{ textAlign: "right" }}>{copy.colDelivery}</div>
       </div>
       {rows.map((tx) => tx.type === "ledger_adjustment" ? (
-        <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center", background: "#fafafa" }}>
+        <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "7px 14px", minHeight: 32, borderBottom: "1px solid #f9fafb", fontSize: 12, alignItems: "center", background: "#fafafa" }}>
           <div>
             <div style={{ fontWeight: 600, color: "#111827" }}>{ledgerAdjustmentLabel(tx, locale)}</div>
             {tx.adjustment_type !== "manual_adjustment" && (
-              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+              <div style={{ fontSize: 10.5, color: "#9ca3af" }}>
                 {tx.charge_method === "card"
                   ? lt(locale, "Charged to card", "Karttan çekildi", "Débité de la carte", "Cargado a tarjeta", "Addebitato su carta", "Von Karte abgebucht")
                   : lt(locale, "Deducted from balance", "Bakiyeden düşüldü", "Déduit du solde", "Deducido del saldo", "Detratto dal saldo", "Vom Guthaben abgezogen")}
               </div>
             )}
           </div>
-          {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
+          {isSuperuser && <div style={{ fontSize: 11, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
           <div style={{ textAlign: "right" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
@@ -889,7 +889,7 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>—</div>
           <div style={{ textAlign: "right", color: tx.payout_cents < 0 ? "#ef4444" : "#10b981", fontWeight: 600 }}>{fmt(tx.payout_cents, tx.currency)}</div>
-          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
             {fmtD(tx.created_at)}
             {isSuperuser && tx.adjustment_type === "manual_adjustment" && (
               <Button
@@ -905,23 +905,23 @@ function TxTable({ rows, loading, isSuperuser, locale, copy, onRemoveAdjustment,
           </div>
         </div>
       ) : (
-        <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "10px 16px", borderBottom: "1px solid #f9fafb", fontSize: 13, alignItems: "center" }}>
+        <div key={tx.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 8, padding: "7px 14px", minHeight: 32, borderBottom: "1px solid #f9fafb", fontSize: 12, alignItems: "center" }}>
           <div>
             <div style={{ fontWeight: 600, color: "#111827" }}>#{tx.order_number}</div>
-            <div style={{ fontSize: 11, color: "#9ca3af" }}>
+            <div style={{ fontSize: 10.5, color: "#9ca3af" }}>
               {tx.first_name} {tx.last_name}
               {tx.destination_country && <span style={{ marginLeft: 6, color: "#6b7280" }}>· {tx.destination_country}</span>}
             </div>
           </div>
-          {isSuperuser && <div style={{ fontSize: 12, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
+          {isSuperuser && <div style={{ fontSize: 11, color: "#6b7280" }}>{tx.store_name || "—"}</div>}
           <div style={{ textAlign: "right" }}>{fmt(tx.total_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(tx.customer_paid_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#6b7280" }}>{fmt(tx.shipping_cents || 0, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#2563eb" }}>{tx.bonus_redeemed_cents > 0 ? fmt(tx.bonus_redeemed_cents, tx.currency) : "—"}</div>
-          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{tx.commission_vat_cents > 0 ? fmt(tx.commission_vat_cents, tx.currency) : "—"}</div>
+          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 11 }}>{tx.commission_vat_cents > 0 ? fmt(tx.commission_vat_cents, tx.currency) : "—"}</div>
           <div style={{ textAlign: "right", color: "#ef4444" }}>−{fmt(tx.commission_cents, tx.currency)}</div>
           <div style={{ textAlign: "right", color: "#10b981", fontWeight: 600 }}>{fmt(tx.payout_cents, tx.currency)}</div>
-          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtD(tx.delivery_date)}</div>
+          <div style={{ textAlign: "right", color: "#6b7280", fontSize: 11 }}>{fmtD(tx.delivery_date)}</div>
         </div>
       ))}
     </div>
@@ -958,7 +958,7 @@ function PayoutsTable({ payouts, loading, isSuperuser, onRefresh, locale, copy }
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: isSuperuser ? "1.4fr 100px 110px 110px 80px 90px auto" : "1.4fr 110px 110px 80px", gap: 8, padding: "9px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isSuperuser ? "1.4fr 100px 110px 110px 80px 90px auto" : "1.4fr 110px 110px 80px", gap: 8, padding: "7px 14px", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 600, color: "#6b7280" }}>
         <div>{copy.periodReference}</div>
         {isSuperuser && <div>{copy.seller}</div>}
         <div style={{ textAlign: "right" }}>{copy.revenue}</div>
@@ -968,16 +968,16 @@ function PayoutsTable({ payouts, loading, isSuperuser, onRefresh, locale, copy }
         {isSuperuser && <div></div>}
       </div>
       {payouts.map((p, i) => (
-        <div key={p.id || i} style={{ display: "grid", gridTemplateColumns: isSuperuser ? "1.4fr 100px 110px 110px 80px 90px auto" : "1.4fr 110px 110px 80px", gap: 8, padding: "11px 16px", borderBottom: "1px solid #f9fafb", alignItems: "center" }}>
+        <div key={p.id || i} style={{ display: "grid", gridTemplateColumns: isSuperuser ? "1.4fr 100px 110px 110px 80px 90px auto" : "1.4fr 110px 110px 80px", gap: 8, padding: "7px 14px", minHeight: 32, borderBottom: "1px solid #f9fafb", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 12, color: "#374151" }}>{fmtD(p.period_start)} – {fmtD(p.period_end)}</div>
-            {p.notes && <code style={{ fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{p.notes}</code>}
+            <div style={{ fontSize: 11, color: "#374151" }}>{fmtD(p.period_start)} – {fmtD(p.period_end)}</div>
+            {p.notes && <code style={{ fontSize: 10.5, color: "#9ca3af", fontFamily: "monospace" }}>{p.notes}</code>}
           </div>
-          {isSuperuser && <div style={{ fontSize: 12, color: "#374151" }}>{p.store_name || p.seller_id || "—"}</div>}
-          <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(p.total_cents)}</div>
-          <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: "#059669" }}>{fmt(p.payout_cents)}</div>
+          {isSuperuser && <div style={{ fontSize: 11, color: "#374151" }}>{p.store_name || p.seller_id || "—"}</div>}
+          <div style={{ textAlign: "right", fontSize: 12 }}>{fmt(p.total_cents)}</div>
+          <div style={{ textAlign: "right", fontSize: 12, fontWeight: 700, color: "#059669" }}>{fmt(p.payout_cents)}</div>
           <div style={{ textAlign: "center" }}><Badge tone={tone(p.status)}>{payoutStatusLabel(locale, p.status)}</Badge></div>
-          {isSuperuser && <div style={{ textAlign: "right", fontSize: 12, color: "#6b7280" }}>{p.paid_at ? fmtD(p.paid_at) : "—"}</div>}
+          {isSuperuser && <div style={{ textAlign: "right", fontSize: 11, color: "#6b7280" }}>{p.paid_at ? fmtD(p.paid_at) : "—"}</div>}
           {isSuperuser && (
             <div>
               {(p.status !== "bezahlt" && p.status !== "paid") && (

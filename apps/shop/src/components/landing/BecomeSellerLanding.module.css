@@ -12,8 +12,8 @@
   --bs-cream: #f3f7f5;
   --bs-muted: #5a6b63;
   --bs-line: rgba(13, 31, 26, 0.12);
-  --bs-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
-  --bs-sans: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --bs-serif: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  --bs-sans: var(--font-manrope), "Segoe UI", system-ui, sans-serif;
   --bs-max: 1120px;
   --bs-ease: cubic-bezier(0.22, 1, 0.36, 1);
 

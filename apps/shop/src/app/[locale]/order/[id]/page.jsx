@@ -14,7 +14,7 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
-import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, splitInclusiveVat } from "@/lib/goods-vat";
+import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, splitInclusiveVat, orderBonusDiscountCents, orderCouponDiscountCents } from "@/lib/goods-vat";
 
 const ORANGE = "#ff971c";
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -491,68 +491,89 @@ function OrderConfirmationView({ order }) {
     return () => clearTimeout(id);
   }, [router]);
 
+  // The order's full taxed value includes whatever was covered by bonus points — bonus points
+  // are a platform-funded payment method, not a price reduction, so they must never be netted
+  // out of the value shown here (that would misrepresent the order as smaller than it was).
+  const bonusPaidCents = Math.max(0, Number(settlement?.bonus_redeemed_cents) || 0);
+  const cardPaidCents = Math.max(0, Number(settlement?.customer_paid_cents) || 0);
+  const orderValueCents = cardPaidCents + bonusPaidCents;
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
       <ShopHeader />
-      <main style={{ flex: 1, maxWidth: 680, margin: "0 auto", width: "100%", padding: "40px 16px 60px", textAlign: "center" }}>
+      <main style={{ flex: 1, maxWidth: 680, margin: "0 auto", width: "100%", padding: "48px 16px 64px", textAlign: "center" }}>
         <div style={{
-          width: 72, height: 72, borderRadius: "50%", background: "#d1fae5",
+          width: 76, height: 76, borderRadius: "50%",
+          background: "radial-gradient(circle at 30% 30%, #34d399, #059669)",
+          boxShadow: "0 8px 24px rgba(5,150,105,0.28)",
           display: "flex", alignItems: "center", justifyContent: "center",
-          margin: "0 auto 24px",
+          margin: "0 auto 26px",
         }}>
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
-        <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#111827", margin: "0 0 12px" }}>
+        <h1 style={{ fontSize: "1.875rem", fontWeight: 800, color: "#111827", margin: "0 0 10px", letterSpacing: "-0.02em" }}>
           {t("confirmationTitle")}
         </h1>
-        <p style={{ fontSize: "1rem", color: "#6b7280", margin: "0 0 32px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: "1rem", color: "#6b7280", margin: "0 0 36px", lineHeight: 1.55 }}>
           {t("confirmationSubtitle")}
         </p>
 
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, textAlign: "left", marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
-            <span style={{ fontWeight: 500, color: "#374151" }}>{t("orderNumber")}</span>
-            <span style={{ fontFamily: "monospace", fontSize: "0.875rem" }}>
+        <div style={{ background: "#fff", border: "1px solid #eef0f2", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 16, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0", borderBottom: "1px solid #f3f4f6" }}>
+            <span style={{ fontWeight: 500, color: "#6b7280" }}>{t("orderNumber")}</span>
+            <span style={{ fontFamily: "monospace", fontSize: "0.875rem", fontWeight: 700, color: "#111827", letterSpacing: "0.02em" }}>
               #{order.order_number || order.id?.slice(0, 8).toUpperCase()}
             </span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: order.email ? "1px solid #f3f4f6" : "none" }}>
-            <span style={{ fontWeight: 500, color: "#374151" }}>{t("orderDate")}</span>
-            <span>{fmtDate(order.created_at)}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0", borderBottom: order.email ? "1px solid #f3f4f6" : "none" }}>
+            <span style={{ fontWeight: 500, color: "#6b7280" }}>{t("orderDate")}</span>
+            <span style={{ color: "#111827", fontWeight: 500 }}>{fmtDate(order.created_at)}</span>
           </div>
           {order.email && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0" }}>
-              <span style={{ fontWeight: 500, color: "#374151" }}>E-Mail</span>
-              <span>{order.email}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0" }}>
+              <span style={{ fontWeight: 500, color: "#6b7280" }}>E-Mail</span>
+              <span style={{ color: "#111827", fontWeight: 500 }}>{order.email}</span>
             </div>
           )}
         </div>
 
         {settlement && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, textAlign: "left", marginBottom: 16 }}>
-            <div style={{ fontWeight: 600, color: "#111827", marginBottom: 12, fontSize: "0.9375rem" }}>
+          <div style={{ background: "#fff", border: "1px solid #eef0f2", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 16, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
+            <div style={{ fontWeight: 700, color: "#111827", marginBottom: 14, fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {t("settlementHeading")}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
-              <span style={{ fontWeight: 500, color: "#374151" }}>{t("paymentFlow")}</span>
-              <span>
+              <span style={{ fontWeight: 500, color: "#6b7280" }}>{t("paymentFlow")}</span>
+              <span style={{ color: "#111827", fontWeight: 500 }}>
                 {settlement.checkout_payment_kind === "platform_loyalty"
                   ? t("paymentFlowPlatform")
                   : t("paymentFlowStripe")}
               </span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0" }}>
-              <span style={{ fontWeight: 500, color: "#374151" }}>{t("paidTotal")}</span>
-              <span>{formatPriceCents(settlement.customer_paid_cents || 0)} €</span>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.0625rem", fontWeight: 800, color: "#111827", padding: "10px 0 2px" }}>
+              <span>{t("total")}</span>
+              <span>{formatPriceCents(orderValueCents)} €</span>
             </div>
+            {bonusPaidCents > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#9ca3af", padding: "0 0 4px" }}>
+                <span>{t("bonusPaidLabel")}</span>
+                <span>−{formatPriceCents(bonusPaidCents)} €</span>
+              </div>
+            )}
+            {bonusPaidCents > 0 && cardPaidCents > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#9ca3af", padding: "0 0 4px" }}>
+                <span>{t("cardPaidLabel")}</span>
+                <span>{formatPriceCents(cardPaidCents)} €</span>
+              </div>
+            )}
           </div>
         )}
 
         {items.length > 0 && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24, textAlign: "left", marginBottom: 24 }}>
-            <div style={{ fontWeight: 600, color: "#111827", marginBottom: 12, fontSize: "0.9375rem" }}>
+          <div style={{ background: "#fff", border: "1px solid #eef0f2", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 28, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
+            <div style={{ fontWeight: 700, color: "#111827", marginBottom: 14, fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {t("items")}
             </div>
             {items.map((item, i) => (
@@ -560,7 +581,7 @@ function OrderConfirmationView({ order }) {
                 display: "flex", alignItems: "center", gap: 12, padding: "12px 0",
                 borderBottom: i < items.length - 1 ? "1px solid #f3f4f6" : "none",
               }}>
-                <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3f4f6" }}>
+                <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: "hidden", background: "#f9fafb", border: "1px solid #f3f4f6" }}>
                   {item.thumbnail ? (
                     <img src={resolveImageUrl(item.thumbnail)} alt={item.title || ""} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
                   ) : (
@@ -571,7 +592,7 @@ function OrderConfirmationView({ order }) {
                   <div style={{ fontSize: "0.9375rem", fontWeight: 500, color: "#111827" }}>
                     {getLocalizedCartLineTitle(item, locale)}
                   </div>
-                  <div style={{ fontSize: "0.8125rem", color: "#6b7280" }}>× {item.quantity}</div>
+                  <div style={{ fontSize: "0.8125rem", color: "#9ca3af" }}>× {item.quantity}</div>
                 </div>
                 <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>
                   {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
@@ -580,10 +601,10 @@ function OrderConfirmationView({ order }) {
             ))}
             <div style={{
               display: "flex", justifyContent: "space-between", fontSize: "1.0625rem",
-              fontWeight: 700, color: "#111827", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb",
+              fontWeight: 800, color: "#111827", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb",
             }}>
               <span>{t("total")}</span>
-              <span>{formatPriceCents(order.total_cents || 0)} €</span>
+              <span>{formatPriceCents(orderValueCents || order.total_cents || 0)} €</span>
             </div>
           </div>
         )}
@@ -591,13 +612,14 @@ function OrderConfirmationView({ order }) {
         <Link
           href="/orders"
           style={{
-            display: "inline-block", padding: "14px 32px", background: ORANGE, color: "#fff",
-            fontWeight: 700, fontSize: "1rem", borderRadius: 8, textDecoration: "none",
+            display: "inline-block", padding: "15px 36px", background: ORANGE, color: "#fff",
+            fontWeight: 700, fontSize: "1rem", borderRadius: 10, textDecoration: "none",
+            boxShadow: "0 6px 18px rgba(255,151,28,0.32)",
           }}
         >
           {t("viewOrders")}
         </Link>
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 14 }}>
           <Link href="/" style={{ fontSize: "0.875rem", fontWeight: 600, color: "#6b7280", textDecoration: "none" }}>
             {t("continueShopping")}
           </Link>
@@ -741,12 +763,16 @@ export default function OrderDetailPage() {
   const items = order.items || [];
   const returns = order.returns || [];
   const status = displayStatus(order);
-  const total = Number(order.total_cents || 0);
   const subtotal = Number(order.subtotal_cents || 0) || items.reduce((s, it) => s + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0);
   const shipping = Number(order.shipping_cents || 0);
-  const discount = Number(order.discount_cents || 0);
+  // Coupon discounts genuinely lower the order's value; bonus points instead cover part of an
+  // otherwise-unchanged price (they're a payment method, not a price cut) — so only the coupon
+  // portion may be subtracted before computing net/VAT. Mirrors order-pdf-buffers.js on the backend.
+  const couponDiscount = orderCouponDiscountCents(order);
+  const bonusPaid = orderBonusDiscountCents(order);
+  const total = Math.max(0, subtotal + shipping - couponDiscount);
   const vatRate = getGoodsVatRatePercent(destinationCountryFromOrder(order));
-  const { vatCents: vatAmount, netCents: netTotal } = splitInclusiveVat(Math.max(0, subtotal + shipping), vatRate);
+  const { vatCents: vatAmount, netCents: netTotal } = splitInclusiveVat(total, vatRate);
 
   const trackingUrl = getTrackingUrl(order.carrier_name, order.tracking_number);
   const activeReturn = returns.find(r => r.status !== "abgelehnt" && r.status !== "abgeschlossen");
@@ -911,7 +937,7 @@ export default function OrderDetailPage() {
             {[
               { label: t("subtotal"), value: fmtEur(subtotal, locale), muted: true },
               shipping !== 0 && { label: t("shippingLabel"), value: shipping > 0 ? fmtEur(shipping, locale) : t("freeShipping"), muted: true },
-              discount > 0 && { label: t("discountLabel"), value: `−${fmtEur(discount, locale)}`, muted: true, green: true },
+              couponDiscount > 0 && { label: t("discountLabel"), value: `−${fmtEur(couponDiscount, locale)}`, muted: true, green: true },
               { label: t("netLabel"), value: fmtEur(netTotal, locale), muted: true },
               { label: t("vatLabel", { rate: formatVatPercent(vatRate) }), value: fmtEur(vatAmount, locale), muted: true },
             ].filter(Boolean).map(row => (
@@ -922,6 +948,16 @@ export default function OrderDetailPage() {
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "#111827", borderTop: "2px solid #e5e7eb", marginTop: 8, paddingTop: 10 }}>
               <span>{t("total")}</span><span>{fmtEur(total, locale)}</span>
             </div>
+            {bonusPaid > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: 6 }}>
+                <span>{t("bonusPaidLabel")}</span><span>−{fmtEur(bonusPaid, locale)}</span>
+              </div>
+            )}
+            {bonusPaid > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9ca3af" }}>
+                <span>{t("cardPaidLabel")}</span><span>{fmtEur(Math.max(0, total - bonusPaid), locale)}</span>
+              </div>
+            )}
           </div>
         </Card>
 

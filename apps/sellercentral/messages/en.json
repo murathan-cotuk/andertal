@@ -70,6 +70,7 @@
     "content": "Content",
     "marketing": "Marketing",
     "settings": "Settings",
+    "help": "Help & Guides",
     "language": "Language",
     "drafts": "Drafts",
     "abandonedCheckouts": "Abandoned checkouts",
@@ -797,5 +798,14 @@
       "empty": "No media files found.",
       "searchPlaceholder": "Search media…"
     }
+  },
+  "helpCenter": {
+    "title": "Help & Guides",
+    "subtitle": "Answers and how-tos for everything on Andertal — from approval to billing.",
+    "searchPlaceholder": "Search help articles…",
+    "allCategories": "All topics",
+    "noResults": "No articles found. Try a different search term.",
+    "back": "Back to overview",
+    "readArticle": "Read article"
   }
 }

@@ -70,6 +70,7 @@
     "content": "Inhalte",
     "marketing": "Marketing",
     "settings": "Einstellungen",
+    "help": "Hilfe & Leitfäden",
     "language": "Sprache",
     "drafts": "Entwürfe",
     "abandonedCheckouts": "Abgebrochene Checkouts",
@@ -797,5 +798,14 @@
       "empty": "Keine Mediendateien gefunden.",
       "searchPlaceholder": "Medien suchen…"
     }
+  },
+  "helpCenter": {
+    "title": "Hilfe & Leitfäden",
+    "subtitle": "Antworten und Anleitungen rund um Andertal — von der Zulassung bis zur Abrechnung.",
+    "searchPlaceholder": "Hilfeartikel durchsuchen…",
+    "allCategories": "Alle Themen",
+    "noResults": "Keine Artikel gefunden. Versuche einen anderen Suchbegriff.",
+    "back": "Zurück zur Übersicht",
+    "readArticle": "Artikel lesen"
   }
 }

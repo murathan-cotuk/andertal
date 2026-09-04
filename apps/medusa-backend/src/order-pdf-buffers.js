@@ -158,7 +158,10 @@ function renderInvoicePdfDocument(doc, { row, itemRows, orderId, invoiceNumber, 
   } else if (goodsVat.scheme === 'intra_b2b') {
     totalsLines.push({ label: s.netTotal, value: pdfCents(goodsVat.netCents, locale) })
     totalsLines.push({ label: s.reverseChargeNote, value: '', color: '#64748b', small: true })
-    if (customerVatId) totalsLines.push({ label: s.buyerVatIdLabel, value: customerVatId, small: true, color: '#64748b' })
+    if (customerVatId) {
+      const viesSuffix = row.customer_vat_id_verified === true ? ` ${s.viesVerifiedSuffix}` : '';
+      totalsLines.push({ label: s.buyerVatIdLabel, value: `${customerVatId}${viesSuffix}`, small: true, color: '#64748b' })
+    }
   } else {
     totalsLines.push({ label: s.vatExempt, value: '', color: '#64748b', small: true })
   }

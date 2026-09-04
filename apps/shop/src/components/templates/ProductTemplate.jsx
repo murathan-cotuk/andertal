@@ -409,7 +409,7 @@ const MetaTable = styled.table`
   border-radius: 12px;
   overflow: hidden;
   background: #fff;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
   font-size: 0.875rem;
   line-height: 1.45;
 

@@ -50,7 +50,9 @@ module.exports = {
         "3xl": "64px",
       },
       fontFamily: {
-        sans: ['"Inter"', "-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "sans-serif"],
+        // next/font self-hosted Inter (apps/shop/src/lib/fonts.js) exposes this CSS variable via
+        // layout.jsx's <html> className — keep in sync with globals.css' --font-sans.
+        sans: ["var(--font-inter)", "-apple-system", "BlinkMacSystemFont", '"Segoe UI"', "sans-serif"],
       },
       fontSize: {
         h1: ["40px", { lineHeight: "1.4" }],

@@ -1,6 +1,7 @@
 ﻿import "./globals.css";
 import Script from "next/script";
 import { headers } from "next/headers";
+import { inter } from "@/lib/fonts";
 import TrustpilotInviteBootstrap from "@/components/TrustpilotInviteBootstrap";
 import UnhandledRejectionGuard from "@/components/UnhandledRejectionGuard";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
@@ -115,7 +116,7 @@ export default async function RootLayout({ children }) {
     <html
       lang={lang}
       translate="no"
-      className="notranslate"
+      className={`notranslate ${inter.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -124,8 +125,6 @@ export default async function RootLayout({ children }) {
           Dil için yerleşik locale rotaları ve dil seçici kullanılıyor (next-intl).
         */}
         <meta name="google" content="notranslate" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body suppressHydrationWarning>
         <SeoJsonLd data={[buildOrganizationJsonLd(), buildWebsiteJsonLd()]} />
