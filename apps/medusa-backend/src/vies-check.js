@@ -12,23 +12,20 @@
  * boolean result is snapshotted for display (invoice note, account page badge) only.
  */
 
+const { createTieredCache } = require('./tiered-cache')
+
 const VIES_REST_URL = 'https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number'
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // re-checking the same VAT-ID within a day is pointless
-const cache = new Map() // `${cc}${number}` -> { result, expiresAt }
+const CACHE_TTL_SECONDS = 24 * 60 * 60 // re-checking the same VAT-ID within a day is pointless
+// Redis-backed, TTL-expired instead of the old size-capped (5000-entry LRU) in-memory Map — a
+// shared cache also means a VAT-ID checked from one Render instance is a hit on every other one.
+const cache = createTieredCache('vies-check', CACHE_TTL_SECONDS)
 
 function cacheGet(key) {
-  const hit = cache.get(key)
-  if (!hit) return null
-  if (hit.expiresAt < Date.now()) { cache.delete(key); return null }
-  return hit.result
+  return cache.get(key)
 }
 
 function cacheSet(key, result) {
-  cache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS })
-  if (cache.size > 5000) {
-    const oldestKey = cache.keys().next().value
-    if (oldestKey) cache.delete(oldestKey)
-  }
+  return cache.set(key, result)
 }
 
 /**
@@ -43,7 +40,7 @@ async function checkVatIdViaVies({ countryCode, vatNumber, timeoutMs = 6000 } = 
     return { ok: false, error: 'invalid_format' }
   }
   const cacheKey = `${cc}${num}`
-  const cached = cacheGet(cacheKey)
+  const cached = await cacheGet(cacheKey)
   if (cached) return cached
 
   if (typeof fetch !== 'function') return { ok: false, error: 'fetch_unavailable' }
@@ -66,7 +63,7 @@ async function checkVatIdViaVies({ countryCode, vatNumber, timeoutMs = 6000 } = 
       name: data.name && data.name !== '---' ? String(data.name).trim() : null,
       address: data.address && data.address !== '---' ? String(data.address).trim() : null,
     }
-    cacheSet(cacheKey, result)
+    cacheSet(cacheKey, result).catch(() => {})
     return result
   } catch (e) {
     return { ok: false, error: e?.name === 'AbortError' ? 'vies_timeout' : (e?.message || 'vies_network_error') }

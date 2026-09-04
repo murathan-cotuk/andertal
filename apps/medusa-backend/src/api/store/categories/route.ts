@@ -7,6 +7,7 @@
 
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import AdminHubService from "../../../../services/admin-hub-service"
+import categoryTreeCache from "../../../category-tree-cache"
 
 export async function GET(
   req: MedusaRequest,
@@ -35,7 +36,11 @@ export async function GET(
       if (is_visible !== undefined) {
         filters.is_visible = is_visible === "true"
       }
-      const categoryTree = await adminHubService.getCategoryTree(filters)
+      let categoryTree = await categoryTreeCache.getCachedCategoryTree(filters)
+      if (!categoryTree) {
+        categoryTree = await adminHubService.getCategoryTree(filters)
+        await categoryTreeCache.setCachedCategoryTree(filters, categoryTree)
+      }
       res.json({
         categories: categoryTree,
         tree: categoryTree,

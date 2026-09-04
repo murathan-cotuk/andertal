@@ -141,8 +141,8 @@ export default function BestsellersPage() {
       try {
         setLoading(true);
         setError("");
-        const [catRes, prData, settingsRes, landingFlag] = await Promise.all([
-          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`),
+        const [catData, prData, settingsRes, landingFlag] = await Promise.all([
+          cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 }).catch(() => ({ tree: [] })),
           // Large catalog snapshot (up to 1200 products) — cached client-side for 2 min so
           // revisits/back-navigation don't re-pull the full payload from the backend each time.
           cachedJsonFetch("/api/store-products?limit=1200", { ttlMs: 120000 }).catch(() => ({ products: [] })),
@@ -159,7 +159,8 @@ export default function BestsellersPage() {
             }
           })(),
         ]);
-        const catData = catRes.ok ? await catRes.json() : { tree: [] };
+        // catData already resolved above (cachedJsonFetch resolves to parsed JSON, with its own
+        // .catch fallback to { tree: [] } on failure — no separate .ok/.json() step needed here).
         const settingsData = settingsRes && settingsRes.ok ? await settingsRes.json().catch(() => null) : null;
         if (!cancelled) {
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);

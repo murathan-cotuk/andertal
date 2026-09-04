@@ -17,7 +17,15 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const qs = searchParams.toString();
-    const cacheKey = qs || "__root__";
+    /* `locale` is sent for future auto-translated names but the backend (api/store/categories/
+       route.ts, tree AND slug branches) never reads it today — content is identical regardless
+       of locale. Drop it from the cache key (not from the outbound request) so requests for the
+       same tree/slug from different locale pages share one cache entry instead of fragmenting
+       into up to 6 (one per locale), each a separate round trip to the — now Redis-shared —
+       backend cache. */
+    const cacheKeyParams = new URLSearchParams(searchParams);
+    cacheKeyParams.delete("locale");
+    const cacheKey = cacheKeyParams.toString() || "__root__";
     const now = Date.now();
 
     /* Dev: bypass cache — easier to spot after starting medusa or fixing DATABASE_URL */

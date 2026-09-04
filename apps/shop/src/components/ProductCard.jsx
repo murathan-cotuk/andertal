@@ -32,6 +32,20 @@ function resolveImg(src) {
   return resolveImageUrl(src) || null;
 }
 
+// Known dummy/placeholder hosts sometimes left in swatch data (e.g. "example.com/img/swatch-x.jpg"
+// from a demo import) — these always 404 and are noisy in the console for no visual benefit since
+// the CSS color-fallback swatch already covers the "no real image" case anyway.
+const PLACEHOLDER_IMAGE_HOSTS = ["example.com", "example.org", "example.net"];
+function resolveSwatchImg(src) {
+  const url = resolveImg(src);
+  if (!url) return null;
+  try {
+    const host = new URL(url, "https://placeholder.invalid").hostname;
+    if (PLACEHOLDER_IMAGE_HOSTS.includes(host)) return null;
+  } catch (_) {}
+  return url;
+}
+
 /* ─────────────────────────────────────────────────────────── *
  *  Styled components
  * ─────────────────────────────────────────────────────────── */
@@ -86,11 +100,14 @@ const ImgBlock = styled.div`
     display: none !important;
   }
 
+  /* Badge images render via next/image \`fill\` (CustomProductBadge.jsx) — they now WANT the
+     same absolute-fill treatment as img-primary/img-secondary above, not the old static/auto
+     override that predates that conversion. */
   img.product-custom-badge-img {
-    position: static !important;
-    inset: auto !important;
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     max-width: none !important;
     max-height: none !important;
     padding: 0 !important;
@@ -694,7 +711,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                       {opts.map((opt, oIdx) => {
                         const val = optionCanonicalValue(opt);
                         const displayStr = optionDisplayLabel(opt, locale) || val;
-                        const swatchUrl = typeof opt === "object" && opt.swatch_image ? resolveImg(opt.swatch_image) : null;
+                        const swatchUrl = typeof opt === "object" && opt.swatch_image ? resolveSwatchImg(opt.swatch_image) : null;
                         const isOn = (selectedOpts[gIdx] || "").toLowerCase() === val.toLowerCase();
                         const hasStock = normalizedVariants.some((v) => {
                           const ov = Array.isArray(v.option_values) ? v.option_values : [];
@@ -718,9 +735,11 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                             {isSwatchGroup ? (
                               <>
                                 {swatchUrl && (
-                                  <img
+                                  <Image
                                     src={swatchUrl}
                                     alt={displayStr}
+                                    width={26}
+                                    height={26}
                                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }}
                                     onError={(e) => {
                                       e.currentTarget.style.display = "none";
@@ -762,7 +781,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
               {normalizedVariants.slice(0, expandedFlat ? undefined : 5).map((v, i) => {
                 const qty = v.inventory_quantity ?? v.inventory ?? 0;
                 const outOfStock = Number(qty) <= 0;
-                const swatchUrl = v.swatch_image_url ? resolveImg(v.swatch_image_url) : null;
+                const swatchUrl = v.swatch_image_url ? resolveSwatchImg(v.swatch_image_url) : null;
                 return (
                   <Pill
                     key={i}
@@ -774,7 +793,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                     title={v.title || v.value || `${i + 1}`}
                   >
                     {swatchUrl ? (
-                      <img src={swatchUrl} alt={v.value || v.title || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
+                      <Image src={swatchUrl} alt={v.value || v.title || ""} width={26} height={26} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
                     ) : (v.title || v.value || `${i + 1}`)}
                   </Pill>
                 );
@@ -868,10 +887,10 @@ const ListImgWrap = styled.div`
     box-sizing: border-box;
   }
   img.product-custom-badge-img {
-    position: static !important;
-    inset: auto !important;
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     padding: 0 !important;
     object-fit: contain !important;
   }

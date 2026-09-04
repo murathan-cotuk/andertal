@@ -7,6 +7,8 @@ import { Link } from "@/i18n/navigation";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, notFound } from "next/navigation";
 import { resolveImageUrl } from "@/lib/image-url";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { SITE_URL } from "@/lib/seo";
 import {
@@ -647,8 +649,7 @@ export default function BrandPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/store-categories?tree=true&is_visible=true")
-      .then((r) => r.json())
+    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 })
       .then((data) => {
         if (cancelled) return;
         const tree = data.tree || [];
@@ -659,7 +660,7 @@ export default function BrandPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     let cancelled = false;

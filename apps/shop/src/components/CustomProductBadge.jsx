@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useProductBadgeStyles, mergeBadgeWithLiveStyle } from "@/components/ProductBadgeStylesProvider";
 
 /**
@@ -62,10 +63,13 @@ function cornerBoxStyle(b, stackIndex = 0) {
   const stack = stackIndex > 0 ? stackIndex * (size + 2) : 0;
   const oy = badgeOffsetPct(b.offset_y) + stack;
 
-  // Image: width always (default 22%). Text: width/height only when merchant set them.
+  // Image: width always (default 22%). Height too — defaults to square (matches width) when
+  // the merchant didn't set one, so the box always has real dimensions for next/image's `fill`
+  // mode (avoids the "no width/height reserved" CLS gap PageSpeed flagged on badge images).
+  // Text: width/height only when merchant set them (text naturally sizes to its content).
   if (b.badge_type === "image") {
     style.width = `${size}%`;
-    if (hasH) style.height = `${badgeSizePct(hRaw, size)}%`;
+    style.height = `${hasH ? badgeSizePct(hRaw, size) : size}%`;
   } else {
     if (hasW) style.width = `${size}%`;
     if (hasH) style.height = `${badgeSizePct(hRaw, hasW ? size : 22)}%`;
@@ -131,19 +135,15 @@ export default function CustomProductBadge({ badge, stackIndex = 0, locale }) {
     if (!imageUrl) return null;
     return (
       <div style={cornerBoxStyle(b, stackIndex)}>
-        <img
+        <Image
           className="product-custom-badge-img"
           src={imageUrl}
           alt={bt(b, "label", locale) || ""}
+          fill
+          sizes="120px"
+          loading="lazy"
           style={{
-            display: "block",
-            width: "100%",
-            height: b.image_height != null && Number(b.image_height) > 0 ? "100%" : "auto",
-            maxWidth: "none",
-            maxHeight: "none",
             objectFit: "contain",
-            position: "static",
-            inset: "auto",
             padding: 0,
             margin: 0,
             border: "none",

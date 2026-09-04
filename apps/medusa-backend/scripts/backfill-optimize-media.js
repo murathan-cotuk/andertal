@@ -6,14 +6,15 @@
  * banners / category / collection images that were stored raw (multi-MB PNGs etc.) and are still
  * being served byte-for-byte to every visitor.
  *
- * Scope: image URLs embedded inside the landing-page "containers" JSON blobs —
- *   admin_hub_landing_page.containers      (the homepage)
- *   admin_hub_landing_categories.containers
- *   admin_hub_landing_pages.containers
+ * Scope:
+ *   - image URLs embedded inside the landing-page "containers" JSON blobs —
+ *     admin_hub_landing_page.containers (homepage), admin_hub_landing_categories.containers,
+ *     admin_hub_landing_pages.containers
+ *   - admin_hub_product_badges.image_url + i18n.<locale>.image_url (the "Made in Europe"/Sale/
+ *     Bestseller corner badges — same raw-PNG problem, separate table, not JSON-embedded)
  * These are recursively scanned for string values that look like our own local-disk-hosted
  * (/uploads/...) or S3-hosted image URLs. Category/collection/brand cover images stored in their
- * own dedicated columns are NOT covered by this pass — the containers JSON is where the huge
- * hero/banner PNGs the PageSpeed audit flagged actually live.
+ * own dedicated columns are NOT covered by this pass.
  *
  * Safety:
  *   - Defaults to --dry-run (no writes, no new files, no DB changes) unless --dry-run is REMOVED.
@@ -191,6 +192,67 @@ async function storeProcessedBuffer(originalUrl, buffer) {
   )
 }
 
+/** Finds every candidate image URL in `payload` (any JSON-shaped value — containers array, or a
+ * plain { image_url, i18n } badge row), processes each once, and returns the url->newUrl map
+ * (empty if DRY_RUN or nothing needed processing). Mutates `summary` in place. */
+async function processPayloadImages(payload, rowLabel, summary) {
+  const urls = new Set()
+  collectImageUrls(payload, urls)
+  const urlMap = new Map()
+  for (const url of urls) {
+    try {
+      const original = await fetchOriginalBuffer(url)
+      const mimetype = /\.png/i.test(url) ? 'image/png' : 'image/jpeg'
+      const processed = await processGenericImageToWebp(original, mimetype)
+      if (!processed) {
+        summary.imagesSkipped += 1
+        continue
+      }
+      summary.imagesProcessed += 1
+      summary.bytesBefore += original.length
+      summary.bytesAfter += processed.length
+      console.log(`  ${url}`)
+      console.log(`    ${(original.length / 1024).toFixed(0)} KB -> ${(processed.length / 1024).toFixed(0)} KB (max edge ${GENERIC_IMAGE_MAX_EDGE}px)`)
+      if (!DRY_RUN) {
+        const newUrl = await storeProcessedBuffer(url, processed)
+        urlMap.set(url, newUrl)
+      }
+    } catch (e) {
+      summary.errors.push(`${rowLabel}: ${url} -> ${e.message}`)
+      console.log(`    ERROR: ${e.message}`)
+    }
+  }
+  return urlMap
+}
+
+/** Product badges (admin_hub_product_badges) — flat image_url column + optional per-locale
+ * i18n.<locale>.image_url overrides. Not covered by the landing-containers pass above, but the
+ * exact same 672KB/189KB-raw-PNG problem the PageSpeed audit flagged for badge images. */
+async function backfillProductBadges(client, summary) {
+  let rows
+  try {
+    rows = (await client.query(`SELECT id, image_url, i18n FROM admin_hub_product_badges`)).rows
+  } catch (e) {
+    console.log(`  [admin_hub_product_badges] query failed (table may not exist here): ${e.message}`)
+    return
+  }
+  console.log(`\n[product badges — admin_hub_product_badges] ${rows.length} row(s)`)
+
+  for (const row of rows) {
+    summary.rowsScanned += 1
+    const payload = { image_url: row.image_url, i18n: row.i18n }
+    const urlMap = await processPayloadImages(payload, `admin_hub_product_badges#${row.id}`, summary)
+    if (!DRY_RUN && urlMap.size > 0) {
+      const rewritten = rewriteImageUrls(payload, urlMap)
+      await client.query(
+        `UPDATE admin_hub_product_badges SET image_url = $1, i18n = $2 WHERE id = $3`,
+        [rewritten.image_url, rewritten.i18n ? JSON.stringify(rewritten.i18n) : null, row.id],
+      )
+      summary.rowsChanged += 1
+    }
+  }
+}
+
 async function main() {
   if (!DATABASE_URL) {
     console.error('DATABASE_URL not set.')
@@ -224,34 +286,7 @@ async function main() {
         const containers = Array.isArray(row.containers) ? row.containers : []
         if (!containers.length) continue
 
-        const urls = new Set()
-        collectImageUrls(containers, urls)
-        if (!urls.size) continue
-
-        const urlMap = new Map()
-        for (const url of urls) {
-          try {
-            const original = await fetchOriginalBuffer(url)
-            const mimetype = /\.png/i.test(url) ? 'image/png' : 'image/jpeg'
-            const processed = await processGenericImageToWebp(original, mimetype)
-            if (!processed) {
-              summary.imagesSkipped += 1
-              continue
-            }
-            summary.imagesProcessed += 1
-            summary.bytesBefore += original.length
-            summary.bytesAfter += processed.length
-            console.log(`  ${url}`);
-            console.log(`    ${(original.length / 1024).toFixed(0)} KB -> ${(processed.length / 1024).toFixed(0)} KB (max edge ${GENERIC_IMAGE_MAX_EDGE}px)`)
-            if (!DRY_RUN) {
-              const newUrl = await storeProcessedBuffer(url, processed)
-              urlMap.set(url, newUrl)
-            }
-          } catch (e) {
-            summary.errors.push(`${table}#${row.row_id}: ${url} -> ${e.message}`)
-            console.log(`    ERROR: ${e.message}`)
-          }
-        }
+        const urlMap = await processPayloadImages(containers, `${table}#${row.row_id}`, summary)
 
         if (!DRY_RUN && urlMap.size > 0) {
           const rewritten = rewriteImageUrls(containers, urlMap)
@@ -260,6 +295,8 @@ async function main() {
         }
       }
     }
+
+    await backfillProductBadges(client, summary)
 
     console.log('\n--- Summary ---')
     console.log(`Rows scanned:     ${summary.rowsScanned}`)

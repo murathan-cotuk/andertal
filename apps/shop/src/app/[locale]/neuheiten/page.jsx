@@ -214,13 +214,12 @@ export default function NeuheitenPage() {
       try {
         setLoading(true);
         setError("");
-        const [catRes, prData] = await Promise.all([
-          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`),
+        const [catData, prData] = await Promise.all([
+          cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 }).catch(() => ({ tree: [] })),
           // Large catalog snapshot (up to 1200 products) — cached client-side for 2 min so
           // revisits/back-navigation don't re-pull the full payload from the backend each time.
           cachedJsonFetch("/api/store-products?limit=1200", { ttlMs: 120000 }).catch(() => ({ products: [] })),
         ]);
-        const catData = catRes.ok ? await catRes.json() : { tree: [] };
         if (!cancelled) {
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);

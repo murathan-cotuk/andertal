@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { Link } from "@/i18n/navigation";
 import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
 import { useLandingChrome } from "@/context/LandingChromeContext";
@@ -13,10 +14,16 @@ import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
-import SupportLanding from "@/components/support/SupportLanding";
-import BecomeSellerLanding from "@/components/landing/BecomeSellerLanding";
 import CatalogHubFilterShell from "@/components/catalog/CatalogHubFilterShell";
-import BrandsDirectoryBlock from "@/components/landing/BrandsDirectoryBlock";
+
+// Code-split: these are each their own module already (no internal refactor needed) and are
+// niche/rarely-rendered container types (support pages, become-seller landing, brands directory)
+// — most product/category page visits never mount any of them, so there's no reason to ship
+// their JS in the same bundle every visitor downloads. This was part of the PageSpeed TBT/unused-
+// JS finding (large landing chunk, ~70KB flagged unused on a typical page load).
+const SupportLanding = dynamic(() => import("@/components/support/SupportLanding"), { ssr: false });
+const BecomeSellerLanding = dynamic(() => import("@/components/landing/BecomeSellerLanding"), { ssr: false });
+const BrandsDirectoryBlock = dynamic(() => import("@/components/landing/BrandsDirectoryBlock"), { ssr: false });
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
 
@@ -33,7 +40,19 @@ function localizedAsset(obj, field, locale) {
 
 function resolveUrl(url) {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    // Strip the host on absolute /uploads/... URLs (including stale/old backend domains from
+    // before any rename/migration) so the shop's own /uploads rewrite proxy serves them through
+    // the CURRENT backend + our domain's caching, instead of a cross-origin hotlink that can 404
+    // if the old host is ever retired. Anything else (external/seller-hotlinked images) passes
+    // through unchanged — mirrors apps/shop/src/lib/image-url.js's resolveImageUrl().
+    try {
+      const pathname = new URL(url).pathname;
+      if (pathname.startsWith("/uploads/")) return pathname;
+    } catch (_) {}
+    return url;
+  }
+  if (url.startsWith("/")) return url;
   return `${BACKEND_URL}/uploads/${url}`;
 }
 
@@ -708,11 +727,21 @@ function ImageText({ container, locale = "de" }) {
             {videoSrc ? (
               <video src={videoSrc} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} autoPlay muted loop playsInline />
             ) : (
-              // No fixed aspect-ratio config exists for this container type (unlike the mosaic/grid
-              // blocks above), so next/image's fill/width+height sizing can't be applied here
-              // without guessing a crop ratio and changing how editors' images render — lazy-load
-              // is still a free win.
-              <img src={imgSrc} alt={title || ""} loading="lazy" style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} />
+              // No fixed aspect-ratio config exists for this container type — width/height below
+              // are only a size HINT for next/image's optimizer + initial reserved space; the
+              // style override (width:100%, height:auto) still lets the real image's own aspect
+              // ratio win once it loads, exactly like the old raw <img>, so editors' crops/ratios
+              // aren't forced into anything. This is next/image's documented pattern for "known
+              // container width, unknown source aspect ratio."
+              <Image
+                src={imgSrc}
+                alt={title || ""}
+                width={800}
+                height={600}
+                sizes="(max-width: 768px) 45vw, 480px"
+                loading="lazy"
+                style={{ width: "100%", height: "auto", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }}
+              />
             )}
           </div>
         )}
@@ -1554,11 +1583,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
           }}
         >
           {image ? (
-            <img
-              src={image}
-              alt={collection.title || ""}
-              style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }}
-            />
+            <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
           ) : (
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
               Keine Vorschau
@@ -1642,11 +1667,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
                 }}
               >
                 {image ? (
-                  <img
-                    src={image}
-                    alt={collection.title || ""}
-                    style={{ width: "100%", height: "100%", objectFit: imgObjectFit, display: "block" }}
-                  />
+                  <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
                 ) : (
                   <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
                     Keine Vorschau
@@ -2586,7 +2607,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // mobile_item_width accepts any CSS length (vw, %, px). Falls back to calculated px value.
   const mobileItemW = String(container.mobile_item_width || "").trim() || `${mobileItemWidthPx}px`;
 
-  const renderImageCell = (img) => {
+  const renderImageCell = (img, isFirstImage = false, sizesHint = "(max-width: 768px) 90vw, 400px") => {
     const src = resolveUrl(lt(img, "url", locale));
     const ratio = pickImageCarouselRatio(container, isNarrow);
     const minH = isNarrow && (container.min_height_mobile != null) && String(container.min_height_mobile).trim() !== "";
@@ -2614,7 +2635,17 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     const block = (
       <>
         <div style={boxStyle}>
-          <Image src={src} alt={imgTitle || ""} fill sizes="(max-width: 768px) 90vw, 400px" style={{ objectFit: "cover" }} />
+          {/* priority (fetchpriority=high, no lazy) only on the very first cell of the
+              first-shown carousel — that's the mobile LCP element per the Lighthouse trace;
+              next/image already lazy-loads everything else by default. */}
+          <Image
+            src={src}
+            alt={imgTitle || ""}
+            fill
+            sizes={sizesHint}
+            style={{ objectFit: "cover" }}
+            priority={isFirstImage}
+          />
         </div>
         {cap}
       </>
@@ -2689,7 +2720,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
                   ...(isLast ? { marginRight: padRight, scrollMarginRight: padRight } : {}),
                 }}
               >
-                {renderImageCell(img)}
+                {renderImageCell(img, isFirstContainer && isFirst, `(max-width: 768px) ${mobileItemW}, 400px`)}
               </div>
             );
           })}
@@ -2711,7 +2742,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
         >
           {images.map((img, i) => (
             <div key={i} style={{ minWidth: 0 }}>
-              {renderImageCell(img)}
+              {renderImageCell(img, isFirstContainer && i === 0)}
             </div>
           ))}
         </Carousel>
@@ -2963,8 +2994,10 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
     return () => { cancelled = true; };
   }, [shouldLoadSidebarLinks, containers, locale]);
 
-  // Don't block render — show layout immediately, data-dependent components show skeleton
-  if (!containers) return null;
+  // Don't block render — show layout immediately, data-dependent components show skeleton.
+  // While containers haven't arrived yet (non-SSR call sites), reserve above-the-fold height
+  // instead of rendering nothing, so the page doesn't pop from 0 → full height (CLS).
+  if (!containers) return <div className="landing-skeleton" />;
   if (containers.length === 0) return null;
 
   const deviceContainers = containers.filter((c) => {

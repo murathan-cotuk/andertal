@@ -11,6 +11,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { LogoutButton } from "@andertal/ui";
 import { useCart } from "@/context/CartContext";
@@ -357,8 +358,7 @@ export default function MobileNav({ layout = "fixed" }) {
   useEffect(() => {
     let cancelled = false;
     setCategoriesLoading(true);
-    fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`)
-      .then((r) => r.json())
+    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 })
       .then((d) => {
         if (cancelled) return;
         const tree = d?.tree || [];

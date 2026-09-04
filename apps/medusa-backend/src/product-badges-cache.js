@@ -6,11 +6,16 @@
  * edits appear without waiting for TTL.
  */
 
+const { createTieredCache } = require('./tiered-cache')
+
 let productBadgesCache = { expiresAt: 0, badges: [] }
 const PRODUCT_BADGES_CACHE_TTL_MS = 60 * 1000
+// Shares the badge list across Render instances so only one of them hits the DB per TTL window.
+const redisCache = createTieredCache('product-badges', PRODUCT_BADGES_CACHE_TTL_MS / 1000)
 
 function invalidateProductBadgesCache() {
   productBadgesCache = { expiresAt: 0, badges: [] }
+  redisCache.invalidateAll().catch(() => {})
 }
 
 /**
@@ -20,6 +25,13 @@ function invalidateProductBadgesCache() {
 async function getActiveProductBadges(getDbClient) {
   const now = Date.now()
   if (productBadgesCache.expiresAt > now) return productBadgesCache.badges
+
+  const shared = await redisCache.get('active')
+  if (Array.isArray(shared)) {
+    productBadgesCache = { expiresAt: now + PRODUCT_BADGES_CACHE_TTL_MS, badges: shared }
+    return shared
+  }
+
   let badges = []
   const client = typeof getDbClient === 'function' ? getDbClient() : null
   if (client) {
@@ -33,6 +45,7 @@ async function getActiveProductBadges(getDbClient) {
     }
   }
   productBadgesCache = { expiresAt: now + PRODUCT_BADGES_CACHE_TTL_MS, badges }
+  redisCache.set('active', badges).catch(() => {})
   return badges
 }
 

@@ -16,6 +16,8 @@ import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { baseHandleFromUrl } from "@/lib/product-url-handle";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { SITE_URL, localizedCmsField } from "@/lib/seo";
 import {
@@ -867,9 +869,8 @@ function CollectionPage() {
             if (pageData?.id) { setCmsPage(pageData); setLoading(false); return; }
           }
           // Fallback 3: full tree lookup
-          const catTreeRes = await fetch(`/api/store-categories?tree=true&is_visible=true`).catch(() => null);
-          if (catTreeRes?.ok) {
-            const catTreeData = await catTreeRes.json().catch(() => null);
+          const catTreeData = await cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 }).catch(() => null);
+          if (catTreeData) {
             const catTree = catTreeData?.tree || catTreeData?.categories || [];
             if (findCategoryBySlug(catTree, handle)) {
               setIsCategorySlug(true); setLoading(false); return;

@@ -14,6 +14,8 @@ import { colorSwatchFallback } from "@/lib/color-swatch";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { SITE_URL } from "@/lib/seo";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
@@ -108,11 +110,13 @@ const MainImageWrap = styled.div`
     z-index: 1;
   }
 
+  /* Renders via next/image \`fill\` (CustomProductBadge.jsx) — wants the same absolute-fill
+     treatment as the product photo above it, not the old static/auto override. */
   img.product-custom-badge-img {
-    position: static !important;
-    inset: auto !important;
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     max-width: none !important;
     max-height: none !important;
     padding: 0 !important;
@@ -1228,8 +1232,7 @@ export default function ProductTemplateMobile() {
     }
 
     let cancelled = false;
-    fetch("/api/store-categories?tree=true&is_visible=true")
-      .then((r) => r.json())
+    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 })
       .then((data) => {
         if (cancelled) return;
         const tree = data?.tree || data?.categories || [];
@@ -1256,7 +1259,7 @@ export default function ProductTemplateMobile() {
     return () => {
       cancelled = true;
     };
-  }, [product?.id, product?.metadata?.category_slug, product?.metadata?.admin_category_id, product?.metadata?.category_id]);
+  }, [product?.id, product?.metadata?.category_slug, product?.metadata?.admin_category_id, product?.metadata?.category_id, locale]);
 
   useEffect(() => {
     if (!product?.variation_groups?.length || !product?.variants?.length) return;

@@ -38,6 +38,8 @@ import {
   filterProductsByCategorySubtree,
 } from "@/lib/search-listing-helpers";
 import { normCatId } from "@/lib/category-product-ids";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import CustomCheckbox from "../ui/CustomCheckbox";
 
 const HEADER_H = 72;
@@ -738,8 +740,7 @@ export default function SearchTemplate() {
     (async () => {
       try {
         setTreeLoading(true);
-        const r = await fetch("/api/store-categories?tree=true&is_visible=true");
-        const j = await r.json().catch(() => ({ tree: [] }));
+        const j = await cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 }).catch(() => ({ tree: [] }));
         if (!c) return;
         const t = j.tree || j.categories || [];
         setTree(Array.isArray(t) ? t : [t].filter(Boolean));
@@ -750,7 +751,7 @@ export default function SearchTemplate() {
       }
     })();
     return () => { c = false; };
-  }, []);
+  }, [locale]);
 
   const textHits = useMemo(
     () => (loading ? [] : textMatchProducts(q, products || [])),

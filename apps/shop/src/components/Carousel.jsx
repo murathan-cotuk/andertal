@@ -316,11 +316,15 @@ export default function Carousel({
     const el = scrollRef.current;
     if (!el) return;
     let { scrollLeft, scrollWidth, clientWidth } = el;
-    /* Loop: sonda iken anında ilk yarıya sar (sonsuz döngü) */
+    /* Loop: sonda iken anında ilk yarıya sar (sonsuz döngü).
+       Write deferred to the next frame — doing the layout write in the same tick as the read
+       above forces a synchronous reflow (flagged by PageSpeed); scheduling it a frame later is
+       visually identical (the wraparound is already designed to be imperceptible) but lets the
+       browser batch the read and write into separate layout passes. */
     if (loopMode && scrollWidth > clientWidth) {
       const half = scrollWidth / 2;
       if (scrollLeft >= half - 2) {
-        el.scrollLeft = scrollLeft - half;
+        requestAnimationFrame(() => { if (el) el.scrollLeft = scrollLeft - half; });
         return;
       }
     }

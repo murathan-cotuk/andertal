@@ -11,6 +11,7 @@ const {
   categoriesPgUnavailable,
 } = require('../categories-helpers')
 const { updateAdminHubCollectionDb } = require('../collections-db')
+const { invalidateCategoryTreeCache } = require('../category-tree-cache')
 
 const requireSuperuser = (req, res, next) => {
   if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
@@ -140,6 +141,7 @@ const adminHubCategoriesPOST_fallbackPg = async (req, res) => {
     await client.end()
     const category = mapAdminHubCategoryPgRow(ir.rows[0])
     await syncCategoryCmsToCollectionFromBody(b)
+    invalidateCategoryTreeCache().catch(() => {})
     return res.status(201).json({ category })
   } catch (e) {
     try { await client.end() } catch (_) {}
@@ -250,6 +252,7 @@ const adminHubCategoryByIdPUT_fallbackPg = async (req, res) => {
     } catch (cmsErr) {
       console.warn('syncCategoryCmsToCollection (PUT PG):', cmsErr && cmsErr.message)
     }
+    invalidateCategoryTreeCache().catch(() => {})
     return res.json({ category })
   } catch (e) {
     try { await client.end() } catch (_) {}
@@ -273,6 +276,7 @@ const adminHubCategoryByIdDELETE_fallbackPg = async (req, res) => {
     const dr = await client.query(`DELETE FROM admin_hub_categories WHERE id = $1::uuid RETURNING id`, [id])
     await client.end()
     if (!dr.rows[0]) return res.status(404).json({ message: 'Category not found' })
+    invalidateCategoryTreeCache().catch(() => {})
     return res.status(200).json({ deleted: true })
   } catch (e) {
     try { await client.end() } catch (_) {}
@@ -315,6 +319,7 @@ const adminHubCategoriesImportPOST_fallbackPg = async (req, res) => {
       categories.push(mapAdminHubCategoryPgRow(row))
     }
     await client.end()
+    invalidateCategoryTreeCache().catch(() => {})
     return res.status(201).json({ imported: categories.length, categories })
   } catch (e) {
     try { await client.end() } catch (_) {}
@@ -383,6 +388,7 @@ const adminHubCategoriesPOST = async (req, res) => {
         metadata: b.metadata,
       })
       await syncCategoryCmsToCollectionFromBody(b)
+      invalidateCategoryTreeCache().catch(() => {})
       return res.status(201).json({ category })
     } catch (err) {
       console.warn('Admin Hub Categories POST (service) failed, PG fallback:', err && err.message)
@@ -402,6 +408,7 @@ const adminHubCategoriesImportPOST = async (req, res) => {
   if (adminHubService) {
     try {
       const { imported, categories } = await adminHubService.importCategories(items)
+      invalidateCategoryTreeCache().catch(() => {})
       return res.status(201).json({ imported, categories })
     } catch (err) {
       console.warn('Admin Hub Categories import (service) failed, PG fallback:', err && err.message)
@@ -456,6 +463,7 @@ const adminHubCategoryByIdPUT = async (req, res) => {
       } catch (e) {
         console.warn('syncCategoryCmsToCollection (PUT):', e && e.message)
       }
+      invalidateCategoryTreeCache().catch(() => {})
       return res.json({ category })
     } catch (err) {
       console.warn('Admin Hub Category PUT (service) failed, PG fallback:', err && err.message)
@@ -471,6 +479,7 @@ const adminHubCategoryByIdDELETE = async (req, res) => {
   if (adminHubService) {
     try {
       await adminHubService.deleteCategory(req.params.id)
+      invalidateCategoryTreeCache().catch(() => {})
       return res.status(200).json({ deleted: true })
     } catch (err) {
       console.warn('Admin Hub Category DELETE (service) failed, PG fallback:', err && err.message)

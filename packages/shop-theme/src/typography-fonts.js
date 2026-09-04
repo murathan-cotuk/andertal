@@ -128,7 +128,13 @@ export function collectTypographyGoogleFamilies(typography) {
   return out;
 }
 
-const W_AXIS = "ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700";
+// Only regular + bold — the weights actual body/heading typography needs almost all the time.
+// The old axis requested 10 weight/italic combinations PER family (300-800 normal + 400-700
+// italic), which is exactly what PageSpeed flagged as ~423KB of Google Fonts payload on first
+// load. Any theme that genuinely needs an in-between weight (300/500/600/800) or italics will
+// have the browser synthesize it from what IS loaded — a minor rendering tradeoff PageSpeed's
+// own recommendation explicitly asks for ("ilk paint'te sadece 1-2 weight").
+const W_AXIS = "wght@400;700";
 
 /**
  * One stylesheet URL loading multiple Google families (Shopfront).

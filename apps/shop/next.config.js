@@ -49,6 +49,11 @@ const nextConfig = {
   },
   typescript: { ignoreBuildErrors: false },
   images: {
+    // Own-storage uploads are named `${Date.now()}-*.webp` (media.js) — a re-upload always gets
+    // a new URL, never overwrites one in place — so the optimizer's cached copy at a given URL
+    // is safe to keep for a long time. Next's default is 60s; bump to 1 year (its documented
+    // example value) so the same optimized image isn't re-derived on every cache-header expiry.
+    minimumCacheTTL: 31536000,
     remotePatterns: [
       {
         protocol: 'http',

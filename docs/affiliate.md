@@ -10,35 +10,32 @@ TALIMAT.md'de Almanya-odaklı, EU-origin, GDPR'a duyarlı tasarım kararları va
 1. **`affiliate.andertal.com`** — Affiliate'lerin kayıt olduğu, link ürettiği, kazancını gördüğü Next.js portal.
 2. Shop + sellercentral tarafında **tracking middleware** (`?ref=AFF_XXX` capture, GDPR-uyumlu).
 3. Backend tarafında attribution engine, commission calculator, payout scheduler, fraud detector.
-4. Sellercentral'da **`/marketing/affiliate`** sayfası — seller'ların ürün ürün affiliate programına ekleyeceği yer.
-5. Sellercentral superuser tarafında **`/affiliate-admin`** — affiliate onay, fraud queue, payout override.
+4. Sellercentral'da **`/marketing/affiliate`** (opsiyonel, bilgilendirici) — seller kendi ürünlerine gelen affiliate tıklama/satış özetini görür; **ürün ekleme/onay yok**.
+5. Sellercentral superuser tarafında **`/affiliate-admin`** — affiliate onay (signup), fraud queue, payout override.
 ## İKİ AFFILIATE MODELİ
+### Ortak kasa kuralı (her iki model)
+- Affiliate komisyonu **seller’dan kesilmez**. Andertal’ın aldığı pazar yeri komisyonundan (varsayılan **%12**, `seller_users.commission_rate`) pay ayrılır.
+- Ödeme: Andertal kasası → affiliate Stripe Connect hesabına (platform Stripe transfer / payout).
+- Formül tabanı: ilgili satışın **Andertal platform komisyonu (EUR cents)** = genelde `merchandise_basis × commission_rate` (örn. 100 € × %12 = **12 €**).
+
 ### Model 1 — Seller Referral (Recurring)
 - Affiliate, sellercentral signup linki üretir: `sellercentral.andertal.com/[locale]/signup?ref=AFF_XXX`.
-- Seller bu linkten kayıt olur ve superuser onaylar.
-- Seller'ın aylık GMV'sinden Andertal her zaman %12 komisyon alır.
-- Bu %12'nin **%10'u affiliate'e ödenir** = GMV'nin efektif %1,2'si.
-- **Süre**: İlk 24 ay tier1 (%10), sonrası tier2 (%3). Lifetime DEĞİL.
-- Bir seller sadece **bir** affiliate'e bağlı kalır (lock-in: ilk attribute eden alır).
-- Seller referral attribution window: **24 saat** (product window'dan ayrı — daha kısa).
-### Model 2 — Product Referral (Per-Product Opt-in)
-- Affiliate, **sadece** seller tarafından affiliate programına eklenmiş ürünler için link üretebilir.
-- Müşteri linkten gelir, 30 gün içinde alışveriş yaparsa affiliate komisyon kazanır.
-- **Komisyon**: **Sabit %3,5** (negotiate yok, boost yok). **Minimum 0,15 € floor.**
-- **Para kaynağı**: Andertal %12 dokunulmaz; seller affiliate ürünlerinde ek olarak %3,5 öder.
-  Toplam seller maliyeti affiliate ürünlerde: **%15,5**. Affiliate olmayan ürünlerde değişmez (%12).
-- **Granülarite**: Per-product. Seller `/marketing/affiliate` sayfasından tek tek veya bulk ekler.
-### Wind-down Modeli — Affiliate Koruma (3 Katman, Toplam 74 gün garanti)
-Seller bir ürünü programa ekledikten sonra çıkarmak istediğinde affiliate'in mağdur olmaması için:
-1. **Min lock-in (30 gün)** — Program eklenen ürün ilk 30 gün çıkarılamaz. UI'da Remove disabled.
-2. **Wind-down (14 gün)** — 30 gün dolunca "Schedule removal" yapılır. 14 gün boyunca:
-   - Mevcut affiliate linkler çalışır, komisyon üretmeye devam eder.
-   - **Yeni link üretilemez** (frontend disabled + backend 409).
-   - Affiliate'lere otomatik e-mail + dashboard'da "Active links affected" widget.
-3. **Attribution survival (30 gün)** — Wind-down öncesi tıklamalar 30 günlük attribution penceresini
-   tamamlar; bu pencere içinde satın alma olursa komisyon ödenir.
-**Emergency override**: Sadece superuser (yasal sorun, recall, fraud için). Affiliate'lere açıklayıcı
-e-mail + **son 90 gündeki tüm confirmed commission'lar clawback olmaz, ödeme garantilidir**.
+- Seller bu linkten kayıt olur ve superuser onaylar (seller hesabı onayı — affiliate ürün onayı değil).
+- O seller’ın her ödenen satışında Andertal platform komisyonu hesaplanır.
+- Affiliate’e: **platform komisyonunun %5’i**.
+  - Örnek: Seller 100 € sattı → Andertal 12 € komisyon → affiliate **0,60 €** (`12 × 0,05`).
+- **Süre**: Referral aktif kaldığı sürece aynı oran (**sabit %5**). Tier1/tier2 yok.
+- Bir seller sadece **bir** affiliate’e bağlı kalır (lock-in: ilk attribute eden alır).
+- Seller referral attribution window: **24 saat** (product window’dan ayrı — daha kısa).
+
+### Model 2 — Product Referral (Tüm katalog — seller onayı yok)
+- Affiliate, **sistemdeki herhangi bir satılabilir ürün** için link üretebilir. Seller’ın ürünü “affiliate programına eklemesi” **yok**; tek tek onay **yok**.
+- Müşteri linkten gelir, 30 gün içinde o ürünü (veya attributed line’ı) alırsa affiliate komisyon kazanır.
+- Affiliate’e: **o satırın Andertal platform komisyonunun %8’i**.
+  - Örnek: 100 € ürün → Andertal 12 € komisyon → affiliate **0,96 €** (`12 × 0,08`).
+- **Para kaynağı**: Andertal kasası (Stripe). Seller’ın maliyeti değişmez — hâlâ yalnızca platform %12 (veya kendi `commission_rate`); ekstra % kesilmez.
+- **Granülarite**: Katalog geneli. Enrollment / wind-down / min lock-in **yok**.
+- Stokta olmayan / silinmiş / `merged` ürünlere yeni link üretimi engellenebilir; mevcut attribution penceresi kuralları attribution engine’de kalır.
 ## KARAR TABLOSU (Tek Kaynak — Kod Yazarken Bunu Referans Al)
 | Karar | Değer |
 |---|---|
@@ -64,21 +61,20 @@ e-mail + **son 90 gündeki tüm confirmed commission'lar clawback olmaz, ödeme 
 | Ban sonrası bakiye | Fraud ban: tüm bakiye müsadere. Non-fraud ban: confirmed bakiye ödenir, pending iptal |
 | Hesap kapatma | Self-service; confirmed bakiye ödenir; data 6 yıl §147 AO retention |
 | Affiliate API | v1: clicks, commissions, payouts read endpoints (Bearer token) |
-| Çoklu affiliate çakışması | Lock-in: ilk attribute'ı oluşturan affiliate sahibi, sonradan değişmez |
-| **Seller referral tier1** | **%10 — ilk 24 ay** |
-| **Seller referral tier2** | **%3 — 24 ay sonrası** |
-| **Product affiliate rate** | **Sabit %3,5, min 0,15 € floor** |
-| **Product affiliate granülaritesi** | **Per-product (seller seçer)** |
-| **Min lock-in** | **30 gün** |
-| **Wind-down** | **14 gün** |
-| **Attribution survival** | **30 gün (click bazlı)** |
-| **Emergency removal** | **Sadece superuser; affiliate'lere son 90 gün ödeme garantili** |
+| Çoklu affiliate çakışması | Lock-in: ilk attribute’ı oluşturan affiliate sahibi, sonradan değişmez |
+| **Platform komisyon tabanı** | **Seller `commission_rate` (varsayılan %12) — Andertal kasası** |
+| **Seller referral payı** | **Platform komisyonunun %5’i (sabit; tier yok)** |
+| **Product referral payı** | **Platform komisyonunun %8’i (sabit)** |
+| **Product link kapsamı** | **Tüm katalog — seller enrollment / onay yok** |
+| **Affiliate ödemesi** | **Andertal → Stripe Connect (seller’dan ek kesinti yok)** |
+| **Product enrollment / wind-down** | **YOK (kaldırıldı)** |
+| **Emergency product removal** | **Superuser isteğe bağlı (yasal/fraud); affiliate link disable + e-mail; confirmed 90g korunabilir** |
 ### Compliance Gate'leri (PR Merge Öncesi Zorunlu)
 - **PR 7 (Payout) merge öncesi**: Steuerberater vergi modülü review'u + DAC7 raporlama logic doğrulaması.
 - **PR 9 (Consent banner) merge öncesi**: Hukuk danışmanı TTDSG/GDPR onayı; cookie kategorilendirmesi.
-- **PR 10 (Terms) merge öncesi**: Avukat affiliate sözleşmesi review'u (brand bidding, ban, müsadere, wind-down maddeleri).
+- **PR 10 (Terms) merge öncesi**: Avukat affiliate sözleşmesi review’u (brand bidding, ban, müsadere, kasa-ödeme maddeleri).
 ### Karar Değişikliği Prosedürü
-Tablodaki herhangi bir karar değişirse: önce tablo → sonra `config.js` + migration → açık PR'lar rebase.
+Tablodaki herhangi bir karar değişirse: önce tablo → sonra `config.js` + migration → açık PR’lar rebase.
 ## MİMARİ
 ```
 apps/
@@ -93,21 +89,18 @@ apps/
 │       │   │   ├── affiliate-commission.ts
 │       │   │   ├── affiliate-payout.ts
 │       │   │   ├── affiliate-fraud-flag.ts
-│       │   │   ├── seller-referral.ts
-│       │   │   └── product-affiliate-enrollment.ts
+│       │   │   └── seller-referral.ts
 │       │   ├── service.ts
 │       │   ├── attribution-engine.ts
 │       │   ├── commission-calculator.ts
 │       │   ├── fraud-detector.ts
-│       │   ├── payout-scheduler.ts
-│       │   └── enrollment-lifecycle.ts
+│       │   └── payout-scheduler.ts
 │       ├── workers/
-│       │   ├── commission-recalc.js              (order.paid → komisyon yarat)
+│       │   ├── commission-recalc.js              (order.paid → komisyon yarat; Andertal kasası payı)
 │       │   ├── commission-clawback.js            (order.refunded → clawback)
 │       │   ├── commission-confirm.js             (cron, daily — 30 gün geçenleri confirm)
-│       │   ├── enrollment-lifecycle.js           (cron, hourly — wind-down state machine)
-│       │   ├── monthly-payout.js                 (cron, ayın 1'i UTC 03:00)
-│       │   └── seller-referral-monthly.js        (cron, ayın 1'i — Model 1 komisyon hesabı)
+│       │   ├── monthly-payout.js                 (cron, ayın 1'i UTC 03:00 — Stripe transfer)
+│       │   └── seller-referral-monthly.js        (cron, ayın 1'i — Model 1: platform_fee × 5%)
 │       └── api/
 │           ├── affiliate/                        (affiliate.andertal.com için, JWT)
 │           │   ├── auth/
@@ -118,7 +111,7 @@ apps/
 │           │   └── seller-referrals/
 │           ├── public/affiliate-track/           (cookie set, shop + sellercentral'dan)
 │           ├── admin/affiliate/                  (superuser onay/fraud/payout)
-│           └── sellercentral/affiliate-marketing/ (/marketing/affiliate backend)
+│           └── sellercentral/affiliate-marketing/ (seller read-only özet; enrollment YOK)
 │
 ├── shop/
 │   └── middleware.js                             (?ref capture + cookie consent check)
@@ -127,7 +120,7 @@ apps/
 │   ├── middleware.ts                             (signup sayfasında ?ref capture)
 │   └── src/app/[locale]/
 │       ├── marketing/
-│       │   └── affiliate/page.jsx                (YENİ — per-product enrollment)
+│       │   └── affiliate/page.jsx                (YENİ — seller bilgilendirme / metrik; onay yok)
 │       └── affiliate-admin/                      (YENİ — superuser only)
 │           ├── page.jsx
 │           ├── pending/page.jsx
@@ -175,7 +168,7 @@ CREATE TABLE affiliate_links (
   type TEXT NOT NULL,                              -- 'seller_signup' | 'product' | 'category' | 'storefront'
   target_url TEXT NOT NULL,
   short_code TEXT UNIQUE NOT NULL,                 -- /r/{short_code}
-  product_id TEXT,                                 -- type='product' ise enrollment check için
+  product_id TEXT,                                 -- type='product' ise katalog ürünü (enrollment yok)
   label TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -211,29 +204,10 @@ CREATE TABLE seller_referrals (
   seller_id TEXT NOT NULL UNIQUE,
   referred_at TIMESTAMPTZ DEFAULT NOW(),
   commission_tier_active BOOLEAN DEFAULT TRUE,
-  tier1_until TIMESTAMPTZ,                         -- referred_at + 24 ay
-  current_rate_pct DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+  current_rate_pct DECIMAL(5,2) NOT NULL DEFAULT 5.00,  -- % of Andertal platform commission
   notes TEXT
 );
-CREATE TABLE product_affiliate_enrollments (
-  id TEXT PRIMARY KEY,
-  product_id TEXT NOT NULL,
-  seller_id TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-    -- pending | active | min_lockin | winding_down | removed | emergency_removed
-  enrolled_at TIMESTAMPTZ DEFAULT NOW(),
-  min_lockin_until TIMESTAMPTZ NOT NULL,           -- enrolled_at + 30 days
-  winddown_started_at TIMESTAMPTZ,
-  winddown_ends_at TIMESTAMPTZ,                    -- winddown_started_at + 14 days
-  removed_at TIMESTAMPTZ,
-  emergency_removed_by TEXT,
-  commission_rate_pct DECIMAL(5,2) NOT NULL DEFAULT 3.50,
-  commission_floor_cents INT NOT NULL DEFAULT 15,
-  UNIQUE (product_id, seller_id)
-);
-CREATE INDEX idx_product_affiliate_status ON product_affiliate_enrollments(status);
-CREATE INDEX idx_product_affiliate_winddown ON product_affiliate_enrollments(winddown_ends_at)
-  WHERE status = 'winding_down';
+-- NOT: product_affiliate_enrollments YOK — tüm katalog affiliate linklenebilir; seller onayı yok.
 CREATE TABLE affiliate_commissions (
   id TEXT PRIMARY KEY,
   affiliate_id TEXT REFERENCES affiliates(id),
@@ -241,16 +215,17 @@ CREATE TABLE affiliate_commissions (
   order_id TEXT,
   seller_id TEXT,
   product_id TEXT,
-  gross_amount_cents INT NOT NULL,
-  rate_pct DECIMAL(5,2) NOT NULL,
-  commission_cents INT NOT NULL,                   -- floor uygulanmış
+  gross_amount_cents INT NOT NULL,                -- merchandise / GMV basis (cents)
+  platform_commission_cents INT NOT NULL,          -- Andertal'ın aldığı komisyon (cents)
+  rate_pct DECIMAL(5,2) NOT NULL,                 -- seller_referral: 5 | product_sale: 8
+  commission_cents INT NOT NULL,                   -- platform_commission_cents * rate_pct / 100
   currency TEXT NOT NULL DEFAULT 'EUR',
   status TEXT NOT NULL DEFAULT 'pending',
     -- pending | confirmed | clawed_back | paid | forfeited
   earned_at TIMESTAMPTZ DEFAULT NOW(),
   confirmable_at TIMESTAMPTZ NOT NULL,             -- earned + 30 gün
   payout_id TEXT,
-  emergency_protected BOOLEAN DEFAULT FALSE        -- emergency_removed durumunda clawback'ten korunur
+  emergency_protected BOOLEAN DEFAULT FALSE
 );
 CREATE TABLE affiliate_payouts (
   id TEXT PRIMARY KEY,
@@ -285,18 +260,13 @@ module.exports = {
   PRODUCT_ATTRIBUTION_WINDOW_DAYS: 30,
   SELLER_SIGNUP_ATTRIBUTION_WINDOW_HOURS: 24,
   ATTRIBUTION_MODEL: 'last_click',
-  // Seller Referral (Model 1)
-  SELLER_REFERRAL_TIER1_PCT: 10,
-  SELLER_REFERRAL_TIER1_DURATION_MONTHS: 24,
-  SELLER_REFERRAL_TIER2_PCT: 3,
-  // Product Referral (Model 2)
-  PRODUCT_REFERRAL_PCT_FIXED: 3.5,
-  PRODUCT_REFERRAL_FLOOR_CENTS: 15,
-  PRODUCT_AFFILIATE_MIN_LOCKIN_DAYS: 30,
-  PRODUCT_AFFILIATE_WINDDOWN_DAYS: 14,
-  PRODUCT_AFFILIATE_ATTRIBUTION_SURVIVAL_DAYS: 30,
-  EMERGENCY_REMOVAL_PROTECTION_DAYS: 90,
-  // Payout
+  // Platform fee (Andertal) — affiliate payı bunun üzerinden
+  DEFAULT_PLATFORM_COMMISSION_RATE: 0.12,          // seller_users.commission_rate yoksa
+  // Seller Referral (Model 1) — Andertal platform komisyonunun yüzdesi
+  SELLER_REFERRAL_OF_PLATFORM_PCT: 5,
+  // Product Referral (Model 2) — Andertal platform komisyonunun yüzdesi
+  PRODUCT_REFERRAL_OF_PLATFORM_PCT: 8,
+  // Payout (Andertal kasası → affiliate Stripe Connect)
   MIN_PAYOUT_EUR: 50,
   PAYOUT_DAY_OF_MONTH: 1,
   CONFIRMATION_HOLD_DAYS: 30,
@@ -310,7 +280,7 @@ module.exports = {
   CHARGEBACK_SUSPEND_WINDOW_DAYS: 90,
   FRAUD_FLAGS_AUTO_SUSPEND_THRESHOLD: 3,
   KYC_REQUIRED_OVER_EUR: 600,                      // DAC7
-  // Approval
+  // Approval (affiliate hesap signup — ürün onayı değil)
   MANUAL_APPROVAL_FIRST_N_AFFILIATES: 100,
   // Geography
   ALLOWED_COUNTRIES: ['DE','AT','CH','NL','BE','LU','FR','IT','ES','PT','IE','DK','SE','FI','PL','GB'],
@@ -318,36 +288,31 @@ module.exports = {
 ```
 ## TRACKING & ATTRIBUTION
 ### Cookie Set Akışı (shop + sellercentral middleware)
-1. URL'de `?ref=AFF_XXX` görünür.
-2. Mevcut cookie consent state'i kontrol edilir.
-3. **Marketing/Affiliate kategorisi onaylı değilse**: click DB'ye kaydedilir (`consent_marketing=false`), cookie set EDİLMEZ, attribution oluşturulmaz.
+1. URL’de `?ref=AFF_XXX` görünür.
+2. Mevcut cookie consent state’i kontrol edilir.
+3. **Marketing/Affiliate kategorisi onaylı değilse**: click DB’ye kaydedilir (`consent_marketing=false`), cookie set EDİLMEZ, attribution oluşturulmaz.
 4. Onaylıysa: `__atrl` cookie set edilir (30 gün, SameSite=Lax, Secure).
-5. Click `affiliate_clicks`'e yazılır, `affiliate_attributions` upsert edilir (cookie_id key).
-### Order Completion
+5. Click `affiliate_clicks`’e yazılır, `affiliate_attributions` upsert edilir (cookie_id key).
+### Order Completion — Product Referral
 1. `order.paid` event → `commission-recalc` worker.
-2. Order'ın `customer_id` veya `cookie_id` üzerinden son 30 gün'deki son attribution bulunur.
-3. Her line item için:
-   - Seller'ın o ürün için aktif `product_affiliate_enrollments` row'u var mı?
-   - Status `active` | `min_lockin` | `winding_down` ise → komisyon yarat.
-   - `winding_down`'da: enrollment'tan değil, **attribution penceresinden** kontrol et — click wind-down'dan önce miydi? Evet ise komisyon yarat.
-   - `removed` ise: attribution survival check — click `removed_at`'ten önce ve 30 gün penceresi içindeyse → komisyon yarat.
-   - Komisyon: `max(line_total * 3.5%, 15 cents)`.
-4. `affiliate_commissions` row'u `status = 'pending'`, `confirmable_at = now + 30 gün`.
+2. Order’ın `customer_id` veya `cookie_id` üzerinden son 30 gün’deki son **product** attribution bulunur.
+3. Her attributed line item için:
+   - Ürün katalogda affiliate’e açıktır (enrollment check **yok**).
+   - `platform_commission_cents` = line merchandise basis × seller `commission_rate` (veya stored application fee’nin satır payı).
+   - Affiliate komisyon: `round(platform_commission_cents * PRODUCT_REFERRAL_OF_PLATFORM_PCT / 100)` → örn. 1200 × 8% = **96 cents**.
+4. `affiliate_commissions` row: `source_type='product_sale'`, `status='pending'`, `confirmable_at = now + 30 gün`.
+5. Seller’dan ek kesinti **yok**; kayıt sadece Andertal → affiliate yükümlülüğü.
+### Seller Referral (aylık)
+1. `seller-referral-monthly` worker: referred seller’ın dönemdeki `platform_commission` toplamı.
+2. Affiliate: `round(sum_platform_commission_cents * SELLER_REFERRAL_OF_PLATFORM_PCT / 100)` → örn. 1200 × 5% = **60 cents**.
+3. Aynı Stripe payout pipeline’ına `confirmed` sonrası dahil.
 ### Refund / Chargeback
 - `order.refunded` → ilgili commission `status = 'clawed_back'` (emergency_protected=true ise yok).
 - Chargeback → `clawed_back` + fraud_flag(medium). 3+/90 gün → auto-suspend.
 ### Confirmation
 - Daily cron: `confirmable_at <= now` AND `status='pending'` → `confirmed`.
-## WIND-DOWN STATE MACHINE (`enrollment-lifecycle.js`, hourly cron)
-```
-pending → active                  (enrollment yaratıldıktan 5 dk sonra)
-active → min_lockin               (her zaman aktif; min_lockin_until > now ise UI'da Remove disabled)
-active/min_lockin → winding_down  (seller "Schedule Removal" tıkladı, min_lockin_until <= now ise)
-winding_down → removed            (winddown_ends_at <= now)
-[any] → emergency_removed         (superuser manuel)
-```
-`winding_down` ve `removed` ürünler için `affiliate_links` oluşturmaya çalışma → 409.
-`emergency_removed` olunca: son 90 gündeki tüm bu ürün için commission'lar `emergency_protected=true`.
+## WIND-DOWN / ENROLLMENT
+**Yok.** Seller ürün onayı ve enrollment state machine kaldırıldı. Superuser yasal/fraud için ürün veya affiliate link’i manuel disable edebilir; confirmed komisyonlar için opsiyonel `emergency_protected`.
 ## FRAUD DETECTION (`fraud-detector.ts`)
 Her commission yaratıldığında çalışır:
 1. **Self-referral**: customer.email/phone/payment == affiliate.email/phone/payment → block + high flag.
@@ -365,22 +330,17 @@ Her commission yaratıldığında çalışır:
 - KYC eksikse payout block, affiliate'e uyarı maili.
 ## SELLERCENTRAL — `/marketing/affiliate` (Her Seller)
 Mevcut sellercentral marketing menüsünün altına "Affiliate" alt-menü eklenir.
-**Layout (Polaris):**
-- Top: KPI bar (bu ay satış, gelir, ödenen komisyon).
-- "Add Products" wizard: ürün arama + bulk multi-select + confirmation modal ("12 ürün eklenecek, %3,5 komisyon, min bağlılık 30 gün, devam?").
-- Table:
-  - Kolonlar: Checkbox, Ürün (image + name + SKU), Rate (%3,5), Clicks (30g), Status badge, Actions menu.
-  - Status badge'ler: `Active` (yeşil), `Min Lock-in: 18d remaining` (sarı), `Winding Down: 8d remaining` (turuncu), `Removed` (gri).
-  - Actions: "Remove" sadece `min_lockin_until <= now` olanlarda enabled; tıklanınca "Schedule Removal" confirmation modal'ı (14 gün wind-down açıklamalı).
-- Bulk actions: bulk schedule removal (her ürün için ayrı min_lockin kontrolü; uygun olmayanlar skip + toast bilgisi).
-- Üst banner: wind-down kuralları kısa metin.
+**Read-only bilgilendirme (enrollment / “Add Products” yok):**
+- Kısa açıklama: ürünler otomatik affiliate programına açıktır; komisyon Andertal kasasından ödenir; seller’dan ek kesinti yok.
+- KPI bar (opsiyonel): bu ay affiliate-attributed clicks / satışlar / (bilgi amaçlı) Andertal’ın affiliate’e ödediği tutar özeti — seller bakiyesini etkilemez.
+- Tablo (read-only): Ürün (image + name + SKU), Clicks (30g), Attributed sales (30g). Actions / Remove / Status badge **yok**.
 ## SELLERCENTRAL — `/affiliate-admin` (Superuser Only)
 Sayfalar:
 - **Pending**: signup approve/reject queue, KYC doc preview.
 - **Fraud**: aktif fraud_flags listesi, severity'ye göre filtre, "Resolve / Suspend / Ban" actions.
 - **Payouts**: tüm payout history, failed transfer retry, manual override.
 - **Commission Adjustments**: manuel claw-back veya bonus (audit log'a yazılır).
-- **Emergency Removal**: seller bazlı ürün emergency_remove butonu (gerekçe zorunlu, e-mail trigger).
+- **Link / product disable** (opsiyonel): yasal/fraud için ürün veya affiliate link disable (gerekçe zorunlu, e-mail); enrollment state machine yok.
 ## SHOP — UI Eklemeleri
 1. **Cookie consent banner**: Mevcut sisteme "Marketing/Affiliate" kategorisi eklenir (GDPR/TTDSG). Reject ederse `__atrl` set edilmez.
 2. **Product page**: `?ref=AFF_XXX` ile gelinmişse ilk landing'de tek seferlik discrete banner: *"Bu ziyaret bir affiliate link üzerinden gerçekleşti. Aldığınız üründen değişiklik olmaz. [Lerne mehr]"* — BGH 2017 disclosure kararları gereği.
@@ -388,28 +348,27 @@ Sayfalar:
 ## AFFILIATE PORTAL — `apps/affiliate/`
 Next.js 14 App Router, next-intl, Polaris (sellercentral ile tutarlı), JWT auth.
 ### Dashboard
-KPI kartları (bu ay clicks/conversions/pending/lifetime) + 30-gün grafiği + top 5 link + top 5 referred seller + "Active links affected" widget (winding_down ürünler).
+KPI kartları (bu ay clicks/conversions/pending/lifetime) + 30-gün grafiği + top 5 link + top 5 referred seller.
 ### Links
 - "New Link" wizard: tip seç → seller_signup / product / category / storefront.
-- Product link'te: arama + sadece `status IN ('active','min_lockin','winding_down')` ürünler listelenir. `winding_down` olanlar gri + uyarı.
+- Product link'te: katalog araması — **tüm satılabilir ürünler** (seller enrollment filtresi yok). Silinmiş / stokta yok / `merged` ürünler link üretiminde engellenebilir.
 - Short URL + QR kod indirme.
 - Per-link metrikler tablosu.
 ### Referrals (Sellers)
-- Getirdiğim seller'lar (anonimize): "S-1234", signup tarihi, status, bu ay earnings, lifetime earnings, tier badge (Tier1/Tier2).
-- Tier1'den Tier2'ye geçiş için gün sayısı.
+- Getirdiğim seller'lar (anonimize): "S-1234", signup tarihi, status, bu ay earnings, lifetime earnings.
+- Oran sabittir: platform komisyonunun **%5**’i (tier badge yok).
 ### Reports
 Tarih aralığı + link + source type filtreleri + CSV export + günlük/haftalık/aylık breakdown.
 ### Payouts
-Sonraki payout tarihi + tahmini tutar + history (Stripe transfer ID linkli).
+Sonraki payout tarihi + tahmini tutar + history (Stripe transfer ID linkli). Ödeme Andertal → Stripe Connect.
 ### Settings
 Profil, Stripe Connect onboarding, vergi bilgileri (DAC7 600€ üstünde Steuer-ID zorunlu).
 ### Resources
 Andertal logo (light/dark), banner setleri (728x90 / 300x250 / 1080x1080 / 1080x1920), DE+EN marketing copy, brand guideline PDF.
 ### Terms (`/terms`)
 Hukuki olarak detaylı affiliate sözleşmesi DE + EN. Mutlaka kapsayacak maddeler:
-- 24 ay sonrası tier1 → tier2 düşüş (Model 1)
-- %3,5 sabit rate + min 0,15 € floor (Model 2)
-- Per-product enrollment + min 30 gün lock-in + 14 gün wind-down + 30 gün attribution survival
+- Model 1: seller referral = Andertal platform komisyonunun **%5**’i (sabit; tier yok); Andertal kasasından Stripe ile ödeme
+- Model 2: product referral = Andertal platform komisyonunun **%8**’i (sabit); tüm katalog; seller ürün onayı yok
 - Self-referral yasağı + sonuçları (commission müsadere)
 - Brand bidding yasağı (andertal + varyantlar)
 - IP/cihaz match, velocity, chargeback kuralları
@@ -423,14 +382,14 @@ Hukuki olarak detaylı affiliate sözleşmesi DE + EN. Mutlaka kapsayacak maddel
 **Tek PR'da hepsini yapma.** Her faz ayrı PR:
 | PR | İçerik |
 |---|---|
-| **PR 1** | Schema migration + module skeleton + config + attribution-engine + scope unit testleri (UI yok). |
+| **PR 1** | Schema migration + module skeleton + config + attribution-engine + scope unit testleri (UI yok). Enrollment tablosu yok. |
 | **PR 2** | Tracking middleware (shop + sellercentral) + cookie consent integration + `affiliate_clicks` write path + short URL redirect. |
-| **PR 3** | Affiliate portal iskelet: signup, login, dashboard, link generator UI + backend CRUD. |
-| **PR 4** | Order event hook: `commission-recalc` + `commission-clawback` + `commission-confirm` worker'ları. |
-| **PR 5** | Sellercentral `/marketing/affiliate` sayfası + `product_affiliate_enrollments` API + `enrollment-lifecycle` worker (state machine: pending → active → min_lockin → winding_down → removed). |
-| **PR 6** | Seller referral flow: signup capture, `seller_referrals` row, `seller-referral-monthly` worker (tier1/tier2 logic). |
-| **PR 7** | Payout system: minimum threshold, Stripe Connect transfer, payout webhook handler. **Steuerberater gate.** |
-| **PR 8** | Fraud detection + sellercentral `/affiliate-admin` paneli (pending, fraud queue, payouts, commission adjustments, emergency removal). |
+| **PR 3** | Affiliate portal iskelet: signup, login, dashboard, link generator UI + backend CRUD (katalog ürün linki; enrollment check yok). |
+| **PR 4** | Order event hook: `commission-recalc` (platform_fee × 8%) + `commission-clawback` + `commission-confirm` worker'ları. |
+| **PR 5** | Sellercentral `/marketing/affiliate` read-only özet sayfası (enrollment API / lifecycle worker **yok**). |
+| **PR 6** | Seller referral flow: signup capture, `seller_referrals` row, `seller-referral-monthly` worker (platform_fee × **%5**, sabit). |
+| **PR 7** | Payout system: minimum threshold, Andertal kasası → Stripe Connect transfer, payout webhook handler. **Steuerberater gate.** |
+| **PR 8** | Fraud detection + sellercentral `/affiliate-admin` paneli (pending, fraud queue, payouts, commission adjustments, opsiyonel link/product disable). |
 | **PR 9** | Shop cookie consent banner update (TTDSG/GDPR compliance) + affiliate disclosure banner + brand bid manual monitoring scripti. **Hukuk gate.** |
 | **PR 10** | Reports + CSV export + Resources + Terms (hukuki uzun metin DE/EN). **Avukat gate.** |
 ## ENTEGRASYON: DEVELOPER PLATFORM İLE ORTAK ALTYAPI
@@ -446,28 +405,23 @@ Premature abstraction yapma — önce developer + affiliate ayrı kalsın, **PR 
 ### Affiliate
 - [ ] Yeni affiliate signup → email verify → Stripe Connect onboarding → status `active`.
 - [ ] Affiliate dashboard'da link üretebilir, short URL alır.
-- [ ] Link üretirken sadece `active/min_lockin/winding_down` enrollment'lı ürünleri görür.
+- [ ] Product link: katalogdaki satılabilir herhangi bir ürün seçilebilir (seller onayı / enrollment yok).
 ### Tracking
 - [ ] `?ref=AFF_XXX` ile gelen ziyaretçi cookie alır (consent verdiyse).
 - [ ] Cookie consent reddederse cookie set edilmez, click DB'ye `consent_marketing=false` yazılır, attribution yaratılmaz.
 - [ ] Short URL `andertal.com/r/{code}` → 302 redirect çalışır.
 ### Commission — Product
-- [ ] Müşteri affiliate link'ten gelir, 30 gün içinde affiliate-enrolled ürün alır → pending commission.
-- [ ] 30 gün sonra commission `confirmed`, ayın 1'inde payout.
-- [ ] Komisyon = `max(line_total * 3.5%, 15 cents)`. %3,5 sabit, floor uygulanır.
+- [ ] Müşteri affiliate link'ten gelir, 30 gün içinde attributed ürünü alır → pending commission.
+- [ ] 30 gün sonra commission `confirmed`, ayın 1'inde Andertal → Stripe Connect payout.
+- [ ] Komisyon = `round(platform_commission_cents * 8 / 100)` (örn. 12 € platform → 0,96 € affiliate). Floor / %3,5 yok.
+- [ ] Seller’dan ek kesinti yok; ödeme Andertal kasasından.
 - [ ] Refund → clawback (emergency_protected hariç).
-### Wind-down
-- [ ] Seller programa ürün ekler → 30 gün boyunca Remove disabled (UI + 409).
-- [ ] 30 gün sonra "Schedule Removal" → status `winding_down`, 14 gün geri sayım.
-- [ ] `winding_down` ürün için affiliate yeni link üretemez, mevcut linkler komisyon üretir.
-- [ ] `winding_down` ürün affected affiliate'lere otomatik e-mail + dashboard widget.
-- [ ] 14 gün sonra `removed`, attribution penceresi (30 gün) içindeki click'lerden satış olursa hâlâ komisyon ödenir.
-- [ ] Superuser emergency removal → son 90 gün confirmed commission `emergency_protected=true`, clawback'ten korunur.
+### Enrollment / Wind-down
+- [ ] Yok — seller ürün ekleme / Remove / wind-down akışı implement edilmez.
 ### Seller Referral
 - [ ] Sellercentral signup linkinde `?ref=AFF_XXX` → `seller_users.referred_by_affiliate_id` set.
-- [ ] Superuser onayı sonrası `seller_referrals` row yaratılır, `tier1_until = now + 24 month`.
-- [ ] Aylık worker seller'ın o ayki Andertal komisyonunu hesaplar, tier1 ise %10, tier2 ise %3.
-- [ ] 24 ay dolunca otomatik tier2'ye geçer.
+- [ ] Superuser onayı sonrası `seller_referrals` row yaratılır, `current_rate_pct = 5`.
+- [ ] Aylık worker: o ayki Andertal platform komisyonunun **%5**’i affiliate’e (örn. 12 € → 0,60 €). Tier1/tier2 yok.
 ### Fraud
 - [ ] Self-referral: aynı email/phone/payment → otomatik reject + high flag.
 - [ ] IP match → medium flag, 3+ flag birikince auto-suspend.
@@ -476,7 +430,7 @@ Premature abstraction yapma — önce developer + affiliate ayrı kalsın, **PR 
 - [ ] Sellercentral `/affiliate-admin` superuser-only erişim.
 - [ ] Pending affiliate signup'lar görünür, approve/reject yapılabilir.
 - [ ] Fraud queue'da flag'ler severity'e göre filtreli.
-- [ ] Emergency removal butonu + e-mail trigger.
+- [ ] Opsiyonel: ürün/link disable + e-mail (enrollment state machine değil).
 ### Compliance
 - [ ] TTDSG cookie consent kategori: "Marketing/Affiliate" eklenmiş.
 - [ ] Affiliate disclosure banner ilk landing'de gösterilir.

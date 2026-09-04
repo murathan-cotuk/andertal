@@ -1678,6 +1678,12 @@ export default function ShopHeader() {
                       <img
                         src={url}
                         alt="Shop logo"
+                        /* width/height attrs let the browser compute an intrinsic aspect-ratio and
+                           reserve this box's space before the (arbitrary per-seller) image has
+                           loaded — without them the element is 0-wide until load, which shifts the
+                           search bar next to it once the real size resolves (CLS). */
+                        width={isNarrowViewport ? Math.max(120, maxW) : Math.max(220, maxW)}
+                        height={imgH}
                         style={{
                           height: imgH,
                           maxHeight: isNarrowViewport ? Math.max(22, height) : 200,

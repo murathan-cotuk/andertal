@@ -21,6 +21,7 @@ import {
 import { normCatId } from "@/lib/category-product-ids";
 import { getLocalizedCategory } from "@/lib/format";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import LandingContainers from "@/components/landing/LandingContainers";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
@@ -974,7 +975,7 @@ export default function CategoryTemplate() {
         setError(null);
         const [catResBySlug, catResTree, productRes] = await Promise.all([
           fetch(`/api/store-categories${storeCategoriesQuery(locale, { slug })}`).then((r) => r.json()).catch(() => ({ categories: [] })),
-          fetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`).then((r) => r.json()).catch(() => ({ tree: [] })),
+          cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 60000 }).catch(() => ({ tree: [] })),
           fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`).then((r) => r.json()).catch(() => ({ products: [] })),
         ]);
         if (cancelled) return;

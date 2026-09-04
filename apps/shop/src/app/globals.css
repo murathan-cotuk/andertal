@@ -28,6 +28,21 @@
   .landing-vis-both { display: none !important; }
 }
 
+/* —— Landing page top-level loading skeleton (LandingContainers.jsx, containers === null) ——
+ * Reserves roughly the above-the-fold height a hero_banner container would occupy (500px default,
+ * see HeroBanner's `height` fallback) so the page doesn't render at 0 height and then pop to full
+ * size once the containers fetch resolves — a large CLS contributor on non-SSR call sites. */
+.landing-skeleton {
+  min-height: 500px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #efefed 25%, #e5e5e3 50%, #efefed 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+@media (max-width: 767px) {
+  .landing-skeleton { min-height: 260px; }
+}
+
 /* —— Design token CSS variables (styled-components / non-Tailwind) —— */
 :root {
   /* Primary */

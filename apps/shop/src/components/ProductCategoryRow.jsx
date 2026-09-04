@@ -65,11 +65,13 @@ const ImgCol = styled.div`
     object-fit: contain;
     display: block;
   }
+  /* Renders via next/image \`fill\` (CustomProductBadge.jsx) — wants the same absolute-fill
+     treatment as the product photo above it, not the old static/auto override. */
   img.product-custom-badge-img {
-    position: static !important;
-    inset: auto !important;
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
     min-height: 0 !important;
     padding: 0 !important;
     object-fit: contain !important;

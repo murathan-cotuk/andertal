@@ -4,6 +4,7 @@ const { resolveAdminHub, mapAdminHubCategoryPgRow, buildAdminHubCategoryTreeFrom
 const { getAdminHubProductByIdOrHandleDb, listAdminHubProductsDb, getProductsDbClient } = require('./admin-products')
 const { getSellerStoreName, getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct, storePublishedStatusSql } = require('./seller-settings')
 const { isEuOriginVerified } = require('../eu-origin')
+const { createTieredCache } = require('../tiered-cache')
 
 // ── DB ────────────────────────────────────────────────────────────────────────
 // Görev 25: shared pool (src/db-pool.js) instead of a fresh Client per call — this
@@ -110,6 +111,10 @@ const getAdminHubCollectionIdByHandle = async (handle) => {
 
 const BESTSELLER_CACHE_TTL_MS = 5 * 60 * 1000
 let bestsellerCache = { expiresAt: 0, ids: new Set(), scoresById: new Map() }
+// Redis mirror of bestsellerCache — Set/Map aren't JSON-serializable, so the shared value is a
+// plain [id, score] entries array; each instance rebuilds its own Set/Map from it. Sharing this
+// avoids every Render instance re-scanning the full orders+products tables every 5 minutes.
+const bestsellerRedisCache = createTieredCache('bestseller-scores', BESTSELLER_CACHE_TTL_MS / 1000)
 
 const salesScoreFromMetadata = (metadata) => {
   const m = metadata && typeof metadata === 'object' ? metadata : {}
@@ -121,6 +126,15 @@ const salesScoreFromMetadata = (metadata) => {
 const getBestsellerProductIds = async () => {
   const now = Date.now()
   if (bestsellerCache.expiresAt > now && bestsellerCache.ids && bestsellerCache.ids.size > 0) return bestsellerCache.ids
+
+  const sharedEntries = await bestsellerRedisCache.get('entries')
+  if (Array.isArray(sharedEntries)) {
+    const allScoresById = new Map(sharedEntries)
+    const ids = new Set([...allScoresById.entries()].filter(([, s]) => s >= 1).map(([id]) => id))
+    bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids, scoresById: allScoresById }
+    return ids
+  }
+
   const realSalesById = new Map()
   const dbSalesClient = getProductsDbClient()
   if (dbSalesClient) {
@@ -156,6 +170,7 @@ const getBestsellerProductIds = async () => {
   const threshold = 1
   const ids = new Set([...allScoresById.entries()].filter(([, s]) => s >= threshold).map(([id]) => id))
   bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids, scoresById: allScoresById }
+  bestsellerRedisCache.set('entries', [...allScoresById.entries()]).catch(() => {})
   return ids
 }
 
@@ -577,6 +592,7 @@ const storeProductCategoryIds = (p) => {
 // ── Product Badges (superuser-managed text badges: Sale, Bestseller, etc.) ────
 
 let categoryTopSellerCache = { expiresAt: 0, topIdSet: new Set() }
+const categoryTopSellerRedisCache = createTieredCache('category-top-seller', BESTSELLER_CACHE_TTL_MS / 1000)
 
 const {
   getActiveProductBadges: getActiveProductBadgesCached,
@@ -591,6 +607,14 @@ const getActiveProductBadges = () => getActiveProductBadgesCached(getDbClient)
 const getCategoryTopSellerIds = async () => {
   const now = Date.now()
   if (categoryTopSellerCache.expiresAt > now) return categoryTopSellerCache.topIdSet
+
+  const sharedIds = await categoryTopSellerRedisCache.get('ids')
+  if (Array.isArray(sharedIds)) {
+    const topIdSet = new Set(sharedIds)
+    categoryTopSellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, topIdSet }
+    return topIdSet
+  }
+
   await getBestsellerProductIds() // ensures bestsellerCache.scoresById is populated/fresh
   const scoresById = bestsellerCache.scoresById || new Map()
   const bestByCategory = new Map() // categoryId -> [productId, score]
@@ -615,6 +639,7 @@ const getCategoryTopSellerIds = async () => {
   }
   const topIdSet = new Set([...bestByCategory.values()].map(([pid]) => pid))
   categoryTopSellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, topIdSet }
+  categoryTopSellerRedisCache.set('ids', [...topIdSet]).catch(() => {})
   return topIdSet
 }
 
