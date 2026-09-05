@@ -169,7 +169,12 @@ function validateProductCompliance(metadata, profileId, marketplace = DEFAULT_MA
 function listProfiles() {
   return Object.keys(PROFILES).map((id) => {
     const r = resolveProfile(id)
-    return { id, label: r ? r.label : id, superuser_only: r ? r.superuser_only : false }
+    return {
+      id,
+      label: r ? r.label : id,
+      label_i18n: r ? r.label_i18n || {} : {},
+      superuser_only: r ? r.superuser_only : false,
+    }
   })
 }
 

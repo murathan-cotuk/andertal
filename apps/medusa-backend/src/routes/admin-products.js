@@ -405,6 +405,59 @@ const stampComplianceReviewAsync = async (productId, metadata) => {
   }
 }
 
+/**
+ * GET /admin-hub/v1/compliance-review — superuser only (docs/HUKUKI.md Faz 2 "sıradaki adım" #4).
+ * Lists products stampComplianceReviewAsync flagged as ok=false, so a superuser can actually see
+ * what needs attention instead of the data just accumulating unseen in metadata.compliance_review.
+ */
+const adminHubComplianceReviewGET = async (req, res) => {
+  const client = getProductsDbClient()
+  if (!client) return res.status(503).json({ message: 'Database unavailable' })
+  try {
+    await client.connect()
+    const r = await client.query(`
+      SELECT id, title, handle, seller_id, status,
+             metadata->'compliance_review' AS compliance_review
+        FROM admin_hub_products
+       WHERE metadata->'compliance_review'->>'ok' = 'false'
+       ORDER BY (metadata->'compliance_review'->>'checked_at') DESC
+       LIMIT 500
+    `)
+    await client.end()
+    const { resolveComplianceProfile } = require('../compliance/resolve-compliance')
+    res.json({
+      products: r.rows.map((row) => {
+        const profileId = row.compliance_review?.profile_id || null
+        const missingFields = Array.isArray(row.compliance_review?.missing_fields) ? row.compliance_review.missing_fields : []
+        let profileLabelI18n = {}
+        let missingFieldLabels = missingFields.map((key) => ({ key, label_i18n: {} }))
+        if (profileId) {
+          try {
+            const resolved = resolveComplianceProfile(profileId)
+            profileLabelI18n = resolved.profile_label_i18n || {}
+            missingFieldLabels = missingFields.map((key) => ({ key, label_i18n: resolved.field_definitions[key]?.label_i18n || {} }))
+          } catch (_) { /* fall back to raw keys below */ }
+        }
+        return {
+          id: row.id,
+          title: row.title,
+          handle: row.handle,
+          seller_id: row.seller_id,
+          status: row.status,
+          profile_id: profileId,
+          profile_label_i18n: profileLabelI18n,
+          missing_fields: missingFieldLabels,
+          checked_at: row.compliance_review?.checked_at || null,
+        }
+      }),
+    })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    console.error('compliance-review GET error:', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
 const createAdminHubProductDb = async (body) => {
   const client = getProductsDbClient()
   if (!client) return null
@@ -1431,6 +1484,7 @@ module.exports = function createAdminProductsRouter() {
   // instead of a listing on the original, making the original owner's product appear
   // to "move" to the newer seller. This tool finds any such already-existing duplicate
   // rows and lets a superuser merge them back into the true (oldest-owned) master.
+  router.get('/admin-hub/v1/compliance-review', requireSuperuser, adminHubComplianceReviewGET)
   router.get('/admin-hub/v1/products/duplicate-eans', requireSuperuser, async (req, res) => {
     try {
       const allProds = await listAdminHubProductsDb({ limit: 5000 })

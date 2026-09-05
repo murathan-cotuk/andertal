@@ -519,16 +519,79 @@ const adminHubCategoryComplianceSchemaGET = async (req, res) => {
     const { resolveComplianceProfile, DEFAULT_PROFILE_ID } = require('../compliance/resolve-compliance')
     const { resolveCategoryComplianceProfileId } = require('../compliance/category-profile-lookup')
     await client.connect()
-    const exists = await client.query('SELECT id FROM admin_hub_categories WHERE id = $1', [id])
-    if (!exists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Category not found' }) }
+    const exists = await client.query('SELECT id, metadata, parent_id, name FROM admin_hub_categories WHERE id = $1', [id])
+    const own = exists.rows[0]
+    if (!own) { await client.end(); return res.status(404).json({ message: 'Category not found' }) }
+    const ownMeta = own.metadata && typeof own.metadata === 'object' ? own.metadata : {}
     const profileId = await resolveCategoryComplianceProfileId(client, id)
     await client.end()
 
     const resolved = resolveComplianceProfile(profileId || DEFAULT_PROFILE_ID, marketplace)
-    res.json({ category_id: id, resolved_from: profileId ? 'category_or_ancestor' : 'default_fallback', ...resolved })
+    res.json({
+      category_id: id,
+      category_name: own.name || null,
+      // own_profile_id: set directly on THIS category (vs. resolved via a parent). ComplianceProfilesPage
+      // uses this to show "explicit" vs "inherited from an ancestor" in the override editor.
+      own_profile_id: ownMeta.compliance_profile_id || null,
+      resolved_from: profileId ? 'category_or_ancestor' : 'default_fallback',
+      ...resolved,
+    })
   } catch (e) {
     try { await client.end() } catch (_) {}
     console.error('Category compliance-schema GET:', e)
+    res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+  }
+}
+
+// GET /admin-hub/v1/compliance-profiles — superuser only. The full profile catalog, for the
+// ComplianceProfilesPage picker (docs/HUKUKI.md "en iyisi" follow-up — per-category override UI).
+const adminHubComplianceProfilesGET = (req, res) => {
+  try {
+    const { listProfiles } = require('../compliance/resolve-compliance')
+    res.json({ profiles: listProfiles() })
+  } catch (e) {
+    res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+  }
+}
+
+// PATCH /admin-hub/v1/categories/:id/compliance-profile — superuser only. Sets or clears
+// (profile_id: null) this category's OWN compliance_profile_id override. Clearing makes it fall
+// back to whatever its nearest ancestor (or the default profile) resolves to — see
+// resolveCategoryComplianceProfileId. Deliberately its own tiny endpoint rather than reusing the
+// general category PUT, since that expects a full category payload and isn't superuser-gated.
+const adminHubCategoryComplianceProfilePATCH = async (req, res) => {
+  const id = (req.params.id || '').trim()
+  if (!id) return res.status(400).json({ message: 'category id required' })
+  const rawProfileId = req.body?.profile_id
+  const profileId = rawProfileId == null ? null : String(rawProfileId).trim() || null
+  if (profileId) {
+    const { listProfiles } = require('../compliance/resolve-compliance')
+    if (!listProfiles().some((p) => p.id === profileId)) {
+      return res.status(400).json({ message: `Unknown compliance profile: ${profileId}` })
+    }
+  }
+  const client = getCategoriesPgClient()
+  if (!client) return categoriesPgUnavailable(res)
+  try {
+    await client.connect()
+    const exists = await client.query('SELECT id FROM admin_hub_categories WHERE id = $1', [id])
+    if (!exists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Category not found' }) }
+    if (profileId) {
+      await client.query(
+        `UPDATE admin_hub_categories SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('compliance_profile_id', $1::text) WHERE id = $2`,
+        [profileId, id],
+      )
+    } else {
+      await client.query(
+        `UPDATE admin_hub_categories SET metadata = COALESCE(metadata, '{}'::jsonb) - 'compliance_profile_id' WHERE id = $1`,
+        [id],
+      )
+    }
+    await client.end()
+    res.json({ success: true, category_id: id, own_profile_id: profileId })
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    console.error('Category compliance-profile PATCH:', e)
     res.status(500).json({ message: (e && e.message) || 'Internal server error' })
   }
 }
@@ -554,6 +617,8 @@ module.exports = function createCategoriesRouter() {
   router.delete('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdDELETE(req, res))
 
   router.post('/admin-hub/v1/categories/warm-translations', requireSuperuser, adminHubCategoriesWarmTranslationsPOST)
+  router.get('/admin-hub/v1/compliance-profiles', requireSuperuser, adminHubComplianceProfilesGET)
+  router.patch('/admin-hub/v1/categories/:id/compliance-profile', requireSuperuser, adminHubCategoryComplianceProfilePATCH)
 
   return router
 }

@@ -488,6 +488,20 @@ class MedusaAdminClient {
     return this.request(`/admin-hub/categories/${categoryId}/compliance-schema?marketplace=${encodeURIComponent(marketplace)}`)
   }
 
+  /** Superuser: full compliance profile catalog, for the per-category override picker. */
+  async getComplianceProfiles() {
+    const data = await this.request('/admin-hub/v1/compliance-profiles').catch(() => ({ profiles: [] }))
+    return { profiles: data.profiles || [] }
+  }
+
+  /** Superuser: set (profileId) or clear (null) a category's own compliance profile override. */
+  async setCategoryComplianceProfile(categoryId, profileId) {
+    return this.request(`/admin-hub/v1/categories/${categoryId}/compliance-profile`, {
+      method: 'PATCH',
+      body: JSON.stringify({ profile_id: profileId || null }),
+    })
+  }
+
   /**
    * Bulk import Admin Hub categories (POST /admin-hub/categories/import)
    * Body: { items: [ { key, label, parentKey, sortOrder } ] }
@@ -585,6 +599,12 @@ class MedusaAdminClient {
   async uploadBrandAuthDocument(brandId, body) {
     const res = await this.request(`/admin-hub/brands/${brandId}/authorization-documents`, { method: 'POST', body: JSON.stringify(body || {}) })
     return res.document ?? res
+  }
+
+  /** Superuser: products flagged needs_compliance_review (metadata.compliance_review.ok === false) */
+  async getComplianceReviewProducts() {
+    const data = await this.request('/admin-hub/v1/compliance-review').catch(() => ({ products: [] }))
+    return { products: data.products || [] }
   }
 
   /** Superuser: list brands pending authorization review (own_registered / authorized_reseller), with their documents */

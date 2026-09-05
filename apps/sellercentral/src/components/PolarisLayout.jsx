@@ -171,6 +171,8 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/content/blog-posts",
   "/content/flows",
   "/content/metaobjects",
+  "/content/compliance-review",
+  "/content/compliance-profiles",
   "/analytics/live-view",
 ];
 
@@ -335,6 +337,8 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/content/pages", label: tx("pages", "Pages"), superuserOnly: true },
         { url: "/content/blog-posts", label: tx("blogPosts", "Blog Posts"), superuserOnly: true },
         { url: "/content/flows", label: tx("flows", "Flows"), superuserOnly: true },
+        { url: "/content/compliance-review", label: tx("complianceReview", "Compliance review"), superuserOnly: true },
+        { url: "/content/compliance-profiles", label: tx("complianceProfiles", "Compliance profiles"), superuserOnly: true },
       ],
     },
     {
@@ -697,6 +701,8 @@ export default function PolarisLayout({ children }) {
     "/content/blog-posts",
     "/content/flows",
     "/content/metaobjects",
+    "/content/compliance-review",
+    "/content/compliance-profiles",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
     "/customers-menu",
@@ -1234,6 +1240,8 @@ export default function PolarisLayout({ children }) {
     "/content/blog-posts",
     "/content/flows",
     "/content/metaobjects",
+    "/content/compliance-review",
+    "/content/compliance-profiles",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
     "/customers-menu",
