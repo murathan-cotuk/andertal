@@ -457,3 +457,5 @@ Premature abstraction yapma — önce developer + affiliate ayrı kalsın, **PR 
 5. Compliance gate'li PR'larda (PR 7, 9, 10) kullanıcıya açıkça "bu PR merge edilmeden önce şu review zorunlu" uyarısı ver.
 6. Her PR commit message'ında karar tablosundaki ilgili satıra referans ver.
 **KAFA KARIŞIKLIĞI VARSA: Durmadan kod yazma — sor.**
+
+AFFILIATE ILE PARA KAZANACAK KISILER BIREYSEL DE OLSA SIRKET DE OLSA VERGI BILGILERINI BILDIRMELERI GEREKIYOR KI FATURA DÜZENLENEBILSIN.
