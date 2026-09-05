@@ -2283,6 +2283,10 @@ async function start() {
     const createMediaRouter = require('./src/routes/media')
     httpApp.use('/', createMediaRouter())
 
+    // --- Idealo product feed (public, unauthenticated XML — docs/idealo.md): src/routes/idealo-feed.js ---
+    const createIdealoFeedRouter = require('./src/routes/idealo-feed')
+    httpApp.use('/', createIdealoFeedRouter())
+
     // Shared Postgres client factory — still used by many not-yet-extracted
     // admin-hub sections below (orders, pages, campaigns, etc.).
     const getDbClient = () => {
