@@ -756,6 +756,27 @@
           "answer": "Open a platform case and describe your device, browser and the steps that caused the problem."
         }
       }
+    },
+    "orderPicker": {
+      "title": "Besoin d'aide pour un article récent, {first_name} ?",
+      "guestTitle": "Besoin d'aide pour une commande ?",
+      "subtitle": "Sélectionnez ci-dessous l'article concerné.",
+      "empty": "Aucune commande pour le moment.",
+      "otherItem": "Aide pour un autre article",
+      "otherProblem": "Aide pour un autre problème"
+    },
+    "helpCards": {
+      "title": "Des questions sur vos achats ?",
+      "viewAll": "Tout voir"
+    },
+    "helpLibrary": {
+      "title": "Parcourir la bibliothèque d'aide",
+      "searchPlaceholder": "Saisissez p. ex. « question sur des frais ».",
+      "allTopics": "Tous les thèmes d'aide",
+      "recommended": "Thèmes recommandés",
+      "more": "Autres thèmes et pages d'aide",
+      "footerTitle": "Besoin d'aide supplémentaire ?",
+      "footerCta": "Nouvelle demande"
     }
   },
   "caseInbox": {

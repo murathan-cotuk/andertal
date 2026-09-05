@@ -773,6 +773,27 @@
           "answer": "Eröffnen Sie einen Plattform-Fall und nennen Sie Gerät, Browser und die Schritte, die zum Problem führten."
         }
       }
+    },
+    "orderPicker": {
+      "title": "Brauchst du Hilfe bei einem aktuellen Artikel, {first_name}?",
+      "guestTitle": "Brauchst du Hilfe bei einer Bestellung?",
+      "subtitle": "Wähle unten den Artikel aus, zu dem du Hilfe brauchst.",
+      "empty": "Noch keine Bestellungen vorhanden.",
+      "otherItem": "Hilfe bei einem anderen Artikel",
+      "otherProblem": "Hilfe bei einem anderen Problem"
+    },
+    "helpCards": {
+      "title": "Haben Sie Fragen zu Ihren Einkäufen?",
+      "viewAll": "Alles ansehen"
+    },
+    "helpLibrary": {
+      "title": "Durchsuche unsere Hilfe-Bibliothek",
+      "searchPlaceholder": "Gib etwas ein, wie z. B. „Frage zu einer Gebühr.“",
+      "allTopics": "Alle Hilfethemen",
+      "recommended": "Empfohlene Themen",
+      "more": "Weitere Themen & Hilfeseiten",
+      "footerTitle": "Brauchst du weitere Hilfe?",
+      "footerCta": "Neue Support-Anfrage"
     }
   },
   "caseInbox": {

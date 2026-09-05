@@ -1872,6 +1872,15 @@ async function start() {
         } catch (e) {
           console.warn('[seed-become-seller]', e?.message || e)
         }
+        try {
+          const { ensureCustomerSupportLanding } = require('./src/customer-support-landing-seed')
+          const cs = await ensureCustomerSupportLanding(client)
+          if (cs?.created || cs?.migrated || cs?.stripped) {
+            console.log(`[seed-customer-support] created=${!!cs.created} migrated=${!!cs.migrated} stripped=${cs.stripped || 0} containers=${cs.added || 0}`)
+          }
+        } catch (e) {
+          console.warn('[seed-customer-support]', e?.message || e)
+        }
         // Seller campaigns (Aktionen/Kampagnen)
         await client.query(`
           CREATE TABLE IF NOT EXISTS seller_campaigns (

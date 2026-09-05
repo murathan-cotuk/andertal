@@ -773,6 +773,27 @@
           "answer": "Open a platform case and describe your device, browser and the steps that caused the problem."
         }
       }
+    },
+    "orderPicker": {
+      "title": "Need help with a recent item, {first_name}?",
+      "guestTitle": "Need help with an order?",
+      "subtitle": "Select the item below that you need help with.",
+      "empty": "No orders yet.",
+      "otherItem": "Help with another item",
+      "otherProblem": "Help with another problem"
+    },
+    "helpCards": {
+      "title": "Questions about your purchases?",
+      "viewAll": "View all"
+    },
+    "helpLibrary": {
+      "title": "Browse our help library",
+      "searchPlaceholder": "Type something like \"question about a fee.\"",
+      "allTopics": "All help topics",
+      "recommended": "Recommended topics",
+      "more": "More topics & help pages",
+      "footerTitle": "Need more help?",
+      "footerCta": "New support request"
     }
   },
   "caseInbox": {

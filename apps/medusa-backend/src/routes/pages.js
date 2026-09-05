@@ -24,6 +24,9 @@ const SUPPORT_CONTAINER_TYPES = new Set([
   'support_case_wizard',
   'support_topic_grid',
   'support_faq',
+  'support_order_picker',
+  'support_help_cards',
+  'support_help_library',
 ])
 const POLLUTION_KEYS = new Set(['__proto__', 'prototype', 'constructor'])
 const LOCALES = new Set(['de', 'en', 'tr', 'fr', 'es', 'it'])
@@ -117,7 +120,7 @@ const validateKeys = (source, path, allowed) => {
 }
 
 const COMMON_FIELDS = new Set([
-  'id', 'type', 'visible', 'visible_on', 'padding', 'margin', 'content_layout', 'content_max_width', '_i18n',
+  'id', 'type', 'visible', 'visible_on', 'padding', 'margin', 'content_layout', 'content_max_width', '_i18n', 'children',
 ])
 const sanitizeCommon = (source, out, path) => {
   if (source.id !== undefined) out.id = text(source.id, `${path}.id`, 100, { required: true })
@@ -231,6 +234,84 @@ const sanitizeSupportContainer = (source, path) => {
       return item
     })
     localizedFields.push(...fields)
+  } else if (source.type === 'support_order_picker') {
+    const fields = [
+      ['title', 160, true], ['subtitle', 240], ['guest_title', 160], ['empty_orders_text', 160],
+      ['cta_other_item_label', 100], ['cta_other_problem_label', 100],
+    ]
+    fields.forEach(([key]) => allowed.add(key))
+    ;['orders_limit', 'orders_columns_desktop', 'orders_columns_tablet', 'orders_columns_mobile', 'cta_other_item_url', 'cta_other_problem_url'].forEach((key) => allowed.add(key))
+    copyFields(source, out, fields, path)
+    if (source.orders_limit !== undefined) out.orders_limit = integer(source.orders_limit, `${path}.orders_limit`, 1, 24)
+    for (const key of ['orders_columns_desktop', 'orders_columns_tablet', 'orders_columns_mobile']) {
+      if (source[key] !== undefined) out[key] = integer(source[key], `${path}.${key}`, 1, 4)
+    }
+    for (const key of ['cta_other_item_url', 'cta_other_problem_url']) {
+      if (source[key] !== undefined) out[key] = url(source[key], `${path}.${key}`)
+    }
+    localizedFields.push(...fields)
+  } else if (source.type === 'support_help_cards') {
+    const fields = [['title', 160, true], ['view_all_label', 100]]
+    fields.forEach(([key]) => allowed.add(key))
+    ;['view_all_url', 'columns_desktop', 'columns_tablet', 'columns_mobile', 'cards'].forEach((key) => allowed.add(key))
+    copyFields(source, out, fields, path)
+    if (source.view_all_url !== undefined) out.view_all_url = url(source.view_all_url, `${path}.view_all_url`)
+    for (const key of ['columns_desktop', 'columns_tablet', 'columns_mobile']) {
+      if (source[key] !== undefined) out[key] = integer(source[key], `${path}.${key}`, 1, 4)
+    }
+    out.cards = boundedArray(source.cards, `${path}.cards`, 12, 1).map((card, index) => {
+      const itemPath = `${path}.cards[${index}]`
+      if (!isPlainObject(card)) fail(itemPath, 'must be an object')
+      validateKeys(card, itemPath, new Set(['id', 'icon', 'title', 'description', 'url', 'order', '_i18n']))
+      const item = {
+        id: text(card.id, `${itemPath}.id`, 100, { required: true }),
+        icon: text(card.icon, `${itemPath}.icon`, 80, { required: true }),
+        title: text(card.title, `${itemPath}.title`, 120, { required: true }),
+        description: text(card.description, `${itemPath}.description`, 400),
+        order: integer(card.order, `${itemPath}.order`, 0, 999),
+      }
+      if (card.url !== undefined) item.url = url(card.url, `${itemPath}.url`)
+      localized(card, item, [['title', 120], ['description', 400]], itemPath)
+      return item
+    })
+    localizedFields.push(...fields)
+  } else if (source.type === 'support_help_library') {
+    const fields = [
+      ['title', 160, true], ['search_placeholder', 160], ['all_topics_label', 100], ['recommended_heading', 160],
+      ['more_heading', 160], ['footer_title', 160], ['footer_body', 600], ['footer_cta_label', 100],
+    ]
+    fields.forEach(([key]) => allowed.add(key))
+    ;['footer_cta_url', 'topics', 'articles'].forEach((key) => allowed.add(key))
+    copyFields(source, out, fields, path)
+    if (source.footer_cta_url !== undefined) out.footer_cta_url = url(source.footer_cta_url, `${path}.footer_cta_url`)
+    out.topics = boundedArray(source.topics, `${path}.topics`, 24, 0).map((topic, index) => {
+      const itemPath = `${path}.topics[${index}]`
+      if (!isPlainObject(topic)) fail(itemPath, 'must be an object')
+      validateKeys(topic, itemPath, new Set(['id', 'title', 'url', 'order', '_i18n']))
+      const item = {
+        id: text(topic.id, `${itemPath}.id`, 100, { required: true }),
+        title: text(topic.title, `${itemPath}.title`, 160, { required: true }),
+        order: integer(topic.order, `${itemPath}.order`, 0, 999),
+      }
+      if (topic.url !== undefined) item.url = url(topic.url, `${itemPath}.url`)
+      localized(topic, item, [['title', 160]], itemPath)
+      return item
+    })
+    out.articles = boundedArray(source.articles, `${path}.articles`, 24, 0).map((article, index) => {
+      const itemPath = `${path}.articles[${index}]`
+      if (!isPlainObject(article)) fail(itemPath, 'must be an object')
+      validateKeys(article, itemPath, new Set(['id', 'title', 'excerpt', 'url', 'order', '_i18n']))
+      const item = {
+        id: text(article.id, `${itemPath}.id`, 100, { required: true }),
+        title: text(article.title, `${itemPath}.title`, 160, { required: true }),
+        excerpt: text(article.excerpt, `${itemPath}.excerpt`, 600),
+        order: integer(article.order, `${itemPath}.order`, 0, 999),
+      }
+      if (article.url !== undefined) item.url = url(article.url, `${itemPath}.url`)
+      localized(article, item, [['title', 160], ['excerpt', 600]], itemPath)
+      return item
+    })
+    localizedFields.push(...fields)
   } else {
     const fields = [['title', 160, true], ['description', 600], ['section_label', 120], ['no_results_text', 240]]
     fields.forEach(([key]) => allowed.add(key))
@@ -274,19 +355,40 @@ const sanitizeSupportContainer = (source, path) => {
   return out
 }
 
+// Nesting (docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §2.1): any container — support-typed or
+// not — may carry an optional `children[]` of the same shape, recursively. Root = depth 1, so
+// depth 4 (root → child → grandchild → great-grandchild) is the first depth that's rejected.
+// Every non-support type still passes through unsanitized (existing behavior) except for its
+// own `children`, which are walked and depth/count-checked the same way.
+const MAX_CONTAINER_DEPTH = 3
+const MAX_TOTAL_CONTAINERS = 200
+
+const sanitizeAnyContainer = (source, path, depth, counter) => {
+  if (!isPlainObject(source)) fail(path, 'must be an object')
+  if (depth > MAX_CONTAINER_DEPTH) fail(path, `container nesting deeper than ${MAX_CONTAINER_DEPTH} is not allowed`)
+  counter.count += 1
+  if (counter.count > MAX_TOTAL_CONTAINERS) fail(path, `containers (including nested children) must not exceed ${MAX_TOTAL_CONTAINERS}`)
+
+  const out = SUPPORT_CONTAINER_TYPES.has(source?.type)
+    ? sanitizeSupportContainer(source, path)
+    : { ...source }
+
+  if (source.children !== undefined) {
+    const kids = boundedArray(source.children, `${path}.children`, MAX_TOTAL_CONTAINERS, 0)
+    out.children = kids.map((child, index) => sanitizeAnyContainer(child, `${path}.children[${index}]`, depth + 1, counter))
+  }
+  return out
+}
+
 const sanitizeLandingPayload = (body) => {
   const cleaned = cleanObject(body)
   if (!isPlainObject(cleaned)) fail('body', 'must be an object')
   if (!Array.isArray(cleaned.containers)) fail('containers', 'must be an array')
   if (cleaned.settings !== undefined && !isPlainObject(cleaned.settings)) fail('settings', 'must be an object')
   const containers = cleaned.containers
-  if (containers.length > 200) fail('containers', 'must contain at most 200 items')
+  const counter = { count: 0 }
   return {
-    containers: containers.map((container, index) => (
-      SUPPORT_CONTAINER_TYPES.has(container?.type)
-        ? sanitizeSupportContainer(container, `containers[${index}]`)
-        : container
-    )),
+    containers: containers.map((container, index) => sanitizeAnyContainer(container, `containers[${index}]`, 1, counter)),
     settings: isPlainObject(cleaned.settings) ? cleaned.settings : {},
   }
 }

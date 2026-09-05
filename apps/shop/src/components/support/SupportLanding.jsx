@@ -686,10 +686,177 @@ function SupportFaq({ container, locale }) {
   );
 }
 
+// Amazon-style "need help with a recent item?" strip — real customer orders, personalized
+// title when logged in, guest fallback (no orders can be fetched without a token) otherwise.
+function SupportOrderPicker({ container, locale }) {
+  const t = useTranslations("supportCenter");
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
+  const dateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale || "de", { day: "2-digit", month: "short", year: "numeric" }),
+    [locale],
+  );
+  const limit = Math.max(1, Math.min(24, Number(container?.orders_limit) || 6));
+
+  useEffect(() => {
+    const token = getToken("customer");
+    if (!token) { setLoggedIn(false); return; }
+    setLoggedIn(true);
+    setLoading(true);
+    Promise.all([
+      getMedusaClient().request(`/store/support/orders?limit=${encodeURIComponent(limit)}`, { headers: authHeaders(false), cache: "no-store" }),
+      getMedusaClient().getCustomer(token).catch(() => null),
+    ]).then(([ordersRes, customerRes]) => {
+      if (!ordersRes?.__error) setOrders(Array.isArray(ordersRes?.orders) ? ordersRes.orders : []);
+      if (customerRes?.customer?.first_name) setFirstName(customerRes.customer.first_name);
+    }).finally(() => setLoading(false));
+  }, [limit]);
+
+  const titleTemplate = loggedIn
+    ? localized(container, "title", locale, t("orderPicker.title"))
+    : localized(container, "guest_title", locale, t("orderPicker.guestTitle"));
+  const title = firstName ? titleTemplate.replace("{first_name}", firstName) : titleTemplate.replace(/,?\s*\{first_name\}/, "");
+  const otherItemUrl = safeHref(container?.cta_other_item_url, "/orders");
+  const otherProblemUrl = safeHref(container?.cta_other_problem_url, "#support-wizard");
+
+  return (
+    <section className={styles.section} aria-labelledby={`orderpicker-${container?.id || "support"}`}>
+      <div className={styles.sectionHeading}>
+        <h2 id={`orderpicker-${container?.id || "support"}`}>{title}</h2>
+        {loggedIn && <p>{localized(container, "subtitle", locale, t("orderPicker.subtitle"))}</p>}
+      </div>
+      {loading ? (
+        <p className={styles.notice}>{t("common.loading")}</p>
+      ) : orders.length > 0 ? (
+        <div className={styles.orderCardGrid} role="list">
+          {orders.map((order) => {
+            const meta = orderCardMeta(order);
+            const thumb = imageUrl(meta.image);
+            return (
+              <button
+                key={order.id}
+                type="button"
+                className={styles.orderCard}
+                onClick={() => { emitTopic("order"); document.getElementById("support-wizard")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+              >
+                <span className={styles.orderCardThumb}>
+                  {thumb ? <Image src={thumb} alt="" width={72} height={72} /> : <span aria-hidden="true">📦</span>}
+                </span>
+                <span className={styles.orderCardBody}>
+                  <strong>{meta.name}</strong>
+                  <span>{t("wizard.orderLabel", { number: orderLabel(order) })}</span>
+                  {meta.date ? <time dateTime={String(meta.date)}>{dateFormatter.format(new Date(meta.date))}</time> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <p className={styles.notice}>{localized(container, "empty_orders_text", locale, t("orderPicker.empty"))}</p>
+      )}
+      <div className={styles.heroActions}>
+        <a className={styles.secondaryAction} href={otherItemUrl}>{localized(container, "cta_other_item_label", locale, t("orderPicker.otherItem"))}</a>
+        <a className={styles.secondaryAction} href={otherProblemUrl} onClick={() => emitTopic("")}>{localized(container, "cta_other_problem_label", locale, t("orderPicker.otherProblem"))}</a>
+      </div>
+    </section>
+  );
+}
+
+// Static "questions about your purchases?" card grid (icon + title + description + link).
+function SupportHelpCards({ container, locale }) {
+  const t = useTranslations("supportCenter");
+  const cards = (Array.isArray(container?.cards) ? container.cards : [])
+    .slice()
+    .sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0));
+  const columnsDesktop = Math.max(1, Math.min(4, Number(container?.columns_desktop) || 2));
+  const viewAllUrl = safeHref(container?.view_all_url, "");
+
+  return (
+    <section className={styles.section} aria-labelledby={`helpcards-${container?.id || "support"}`}>
+      <div className={styles.sectionHeading}>
+        <h2 id={`helpcards-${container?.id || "support"}`}>{localized(container, "title", locale, t("helpCards.title"))}</h2>
+        {viewAllUrl && <a href={viewAllUrl} className={styles.viewAllLink}>{localized(container, "view_all_label", locale, t("helpCards.viewAll"))}</a>}
+      </div>
+      <div className={styles.helpCardGrid} style={{ "--support-help-columns": columnsDesktop }}>
+        {cards.map((card, index) => (
+          <a key={card.id || index} className={styles.helpCard} href={safeHref(card?.url, "#support-wizard")}>
+            <span className={styles.helpCardIcon} aria-hidden="true">{card.icon || "•"}</span>
+            <strong>{localized(card, "title", locale, "")}</strong>
+            <span>{localized(card, "description", locale, "")}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Searchable "help library" — topic chips + article list + closing "still need help" CTA.
+function SupportHelpLibrary({ container, locale }) {
+  const t = useTranslations("supportCenter");
+  const [query, setQuery] = useState("");
+  const topics = (Array.isArray(container?.topics) ? container.topics : []).slice().sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0));
+  const articles = (Array.isArray(container?.articles) ? container.articles : []).slice().sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0));
+  const needle = query.trim().toLocaleLowerCase(locale);
+  const visibleArticles = needle
+    ? articles.filter((article) => `${localized(article, "title", locale, "")} ${localized(article, "excerpt", locale, "")}`.toLocaleLowerCase(locale).includes(needle))
+    : articles;
+
+  return (
+    <section className={styles.section} aria-labelledby={`helplibrary-${container?.id || "support"}`}>
+      <div className={styles.sectionHeading}>
+        <h2 id={`helplibrary-${container?.id || "support"}`}>{localized(container, "title", locale, t("helpLibrary.title"))}</h2>
+      </div>
+      <label className={styles.field}>
+        <span className={styles.srOnly}>{localized(container, "search_placeholder", locale, t("helpLibrary.searchPlaceholder"))}</span>
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={localized(container, "search_placeholder", locale, t("helpLibrary.searchPlaceholder"))} />
+      </label>
+      {topics.length > 0 && (
+        <>
+          <h3 className={styles.orderHeading}>{localized(container, "recommended_heading", locale, t("helpLibrary.recommended"))}</h3>
+          <nav className={styles.topicChips} aria-label={localized(container, "all_topics_label", locale, t("helpLibrary.allTopics"))}>
+            {topics.map((topic, index) => (
+              <a key={topic.id || index} href={safeHref(topic?.url, "#support-wizard")} className={styles.topicChip}>
+                {localized(topic, "title", locale, "")}
+              </a>
+            ))}
+          </nav>
+        </>
+      )}
+      {visibleArticles.length > 0 && (
+        <>
+          <h3 className={styles.orderHeading}>{localized(container, "more_heading", locale, t("helpLibrary.more"))}</h3>
+          <ul className={styles.articleList}>
+            {visibleArticles.map((article, index) => (
+              <li key={article.id || index}>
+                <a href={safeHref(article?.url, "#support-wizard")}>
+                  <strong>{localized(article, "title", locale, "")}</strong>
+                  <span>{localized(article, "excerpt", locale, "")}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <div className={styles.helpLibraryFooter}>
+        <strong>{localized(container, "footer_title", locale, t("helpLibrary.footerTitle"))}</strong>
+        <p>{localized(container, "footer_body", locale, "")}</p>
+        <a className={styles.primaryAction} href={safeHref(container?.footer_cta_url, "#support-wizard")}>
+          {localized(container, "footer_cta_label", locale, t("helpLibrary.footerCta"))}
+        </a>
+      </div>
+    </section>
+  );
+}
+
 export default function SupportLanding({ type, container, locale }) {
   if (type === "support_hero") return <SupportHero container={container} locale={locale} />;
   if (type === "support_topic_grid") return <SupportTopicGrid container={container} locale={locale} />;
   if (type === "support_case_wizard") return <SupportCaseWizard container={container} locale={locale} />;
   if (type === "support_faq") return <SupportFaq container={container} locale={locale} />;
+  if (type === "support_order_picker") return <SupportOrderPicker container={container} locale={locale} />;
+  if (type === "support_help_cards") return <SupportHelpCards container={container} locale={locale} />;
+  if (type === "support_help_library") return <SupportHelpLibrary container={container} locale={locale} />;
   return null;
 }

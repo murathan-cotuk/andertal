@@ -2821,7 +2821,10 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "support_hero":
     case "support_case_wizard":
     case "support_topic_grid":
-    case "support_faq":                inner = <SupportLanding type={c.type} container={c} locale={locale} />; break;
+    case "support_faq":
+    case "support_order_picker":
+    case "support_help_cards":
+    case "support_help_library":        inner = <SupportLanding type={c.type} container={c} locale={locale} />; break;
     default: return null;
   }
   const m = c.margin || {};

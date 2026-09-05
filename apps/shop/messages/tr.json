@@ -773,6 +773,27 @@
           "answer": "Open a platform case and describe your device, browser and the steps that caused the problem."
         }
       }
+    },
+    "orderPicker": {
+      "title": "Güncel bir ürün için yardıma mı ihtiyacın var, {first_name}?",
+      "guestTitle": "Bir sipariş için yardıma mı ihtiyacın var?",
+      "subtitle": "Yardım istediğin ürünü aşağıdan seç.",
+      "empty": "Henüz sipariş yok.",
+      "otherItem": "Başka bir ürün için yardım",
+      "otherProblem": "Başka bir sorun için yardım"
+    },
+    "helpCards": {
+      "title": "Alışverişlerinizle ilgili sorularınız mı var?",
+      "viewAll": "Tümünü gör"
+    },
+    "helpLibrary": {
+      "title": "Yardım kütüphanesine göz at",
+      "searchPlaceholder": "Örn. “ücret hakkında soru” yazın.",
+      "allTopics": "Tüm yardım konuları",
+      "recommended": "Önerilen konular",
+      "more": "Diğer konular ve yardım sayfaları",
+      "footerTitle": "Daha fazla yardıma mı ihtiyacın var?",
+      "footerCta": "Yeni destek talebi"
     }
   },
   "caseInbox": {

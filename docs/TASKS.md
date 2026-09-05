@@ -38,3 +38,26 @@ Rechtlich: önceden de belirttigim gibi bu kisimdan nefret ediyorum. hukuki olar
 
 haydi bu düzenlemeleri adim adim detaylica yap. HICBIR SEYI BOZMA!!! DÜZENLE VE YENIDEN KUR ANCAK FONKSIYONLARI SAKIN BOZMA!!!
 
+---
+
+## Docs klasöründeki dış görevler — SENİN yapman gerekenler (2026-09-05 taranan)
+
+Aşağıdakiler kod tarafında yapılamaz — hesap/panel erişimi, domain/ödeme kararı ya da fiziksel test gerektiriyor.
+
+- [ ] **Performans (Redis doğrulama):** Render dashboard → `REDIS_URL` tanımlı mı ve loglarda "Redis connected" var mı bak. Sonra `curl -w "%{time_total}"` ile aynı isteği 2 kere at, ikincisi hızlı mı (Redis'ten) kontrol et.
+- [ ] **Developer Platform yayına alma:** Vercel'de `apps/developer` için proje oluştur → domain `developer.andertal.com`. Render'a `DEVELOPER_JWT_SECRET`, `CORS_ORIGINS`'e `developer.andertal.com`, `APP_PLATFORM_AUTO_APPROVE=true`, `SUPERUSER_EMAILS` ekle.
+- [ ] **JTL Connector (Connector projesi için ön koşul):** JTL Partner Portal'dan sandbox token iste. Token gelince Render'a `JTL_SCX_CHANNEL_REFRESH_TOKEN` / `JTL_SCX_API_BASE` / `JTL_SCX_CHANNEL_ID` ekle, Partner Portal'da sign-up/update URL'lerini tanımla. Mümkünse Windows'ta JTL-Wawi kurup gerçek satıcı akışını test et.
+- [ ] **Affiliate programı — domain kararı:** Yeni bir domain gerekiyor (ör. `affiliate.andertal.com`). Kod tarafı hiç başlamadı (0%) — domain/isim kararını verirsen inşaya başlanabilir.
+- [ ] **Bonuspunkte backfill onayı:** `scripts/backfill-platform-bonus-funding.js` canlı DB'ye karşı hazır ama hiç çalıştırılmadı (production veri değişikliği içeriyor) — önce `--dry-run`, sonra gerçek çalıştırma için onayın gerekiyor.
+
+## Docs klasöründeki iç görevler — kod tarafında yapılacaklar (bana ait, öncelik sırasıyla soracağım)
+
+- **BRAND.md:** ✅ Kontrol edildi — zaten yapılmış. Onay ekranı ayrı sayfa değil, `BrandPage.jsx` içine gömülü ("Pending Authorizations" kartı, sadece superuser'a görünüyor, `/content/brands`'te). Yanlış alarm.
+- **HUKUKI.md:** Sabit GPSR zorunluluk kontrolü hâlâ profile-bazlı değil; Excel-import uyumluluk kontrolü ve superuser inceleme kuyruğu hiç yok; `docs/COMPLIANCE.md` yazılmadı.
+- **SUPPORT-LANDING:** ✅ Gerçek eksikler kapatıldı (2026-09-05) — 3 yeni container tipi (support_order_picker, support_help_cards, support_help_library) artık shop'ta gerçekten render oluyor (önceden sadece DB'deydi, ekranda HİÇ görünmüyorlardı — canlı bug'dı); backend sanitize whitelist'i bu 3 tip + recursive `children[]` nesting (derinlik 3, toplam 200 sınırı) ile güncellendi; sunucu başlangıç kancası (`ensureCustomerSupportLanding`) server.js'e bağlandı; eksik npm script'leri (`test:customer-support-landing`, `smoke:customer-support-landing`) eklendi ve ana `test` script'ine dahil edildi. Tüm testler (9/9 yeni + 53/53 toplam) ve smoke test geçiyor. Sellercentral editöründe tam ağaç/nesting UI'ı (STEP1'in Adım 2 kısmı) henüz yok — o ayrı, büyük bir iş.
+- **Connector (JTL):** Canonical model + Billbee mapper + DB tabloları var ama JTL SCX auth/event-poller/mapper ve sellercentral "ERP bağla" sayfası hiç yok.
+- **Developer Platform:** Kod (PR1-4) tamam, sadece deploy/env eksik (yukarıdaki dış görev).
+- **Affiliate:** Domain kararından sonra sıfırdan inşa (en son öncelik, idealo'dan bile sonra değil ama idealo listenin en sonunda kalacak şekilde sıralayacağım).
+- **Idealo:** En sona bırakıldı, sadece yol haritası var, hiç kod yok.
+
+- Sellercentralde /help sayfasi her dile göre uyarlanmamis.
