@@ -173,6 +173,7 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/content/metaobjects",
   "/content/compliance-review",
   "/content/compliance-profiles",
+  "/content/payout-risk",
   "/analytics/live-view",
 ];
 
@@ -339,6 +340,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/content/flows", label: tx("flows", "Flows"), superuserOnly: true },
         { url: "/content/compliance-review", label: tx("complianceReview", "Compliance review"), superuserOnly: true },
         { url: "/content/compliance-profiles", label: tx("complianceProfiles", "Compliance profiles"), superuserOnly: true },
+        { url: "/content/payout-risk", label: tx("payoutRisk", "Payout risk"), superuserOnly: true },
       ],
     },
     {
@@ -703,6 +705,7 @@ export default function PolarisLayout({ children }) {
     "/content/metaobjects",
     "/content/compliance-review",
     "/content/compliance-profiles",
+    "/content/payout-risk",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
     "/customers-menu",
@@ -1242,6 +1245,7 @@ export default function PolarisLayout({ children }) {
     "/content/metaobjects",
     "/content/compliance-review",
     "/content/compliance-profiles",
+    "/content/payout-risk",
     "/analytics/live-view",
     "/orders/abandoned-checkouts",
     "/customers-menu",

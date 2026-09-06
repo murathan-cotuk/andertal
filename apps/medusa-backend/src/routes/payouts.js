@@ -697,6 +697,68 @@ module.exports = function createPayoutsRouter({
       }
     }
 
+    // GET /admin-hub/v1/sellers-missing-iban — superuser: sellers with money owed but no
+    // (valid-looking) IBAN on file. runSellerIbanPayoutsIfDue silently skips these on every
+    // payout run (console.warn only) — without this list a seller's earned money can sit
+    // unpaid indefinitely with nobody noticing. Mirrors that job's own eligibility SQL so the
+    // amounts shown here match exactly what would actually be paid out once IBAN is added.
+    const adminHubSellersMissingIbanGET = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const r = await client.query(
+          `SELECT o.seller_id,
+                  s.email, s.store_name, s.company_name, s.iban,
+                  COUNT(*)::int AS order_count,
+                  SUM(
+                    GREATEST(0,
+                      COALESCE(o.seller_net_after_commission_cents::bigint,
+                        FLOOR(o.subtotal_cents::numeric * (1 - COALESCE(s.commission_rate, 0.12)))::bigint)
+                    )
+                  )::bigint AS owed_cents
+             FROM store_orders o
+             JOIN seller_users s ON s.seller_id = o.seller_id
+            WHERE o.stripe_payout_status = 'pending'
+              AND o.stripe_account_id IS NULL
+              AND o.payment_status = 'bezahlt'
+              AND o.delivery_date IS NOT NULL
+              AND o.delivery_date <= now() - interval '14 days'
+              AND COALESCE(o.order_status, '') NOT IN ('storniert', 'refunded', 'retoure', 'retoure_anfrage')
+              AND NOT EXISTS (
+                SELECT 1 FROM store_returns ret
+                WHERE ret.order_id = o.id
+                  AND COALESCE(ret.status, '') NOT IN ('abgelehnt', 'abgeschlossen')
+              )
+              AND (s.iban IS NULL OR LENGTH(TRIM(REPLACE(s.iban, ' ', ''))) < 15)
+            GROUP BY o.seller_id, s.email, s.store_name, s.company_name, s.iban
+            HAVING SUM(
+                     GREATEST(0,
+                       COALESCE(o.seller_net_after_commission_cents::bigint,
+                         FLOOR(o.subtotal_cents::numeric * (1 - COALESCE(s.commission_rate, 0.12)))::bigint)
+                     )
+                   ) > 0
+            ORDER BY owed_cents DESC`
+        )
+        await client.end()
+        res.json({
+          sellers: r.rows.map((row) => ({
+            seller_id: row.seller_id,
+            email: row.email,
+            store_name: row.store_name,
+            company_name: row.company_name,
+            has_iban: !!(row.iban && String(row.iban).replace(/\s+/g, '').length >= 15),
+            order_count: row.order_count,
+            owed_cents: Number(row.owed_cents || 0),
+          })),
+        })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     // GET /admin-hub/v1/payout-overview — superuser: all sellers summary for a period
     const adminHubPayoutOverviewGET = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
@@ -1189,6 +1251,7 @@ module.exports = function createPayoutsRouter({
   router.get('/admin-hub/v1/payout-summary', adminHubPayoutSummaryGET)
   router.get('/admin-hub/v1/analytics/marketing', adminHubAnalyticsMarketingGET)
   router.get('/admin-hub/v1/payout-overview', adminHubPayoutOverviewGET)
+  router.get('/admin-hub/v1/sellers-missing-iban', adminHubSellersMissingIbanGET)
 
   return router
 }

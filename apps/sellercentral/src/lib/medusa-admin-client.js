@@ -607,6 +607,14 @@ class MedusaAdminClient {
     return { products: data.products || [] }
   }
 
+  /** Superuser: sellers with money owed (14d+ delivered, unrefunded) but no valid IBAN on file —
+   * runSellerIbanPayoutsIfDue silently skips these on every payout run, so without this list a
+   * seller's earned money can sit unpaid indefinitely with nobody noticing. */
+  async getSellersMissingIban() {
+    const data = await this.request('/admin-hub/v1/sellers-missing-iban').catch(() => ({ sellers: [] }))
+    return { sellers: data.sellers || [] }
+  }
+
   /** Superuser: list brands pending authorization review (own_registered / authorized_reseller), with their documents */
   async getPendingBrandAuthorizations() {
     const data = await this.request('/admin-hub/brands/pending-authorizations').catch(() => ({ brands: [] }))
