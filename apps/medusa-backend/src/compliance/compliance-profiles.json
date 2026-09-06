@@ -248,7 +248,7 @@
     "hersteller_information": {
       "type": "text",
       "label_i18n": { "de": "Herstellerinformationen", "en": "Manufacturer details", "tr": "Üretici bilgileri", "fr": "Coordonnées du fabricant", "es": "Datos del fabricante", "it": "Dati del fabbricante" },
-      "validation_regex": null,
+      "validation_regex": "^.{10,}$",
       "help_text_i18n": {
         "de": "Postanschrift und Kontakt des Herstellers (Straße, PLZ, Ort, Land, E-Mail und/oder Telefon).",
         "en": "Postal address and contact of the manufacturer (street, postcode, city, country, email and/or phone).",
@@ -261,7 +261,7 @@
     "verantwortliche_person_information": {
       "type": "text",
       "label_i18n": { "de": "Verantwortliche Person (EU)", "en": "Responsible person (EU)", "tr": "Sorumlu kişi (AB)", "fr": "Personne responsable (UE)", "es": "Persona responsable (UE)", "it": "Persona responsabile (UE)" },
-      "validation_regex": null,
+      "validation_regex": "^.{10,}$",
       "help_text_i18n": {
         "de": "In der EU ansässige Kontaktstelle für Produktsicherheit (Name + Adresse + Kontakt). Sitzt der Hersteller in der EU, kann dies dieselbe Stelle sein.",
         "en": "EU-based contact for product safety (name + address + contact). If the manufacturer is in the EU, this can be the same party.",
