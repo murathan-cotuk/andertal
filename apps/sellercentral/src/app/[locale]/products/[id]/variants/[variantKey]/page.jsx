@@ -59,7 +59,9 @@ export default function ProductVariantDetailRoute() {
     );
   }
 
-  if (loading) {
+  // First load only — a background refetch after Save keeps <VariantEditPage> mounted
+  // so it doesn't reset to the first tab.
+  if (loading && !product) {
     return (
       <DashboardLayout>
         <Box padding="400">

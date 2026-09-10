@@ -42,7 +42,7 @@ import { encodeVariantPathKey } from "@/lib/variant-path-key";
 import { ChangeRequestFieldBadge } from "@/components/ChangeRequestFieldBadge";
 import {
   fieldNameDisplayLabel,
-  formatChangeRequestValueForDisplay,
+  buildChangeRequestDiff,
   seoPlainPreview,
 } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
@@ -578,6 +578,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [selectedVariantKeys, setSelectedVariantKeys] = useState(() => new Set());
   const [bulkVariantOpen, setBulkVariantOpen] = useState(false);
   const [bulkVariantCfg, setBulkVariantCfg] = useState({});
+  // option_values of the matrix row awaiting delete confirmation (null = no prompt)
+  const [variantPendingDelete, setVariantPendingDelete] = useState(null);
   // After a save that was blocked/downgraded: field paths to outline red + jump to
   const [saveErrorFields, setSaveErrorFields] = useState([]);
   const [saveErrorListOpen, setSaveErrorListOpen] = useState(false);
@@ -1489,6 +1491,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           errList.push({
             tab: 2,
             anchor: "vm-matrix",
+            // Deep-link straight into this variant's full edit page, Legal tab, GPSR block.
+            optionValues: vv.option_values,
+            errKey: "gpsr",
             label: lt(locale, "Variant", "Varyant", "Variante", "Variante", "Variante", "Variante") + ": " + vv.option_values.join(" / ") + " — GPSR",
           });
         }
@@ -2061,23 +2066,66 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const toggleMatrixVariantDisabled = (optionValues, disabled) =>
     updateMatrixVariantMeta(optionValues, "disabled", disabled ? true : null);
 
-  // Fields a matrix variant can copy from / lock to the parent (mirrors VariantEditPage).
+  // Fields the bulk-edit modal can push onto every selected matrix variant.
+  //  - `lockable: true`  → shows the 🔗 hook: copy from & stay linked to the main article.
+  //  - otherwise          → set-only: type/pick a value, applied to all selected.
+  //  - `root`             → written to the variant row (not metadata): price/stock.
+  //  - `meta`             → metadata key differs from `key`.
+  //  - EAN & SKU are intentionally excluded — they must stay unique per variant.
   const BULK_PARENT_FIELDS = [
-    { key: "hersteller", kind: "text" },
-    { key: "hersteller_information", kind: "text", multiline: true },
-    { key: "verantwortliche_person_information", kind: "text", multiline: true },
-    { key: "eu_origin_country", kind: "text" },
-    { key: "eu_origin_registry_id", kind: "text" },
-    { key: "eu_origin_document_url", kind: "text" },
-    { key: "category_id", kind: "lockonly" },
-    { key: "brand_id", kind: "lockonly" },
-    { key: "spezifikationen", kind: "lockonly" },
-    { key: "metafields", kind: "lockonly" },
+    // Legal / GPSR
+    { key: "hersteller", kind: "text", lockable: true },
+    { key: "hersteller_information", kind: "text", multiline: true, lockable: true },
+    { key: "verantwortliche_person_information", kind: "text", multiline: true, lockable: true },
+    { key: "eu_origin_country", kind: "text", lockable: true },
+    { key: "eu_origin_registry_id", kind: "text", lockable: true },
+    { key: "eu_origin_document_url", kind: "text", lockable: true },
+    // Shop assignment
+    { key: "category_id", kind: "lockonly", lockable: true },
+    { key: "brand_id", kind: "lockonly", lockable: true },
+    { key: "shipping_group_id", kind: "select", optionsFrom: "shipping" },
+    { key: "spezifikationen", kind: "lockonly", lockable: true },
+    { key: "metafields", kind: "lockonly", lockable: true },
+    // Pricing & stock (variant row fields)
+    { key: "price", kind: "money", root: "price_cents" },
+    { key: "sale_price", kind: "money", root: "sale_price_cents" },
+    { key: "inventory", kind: "number", root: "inventory" },
+    { key: "active", kind: "select", optionsFrom: "active" },
+    // Dimensions / base price
+    { key: "dimensions_width", kind: "number" },
+    { key: "dimensions_height", kind: "number" },
+    { key: "dimensions_length", kind: "number" },
+    { key: "weight_grams", kind: "number" },
+    { key: "sales_unit", kind: "text" },
+    { key: "packaging_unit", kind: "text" },
+    { key: "packaging_unit_plural", kind: "text" },
+    { key: "unit_type", kind: "select", optionsFrom: "unit_type" },
+    { key: "unit_value", kind: "number" },
+    { key: "unit_reference", kind: "number" },
+    // Content
+    { key: "description", kind: "text", multiline: true, meta: "description" },
   ];
   const SPEZ_LOCK_KEYS = [
     "dimensions_width", "dimensions_height", "dimensions_length", "weight_grams",
     "sales_unit", "packaging_unit", "packaging_unit_plural", "unit_type", "unit_value", "unit_reference",
   ];
+  const bulkSelectOptions = (f) => {
+    if (f.optionsFrom === "shipping") {
+      return [
+        { label: lt(locale, "— None —", "— Yok —", "— Aucun —", "— Ninguno —", "— Nessuno —", "— Keine —"), value: "" },
+        ...((shippingGroupsList || []).map((g) => ({ label: g.name || g.id, value: String(g.id) }))),
+      ];
+    }
+    if (f.optionsFrom === "active") {
+      return [
+        { label: lt(locale, "— No change —", "— Değişiklik yok —", "— Aucun changement —", "— Sin cambios —", "— Nessuna modifica —", "— Keine Änderung —"), value: "" },
+        { label: lt(locale, "Active", "Aktif", "Actif", "Activo", "Attivo", "Aktiv"), value: "active" },
+        { label: lt(locale, "Inactive", "Pasif", "Inactif", "Inactivo", "Inattivo", "Inaktiv"), value: "inactive" },
+      ];
+    }
+    if (f.optionsFrom === "unit_type") return UNIT_TYPE_OPTIONS;
+    return [{ label: "—", value: "" }];
+  };
   const bulkFieldLabel = (key) => {
     switch (key) {
       case "hersteller": return lt(locale, "Manufacturer", "Üretici", "Fabricant", "Fabricante", "Fabbricante", "Hersteller");
@@ -2090,12 +2138,30 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       case "brand_id": return lt(locale, "Brand", "Marka", "Marque", "Marca", "Marca", "Marke");
       case "spezifikationen": return lt(locale, "Specifications (dimensions, units)", "Özellikler (ölçü, birim)", "Spécifications", "Especificaciones", "Specifiche", "Spezifikationen (Maße, Einheiten)");
       case "metafields": return lt(locale, "Properties (metafields)", "Özellikler (metafield)", "Propriétés", "Propiedades", "Proprietà", "Eigenschaften (Metafelder)");
+      case "shipping_group_id": return lt(locale, "Shipping group", "Kargo grubu", "Groupe d'expédition", "Grupo de envío", "Gruppo di spedizione", "Versandgruppe");
+      case "price": return lt(locale, "Selling price (€)", "Satış fiyatı (€)", "Prix de vente (€)", "Precio de venta (€)", "Prezzo di vendita (€)", "Verkaufspreis (€)");
+      case "sale_price": return lt(locale, "Discount price (€)", "İndirim fiyatı (€)", "Prix réduit (€)", "Precio de descuento (€)", "Prezzo scontato (€)", "Rabattpreis (€)");
+      case "inventory": return lt(locale, "Stock", "Stok", "Stock", "Stock", "Stock", "Bestand");
+      case "active": return lt(locale, "Status", "Durum", "Statut", "Estado", "Stato", "Status");
+      case "dimensions_width": return lt(locale, "Width (cm)", "Genişlik (cm)", "Largeur (cm)", "Ancho (cm)", "Larghezza (cm)", "Breite (cm)");
+      case "dimensions_height": return lt(locale, "Height (cm)", "Yükseklik (cm)", "Hauteur (cm)", "Alto (cm)", "Altezza (cm)", "Höhe (cm)");
+      case "dimensions_length": return lt(locale, "Length (cm)", "Uzunluk (cm)", "Longueur (cm)", "Largo (cm)", "Lunghezza (cm)", "Länge (cm)");
+      case "weight_grams": return lt(locale, "Weight (g)", "Ağırlık (g)", "Poids (g)", "Peso (g)", "Peso (g)", "Gewicht (g)");
+      case "sales_unit": return lt(locale, "Sales unit", "Satış birimi", "Unité de vente", "Unidad de venta", "Unità di vendita", "Verkaufseinheit");
+      case "packaging_unit": return lt(locale, "Packaging unit", "Ambalaj birimi", "Unité d'emballage", "Unidad de embalaje", "Unità di imballaggio", "Verpackungseinheit");
+      case "packaging_unit_plural": return lt(locale, "Packaging unit (plural)", "Ambalaj birimi (çoğul)", "Unité d'emballage (pluriel)", "Unidad de embalaje (plural)", "Unità di imballaggio (plurale)", "Verpackungseinheit (Plural)");
+      case "unit_type": return lt(locale, "Unit of measure", "Ölçü birimi", "Unité de mesure", "Unidad de medida", "Unità di misura", "Maßeinheit");
+      case "unit_value": return lt(locale, "Amount", "Miktar", "Quantité", "Cantidad", "Quantità", "Menge");
+      case "unit_reference": return lt(locale, "Base unit", "Temel birim", "Unité de base", "Unidad base", "Unità base", "Grundeinheit");
+      case "description": return lt(locale, "Description", "Açıklama", "Description", "Descripción", "Descrizione", "Beschreibung");
       default: return key;
     }
   };
   const bulkVariantHasChanges = BULK_PARENT_FIELDS.some((f) => {
     const c = bulkVariantCfg[f.key];
-    return c && (c.lock || (f.kind === "text" && String(c.value || "").trim() !== ""));
+    if (!c) return false;
+    if (c.lock) return true;
+    return ["text", "number", "select", "money"].includes(f.kind) && String(c.value ?? "").trim() !== "";
   });
 
   /** Apply the bulk-edit config to every selected matrix variant (local state; Save persists). */
@@ -2112,6 +2178,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         if (!keySet.has(variantRowKey(v))) return v;
         const m = { ...(v.metadata && typeof v.metadata === "object" ? v.metadata : {}) };
         const locks = new Set(Array.isArray(m.parent_locked_fields) ? m.parent_locked_fields : []);
+        const rootPatch = {};
         let touched = false;
         for (const f of BULK_PARENT_FIELDS) {
           const cfg = bulkVariantCfg[f.key];
@@ -2128,15 +2195,29 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               copyKey(m, f.key);
             }
             touched = true;
-          } else if (f.kind === "text" && String(cfg.value || "").trim() !== "") {
-            locks.delete(f.key);
-            m[f.key] = String(cfg.value).trim();
-            touched = true;
+            continue;
           }
+          const raw = cfg.value;
+          const hasVal = raw != null && String(raw).trim() !== "";
+          if (!["text", "number", "select", "money"].includes(f.kind) || !hasVal) continue;
+          locks.delete(f.key);
+          const val = String(raw).trim();
+          if (f.key === "active") {
+            if (val === "inactive") m.disabled = true; else delete m.disabled;
+          } else if (f.kind === "money") {
+            const n = parseFloat(sanitizePriceDraftString(val));
+            rootPatch[f.root] = !isNaN(n) ? Math.round(n * 100) : undefined;
+          } else if (f.root === "inventory") {
+            const n = parseInt(val, 10);
+            rootPatch.inventory = isNaN(n) ? 0 : n;
+          } else {
+            m[f.meta || f.key] = val;
+          }
+          touched = true;
         }
         if (!touched) return v;
         if (locks.size) m.parent_locked_fields = [...locks]; else delete m.parent_locked_fields;
-        return { ...v, metadata: m };
+        return { ...v, ...rootPatch, metadata: m };
       });
       return { ...prev, variants };
     });
@@ -2475,32 +2556,39 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vg-swatch:hover { border-color: var(--p-color-border-hover); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); }
         .vg-swatch-empty { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; border: 1.5px dashed var(--p-color-border); display: inline-flex; align-items: center; justify-content: center; color: var(--p-color-icon-subdued); font-size: 11px; cursor: pointer; padding: 0; background: none; appearance: none; }
         .vg-swatch-empty:hover { border-color: var(--p-color-border-info); background: rgba(0,113,227,0.04); }
-        /* ── Variation engine — Matrix rows (compact single line) ── */
-        .vm-list { border: 1px solid var(--p-color-border); border-radius: 10px; overflow: hidden; background: var(--p-color-bg-surface, #fff); }
-        .vm-head, .vm-row { display: flex; align-items: center; gap: 10px; padding: 7px 12px; }
+        /* ── Variation engine — Matrix rows (aligned column grid) ── */
+        .vm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .vm-list { border: 1px solid var(--p-color-border); border-radius: 10px; overflow: hidden; background: var(--p-color-bg-surface, #fff); min-width: 940px; }
+        .vm-head, .vm-row {
+          display: grid;
+          grid-template-columns: 30px minmax(150px, 1.7fr) minmax(88px, 1fr) minmax(96px, 1fr) minmax(58px, 0.66fr) minmax(74px, 0.9fr) minmax(74px, 0.9fr) minmax(120px, auto) minmax(96px, auto);
+          align-items: center;
+          gap: 10px;
+          padding: 7px 12px;
+        }
         .vm-head { background: var(--p-color-bg-surface-secondary, #f6f6f7); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--p-color-text-subdued); border-bottom: 1px solid var(--p-color-border); }
-        .vm-row { border-top: 1px solid var(--p-color-border); flex-wrap: wrap; }
+        .vm-head > span { min-width: 0; }
+        .vm-head .vm-num-h { text-align: right; padding-right: 7px; }
+        .vm-row { border-top: 1px solid var(--p-color-border); }
         .vm-row:first-child { border-top: none; }
         .vm-row.vm-row-selected { background: var(--p-color-bg-surface-selected, #f2f7fe); }
         .vm-row.vm-row-off { opacity: .55; }
-        .vm-check { flex: 0 0 auto; display: flex; align-items: center; }
-        .vm-sku { flex: 0 0 auto; width: 200px; }
-        .vm-opts { flex: 1 1 180px; min-width: 130px; display: flex; flex-wrap: wrap; gap: 4px; }
+        .vm-check { display: flex; align-items: center; }
+        .vm-cell { min-width: 0; }
+        .vm-opts { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
         .vm-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--p-color-text); background: var(--p-color-bg-surface-secondary, #f1f1f1); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
         .vm-opt i { font-style: normal; color: var(--p-color-text-subdued); }
-        .vm-nums { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
-        .vm-f { display: flex; flex-direction: column; gap: 1px; }
-        .vm-f > span { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; color: var(--p-color-text-subdued); padding-left: 3px; }
         .vm-inp { width: 100%; border: 1px solid transparent; border-radius: 6px; background: transparent; padding: 5px 7px; font-size: 13px; color: var(--p-color-text); font-variant-numeric: tabular-nums; box-sizing: border-box; }
         .vm-inp::placeholder { color: var(--p-color-text-disabled, #b5b5b5); }
         .vm-inp:hover { background: var(--p-color-bg-fill-transparent-hover, rgba(0,0,0,.04)); }
         .vm-inp:focus { outline: none; border-color: var(--p-color-border-emphasis, #2c6ecb); background: var(--p-color-bg-surface, #fff); }
         .vm-inp.vm-err { border-color: var(--p-color-border-critical, #d82c0d); background: var(--p-color-bg-surface-critical, #fff4f4); }
         .vm-inp-sku { font-weight: 600; }
-        .vm-inp-n { width: 82px; text-align: right; }
-        .vm-flag { flex: 0 0 auto; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px; cursor: help; }
+        .vm-inp-n { text-align: right; }
+        .vm-flag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px; cursor: help; white-space: nowrap; }
         .vm-flag-bad { color: var(--p-color-text-critical, #b42318); background: var(--p-color-bg-surface-critical, #fff0f0); }
-        .vm-imgs { flex: 0 0 auto; display: flex; gap: 5px; align-items: center; margin-left: auto; }
+        .vm-imgs { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+        .vm-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; }
         .vm-img { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
         .vm-img img { width: 40px; height: 40px; object-fit: cover; border-radius: 7px; border: 1px solid var(--p-color-border); display: block; }
         .vm-img-x { position: absolute; top: -5px; right: -5px; width: 15px; height: 15px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 10px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
@@ -2510,14 +2598,21 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vm-rowbtn { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 6px; border: 1px solid transparent; background: transparent; cursor: pointer; color: var(--p-color-text-subdued); display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; padding: 0; }
         .vm-rowbtn:hover { background: var(--p-color-bg-fill-transparent-hover, rgba(0,0,0,.06)); color: var(--p-color-text); }
         .vm-rowbtn.vm-rowbtn-danger:hover { background: var(--p-color-bg-surface-critical, #fff0f0); color: var(--p-color-text-critical, #b42318); }
+        /* Active/inactive status dot */
+        .vm-rowbtn-status { width: 22px; }
+        .vm-dot { width: 10px; height: 10px; border-radius: 50%; display: block; box-shadow: 0 0 0 3px var(--p-color-bg-surface, #fff); }
+        .vm-dot-on { background: #22c55e; }
+        .vm-dot-off { background: #ef4444; }
+        /* Prominent "Edit" (open full variant) button */
+        .vm-rowbtn-edit { width: auto; min-width: 26px; gap: 5px; padding: 0 9px; height: 28px; border-color: var(--p-color-border, #c9cccf); background: var(--p-color-bg-surface, #fff); color: var(--p-color-text); font-size: 12px; font-weight: 600; }
+        .vm-rowbtn-edit:hover { background: var(--p-color-bg-surface-secondary, #f1f2f4); border-color: var(--p-color-border-emphasis, #8c9196); }
+        .vm-rowbtn-edit .vm-rowbtn-ico { width: 15px; height: 15px; display: inline-flex; }
+        .vm-rowbtn-edit .vm-rowbtn-ico svg { width: 15px; height: 15px; }
+        @media (max-width: 1180px) { .vm-rowbtn-edit .vm-rowbtn-edit-label { display: none; } .vm-rowbtn-edit { padding: 0 7px; } }
         .vm-field-err { border: 1px solid var(--p-color-border-critical, #d82c0d) !important; border-radius: 8px; }
         .variations-fullwidth { width: 100%; }
         .variations-fullwidth .Polaris-ShadowBevel { width: 100%; }
-        @media (max-width: 940px) {
-          .vm-row { align-items: flex-start; }
-          .vm-sku { width: 100%; }
-          .vm-imgs { margin-left: 0; }
-        }
+        /* Grid keeps its shape; the .vm-scroll wrapper scrolls it sideways below its min-width. */
         .mp-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .mp-grid > * { min-width: 0; }
         @media (max-width: 720px) { .mp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -2551,13 +2646,23 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <Button
                   size="micro"
                   onClick={() => {
+                    if (Array.isArray(f.optionValues) && !isNew) {
+                      // Deep-link into the specific variant's full edit page + errored block.
+                      router.push(
+                        "/products/" + idOrHandle + "/variants/" + encodeVariantPathKey(f.optionValues) +
+                        (f.errKey ? "?err=" + encodeURIComponent(f.errKey) : "")
+                      );
+                      return;
+                    }
                     setActiveTabIndex(f.tab);
                     setTimeout(() => {
                       try { document.getElementById(f.anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignore */ }
                     }, 80);
                   }}
                 >
-                  {lt(locale, "Go to error", "Hataya git", "Aller à l'erreur", "Ir al error", "Vai all'errore", "Zum Fehler")}
+                  {Array.isArray(f.optionValues)
+                    ? lt(locale, "Open variant", "Varyantı aç", "Ouvrir la variante", "Abrir variante", "Apri variante", "Variante öffnen")
+                    : lt(locale, "Go to error", "Hataya git", "Aller à l'erreur", "Ir al error", "Vai all'errore", "Zum Fehler")}
                 </Button>
               </div>
             ))}
@@ -2660,28 +2765,61 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                           {`${locale === "tr" ? "Satıcı" : locale === "fr" ? "Vendeur" : locale === "es" ? "Vendedor" : locale === "it" ? "Venditore" : locale === "de" ? "Verkäufer" : "Seller"}: ${changeRequestSellerLabel(cr)}`}
                         </Text>
                       </InlineStack>
-                      <InlineStack gap="400" wrap align="start">
-                        <Box minWidth="240px" maxWidth="480px">
-                          <BlockStack gap="100">
-                            <Text as="p" variant="bodyXs" tone="subdued">
-                              {locale === "tr" ? "Mevcut değer" : locale === "fr" ? "Valeur actuelle" : locale === "es" ? "Valor actual" : locale === "it" ? "Valore attuale" : locale === "de" ? "Aktueller Wert" : "Current value"}
+                      {(() => {
+                        const diff = buildChangeRequestDiff(cr.old_value, cr.new_value);
+                        const beforeLbl = lt(locale, "Before", "Önce", "Avant", "Antes", "Prima", "Vorher");
+                        const afterLbl = lt(locale, "After", "Sonra", "Après", "Después", "Dopo", "Nachher");
+                        const emptyMark = lt(locale, "(empty)", "(boş)", "(vide)", "(vacío)", "(vuoto)", "(leer)");
+                        if (diff.kind === "scalar") {
+                          return (
+                            <BlockStack gap="150">
+                              <BlockStack gap="050">
+                                <Text as="p" variant="bodyXs" tone="subdued">{beforeLbl}</Text>
+                                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", color: "#6b7280", textDecoration: diff.changed ? "line-through" : "none" }}>
+                                  {diff.before || emptyMark}
+                                </div>
+                              </BlockStack>
+                              <BlockStack gap="050">
+                                <Text as="p" variant="bodyXs" tone="subdued">{afterLbl}</Text>
+                                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", fontWeight: 600 }}>
+                                  {diff.after || emptyMark}
+                                </div>
+                              </BlockStack>
+                            </BlockStack>
+                          );
+                        }
+                        if (diff.rows.length === 0) {
+                          return (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {lt(locale, "No effective change.", "Fiili bir değişiklik yok.", "Aucune modification effective.", "Sin cambios efectivos.", "Nessuna modifica effettiva.", "Keine effektive Änderung.")}
                             </Text>
-                            <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
-                              {formatChangeRequestValueForDisplay(cr.old_value)}
-                            </div>
-                          </BlockStack>
-                        </Box>
-                        <Box minWidth="240px" maxWidth="480px">
-                          <BlockStack gap="100">
+                          );
+                        }
+                        return (
+                          <BlockStack gap="150">
                             <Text as="p" variant="bodyXs" tone="subdued">
-                              {locale === "tr" ? "Önerilen değer" : locale === "fr" ? "Valeur proposée" : locale === "es" ? "Valor propuesto" : locale === "it" ? "Valore proposto" : locale === "de" ? "Vorgeschlagener Wert" : "Proposed value"}
+                              {`${diff.rows.length} ${lt(locale, "field(s) changed", "alan değişti", "champ(s) modifié(s)", "campo(s) modificado(s)", "campo/i modificato/i", "Feld(er) geändert")}`}
                             </Text>
-                            <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", fontWeight: 600 }}>
-                              {formatChangeRequestValueForDisplay(cr.new_value)}
-                            </div>
+                            {diff.rows.map((r) => (
+                              <div key={r.path} style={{ borderLeft: "3px solid #e2e8f0", paddingLeft: 10 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 2 }}>{r.path}</div>
+                                <div style={{ fontSize: 13, lineHeight: 1.45, color: "#9ca3af", textDecoration: "line-through", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                                  {r.before ? r.before : emptyMark}
+                                </div>
+                                {r.status === "removed" ? (
+                                  <div style={{ fontSize: 12, color: "#b91c1c" }}>
+                                    {lt(locale, "(removed)", "(kaldırıldı)", "(supprimé)", "(eliminado)", "(rimosso)", "(entfernt)")}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: 13, lineHeight: 1.45, color: "#047857", fontWeight: 600, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                                    {r.after ? r.after : emptyMark}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </BlockStack>
-                        </Box>
-                      </InlineStack>
+                        );
+                      })()}
                       <InlineStack gap="200">
                         <Button size="slim" tone="success" onClick={() => approveChangeRequest(cr.id)} loading={busy} disabled={busy}>
                           {locale === "tr" ? "Onayla" : locale === "fr" ? "Approuver" : locale === "es" ? "Aprobar" : locale === "it" ? "Approva" : locale === "de" ? "Freigeben" : "Approve"}
@@ -3730,14 +3868,20 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                           </>
                         )}
                       </div>
+                      <div className="vm-scroll">
                       <div className="vm-list">
                         <div className="vm-head">
                           <span className="vm-check">
                             <Checkbox label="" labelHidden checked={allSel ? true : (someSel ? "indeterminate" : false)} onChange={(on) => setAllVariantsSelected(matrixKeys, on)} />
                           </span>
-                          <span className="vm-sku">SKU</span>
-                          <span className="vm-opts">{lt(locale, "Variant", "Varyant", "Variante", "Variante", "Variante", "Variante")}</span>
-                          <span style={{ marginLeft: "auto" }}>EAN · {pe.inventory} · {pe.sellingPrice}</span>
+                          <span>{lt(locale, "Variant", "Varyant", "Variante", "Variante", "Variante", "Variante")}</span>
+                          <span>SKU</span>
+                          <span>EAN</span>
+                          <span className="vm-num-h">{pe.inventory}</span>
+                          <span className="vm-num-h">{pe.sellingPrice}</span>
+                          <span className="vm-num-h">{pe.discountPrice}</span>
+                          <span>{lt(locale, "Images", "Görseller", "Images", "Imágenes", "Immagini", "Bilder")}</span>
+                          <span />
                         </div>
                         {matrixRows.map((v, vi) => {
                           const rk = variantRowKey(v);
@@ -3758,13 +3902,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               <span className="vm-check">
                                 <Checkbox label="" labelHidden checked={isSel} onChange={() => toggleVariantSelected(rk)} />
                               </span>
-                              <span className="vm-sku">
-                                <span className="vm-f">
-                                  <span>SKU</span>
-                                  <input className="vm-inp vm-inp-sku" value={v.sku ?? ""} placeholder="SKU" autoComplete="off"
-                                    onChange={(e) => updateMatrixVariant(v.option_values, "sku", e.target.value)} />
-                                </span>
-                              </span>
                               <span className="vm-opts">
                                 {(v.option_values || []).map((val, oi) => {
                                   const gOpt = variantGroups[oi];
@@ -3782,45 +3919,44 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                     </span>
                                   );
                                 })}
+                                {!variantGpsrOk(v) && (
+                                  <span className="vm-flag vm-flag-bad" title={lt(locale, "Missing GPSR fields (Manufacturer / details / responsible person)", "GPSR alanları eksik (Üretici / bilgi / sorumlu kişi)", "Champs GPSR manquants", "Faltan campos GPSR", "Campi GPSR mancanti", "GPSR-Felder fehlen (Hersteller / Info / verantwortliche Person)")}>GPSR</span>
+                                )}
                               </span>
-                              {!variantGpsrOk(v) && (
-                                <span className="vm-flag vm-flag-bad" title={lt(locale, "Missing GPSR fields (Manufacturer / details / responsible person)", "GPSR alanları eksik (Üretici / bilgi / sorumlu kişi)", "Champs GPSR manquants", "Faltan campos GPSR", "Campi GPSR mancanti", "GPSR-Felder fehlen (Hersteller / Info / verantwortliche Person)")}>GPSR</span>
-                              )}
-                              <span className="vm-nums">
-                                <span className="vm-f">
-                                  <span>EAN</span>
-                                  <input className={"vm-inp" + (eanErr ? " vm-err" : "")} style={{ width: 128 }} value={v.ean ?? ""} placeholder="EAN" autoComplete="off"
-                                    title={eanErr ? lt(locale, "EAN required", "EAN gerekli", "EAN requis", "EAN obligatorio", "EAN obbligatorio", "EAN erforderlich") : undefined}
-                                    onChange={(e) => updateMatrixVariant(v.option_values, "ean", e.target.value)} />
-                                </span>
-                                <span className="vm-f">
-                                  <span>{pe.inventory}</span>
-                                  <input className="vm-inp vm-inp-n" inputMode="numeric" value={v.inventory != null ? String(v.inventory) : "0"}
-                                    onChange={(e) => updateMatrixVariant(v.option_values, "inventory", e.target.value)} />
-                                </span>
-                                {priceCfg.map(({ f, centsKey, ph }) => {
-                                  const dk = rk + "_" + f;
-                                  const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
-                                  const displayVal = isDraft
-                                    ? priceInputs[dk]
-                                    : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
-                                  return (
-                                    <span className="vm-f" key={f}>
-                                      <span>{f === "price" ? pe.sellingPrice : pe.discountPrice}</span>
-                                      <input className="vm-inp vm-inp-n" value={displayVal} placeholder={ph} autoComplete="off"
-                                        onChange={(e) => {
-                                          const clean = sanitizePriceDraftString(e.target.value);
-                                          setPriceInputs((prev) => { const next = { ...prev, [dk]: clean }; priceInputsRef.current = next; return next; });
-                                        }}
-                                        onBlur={(e) => {
-                                          const raw = sanitizePriceDraftString(e.currentTarget.value);
-                                          updateMatrixVariant(v.option_values, f, raw);
-                                          setPriceInputs((prev) => { const next = { ...prev }; delete next[dk]; priceInputsRef.current = next; return next; });
-                                        }} />
-                                    </span>
-                                  );
-                                })}
+                              <span className="vm-cell">
+                                <input className="vm-inp vm-inp-sku" value={v.sku ?? ""} placeholder="SKU" autoComplete="off"
+                                  onChange={(e) => updateMatrixVariant(v.option_values, "sku", e.target.value)} />
                               </span>
+                              <span className="vm-cell">
+                                <input className={"vm-inp" + (eanErr ? " vm-err" : "")} value={v.ean ?? ""} placeholder="EAN" autoComplete="off"
+                                  title={eanErr ? lt(locale, "EAN required", "EAN gerekli", "EAN requis", "EAN obligatorio", "EAN obbligatorio", "EAN erforderlich") : undefined}
+                                  onChange={(e) => updateMatrixVariant(v.option_values, "ean", e.target.value)} />
+                              </span>
+                              <span className="vm-cell">
+                                <input className="vm-inp vm-inp-n" inputMode="numeric" value={v.inventory != null ? String(v.inventory) : "0"}
+                                  onChange={(e) => updateMatrixVariant(v.option_values, "inventory", e.target.value)} />
+                              </span>
+                              {priceCfg.map(({ f, centsKey, ph }) => {
+                                const dk = rk + "_" + f;
+                                const isDraft = Object.prototype.hasOwnProperty.call(priceInputs, dk);
+                                const displayVal = isDraft
+                                  ? priceInputs[dk]
+                                  : (v[centsKey] != null ? (Number(v[centsKey]) / 100).toFixed(2) : "");
+                                return (
+                                  <span className="vm-cell" key={f}>
+                                    <input className="vm-inp vm-inp-n" value={displayVal} placeholder={ph} autoComplete="off"
+                                      onChange={(e) => {
+                                        const clean = sanitizePriceDraftString(e.target.value);
+                                        setPriceInputs((prev) => { const next = { ...prev, [dk]: clean }; priceInputsRef.current = next; return next; });
+                                      }}
+                                      onBlur={(e) => {
+                                        const raw = sanitizePriceDraftString(e.currentTarget.value);
+                                        updateMatrixVariant(v.option_values, f, raw);
+                                        setPriceInputs((prev) => { const next = { ...prev }; delete next[dk]; priceInputsRef.current = next; return next; });
+                                      }} />
+                                  </span>
+                                );
+                              })}
                               <span className="vm-imgs">
                                 {variantImgs.length === 0 && localeVariantImg && (
                                   <span className="vm-img" title={lt(locale, "Managed in full variant edit", "Tam varyant düzenlemede yönetilir", "Géré dans l'édition complète", "Gestionado en la edición completa", "Gestito nella modifica completa", "In der vollständigen Variantenbearbeitung verwaltet")}>
@@ -3840,24 +3976,30 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                   <button type="button" className="vm-img-add" onClick={() => openVariantImgPicker(v.option_values)}>+</button>
                                 )}
                               </span>
-                              <button type="button" className="vm-rowbtn"
-                                title={isOff
-                                  ? lt(locale, "Activate this variant", "Bu varyantı etkinleştir", "Activer cette variante", "Activar esta variante", "Attiva questa variante", "Diese Variante aktivieren")
-                                  : lt(locale, "Deactivate this variant", "Bu varyantı devre dışı bırak", "Désactiver cette variante", "Desactivar esta variante", "Disattiva questa variante", "Diese Variante deaktivieren")}
-                                onClick={() => toggleMatrixVariantDisabled(v.option_values, !isOff)}>
-                                {isOff ? "○" : "●"}
-                              </button>
-                              {!isNew && (
-                                <button type="button" className="vm-rowbtn"
-                                  title={lt(locale, "Open full variant edit", "Tam varyant düzenlemeyi aç", "Ouvrir l'édition complète", "Abrir edición completa", "Apri modifica completa", "Vollständige Variantenbearbeitung öffnen")}
-                                  onClick={() => router.push("/products/" + idOrHandle + "/variants/" + encodeVariantPathKey(v.option_values))}>✎</button>
-                              )}
-                              <button type="button" className="vm-rowbtn vm-rowbtn-danger"
-                                title={lt(locale, "Remove this variant", "Bu varyantı kaldır", "Supprimer cette variante", "Eliminar esta variante", "Rimuovi questa variante", "Diese Variante entfernen")}
-                                onClick={() => removeMatrixVariant(v.option_values)}>×</button>
+                              <span className="vm-actions">
+                                <button type="button" className="vm-rowbtn vm-rowbtn-status"
+                                  title={isOff
+                                    ? lt(locale, "Inactive — click to activate", "Pasif — etkinleştirmek için tıklayın", "Inactive — cliquez pour activer", "Inactiva — clic para activar", "Inattiva — clic per attivare", "Inaktiv — zum Aktivieren klicken")
+                                    : lt(locale, "Active — click to deactivate", "Aktif — devre dışı bırakmak için tıklayın", "Active — cliquez pour désactiver", "Activa — clic para desactivar", "Attiva — clic per disattivare", "Aktiv — zum Deaktivieren klicken")}
+                                  onClick={() => toggleMatrixVariantDisabled(v.option_values, !isOff)}>
+                                  <span className={"vm-dot " + (isOff ? "vm-dot-off" : "vm-dot-on")} />
+                                </button>
+                                {!isNew && (
+                                  <button type="button" className="vm-rowbtn vm-rowbtn-edit"
+                                    title={lt(locale, "Open full variant edit", "Tam varyant düzenlemeyi aç", "Ouvrir l'édition complète", "Abrir edición completa", "Apri modifica completa", "Vollständige Variantenbearbeitung öffnen")}
+                                    onClick={() => router.push("/products/" + idOrHandle + "/variants/" + encodeVariantPathKey(v.option_values))}>
+                                    <span className="vm-rowbtn-ico"><EditIcon /></span>
+                                    <span className="vm-rowbtn-edit-label">{lt(locale, "Edit", "Düzenle", "Modifier", "Editar", "Modifica", "Bearbeiten")}</span>
+                                  </button>
+                                )}
+                                <button type="button" className="vm-rowbtn vm-rowbtn-danger"
+                                  title={lt(locale, "Remove this variant", "Bu varyantı kaldır", "Supprimer cette variante", "Eliminar esta variante", "Rimuovi questa variante", "Diese Variante entfernen")}
+                                  onClick={() => setVariantPendingDelete(v.option_values)}>×</button>
+                              </span>
                             </div>
                           );
                         })}
+                      </div>
                       </div>
                     </div>
                   );
@@ -4544,6 +4686,36 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </div>
       )}
 
+      {variantPendingDelete && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setVariantPendingDelete(null)}>
+          <div style={{ background: "var(--p-color-bg-surface)", padding: 24, borderRadius: 12, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <BlockStack gap="200">
+              <Text as="p" variant="headingSm">
+                {lt(locale, "Remove this variant?", "Bu varyant silinsin mi?", "Supprimer cette variante ?", "¿Eliminar esta variante?", "Rimuovere questa variante?", "Diese Variante entfernen?")}
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {(variantPendingDelete || []).join(" · ")}
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {lt(locale,
+                  "This only takes effect after you Save the product.",
+                  "Bu değişiklik yalnızca ürünü kaydettiğinizde geçerli olur.",
+                  "Effectif uniquement après l'enregistrement du produit.",
+                  "Solo surte efecto tras guardar el producto.",
+                  "Ha effetto solo dopo aver salvato il prodotto.",
+                  "Wird erst nach dem Speichern des Produkts wirksam.")}
+              </Text>
+              <InlineStack gap="200" align="end" blockAlign="center">
+                <Button onClick={() => setVariantPendingDelete(null)}>{ui.cancel}</Button>
+                <Button variant="primary" tone="critical" onClick={() => { const ov = variantPendingDelete; setVariantPendingDelete(null); removeMatrixVariant(ov); }}>
+                  {lt(locale, "Remove", "Sil", "Supprimer", "Eliminar", "Rimuovi", "Entfernen")}
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          </div>
+        </div>
+      )}
+
       {/* Variant image + swatch pickers — top-level so they open from any tab (Variants/Specs) */}
       {/* ── Variant image picker (multiple) ── */}
       <MediaPickerModal
@@ -4635,35 +4807,49 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             {BULK_PARENT_FIELDS.map((f) => {
               const cfg = bulkVariantCfg[f.key] || { lock: false, value: "" };
               const parentVal = String((product?.metadata || {})[f.key] ?? "");
+              const setVal = (val) => setBulkVariantCfg((prev) => ({ ...prev, [f.key]: { lock: false, value: val } }));
+              const isInput = f.kind === "text" || f.kind === "number" || f.kind === "money";
               return (
                 <div key={f.key} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <button
-                    type="button"
-                    title={lt(locale, "Use main article value", "Ana ürün değerini kullan", "Utiliser la valeur de l'article principal", "Usar el valor del artículo principal", "Usa il valore dell'articolo principale", "Wert vom Hauptartikel übernehmen")}
-                    onClick={() => setBulkVariantCfg((prev) => ({ ...prev, [f.key]: { lock: !cfg.lock, value: cfg.value || "" } }))}
-                    style={{
-                      marginTop: f.kind === "text" ? 24 : 2, width: 34, height: 30, flexShrink: 0, borderRadius: 8,
-                      border: "1px solid var(--p-color-border)", cursor: "pointer",
-                      background: cfg.lock ? "var(--p-color-bg-fill-brand, #303030)" : "transparent",
-                      color: cfg.lock ? "#fff" : "var(--p-color-text-subdued)",
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
-                    }}
-                  >
-                    {cfg.lock ? "🔗" : "○"}
-                  </button>
+                  {f.lockable ? (
+                    <button
+                      type="button"
+                      title={lt(locale, "Use main article value", "Ana ürün değerini kullan", "Utiliser la valeur de l'article principal", "Usar el valor del artículo principal", "Usa il valore dell'articolo principale", "Wert vom Hauptartikel übernehmen")}
+                      onClick={() => setBulkVariantCfg((prev) => ({ ...prev, [f.key]: { lock: !cfg.lock, value: cfg.value || "" } }))}
+                      style={{
+                        marginTop: isInput ? 24 : 2, width: 34, height: 30, flexShrink: 0, borderRadius: 8,
+                        border: "1px solid var(--p-color-border)", cursor: "pointer",
+                        background: cfg.lock ? "var(--p-color-bg-fill-brand, #303030)" : "transparent",
+                        color: cfg.lock ? "#fff" : "var(--p-color-text-subdued)",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+                      }}
+                    >
+                      {cfg.lock ? "🔗" : "○"}
+                    </button>
+                  ) : (
+                    <span style={{ width: 34, flexShrink: 0 }} />
+                  )}
                   <div style={{ flex: 1 }}>
-                    {f.kind === "text" ? (
+                    {f.kind === "select" ? (
+                      <Select
+                        label={bulkFieldLabel(f.key)}
+                        options={bulkSelectOptions(f)}
+                        value={cfg.value || ""}
+                        onChange={setVal}
+                      />
+                    ) : isInput ? (
                       <TextField
                         label={bulkFieldLabel(f.key)}
+                        type={f.kind === "number" || f.kind === "money" ? "number" : undefined}
                         value={cfg.lock ? parentVal : (cfg.value || "")}
                         disabled={cfg.lock}
                         multiline={f.multiline ? 2 : undefined}
                         autoComplete="off"
-                        placeholder={parentVal || undefined}
+                        placeholder={f.lockable ? (parentVal || undefined) : undefined}
                         helpText={cfg.lock
                           ? lt(locale, "Linked to main article — copied into each variant on save", "Ana ürüne bağlı — kaydetmede her varyanta kopyalanır", "Lié à l'article principal — copié à l'enregistrement", "Vinculado al artículo principal — se copia al guardar", "Collegato all'articolo principale — copiato al salvataggio", "Mit Hauptartikel verknüpft — beim Speichern in jede Variante übernommen")
                           : undefined}
-                        onChange={(val) => setBulkVariantCfg((prev) => ({ ...prev, [f.key]: { lock: false, value: val } }))}
+                        onChange={setVal}
                       />
                     ) : (
                       <div style={{ paddingTop: 4 }}>

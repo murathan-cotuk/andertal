@@ -73,6 +73,17 @@ function requestWithPreferredLocale(request) {
 
 const intlMiddleware = createMiddleware(routing);
 
+/** Next.js App Router flight/prefetch — must not 307 to the public market URL. */
+function isNextFlightRequest(request) {
+  const h = request.headers;
+  return (
+    h.get("rsc") === "1" ||
+    h.get("next-router-prefetch") === "1" ||
+    h.get("next-router-state-tree") != null ||
+    h.get("next-url") != null
+  );
+}
+
 // Paths that require customer login (matched against the locale-stripped path segment)
 const PROTECTED_SEGMENTS = new Set([
   "account", "orders", "addresses", "reviews", "bonus",
@@ -165,9 +176,6 @@ export default function proxy(request) {
     if (curCookie && isValidCurrency(curCookie)) {
       requestHeaders.set("x-andertal-currency", curCookie);
     }
-    // Rewrite (not redirect / not a synthetic NextRequest): public URL stays /{cc}/{lang}/…
-    // while App Router serves /{lang}/…. Soft client navigations need this or the bar updates
-    // without swapping the page until a second click / hard reload.
     const rewriteRes = NextResponse.rewrite(rewriteUrl, {
       request: { headers: requestHeaders },
     });
@@ -192,6 +200,29 @@ export default function proxy(request) {
         ? cookieT.country
         : marketFromGeoRequest(request) || DEFAULT_MARKET;
     const mp = marketPrefix(market, loc);
+
+    // Soft-nav pushes /{locale}/… so the client tree matches. A 307 to
+    // /{cc}/{locale}/… here would update the address bar and leave the old page mounted.
+    if (isNextFlightRequest(request)) {
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-andertal-market-prefix", mp);
+      requestHeaders.set("x-andertal-locale", loc);
+      const curCookie = (request.cookies.get("andertal_currency")?.value || "").trim().toLowerCase();
+      if (curCookie && isValidCurrency(curCookie)) {
+        requestHeaders.set("x-andertal-currency", curCookie);
+      }
+      const flightRes = NextResponse.next({ request: { headers: requestHeaders } });
+      try {
+        flightRes.cookies.set("andertal_market_prefix", mp, {
+          path: "/",
+          maxAge: 60 * 60 * 24 * 365,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        });
+      } catch (_) {}
+      return flightRes;
+    }
+
     const destPath =
       rest === "" || rest === "/" ? `${mp}/` : `${mp}${rest}`;
     const dest = new URL(destPath, request.url);

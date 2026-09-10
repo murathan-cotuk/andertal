@@ -147,6 +147,8 @@ export function getLandingEditorCopy(locale) {
     apiSaleLabel: x("Sale (/sales)", "İndirim (/sales)", "Soldes (/sales)", "Rebajas (/sales)", "Saldi (/sales)", "Sale (/sales)"),
     apiBrandsLabel: x("Brands (/brands)", "Markalar (/brands)", "Marques (/brands)", "Marcas (/brands)", "Brand (/brands)", "Marken (/brands)"),
     apiNeuheitenLabel: x("New in (/neuheiten)", "Yenilikler (/neuheiten)", "Nouveautés (/neuheiten)", "Novedades (/neuheiten)", "Novità (/neuheiten)", "Neuheiten (/neuheiten)"),
+    shopPagesHeading: x("—— Shop pages ——", "—— Mağaza sayfaları ——", "—— Pages boutique ——", "—— Páginas tienda ——", "—— Pagine shop ——", "—— Shop-Seiten ——"),
+    productPageLabel: x("Product page", "Ürün sayfası", "Page produit", "Página de producto", "Pagina prodotto", "Produktseite"),
     apiContainersHint: x(
       "Containers for this API page are stored on the matching CMS page and appear below. You can also select that CMS page under CMS pages.",
       "Bu API sayfasının konteynerleri eşleşen CMS sayfasında saklanır ve aşağıda görünür. CMS sayfaları altından da seçebilirsiniz.",

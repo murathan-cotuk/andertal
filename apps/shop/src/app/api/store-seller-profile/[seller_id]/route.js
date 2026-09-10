@@ -15,6 +15,6 @@ export async function GET(req, { params }) {
     const data = await r.json().catch(() => ({}));
     return NextResponse.json(data, { status: r.ok ? 200 : r.status });
   } catch (e) {
-    return NextResponse.json({ seller: null, reviews: [], products: [] }, { status: 200 });
+    return NextResponse.json({ seller: null, reviews: [], products: [], brands: [] }, { status: 200 });
   }
 }

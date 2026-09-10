@@ -287,10 +287,25 @@ const storeSellerProfileGET = async (req, res) => {
     if (!client) return res.json({ seller: null, reviews: [], products: [] })
     await client.connect()
     const sellerR = await client.query(
-      `SELECT store_name, shop_logo_url, shop_logo_height, review_avg, review_count FROM admin_hub_seller_settings WHERE seller_id = $1`,
+      `SELECT store_name, shop_logo_url, shop_logo_height, review_avg, review_count,
+              legal_company_name, legal_representative, legal_street, legal_city,
+              legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email,
+              return_conditions, shop_about
+       FROM admin_hub_seller_settings WHERE seller_id = $1`,
       [seller_id]
     )
     const sellerRow = sellerR.rows[0] || null
+    const legalOf = (r) => ({
+      company_name: r?.legal_company_name || '',
+      representative: r?.legal_representative || '',
+      street: r?.legal_street || '',
+      city: r?.legal_city || '',
+      trade_register: r?.legal_trade_register || '',
+      register_court: r?.legal_register_court || '',
+      vat_id: r?.legal_vat_id || '',
+      tax_id: r?.legal_tax_id || '',
+      email: r?.legal_email || '',
+    })
     const distR = await client.query(
       `SELECT rating, COUNT(*)::int as cnt FROM store_product_reviews WHERE seller_id = $1 GROUP BY rating ORDER BY rating DESC`,
       [seller_id]
@@ -308,6 +323,17 @@ const storeSellerProfileGET = async (req, res) => {
       [seller_id]
     )
     await client.end()
+    const products = (prodR.rows || []).map((p) => ({ id: p.id, title: p.title, handle: p.handle, price_cents: p.price_cents, metadata: p.metadata || {} }))
+    // Distinct brands this seller lists products in (derived from product metadata — no extra query).
+    const brandMap = new Map()
+    for (const p of products) {
+      const m = p.metadata || {}
+      const name = String(m.brand_name || m.brand || '').trim()
+      if (!name) continue
+      const key = name.toLowerCase()
+      if (!brandMap.has(key)) brandMap.set(key, { name, handle: String(m.brand_handle || '').trim() || null })
+    }
+    const brands = [...brandMap.values()].sort((a, b) => a.name.localeCompare(b.name))
     res.json({
       seller: sellerRow ? {
         seller_id, store_name: sellerRow.store_name || '', shop_logo_url: sellerRow.shop_logo_url || '',
@@ -315,9 +341,13 @@ const storeSellerProfileGET = async (req, res) => {
         review_avg: sellerRow.review_avg != null ? parseFloat(sellerRow.review_avg) : null,
         review_count: sellerRow.review_count != null ? Number(sellerRow.review_count) : 0,
         rating_distribution: dist,
-      } : { seller_id, store_name: '', shop_logo_url: '', shop_logo_height: 34, review_avg: null, review_count: 0, rating_distribution: dist },
+        legal: legalOf(sellerRow),
+        return_conditions: sellerRow.return_conditions || '',
+        shop_about: sellerRow.shop_about || '',
+      } : { seller_id, store_name: '', shop_logo_url: '', shop_logo_height: 34, review_avg: null, review_count: 0, rating_distribution: dist, legal: legalOf(null), return_conditions: '', shop_about: '' },
+      brands,
       reviews: revR.rows || [],
-      products: (prodR.rows || []).map((p) => ({ id: p.id, title: p.title, handle: p.handle, price_cents: p.price_cents, metadata: p.metadata || {} })),
+      products,
     })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}

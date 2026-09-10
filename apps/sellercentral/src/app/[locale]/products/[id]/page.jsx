@@ -58,7 +58,10 @@ export default function ProductDetailRoute() {
     fetchProduct();
   }, [isNewProduct, fetchProduct]);
 
-  if (!isNewProduct && loading) {
+  // Only show the full-page skeleton on the FIRST load. A background refetch
+  // (after Save → onReload) must keep <ProductEditPage> mounted, otherwise it
+  // remounts and jumps back to the first tab / loses transient UI state.
+  if (!isNewProduct && loading && !product) {
     return (
       <DashboardLayout>
         <Box padding="400">

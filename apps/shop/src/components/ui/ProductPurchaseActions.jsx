@@ -121,6 +121,7 @@ export default function ProductPurchaseActions({
   shippingUnavailable = false,
   isComingSoon = false,
   inStock = true,
+  hideQuantity = false,
 }) {
   const tp = useTranslations("product");
 
@@ -140,16 +141,18 @@ export default function ProductPurchaseActions({
         <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice>
       ) : null}
       <PurchaseRow>
-        <QtySelect
-          value={quantity}
-          disabled={purchaseDisabled}
-          onChange={(e) => onQuantityChange(Number(e.target.value))}
-          aria-label={tp("qty")}
-        >
-          {Array.from({ length: qtyCount }, (_, i) => i + 1).map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </QtySelect>
+        {!hideQuantity && (
+          <QtySelect
+            value={quantity}
+            disabled={purchaseDisabled}
+            onChange={(e) => onQuantityChange(Number(e.target.value))}
+            aria-label={tp("qty")}
+          >
+            {Array.from({ length: qtyCount }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </QtySelect>
+        )}
         <AddBtn onClick={onAddToCart} disabled={purchaseDisabled}>
           <CartIcon />
           <span>{buttonLabel}</span>

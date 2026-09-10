@@ -116,6 +116,8 @@ export default function GeneralSettingsPage() {
     tradeRegister: "",
     registerCourt: "",
     legalEmail: "",
+    shopAbout: "",
+    returnConditions: "",
     documents: [],
   });
   const [saved, setSaved] = useState(false);
@@ -262,6 +264,8 @@ export default function GeneralSettingsPage() {
             tradeRegister: platData.legal_trade_register || "",
             registerCourt: platData.legal_register_court || "",
             legalEmail: platData.legal_email || "",
+            shopAbout: data.shop_about || "",
+            returnConditions: data.return_conditions || "",
             documents,
           }));
         }
@@ -288,7 +292,11 @@ export default function GeneralSettingsPage() {
     setSaveError("");
     setSaving(true);
     try {
-      await client.updateSellerSettings({ store_name: formData.storeName.trim() });
+      await client.updateSellerSettings({
+        store_name: formData.storeName.trim(),
+        shop_about: formData.shopAbout.trim() || "",
+        return_conditions: formData.returnConditions.trim() || "",
+      });
       await client.updateSellerCompanyInfo({
         company_name: formData.companyName.trim() || null,
         tax_id: formData.taxId.trim() || null,
@@ -573,6 +581,23 @@ export default function GeneralSettingsPage() {
                   />
                 </Box>
               </InlineStack>
+              <TextField
+                label={locale === "tr" ? "Mağaza hakkında (herkese açık satıcı sayfasında görünür)" : locale === "en" ? "About the shop (shown on your public seller page)" : "Über den Shop (erscheint auf deiner öffentlichen Verkäuferseite)"}
+                value={formData.shopAbout}
+                onChange={(v) => setFormData((p) => ({ ...p, shopAbout: v }))}
+                multiline={3}
+                autoComplete="off"
+                maxLength={800}
+                showCharacterCount
+              />
+              <TextField
+                label={locale === "tr" ? "Rücksende- und Erstattungsbedingungen (herkese açık satıcı sayfasında görünür)" : locale === "en" ? "Return & refund conditions (shown on your public seller page)" : "Rücksende- und Erstattungsbedingungen (erscheint auf deiner öffentlichen Verkäuferseite)"}
+                value={formData.returnConditions}
+                onChange={(v) => setFormData((p) => ({ ...p, returnConditions: v }))}
+                multiline={4}
+                autoComplete="off"
+                maxLength={2000}
+              />
             </BlockStack>
           </Card>
 

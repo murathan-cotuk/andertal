@@ -399,6 +399,8 @@ class MedusaAdminClient {
       legal_vat_id: res?.legal_vat_id ?? '',
       legal_tax_id: res?.legal_tax_id ?? '',
       legal_email: res?.legal_email ?? '',
+      return_conditions: res?.return_conditions ?? '',
+      shop_about: res?.shop_about ?? '',
       enabled_shop_locales: Array.isArray(res?.enabled_shop_locales) ? res.enabled_shop_locales : null,
       locale: ['en', 'de', 'tr', 'fr', 'it', 'es'].includes(String(res?.locale || '').toLowerCase())
         ? String(res.locale).toLowerCase()

@@ -1,6 +1,6 @@
 "use client";
 
-import NextLink from "next/link";
+import { forwardRef } from "react";
 import {
   usePathname as useNextPathname,
   useRouter as useNextRouter,
@@ -48,14 +48,19 @@ function isModifiedClick(e) {
 }
 
 /**
- * Public href is always /{country}/{lang}/…. Soft-nav targets that same URL; proxy rewrites
- * to App Router /{lang}/…. Click handler still force-pushes via the router so Polaris-like
- * nested anchors / interrupted default navigations cannot leave URL updated with a stale page.
+ * Public storefront URLs are /{country}/{lang}/… while App Router files live at /{lang}/….
+ * next/link soft-nav against the public URL only updates the address bar (first click no-op,
+ * second click loads). A real <a> document navigation lets proxy.js rewrite and render.
  */
-export function Link({ href, locale, onClick, ...props }) {
+export const Link = forwardRef(function Link(
+  { href, locale, onClick, prefetch, replace, scroll, ...props },
+  ref,
+) {
+  void prefetch;
+  void replace;
+  void scroll;
   const pathname = useNextPathname() || "/";
   const ctxPrefix = useMarketPrefix();
-  const nextRouter = useNextRouter();
   const base = marketTripleFromPathname(pathname, ctxPrefix);
   let country = base?.country ?? "de";
   let lang = base?.lang ?? "de";
@@ -65,7 +70,7 @@ export function Link({ href, locale, onClick, ...props }) {
   const prefix = marketPrefix(country, lang);
 
   if (typeof href === "string" && (href.startsWith("http://") || href.startsWith("https://"))) {
-    return <NextLink href={href} onClick={onClick} {...props} />;
+    return <a href={href} ref={ref} onClick={onClick} {...props} />;
   }
 
   const pathOnly =
@@ -78,12 +83,10 @@ export function Link({ href, locale, onClick, ...props }) {
   const handleClick = (e) => {
     onClick?.(e);
     if (e.defaultPrevented || isModifiedClick(e) || props.target === "_blank") return;
-    e.preventDefault();
-    nextRouter.push(marketHref);
   };
 
-  return <NextLink href={marketHref} onClick={handleClick} {...props} />;
-}
+  return <a href={marketHref} ref={ref} onClick={handleClick} {...props} />;
+});
 
 export function useRouter() {
   const nr = useNextRouter();
@@ -103,8 +106,22 @@ export function useRouter() {
 
   return {
     ...nr,
-    push: (h, o) => nr.push(abs(h), o),
-    replace: (h, o) => nr.replace(abs(h), o),
+    push: (h) => {
+      const url = abs(h);
+      if (typeof url === "string" && typeof window !== "undefined") {
+        window.location.assign(url);
+        return;
+      }
+      return nr.push(url);
+    },
+    replace: (h) => {
+      const url = abs(h);
+      if (typeof url === "string" && typeof window !== "undefined") {
+        window.location.replace(url);
+        return;
+      }
+      return nr.replace(url);
+    },
     prefetch: (h, o) => nr.prefetch(abs(h), o),
   };
 }

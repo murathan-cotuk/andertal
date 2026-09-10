@@ -82,12 +82,29 @@ const nextConfig = {
   },
   async rewrites() {
     const backendBase = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
-    return [
-      {
-        source: "/uploads/:path*",
-        destination: `${backendBase}/uploads/:path*`,
-      },
-    ];
+    // Keep in sync with SHOP_LOCALES in src/lib/shop-market.js.
+    // Public URLs are /{country}/{locale}/…; App Router files live at /{locale}/….
+    // Middleware rewrites the document/RSC request; beforeFiles is what the client
+    // router uses to match those public hrefs on first click (middleware alone is not).
+    const localeSeg = "en|de|tr|fr|it|es";
+    return {
+      beforeFiles: [
+        {
+          source: `/:country([a-z]{2})/:locale(${localeSeg})`,
+          destination: "/:locale",
+        },
+        {
+          source: `/:country([a-z]{2})/:locale(${localeSeg})/:path*`,
+          destination: "/:locale/:path*",
+        },
+      ],
+      afterFiles: [
+        {
+          source: "/uploads/:path*",
+          destination: `${backendBase}/uploads/:path*`,
+        },
+      ],
+    };
   },
 
   async headers() {

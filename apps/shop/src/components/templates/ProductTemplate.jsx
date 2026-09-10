@@ -45,6 +45,8 @@ import { isBestsellerMetadata } from "@/lib/bestseller";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { useStoreCampaignDiscount } from "@/hooks/useStoreCampaignDiscount";
 import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap, resolveProductSaleCents } from "@/lib/product-price";
+import { useProductPageSettings } from "@/lib/product-page-settings";
+import { pdpOrderedKeys } from "@andertal/shop-theme";
 
 const Container = styled.div`
   max-width: 100%;
@@ -969,6 +971,8 @@ function ProductCampaignPriceBlock({
   priceCents,
   uvpCents,
   grundpreis,
+  showUvp = true,
+  showCampaignBadge = true,
 }) {
   const tp = useTranslations("product");
   const { promo: campaignPromo, finalPriceCents: campaignFinalCents } = useStoreCampaignDiscount({
@@ -1000,14 +1004,14 @@ function ProductCampaignPriceBlock({
         <PriceMainRow>
           {strikeCents != null ? <Strike $inline>{formatPriceCents(strikeCents)} €</Strike> : null}
           <PriceMain $sale={isDiscounted}>{formatPriceCents(buyBoxPriceCents)} €</PriceMain>
-          {campaignPromo?.show_badge && (campaignPromo.badge_text || "").trim() ? (
+          {showCampaignBadge && campaignPromo?.show_badge && (campaignPromo.badge_text || "").trim() ? (
             <DiscountPill title={campaignPromo.campaign_name || ""}>{campaignPromo.badge_text.trim()}</DiscountPill>
           ) : null}
-          {!campaignPromo?.badge_text?.trim() && discountPillPercent != null && discountPillPercent > 0 && (
+          {showCampaignBadge && !campaignPromo?.badge_text?.trim() && discountPillPercent != null && discountPillPercent > 0 && (
             <DiscountPill>-{discountPillPercent}%</DiscountPill>
           )}
         </PriceMainRow>
-        {uvpCents != null && uvpCents > 0 && (
+        {showUvp && uvpCents != null && uvpCents > 0 && (
           <PriceSubRow>
             <MSRP>UVP {formatPriceCents(uvpCents)} €</MSRP>
           </PriceSubRow>
@@ -1046,6 +1050,9 @@ export default function ProductTemplate() {
   const marketCountry = (marketPrefixVal?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
   const slug = params?.slug ?? params?.handle;
+  // Global product-page element visibility (Sellercentral › Content › Landing page › Product page).
+  // Fails open — every element visible until settings load / on error.
+  const { visible: pdpVisible, settings: pdpSettings } = useProductPageSettings();
   const [selectedImage, setSelectedImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [product, setProduct] = useState(null);
@@ -1671,11 +1678,11 @@ export default function ProductTemplate() {
 
   return (
     <Container>
-      <Breadcrumbs items={breadcrumbItems} />
+      {pdpVisible("breadcrumb") && <Breadcrumbs items={breadcrumbItems} />}
 
       <MobileHeaderBlock>
         <MobileBrandReviewRow>
-          {(meta.brand_name || meta.brand) ? (
+          {(meta.brand_name || meta.brand) && pdpVisible("brand") ? (
             <BrandRow
               brandName={meta.brand_name || meta.brand || ""}
               brandHandle={meta.brand_handle || null}
@@ -1683,15 +1690,17 @@ export default function ProductTemplate() {
               reviewCount={0}
             />
           ) : <span />}
-          <a
-            href="#reviews"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "inherit", whiteSpace: "nowrap" }}
-          >
-            <StarRating average={reviewAvg} count={reviewCount} />
-            <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-              {reviewCount > 0 ? `${reviewCount}` : "0"}
-            </span>
-          </a>
+          {pdpVisible("rating") && (
+            <a
+              href="#reviews"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "inherit", whiteSpace: "nowrap" }}
+            >
+              <StarRating average={reviewAvg} count={reviewCount} />
+              <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                {reviewCount > 0 ? `${reviewCount}` : "0"}
+              </span>
+            </a>
+          )}
         </MobileBrandReviewRow>
 
         <Title>{titleDisplay}</Title>
@@ -1713,22 +1722,33 @@ export default function ProductTemplate() {
                 onKeyDown={(e) => e.stopPropagation()}
                 role="presentation"
               >
-                <div style={{ position: "relative" }}>
-                  <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
-                </div>
-                <GalleryActionBtn type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="18" cy="5" r="3"></circle>
-                    <circle cx="6" cy="12" r="3"></circle>
-                    <circle cx="18" cy="19" r="3"></circle>
-                    <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"></line>
-                    <line x1="15.4" y1="6.5" x2="8.6" y2="10.5"></line>
-                  </svg>
-                </GalleryActionBtn>
+                {pdpOrderedKeys(pdpSettings || {}, "gallery_actions", ["wishlist_button", "share_button"]).map((k) => {
+                  if (k === "wishlist_button") {
+                    return pdpVisible("wishlist_button") ? (
+                      <div key="wishlist_button" style={{ position: "relative" }}>
+                        <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
+                      </div>
+                    ) : null;
+                  }
+                  if (k === "share_button") {
+                    return pdpVisible("share_button") ? (
+                      <GalleryActionBtn key="share_button" type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="18" cy="5" r="3"></circle>
+                          <circle cx="6" cy="12" r="3"></circle>
+                          <circle cx="18" cy="19" r="3"></circle>
+                          <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"></line>
+                          <line x1="15.4" y1="6.5" x2="8.6" y2="10.5"></line>
+                        </svg>
+                      </GalleryActionBtn>
+                    ) : null;
+                  }
+                  return null;
+                })}
               </GalleryActionRow>
             )}
           </div>
-          {displayImages.length > 1 && (
+          {displayImages.length > 1 && pdpVisible("gallery_thumbnails") && (
             <Thumbnails>
               {displayImages.map((img, index) => (
                 <Thumbnail
@@ -1742,7 +1762,7 @@ export default function ProductTemplate() {
               ))}
             </Thumbnails>
           )}
-          {displayImages.length > 1 && (
+          {displayImages.length > 1 && pdpVisible("gallery_thumbnails") && (
             <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
               <button type="button" onClick={goPrev} className="px-3 py-1 border rounded hover:bg-gray-100">‹</button>
               <button type="button" onClick={goNext} className="px-3 py-1 border rounded hover:bg-gray-100">›</button>
@@ -1757,21 +1777,23 @@ export default function ProductTemplate() {
         <CenterCol>
           <DesktopOnly>
             <Title>{titleDisplay}</Title>
-            <a
-              href="#reviews"
-              style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}
-            >
-              <StarRating average={reviewAvg} count={reviewCount} />
-              {reviewAvg > 0 ? (
-                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151" }}>
-                  {reviewAvg.toFixed(1).replace(".", ",")}
+            {pdpVisible("rating") && (
+              <a
+                href="#reviews"
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}
+              >
+                <StarRating average={reviewAvg} count={reviewCount} />
+                {reviewAvg > 0 ? (
+                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151" }}>
+                    {reviewAvg.toFixed(1).replace(".", ",")}
+                  </span>
+                ) : null}
+                <span style={{ fontSize: "0.8125rem", color: "#6b7280" }}>
+                  {reviewCount > 0 ? `(${reviewCount} ${tp("reviews")})` : tp("noReviews")}
                 </span>
-              ) : null}
-              <span style={{ fontSize: "0.8125rem", color: "#6b7280" }}>
-                {reviewCount > 0 ? `(${reviewCount} ${tp("reviews")})` : tp("noReviews")}
-              </span>
-            </a>
-            {(meta.brand_name || meta.brand) && (
+              </a>
+            )}
+            {(meta.brand_name || meta.brand) && pdpVisible("brand") && (
               <BrandRow
                 brandName={meta.brand_name || meta.brand || ""}
                 brandHandle={meta.brand_handle || null}
@@ -1788,14 +1810,14 @@ export default function ProductTemplate() {
 
           <DesktopOnly>{variantSelectorContent}</DesktopOnly>
 
-          {bulletPoints.length > 0 && (
+          {bulletPoints.length > 0 && pdpVisible("bullet_points") && (
             <BulletList>
               {bulletPoints.map((text, i) => (
                 <li key={i}>{text}</li>
               ))}
             </BulletList>
           )}
-          {(metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value)) || variantMetafields.length > 0) && (
+          {pdpVisible("properties_table") && (metaRows.length > 0 || dimensionsDisplay || (Array.isArray(meta.metafields) && meta.metafields.some((f) => f?.key && f?.value)) || variantMetafields.length > 0) && (
             <MetaTable>
               <tbody>
                 {metaRows.map(({ key, label, value }) => (
@@ -1846,12 +1868,15 @@ export default function ProductTemplate() {
                 priceCents={priceCents}
                 uvpCents={uvpCents}
                 grundpreis={grundpreis}
+                showUvp={pdpVisible("uvp_strike")}
+                showCampaignBadge={pdpVisible("campaign_badge")}
               />
 
               <ProductPurchaseActions
                 quantity={quantity}
                 onQuantityChange={setQuantity}
                 maxQty={maxQty}
+                hideQuantity={!pdpVisible("quantity_selector")}
                 purchaseDisabled={!inStock || isComingSoon || shippingUnavailable}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
@@ -1862,16 +1887,33 @@ export default function ProductTemplate() {
               />
 
               <InfoList>
-                {[
-                  { label: tp("shipping"), value: shippingDisplay },
-                  { label: tp("returns"), value: `${returnDays} ${tp("days")}, ${returnCost}` },
-                  { label: tp("seller"), value: effectiveStoreName },
-                  ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
-                  ...(meta.weee_number ? [{ label: localizeMetaKey("weee_number", locale), value: String(meta.weee_number) }] : []),
-                ].map(({ label, value }) => (
+                {(() => {
+                  // Buybox InfoList rows. Order of seller/shipping/return follows the optional
+                  // editor setting; default = today's order (shipping, returns, seller).
+                  const rowByKey = {
+                    shipping_cost: pdpVisible("shipping_cost") ? { label: tp("shipping"), value: shippingDisplay } : null,
+                    return_info: pdpVisible("return_info") ? { label: tp("returns"), value: `${returnDays} ${tp("days")}, ${returnCost}` } : null,
+                    seller: pdpVisible("seller") ? {
+                      label: tp("seller"),
+                      value: effectiveStoreName,
+                      href: (product.seller_id || meta.seller_id)
+                        ? `${(marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`}/seller/${encodeURIComponent(product.seller_id || meta.seller_id)}`
+                        : null,
+                    } : null,
+                  };
+                  return [
+                    ...pdpOrderedKeys(pdpSettings || {}, "buybox_info", ["shipping_cost", "return_info", "seller"]).map((k) => rowByKey[k]),
+                    ...((variant?.ean || meta.ean) ? [{ label: "EAN", value: variant?.ean || meta.ean }] : []),
+                    ...(meta.weee_number ? [{ label: localizeMetaKey("weee_number", locale), value: String(meta.weee_number) }] : []),
+                  ];
+                })().filter(Boolean).map(({ label, value, href }) => (
                   <InfoRow key={label}>
                     <InfoLabel>{label}</InfoLabel>
-                    <InfoValue title={String(value ?? "")}>{value}</InfoValue>
+                    <InfoValue title={String(value ?? "")}>
+                      {href
+                        ? <Link href={href} style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}>{value}</Link>
+                        : value}
+                    </InfoValue>
                   </InfoRow>
                 ))}
                 {meta.eprel_number && (
@@ -1884,7 +1926,7 @@ export default function ProductTemplate() {
             </BuyboxInner>
           </BuyboxCard>
 
-          {otherSellersForVariant.length > 0 ? (
+          {otherSellersForVariant.length > 0 && pdpVisible("other_sellers") ? (
             <OtherSellersCard>
               <button
                 type="button"
@@ -1965,7 +2007,7 @@ export default function ProductTemplate() {
         </PageRight>
       </PageLayout>
 
-      {(effectiveDescription || product.subtitle) && (
+      {(effectiveDescription || product.subtitle) && pdpVisible("description") && (
           <DescriptionSection
             id="description"
             dangerouslySetInnerHTML={{
@@ -1975,6 +2017,7 @@ export default function ProductTemplate() {
         )}
 
         {(() => {
+          if (!pdpVisible("product_safety")) return null;
           const extraCompliance = EXTRA_COMPLIANCE_KEYS.filter((k) => meta[k] != null && String(meta[k]).trim() !== "");
           if (!meta.hersteller && !meta.hersteller_information && !meta.verantwortliche_person_information && extraCompliance.length === 0) return null;
           return (

@@ -52,5 +52,15 @@ export {
   isEuOriginVerified,
   mergeMadeInEuropeBadge,
 } from "./eu-origin.js";
+export {
+  PDP_COLUMNS,
+  PDP_ELEMENTS,
+  PDP_ELEMENT_KEYS,
+  pdpElementLabel,
+  pdpElementVisible,
+  pdpElementsByColumn,
+  pdpOrderedKeys,
+  pdpReorderGroups,
+} from "./pdp-elements.js";
 export { ensureActiveVariant, mergeButtonCatalog, normalizeButtonType } from "./button-merge.js";
 export { DEFAULT_BUTTON_COLORS, buildButtonColorVarLines, BUTTON_COLOR_VAR_PREFIX } from "./button-type-colors.js";

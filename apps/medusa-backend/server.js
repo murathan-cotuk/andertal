@@ -1058,6 +1058,8 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_vat_id varchar(100)`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_tax_id varchar(100)`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS legal_email varchar(255)`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS return_conditions text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS shop_about text`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS enabled_shop_locales jsonb`).catch(() => {})
         await client.query(`CREATE TABLE IF NOT EXISTS admin_hub_notifications (
           id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -407,33 +407,29 @@ const isModifiedOrNewTabClick = (e) => {
 const isToggleOnlyNavUrl = (url, onClick) => PARENT_NAV_URLS.has(url || "") && typeof onClick === "function";
 
 /**
- * Soft-nav through next-intl router.push (not raw next/link alone).
- * Raw Link + middleware locale redirect often updates the address bar while leaving the
- * previous RSC page mounted until a second click or hard reload.
+ * Polaris `linkComponent` adapter. Let next-intl Link own the navigation.
+ * preventDefault + router.push on top of Link cancels the in-flight RSC fetch after
+ * the address bar already updated — first click looks like a no-op, second click works.
  */
 const NextLink = forwardRef(function NextLink({ url, children, external, onClick, ...rest }, ref) {
-  const router = useRouter();
   const toggleOnly = isToggleOnlyNavUrl(url, onClick);
   const target = NAV_VIRTUAL_URL_FALLBACK[url] || (url || "");
   const href = toggleOnly ? "#" : target;
   const handleClick = (e) => {
-    if (isModifiedOrNewTabClick(e) || external) {
-      onClick?.(e);
-      return;
-    }
     if (toggleOnly) {
       e.preventDefault();
       onClick?.(e);
       return;
     }
-    if (!target || target.startsWith("#")) {
-      onClick?.(e);
-      return;
-    }
-    e.preventDefault();
     onClick?.(e);
-    router.push(target);
   };
+  if (external) {
+    return (
+      <a href={href} ref={ref} onClick={onClick} target="_blank" rel="noopener noreferrer" {...rest}>
+        {children}
+      </a>
+    );
+  }
   return (
     <Link href={href} ref={ref} onClick={handleClick} {...rest}>
       {children}
@@ -443,7 +439,6 @@ const NextLink = forwardRef(function NextLink({ url, children, external, onClick
 
 const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, external, onClick, ...rest }, ref) {
   const ctx = useUnsavedChanges();
-  const router = useRouter();
   const toggleOnly = isToggleOnlyNavUrl(url, onClick);
   const target = NAV_VIRTUAL_URL_FALLBACK[url] || (url || "");
   const href = toggleOnly ? "#" : (target || "#");
@@ -462,14 +457,15 @@ const UnsavedAwareLink = forwardRef(function UnsavedAwareLink({ url, children, e
       ctx.startNavigate(target);
       return;
     }
-    if (!target || target.startsWith("#")) {
-      onClick?.(e);
-      return;
-    }
-    e.preventDefault();
     onClick?.(e);
-    router.push(target);
   };
+  if (external) {
+    return (
+      <a href={href} ref={ref} onClick={handleClick} target="_blank" rel="noopener noreferrer" {...rest}>
+        {children}
+      </a>
+    );
+  }
   return (
     <Link ref={ref} href={href} onClick={handleClick} {...rest}>
       {children}
@@ -548,6 +544,10 @@ export default function PolarisLayout({ children }) {
     typeof window !== "undefined"
       ? localStorage.getItem("storeName") || "Seller Account"
       : "Seller Account"
+  );
+  // Shop image (Settings › General › Shop) — shown in the top-right profile bar in place of the initial.
+  const [shopAvatarUrl, setShopAvatarUrl] = useState(
+    typeof window !== "undefined" ? localStorage.getItem("shopAvatarUrl") || "" : ""
   );
   const [approvalStatus, setApprovalStatus] = useState(
     typeof window !== "undefined" ? String(localStorage.getItem("sellerApprovalStatus") || "").toLowerCase() : ""
@@ -787,6 +787,9 @@ export default function PolarisLayout({ children }) {
           localStorage.setItem("storeName", data.store_name);
           setStoreName(data.store_name);
         }
+        const avatar = data?.shop_logo_url || "";
+        localStorage.setItem("shopAvatarUrl", avatar);
+        setShopAvatarUrl(avatar);
       }).catch(() => {});
     }
   }, [pathname, router]);
@@ -913,8 +916,8 @@ export default function PolarisLayout({ children }) {
           content: label,
           active: locale === code,
           onAction: () => {
-            router.replace(pathname, { locale: code });
             setLangDropdownOpen(false);
+            router.replace(pathname, { locale: code });
           },
         }))}
       />
@@ -1203,6 +1206,7 @@ export default function PolarisLayout({ children }) {
             name={storeName}
             detail={isSuperuser ? "⚡ Superuser" : "Seller"}
             initials={getUserInitials()}
+            avatar={shopAvatarUrl || undefined}
             actions={userMenuActions}
             open={userMenuOpen}
             onToggle={() => setUserMenuOpen((v) => !v)}

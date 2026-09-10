@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
+import { useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import {
   Page,
@@ -232,12 +233,26 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
   const [shippingGroupsList, setShippingGroupsList] = useState([]);
   const [euOriginVerifying, setEuOriginVerifying] = useState(false);
   const [euOriginNotice, setEuOriginNotice] = useState("");
-  const [activeTabIndex, setActiveTabIndex] = useState(0);
+  const searchParams = useSearchParams();
+  const [activeTabIndex, setActiveTabIndex] = useState(() =>
+    (searchParams?.get("err") === "gpsr" ? 2 : 0),
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
   }, []);
+
+  // Deep-link from the product page's "Open variant" error button: land on the
+  // Legal tab and scroll the GPSR block into view.
+  useEffect(() => {
+    if (searchParams?.get("err") !== "gpsr") return;
+    setActiveTabIndex(2);
+    const id = window.setTimeout(() => {
+      try { document.getElementById("gpsr-fields")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* ignore */ }
+    }, 120);
+    return () => window.clearTimeout(id);
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -403,15 +418,40 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
             "Bitte EAN für diese Variante eintragen, um zu speichern.",
           ),
         });
+        setActiveTabIndex(0);
         return false;
       }
+
+      // Soft GPSR gate — same policy as the parent article: never block the save,
+      // but warn that the variant stays hidden in the shop until GPSR is complete.
+      // `current.metadata` already has parent-locked values materialised above.
+      const cm = current?.metadata && typeof current.metadata === "object" ? current.metadata : {};
+      const gpsrMissing = [];
+      if (!String(cm.hersteller || "").trim()) gpsrMissing.push("Hersteller");
+      if (!String(cm.hersteller_information || "").trim()) gpsrMissing.push("Hersteller-Informationen");
+      if (!String(cm.verantwortliche_person_information || "").trim()) gpsrMissing.push("Verantwortliche Person (EU)");
 
       const res = await client.patchProductVariants(idOrHandle, variantsToSave);
       const saved = res?.product || { ...product, variants: variantsToSave };
       setProduct(saved);
       setBaselineSnapshot(JSON.stringify(normalizeForCompareProduct(saved)));
       unsaved?.setDirty(false);
-      setMessage({ type: "success", text: t("Saved", "Kaydedildi", "Enregistré", "Guardado", "Salvato", "Gespeichert") });
+      if (gpsrMissing.length > 0) {
+        setActiveTabIndex(2);
+        setMessage({
+          type: "warning",
+          text: t(
+            `Saved — this variant stays hidden in the shop until these GPSR fields are filled: ${gpsrMissing.join(", ")}`,
+            `Kaydedildi — bu varyant, şu GPSR alanları doldurulana kadar mağazada gizli kalır: ${gpsrMissing.join(", ")}`,
+            `Enregistré — cette variante reste masquée en boutique tant que ces champs GPSR ne sont pas remplis : ${gpsrMissing.join(", ")}`,
+            `Guardado — esta variante permanece oculta en la tienda hasta que se completen estos campos GPSR: ${gpsrMissing.join(", ")}`,
+            `Salvato — questa variante resta nascosta nel negozio finché non compili questi campi GPSR: ${gpsrMissing.join(", ")}`,
+            `Gespeichert — diese Variante bleibt im Shop verborgen, bis diese GPSR-Felder ausgefüllt sind: ${gpsrMissing.join(", ")}`,
+          ),
+        });
+      } else {
+        setMessage({ type: "success", text: t("Saved", "Kaydedildi", "Enregistré", "Guardado", "Salvato", "Gespeichert") });
+      }
       onReload?.();
       return true;
     } catch (err) {
@@ -1419,7 +1459,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
       <Layout>
         <Layout.Section>
           <Card>
-            <div className="product-edit-sections">
+            <div className="product-edit-sections" id="gpsr-fields">
             <BlockStack gap="300">
               <ProductSectionHeading>
                 {locale === "en" ? "Compliance / manufacturer (this variant)" : locale === "tr" ? "Uyumluluk / üretici (bu varyant)" : locale === "fr" ? "Conformité / fabricant (cette variante)" : locale === "es" ? "Cumplimiento / fabricante (esta variante)" : locale === "it" ? "Conformità / produttore (questa variante)" : "Compliance / Hersteller (diese Variante)"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
@@ -167,6 +167,77 @@ const SectionTitle = styled.h2`
   margin: 0 0 16px;
 `;
 
+const AskBtn = styled.a`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #1b8880;
+  background: #1b8880;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+
+  &:hover { background: #0d6e66; }
+`;
+
+const AboutText = styled.p`
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: #4b5563;
+  line-height: 1.6;
+  max-width: 620px;
+  white-space: pre-wrap;
+`;
+
+const InfoCard = styled.div`
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 32px;
+`;
+
+const ImpressumGrid = styled.dl`
+  margin: 0;
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 8px 20px;
+  font-size: 13.5px;
+
+  dt { color: #6b7280; }
+  dd { margin: 0; color: #111827; }
+
+  @media (max-width: 560px) {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+    dd { margin-bottom: 10px; }
+  }
+`;
+
+const BrandChips = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+`;
+
+const BrandChip = styled.a`
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover { border-color: #1b8880; color: #1b8880; }
+`;
+
 /* ─── Reviews ─────────────────────────────────────────────── */
 const ReviewsWrap = styled.div`
   margin-top: 40px;
@@ -260,6 +331,23 @@ export default function SellerProfilePage() {
   const avg = seller?.review_avg || 0;
   const count = seller?.review_count || 0;
   const storeName = seller?.store_name || seller_id;
+  const legal = seller?.legal || {};
+  const brands = data?.brands || [];
+  const about = seller?.shop_about || "";
+  const returnConditions = seller?.return_conditions || "";
+  const askHref = legal.email
+    ? `mailto:${legal.email}?subject=${encodeURIComponent(`Frage zu ${storeName}`)}`
+    : null;
+  const impressumRows = [
+    [legal.company_name && "Firma", legal.company_name],
+    [legal.representative && "Vertretungsberechtigt", legal.representative],
+    [(legal.street || legal.city) && "Anschrift", [legal.street, legal.city].filter(Boolean).join(", ")],
+    [legal.register_court && "Registergericht", legal.register_court],
+    [legal.trade_register && "Handelsregister", legal.trade_register],
+    [legal.vat_id && "USt-IdNr.", legal.vat_id],
+    [legal.tax_id && "Steuernummer", legal.tax_id],
+    [legal.email && "E-Mail", legal.email],
+  ].filter(([k, v]) => k && v);
 
   return (
     <PageWrap>
@@ -296,6 +384,12 @@ export default function SellerProfilePage() {
                 ) : (
                   <RatingCount>Noch keine Bewertungen</RatingCount>
                 )}
+                {about && <AboutText>{about}</AboutText>}
+                {askHref && (
+                  <AskBtn href={askHref}>
+                    <span aria-hidden>✉</span> Fragen stellen
+                  </AskBtn>
+                )}
               </SellerInfo>
 
               {count > 0 && (
@@ -331,6 +425,47 @@ export default function SellerProfilePage() {
             ) : (
               <ProductGrid products={products} maxColumns={4} />
             )}
+          </div>
+        )}
+
+        {/* ── Brands ── */}
+        {!loading && brands.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <SectionTitle>Marken von {storeName}</SectionTitle>
+            <BrandChips>
+              {brands.map((b) => (
+                b.handle
+                  ? <BrandChip key={b.name} href={`/brand/${b.handle}`}>{b.name}</BrandChip>
+                  : <BrandChip key={b.name} as="span">{b.name}</BrandChip>
+              ))}
+            </BrandChips>
+          </div>
+        )}
+
+        {/* ── Return / refund conditions ── */}
+        {!loading && returnConditions && (
+          <div style={{ marginBottom: 32 }}>
+            <SectionTitle>Rücksende- und Erstattungsbedingungen</SectionTitle>
+            <InfoCard>
+              <AboutText style={{ margin: 0, maxWidth: "none" }}>{returnConditions}</AboutText>
+            </InfoCard>
+          </div>
+        )}
+
+        {/* ── Impressum ── */}
+        {!loading && impressumRows.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <SectionTitle>Impressum</SectionTitle>
+            <InfoCard>
+              <ImpressumGrid>
+                {impressumRows.map(([k, v]) => (
+                  <React.Fragment key={k}>
+                    <dt>{k}</dt>
+                    <dd>{v}</dd>
+                  </React.Fragment>
+                ))}
+              </ImpressumGrid>
+            </InfoCard>
           </div>
         )}
 

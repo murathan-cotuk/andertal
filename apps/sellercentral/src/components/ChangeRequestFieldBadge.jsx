@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { Popover, Box, BlockStack, Text } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import {
-  formatChangeRequestValueForDisplay,
+  buildChangeRequestDiff,
   fieldNameDisplayLabel,
 } from "@/lib/product-change-request-format";
 
@@ -34,24 +34,37 @@ export function ChangeRequestFieldBadge({ requests, fieldName }) {
   const l =
     locale === "tr"
       ? {
-          cur: "Mevcut değer",
-          prop: "Önerilen değer",
+          cur: "Önce",
+          prop: "Sonra",
           hint: "Onay bekleyen değişiklik",
           seller: "Öneren satıcı",
+          empty: "(boş)",
+          removed: "(kaldırıldı)",
+          noChange: "Fiili bir değişiklik yok.",
+          changed: "alan değişti",
         }
       : locale === "de"
         ? {
-            cur: "Aktueller Wert",
-            prop: "Vorgeschlagener Wert",
+            cur: "Vorher",
+            prop: "Nachher",
             hint: "Änderung ausstehend",
             seller: "Vorschlag von",
+            empty: "(leer)",
+            removed: "(entfernt)",
+            noChange: "Keine effektive Änderung.",
+            changed: "Feld(er) geändert",
           }
         : {
-            cur: "Current value",
-            prop: "Proposed value",
+            cur: "Before",
+            prop: "After",
             hint: "Change pending approval",
             seller: "Suggested by",
+            empty: "(empty)",
+            removed: "(removed)",
+            noChange: "No effective change.",
+            changed: "field(s) changed",
           };
+  const diff = buildChangeRequestDiff(cr.old_value, cr.new_value);
 
   return (
     <Popover
@@ -97,31 +110,43 @@ export function ChangeRequestFieldBadge({ requests, fieldName }) {
           <Text as="p" variant="bodyXs" tone="subdued">
             {l.seller}: {changeRequestSellerLabel(cr)}
           </Text>
-          <BlockStack gap="100">
-            <Text as="p" variant="bodyXs" tone="subdued">
-              {l.cur}
-            </Text>
-            <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
-              {formatChangeRequestValueForDisplay(cr.old_value)}
-            </div>
-          </BlockStack>
-          <BlockStack gap="100">
-            <Text as="p" variant="bodyXs" tone="subdued">
-              {l.prop}
-            </Text>
-            <div
-              style={{
-                fontSize: 13,
-                lineHeight: 1.45,
-                wordBreak: "break-word",
-                whiteSpace: "pre-wrap",
-                fontWeight: 600,
-                color: "var(--p-color-text)",
-              }}
-            >
-              {formatChangeRequestValueForDisplay(cr.new_value)}
-            </div>
-          </BlockStack>
+          {diff.kind === "scalar" ? (
+            <>
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyXs" tone="subdued">{l.cur}</Text>
+                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", color: "#6b7280", textDecoration: diff.changed ? "line-through" : "none" }}>
+                  {diff.before || l.empty}
+                </div>
+              </BlockStack>
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyXs" tone="subdued">{l.prop}</Text>
+                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", fontWeight: 600, color: "var(--p-color-text)" }}>
+                  {diff.after || l.empty}
+                </div>
+              </BlockStack>
+            </>
+          ) : diff.rows.length === 0 ? (
+            <Text as="p" variant="bodySm" tone="subdued">{l.noChange}</Text>
+          ) : (
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyXs" tone="subdued">{`${diff.rows.length} ${l.changed}`}</Text>
+              {diff.rows.map((r) => (
+                <div key={r.path} style={{ borderLeft: "3px solid var(--p-color-border)", paddingLeft: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text)", marginBottom: 2 }}>{r.path}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.45, color: "#9ca3af", textDecoration: "line-through", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                    {r.before ? r.before : l.empty}
+                  </div>
+                  {r.status === "removed" ? (
+                    <div style={{ fontSize: 12, color: "#b91c1c" }}>{l.removed}</div>
+                  ) : (
+                    <div style={{ fontSize: 13, lineHeight: 1.45, color: "#047857", fontWeight: 600, wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                      {r.after ? r.after : l.empty}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </BlockStack>
+          )}
         </BlockStack>
       </Box>
     </Popover>

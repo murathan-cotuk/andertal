@@ -31,6 +31,7 @@ import { getNewContainerSeed } from "@/lib/landing-page-editor-i18n";
 import { createContext, useContext } from "react";
 import { getLandingEditorCopy, getContainerTypes } from "@/lib/landing-page-editor-i18n";
 import ApiPageSettingsPanel from "@/components/pages/content/ApiPageSettingsPanel";
+import ProductPageSettingsPanel from "@/components/pages/content/ProductPageSettingsPanel";
 import {
   ContainerTypePreview,
 } from "@/components/pages/content/ContainerTypePreview";
@@ -179,6 +180,7 @@ const CAT_HEADING = "__heading_categories__";
 const PAGE_HEADING = "__heading_cms_pages__";
 const BLOG_HEADING = "__heading_blog_posts__";
 const API_HEADING = "__heading_api_pages__";
+const SHOP_HEADING = "__heading_shop_pages__";
 
 function flattenCategoriesForSelect(nodes, depth = 0, acc = []) {
   if (!Array.isArray(nodes)) return acc;
@@ -4010,14 +4012,17 @@ export default function LandingPageEditor() {
     { label: copy.apiSaleLabel, value: "api:sales" },
     { label: copy.apiNeuheitenLabel, value: "api:neuheiten" },
     { label: copy.apiBrandsLabel, value: "api:brands" },
+    { label: copy.shopPagesHeading || copy.apiPagesHeading, value: SHOP_HEADING, disabled: true },
+    { label: copy.productPageLabel || "Product page", value: "__product_page__" },
   ];
   const isCategorySelection = String(selectedPageId).startsWith("cat:");
   const isApiSelection = String(selectedPageId).startsWith("api:");
+  const isProductPageSelection = selectedPageId === "__product_page__";
   const apiHasSettings = selectedPageId === "api:bestsellers" || selectedPageId === "api:sales";
   const linkedCmsForApi = isApiSelection
     ? pages.find((p) => String(p.slug) === API_CMS_SLUG[selectedPageId])
     : null;
-  const showContainerEditor = selectedPageId && (!isApiSelection || !!linkedCmsForApi);
+  const showContainerEditor = selectedPageId && !isProductPageSelection && (!isApiSelection || !!linkedCmsForApi);
   const editorTabs = [
     { id: "containers", content: copy.tabContainers },
     { id: "category", content: copy.tabCategory },
@@ -4077,7 +4082,7 @@ export default function LandingPageEditor() {
                 options={pageOptions}
                 value={selectedPageId}
                 onChange={(v) => {
-                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === BLOG_HEADING || v === API_HEADING || v === "__no_cat__" || v === "__no_page__" || v === "__no_blog__") return;
+                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === BLOG_HEADING || v === API_HEADING || v === SHOP_HEADING || v === "__no_cat__" || v === "__no_page__" || v === "__no_blog__") return;
                   setSelectedPageId(v);
                   setExpandedId(null);
                   setActiveTab(0);
@@ -4110,6 +4115,14 @@ export default function LandingPageEditor() {
                 <p style={{ marginTop: 8 }}>{copy.noCmsPages}</p>
               )}
             </Banner>
+          </Layout.Section>
+        )}
+
+        {mainTab === 0 && isProductPageSelection && (
+          <Layout.Section>
+            <Card>
+              <ProductPageSettingsPanel />
+            </Card>
           </Layout.Section>
         )}
 
