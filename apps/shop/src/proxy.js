@@ -120,6 +120,18 @@ export default function proxy(request) {
     }
   }
 
+  // Sellercentral's landing-page editor iframes this exact bare `/{locale}/cms-preview` path
+  // (see LandingLivePreview / next.config.js's frame-ancestors override, which only recognizes
+  // this un-prefixed shape). It's an internal, session-less preview surface — not a page anyone
+  // should land on via search/geo — so it must NOT go through the market-prefix canonicalization
+  // below: that 307-redirects every bare `/{locale}/...` to `/{market}/{locale}/...`, and the
+  // resulting path (i) isn't allowed to embed by the strict catch-all CSP (only the un-prefixed
+  // path gets the relaxed frame-ancestors) and (ii) depends on geo-IP, so the target path isn't
+  // even predictable enough to add a second CSP exception for.
+  if (/^\/(?:de|en|tr|fr|es|it)\/cms-preview(?:\/|$)/.test(pathname)) {
+    return intlMiddleware(requestWithPreferredLocale(request));
+  }
+
   if (pathname === "/sale" || pathname === "/sale/") {
     const loc = localeFromAcceptLanguage(request) || DEFAULT_LOCALE;
     const market = marketFromGeoRequest(request) || DEFAULT_MARKET;

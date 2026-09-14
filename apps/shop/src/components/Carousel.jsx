@@ -143,7 +143,14 @@ const Scroll = styled.div`
   scroll-snap-type: x mandatory;
   scroll-padding-inline: ${(p) => (p.$navOnSides ? SIDE_NAV_WIDTH : 0)}px;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  /* Nav is via the prev/next buttons (or touch swipe on mobile, where they're hidden) — a visible
+     native scroll track underneath is redundant clutter, not an accessibility requirement, since
+     scrolling itself still works identically with the bar hidden. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
   scroll-behavior: smooth;
 
   @media (max-width: 1279px) {

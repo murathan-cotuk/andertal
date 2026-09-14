@@ -815,6 +815,14 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
   const tNav = useTranslations("nav");
   const isNarrow = useIsNarrow(1023);
   const source = String(container.source || "images");
+  // Products/collections are equal-size cards, not a curated collage — render them as a plain,
+  // evenly-sized grid (same as the collection carousel) instead of the images-only row pattern
+  // below, which was making the first row (often just 1 item) span full-width huge and the rest
+  // stack oversized on top of each other.
+  const isGridSource = source === "collection" || source === "collections";
+  const gridColsDesktop = Math.max(1, Math.min(6, container.items_per_row != null ? Number(container.items_per_row) || 4 : 4));
+  const gridColsMobile = Math.max(1, Math.min(4, container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) || 2 : 2));
+  const gridCols = isNarrow ? gridColsMobile : gridColsDesktop;
   const baseGap = container.gap != null ? Number(container.gap) : 16;
   const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
   const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
@@ -883,13 +891,9 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
     return (
       <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
         <div style={getContentInnerStyle(container, 1280)}>
-          <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
-            {[1, 2, 3].map((i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: i === 1 ? "1fr" : "1fr 1fr", gap, width: "100%" }}>
-                {Array.from({ length: i === 1 ? 1 : 2 }).map((_, j) => (
-                  <div key={j} style={{ minHeight: 200, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
-                ))}
-              </div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
+            {Array.from({ length: gridCols * 2 }).map((_, j) => (
+              <div key={j} style={{ minHeight: 200, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
             ))}
           </div>
         </div>
@@ -918,8 +922,14 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
     ) : null;
     const card = (
       <div>
-        <div style={{ position: "relative", width: "100%", aspectRatio: r, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb" }}>
-          <Image src={src} alt={imgTitle || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: "cover" }} />
+        {/* "Container within container": a framed, padded shell around the image so a lone
+            full-width row (e.g. a 1-column pattern) reads as a bounded card, not a bare oversized
+            image dropped edge-to-edge on the page — and a maxHeight clamp keeps tall aspect ratios
+            (or a very wide row) from growing without limit. */}
+        <div style={{ background: "#f8f9fb", border: "1px solid #e5e7eb", borderRadius: 16, padding: 10, boxSizing: "border-box" }}>
+          <div style={{ position: "relative", width: "100%", aspectRatio: r, borderRadius: 10, overflow: "hidden", maxHeight: isNarrow ? 360 : 560 }}>
+            <Image src={src} alt={imgTitle || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: "cover" }} />
+          </div>
         </div>
         {below}
       </div>
@@ -985,21 +995,29 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
         {lt(container, "title", locale) && (
           <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
         )}
-        <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
-          {rows.map((rowItems, ri) => (
-            <div
-              key={ri}
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${rowItems.length}, minmax(0, 1fr))`,
-                gap,
-                width: "100%",
-                alignItems: "start",
-              }}
-            >
-              {rowItems.map((it, ci) => {
-                const k = `m-${ri}-${ci}`;
-                if (source === "images") {
+        {isGridSource ? (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%", alignItems: "start" }}>
+            {items.map((it, i) =>
+              source === "collection"
+                ? renderProduct(it, `m-${i}`, i)
+                : renderCollectionCard(it, i, `m-${i}`)
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
+            {rows.map((rowItems, ri) => (
+              <div
+                key={ri}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${rowItems.length}, minmax(0, 1fr))`,
+                  gap,
+                  width: "100%",
+                  alignItems: "start",
+                }}
+              >
+                {rowItems.map((it, ci) => {
+                  const k = `m-${ri}-${ci}`;
                   return (
                     <div
                       key={k}
@@ -1008,13 +1026,11 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
                       {renderImage(it)}
                     </div>
                   );
-                }
-                if (source === "collection") return renderProduct(it, k, mosaicGridCellIndex(rows, ri, ci));
-                return renderCollectionCard(it, ri * 10 + ci, k);
-              })}
-            </div>
-          ))}
-        </div>
+                })}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2545,13 +2561,11 @@ function pickImageCarouselRatio(container, isNarrow) {
 }
 
 function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
-  const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
-  const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
-  const itemsPerRow = useResponsiveColumnCount(desktopN, mobileN);
   const isNarrow = useIsNarrow(1023);
   const images = (container.images || []).filter((i) => localizedAsset(i, "url", locale));
   const { setLandingHeaderBg } = useLandingChrome();
   const mobileScrollRef = useRef(null);
+  const desktopScrollRef = useRef(null);
   const [activeIdx, setActiveIdx] = useState(0);
 
   // Track active slide for header gradient
@@ -2606,6 +2620,20 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   const mobileItemWidthPx = Math.max(110, Math.min(320, Math.round(260 * mobileRatioNum)));
   // mobile_item_width accepts any CSS length (vw, %, px). Falls back to calculated px value.
   const mobileItemW = String(container.mobile_item_width || "").trim() || `${mobileItemWidthPx}px`;
+  // desktop_item_width accepts any CSS length (px, vw, calc(...)). Falls back to the legacy
+  // "images per row" count, evenly dividing the ~1280px content box (same math the old fixed-
+  // column Carousel used), so containers configured before this became a peek-scroll still get a
+  // sensible width instead of silently ignoring their existing setting.
+  const desktopN = Math.max(1, container.items_per_row != null ? Number(container.items_per_row) || 4 : 4);
+  const desktopItemWidthPx = Math.max(160, Math.floor((1280 - gap * (desktopN - 1)) / desktopN));
+  const desktopItemW = String(container.desktop_item_width || "").trim() || `${desktopItemWidthPx}px`;
+  const scrollByOneItem = (ref, dir) => {
+    const el = ref.current;
+    if (!el) return;
+    const child = el.firstElementChild;
+    const step = (child ? child.getBoundingClientRect().width : 300) + gap;
+    el.scrollBy({ left: dir * step, behavior: "smooth" });
+  };
 
   const renderImageCell = (img, isFirstImage = false, sizesHint = "(max-width: 768px) 90vw, 400px") => {
     const src = resolveUrl(lt(img, "url", locale));
@@ -2659,6 +2687,34 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     }
     return shell(<div>{block}</div>);
   };
+
+  // Opt-in grid mode (default stays the carousel above — existing containers are unaffected):
+  // a plain, non-scrolling CSS grid using the same "images per row" fields as before, capped to
+  // grid_rows so e.g. a 2×2 product square shows exactly 4 images regardless of how many are
+  // configured. Reuses renderImageCell, so links/captions/padding/aspect all behave identically.
+  if (container.display_mode === "grid") {
+    const gridColsDesktop = Math.max(1, Math.min(6, Number(container.items_per_row) || 4));
+    const gridColsMobile = Math.max(1, Math.min(4, Number(container.items_per_row_mobile) || 2));
+    const gridCols = isNarrow ? gridColsMobile : gridColsDesktop;
+    const gridRows = Math.max(1, Math.min(6, Number(container.grid_rows) || 1));
+    const shown = images.slice(0, gridCols * gridRows);
+    return (
+      <div style={{ ...carouselPadding, background: bg }}>
+        <div style={getContentInnerStyle(container, 1280)}>
+          {lt(container, "title", locale) && (
+            <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.375rem)", fontWeight: 600, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
+            {shown.map((img, i) => (
+              <div key={i} style={{ minWidth: 0 }}>
+                {renderImageCell(img, isFirstContainer && i === 0, `(max-width: 768px) ${Math.round(100 / gridCols)}vw, ${Math.round(1280 / gridCols)}px`)}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isNarrow && isGrid) {
     return (
@@ -2729,24 +2785,156 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     );
   }
 
+  // ── DESKTOP: same native scroll-snap peek carousel as mobile (only item width + edge-anchoring
+  // differ), so the section looks and behaves consistently across breakpoints. Arrow buttons are
+  // added since a mouse doesn't swipe as naturally as a touch gesture; the underlying scroll-snap
+  // still works with drag/wheel either way.
   return (
     <div style={{ ...carouselPadding, background: bg }}>
       <div style={getContentInnerStyle(container, 1280)}>
-        <Carousel
-          contained={false}
-          title={lt(container, "title", locale) || undefined}
-          visibleCount={itemsPerRow}
-          navOnSides
-          gap={gap}
-          ariaLabel={lt(container, "title", locale) || "Bild-Karussell"}
-        >
-          {images.map((img, i) => (
-            <div key={i} style={{ minWidth: 0 }}>
-              {renderImageCell(img, isFirstContainer && i === 0)}
-            </div>
-          ))}
-        </Carousel>
+        {lt(container, "title", locale) && (
+          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.375rem)", fontWeight: 600, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
+        )}
+        <div style={{ position: "relative" }}>
+          <div
+            className="landing-peek-scroll"
+            ref={desktopScrollRef}
+            style={{
+              display: "flex",
+              gap: `${gap}px`,
+              overflowX: "auto",
+              scrollSnapType: "x mandatory",
+              scrollBehavior: "smooth",
+              WebkitOverflowScrolling: "touch",
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+              paddingBottom: 4,
+            }}
+          >
+            {images.map((img, i) => {
+              const isFirst = i === 0;
+              const isLast = i === images.length - 1;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    flexShrink: 0,
+                    width: desktopItemW,
+                    minWidth: desktopItemW,
+                    scrollSnapAlign: isFirst ? "start" : isLast ? "end" : "center",
+                  }}
+                >
+                  {renderImageCell(img, isFirstContainer && isFirst, `${desktopItemW}`)}
+                </div>
+              );
+            })}
+          </div>
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Zurück"
+                onClick={() => scrollByOneItem(desktopScrollRef, -1)}
+                style={{ position: "absolute", left: -8, top: "50%", transform: "translate(-50%, -50%)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "50%", width: 40, height: 40, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 2px 8px rgba(0,0,0,0.14)" }}
+              >‹</button>
+              <button
+                type="button"
+                aria-label="Weiter"
+                onClick={() => scrollByOneItem(desktopScrollRef, 1)}
+                style={{ position: "absolute", right: -8, top: "50%", transform: "translate(50%, -50%)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "50%", width: 40, height: 40, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 2px 8px rgba(0,0,0,0.14)" }}
+              >›</button>
+            </>
+          )}
+        </div>
       </div>
+      <style>{`.landing-peek-scroll::-webkit-scrollbar{display:none}`}</style>
+    </div>
+  );
+}
+
+// ── Layout Section: the one container type meant to nest — splits the section into N columns,
+// each column ("slot") holding any other container (including another layout_section, up to the
+// shared depth-3 cap enforced by landing-container-tree.js + the backend's sanitizeAnyContainer).
+// See docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §2.1/§3.1. Deliberately NOT content_mosaic —
+// mosaic stays a flat images-or-products grid; this is the actual "box inside a box" primitive.
+function layoutSectionTemplate(cols, widths) {
+  if (Array.isArray(widths) && widths.length === cols) {
+    return widths.map((w) => `${Math.max(0.1, Number(w) || 1)}fr`).join(" ");
+  }
+  return `repeat(${Math.max(1, cols)}, minmax(0, 1fr))`;
+}
+
+function LayoutSection({ container, locale = "de", preload = {}, ctx = {} }) {
+  const children = Array.isArray(container.children) ? container.children.filter(Boolean) : [];
+  if (!children.length) return null;
+
+  const colsDesktop = Math.max(1, Math.min(4, Number(container.columns_desktop ?? container.columns) || 1));
+  const colsTablet = Math.max(1, Math.min(4, Number(container.columns_tablet) || colsDesktop));
+  const colsMobile = Math.max(1, Math.min(4, Number(container.columns_mobile) || 1));
+  const gap = container.gap != null ? Number(container.gap) : 16;
+  const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : gap;
+  const widths = Array.isArray(container.column_widths) ? container.column_widths : null;
+  const bg = container.bg_color || undefined;
+  const titleAlign = container.title_align === "center" ? "center" : "left";
+  const title = container.show_title === false ? "" : lt(container, "title", locale);
+
+  // Optional per-cell "card" chrome (aspect ratio / background / radius / height clamp) — applied
+  // uniformly to every slot; a slot's own container still renders its normal content inside it.
+  const cellAspect = container.cell_aspect && container.cell_aspect !== "auto"
+    ? String(container.cell_aspect === "custom" ? (container.cell_aspect_custom || "") : container.cell_aspect).replace(/:/g, "/")
+    : "";
+  const cellRadius = container.cell_radius != null ? Number(container.cell_radius) || 0 : 0;
+  const cellBg = container.cell_bg || "";
+  const cellMinH = container.cell_min_height ? String(container.cell_min_height).trim() : "";
+  const cellMaxH = container.cell_max_height ? String(container.cell_max_height).trim() : "";
+  const needsCellShell = !!(cellAspect || cellBg || cellRadius || cellMinH || cellMaxH);
+  const cls = `ls-${String(container.id || "x").replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+  return (
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+      <div style={getContentInnerStyle(container, 1280)}>
+        {title && (
+          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: container.text_color || "#111827", margin: "0 0 20px", textAlign: titleAlign }}>
+            {title}
+          </h2>
+        )}
+        <div
+          className={cls}
+          style={{
+            display: "grid",
+            gridTemplateColumns: layoutSectionTemplate(colsDesktop, widths),
+            gap,
+            alignItems: container.cell_align === "start" ? "start" : "stretch",
+          }}
+        >
+          {children.map((child, i) => {
+            const rendered = renderContainer(child, preload, ctx, { isChild: true });
+            if (rendered == null) return null;
+            return (
+              <div
+                key={child.id || i}
+                style={{
+                  minWidth: 0,
+                  ...(needsCellShell ? {
+                    background: cellBg || undefined,
+                    borderRadius: cellRadius || undefined,
+                    overflow: cellRadius || cellMaxH ? "hidden" : undefined,
+                    ...(cellAspect ? { position: "relative", aspectRatio: cellAspect } : {}),
+                    ...(cellMinH ? { minHeight: cellMinH } : {}),
+                    ...(cellMaxH ? { maxHeight: cellMaxH } : {}),
+                  } : {}),
+                }}
+              >
+                {rendered}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <style>{`
+        @media (max-width: 1199px) { .${cls} { grid-template-columns: ${layoutSectionTemplate(colsTablet, widths && widths.length === colsTablet ? widths : null)} !important; } }
+        @media (max-width: 767px) { .${cls} { grid-template-columns: ${layoutSectionTemplate(colsMobile, widths && widths.length === colsMobile ? widths : null)} !important; gap: ${gapMobile}px !important; } }
+      `}</style>
     </div>
   );
 }
@@ -2768,10 +2956,16 @@ const FETCH_GATED_CONTAINER_TYPES = new Set([
   "personalized_product_row",
 ]);
 
-function renderContainer(c, preload = {}, ctx = {}) {
+// `opts.isChild` — layout_section slots (docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §2.3): a
+// child container always renders on whatever device its parent is currently shown on and never
+// gets its own independent visible_on device targeting (which otherwise defaults to "desktop" and
+// would make every child vanish on mobile unless explicitly overridden). `visible: false` (the
+// hard on/off switch, as opposed to device targeting) still applies to children as normal.
+function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
   if (!c.visible) return null;
+  const isChild = !!opts.isChild;
   const v = c.visible_on || "desktop";
-  const isFetchGated = FETCH_GATED_CONTAINER_TYPES.has(c.type);
+  const isFetchGated = !isChild && FETCH_GATED_CONTAINER_TYPES.has(c.type);
   if (isFetchGated) {
     // Strict device isolation via JS: mobile (< 600px), tablet (600–1199px), desktop (≥ 1200px)
     if (v === "tablet") {
@@ -2784,7 +2978,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
       if (ctx.isTablet) return null;
     }
   }
-  const visClass = isFetchGated
+  const visClass = isChild ? "" : isFetchGated
     ? ""
     : v === "tablet" ? "landing-vis-tablet"
     : v === "desktop" ? "landing-vis-desktop"
@@ -2818,6 +3012,7 @@ function renderContainer(c, preload = {}, ctx = {}) {
     case "feature_grid":         inner = <FeatureGrid container={c} locale={locale} />; break;
     case "testimonials":              inner = <Testimonials container={c} locale={locale} />; break;
     case "personalized_product_row":  inner = <PersonalizedProductRow container={c} locale={locale} />; break;
+    case "layout_section":       inner = <LayoutSection container={c} locale={locale} preload={preload} ctx={ctx} />; break;
     case "support_hero":
     case "support_case_wizard":
     case "support_topic_grid":

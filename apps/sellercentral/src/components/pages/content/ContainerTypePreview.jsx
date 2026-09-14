@@ -99,14 +99,44 @@ export function ContainerTypePreview({ type, label }) {
           </div>
         </PreviewShell>
       );
+    case "layout_section":
+      return (
+        <PreviewShell title={label}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3, padding: 6, height: "100%", boxSizing: "border-box" }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{ ...block({ minHeight: 0, border: "1px dashed #8c9196" }), background: "transparent" }} />
+            ))}
+          </div>
+        </PreviewShell>
+      );
+    case "layout_section_2x2":
+      // The ready-made preset — a filled-in 2×2 grid (solid tiles), distinct from the empty
+      // dashed-slot wireframe above so it reads as "already populated" in the picker.
+      return (
+        <PreviewShell title={label}>
+          <div style={{ background: "#e5e7eb", height: "100%", boxSizing: "border-box", padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={bar({ width: "40%", height: 4 })} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 3, flex: 1 }}>
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} style={{ ...block({ minHeight: 0 }), background: "#fff", border: "1px solid #c9cccf" }} />
+              ))}
+            </div>
+          </div>
+        </PreviewShell>
+      );
     case "image_carousel":
+      // Pure image strip — no card chrome, no price/title line (distinguishes it from the
+      // product-card carousels below, which all shared this exact wireframe before).
+      return (
+        <PreviewShell title={label}>
+          <div style={{ display: "flex", gap: 4, padding: 6, height: "100%", boxSizing: "border-box" }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{ flex: 1, ...block({}), background: i === 1 ? "#9aa3ad" : "#c5ccd4" }} />
+            ))}
+          </div>
+        </PreviewShell>
+      );
     case "collection_carousel":
-    case "bestseller_carousel":
-    case "brands_directory":
-    case "seller_carousel":
-    case "collections_carousel":
-    case "blog_carousel":
-    case "personalized_product_row":
       return (
         <PreviewShell title={label}>
           <div style={{ padding: "8px 6px", display: "flex", flexDirection: "column", gap: 4, height: "100%", boxSizing: "border-box" }}>
@@ -116,6 +146,92 @@ export function ContainerTypePreview({ type, label }) {
                 <div key={i} style={{ flex: 1, ...block({}), background: i === 1 ? "#8c969f" : "#c5ccd4", display: "flex", flexDirection: "column", padding: 3, gap: 2 }}>
                   <div style={{ flex: 1, background: "rgba(255,255,255,0.35)", borderRadius: 2 }} />
                   <div style={{ height: 2, width: "70%", background: "rgba(32,34,35,0.35)", borderRadius: 1 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </PreviewShell>
+      );
+    case "bestseller_carousel":
+      // Same product-card base as collection_carousel, plus a ranking ribbon on the first card.
+      return (
+        <PreviewShell title={label}>
+          <div style={{ padding: "8px 6px", display: "flex", flexDirection: "column", gap: 4, height: "100%", boxSizing: "border-box" }}>
+            <div style={bar({ width: "45%", height: 4 })} />
+            <div style={{ display: "flex", gap: 4, flex: 1 }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ position: "relative", flex: 1, ...block({}), background: i === 1 ? "#8c969f" : "#c5ccd4", display: "flex", flexDirection: "column", padding: 3, gap: 2 }}>
+                  {i === 0 && <div style={{ position: "absolute", top: 0, left: 0, width: 10, height: 6, background: "#c05717", borderRadius: "0 0 2px 0" }} />}
+                  <div style={{ flex: 1, background: "rgba(255,255,255,0.35)", borderRadius: 2 }} />
+                  <div style={{ height: 2, width: "70%", background: "rgba(32,34,35,0.35)", borderRadius: 1 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </PreviewShell>
+      );
+    case "personalized_product_row":
+      // Same product-card base, plus a small "for you" heart marker instead of a rank ribbon.
+      return (
+        <PreviewShell title={label}>
+          <div style={{ padding: "8px 6px", display: "flex", flexDirection: "column", gap: 4, height: "100%", boxSizing: "border-box" }}>
+            <div style={bar({ width: "45%", height: 4 })} />
+            <div style={{ display: "flex", gap: 4, flex: 1 }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ position: "relative", flex: 1, ...block({}), background: i === 1 ? "#8c969f" : "#c5ccd4", display: "flex", flexDirection: "column", padding: 3, gap: 2 }}>
+                  {i === 1 && <div style={{ position: "absolute", top: 2, right: 2, width: 5, height: 5, borderRadius: "50%", background: "#c0395e" }} />}
+                  <div style={{ flex: 1, background: "rgba(255,255,255,0.35)", borderRadius: 2 }} />
+                  <div style={{ height: 2, width: "70%", background: "rgba(32,34,35,0.35)", borderRadius: 1 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </PreviewShell>
+      );
+    case "brands_directory":
+    case "seller_carousel":
+      // Circular brand logos in a row — visually distinct from the rectangular product cards.
+      return (
+        <PreviewShell title={label}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center", justifyContent: "center", height: "100%" }}>
+            <div style={bar({ width: "40%", height: 4 })} />
+            <div style={{ display: "flex", gap: 6 }}>
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} style={{ width: 14, height: 14, borderRadius: "50%", background: i % 2 ? "#b5bec8" : "#9aa3ad" }} />
+              ))}
+            </div>
+          </div>
+        </PreviewShell>
+      );
+    case "collections_carousel":
+      // Image on top, title BELOW the card (not overlaid) — the collection-card look.
+      return (
+        <PreviewShell title={label}>
+          <div style={{ padding: "8px 6px", display: "flex", flexDirection: "column", gap: 4, height: "100%", boxSizing: "border-box" }}>
+            <div style={bar({ width: "45%", height: 4 })} />
+            <div style={{ display: "flex", gap: 4, flex: 1 }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div style={{ ...block({ flex: 1 }), background: i === 1 ? "#8c969f" : "#c5ccd4" }} />
+                  <div style={{ height: 2, width: "80%", background: "#8c9196", borderRadius: 1 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </PreviewShell>
+      );
+    case "blog_carousel":
+      // Image on top, two excerpt lines below — the blog-card look.
+      return (
+        <PreviewShell title={label}>
+          <div style={{ padding: "8px 6px", display: "flex", flexDirection: "column", gap: 4, height: "100%", boxSizing: "border-box" }}>
+            <div style={bar({ width: "45%", height: 4 })} />
+            <div style={{ display: "flex", gap: 4, flex: 1 }}>
+              {[0, 1].map((i) => (
+                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div style={{ ...block({ flex: 1 }), background: i === 0 ? "#9aa3ad" : "#c5ccd4" }} />
+                  <div style={{ height: 2, width: "90%", background: "#8c9196", borderRadius: 1 }} />
+                  <div style={{ height: 2, width: "60%", background: "#c9cccf", borderRadius: 1 }} />
                 </div>
               ))}
             </div>

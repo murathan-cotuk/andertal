@@ -58,6 +58,18 @@ const nextConfig = {
   },
   async headers() {
     // Strict CSP for the admin/seller panel — no third-party embeds needed.
+    // The landing-page editor's live "vitrin" preview (LandingLivePreview) embeds ONE shop route
+    // (/:locale/cms-preview) in an iframe — that route itself only allows framing by this exact
+    // origin (see apps/shop/next.config.js's frame-ancestors override), so this is a narrow,
+    // mutually-scoped exception, not a general embed allowance.
+    const shopOrigin = (() => {
+      try {
+        const u = process.env.NEXT_PUBLIC_SHOP_URL ? new URL(process.env.NEXT_PUBLIC_SHOP_URL).origin : "";
+        return u;
+      } catch {
+        return "";
+      }
+    })();
     const csp = [
       "default-src 'self'",
       // Next.js hydration + Polaris + styled-components require unsafe-inline/eval.
@@ -71,8 +83,9 @@ const nextConfig = {
       // Dev-only backend origins come from SC_ALLOWED_DEV_BACKEND_HOSTS env.
       `connect-src 'self' https: wss:${devBackendHosts.length ? " " + devBackendHosts.join(" ") : ""}`,
       // Admin panel must never be embeddable in any frame (frame-ancestors) — but this page embeds
-      // Stripe's own Card Element / 3D Secure iframes, so those two origins must be allowed here.
-      "frame-src https://js.stripe.com https://hooks.stripe.com",
+      // Stripe's own Card Element / 3D Secure iframes AND the shop's cms-preview route, so those
+      // origins must be allowed here.
+      `frame-src https://js.stripe.com https://hooks.stripe.com${shopOrigin ? ` ${shopOrigin}` : ""}${!isProduction ? " http://localhost:*" : ""}`,
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",

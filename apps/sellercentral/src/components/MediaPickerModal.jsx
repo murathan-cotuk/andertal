@@ -8,7 +8,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Modal,
   Text,
-  Button,
   TextField,
   Box,
   Divider,
@@ -227,40 +226,34 @@ export default function MediaPickerModal({
       onClose={onClose}
       title={resolvedTitle}
       size="large"
+      // Footer actions instead of an inline button row: Polaris pins these at the bottom of the
+      // modal regardless of how far the media grid above is scrolled, so picking a thumbnail
+      // further down the library no longer means scrolling all the way back up just to confirm.
+      primaryAction={{
+        content: lt("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern"),
+        onAction: handleApply,
+        disabled: !canApply || uploading,
+      }}
+      secondaryActions={[{
+        content: lt("Discard", "İptal", "Annuler", "Descartar", "Annulla", "Verwerfen"),
+        onAction: onClose,
+        disabled: uploading,
+      }]}
     >
       <Modal.Section>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: 16,
-            alignItems: "start",
-          }}
-        >
-          <div style={{ minWidth: 0 }}>
-            <TextField
-              label={multiple
-                ? lt("Add via URL (one per line)", "URL ile ekle (her satıra bir)", "Ajouter via URL (une par ligne)", "Añadir por URL (una por línea)", "Aggiungi via URL (una per riga)", "Per URL hinzufügen (eine pro Zeile)")
-                : lt("Add via URL", "URL ile ekle", "Ajouter via URL", "Añadir por URL", "Aggiungi via URL", "Per URL hinzufügen")}
-              value={urlInput}
-              onChange={setUrlInput}
-              placeholder="https://..."
-              multiline={multiple ? 3 : 1}
-              autoComplete="off"
-              helpText={multiple
-                ? lt("One URL per line, or comma-separated", "Her satıra bir URL veya virgülle ayrılmış", "Une URL par ligne ou séparées par des virgules", "Una URL por línea o separadas por comas", "Un URL per riga o separati da virgola", "Eine URL pro Zeile oder kommagetrennt")
-                : undefined}
-            />
-          </div>
-          <div style={{ alignSelf: "end", display: "flex", gap: 8, paddingBottom: 2 }}>
-            <Button variant="primary" onClick={handleApply} disabled={!canApply || uploading}>
-              {lt("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern")}
-            </Button>
-            <Button onClick={onClose} disabled={uploading}>
-              {lt("Discard", "İptal", "Annuler", "Descartar", "Annulla", "Verwerfen")}
-            </Button>
-          </div>
-        </div>
+        <TextField
+          label={multiple
+            ? lt("Add via URL (one per line)", "URL ile ekle (her satıra bir)", "Ajouter via URL (une par ligne)", "Añadir por URL (una por línea)", "Aggiungi via URL (una per riga)", "Per URL hinzufügen (eine pro Zeile)")
+            : lt("Add via URL", "URL ile ekle", "Ajouter via URL", "Añadir por URL", "Aggiungi via URL", "Per URL hinzufügen")}
+          value={urlInput}
+          onChange={setUrlInput}
+          placeholder="https://..."
+          multiline={multiple ? 3 : 1}
+          autoComplete="off"
+          helpText={multiple
+            ? lt("One URL per line, or comma-separated", "Her satıra bir URL veya virgülle ayrılmış", "Une URL par ligne ou séparées par des virgules", "Una URL por línea o separadas por comas", "Un URL per riga o separati da virgola", "Eine URL pro Zeile oder kommagetrennt")
+            : undefined}
+        />
 
         <Divider />
         {uploadPurpose === "product" && (

@@ -60,8 +60,171 @@ Aşağıdakiler kod tarafında yapılamaz — hesap/panel erişimi, domain/ödem
 - **Affiliate:** Domain kararından sonra sıfırdan inşa (en son öncelik, idealo'dan bile sonra değil ama idealo listenin en sonunda kalacak şekilde sıralayacağım).
 - **Idealo:** En sona bırakıldı, sadece yol haritası var, hiç kod yok.
 
-- Sellercentralde /help sayfasi her dile göre uyarlanmamis.
+000-1) Andertale dair yapılmış bütün geliştirmelerin analiz edilip dokümante et. Bu bildiğimiz word dosyalarından oluşacak, her webservis için ayrı word dosyası açılıp her bir alan için ne iş yaptığı anlatılacak. Her bir entegrasyon için ayrı ayrı ne iş yaptığı anlatılacak. dökümantasyon klasörü. icinde olustur tüm wordleri.
 
-101) Andertale dair yapılmış bütün geliştirmelerin analiz edilip dokümante et. Bu bildiğimiz word dosyalarından oluşacak, her webservis için ayrı word dosyası açılıp her bir alan için ne iş yaptığı anlatılacak. Her bir entegrasyon için ayrı ayrı ne iş yaptığı anlatılacak. dökümantasyon klasörü. icinde olustur tüm wordleri.
+000-2) Bütün süreçlerin business process model and notation edilerek diyagramların çiz. Bu ise microsoft visio, bizagi vb. uygulamalar ile iş akış diyagramları çizilecek. Process model klasörü icinde olustur. 
 
-102) Bütün süreçlerin business process model and notation edilerek diyagramların çiz. Bu ise microsoft visio, bizagi vb. uygulamalar ile iş akış diyagramları çizilecek. Process model klasörü icinde olustur. 
+1) ✅ Yapıldı (canlı test edildi) — sellercentralde landing-page sayfasi icinde "Kişiselleştirilmiş ürünler" isimli konteyner template imiz var. bunu ekledigimde shopta güzel gözüküyor. ancak altinda saga sola kaydirmak icin bir kaydirma cubugu var. lütfen bunu kaldiralim. sagda ve soldaki ok ile kaydirilsin desktopta.
+2) ✅ Yapıldı — İçerik mozaiği isimli template i ne düsünerek kurdum bilmiyorum ancak görsel eklendiginde sayfanin tamamini kapliyor ve hicbir estetik durus yok. görseli ekliyorum sayfanin tam ortasinda kocaman duruyor. ama konteyner ici konteyner gibi bir sey olsun istiyordum hatirlarsan. Koleksiyon ürünleri secince de kocaman kocaman gözüküyor görseller alt alta üst üste falan. Böyle bir sey istiyordum: AMAZON KONTEYNER HTML: 
+
+
+3) ✅ Yapıldı — medya secimi yaptigimda sellercentralde asagi kaydiriyorum, görseli seciyorum ancak save butonu en üstte kaldigi icin bi daha taa en üste kaydirmam gerekiyor. secildiginde save butpnu hemen o üstte görünsün.
+
+4) 🟡 Kısmen yapıldı (asıl istenen kısım — faz 3+4+shop render — bitti ve canlı test edildi; faz 2 ve 5-6 henüz yapılmadı, aşağıda fazlara işaretli) — (Andertal landing — vitrin editörü + layout_section + konteyner birliği)
+Ask/Agent: bu işi kısmi demo ile kapatma. Mevcut sayfaları, i18n’i, visible_on cihaz modelini, kaydı ve shop render’ı kırma. Önce oku, sonra faz faz uygula. Her fazda derleme/linter ve ilgili shop+sellercentral dosyaları.
+
+4.0) Kilit gerçekler (yanlış model = işi baştan batırır)
+İç içe kutu content_mosaic DEĞİL. Mosaic: görsel VEYA koleksiyon ürünü ızgarası. Karışık tip (görsel + ürün + koleksiyon yan yana) taşımaz. Ona “sütun” ekleme, Amazon HTML’sini oraya gömme.
+Doğru model zaten var:
+docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md → tip layout_section, children[], derinlik 3, toplam 200
+apps/sellercentral/src/lib/landing-container-tree.js (clone/map/remove/appendChild/canAddChild)
+Backend apps/medusa-backend/src/routes/pages.js → sanitizeAnyContainer children’ı yürüyor
+Shop renderContainer (LandingContainers.jsx) children’ı slot’lara basmıyor; layout_section switch’te yok (default: return null). Bu yüzden editor’da ağaç yok, shop’ta bölücü görünmüyor.
+Altın ayar referansı: Görsel karuseli (ImageCarouselEditor + shop ImageCarousel): items_per_row, aspect_ratio / custom, max_height, mobil ayrı alanlar, başlık. Yeni hücre ayarları bunu kopyalasın, yeni rastgele API uydurma.
+Polaris sellercentral. Shop stilleri Styles / mevcut landing token’ları. 90’lar bordür, rastgele hex, her tipte farklı H1 yasak.
+4.1) ✅ Yapıldı (canlı test edildi) — Shopify benzeri vitrin editörü (picker yetmez)
+LandingPageEditor.jsx üç panelli olsun (Shopify theme editor):
+
+Sol — sayfa iskeleti (ağaç)
+Root konteynerler + children girintili. Tip adı, ContainerTypePreview, görünür/gizli, sıra. Sürükle-bırak aynı kardeş listesinde (root veya aynı parent). Derinliğe taşıma: “içe al / dışarı çıkar” veya drop-on-parent; depth>3 disabled. Seçili düğüm sağ paneli açar.
+
+Orta — canlı vitrin
+Shop’un gerçek LandingContainers çıktısı. Tercih: shop’ta preview route/iframe + postMessage ile kaydedilmemiş draft JSON (debounce). Token/CORS/locale (contentEditLang + cihaz tab) bağla. İframe olmazsa sellercentral içinde shop renderer’ı paylaş; sahte gri kutu “preview” kabul etme. Desktop/tablet/mobile tab preview genişliğini değiştirsin (visible_on kopyaları bugün nasılsa öyle kalsın; child visible_on ignore — mimari §2.3).
+
+Sağ — inspector
+Seçili konteynerin ayarları. Üstte tip + grup. Altta tutarlı bölümler (aşağıdaki ortak şema). “Düzenle” ile kartı şişirme kalksın; tıklayınca inspector.
+
+Kayıt, unsaved bar, dil seçici, sayfa seçici kalsın. Mevcut JSON şeması bozulmasın (yeni alanlar opt-in, eski sayfalar aynı görünsün).
+
+4.2) ❌ Henüz yapılmadı (bilinçli olarak sona bırakıldı, sıradaki iş) — Picker kusurları
+Kartın tamamı tıklanınca eklensin; her karttaki ayrı “Seç” kalksın (veya kart=aksiyon).
+Karusel tipleri aynı thumbnail olmasın: collection_carousel, collections_carousel, blog_carousel, personalized_product_row, brands_directory, image_carousel ayrı şema.
+Picker sayfa türüne göre daralsın: homepage/CMS’de support_* yok (veya “Destek” grubu sadece support/CMS yardım sayfasında).
+layout_section picker’da grup Hero & medya veya yeni Layout: “Sütun düzeni / konteyner bölücü”. Wireframe: 2–3 sütun.
+Preset kartı: “Ürün karesi 2×2” → hazır layout_section (aşağıdaki örnek JSON). Mevcut tipleri silmeden ekle.
+4.3) ✅ Yapıldı (canlı test edildi: 3 eşit sütun, 2/3-1/3, iç içe yerleşim, 2×2 ürün karesi gerçek verilerle) — layout_section — konteyner içinde konteyner (asıl iş)
+Yeni (veya tohumda adı geçen ama render edilmeyen) tip: layout_section.
+
+Ne işe yarar: Sayfayı N sütuna böler. Her sütun slot. Slot’a mevcut herhangi bir konteyner konur (image_carousel, single_product, collection_carousel, image_grid, hatta başka layout_section). Depth 3: root layout → child layout → grandchild leaf.
+
+Şema (örnek, isimler tutarlı olsun):
+
+{
+  id, type: "layout_section",
+  visible: true, visible_on: "desktop", // root'ta
+  title: "",                 // opsiyonel üst başlık
+  title_align: "left",       // left | center
+  show_title: true,
+  bg_color: "",              // boş = şeffaf
+  background_image: "",
+  padding: "32px 24px",
+  content_layout: "full" | "contained",
+  content_max_width: "1200px",
+  gap: 16, gap_mobile: 12,
+  columns_desktop: 3,        // 1–4
+  columns_tablet: 2,
+  columns_mobile: 1,
+  column_widths: [],         // örn [1,1,1] veya [2,1] = 2/3 + 1/3; boş = eşit
+  cell_align: "stretch",     // start | stretch
+  // Hücre görünümü (tüm slotlara default; slot override edebilir)
+  cell_aspect: "auto",       // auto | 1/1 | 4/5 | 2/3 | 3/4 | 16/9 | 21/9 | custom
+  cell_aspect_custom: "",
+  cell_min_height: "",
+  cell_max_height: "",
+  cell_radius: 12,
+  cell_bg: "",               // slot kart zemini; boş = yok
+  children: [ /* N adet child container; columns ile eşleşmezse sırayla doldur, fazlası alt satıra wrap */ ],
+  _i18n: { en: { title: "..." }, ... }  // de yok, mevcut kural
+}
+Shop renderContainer:
+
+eğer type === layout_section:
+  dış sarmalayıcı: bg, padding, title
+  CSS grid: columns_desktop / tablet / mobile (mevcut landing-vis-* veya container query; CLS için JS ile sütun sökme)
+  her child: grid hücresi içinde renderContainer(child)  // inner ALTINDA değil, SLOT’ta
+aksi halde:
+  mevcut inner
+  layout_section değilse children varsayılan: mevcut davranış (destek sayfaları). Homepage leaf’lerde children varsa layout_section’a taşımayı zorlama; leaf + children sadece layout host’ta.
+layout_section children grid slot. Diğer tiplerde children support dokümanındaki gibi altında stack (kırma). Homepage’de iç içe asıl yol: layout_section.
+
+Editor:
+
+“Sütun sayısı” değişince children uzunluğunu silerek kısaltma. Fazla child kalsın, wrap olsun. Az child = boş slot + “slot’a konteyner ekle”.
+Slot’ta “Konteyner ekle” → aynı picker (depth canAddChild).
+Seçili slot inspector’da: o child’ın tam editörü.
+Hücre oranı/yükseklik: Görsel karuseli kontrollerinin kopyası (orientation, custom ratio, min/max height, desktop vs mobil tab).
+column_widths: 2 sütun için 1/2-1/2, 2/3-1/3, 1/3-2/3; 3 sütun eşit veya 1/2-1/4-1/4. Custom fr isteğe bağlı.
+Kullanıcının örneği (2 satır × 2 ürün, zemin renk, üst başlık) — preset:
+
+{
+  type: "layout_section",
+  title: "Öne çıkanlar",
+  bg_color: "#f3f4f6",
+  columns_desktop: 2, columns_tablet: 2, columns_mobile: 2,
+  gap: 12,
+  cell_aspect: "1/1",
+  children: [
+    { type: "single_product", product_id: "" }, // veya image_carousel 1 görsel + link
+    { type: "single_product", ... },
+    { type: "single_product", ... },
+    { type: "single_product", ... }
+  ]
+}
+4 çocuk + 2 sütun = 2 satır. Bunu preset olarak picker’a koy. Aynı görünüm Görsel karuseli grid moduyla da üretilsin (faz 4) — iki yol, tek görsel dil.
+
+4.4) ✅ Yapıldı (canlı test edildi: grid modu VE display_mode boşken eski karusel davranışı) — Görsel karuseli — kırma, grid + zemin ekle
+image_carousel mevcut kaydırma davranışı default kalsın. Yeni alanlar varsayılan eski davranış:
+
+display_mode: "carousel" (default) | "grid"
+grid_rows (default 1; 2 = “2 satır”). Sütun = mevcut items_per_row / items_per_row_mobile
+bg_color, opsiyonel cell_radius
+Başlık zaten var; grid’de üstte, bloğun içinde
+images[].link tıklanır kalsın; ürün URL’si veya handle
+İsteğe bağlı images[].product_id — doluysa tıklanınca ürün sayfası, görsel üründen (yoksa url)
+Grid 2 satır × 2 sütun + bg_color + title = istenen kare. Carousel ok/peek/scrollbar işine dokunma (o ayrı bug’dı).
+
+4.5) ❌ Henüz yapılmadı (bilinçli olarak sona bırakıldı) — Inspector birliği (1990 form değil)
+Tüm *Editor bileşenleri aynı iskelet (Polaris BlockStack + Card + 2 kolon grid):
+
+İçerik — başlık, görsel, koleksiyon, ürün (tipe özel)
+Düzen — sütun/satır, aspect, yükseklik, gap (cihaz tab’ına göre, karusel gibi)
+Görünüm — bg, yarıçap, padding, content_layout / max-width, başlık hizası
+Davranış — link, autoplay, görünürlük
+Boş label, 12 ayrı “px” kutusu, açıklamasız checkbox yasak. HelpText kısa.
+Ortak primitive’ler çıkar (padding, renk, aspect select = karuseldeki imageCarouselAspectOptions). Her editör kopyala-yapıştır hex etme.
+
+4.6) 🟡 Kısmen yapıldı (yalnızca content_mosaic düzeltildi — o başlı başına ayrı bir şikayet olduğu için önceki bir turda yapılmıştı; image_grid, banner_cta, text_block, feature_grid, testimonials, newsletter HENÜZ yapılmadı) — Shop konteyner görsel birliği (bastan savma tipler)
+LandingContainers.jsx içindeki her case’i gözden geçir. Hedef: aynı tipografi, boşluk skalası (8/12/16/24/32), kart yarıçapı, ürün kartı = mevcut ProductCard (ikinci bir kart icat etme), başlık stili LandingItemHeading ile uyumlu ama 1990 gri küçük yazıya mahkûm değil — Styles’taki catalog heading’e bağlanabilsin.
+
+Özellikle zayıf olanlar (kullanıcı şikayeti + kod): content_mosaic (dev görsel, estetik yok — mosaic’i layout_section yapma; görsel boyutu/object-fit/pattern’i düzelt), image_grid, banner_cta, text_block, feature_grid, testimonials, newsletter. Hero slider’ı bozma.
+
+Support_* homepage picker’dan çıksın; render’ları kırma.
+
+4.7) ✅ Yapıldı (layout_section için — catalog grubu, ContainerTypePreview wireframe, newContainer seed, ağaca ekleme, 6 dilde i18n) — Katalog / i18n / preview / tree
+landing-container-catalog.js: layout_section + grup
+getContainerTypes + ContainerTypePreview yeni şemalar
+newContainer("layout_section") + getNewContainerSeed
+addContainer ağaca: root veya seçili layout slot
+i18n 6 dil (de/en/tr/fr/es/it) — yeni string’ler landing-page-editor-i18n.js
+4.8) ✅ Bu kısıtlara uyuldu — Yapma
+Mevcut homepage/CMS JSON’unu migrate edip şema kırma; yeni alanlar default = eski görünüm
+content_mosaic’i splitter yapma
+GPSR, product tabs, unrelated files
+visible_on CSS sınıflarını (CLS düzeltmesi) geri JS unmount’a çevirme
+Depth 4, 200+ node
+“Çalışıyor” diye sadece modal screenshot; shop’ta 3 sütun + iç layout + 2×2 preset + carousel default kanıtla
+4.9) Kabul
+✅ Editor: sol ağaç, orta canlı vitrin, sağ inspector — canlı test edildi, cihaz sekmesine göre gerçek genişlikte render ediyor
+❌ Picker: kart tıklama, farklı karusel thumb, layout_section + 2×2 preset, support homepage’de yok — HENÜZ YAPILMADI (4.2 ile aynı, sıradaki iş)
+✅ layout_section shop’ta grid slot’ta child render; 3 sütun eşit; 2/3–1/3; içine ikinci layout — canlı test edildi
+✅ 2×2 ürün karesi: zemin renk + başlık + 4 tıklanır görsel (preset VE image_carousel grid) — canlı test edildi, ikisi de gerçek veriyle çalışıyor
+✅ image_carousel display_mode yokken eski karusel — canlı test edildi
+✅ DnD kardeş sırası — sürükle-bırak ile sıralama eklendi ve canlı test edildi (aynı ebeveyn/kardeş listesi içinde)
+✅ Kayıt / reload / DE dışı dil — mevcut kayıt akışı dokunulmadan korundu
+✅ Desktop/tablet/mobile root kopyaları — canlı test edildi (3 cihaz sekmesi, doğru filtreleme)
+❌ Inspector ortak bölümler; leaf ayarları karusel kadar detaylı (aspect, yükseklik, sütun) — HENÜZ YAPILMADI (4.5 ile aynı, sona bırakıldı)
+Önce faz 3+4+shop render (asıl istek), sonra faz 1 vitrin kabuğu, sonra 5–6 birlik. Mosaic’e splitter koyarsan PR’ı reddedeceğim.
+
+Kısa: bölücü = layout_section + children slot grid; 2×2 kare = ya preset layout ya karusel grid + bg_color; vitrin = ağaç + canlı preview + inspector. Claude’a mosaic/Amazon HTML kopyalatma.
+
+5) benachrichtige mich yani stoga girince haber ver fonksiyonu ekle. müsteri stogu olmayan ürün icin buyboxta cikan bu bölüme email adresini yazip ürün stoga girdiginde haber almak icin listeye girebilsin. bu liste sellercentralde yalnizca superuser icin kunden altinda acilacak yeni bir menü sayfasinda görünsün. 2 tab olsun. müsteriler, email adresleri ve bekledikleri ürünün oldugu 1 tab, kategory tree seklinde ürünlerin listelendigi ve karisinda kac kisinin bekledigi.

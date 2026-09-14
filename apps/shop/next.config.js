@@ -141,9 +141,34 @@ const nextConfig = {
       "form-action 'self' https://checkout.stripe.com",
     ].join("; ");
 
+    // The Sellercentral landing-page editor embeds ONE specific shop route (/:locale/cms-preview,
+    // a client-only route with no real data — it only ever renders whatever draft JSON the editor
+    // posts to it via postMessage) in an iframe for its live "vitrin" panel. Every other shop page
+    // keeps the strict frame-ancestors 'self' above; this is a narrow, explicit exception for that
+    // one route, allowing only the sellercentral origin (+ localhost in dev) to frame it.
+    const sellercentralOrigin = (process.env.NEXT_PUBLIC_SELLERCENTRAL_URL || "").replace(/\/$/, "");
+    const previewCsp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://widget.trustpilot.com https://invitejs.trustpilot.com https://www.googletagmanager.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "worker-src 'self' blob:",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      `connect-src 'self' https: wss:${process.env.NODE_ENV !== 'production' ? ' http://localhost:9000 http://localhost:* ws://localhost:*' : ''}`,
+      "frame-src https://*.stripe.com https://widget.trustpilot.com",
+      `frame-ancestors 'self'${sellercentralOrigin ? ` ${sellercentralOrigin}` : ''}${process.env.NODE_ENV !== 'production' ? ' http://localhost:*' : ''}`,
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self' https://checkout.stripe.com",
+    ].join("; ");
+
     return [
       {
-        source: "/(.*)",
+        // Everything except /:locale/cms-preview — that route gets its own relaxed frame-ancestors
+        // block below instead (kept separate so there's no ambiguity about which CSP value a
+        // browser receives for that path).
+        source: "/((?!(?:de|en|tr|fr|es|it)/cms-preview(?:/|$)).*)",
         headers: [
           { key: "Content-Security-Policy", value: csp },
           // Prevent clickjacking (legacy browsers — frame-ancestors above covers modern ones)
@@ -157,6 +182,17 @@ const nextConfig = {
           // Permissions — disable unused browser APIs
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           // Basic XSS protection for older browsers
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+        ],
+      },
+      {
+        source: "/:locale(de|en|tr|fr|es|it)/cms-preview",
+        headers: [
+          { key: "Content-Security-Policy", value: previewCsp },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "X-XSS-Protection", value: "1; mode=block" },
         ],
       },

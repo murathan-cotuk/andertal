@@ -12,6 +12,14 @@ export function getContainerTypes(locale) {
       label: t(loc, "Hero Banner / Slider", "Hero Banner / Slider", "Bannière Hero / Slider", "Banner Hero / Slider", "Banner Hero / Slider", "Hero Banner / Slider"),
       description: t(loc, "Full-width slider with multiple images (3000×1000 px recommended)", "Birden fazla görselli tam genişlik slider (3000x1000 px önerilir)", "Slider pleine largeur (3000×1000 px recommandé)", "Slider a ancho completo (3000×1000 px recomendado)", "Slider a tutta larghezza (3000×1000 px consigliato)", "Vollbild-Slider mit mehreren Bildern (3000×1000 px empfohlen)"),
     },
+    layout_section: {
+      label: t(loc, "Column layout (container)", "Sütun düzeni (konteyner)", "Disposition en colonnes (conteneur)", "Diseño en columnas (contenedor)", "Layout a colonne (contenitore)", "Spalten-Layout (Container)"),
+      description: t(loc, "Splits the section into columns; put any other block into each column (container inside container)", "Bölümü sütunlara böler; her sütuna başka bir blok koyabilirsiniz (konteyner içinde konteyner)", "Divise la section en colonnes ; placez n'importe quel bloc dans chaque colonne", "Divide la sección en columnas; coloca cualquier bloque en cada columna", "Divide la sezione in colonne; inserisci qualsiasi blocco in ogni colonna", "Teilt den Bereich in Spalten; in jede Spalte kann ein beliebiger anderer Block gelegt werden (Container im Container)"),
+    },
+    layout_section_2x2: {
+      label: t(loc, "Product square 2×2 (preset)", "Ürün karesi 2×2 (hazır şablon)", "Carré produits 2×2 (préréglage)", "Cuadro de productos 2×2 (preset)", "Quadrato prodotti 2×2 (preimpostato)", "Produktquadrat 2×2 (Vorlage)"),
+      description: t(loc, "Ready-made column layout: background, title and 4 product slots in a 2×2 grid — edit or replace each slot afterwards", "Hazır sütun düzeni: zemin rengi, başlık ve 2×2 ızgarada 4 ürün yuvası — sonradan her yuvayı düzenleyebilir veya değiştirebilirsiniz", "Disposition prête à l'emploi : fond, titre et 4 emplacements produits en grille 2×2", "Diseño listo: fondo, título y 4 espacios de producto en cuadrícula 2×2", "Layout pronto: sfondo, titolo e 4 slot prodotto in griglia 2×2", "Fertige Spalten-Vorlage: Hintergrund, Titel und 4 Produkt-Slots im 2×2-Raster — jeder Slot lässt sich danach bearbeiten oder ersetzen"),
+    },
     text_block: {
       label: t(loc, "Text block", "Metin Bloğu", "Bloc de texte", "Bloque de texto", "Blocco di testo", "Text-Block"),
       description: t(loc, "Heading, body text (HTML) and optional button", "Başlık, metin (HTML) ve opsiyonel buton", "Titre, texte (HTML) et bouton optionnel", "Título, texto (HTML) y botón opcional", "Titolo, testo (HTML) e pulsante opzionale", "Überschrift, Fließtext (HTML) und optionaler Button"),
@@ -118,6 +126,10 @@ export function getLandingEditorCopy(locale) {
   const loc = String(locale || "de").slice(0, 2).toLowerCase();
   const x = (en, tr, fr, es, it, de) => t(loc, en, tr, fr, es, it, de);
   return {
+    // Locale-aware container-type catalog (label/description/group per type), available to every
+    // editor sub-component via useLandingCopy() — used by layout_section's "add block to slot"
+    // picker so it doesn't need its own separate locale plumbing.
+    containerTypes: getContainerTypes(loc),
     pageTitle: x("Landing Page", "Landing Page", "Page d'accueil", "Landing Page", "Landing Page", "Landing Page"),
     pageSubtitle: x("Design your shop pages with containers", "Mağaza sayfalarını konteynerlerle tasarla", "Concevez vos pages boutique avec des conteneurs", "Diseña páginas de tu tienda con contenedores", "Progetta le pagine del negozio con contenitori", "Gestalte Seiten deines Shops mit Containern"),
     save: x("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern"),
@@ -605,6 +617,36 @@ export function getLandingEditorCopy(locale) {
     gridShop: x("Grid (shop)", "Izgara (shop)", "Grille (boutique)", "Cuadrícula (tienda)", "Griglia (negozio)", "Raster (Shop)"),
     patternHelpMobile: x("e.g. 1 or 2,2", "örn. 1 veya 2,2", "ex. 1 ou 2,2", "p. ej. 1 o 2,2", "es. 1 o 2,2", "Z. B. 1 oder 2,2"),
     patternHelpDesktop: x("e.g. 1,2,2", "örn. 1,2,2", "ex. 1,2,2", "p. ej. 1,2,2", "es. 1,2,2", "Z. B. 1,2,2"),
+    // Layout section — "container within container": splits the block into columns, each column
+    // holding any other container type (see docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §3.1).
+    layoutSectionHeading: x("Columns", "Sütunlar", "Colonnes", "Columnas", "Colonne", "Spalten"),
+    layoutSectionIntro: x("Splits this section into columns. Add any block (image carousel, single product, another column layout, …) into each column below.", "Bu bölümü sütunlara böler. Aşağıdaki her sütuna istediğiniz bloğu (görsel karuseli, tekil ürün, başka bir sütun düzeni…) ekleyebilirsiniz.", "Divise cette section en colonnes. Ajoutez un bloc dans chaque colonne ci-dessous.", "Divide esta sección en columnas. Añade un bloque en cada columna.", "Divide questa sezione in colonne. Aggiungi un blocco in ogni colonna.", "Teilt diesen Bereich in Spalten. In jede Spalte unten kann ein beliebiger Block gelegt werden."),
+    layoutColumnsDesktop: x("Columns (desktop)", "Sütun sayısı (masaüstü)", "Colonnes (desktop)", "Columnas (escritorio)", "Colonne (desktop)", "Spalten (Desktop)"),
+    layoutColumnsTablet: x("Columns (tablet)", "Sütun sayısı (tablet)", "Colonnes (tablette)", "Columnas (tableta)", "Colonne (tablet)", "Spalten (Tablet)"),
+    layoutColumnsMobile: x("Columns (mobile)", "Sütun sayısı (mobil)", "Colonnes (mobile)", "Columnas (móvil)", "Colonne (mobile)", "Spalten (Mobil)"),
+    columnWidthsOptional: x("Column width ratios (optional)", "Sütun genişlik oranları (opsiyonel)", "Ratios largeur colonnes (optionnel)", "Proporciones de ancho (opcional)", "Proporzioni larghezza (opzionale)", "Spaltenbreiten-Verhältnis (optional)"),
+    columnWidthsPh: x("e.g. 2,1 or 1,1,1 — empty = equal width", "örn. 2,1 veya 1,1,1 — boş = eşit genişlik", "ex. 2,1 — vide = largeur égale", "p. ej. 2,1 — vacío = igual", "es. 2,1 — vuoto = uguale", "Z. B. 2,1 — leer = gleich breit"),
+    titleAlignLabel: x("Title alignment", "Başlık hizası", "Alignement du titre", "Alineación del título", "Allineamento titolo", "Titel-Ausrichtung"),
+    showTitleLabel: x("Show title above the columns", "Sütunların üstünde başlık göster", "Afficher le titre au-dessus des colonnes", "Mostrar título sobre las columnas", "Mostra titolo sopra le colonne", "Titel über den Spalten anzeigen"),
+    cellSettingsHeading: x("Slot appearance (applies to every column)", "Sütun görünümü (tüm sütunlara uygulanır)", "Apparence des slots (toutes les colonnes)", "Aspecto de las columnas (todas)", "Aspetto delle colonne (tutte)", "Slot-Aussehen (gilt für alle Spalten)"),
+    cellAlignLabel: x("Vertical alignment", "Dikey hizalama", "Alignement vertical", "Alineación vertical", "Allineamento verticale", "Vertikale Ausrichtung"),
+    cellAlignStretch: x("Stretch to same height", "Aynı yüksekliğe uzat", "Étirer à la même hauteur", "Estirar a la misma altura", "Estendi alla stessa altezza", "Auf gleiche Höhe strecken"),
+    cellAlignStart: x("Own height", "Kendi yüksekliği", "Hauteur propre", "Altura propia", "Altezza propria", "Eigene Höhe"),
+    cellAspectLabel: x("Slot aspect ratio", "Sütun en-boy oranı", "Ratio du slot", "Relación de aspecto", "Aspect ratio slot", "Slot-Seitenverhältnis"),
+    cellAspectAuto: x("Auto (content decides)", "Otomatik (içerik belirler)", "Auto (contenu décide)", "Auto (según contenido)", "Auto (decide il contenuto)", "Automatisch (Inhalt entscheidet)"),
+    cellAspectCustom: x("Custom", "Özel", "Personnalisé", "Personalizado", "Personalizzato", "Benutzerdefiniert"),
+    cellBgLabel: x("Slot background (optional)", "Sütun arka planı (opsiyonel)", "Fond du slot (optionnel)", "Fondo de columna (opcional)", "Sfondo colonna (opzionale)", "Slot-Hintergrund (optional)"),
+    cellRadiusLabel: x("Slot corner radius (px)", "Sütun köşe yuvarlaklığı (px)", "Rayon des coins (px)", "Radio de esquina (px)", "Raggio angoli (px)", "Slot-Eckenradius (px)"),
+    blocksHeading: x("Blocks in these columns", "Bu sütunlardaki bloklar", "Blocs dans ces colonnes", "Bloques en estas columnas", "Blocchi in queste colonne", "Blöcke in diesen Spalten"),
+    noBlocksYet: x("No blocks yet — add one below.", "Henüz blok yok — aşağıdan ekleyin.", "Aucun bloc — ajoutez-en un ci-dessous.", "Sin bloques — añade uno abajo.", "Nessun blocco — aggiungine uno sotto.", "Noch keine Blöcke — unten einen hinzufügen."),
+    addBlockLabel: x("Add block to a column", "Sütuna blok ekle", "Ajouter un bloc à une colonne", "Añadir bloque a una columna", "Aggiungi blocco a una colonna", "Block zu einer Spalte hinzufügen"),
+    addBlockAction: x("Add", "Ekle", "Ajouter", "Añadir", "Aggiungi", "Hinzufügen"),
+    maxDepthReached: x("Maximum nesting depth reached — this column layout can't hold another column layout with its own blocks.", "Maksimum iç içe geçme derinliğine ulaşıldı — bu sütun düzeni, kendi bloklarına sahip başka bir sütun düzeni içeremez.", "Profondeur maximale atteinte.", "Profundidad máxima alcanzada.", "Profondità massima raggiunta.", "Maximale Verschachtelungstiefe erreicht."),
+    blockN: (n) => x(`Block ${n}`, `Blok ${n}`, `Bloc ${n}`, `Bloque ${n}`, `Blocco ${n}`, `Block ${n}`),
+    // Vitrin editor shell — tree (left) + live preview (middle) + inspector (right)
+    livePreviewTitle: x("Live preview", "Canlı önizleme", "Aperçu en direct", "Vista previa en vivo", "Anteprima live", "Live-Vorschau"),
+    previewUnavailable: x("Live preview is not configured for this environment (NEXT_PUBLIC_SHOP_URL missing).", "Bu ortam için canlı önizleme yapılandırılmamış (NEXT_PUBLIC_SHOP_URL eksik).", "Aperçu en direct non configuré (NEXT_PUBLIC_SHOP_URL manquant).", "Vista previa no configurada (falta NEXT_PUBLIC_SHOP_URL).", "Anteprima non configurata (manca NEXT_PUBLIC_SHOP_URL).", "Live-Vorschau ist für diese Umgebung nicht konfiguriert (NEXT_PUBLIC_SHOP_URL fehlt)."),
+    selectBlockHint: x("Select a block on the left to edit it here.", "Düzenlemek için soldan bir blok seçin.", "Sélectionnez un bloc à gauche pour le modifier ici.", "Selecciona un bloque a la izquierda para editarlo.", "Seleziona un blocco a sinistra per modificarlo.", "Wähle links einen Block aus, um ihn hier zu bearbeiten."),
     gapFallsBackDesktop: x("Leave empty to use desktop value.", "Boş bırakırsan masaüstü değeri kullanılır.", "Laisser vide pour la valeur desktop.", "Vacío = valor de escritorio.", "Vuoto = valore desktop.", "Boş bırakırsan desktop değeri kullanılır."),
     imageAreaLeft: x("Image area — left", "Görsel alanı — sol", "Zone image — gauche", "Área imagen — izq.", "Area immagine — sin.", "Görsel alanı — sol"),
     imageAreaRight: x("Image area — right", "Görsel alanı — sağ", "Zone image — droite", "Área imagen — der.", "Area immagine — des.", "Görsel alanı — sağ"),
@@ -631,6 +673,15 @@ export function getLandingEditorCopy(locale) {
     sectionTitleOptional: x("Section title (optional)", "Bölüm başlığı (opsiyonel)", "Titre de section (optionnel)", "Título de sección (opcional)", "Titolo sezione (opzionale)", "Abschnitt-Titel (optional)"),
     sectionTitlePh: x("e.g. Our collections", "örn. Koleksiyonlarımız", "ex. Nos collections", "p. ej. Nuestras colecciones", "es. Le nostre collezioni", "z. B. Unsere Kollektionen"),
     imagesPerRowDesktop: x("Images per row (desktop)", "Satır başına görsel (masaüstü)", "Images par ligne (desktop)", "Imágenes por fila (escritorio)", "Immagini per riga (desktop)", "Bilder pro Zeile (Desktop)"),
+    imagesPerRowMobile: x("Images per row (mobile)", "Satır başına görsel (mobil)", "Images par ligne (mobile)", "Imágenes por fila (móvil)", "Immagini per riga (mobile)", "Bilder pro Zeile (Mobil)"),
+    displayModeLabel: x("Display", "Görünüm", "Affichage", "Visualización", "Visualizzazione", "Anzeige"),
+    displayModeCarousel: x("Scrollable carousel (default)", "Kaydırılabilir karusel (varsayılan)", "Carrousel défilant (défaut)", "Carrusel desplazable (predet.)", "Carosello scorrevole (predefinito)", "Scrollbares Karussell (Standard)"),
+    displayModeGrid: x("Fixed grid (no scrolling)", "Sabit ızgara (kaydırma yok)", "Grille fixe (sans défilement)", "Cuadrícula fija (sin desplazamiento)", "Griglia fissa (senza scorrimento)", "Feste Raster-Ansicht (kein Scrollen)"),
+    gridRowsLabel: x("Rows (grid mode)", "Satır sayısı (ızgara modu)", "Lignes (mode grille)", "Filas (modo cuadrícula)", "Righe (modalità griglia)", "Zeilen (Raster-Modus)"),
+    gridRowsHelp: x("e.g. rows=2 + 2 images/row = a 2×2 square of exactly 4 images", "örn. satır=2 + satır başına 2 görsel = tam 4 görsellik 2×2 kare", "ex. lignes=2 + 2 images/ligne = carré 2×2 de 4 images", "p. ej. filas=2 + 2 img/fila = cuadrado 2×2 de 4 imágenes", "es. righe=2 + 2 img/riga = quadrato 2×2 di 4 immagini", "Z. B. Zeilen=2 + 2 Bilder/Zeile = 2×2-Quadrat mit genau 4 Bildern"),
+    desktopItemWidth: x("Image width (CSS value)", "Görsel genişliği (CSS değeri)", "Largeur image (CSS)", "Ancho imagen (CSS)", "Larghezza immagine (CSS)", "Görsel genişliği (CSS değeri)"),
+    desktopItemWidthPh: x("e.g. 420px, 28vw, calc(33vw - 24px)", "örn. 420px, 28vw, calc(33vw - 24px)", "ex. 420px, 28vw", "p. ej. 420px, 28vw", "es. 420px, 28vw", "Örn: 420px, 28vw, calc(33vw - 24px)"),
+    desktopItemWidthHelp: x("Same peek-scroll behavior as mobile — overrides \"images per row\" when set.", "Mobildeki gibi kaydırmalı görünüm — doldurulursa \"satır başına görsel\" yerine bunu kullanır.", "Comme mobile — remplace \"images par ligne\" si rempli.", "Como en móvil — anula \"imágenes por fila\" si se define.", "Come su mobile — sostituisce \"immagini per riga\" se impostato.", "Mobildeki gibi kaydırmalı görünüm — doldurulursa \"satır başına görsel\" yerine bunu kullanır."),
     mobileImageWidth: x("Image width (CSS value)", "Görsel genişliği (CSS değeri)", "Largeur image (CSS)", "Ancho imagen (CSS)", "Larghezza immagine (CSS)", "Görsel genişliği (CSS değeri)"),
     mobileImageWidthPh: x("e.g. 82vw, 280px, calc(100vw - 48px)", "örn. 82vw, 280px, calc(100vw - 48px)", "ex. 82vw, 280px", "p. ej. 82vw, 280px", "es. 82vw, 280px", "Örn: 82vw, 280px, calc(100vw - 48px)"),
     mobileImageWidthHelp: x("Leave empty to use ratio-based px value.", "Boş bırakırsan oran bazlı px kullanılır.", "Laisser vide pour px basé sur ratio.", "Vacío = px por ratio.", "Vuoto = px da ratio.", "Boş bırakırsan oran bazlı px değeri kullanılır."),

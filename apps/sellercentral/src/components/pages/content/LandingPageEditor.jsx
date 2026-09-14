@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Page,
   Layout,
@@ -35,7 +35,14 @@ import ProductPageSettingsPanel from "@/components/pages/content/ProductPageSett
 import {
   ContainerTypePreview,
 } from "@/components/pages/content/ContainerTypePreview";
-import { groupContainerTypes, groupLabel } from "@/lib/landing-container-catalog";
+import { groupContainerTypes } from "@/lib/landing-container-catalog";
+import {
+  MAX_LANDING_CONTAINER_DEPTH,
+  findContainerById,
+  mapContainerById,
+  removeContainerById,
+  moveSiblingInGroup,
+} from "@/lib/landing-container-tree";
 
 const LandingCopyContext = createContext(null);
 function useLandingCopy() {
@@ -275,6 +282,8 @@ function newContainer(type) {
         collections: [],
         layout_pattern_desktop: "1,2",
         layout_pattern_mobile: "1",
+        items_per_row: 4,
+        items_per_row_mobile: 2,
         gap: 16,
         gap_mobile: undefined,
         card_aspect_ratio: "4/5",
@@ -484,6 +493,51 @@ function newContainer(type) {
       return {
         ...base, title: "", description: "", section_label: "", no_results_text: "", categories: [],
         padding: "48px 24px", content_layout: "contained", content_max_width: "1000px",
+      };
+    case "layout_section":
+      // "Container within container" — see docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §2.1/§3.1.
+      // Defaults render as 3 equal columns with no cell chrome; every field is opt-in on top.
+      return {
+        ...base,
+        title: "", show_title: true, title_align: "left",
+        bg_color: "", text_color: "#111827",
+        columns_desktop: 3, columns_tablet: 2, columns_mobile: 1,
+        column_widths: [],
+        gap: 16, gap_mobile: 12,
+        cell_align: "stretch",
+        cell_aspect: "auto", cell_aspect_custom: "", cell_min_height: "", cell_max_height: "",
+        cell_radius: 0, cell_bg: "",
+        padding: "32px 24px", content_layout: "full",
+        children: [],
+      };
+    case "layout_section_2x2":
+      // Picker-only preset (docs/TASKS.md §4.2/§4.3): a ready-made 2×2 product square — same
+      // layout_section type as above, just pre-populated instead of starting empty. `base.type`
+      // is overridden to the real, persisted type; "layout_section_2x2" never reaches the shop.
+      return {
+        ...base,
+        type: "layout_section",
+        title: "", show_title: true, title_align: "left",
+        bg_color: "#f3f4f6", text_color: "#111827",
+        columns_desktop: 2, columns_tablet: 2, columns_mobile: 2,
+        column_widths: [],
+        gap: 12, gap_mobile: 12,
+        cell_align: "stretch",
+        cell_aspect: "1/1", cell_aspect_custom: "", cell_min_height: "", cell_max_height: "",
+        cell_radius: 8, cell_bg: "",
+        padding: "32px 24px", content_layout: "full",
+        children: [0, 1, 2, 3].map(() => ({
+          id: Math.random().toString(36).slice(2),
+          type: "single_product",
+          visible: true,
+          title: "",
+          product_id: "",
+          product_handle: "",
+          bg_color: "#ffffff",
+          text_color: "#111827",
+          padding: "0px",
+          content_layout: "full",
+        })),
       };
     default:
       return base;
@@ -1128,16 +1182,31 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.gridShop}</Text>
-          <TextField
-            label={c.pattern}
-            value={String(isMobileView ? (container.layout_pattern_mobile || "1") : (container.layout_pattern_desktop || "1,2"))}
-            onChange={(v) => onChange({
-              ...container,
-              ...(isMobileView ? { layout_pattern_mobile: v } : { layout_pattern_desktop: v }),
-            })}
-            autoComplete="off"
-            helpText={isMobileView ? c.patternHelpMobile : c.patternHelpDesktop}
-          />
+          {source === "images" ? (
+            <TextField
+              label={c.pattern}
+              value={String(isMobileView ? (container.layout_pattern_mobile || "1") : (container.layout_pattern_desktop || "1,2"))}
+              onChange={(v) => onChange({
+                ...container,
+                ...(isMobileView ? { layout_pattern_mobile: v } : { layout_pattern_desktop: v }),
+              })}
+              autoComplete="off"
+              helpText={isMobileView ? c.patternHelpMobile : c.patternHelpDesktop}
+            />
+          ) : (
+            // Products/collections are equal-size cards, not an editorial collage — a plain,
+            // evenly-sized grid (same control as the collection carousel) instead of the
+            // images-only row pattern, which was making a lone first row span full-width huge.
+            <Select
+              label={c.productsPerRow}
+              options={(isMobileView ? [1, 2, 3, 4] : [2, 3, 4, 5, 6]).map((n) => ({ label: String(n), value: String(n) }))}
+              value={String(isMobileView ? (container.items_per_row_mobile ?? 2) : (container.items_per_row || 4))}
+              onChange={(v) => onChange({
+                ...container,
+                ...(isMobileView ? { items_per_row_mobile: Number(v) } : { items_per_row: Number(v) }),
+              })}
+            />
+          )}
           <div style={EDITOR_FIELD_GRID}>
             <TextField
               label={c.gapPx}
@@ -1369,6 +1438,30 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
             <Text as="p" variant="bodySm" tone="subdued">{c.imagesAndGridHelp}</Text>
             <TextField label={c.sectionTitleOptional} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" placeholder={c.sectionTitlePh} />
             <div style={EDITOR_FIELD_GRID}>
+              <Select
+                label={c.displayModeLabel}
+                options={[
+                  { label: c.displayModeCarousel, value: "carousel" },
+                  { label: c.displayModeGrid, value: "grid" },
+                ]}
+                value={container.display_mode === "grid" ? "grid" : "carousel"}
+                onChange={(v) => onChange({ ...container, display_mode: v })}
+              />
+              {container.display_mode === "grid" && (
+                <>
+                  <TextField
+                    label={c.gridRowsLabel}
+                    type="number"
+                    value={String(container.grid_rows || 1)}
+                    onChange={(v) => onChange({ ...container, grid_rows: Math.max(1, Number(v) || 1) })}
+                    autoComplete="off"
+                    helpText={c.gridRowsHelp}
+                  />
+                  <ColorField label={`${c.backgroundColor} ${c.optional}`} value={container.bg_color || ""} onChange={(v) => onChange({ ...container, bg_color: v })} />
+                </>
+              )}
+            </div>
+            <div style={EDITOR_FIELD_GRID}>
               {!isMobileView && (
                 <TextField
                   label={c.imagesPerRowDesktop}
@@ -1380,6 +1473,15 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
               )}
               {isMobileView ? (
                 <>
+                  {container.display_mode === "grid" && (
+                    <TextField
+                      label={c.imagesPerRowMobile}
+                      type="number"
+                      value={String(container.items_per_row_mobile || 2)}
+                      onChange={(v) => onChange({ ...container, items_per_row_mobile: Number(v) || 2 })}
+                      autoComplete="off"
+                    />
+                  )}
                   <TextField
                     label={c.mobileImageWidth}
                     value={container.mobile_item_width != null ? String(container.mobile_item_width) : ""}
@@ -1418,6 +1520,14 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
                 </>
               ) : (
                 <>
+                  <TextField
+                    label={c.desktopItemWidth}
+                    value={container.desktop_item_width != null ? String(container.desktop_item_width) : ""}
+                    onChange={(v) => onChange({ ...container, desktop_item_width: v })}
+                    autoComplete="off"
+                    placeholder={c.desktopItemWidthPh}
+                    helpText={c.desktopItemWidthHelp}
+                  />
                   <Select
                     label={c.imageOrientation}
                     options={c.imageCarouselAspectOptions()}
@@ -3354,6 +3464,212 @@ function PersonalizedProductRowEditor({ container, onChange, editLang = "de" }) 
   );
 }
 
+/**
+ * layout_section — "container within container": splits the block into columns; each column
+ * ("slot") holds any other container, including another layout_section, up to the shared depth-3
+ * cap (docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §2.1/§3.1). `depth` is this node's own depth in
+ * the tree (root = 1) so a grandchild (depth 3) correctly can't add its own children (depth 4).
+ */
+function LayoutSectionEditor({ container, onChange, deviceTab = 0, editLang = "de", depth = 1 }) {
+  const c = useLandingCopy();
+  const uiLocale = useLocale();
+  const [expandedChild, setExpandedChild] = useState(null);
+  const [addType, setAddType] = useState("");
+
+  const children = Array.isArray(container.children) ? container.children : [];
+  const canAddMore = depth < MAX_LANDING_CONTAINER_DEPTH;
+  const typeInfo = (type) => (c.containerTypes || []).find((t) => t.type === type) || { label: type };
+
+  const updateChildren = (next) => onChange({ ...container, children: next });
+  const updateChildAt = (i, patch) => updateChildren(children.map((ch, idx) => (idx === i ? patch : ch)));
+  const removeChildAt = (i) => {
+    updateChildren(children.filter((_, idx) => idx !== i));
+    setExpandedChild((cur) => (cur === i ? null : cur != null && cur > i ? cur - 1 : cur));
+  };
+  const moveChildAt = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= children.length) return;
+    const next = [...children];
+    [next[i], next[j]] = [next[j], next[i]];
+    updateChildren(next);
+  };
+  const addChild = () => {
+    if (!addType) return;
+    const created = newContainer(addType);
+    const seed = getNewContainerSeed(uiLocale, addType);
+    const child = { ...created, ...seed };
+    updateChildren([...children, child]);
+    setExpandedChild(children.length);
+    setAddType("");
+  };
+
+  const widthsStr = Array.isArray(container.column_widths) ? container.column_widths.join(",") : "";
+  const onWidthsChange = (v) => {
+    const parts = String(v).split(",").map((s) => s.trim()).filter(Boolean).map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    onChange({ ...container, column_widths: parts });
+  };
+
+  const colOptions = [1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }));
+  const cellAspectValue = container.cell_aspect || "auto";
+  const cellAspectOptions = [
+    { label: c.cellAspectAuto, value: "auto" },
+    ...c.imageCarouselAspectOptions(),
+    { label: c.cellAspectCustom, value: "custom" },
+  ];
+  const addableTypes = (c.containerTypes || []).map((t) => ({ label: t.label, value: t.type }));
+
+  return (
+    <BlockStack gap="400">
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.layoutSectionHeading}</Text>
+          <Text as="p" variant="bodySm" tone="subdued">{c.layoutSectionIntro}</Text>
+          <Checkbox
+            label={c.showTitleLabel}
+            checked={container.show_title !== false}
+            onChange={(v) => onChange({ ...container, show_title: v })}
+          />
+          {container.show_title !== false && (
+            <div style={EDITOR_FIELD_GRID}>
+              <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+              <Select
+                label={c.titleAlignLabel}
+                options={[{ label: c.alignLeft, value: "left" }, { label: c.alignCenter, value: "center" }]}
+                value={container.title_align === "center" ? "center" : "left"}
+                onChange={(v) => onChange({ ...container, title_align: v })}
+              />
+            </div>
+          )}
+          <ColorField label={`${c.backgroundColor} ${c.optional}`} value={container.bg_color || ""} onChange={(v) => onChange({ ...container, bg_color: v })} />
+        </BlockStack>
+      </Card>
+
+      <Card>
+        <BlockStack gap="300">
+          <div style={EDITOR_FIELD_GRID}>
+            <Select label={c.layoutColumnsDesktop} options={colOptions} value={String(container.columns_desktop || 3)} onChange={(v) => onChange({ ...container, columns_desktop: Number(v) })} />
+            <Select label={c.layoutColumnsTablet} options={colOptions} value={String(container.columns_tablet || container.columns_desktop || 2)} onChange={(v) => onChange({ ...container, columns_tablet: Number(v) })} />
+            <Select label={c.layoutColumnsMobile} options={colOptions} value={String(container.columns_mobile || 1)} onChange={(v) => onChange({ ...container, columns_mobile: Number(v) })} />
+          </div>
+          <TextField label={c.columnWidthsOptional} value={widthsStr} onChange={onWidthsChange} autoComplete="off" placeholder={c.columnWidthsPh} helpText={c.columnWidthsPh} />
+          <div style={EDITOR_FIELD_GRID}>
+            <TextField
+              label={`${c.gapPx} (${c.desktop})`}
+              type="number"
+              value={String(container.gap ?? 16)}
+              onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })}
+              autoComplete="off"
+            />
+            <TextField
+              label={`${c.gapPx} (${c.mobile})`}
+              type="number"
+              value={String(container.gap_mobile ?? "")}
+              onChange={(v) => {
+                const t = (v || "").trim();
+                onChange({ ...container, gap_mobile: t === "" ? undefined : Number(v) || 0 });
+              }}
+              autoComplete="off"
+              helpText={c.gapFallsBackDesktop}
+            />
+          </div>
+        </BlockStack>
+      </Card>
+
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.cellSettingsHeading}</Text>
+          <div style={EDITOR_FIELD_GRID}>
+            <Select
+              label={c.cellAlignLabel}
+              options={[{ label: c.cellAlignStretch, value: "stretch" }, { label: c.cellAlignStart, value: "start" }]}
+              value={container.cell_align === "start" ? "start" : "stretch"}
+              onChange={(v) => onChange({ ...container, cell_align: v })}
+            />
+            <Select label={c.cellAspectLabel} options={cellAspectOptions} value={cellAspectValue} onChange={(v) => onChange({ ...container, cell_aspect: v })} />
+            {cellAspectValue === "custom" && (
+              <TextField label={c.customRatioOptional} value={container.cell_aspect_custom || ""} onChange={(v) => onChange({ ...container, cell_aspect_custom: v })} autoComplete="off" placeholder={c.customRatioPhDesktop} />
+            )}
+            <TextField label={c.minHeightOptional} value={container.cell_min_height || ""} onChange={(v) => onChange({ ...container, cell_min_height: v })} autoComplete="off" placeholder={c.minHeightPh} />
+            <TextField label={c.maxHeightOptional} value={container.cell_max_height || ""} onChange={(v) => onChange({ ...container, cell_max_height: v })} autoComplete="off" placeholder={c.maxHeightPhDesktop} />
+            <ColorField label={c.cellBgLabel} value={container.cell_bg || ""} onChange={(v) => onChange({ ...container, cell_bg: v })} />
+            <TextField label={c.cellRadiusLabel} type="number" value={String(container.cell_radius ?? 0)} onChange={(v) => onChange({ ...container, cell_radius: Number(v) || 0 })} autoComplete="off" />
+          </div>
+        </BlockStack>
+      </Card>
+
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.blocksHeading}</Text>
+          {children.length === 0 && <Text as="p" variant="bodySm" tone="subdued">{c.noBlocksYet}</Text>}
+          {children.map((child, i) => {
+            const info = typeInfo(child.type);
+            const isExpanded = expandedChild === i;
+            return (
+              <Card key={child.id || i}>
+                <BlockStack gap="0">
+                  <Box paddingBlockEnd={isExpanded ? "400" : "0"}>
+                    <InlineStack align="space-between" blockAlign="center" gap="300">
+                      <InlineStack gap="300" blockAlign="center" wrap={false}>
+                        <ContainerTypePreview type={child.type} label={info.label} />
+                        <BlockStack gap="100">
+                          <InlineStack gap="200" blockAlign="center" wrap>
+                            <Text as="h3" variant="headingSm">{info.label}</Text>
+                            <Text as="span" variant="bodySm" tone="subdued">{c.blockN(i + 1)}</Text>
+                          </InlineStack>
+                        </BlockStack>
+                      </InlineStack>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Button size="slim" disabled={i === 0} onClick={() => moveChildAt(i, -1)}>↑</Button>
+                        <Button size="slim" disabled={i === children.length - 1} onClick={() => moveChildAt(i, 1)}>↓</Button>
+                        <Button size="slim" variant={isExpanded ? "primary" : "secondary"} onClick={() => setExpandedChild(isExpanded ? null : i)}>
+                          {isExpanded ? c.collapse : c.edit}
+                        </Button>
+                      </InlineStack>
+                    </InlineStack>
+                  </Box>
+                  {isExpanded && (
+                    <>
+                      <Divider />
+                      <Box paddingBlockStart="400">
+                        {child.type === "layout_section" ? (
+                          <LayoutSectionEditor container={child} onChange={(updated) => updateChildAt(i, updated)} deviceTab={deviceTab} editLang={editLang} depth={depth + 1} />
+                        ) : (
+                          <ContainerEditor container={child} onChange={(updated) => updateChildAt(i, updated)} deviceTab={deviceTab} editLang={editLang} />
+                        )}
+                        <Box paddingBlockStart="400">
+                          <InlineStack align="end">
+                            <Button size="slim" tone="critical" onClick={() => removeChildAt(i)}>{c.remove}</Button>
+                          </InlineStack>
+                        </Box>
+                      </Box>
+                    </>
+                  )}
+                </BlockStack>
+              </Card>
+            );
+          })}
+          <Divider />
+          {canAddMore ? (
+            <InlineStack gap="200" blockAlign="end" wrap={false}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <Select
+                  label={c.addBlockLabel}
+                  options={[{ label: c.selectPlaceholder, value: "" }, ...addableTypes]}
+                  value={addType}
+                  onChange={setAddType}
+                />
+              </div>
+              <Button onClick={addChild} disabled={!addType}>{c.addBlockAction}</Button>
+            </InlineStack>
+          ) : (
+            <Banner tone="info">{c.maxDepthReached}</Banner>
+          )}
+        </BlockStack>
+      </Card>
+    </BlockStack>
+  );
+}
+
 function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   let editor = null;
   switch (container.type) {
@@ -3383,6 +3699,7 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "support_case_wizard":       editor = <SupportCaseWizardEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "support_topic_grid":        editor = <SupportTopicGridEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "support_faq":               editor = <SupportFaqEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "layout_section":       editor = <LayoutSectionEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     default: return null;
   }
   return (
@@ -3650,6 +3967,134 @@ function PopupEditor({ settings, onChange }) {
   );
 }
 
+// Shared with apps/shop/src/app/[locale]/cms-preview/page.jsx — keep both sides of this literal
+// in sync if it ever changes.
+const CMS_PREVIEW_MESSAGE_SOURCE = "andertal-cms-preview";
+// REAL device pixel widths — must match the shop's own responsive breakpoints (useIsNarrow(1023),
+// useIsTablet() = 600–1199px in apps/shop/src/hooks/useIsNarrow.js) so the iframe's OWN
+// window.matchMedia queries resolve exactly like a visitor's browser at that device size, not the
+// (much narrower) pixel width this editor column happens to have. The iframe is rendered at this
+// full intrinsic width, then visually scaled down to fit the column — see the scale-to-fit wrapper
+// below. Getting this wrong silently mis-selects which desktop/tablet/mobile containers render.
+const PREVIEW_DEVICE_WIDTH = { 0: 1280, 1: 900, 2: 390 };
+const PREVIEW_VISIBLE_HEIGHT = 640;
+
+/**
+ * Middle panel of the vitrin editor shell (docs/TASKS.md §4.1): an iframe onto the shop's own
+ * /:locale/cms-preview route, fed the current draft `containers`/`settings` via postMessage. This
+ * is the REAL LandingContainers renderer, not a mock — see next.config.js for the narrow
+ * frame-ancestors exception that makes embedding it possible at all.
+ */
+function LandingLivePreview({ containers, settings, deviceTab = 0, locale = "de" }) {
+  const c = useLandingCopy();
+  const iframeRef = useRef(null);
+  const wrapRef = useRef(null);
+  const revRef = useRef(0);
+  const readyRef = useRef(false);
+  const [wrapWidth, setWrapWidth] = useState(0);
+  const shopUrl = (process.env.NEXT_PUBLIC_SHOP_URL || "").replace(/\/$/, "");
+  const shopOrigin = useMemo(() => {
+    try { return shopUrl ? new URL(shopUrl).origin : ""; } catch { return ""; }
+  }, [shopUrl]);
+  const previewSrc = shopUrl ? `${shopUrl}/${locale || "de"}/cms-preview` : "";
+
+  const post = useCallback(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win || !shopOrigin) return;
+    revRef.current += 1;
+    win.postMessage(
+      { source: CMS_PREVIEW_MESSAGE_SOURCE, kind: "state", containers, settings, rev: revRef.current },
+      shopOrigin,
+    );
+  }, [containers, settings, shopOrigin]);
+
+  useEffect(() => {
+    function onMessage(event) {
+      if (!shopOrigin || event.origin !== shopOrigin) return;
+      const msg = event.data;
+      if (!msg || msg.source !== CMS_PREVIEW_MESSAGE_SOURCE || msg.kind !== "ready") return;
+      readyRef.current = true;
+      post();
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [shopOrigin, post]);
+
+  // Debounced re-send whenever the draft changes, once the iframe has confirmed it's ready.
+  useEffect(() => {
+    if (!readyRef.current) return;
+    const id = setTimeout(post, 350);
+    return () => clearTimeout(id);
+  }, [post]);
+
+  // Measure the available column width so the device frame below can be scaled to fit it — the
+  // iframe itself always renders at the REAL device width (see PREVIEW_DEVICE_WIDTH), so this
+  // scale is purely a visual fit, never a layout-affecting resize of the iframe's own viewport.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width;
+      if (w) setWrapWidth(w);
+    });
+    ro.observe(el);
+    setWrapWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  if (!shopUrl) {
+    return (
+      <Box padding="600">
+        <Text as="p" tone="subdued" alignment="center">{c.previewUnavailable}</Text>
+      </Box>
+    );
+  }
+
+  const deviceWidth = PREVIEW_DEVICE_WIDTH[deviceTab] || PREVIEW_DEVICE_WIDTH[0];
+  // Clamped to a 0.15 floor: without it, a transient near-zero column width (mid-layout-shift,
+  // e.g. the instant the inspector column mounts/unmounts) would divide PREVIEW_VISIBLE_HEIGHT by
+  // a near-zero scale below and hand the iframe a runaway multi-thousand-px height.
+  const scale = wrapWidth > 20 ? Math.min(1, Math.max(0.15, wrapWidth / deviceWidth)) : 1;
+  const frameHeight = PREVIEW_VISIBLE_HEIGHT / scale;
+
+  return (
+    <div ref={wrapRef} style={{ background: "#f1f2f4", padding: 12, borderRadius: "var(--p-border-radius-300, 12px)" }}>
+      <div
+        style={{
+          width: "100%",
+          height: PREVIEW_VISIBLE_HEIGHT,
+          overflow: "hidden",
+          borderRadius: 8,
+          boxShadow: "0 0 0 1px var(--p-color-border, #e1e3e5)",
+          background: "#fff",
+          position: "relative",
+        }}
+      >
+        {/* Renders at the real device pixel width (so the shop's own responsive breakpoints
+            resolve correctly inside the iframe), then scaled down visually to fit the column —
+            same technique theme editors (e.g. Shopify) use for an accurate device preview. */}
+        <div
+          style={{
+            width: deviceWidth,
+            height: frameHeight,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+            transition: "width 0.2s ease, height 0.2s ease",
+          }}
+        >
+          <iframe
+            ref={iframeRef}
+            src={previewSrc}
+            title={c.livePreviewTitle}
+            style={{ width: deviceWidth, height: frameHeight, border: 0, display: "block" }}
+            onLoad={() => { readyRef.current = false; }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPageEditor() {
   const uiLocale = useLocale();
   const copy = useMemo(() => getLandingEditorCopy(uiLocale), [uiLocale]);
@@ -3736,6 +4181,8 @@ export default function LandingPageEditor() {
   const [err, setErr] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [dragTreeId, setDragTreeId] = useState(null);
+  const [dragOverTreeId, setDragOverTreeId] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   /** Seiten → Container: 0 = Desktop, 1 = Tablet (600–1199px), 2 = Mobil (≤599px) */
   const [seitenDeviceTab, setSeitenDeviceTab] = useState(0);
@@ -3970,27 +4417,61 @@ export default function LandingPageEditor() {
     setIsDirty(true);
   };
 
-  const updateContainer = (id, updated) => { setContainers((prev) => prev.map((c) => c.id === id ? updated : c)); setIsDirty(true); };
-  const removeContainer = (id) => { setContainers((prev) => prev.filter((c) => c.id !== id)); if (expandedId === id) setExpandedId(null); setIsDirty(true); };
-
   /** Reihenfolge nur innerhalb des aktuellen Desktop- bzw. Mobil-Reiters. */
-  const moveContainerInSeitenTab = (id, dir) => {
+  // Tree-wide operations (root OR any nested layout_section child) — used by the vitrin editor's
+  // tree/inspector panels below. The tree shows the WHOLE page (every device's root containers
+  // together, not just the current tab's), so reordering must walk the full sibling list too —
+  // moveSiblingInGroup already recurses to whichever level `id` lives at (root or nested), so one
+  // generic call covers both; `dir` can be any signed delta, not just ±1 (used by drag-and-drop
+  // below to jump straight to the drop target's position in one step).
+  const treeUpdateById = (id, updater) => { setContainers((prev) => mapContainerById(prev, id, updater)); setIsDirty(true); };
+  const treeRemoveById = (id) => {
+    setContainers((prev) => removeContainerById(prev, id));
+    setExpandedId((cur) => (cur === id ? null : cur));
+    setIsDirty(true);
+  };
+  const treeMove = (id, dir) => {
+    setContainers((prev) => moveSiblingInGroup(prev, id, dir, () => true));
+    setIsDirty(true);
+  };
+  /** Drag-and-drop reorder: move `draggedId` to sit just before/after `targetId`, both must be
+   *  siblings under the same parent (or both root) — cross-parent drag is not supported here. */
+  const treeMoveToPosition = (draggedId, targetId, after) => {
+    if (!draggedId || !targetId || draggedId === targetId) return;
     setContainers((prev) => {
-      const inTab = prev.filter((c) => matchContainerSeitenTab(c, seitenDeviceTab));
-      const pos = inTab.findIndex((c) => c.id === id);
-      if (pos < 0) return prev;
-      const newPos = pos + dir;
-      if (newPos < 0 || newPos >= inTab.length) return prev;
-      const idA = id;
-      const idB = inTab[newPos].id;
-      const iA = prev.findIndex((c) => c.id === idA);
-      const iB = prev.findIndex((c) => c.id === idB);
-      if (iA < 0 || iB < 0) return prev;
-      const n = [...prev];
-      [n[iA], n[iB]] = [n[iB], n[iA]];
-      return n;
+      const siblingsOf = (list, id) => {
+        if (!Array.isArray(list)) return null;
+        if (list.some((c) => c.id === id)) return list;
+        for (const node of list) {
+          const found = siblingsOf(node.children, id);
+          if (found) return found;
+        }
+        return null;
+      };
+      const group = siblingsOf(prev, draggedId);
+      const targetGroup = siblingsOf(prev, targetId);
+      if (!group || group !== targetGroup) return prev; // different parents — not supported
+      const from = group.findIndex((c) => c.id === draggedId);
+      const targetIdx = group.findIndex((c) => c.id === targetId);
+      if (from < 0 || targetIdx < 0) return prev;
+      const to = after ? targetIdx + (targetIdx > from ? 0 : 1) : targetIdx + (targetIdx > from ? -1 : 0);
+      if (to === from) return prev;
+      return moveSiblingInGroup(prev, draggedId, to - from, () => true);
     });
     setIsDirty(true);
+  };
+  /** Flat, indented rows for the tree panel: root containers (already device-filtered) + every
+   *  nested layout_section child underneath, depth-first. */
+  const flattenLandingTree = (roots) => {
+    const rows = [];
+    const walk = (list, depth) => {
+      list.forEach((node, i) => {
+        rows.push({ node, depth, index: i, siblingCount: list.length });
+        if (Array.isArray(node.children) && node.children.length) walk(node.children, depth + 1);
+      });
+    };
+    walk(roots, 0);
+    return rows;
   };
 
   const typeInfo = (type) => containerTypes.find((t) => t.type === type) || { label: type };
@@ -4262,61 +4743,155 @@ export default function LandingPageEditor() {
                             </Banner>
                           )}
 
-                          {filteredSeitenContainers.map((c, idx) => {
-                            const info = typeInfo(c.type);
-                            const isExpanded = expandedId === c.id;
-                            const vis = c.visible_on || "desktop";
-                            const isLegacyBoth = vis === "both";
-                            const last = idx === filteredSeitenContainers.length - 1;
-                            const gLabel = groupLabel(info.group || "content", uiLocale);
-                            return (
-                              <Card key={c.id}>
-                                <BlockStack gap="0">
-                                  <Box paddingBlockEnd={isExpanded ? "400" : "0"}>
-                                    <InlineStack align="space-between" blockAlign="center" gap="300">
-                                      <InlineStack gap="300" blockAlign="center" wrap={false}>
-                                        <ContainerTypePreview type={c.type} label={info.label} />
-                                        <BlockStack gap="100">
-                                          <InlineStack gap="200" blockAlign="center" wrap>
-                                            <Text as="h3" variant="headingSm">{info.label}</Text>
-                                            <Badge>{gLabel}</Badge>
-                                            <Badge tone={c.visible ? "success" : undefined}>{c.visible ? copy.visible : copy.hidden}</Badge>
-                                            {isLegacyBoth && <Badge tone="info">{copy.legacyBoth}</Badge>}
-                                            <Text as="span" variant="bodySm" tone="subdued">#{idx + 1}</Text>
-                                          </InlineStack>
-                                        </BlockStack>
-                                      </InlineStack>
-                                      <InlineStack gap="200" blockAlign="center">
-                                        <Button size="slim" onClick={() => { updateContainer(c.id, { ...c, visible: !c.visible }); }}>{c.visible ? copy.hide : copy.show}</Button>
-                                        <Button size="slim" disabled={idx === 0} onClick={() => moveContainerInSeitenTab(c.id, -1)}>↑</Button>
-                                        <Button size="slim" disabled={last} onClick={() => moveContainerInSeitenTab(c.id, 1)}>↓</Button>
-                                        <Button size="slim" variant={isExpanded ? "primary" : "secondary"} onClick={() => setExpandedId(isExpanded ? null : c.id)}>
-                                          {isExpanded ? copy.collapse : copy.edit}
-                                        </Button>
-                                      </InlineStack>
-                                    </InlineStack>
-                                  </Box>
-                                  {isExpanded && (
-                                    <>
-                                      <Divider />
-                                      <Box paddingBlockStart="400">
-                                        <ContainerEditor container={c} onChange={(updated) => updateContainer(c.id, updated)} deviceTab={seitenDeviceTab} editLang={contentEditLang} />
-                                        <Box paddingBlockStart="400">
-                                          <InlineStack align="end">
-                                            <Button size="slim" tone="critical" onClick={async () => { if (await confirmDelete(copy.removeContainerConfirm)) removeContainer(c.id); }}>
-                                              {copy.remove}
-                                            </Button>
-                                          </InlineStack>
-                                        </Box>
-                                      </Box>
-                                    </>
-                                  )}
-                                </BlockStack>
-                              </Card>
+                          {containers.length > 0 && (() => {
+                            // The tree always shows the WHOLE page (every device's containers) —
+                            // filtering it down to only the current device tab hid most of the
+                            // page from the skeleton view, which is confusing (a Shopify-style
+                            // page tree shows everything; it's the live preview below, not the
+                            // tree, whose per-device rendering already reflects visible_on).
+                            const treeRows = flattenLandingTree(containers);
+                            const selectedNode = expandedId ? findContainerById(containers, expandedId) : null;
+                            const selectedInfo = selectedNode ? typeInfo(selectedNode.type) : null;
+                            const deviceBadgeLabel = (v) => (
+                              v === "mobile" ? copy.mobile : v === "tablet" ? copy.tablet : v === "desktop" ? copy.desktop : null
                             );
-                          })}
+                            return (
+                              <div style={{ display: "flex", gap: 16, alignItems: "flex-start", width: "100%", flexWrap: "wrap" }}>
+                                {/* ── Left: tree ── */}
+                                <div style={{ flex: "1 1 280px", minWidth: 260, maxWidth: 340 }}>
+                                  <Card>
+                                    <BlockStack gap="300">
+                                      <InlineStack align="space-between" blockAlign="center">
+                                        <Text as="h3" variant="headingSm">{copy.tabContainers}</Text>
+                                        <Button size="slim" onClick={() => setAddModalOpen(true)}>{copy.addContainerShort}</Button>
+                                      </InlineStack>
+                                      {!selectedNode && (
+                                        <Text as="p" variant="bodySm" tone="subdued">{copy.selectBlockHint}</Text>
+                                      )}
+                                      <Divider />
+                                      <BlockStack gap="100">
+                                        {treeRows.map(({ node, depth, index, siblingCount }) => {
+                                          const info = typeInfo(node.type);
+                                          const isSelected = expandedId === node.id;
+                                          const deviceLabel = depth === 0 ? deviceBadgeLabel(node.visible_on) : null;
+                                          const isDragging = dragTreeId === node.id;
+                                          const isDragOver = dragOverTreeId === node.id && dragTreeId && dragTreeId !== node.id;
+                                          return (
+                                            <div
+                                              key={node.id}
+                                              onClick={() => setExpandedId(node.id)}
+                                              draggable
+                                              onDragStart={(e) => {
+                                                e.stopPropagation();
+                                                setDragTreeId(node.id);
+                                                e.dataTransfer.effectAllowed = "move";
+                                              }}
+                                              onDragOver={(e) => {
+                                                if (!dragTreeId || dragTreeId === node.id) return;
+                                                e.preventDefault();
+                                                e.dataTransfer.dropEffect = "move";
+                                                setDragOverTreeId(node.id);
+                                              }}
+                                              onDragLeave={() => setDragOverTreeId((cur) => (cur === node.id ? null : cur))}
+                                              onDrop={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                if (dragTreeId && dragTreeId !== node.id) treeMoveToPosition(dragTreeId, node.id, false);
+                                                setDragTreeId(null);
+                                                setDragOverTreeId(null);
+                                              }}
+                                              onDragEnd={() => { setDragTreeId(null); setDragOverTreeId(null); }}
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                                padding: "6px 8px",
+                                                paddingLeft: 8 + depth * 18,
+                                                borderRadius: 8,
+                                                cursor: "grab",
+                                                opacity: isDragging ? 0.4 : 1,
+                                                background: isSelected ? "var(--p-color-bg-surface-selected, #f1f5ff)" : "transparent",
+                                                border: isSelected ? "1px solid var(--p-color-border-emphasis, #2c6ecb)" : "1px solid transparent",
+                                                borderTop: isDragOver ? "2px solid var(--p-color-border-emphasis, #2c6ecb)" : undefined,
+                                              }}
+                                            >
+                                              <Text as="span" tone="subdued">⠿</Text>
+                                              <div style={{ transform: "scale(0.6)", transformOrigin: "left center", flexShrink: 0, width: 68 }}>
+                                                <ContainerTypePreview type={node.type} label={info.label} />
+                                              </div>
+                                              <div style={{ flex: 1, minWidth: 0 }}>
+                                                <InlineStack gap="100" blockAlign="center" wrap={false}>
+                                                  <Text as="span" variant="bodySm" fontWeight={isSelected ? "semibold" : "regular"} truncate>{info.label}</Text>
+                                                  {deviceLabel && <Badge>{deviceLabel}</Badge>}
+                                                </InlineStack>
+                                                {!node.visible && <Text as="span" variant="bodySm" tone="subdued"> · {copy.hidden}</Text>}
+                                              </div>
+                                              <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                                                <Button size="micro" onClick={() => treeUpdateById(node.id, (n) => ({ ...n, visible: !n.visible }))}>
+                                                  {node.visible ? copy.hide : copy.show}
+                                                </Button>
+                                                <Button size="micro" disabled={index === 0} onClick={() => treeMove(node.id, -1)}>↑</Button>
+                                                <Button size="micro" disabled={index === siblingCount - 1} onClick={() => treeMove(node.id, 1)}>↓</Button>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </BlockStack>
+                                    </BlockStack>
+                                  </Card>
+                                </div>
 
-                          {!loading && containers.length > 0 && (
+                                {/* ── Middle: live vitrin — grows to fill the space the inspector
+                                     gives up when nothing is selected. */}
+                                <div style={{ flex: selectedNode ? "3 1 420px" : "1 1 600px", minWidth: 320 }}>
+                                  <Card>
+                                    <BlockStack gap="200">
+                                      <Text as="h3" variant="headingSm">{copy.livePreviewTitle}</Text>
+                                      <LandingLivePreview
+                                        containers={containers}
+                                        settings={{}}
+                                        deviceTab={seitenDeviceTab}
+                                        locale={contentEditLang}
+                                      />
+                                    </BlockStack>
+                                  </Card>
+                                </div>
+
+                                {/* ── Right: inspector — only reserves column width once a block
+                                     is actually selected, so it doesn't squeeze the preview. */}
+                                {selectedNode && (
+                                  <div style={{ flex: "2 1 340px", minWidth: 300, position: "sticky", top: 16 }}>
+                                    <Card>
+                                      <BlockStack gap="300">
+                                        <InlineStack align="space-between" blockAlign="center">
+                                          <InlineStack gap="200" blockAlign="center">
+                                            <Text as="h3" variant="headingSm">{selectedInfo.label}</Text>
+                                            <Badge tone={selectedNode.visible ? "success" : undefined}>{selectedNode.visible ? copy.visible : copy.hidden}</Badge>
+                                          </InlineStack>
+                                          <Button
+                                            size="slim"
+                                            tone="critical"
+                                            onClick={async () => { if (await confirmDelete(copy.removeContainerConfirm)) treeRemoveById(selectedNode.id); }}
+                                          >
+                                            {copy.remove}
+                                          </Button>
+                                        </InlineStack>
+                                        <Divider />
+                                        <ContainerEditor
+                                          container={selectedNode}
+                                          onChange={(updated) => treeUpdateById(selectedNode.id, () => updated)}
+                                          deviceTab={seitenDeviceTab}
+                                          editLang={contentEditLang}
+                                        />
+                                      </BlockStack>
+                                    </Card>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {!loading && containers.length > 0 && filteredSeitenContainers.length === 0 && (
                             <InlineStack>
                               <Button onClick={() => setAddModalOpen(true)}>{copy.addContainerShort}</Button>
                             </InlineStack>
@@ -4618,6 +5193,12 @@ export default function LandingPageEditor() {
                     {group.items.map((t) => (
                       <div
                         key={t.type}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => addContainer(t.type)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); addContainer(t.type); } }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--p-color-border-emphasis, #2c6ecb)"; e.currentTarget.style.boxShadow = "0 0 0 1px var(--p-color-border-emphasis, #2c6ecb)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--p-color-border, #e1e3e5)"; e.currentTarget.style.boxShadow = "none"; }}
                         style={{
                           border: "1px solid var(--p-color-border, #e1e3e5)",
                           borderRadius: 10,
@@ -4626,7 +5207,9 @@ export default function LandingPageEditor() {
                           display: "flex",
                           flexDirection: "column",
                           gap: 10,
-                          minHeight: 148,
+                          minHeight: 116,
+                          cursor: "pointer",
+                          transition: "border-color 0.1s ease, box-shadow 0.1s ease",
                         }}
                       >
                         <InlineStack gap="300" blockAlign="start" wrap={false}>
@@ -4638,11 +5221,6 @@ export default function LandingPageEditor() {
                             </BlockStack>
                           </div>
                         </InlineStack>
-                        <div style={{ marginTop: "auto" }}>
-                          <Button variant="primary" size="slim" fullWidth onClick={() => addContainer(t.type)}>
-                            {copy.choose}
-                          </Button>
-                        </div>
                       </div>
                     ))}
                   </div>
