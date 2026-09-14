@@ -2299,6 +2299,10 @@ async function start() {
     const createIdealoFeedRouter = require('./src/routes/idealo-feed')
     httpApp.use('/', createIdealoFeedRouter())
 
+    // --- "Notify me when back in stock" (TASKS.md #5): src/routes/back-in-stock.js ---
+    const createBackInStockRouter = require('./src/routes/back-in-stock')
+    httpApp.use('/', createBackInStockRouter())
+
     // Shared Postgres client factory — still used by many not-yet-extracted
     // admin-hub sections below (orders, pages, campaigns, etc.).
     const getDbClient = () => {
@@ -3020,6 +3024,15 @@ async function start() {
       runAbandonedCartScan().catch(() => {})
       setInterval(() => runAbandonedCartScan().catch(() => {}), 15 * 60 * 1000)
     }, 50 * 1000) // 50s delay after startup
+
+    // "Notify me when back in stock" (TASKS.md #5): checked every 15 minutes, same cadence as
+    // the wishlist low-stock watcher above — email pending subscribers once the product they
+    // asked about actually has inventory again.
+    setTimeout(() => {
+      const { runBackInStockWatcher } = require('./src/routes/back-in-stock')
+      runBackInStockWatcher().catch(() => {})
+      setInterval(() => runBackInStockWatcher().catch(() => {}), 15 * 60 * 1000)
+    }, 55 * 1000) // 55s delay after startup
 
     // docs/affiliate.md PR 4 — promotes affiliate_commissions past their 30-day hold to
     // 'confirmed'. Doc calls for a daily cron; every 6h is just a more prompt version of the same

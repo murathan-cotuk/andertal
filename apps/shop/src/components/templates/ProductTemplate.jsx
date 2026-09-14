@@ -1884,6 +1884,8 @@ export default function ProductTemplate() {
                 shippingUnavailable={shippingUnavailable}
                 isComingSoon={isComingSoon}
                 inStock={inStock}
+                productId={product?.id}
+                variantId={variant?.id}
               />
 
               <InfoList>

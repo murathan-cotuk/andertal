@@ -633,6 +633,13 @@ class MedusaAdminClient {
     return { sellers: data.sellers || [] }
   }
 
+  /** Superuser: "notify me when back in stock" subscribers — raw list (Tab 1) + per-product
+   * waiting counts (Tab 2), see TASKS.md #5. */
+  async getBackInStockSubscribers() {
+    const data = await this.request('/admin-hub/v1/back-in-stock-subscribers').catch(() => ({ subscribers: [], product_counts: [] }))
+    return { subscribers: data.subscribers || [], product_counts: data.product_counts || [] }
+  }
+
   /** Superuser: list brands pending authorization review (own_registered / authorized_reseller), with their documents */
   async getPendingBrandAuthorizations() {
     const data = await this.request('/admin-hub/brands/pending-authorizations').catch(() => ({ brands: [] }))

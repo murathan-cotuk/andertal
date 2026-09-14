@@ -1849,6 +1849,8 @@ export default function ProductTemplateMobile() {
             inStock={inStock}
             publishDate={publishDate}
             stackOnly
+            productId={product.id}
+            variantId={variant?.id}
           />
         </MobileSection>
 
@@ -2058,6 +2060,8 @@ export default function ProductTemplateMobile() {
                 inStock={inStock}
                 publishDate={publishDate}
                 stackOnly
+                productId={product.id}
+                variantId={variant?.id}
               />
 
               <InfoList>
