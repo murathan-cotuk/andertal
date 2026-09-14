@@ -559,6 +559,7 @@ function TextBlock({ container, locale = "de" }) {
         {btnText && container.btn_url && (
           <a
             href={container.btn_url}
+            className="landing-cta-btn"
             style={{
               display: "inline-block", padding: container.btn_padding || "12px 28px",
               background: container.btn_bg || "#ff971c",
@@ -572,6 +573,7 @@ function TextBlock({ container, locale = "de" }) {
           </a>
         )}
       </div>
+      <style>{`.landing-cta-btn{transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;}.landing-cta-btn:hover{transform:translateY(-1px);filter:brightness(0.96);}.landing-cta-btn:active{transform:translateY(0);filter:brightness(0.92);}`}</style>
     </div>
   );
 }
@@ -1037,21 +1039,34 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 }
 
 // ── Image Grid ────────────────────────────────────────────────────────────────
+// Visual language matched to ContentMosaic (the reference block, TASKS.md 4.6): a framed
+// "container within container" card around every image (not a bare edge-to-edge photo), a
+// smart mobile column count instead of squeezing a 4-up desktop grid onto a phone, and a
+// subtle hover lift on linked cells. All new knobs (cols_mobile, gap_mobile, bg_color) are
+// optional with the old behavior as the default, so existing pages render unchanged.
 function ImageGrid({ container, locale = "de" }) {
-  const cols = container.cols || 2;
-  const gap = container.gap || 16;
+  const isNarrow = useIsNarrow(1023);
+  const colsDesktop = Math.max(1, Math.min(6, Number(container.cols) || 2));
+  const colsMobile = Math.max(1, Math.min(4, container.cols_mobile != null ? Number(container.cols_mobile) || 1 : Math.min(colsDesktop, 2)));
+  const cols = isNarrow ? colsMobile : colsDesktop;
+  const gapDesktop = Number(container.gap) || 16;
+  const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
+  const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : gapDesktop;
+  const bg = container.bg_color || "#fff";
   const images = (container.images || []).filter((i) => localizedAsset(i, "url", locale));
   if (!images.length) return null;
   return (
-    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-      <div style={{ ...getContentInnerStyle(container, 1100), display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap }}>
+    <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
+      <div style={{ ...getContentInnerStyle(container, 1100), display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap }}>
         {images.map((img, i) => {
           const ratio = img.aspect_ratio || "1/1";
           const imgTitle = lt(img, "title", locale);
           const imgText = lt(img, "text", locale);
           const imgEl = (
-            <div style={{ position: "relative", width: "100%", aspectRatio: ratio, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb" }}>
-              <Image src={resolveUrl(lt(img, "url", locale))} alt={imgTitle || ""} fill sizes={`(max-width: 768px) 100vw, ${Math.round(100 / cols)}vw`} style={{ objectFit: "cover" }} />
+            <div style={{ background: "#f8f9fb", border: "1px solid #e5e7eb", borderRadius: 16, padding: 10, boxSizing: "border-box" }}>
+              <div style={{ position: "relative", width: "100%", aspectRatio: ratio, borderRadius: 10, overflow: "hidden" }}>
+                <Image src={resolveUrl(lt(img, "url", locale))} alt={imgTitle || ""} fill sizes={`(max-width: 768px) 100vw, ${Math.round(100 / cols)}vw`} style={{ objectFit: "cover" }} />
+              </div>
             </div>
           );
           const hasTitle = !!(imgTitle && String(imgTitle).trim());
@@ -1064,10 +1079,11 @@ function ImageGrid({ container, locale = "de" }) {
           ) : null;
           const inner = <>{imgEl}{caption}</>;
           return img.link
-            ? <a key={i} href={img.link} style={{ display: "block", textDecoration: "none" }}>{inner}</a>
-            : <div key={i}>{inner}</div>;
+            ? <a key={i} href={img.link} className="landing-image-grid-item" style={{ display: "block", textDecoration: "none", minWidth: 0 }}>{inner}</a>
+            : <div key={i} style={{ minWidth: 0 }}>{inner}</div>;
         })}
       </div>
+      <style>{`.landing-image-grid-item{transition:transform .18s ease,box-shadow .18s ease;}.landing-image-grid-item:hover{transform:translateY(-2px);box-shadow:0 8px 20px -8px rgba(15,23,42,0.18);}`}</style>
     </div>
   );
 }
@@ -1108,6 +1124,7 @@ function BannerCta({ container, locale = "de" }) {
         {lt(container, "btn_text", locale) && container.btn_url && (
           <a
             href={container.btn_url}
+            className="landing-cta-btn"
             style={{
               display: "inline-block",
               maxWidth: "100%",
@@ -1129,6 +1146,7 @@ function BannerCta({ container, locale = "de" }) {
           </a>
         )}
       </div>
+      <style>{`.landing-cta-btn{transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;}.landing-cta-btn:hover{transform:translateY(-1px);filter:brightness(0.96);}.landing-cta-btn:active{transform:translateY(0);filter:brightness(0.92);}`}</style>
     </div>
   );
 }

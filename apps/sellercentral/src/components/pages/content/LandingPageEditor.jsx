@@ -965,8 +965,9 @@ function ImageTextEditor({ container, onChange, editLang = "de" }) {
 }
 
 // ── Image Grid editor ───────────────────────────────────────────────────────
-function ImageGridEditor({ container, onChange, editLang = "de" }) {
+function ImageGridEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   const c = useLandingCopy();
+  const isMobileView = deviceTab >= 1;
   const [pickerIdx, setPickerIdx] = useState(null);
   const updateImg = (idx, key, val) => {
     const images = [...(container.images || [])];
@@ -995,12 +996,33 @@ function ImageGridEditor({ container, onChange, editLang = "de" }) {
       )}
       <InlineStack gap="400">
         <div style={{ flex: 1 }}>
-          <Select label={c.columns} options={c.colsOptions()} value={String(container.cols || 2)} onChange={(v) => onChange({ ...container, cols: Number(v) })} />
+          {isMobileView ? (
+            <Select
+              label={c.columns}
+              options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
+              value={String(container.cols_mobile || Math.min(Number(container.cols) || 2, 2))}
+              onChange={(v) => onChange({ ...container, cols_mobile: Number(v) })}
+            />
+          ) : (
+            <Select label={c.columns} options={c.colsOptions()} value={String(container.cols || 2)} onChange={(v) => onChange({ ...container, cols: Number(v) })} />
+          )}
         </div>
         <div style={{ flex: 1 }}>
-          <TextField label={c.gapPx} type="number" value={String(container.gap || 16)} onChange={(v) => onChange({ ...container, gap: Number(v) || 16 })} autoComplete="off" />
+          <TextField
+            label={c.gapPx}
+            type="number"
+            value={String(isMobileView ? (container.gap_mobile ?? "") : (container.gap ?? 16))}
+            onChange={(v) => {
+              const t = (v || "").trim();
+              if (isMobileView) onChange({ ...container, gap_mobile: t === "" ? undefined : Number(v) || 0 });
+              else onChange({ ...container, gap: Number(v) || 16 });
+            }}
+            autoComplete="off"
+            helpText={isMobileView ? c.optional : undefined}
+          />
         </div>
       </InlineStack>
+      <ColorField label={`${c.backgroundColor} ${c.optional}`} value={container.bg_color || ""} onChange={(v) => onChange({ ...container, bg_color: v })} />
 
       {(container.images || []).map((img, idx) => (
         <Card key={idx}>
@@ -3676,7 +3698,7 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "hero_banner":          editor = <HeroBannerEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "text_block":           editor = <TextBlockEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "image_text":           editor = <ImageTextEditor container={container} onChange={onChange} editLang={editLang} />; break;
-    case "image_grid":           editor = <ImageGridEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "image_grid":           editor = <ImageGridEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "content_mosaic":       editor = <ContentMosaicEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "image_carousel":       editor = <ImageCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "banner_cta":           editor = <BannerCtaEditor container={container} onChange={onChange} editLang={editLang} />; break;
