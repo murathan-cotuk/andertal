@@ -119,12 +119,14 @@ const SQL_STEPS = [
         inventory integer DEFAULT 0,
         metadata jsonb,
         variants jsonb,
+        an_id varchar(16),
         created_at timestamp DEFAULT now(),
         updated_at timestamp DEFAULT now()
       );
       CREATE INDEX IF NOT EXISTS idx_admin_hub_products_handle ON admin_hub_products(handle);
       CREATE INDEX IF NOT EXISTS idx_admin_hub_products_seller ON admin_hub_products(seller_id);
       CREATE INDEX IF NOT EXISTS idx_admin_hub_products_status ON admin_hub_products(status);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_products_an_id ON admin_hub_products(an_id) WHERE an_id IS NOT NULL;
     `,
   },
 ]

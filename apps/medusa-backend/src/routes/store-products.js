@@ -2,6 +2,7 @@
 const { Router } = require('express')
 const { resolveAdminHub, mapAdminHubCategoryPgRow, buildAdminHubCategoryTreeFromFlat, getCategoriesPgClient } = require('../categories-helpers')
 const { getAdminHubProductByIdOrHandleDb, listAdminHubProductsDb, getProductsDbClient } = require('./admin-products')
+const { normalizeAnId } = require('../an-id')
 const { getSellerStoreName, getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct, storePublishedStatusSql } = require('./seller-settings')
 const { isEuOriginVerified } = require('../eu-origin')
 const { createTieredCache } = require('../tiered-cache')
@@ -1066,11 +1067,38 @@ const storeProductByIdFromAdminHubGET = async (req, res) => {
   }
 }
 
+/**
+ * Resolve a stable AN-ID (Sellercentral "Products" page, affiliate links) to the
+ * product's id/handle so the caller (shop redirect route) can build the canonical
+ * SEO URL. Minimal response — no pricing/media — this exists purely for redirects.
+ */
+const storeProductByAnIdGET = async (req, res) => {
+  const anId = normalizeAnId(req.params.an_id)
+  if (!anId) return res.status(400).json({ message: 'Invalid AN-ID' })
+  const client = getProductsDbClient()
+  if (!client) return res.status(503).json({ message: 'Database unavailable' })
+  try {
+    await client.connect()
+    const r = await client.query('SELECT id FROM admin_hub_products WHERE an_id = $1', [anId])
+    await client.end()
+    const row = r.rows && r.rows[0]
+    if (!row) return res.status(404).json({ message: 'Unknown AN-ID' })
+    const product = await getAdminHubProductByIdOrHandleDb(row.id)
+    if (!product) return res.status(404).json({ message: 'Product not found' })
+    res.json({ id: product.id, handle: product.handle, an_id: product.an_id, metadata: product.metadata || {} })
+  } catch (err) {
+    try { await client.end() } catch (_) {}
+    console.error('Store product by AN-ID GET error:', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 module.exports = function createStoreProductsRouter() {
   const router = Router()
 
+  router.get('/store/products/by-an-id/:an_id', storeProductByAnIdGET)
   router.get('/store/products', storeProductsFromAdminHubGET)
   router.get('/store/products/:idOrHandle', storeProductByIdFromAdminHubGET)
 

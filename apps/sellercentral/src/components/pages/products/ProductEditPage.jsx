@@ -26,7 +26,7 @@ import {
   Tag,
   Tabs,
 } from "@shopify/polaris";
-import { ProductIcon, MenuHorizontalIcon, ViewIcon, EditIcon } from "@shopify/polaris-icons";
+import { ProductIcon, MenuHorizontalIcon, ViewIcon, EditIcon, DuplicateIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { getUI } from "@/lib/ui-strings";
@@ -2980,6 +2980,28 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     }
                   />
                 </Box>
+                {!isNew && (
+                  <Box minWidth="200px" flex="1">
+                    <TextField
+                      label={
+                        <InlineStack gap="100" blockAlign="center" wrap={false}>
+                          <span>AN-ID</span>
+                          <InfoIconTooltip text={lt(locale, "Permanent platform ID for this product — stable even if the title, handle or EAN change. Shared by every seller listing this same product.", "Bu ürün için kalıcı platform kimliği — başlık, URL veya EAN değişse de sabit kalır. Bu ürünü listeleyen tüm satıcılar tarafından paylaşılır.", "Identifiant de plateforme permanent pour ce produit — stable même si le titre, l'URL ou l'EAN changent. Partagé par tous les vendeurs de ce même produit.", "ID de plataforma permanente para este producto — estable aunque cambien el título, la URL o el EAN. Compartido por todos los vendedores que listan este producto.", "ID piattaforma permanente per questo prodotto — stabile anche se titolo, URL o EAN cambiano. Condiviso da tutti i venditori che elencano questo prodotto.", "Dauerhafte Plattform-ID für dieses Produkt — bleibt stabil, auch wenn sich Titel, URL oder EAN ändern. Wird von allen Verkäufern dieses Produkts geteilt.")} />
+                        </InlineStack>
+                      }
+                      value={product.an_id || lt(locale, "assigned on save", "kayıtta atanır", "attribué à l'enregistrement", "asignado al guardar", "assegnato al salvataggio", "wird beim Speichern vergeben")}
+                      disabled
+                      autoComplete="off"
+                      connectedRight={product.an_id ? (
+                        <Button
+                          icon={DuplicateIcon}
+                          accessibilityLabel={lt(locale, "Copy AN-ID", "AN-ID'yi kopyala", "Copier l'AN-ID", "Copiar AN-ID", "Copia AN-ID", "AN-ID kopieren")}
+                          onClick={() => { try { navigator.clipboard?.writeText(product.an_id); } catch (_) { /* ignore */ } }}
+                        />
+                      ) : undefined}
+                    />
+                  </Box>
+                )}
               </InlineStack>
 
               {eanLookupState === "found" && (

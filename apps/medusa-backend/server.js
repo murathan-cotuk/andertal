@@ -2785,6 +2785,11 @@ async function start() {
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_product ON admin_hub_seller_listings(product_id)`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_seller  ON admin_hub_seller_listings(seller_id)`).catch(() => {})
 
+    // AN-ID — stable platform product identifier, one per canonical (master) product row.
+    // Shared by every seller listing (admin_hub_seller_listings) of the same EAN-deduped product.
+    await dbQ(`ALTER TABLE admin_hub_products ADD COLUMN IF NOT EXISTS an_id varchar(16)`).catch(() => {})
+    await dbQ(`CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_products_an_id ON admin_hub_products(an_id) WHERE an_id IS NOT NULL`).catch(() => {})
+
     // ── ERP Connector Platform (Faz 1: JTL SCX + Billbee) ──────────────────────
     await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_erp_connections (
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),

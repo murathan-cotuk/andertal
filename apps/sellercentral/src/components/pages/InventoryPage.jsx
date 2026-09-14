@@ -812,6 +812,9 @@ function InventoryProductRow({
               {i18n.sku}: {sku}
             </I18nLink>
             <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2 }}>{i18n.ean}: {ean}</div>
+            {product.an_id && (
+              <div style={{ fontSize: 10, color: "#9ca3af", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>AN-ID: {product.an_id}</div>
+            )}
           </div>
           <div style={{ fontSize: 13, color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{inv}</div>
           <div style={{ fontSize: 13, color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "8px 8px", borderRight: EXCEL_BORDER }}>?{formatDecimal(price)}</div>
@@ -1315,6 +1318,7 @@ export default function InventoryPage() {
       product?.title || "",
       product?.sku || "",
       meta?.ean || "",
+      product?.an_id || "",
       ...(Array.isArray(product?.variants)
         ? product.variants.map((v) =>
             [v?.sku || "", v?.ean || "", getVariantLabel(v, locale) || "", getVariantName(v, locale, "") || ""].join(" ")

@@ -188,7 +188,7 @@ module.exports = function createAffiliateApiRouter() {
     const q = String(req.query.q || '').trim()
     if (q.length < 2) return res.json({ products: [] })
     const r = await client.query(
-      `SELECT id, title, handle, status, seller_id, metadata
+      `SELECT id, title, handle, status, seller_id, metadata, an_id
          FROM admin_hub_products
         WHERE ${storePublishedStatusSql('status')} AND title ILIKE $1
         ORDER BY title ASC
@@ -199,7 +199,7 @@ module.exports = function createAffiliateApiRouter() {
     const visible = r.rows
       .filter((p) => isStorePublishedStatus(p.status) && isStoreVisibleSellerProduct(p, approvedSellerIds))
       .slice(0, 8)
-      .map((p) => ({ id: p.id, title: p.title, handle: p.handle }))
+      .map((p) => ({ id: p.id, title: p.title, handle: p.handle, an_id: p.an_id || null }))
     res.json({ products: visible })
   }))
 

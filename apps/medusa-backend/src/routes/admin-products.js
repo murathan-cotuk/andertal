@@ -8,6 +8,7 @@ const {
   resolveNonPlaceholderHandle,
   patchPlaceholderTranslationHandles,
 } = require('../product-url-handle')
+const { assignAnId } = require('../an-id')
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ const listAdminHubProductsDb = async (query = {}) => {
     // existing catalog product) has a `created_at` from the ORIGINAL owner, not from when
     // this seller added it. `seller_listing_created_at` exposes that seller's own listing
     // date so the frontend can sort "my most recently added" correctly for non-owners too.
-    let sql = 'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at' +
+    let sql = 'SELECT id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, an_id, created_at, updated_at' +
       (sellerId ? ', (SELECT MAX(_sl2.created_at) FROM admin_hub_seller_listings _sl2 WHERE _sl2.product_id = admin_hub_products.id AND TRIM(_sl2.seller_id) = $1) AS seller_listing_created_at' : '') +
       ' FROM admin_hub_products'
     const params = []
@@ -212,7 +213,7 @@ const listAdminHubProductsDb = async (query = {}) => {
         description: r.description, status: r.status, seller_id: r.seller_id, seller: r.seller_id,
         collection_id: r.collection_id, price: r.price_cents != null ? r.price_cents / 100 : 0,
         price_cents: r.price_cents, inventory: r.inventory != null ? r.inventory : 0,
-        thumbnail, metadata: r.metadata, variants: r.variants,
+        thumbnail, metadata: r.metadata, variants: r.variants, an_id: r.an_id || null,
         created_at: r.created_at, updated_at: r.updated_at,
         seller_listing_created_at: r.seller_listing_created_at || null,
       }
@@ -593,14 +594,18 @@ const createAdminHubProductDb = async (body) => {
       complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
       if (status.toLowerCase() === 'published') status = 'draft'
     }
+    // AN-ID: assigned once, here, for every new CANONICAL (master) product. A seller who
+    // later lists against the same EAN gets a row in admin_hub_seller_listings instead — this
+    // INSERT never runs for them, so the master's AN-ID stays the one shared reference.
+    const anId = await assignAnId(client)
     const res = await client.query(
-      `INSERT INTO admin_hub_products (title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       RETURNING id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at`,
+      `INSERT INTO admin_hub_products (title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, an_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, an_id, created_at, updated_at`,
       [
         title, handle, (body.sku || '').trim() || null, description,
         status, (body.seller || body.seller_id || '').trim() || null,
-        body.collection_id || null, price, inventory, metadata, variants,
+        body.collection_id || null, price, inventory, metadata, variants, anId,
       ]
     )
     await client.end()
@@ -612,7 +617,8 @@ const createAdminHubProductDb = async (body) => {
       description: r.description, status: r.status, seller_id: r.seller_id, seller: r.seller_id,
       collection_id: r.collection_id, price: r.price_cents != null ? r.price_cents / 100 : 0,
       price_cents: r.price_cents, inventory: r.inventory != null ? r.inventory : 0,
-      metadata: r.metadata, variants: r.variants, created_at: r.created_at, updated_at: r.updated_at,
+      metadata: r.metadata, variants: r.variants, an_id: r.an_id || null,
+      created_at: r.created_at, updated_at: r.updated_at,
       ...(autoTranslatedLocales.length ? { auto_translated_locales: autoTranslatedLocales } : {}),
       ...(complianceWarning ? { compliance_warning: complianceWarning, compliance_detail: complianceDetail, compliance_downgraded: true } : {}),
     }
@@ -630,7 +636,7 @@ const getAdminHubProductByIdOrHandleDb = async (idOrHandle) => {
     await client.connect()
     const val = String(idOrHandle || '').trim()
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
-    const hubCols = 'id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, created_at, updated_at'
+    const hubCols = 'id, title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, an_id, created_at, updated_at'
     let res
     if (isUuid) {
       res = await client.query(
@@ -670,15 +676,26 @@ const getAdminHubProductByIdOrHandleDb = async (idOrHandle) => {
         if (res.rows && res.rows[0]) break
       }
     }
+    let r = res.rows && res.rows[0]
+    if (!r) { await client.end(); return null }
+    // Lazy backfill: products created before AN-ID existed get one assigned the first time
+    // they're opened/saved, instead of a slow one-time batch migration over the whole catalog.
+    if (!r.an_id) {
+      try {
+        const anId = await assignAnId(client)
+        const upd = await client.query('UPDATE admin_hub_products SET an_id = $1 WHERE id = $2 RETURNING an_id', [anId, r.id])
+        if (upd.rows && upd.rows[0]) r = { ...r, an_id: upd.rows[0].an_id }
+      } catch (backfillErr) {
+        console.warn('AN-ID lazy backfill failed:', backfillErr && backfillErr.message)
+      }
+    }
     await client.end()
-    const r = res.rows && res.rows[0]
-    if (!r) return null
     return {
       id: r.id, title: r.title, handle: r.handle, slug: r.handle, sku: r.sku,
       description: r.description, status: r.status, seller_id: r.seller_id, seller: r.seller_id,
       collection_id: r.collection_id, price: r.price_cents != null ? r.price_cents / 100 : 0,
       inventory: r.inventory != null ? r.inventory : 0, metadata: r.metadata, variants: r.variants,
-      created_at: r.created_at, updated_at: r.updated_at,
+      an_id: r.an_id || null, created_at: r.created_at, updated_at: r.updated_at,
     }
   } catch (e) {
     try { await client.end() } catch (_) {}
@@ -841,7 +858,7 @@ const adminHubProductsPOST = async (req, res) => {
         await eanCl.connect()
         const eanSql = `
           SELECT id, title, handle, sku, description, status, seller_id, collection_id,
-                 price_cents, inventory, metadata, variants, created_at, updated_at
+                 price_cents, inventory, metadata, variants, an_id, created_at, updated_at
           FROM admin_hub_products
           WHERE (
             REGEXP_REPLACE(TRIM(COALESCE(metadata->>'ean', '')), '[^0-9]', '', 'g') = $1
@@ -864,10 +881,19 @@ const adminHubProductsPOST = async (req, res) => {
             seller: r.seller_id, collection_id: r.collection_id,
             price: r.price_cents != null ? r.price_cents / 100 : 0,
             price_cents: r.price_cents, inventory: r.inventory != null ? r.inventory : 0,
-            metadata: r.metadata, variants: r.variants,
+            metadata: r.metadata, variants: r.variants, an_id: r.an_id || null,
             created_at: r.created_at, updated_at: r.updated_at,
           }
           eanDirectFound = true
+          if (!masterProduct.an_id) {
+            try {
+              const anId = await assignAnId(eanCl)
+              await eanCl.query('UPDATE admin_hub_products SET an_id = $1 WHERE id = $2', [anId, masterProduct.id])
+              masterProduct.an_id = anId
+            } catch (backfillErr) {
+              console.warn('AN-ID lazy backfill (EAN match) failed:', backfillErr && backfillErr.message)
+            }
+          }
         }
       } catch (eanLookupErr) {
         console.warn('EAN direct SQL lookup failed, falling back to full scan:', eanLookupErr && eanLookupErr.message)
@@ -1069,7 +1095,7 @@ const adminHubProductsPOST = async (req, res) => {
             await fbCl.connect()
             const fbSql = `
               SELECT id, title, handle, sku, description, status, seller_id, collection_id,
-                     price_cents, inventory, metadata, variants, created_at, updated_at
+                     price_cents, inventory, metadata, variants, an_id, created_at, updated_at
               FROM admin_hub_products
               WHERE (
                 REGEXP_REPLACE(TRIM(COALESCE(metadata->>'ean', '')), '[^0-9]', '', 'g') = $1
@@ -1092,8 +1118,17 @@ const adminHubProductsPOST = async (req, res) => {
                 seller: r.seller_id, collection_id: r.collection_id,
                 price: r.price_cents != null ? r.price_cents / 100 : 0,
                 price_cents: r.price_cents, inventory: r.inventory != null ? r.inventory : 0,
-                metadata: r.metadata, variants: r.variants,
+                metadata: r.metadata, variants: r.variants, an_id: r.an_id || null,
                 created_at: r.created_at, updated_at: r.updated_at,
+              }
+              if (!fallbackMaster.an_id) {
+                try {
+                  const anId = await assignAnId(fbCl)
+                  await fbCl.query('UPDATE admin_hub_products SET an_id = $1 WHERE id = $2', [anId, fallbackMaster.id])
+                  fallbackMaster.an_id = anId
+                } catch (backfillErr) {
+                  console.warn('AN-ID lazy backfill (fallback master) failed:', backfillErr && backfillErr.message)
+                }
               }
             }
           } finally { try { await fbCl.end() } catch (_) {} }
