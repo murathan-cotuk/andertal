@@ -2047,11 +2047,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   };
 
   const removeMatrixVariant = (optionValues) => {
-    const key = Array.isArray(optionValues) ? optionValues.join(" ") : "";
+    const key = Array.isArray(optionValues) ? optionValues.join("\u0000") : "";
     setProduct((prev) => {
       if (!prev) return prev;
       const variants = (prev.variants || []).filter(
-        (v) => !(Array.isArray(v.option_values) && v.option_values.join(" ") === key)
+        (v) => !(Array.isArray(v.option_values) && v.option_values.join("\u0000") === key)
       );
       return { ...prev, variants };
     });

@@ -319,6 +319,19 @@ const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
             `INSERT INTO admin_hub_metafield_pending (key, label, seller_id, proposed_values) VALUES ($1, $2, $3, $4)`,
             [key, label, sid, JSON.stringify(vals)]
           )
+          // TASKS.md #27 (Spezifikationen tab): "Superusera bunun bildirimi kesinlikle gitmeli" —
+          // only for a genuinely NEW key (this else-branch), not every time a seller adds one more
+          // value to an already-pending key, or every save would spam a fresh notification.
+          try {
+            const { insertAdminHubNotificationSafe } = require('../admin-hub-notify')
+            insertAdminHubNotificationSafe({
+              type: 'metafield_proposed',
+              title: `Neue Eigenschaft vorgeschlagen: ${label}`,
+              body: `Ein Verkäufer hat die Eigenschaft "${label}" (${key}) mit Wert(en) "${vals.join(', ')}" vorgeschlagen. Bitte in Metaobjekte prüfen.`,
+              sellerId: sid,
+              referenceId: key,
+            })
+          } catch (_) {}
         }
         result.queued++
       }
