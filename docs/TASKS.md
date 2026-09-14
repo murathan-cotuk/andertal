@@ -191,7 +191,10 @@ images[].link tıklanır kalsın; ürün URL’si veya handle
 İsteğe bağlı images[].product_id — doluysa tıklanınca ürün sayfası, görsel üründen (yoksa url)
 Grid 2 satır × 2 sütun + bg_color + title = istenen kare. Carousel ok/peek/scrollbar işine dokunma (o ayrı bug’dı).
 
-4.5) ❌ Henüz yapılmadı (bilinçli olarak sona bırakıldı) — Inspector birliği (1990 form değil)
+4.5) 🟡 Kısmen yapıldı (2026-09-14) — Inspector birliği (1990 form değil)
+    Önemli keşif: "Düzen"/"Görünüm" (padding, content_layout, görünürlük) zaten TAM birleşikmiş — ContainerEditor dispatcher'ı her tip için ortak bir ContainerChromePanel (yan panel) render ediyor, bu da PaddingEditor/ContainerLayoutEditor/ContainerSpacingEditor gibi paylaşılan primitive'leri kullanıyor. Eski not bunu bilmiyormuş, "her editör kopyala-yapıştır hex ediyor" korkusu asılsız çıktı — ColorField zaten 76 yerde paylaşılan tek bileşen olarak kullanılıyor.
+    Yapılan: Kalan gerçek dağınıklık, her editörün kendi "İçerik" bölümünde içerik alanlarıyla stil (renk/hizalama/buton) alanlarının tek düz listede karışmasıydı. Yeni paylaşılan `EditorSectionLabel` bileşeni + `content`/`sectionStyle`/`sectionBehavior` i18n anahtarları (6 dil) eklendi; TextBlockEditor, BannerCtaEditor, AccordionEditor, TabsEditor, NewsletterEditor, FeatureGridEditor, TestimonialsEditor (7 editör) İçerik/Stil/Davranış bölümlerine ayrıldı — saf ekleme, hiçbir alanın value/onChange mantığı değişmedi.
+    Kalan: ~15 editör (HeroBanner, ImageText, ImageCarousel, CollectionCarousel, BestsellerCarousel, BrandsDirectory, CollectionsCarousel, SingleProduct, BlogCarousel, VideoBlock, PersonalizedProductRow, LayoutSection, Support*) henüz aynı EditorSectionLabel ayrımını almadı — aynı desen, mekanik ama zaman alıyor.
 Tüm *Editor bileşenleri aynı iskelet (Polaris BlockStack + Card + 2 kolon grid):
 
 İçerik — başlık, görsel, koleksiyon, ürün (tipe özel)

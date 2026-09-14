@@ -150,6 +150,17 @@ function containerPaddingHorizontalOnly(type) {
   return type !== "banner_cta";
 }
 
+// TASKS.md 4.5 (Inspector birliği): "Düzen"/"Görünüm"/"Davranış" zaten ContainerChromePanel
+// (padding, content_layout, görünürlük — tüm tiplerde ortak) altında birleşik. Kalan tek dağınıklık,
+// her editörün kendi "İçerik" bölümünün tek düz BlockStack içinde içerik + stil alanlarını
+// karıştırmasıydı. Bu küçük, paylaşılan alt-başlık her editörün İÇİNDE aynı görsel ayrımı
+// (İçerik / Stil) tutarlı şekilde vermek için — yeni bir form şeması değil, sadece etiketleme.
+function EditorSectionLabel({ children }) {
+  return (
+    <Text as="h4" variant="headingXs" tone="subdued">{children}</Text>
+  );
+}
+
 // horizontalOnly=true: only shows Rechts/Links fields (vertical spacing comes from ContainerSpacingEditor)
 function PaddingEditor({ label, value, onChange, defaultValue = "0px 0px 0px 0px", horizontalOnly = false }) {
   const c = useLandingCopy();
@@ -799,6 +810,7 @@ function TextBlockEditor({ container, onChange, editLang = "de" }) {
   const c = useLandingCopy();
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} placeholder={c.headingPh} autoComplete="off" />
       <RichTextEditor label={c.text} value={gi(container, "body", editLang)} onChange={(v) => onChange(si(container, "body", editLang, v))} placeholder={c.enterText} minHeight="160px" />
       <InlineStack gap="400" wrap={false}>
@@ -809,6 +821,8 @@ function TextBlockEditor({ container, onChange, editLang = "de" }) {
           <TextField label={c.buttonUrl} value={container.btn_url || ""} onChange={(v) => onChange({ ...container, btn_url: v })} autoComplete="off" />
         </div>
       </InlineStack>
+      <Divider />
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
           <Select label={c.alignment} options={c.alignOptions()} value={container.align || "center"} onChange={(v) => onChange({ ...container, align: v })} />
@@ -1744,6 +1758,7 @@ function BannerCtaEditor({ container, onChange, editLang = "de" }) {
   const c = useLandingCopy();
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <TextField label={c.subtitle} value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} autoComplete="off" />
       <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" />
@@ -1755,6 +1770,8 @@ function BannerCtaEditor({ container, onChange, editLang = "de" }) {
           <TextField label={c.buttonUrl} value={container.btn_url || ""} onChange={(v) => onChange({ ...container, btn_url: v })} autoComplete="off" />
         </div>
       </InlineStack>
+      <Divider />
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 2 }}>
           <Select label={c.textPosition} options={c.textPositionOptions()} value={container.text_position || "center"} onChange={(v) => onChange({ ...container, text_position: v })} />
@@ -2261,13 +2278,16 @@ function AccordionEditor({ container, onChange, editLang = "de" }) {
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.accordionSettings}</Text>
+          <EditorSectionLabel>{c.content}</EditorSectionLabel>
           <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
           <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" helpText={c.optional} />
-          <Select label={c.layoutVariant} options={c.accordionThemeOptions()} value={container.variant || container.theme || "light"} onChange={(v) => onChange({ ...container, variant: v, theme: v })} />
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}><TextField label={c.buttonText} value={gi(container, "btn_text", editLang)} onChange={(v) => onChange(si(container, "btn_text", editLang, v))} autoComplete="off" /></div>
             <div style={{ flex: 1 }}><TextField label={c.buttonUrl} value={container.btn_url || ""} onChange={(v) => onChange({ ...container, btn_url: v })} autoComplete="off" /></div>
           </InlineStack>
+          <Divider />
+          <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
+          <Select label={c.layoutVariant} options={c.accordionThemeOptions()} value={container.variant || container.theme || "light"} onChange={(v) => onChange({ ...container, variant: v, theme: v })} />
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}>
               <Select
@@ -2399,6 +2419,7 @@ function TabsEditor({ container, onChange, editLang = "de" }) {
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.tabSettings}</Text>
+          <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
           <InlineStack gap="400" wrap={false}>
             <div style={{ flex: 1 }}>
               <Select
@@ -2629,6 +2650,7 @@ function NewsletterEditor({ container, onChange, editLang = "de" }) {
       <Banner tone="info">
         {c.newsletterBanner}
       </Banner>
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={c.title} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <TextField label={c.subtitle} value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} multiline={2} autoComplete="off" />
       <TextField label={c.buttonText} value={gi(container, "button_text", editLang)} onChange={(v) => onChange(si(container, "button_text", editLang, v))} autoComplete="off" />
@@ -2651,6 +2673,8 @@ function NewsletterEditor({ container, onChange, editLang = "de" }) {
         </div>
       </InlineStack>
       <TextField label={c.emailPlaceholder} value={gi(container, "email_placeholder", editLang)} onChange={(v) => onChange(si(container, "email_placeholder", editLang, v))} autoComplete="off" />
+      <Divider />
+      <EditorSectionLabel>{c.sectionBehavior}</EditorSectionLabel>
       <Select
         label={c.providerHint}
         options={c.newsletterProviderOptions()}
@@ -2692,6 +2716,8 @@ function NewsletterEditor({ container, onChange, editLang = "de" }) {
         helpText={c.fieldNameHelpEmail}
       />
       <TextField label={c.privacyNote} value={container.privacy_note || ""} onChange={(v) => onChange({ ...container, privacy_note: v })} multiline={2} autoComplete="off" />
+      <Divider />
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}><ColorField label={c.background} value={container.bg_color || "#f3f4f6"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
         <div style={{ flex: 1 }}><ColorField label={c.textColor} value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
@@ -2741,10 +2767,13 @@ function FeatureGridEditor({ container, onChange, editLang = "de" }) {
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.featureGridSettings}</Text>
+          <EditorSectionLabel>{c.content}</EditorSectionLabel>
           <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" helpText={c.featureGridTitleHelp} />
           <TextField label={`${c.subtitle} ${c.optional}`} value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} multiline={2} autoComplete="off" helpText={c.featureGridSubtitleHelp} />
           <TextField label={c.eyebrow} value={gi(container, "eyebrow", editLang)} onChange={(v) => onChange(si(container, "eyebrow", editLang, v))} autoComplete="off" helpText={c.optional} />
           <TextField label={c.leadText} value={gi(container, "lead", editLang)} onChange={(v) => onChange(si(container, "lead", editLang, v))} multiline={2} autoComplete="off" helpText={c.optional} />
+          <Divider />
+          <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
           <div style={EDITOR_FIELD_GRID}>
             <Select
               label={c.layoutVariant}
@@ -2844,8 +2873,11 @@ function TestimonialsEditor({ container, onChange, editLang = "de" }) {
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.testimonialsSettings}</Text>
+          <EditorSectionLabel>{c.content}</EditorSectionLabel>
           <TextField label={c.heading} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
           <TextField label={`${c.subtitle} ${c.optional}`} value={gi(container, "subtitle", editLang)} onChange={(v) => onChange(si(container, "subtitle", editLang, v))} multiline={2} autoComplete="off" />
+          <Divider />
+          <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
           <div style={EDITOR_FIELD_GRID}>
             <Select
               label={c.titleAlign}
