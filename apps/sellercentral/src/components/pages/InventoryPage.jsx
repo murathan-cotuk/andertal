@@ -1021,6 +1021,11 @@ export default function InventoryPage() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState("xlsx");
   const [exporting, setExporting] = useState(false);
+  // Same required-setup check as OnboardingChecklist (dashboard home) — repeated here because
+  // a seller who never visits the dashboard can otherwise publish/manage products for a long
+  // time without ever seeing the IBAN/card warning (TASKS.md #25: "ilgili settings net uyarmalı").
+  // null = not checked yet; render nothing until known so the banner never flashes in then out.
+  const [payoutSetupMissing, setPayoutSetupMissing] = useState(null);
   const medusaClient = getMedusaAdminClient();
   const ui = getUI(locale);
   const l = String(locale || "en").toLowerCase();
@@ -1137,6 +1142,21 @@ export default function InventoryPage() {
     setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true");
     setMySellerId(localStorage.getItem("sellerId") || "");
   }, []);
+
+  useEffect(() => {
+    if (isSuperuser) return;
+    let cancelled = false;
+    Promise.all([
+      medusaClient.getSellerAccount().catch(() => null),
+      medusaClient.getSellerCard().catch(() => null),
+    ]).then(([account, cardRes]) => {
+      if (cancelled) return;
+      const seller = account?.sellerUser || account?.user || {};
+      const iban = String(seller?.iban || "").replace(/\s+/g, "");
+      setPayoutSetupMissing({ card: !cardRes?.has_card, iban: iban.length < 15 });
+    });
+    return () => { cancelled = true; };
+  }, [isSuperuser, medusaClient]);
 
   useEffect(() => {
     if (!isSuperuser) return;
@@ -1600,6 +1620,24 @@ export default function InventoryPage() {
           <Layout.Section>
             <Banner tone="critical" onDismiss={() => setError(null)}>
               {error}
+            </Banner>
+          </Layout.Section>
+        )}
+
+        {!isSuperuser && payoutSetupMissing && (payoutSetupMissing.card || payoutSetupMissing.iban) && (
+          <Layout.Section>
+            <Banner
+              tone="warning"
+              title={l === "tr" ? "Satış için zorunlu bilgiler eksik" : l === "de" ? "Pflichtangaben für den Verkauf fehlen" : l === "fr" ? "Informations obligatoires manquantes" : l === "es" ? "Faltan datos obligatorios" : l === "it" ? "Dati obbligatori mancanti" : "Required setup missing"}
+              action={{ content: l === "tr" ? "Şimdi tamamla" : l === "de" ? "Jetzt erledigen" : l === "fr" ? "Compléter maintenant" : l === "es" ? "Completar ahora" : l === "it" ? "Completa ora" : "Complete now", onAction: () => router.push("/settings/payments") }}
+            >
+              <p>
+                {payoutSetupMissing.card && payoutSetupMissing.iban
+                  ? (l === "tr" ? "Ürünlerinizi yönetmeye devam edebilirsiniz, ama Gebühren için kredi kartı ve Auszahlung için IBAN eklemeden gerçek satış/ödeme akışı tamamlanmış sayılmaz." : l === "de" ? "Sie können Ihre Produkte weiter verwalten, aber ohne Kreditkarte (Gebühren) und IBAN (Auszahlung) gilt die Einrichtung für den echten Verkauf nicht als abgeschlossen." : "You can keep managing products, but without a credit card (fees) and IBAN (payouts) your seller setup isn't complete for real sales.")
+                  : payoutSetupMissing.card
+                  ? (l === "tr" ? "Platform ücretleri (Gebühren) için kredi kartı eklemediniz." : l === "de" ? "Sie haben noch keine Kreditkarte für die Plattformgebühren (Gebühren) hinterlegt." : "You haven't added a credit card for platform fees yet.")
+                  : (l === "tr" ? "Ödemelerinizin (Auszahlung) yatırılabilmesi için IBAN eklemediniz." : l === "de" ? "Sie haben noch keine IBAN für Ihre Auszahlungen hinterlegt." : "You haven't added an IBAN for your payouts yet.")}
+              </p>
             </Banner>
           </Layout.Section>
         )}
