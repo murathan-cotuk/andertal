@@ -70,7 +70,7 @@ Aşağıdakiler kod tarafında yapılamaz — hesap/panel erişimi, domain/ödem
 
 3) ✅ Yapıldı — medya secimi yaptigimda sellercentralde asagi kaydiriyorum, görseli seciyorum ancak save butonu en üstte kaldigi icin bi daha taa en üste kaydirmam gerekiyor. secildiginde save butpnu hemen o üstte görünsün.
 
-4) 🟡 Kısmen yapıldı (asıl istenen kısım — faz 3+4+shop render — bitti ve canlı test edildi; faz 2 ve 5-6 henüz yapılmadı, aşağıda fazlara işaretli) — (Andertal landing — vitrin editörü + layout_section + konteyner birliği)
+4) 🟡 Kısmen yapıldı (asıl istenen kısım — faz 3+4+shop render — VE faz 1 vitrin kabuğu VE faz 2 picker düzeltmeleri bitti; yalnızca faz 5-6 —inspector birliği ve kalan 6 konteyner tipinin görsel birliği— henüz yapılmadı, aşağıda fazlara işaretli) — (Andertal landing — vitrin editörü + layout_section + konteyner birliği)
 Ask/Agent: bu işi kısmi demo ile kapatma. Mevcut sayfaları, i18n’i, visible_on cihaz modelini, kaydı ve shop render’ı kırma. Önce oku, sonra faz faz uygula. Her fazda derleme/linter ve ilgili shop+sellercentral dosyaları.
 
 4.0) Kilit gerçekler (yanlış model = işi baştan batırır)
@@ -96,7 +96,7 @@ Seçili konteynerin ayarları. Üstte tip + grup. Altta tutarlı bölümler (aş
 
 Kayıt, unsaved bar, dil seçici, sayfa seçici kalsın. Mevcut JSON şeması bozulmasın (yeni alanlar opt-in, eski sayfalar aynı görünsün).
 
-4.2) ❌ Henüz yapılmadı (bilinçli olarak sona bırakıldı, sıradaki iş) — Picker kusurları
+4.2) ✅ Yapıldı (statik kontrol edildi; kart tıklama + 2×2 preset canlı test edildi, sayfa-türü filtresi henüz canlı denenmedi) — Picker kusurları
 Kartın tamamı tıklanınca eklensin; her karttaki ayrı “Seç” kalksın (veya kart=aksiyon).
 Karusel tipleri aynı thumbnail olmasın: collection_carousel, collections_carousel, blog_carousel, personalized_product_row, brands_directory, image_carousel ayrı şema.
 Picker sayfa türüne göre daralsın: homepage/CMS’de support_* yok (veya “Destek” grubu sadece support/CMS yardım sayfasında).
@@ -215,7 +215,7 @@ Depth 4, 200+ node
 “Çalışıyor” diye sadece modal screenshot; shop’ta 3 sütun + iç layout + 2×2 preset + carousel default kanıtla
 4.9) Kabul
 ✅ Editor: sol ağaç, orta canlı vitrin, sağ inspector — canlı test edildi, cihaz sekmesine göre gerçek genişlikte render ediyor
-❌ Picker: kart tıklama, farklı karusel thumb, layout_section + 2×2 preset, support homepage’de yok — HENÜZ YAPILMADI (4.2 ile aynı, sıradaki iş)
+✅ Picker: kart tıklama, farklı karusel thumb, layout_section + 2×2 preset, support homepage’de yok — kart tıklama + 2×2 preset canlı test edildi; farklı thumb’lar ve sayfa-türü filtresi statik kontrol edildi (henüz canlı denenmedi)
 ✅ layout_section shop’ta grid slot’ta child render; 3 sütun eşit; 2/3–1/3; içine ikinci layout — canlı test edildi
 ✅ 2×2 ürün karesi: zemin renk + başlık + 4 tıklanır görsel (preset VE image_carousel grid) — canlı test edildi, ikisi de gerçek veriyle çalışıyor
 ✅ image_carousel display_mode yokken eski karusel — canlı test edildi

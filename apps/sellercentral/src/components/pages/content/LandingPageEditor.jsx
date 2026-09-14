@@ -4104,18 +4104,6 @@ export default function LandingPageEditor() {
     [containerTypes, uiLocale]
   );
   const [containerSearch, setContainerSearch] = useState("");
-  const filteredContainerTypeGroups = useMemo(() => {
-    const q = containerSearch.trim().toLowerCase();
-    if (!q) return containerTypeGroups;
-    return containerTypeGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter(
-          (t) => t.label?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
-        ),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [containerTypeGroups, containerSearch]);
   const client = getMedusaAdminClient();
   const unsaved = useUnsavedChanges();
 
@@ -4499,6 +4487,29 @@ export default function LandingPageEditor() {
   const isCategorySelection = String(selectedPageId).startsWith("cat:");
   const isApiSelection = String(selectedPageId).startsWith("api:");
   const isProductPageSelection = selectedPageId === "__product_page__";
+  // The customer-support landing (docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md) is a normal CMS
+  // page identified only by its slug — support_* container types only make sense there, so the
+  // picker (below) hides that group everywhere else (homepage/CMS/category/blog/product page).
+  const isSupportPageSelection =
+    !isCategorySelection && !isApiSelection && !isProductPageSelection &&
+    pages.find((p) => String(p.id) === String(selectedPageId))?.slug === "customer-support";
+  // Picker: hide the "support" catalog group (support_hero/case_wizard/topic_grid/faq) everywhere
+  // except the customer-support page itself — those types render nothing useful anywhere else.
+  const filteredContainerTypeGroups = useMemo(() => {
+    const q = containerSearch.trim().toLowerCase();
+    const base = isSupportPageSelection
+      ? containerTypeGroups
+      : containerTypeGroups.filter((group) => group.id !== "support");
+    if (!q) return base;
+    return base
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (t) => t.label?.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [containerTypeGroups, containerSearch, isSupportPageSelection]);
   const apiHasSettings = selectedPageId === "api:bestsellers" || selectedPageId === "api:sales";
   const linkedCmsForApi = isApiSelection
     ? pages.find((p) => String(p.slug) === API_CMS_SLUG[selectedPageId])
