@@ -683,6 +683,7 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
               </InlineStack>
             </InlineStack>
 
+            <EditorSectionLabel>{c.content}</EditorSectionLabel>
             <ImageField
               label={c.image}
               helpText={c.imageHelpHero}
@@ -723,6 +724,8 @@ function HeroBannerEditor({ container, onChange, editLang = "de" }) {
               </div>
             </InlineStack>
 
+            <Divider />
+            <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
             <InlineStack gap="400" wrap={false}>
               <div style={{ flex: 2 }}>
                 <Select label={c.textPosition} options={c.textPositionOptions()} value={slide.text_position || "center"} onChange={(v) => updateSlide(idx, "text_position", v)} />
@@ -873,6 +876,7 @@ function ImageTextEditor({ container, onChange, editLang = "de" }) {
       {videoPickerOpen && (
         <MediaPickerModal open multiple={false} title={c.selectVideo} onClose={() => setVideoPickerOpen(false)} onSelect={(urls) => { if (urls[0]) onChange({ ...container, video_url: urls[0] }); setVideoPickerOpen(false); }} />
       )}
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <ImageField label={c.image} value={gi(container, "image", editLang)} onPick={() => setPickerOpen(true)} onClear={() => onChange(si(container, "image", editLang, ""))} />
       <BlockStack gap="150">
         <Text as="p" variant="bodySm" fontWeight="medium">{c.imageOptional}</Text>
@@ -911,18 +915,20 @@ function ImageTextEditor({ container, onChange, editLang = "de" }) {
       <RichTextEditor label={c.text} value={gi(container, "body", editLang)} onChange={(v) => onChange(si(container, "body", editLang, v))} placeholder={c.enterText} minHeight="130px" />
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}>
-          <ColorField label={c.titleColor} value={container.title_color || container.text_color || "#111827"} onChange={(v) => onChange({ ...container, title_color: v })} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <ColorField label={c.subtitleColor} value={container.subtitle_color || container.text_color || "#111827"} onChange={(v) => onChange({ ...container, subtitle_color: v })} />
-        </div>
-      </InlineStack>
-      <InlineStack gap="400" wrap={false}>
-        <div style={{ flex: 1 }}>
           <TextField label={c.buttonText} value={gi(container, "btn_text", editLang)} onChange={(v) => onChange(si(container, "btn_text", editLang, v))} autoComplete="off" />
         </div>
         <div style={{ flex: 1 }}>
           <TextField label={c.buttonUrl} value={container.btn_url || ""} onChange={(v) => onChange({ ...container, btn_url: v })} autoComplete="off" />
+        </div>
+      </InlineStack>
+      <Divider />
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
+      <InlineStack gap="400" wrap={false}>
+        <div style={{ flex: 1 }}>
+          <ColorField label={c.titleColor} value={container.title_color || container.text_color || "#111827"} onChange={(v) => onChange({ ...container, title_color: v })} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <ColorField label={c.subtitleColor} value={container.subtitle_color || container.text_color || "#111827"} onChange={(v) => onChange({ ...container, subtitle_color: v })} />
         </div>
       </InlineStack>
       <InlineStack gap="400" wrap={false}>
@@ -1008,6 +1014,7 @@ function ImageGridEditor({ container, onChange, deviceTab = 0, editLang = "de" }
       {pickerIdx !== null && (
         <MediaPickerModal open multiple={false} onClose={() => setPickerIdx(null)} onSelect={(urls) => { if (urls[0]) updateImg(pickerIdx, "url", urls[0]); setPickerIdx(null); }} />
       )}
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
       <InlineStack gap="400">
         <div style={{ flex: 1 }}>
           {isMobileView ? (
@@ -1038,6 +1045,8 @@ function ImageGridEditor({ container, onChange, deviceTab = 0, editLang = "de" }
       </InlineStack>
       <ColorField label={`${c.backgroundColor} ${c.optional}`} value={container.bg_color || ""} onChange={(v) => onChange({ ...container, bg_color: v })} />
 
+      <Divider />
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       {(container.images || []).map((img, idx) => (
         <Card key={idx}>
           <BlockStack gap="300">
@@ -1814,6 +1823,7 @@ function CollectionCarouselEditor({ container, onChange, deviceTab = 0, editLang
 
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <Select
         label={c.collection}
@@ -1832,6 +1842,8 @@ function CollectionCarouselEditor({ container, onChange, deviceTab = 0, editLang
         autoComplete="off"
         helpText={c.productCaptionsHelpShort}
       />
+      <Divider />
+      <EditorSectionLabel>{c.layout}</EditorSectionLabel>
       <div style={EDITOR_FIELD_GRID}>
         <Select
           label={c.productsPerRow}
@@ -1917,6 +1929,7 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
 
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <Select
         label={c.carouselModeLabel}
@@ -1939,6 +1952,8 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
         />
         <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280" }}>{c.bestsellerCategoryHelp}</div>
       </div>
+      <Divider />
+      <EditorSectionLabel>{c.layout}</EditorSectionLabel>
       <div style={EDITOR_FIELD_GRID}>
         <Select
           label={c.productsPerRow}
@@ -2004,7 +2019,10 @@ function BrandsDirectoryEditor({ container, onChange, deviceTab = 0, editLang = 
   const isMobileView = deviceTab >= 1;
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <Divider />
+      <EditorSectionLabel>{c.layout}</EditorSectionLabel>
       <div style={EDITOR_FIELD_GRID}>
         <Select
           label={c.productsPerRow}
@@ -2037,7 +2055,10 @@ function SellerCarouselEditor({ container, onChange, deviceTab = 0, editLang = "
   const isMobileView = deviceTab >= 1;
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <Divider />
+      <EditorSectionLabel>{c.layout}</EditorSectionLabel>
       <div style={EDITOR_FIELD_GRID}>
         <Select
           label={c.productsPerRow}
@@ -2135,6 +2156,7 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
 
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <Select
         label={c.addCollection}
@@ -2145,6 +2167,8 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
           addCollection(id);
         }}
       />
+      <Divider />
+      <EditorSectionLabel>{c.layout}</EditorSectionLabel>
       <InlineStack gap="400" wrap>
         <div style={{ flex: "1 1 200px", minWidth: 160 }}>
           <Select
@@ -2487,6 +2511,7 @@ function SingleProductEditor({ container, onChange, editLang = "de" }) {
 
   return (
     <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
       <Select
         label={c.product}
@@ -2504,6 +2529,8 @@ function SingleProductEditor({ container, onChange, editLang = "de" }) {
       <Text as="p" variant="bodySm" tone="subdued">
         {c.singleProductHelp}
       </Text>
+      <Divider />
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
       <InlineStack gap="400" wrap={false}>
         <div style={{ flex: 1 }}><ColorField label={c.background} value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} /></div>
         <div style={{ flex: 1 }}><ColorField label={c.titleColor} value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} /></div>
@@ -2571,7 +2598,10 @@ function BlogCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de
           <Text as="p" variant="bodySm" tone="subdued">
             {c.blogCarouselHelp}
           </Text>
+          <EditorSectionLabel>{c.content}</EditorSectionLabel>
           <TextField label={c.sectionTitle} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+          <Divider />
+          <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
           <div style={EDITOR_FIELD_GRID}>
             <Select
               options={[1, 2, 3, 4].map((n) => ({ label: String(n), value: String(n) }))}
@@ -2975,6 +3005,7 @@ function VideoBlockEditor({ container, onChange, deviceTab = 0, editLang = "de" 
         />
       )}
 
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField
         label={`${c.heading} ${c.optional}`}
         value={gi(container, "title", editLang)}
@@ -2988,9 +3019,13 @@ function VideoBlockEditor({ container, onChange, deviceTab = 0, editLang = "de" 
         multiline={2}
         autoComplete="off"
       />
+      <Divider />
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
       <ColorField label={`${c.textColor} (${c.title} & ${c.captionOptional})`} value={container.text_color || "#111827"} onChange={(v) => onChange({ ...container, text_color: v })} />
       <ColorField label={c.background} value={container.bg_color || "#ffffff"} onChange={(v) => onChange({ ...container, bg_color: v })} />
 
+      <Divider />
+      <EditorSectionLabel>{c.sectionBehavior}</EditorSectionLabel>
       <Select
         label={c.source}
         options={c.videoSourceOptions()}
@@ -3301,6 +3336,7 @@ function SupportHeroEditor({ container, onChange, editLang = "de" }) {
       </Card>
       <Card>
         <BlockStack gap="300">
+          <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
           <Select label={c.supportLayout} options={c.supportLayoutOptions()} value={container.layout || "split"} onChange={(v) => onChange({ ...container, layout: v })} />
           <ImageField label={c.image} value={gi(container, "image", editLang)} onPick={() => setPickerOpen(true)} onClear={() => onChange(si(container, "image", editLang, ""))} />
           <div style={EDITOR_FIELD_GRID}>

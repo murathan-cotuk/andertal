@@ -613,6 +613,7 @@ export function getLandingEditorCopy(locale) {
     content: x("Content", "İçerik", "Contenu", "Contenido", "Contenuto", "Inhalt"),
     sectionStyle: x("Style", "Stil", "Style", "Estilo", "Stile", "Stil"),
     sectionBehavior: x("Behavior", "Davranış", "Comportement", "Comportamiento", "Comportamento", "Verhalten"),
+    layout: x("Layout", "Düzen", "Mise en page", "Diseño", "Layout", "Layout"),
     pattern: x("Pattern", "Muster", "Motif", "Patrón", "Schema", "Muster"),
     contentMosaicHeading: x("Content mosaic", "İçerik mozaiği", "Mosaïque de contenu", "Mosaico de contenido", "Mosaico contenuti", "Inhalts-Mosaik"),
     contentMosaicIntro: x("Row layout: numbers = columns per row, comma-separated, repeated (e.g. 1,2 = one full row, then two side by side). Desktop & mobile configured separately.", "Satır düzeni: sayılar = satır başına sütun, virgülle ayrılmış. Masaüstü ve mobil ayrı.", "Disposition des lignes : nombres = colonnes par ligne.", "Disposición de filas: números = columnas por fila.", "Layout righe: numeri = colonne per riga.", "Zeilenaufbau: Zahlen = Spalten pro Zeile, durch Komma getrennt, wiederholt."),

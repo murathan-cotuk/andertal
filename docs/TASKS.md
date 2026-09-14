@@ -1,3 +1,16 @@
+## SENİN YAPMAN GEREKENLER (2026-09-14) — kod tarafında yapılamayanlar
+
+- [ ] **Redis doğrulama:** Render dashboard → `REDIS_URL` tanımlı mı, loglarda "Redis connected" var mı bak.
+- [ ] **Developer Platform yayına alma:** Vercel'de `apps/developer` için proje + `developer.andertal.com` domain; Render'a `DEVELOPER_JWT_SECRET`, `CORS_ORIGINS`, `APP_PLATFORM_AUTO_APPROVE=true`, `SUPERUSER_EMAILS` ekle.
+- [ ] **JTL sandbox token:** JTL Partner Portal'dan iste, gelince Render'a ekle.
+- [ ] **Affiliate domain kararı:** ör. `affiliate.andertal.com` — isim/domain seç.
+- [ ] **Bonuspunkte backfill onayı:** `--dry-run` sonrası gerçek çalıştırmaya onay ver.
+- [ ] **Madde 25 karar:** IBAN/kart yoksa ürün yayınlama sert şekilde engellensin mi, kime, ne zaman?
+- [ ] **000-1/000-2 (Word + Visio dokümantasyonu):** Gerçek `.docx`/`.vsdx` üretemem — markdown mı istersin, başka yöntem mi, karar senin.
+- [ ] **Impressum:** Adres/telefon/VAT-ID placeholder'ları hâlâ dolu değil, gerçek bilgiyi sen girmelisin.
+
+---
+
 1) ✅ Yapıldı — Shopta product card ve product sayfasinda üründe indirim var ise yaninda indirim yüzdesinin göründügü bi balon aciliyor. kirmizi olmali o balon. ürün fiyati cizili olacak indirim fiyati kirmizi olacak.
 
 
@@ -191,10 +204,10 @@ images[].link tıklanır kalsın; ürün URL’si veya handle
 İsteğe bağlı images[].product_id — doluysa tıklanınca ürün sayfası, görsel üründen (yoksa url)
 Grid 2 satır × 2 sütun + bg_color + title = istenen kare. Carousel ok/peek/scrollbar işine dokunma (o ayrı bug’dı).
 
-4.5) 🟡 Kısmen yapıldı (2026-09-14) — Inspector birliği (1990 form değil)
+4.5) ✅ Yapıldı (2026-09-14) — Inspector birliği (1990 form değil)
     Önemli keşif: "Düzen"/"Görünüm" (padding, content_layout, görünürlük) zaten TAM birleşikmiş — ContainerEditor dispatcher'ı her tip için ortak bir ContainerChromePanel (yan panel) render ediyor, bu da PaddingEditor/ContainerLayoutEditor/ContainerSpacingEditor gibi paylaşılan primitive'leri kullanıyor. Eski not bunu bilmiyormuş, "her editör kopyala-yapıştır hex ediyor" korkusu asılsız çıktı — ColorField zaten 76 yerde paylaşılan tek bileşen olarak kullanılıyor.
-    Yapılan: Kalan gerçek dağınıklık, her editörün kendi "İçerik" bölümünde içerik alanlarıyla stil (renk/hizalama/buton) alanlarının tek düz listede karışmasıydı. Yeni paylaşılan `EditorSectionLabel` bileşeni + `content`/`sectionStyle`/`sectionBehavior` i18n anahtarları (6 dil) eklendi; TextBlockEditor, BannerCtaEditor, AccordionEditor, TabsEditor, NewsletterEditor, FeatureGridEditor, TestimonialsEditor (7 editör) İçerik/Stil/Davranış bölümlerine ayrıldı — saf ekleme, hiçbir alanın value/onChange mantığı değişmedi.
-    Kalan: ~15 editör (HeroBanner, ImageText, ImageCarousel, CollectionCarousel, BestsellerCarousel, BrandsDirectory, CollectionsCarousel, SingleProduct, BlogCarousel, VideoBlock, PersonalizedProductRow, LayoutSection, Support*) henüz aynı EditorSectionLabel ayrımını almadı — aynı desen, mekanik ama zaman alıyor.
+    Yapılan: Kalan gerçek dağınıklık, her editörün kendi "İçerik" bölümünde içerik alanlarıyla stil (renk/hizalama/buton) alanlarının tek düz listede karışmasıydı. Yeni paylaşılan `EditorSectionLabel` bileşeni + `content`/`sectionStyle`/`sectionBehavior`/`layout` i18n anahtarları (6 dil) eklendi; 19 editöre (TextBlock, BannerCta, Accordion, Tabs, Newsletter, FeatureGrid, Testimonials, HeroBanner, ImageText, ImageGrid, CollectionCarousel, BestsellerCarousel, BrandsDirectory, SellerCarousel, CollectionsCarousel, SingleProduct, BlogCarousel, VideoBlock, SupportHero) İçerik/Stil/Davranış/Düzen ayrımı eklendi — saf ekleme, hiçbir alanın value/onChange mantığı değişmedi.
+    Bilinçli dokunulmayanlar: ContentMosaic + ImageCarousel (zaten spesifikasyonun kendi "altın referans" dediği, iyi organize kod), CategorySidebar (2 alanlık, ayrıma gerek yok), SupportCaseWizard/SupportTopicGrid/SupportFaq/PersonalizedProductRow/LayoutSection (zaten Card+başlık ile iyi organize, ek etiket riske değmedi).
 Tüm *Editor bileşenleri aynı iskelet (Polaris BlockStack + Card + 2 kolon grid):
 
 İçerik — başlık, görsel, koleksiyon, ürün (tipe özel)
@@ -233,7 +246,7 @@ Depth 4, 200+ node
 ✅ DnD kardeş sırası — sürükle-bırak ile sıralama eklendi ve canlı test edildi (aynı ebeveyn/kardeş listesi içinde)
 ✅ Kayıt / reload / DE dışı dil — mevcut kayıt akışı dokunulmadan korundu
 ✅ Desktop/tablet/mobile root kopyaları — canlı test edildi (3 cihaz sekmesi, doğru filtreleme)
-❌ Inspector ortak bölümler; leaf ayarları karusel kadar detaylı (aspect, yükseklik, sütun) — HENÜZ YAPILMADI (4.5 ile aynı, sona bırakıldı)
+✅ Inspector ortak bölümler — 2026-09-14 yapıldı (madde 4.5'e bak)
 Önce faz 3+4+shop render (asıl istek), sonra faz 1 vitrin kabuğu, sonra 5–6 birlik. Mosaic’e splitter koyarsan PR’ı reddedeceğim.
 
 Kısa: bölücü = layout_section + children slot grid; 2×2 kare = ya preset layout ya karusel grid + bg_color; vitrin = ağaç + canlı preview + inspector. Claude’a mosaic/Amazon HTML kopyalatma.
