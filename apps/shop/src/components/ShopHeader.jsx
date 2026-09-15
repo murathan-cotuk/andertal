@@ -139,12 +139,13 @@ const HeaderWrap = styled.header`
     top: 0;
     left: 0;
     right: 0;
-    height: env(safe-area-inset-top, 0px);
+    height: 0;
     background: transparent;
     pointer-events: none;
     z-index: 0;
 
     @media (display-mode: standalone) {
+      height: env(safe-area-inset-top, 0px);
       background: var(
         --narrow-header-safe-fill,
         var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}))
@@ -160,8 +161,18 @@ const HeaderWrap = styled.header`
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     background: var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}));
-    /* Push logo/search/icons below the OS status bar; ::before fills that inset. */
-    padding-top: env(safe-area-inset-top, 0px);
+
+    /*
+     * Push logo/search/icons below the OS status bar/notch — but ONLY in
+     * standalone (home-screen) mode. In a normal browser tab (Safari, Chrome, …)
+     * the browser's own address bar already reserves that space above the page,
+     * so this padding is pure unwanted extra height there — and browsers disagree
+     * on what env(safe-area-inset-top) even reports in a regular tab (reported as
+     * the header sitting lower / a blank gap above it specifically in Chrome).
+     */
+    @media (display-mode: standalone) {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
   }
 `;
 

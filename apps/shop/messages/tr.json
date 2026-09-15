@@ -520,6 +520,7 @@
     "shipping": "Kargo",
     "freeShipping": "Ücretsiz kargo",
     "shippingUnavailable": "Kargo mevcut değil",
+    "moreVariants": "+{n} diğer",
     "reviews": "Değerlendirmeler",
     "noReviews": "Henüz değerlendirme yok",
     "reviewsDisclaimer": "Değerlendirmeler bu mağazadan.",

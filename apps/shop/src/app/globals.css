@@ -28,6 +28,17 @@
   .landing-vis-both { display: none !important; }
 }
 
+/* No tablet-specific container was authored for this page (LandingContainers.jsx computes
+ * `hasTabletContainer` from the actual data, not a media query) — a tablet visitor sees the
+ * mobile design instead of a blank section. Re-shows mobile/both containers in the tablet range
+ * that the rules above would otherwise hide. */
+@media (min-width: 600px) and (max-width: 1199px) {
+  .landing-vis-mobile.landing-tablet-fallback,
+  .landing-vis-both.landing-tablet-fallback {
+    display: block !important;
+  }
+}
+
 /* —— Landing page top-level loading skeleton (LandingContainers.jsx, containers === null) ——
  * Reserves roughly the above-the-fold height a hero_banner container would occupy (500px default,
  * see HeroBanner's `height` fallback) so the page doesn't render at 0 height and then pop to full

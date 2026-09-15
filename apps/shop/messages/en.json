@@ -520,6 +520,7 @@
     "shipping": "Shipping",
     "freeShipping": "Free shipping",
     "shippingUnavailable": "Shipping unavailable",
+    "moreVariants": "+{n} more",
     "reviews": "Reviews",
     "noReviews": "No reviews yet",
     "reviewsDisclaimer": "Reviews from this shop.",

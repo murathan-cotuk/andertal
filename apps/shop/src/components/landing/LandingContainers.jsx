@@ -2983,10 +2983,15 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
   if (!c.visible) return null;
   const isChild = !!opts.isChild;
   const v = c.visible_on || "desktop";
+  // No tablet-specific container was authored for this page — a tablet visitor falls back to
+  // whatever mobile shows instead of seeing nothing (see `hasTabletContainer` in LandingContainers).
+  const tabletFallsBackToMobile = ctx.isTablet && !ctx.hasTabletContainer;
   const isFetchGated = !isChild && FETCH_GATED_CONTAINER_TYPES.has(c.type);
   if (isFetchGated) {
-    // Strict device isolation via JS: mobile (< 600px), tablet (600–1199px), desktop (≥ 1200px)
-    if (v === "tablet") {
+    if (tabletFallsBackToMobile) {
+      if (v !== "mobile" && v !== "both") return null;
+    } else if (v === "tablet") {
+      // Strict device isolation via JS: mobile (< 600px), tablet (600–1199px), desktop (≥ 1200px)
       if (!ctx.isTablet) return null;
     } else if (v === "desktop") {
       if (ctx.isNarrow || ctx.isTablet) return null;
@@ -2996,12 +3001,16 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
       if (ctx.isTablet) return null;
     }
   }
+  // No tablet-specific container exists for this page — extend the mobile/both CSS visibility
+  // classes to cover the tablet width range too (see .landing-tablet-fallback in globals.css),
+  // instead of leaving that section blank for tablet visitors.
+  const tabletFallbackVisible = !ctx.hasTabletContainer && (v === "mobile" || v === "both");
   const visClass = isChild ? "" : isFetchGated
     ? ""
     : v === "tablet" ? "landing-vis-tablet"
     : v === "desktop" ? "landing-vis-desktop"
-    : v === "mobile" ? "landing-vis-mobile"
-    : v === "both" ? "landing-vis-both"
+    : v === "mobile" ? `landing-vis-mobile${tabletFallbackVisible ? " landing-tablet-fallback" : ""}`
+    : v === "both" ? `landing-vis-both${tabletFallbackVisible ? " landing-tablet-fallback" : ""}`
     : "";
   const locale = ctx.locale || "de";
   let inner = null;
@@ -3216,9 +3225,15 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
   if (!containers) return <div className="landing-skeleton" />;
   if (containers.length === 0) return null;
 
+  // Sellers often only ever fill in desktop + mobile — if no container was ever scoped to
+  // "tablet", a tablet visitor should see the mobile design rather than an empty section.
+  const hasTabletContainer = containers.some((c) => c?.visible && (c.visible_on || "desktop") === "tablet");
+  const tabletFallsBackToMobile = isTablet && !hasTabletContainer;
+
   const deviceContainers = containers.filter((c) => {
     if (!c?.visible) return false;
     const v = c.visible_on || "desktop";
+    if (tabletFallsBackToMobile) return v === "mobile" || v === "both";
     if (v === "tablet") return isTablet;
     if (v === "desktop") return !isNarrow && !isTablet;
     if (v === "mobile") return isNarrow && !isTablet;
@@ -3238,6 +3253,10 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
     for (const c of containers) {
       if (!c.visible) continue;
       const v = c.visible_on || "desktop";
+      if (tabletFallsBackToMobile) {
+        if (v === "mobile" || v === "both") return c.id;
+        continue;
+      }
       if (v === "tablet" && isTablet) return c.id;
       if (v === "desktop" && !isNarrow && !isTablet) return c.id;
       if (v === "mobile" && isNarrow && !isTablet) return c.id;
@@ -3249,7 +3268,7 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
   const mainContainers = containers.filter((c) => c.type !== "category_sidebar");
   const stack = (
     <div>
-      {mainContainers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, locale, firstVisibleId }))}
+      {mainContainers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, hasTabletContainer, locale, firstVisibleId }))}
     </div>
   );
 

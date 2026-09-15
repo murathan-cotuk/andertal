@@ -26,7 +26,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
-import { categoryDisplayName } from "@/lib/category-locale";
+import { categoryDisplayName, categoryNameForEditForm, normalizeCategoryLocale } from "@/lib/category-locale";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
 
 function slugFromName(name) {
@@ -250,7 +250,7 @@ export default function ContentCategoriesPage() {
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     client.getMedusaCollections({ adminHub: true }).then((r) => setMedusaCollections(r.collections || [])).catch(() => setMedusaCollections([]));
@@ -275,7 +275,7 @@ export default function ContentCategoriesPage() {
     setEditId(cat.id);
     setSlugManuallyEdited(false);
     setForm({
-      name: cat.name || "",
+      name: categoryNameForEditForm(cat, locale) || cat.name || "",
       slug: cat.slug || slugFromName(cat.name || ""),
       description: cat.description || "",
       parent_id: cat.parent_id || "",
@@ -381,6 +381,13 @@ export default function ContentCategoriesPage() {
 
     try {
       if (editId) {
+        const existing = categories.find((c) => c.id === editId);
+        const existingMeta = existing?.metadata && typeof existing.metadata === "object" ? { ...existing.metadata } : {};
+        const loc = normalizeCategoryLocale(locale);
+        const tr = { ...(existingMeta.translations || {}) };
+        tr[loc] = { ...(tr[loc] || {}), name };
+        payload.metadata = { ...existingMeta, ...payload.metadata, translations: tr };
+        if (loc !== "en" && existing?.name) payload.name = existing.name;
         setSaving(true);
         setError(null);
         await client.updateAdminHubCategory(editId, payload);

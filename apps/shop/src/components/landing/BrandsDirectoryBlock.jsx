@@ -69,6 +69,21 @@ const AlphaBar = styled.div`
   flex-wrap: wrap;
   gap: 4px;
   margin-bottom: 20px;
+
+  /* 27 buttons wrapping into a wall of tiny squares reads as clutter on a phone —
+     a single scrollable row (like a contacts A–Z index) is the standard mobile pattern. */
+  @media (max-width: 767px) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    &::-webkit-scrollbar { display: none; }
+  }
 `;
 
 const AlphaBtn = styled.button`
@@ -85,6 +100,10 @@ const AlphaBtn = styled.button`
 
   &:hover { border-color: #111827; }
   &:disabled { opacity: 0.3; cursor: default; }
+
+  @media (max-width: 767px) {
+    flex-shrink: 0;
+  }
 `;
 
 const ResultCount = styled.span`

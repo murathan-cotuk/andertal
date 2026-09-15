@@ -323,19 +323,6 @@ const OriginalPrice = styled.span`
   text-decoration: line-through;
 `;
 
-/* Fixed-height slot for the variant pills — always rendered (even with 0 variants) so the
-   qty stepper below always lands at the same height across every card, regardless of how
-   many variation groups (or none) a given product has. Overflow scrolls internally instead
-   of growing the card. */
-const VariantSlot = styled.div`
-  height: 50px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  &::-webkit-scrollbar {
-    width: 3px;
-  }
-`;
-
 /* Variant groups area */
 const VariantGroups = styled.div`
   display: flex;
@@ -429,6 +416,24 @@ const Pill = styled.button`
   }
 `;
 
+/* "+N weitere" — right-aligned toggle to reveal variation groups beyond the first 2 */
+const MoreGroupsBtn = styled.button`
+  align-self: flex-end;
+  margin-top: -1px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    color: #111;
+  }
+`;
+
 const MorePill = styled.button`
   padding: 0 9px;
   height: 26px;
@@ -510,6 +515,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
   const [expandedGroups, setExpandedGroups] = useState({});
   const [expandedFlat, setExpandedFlat] = useState(false);
+  const [expandedAllGroups, setExpandedAllGroups] = useState(false);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
 
   // For grouped display: track selected option per group index
@@ -705,12 +711,13 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           </CurrentPrice>
         </Prices>
 
-        <VariantSlot>
         {showPills && (
           variationGroups ? (
-            /* Grouped display: one row per variation group */
+            /* Grouped display: one row per variation group. More than 2 groups stay
+               collapsed to the first 2 behind a "+N weitere" toggle so cards don't grow
+               unpredictably tall — same idea as the per-group option truncation below. */
             <VariantGroups>
-              {variationGroups.map((group, gIdx) => {
+              {(expandedAllGroups ? variationGroups : variationGroups.slice(0, 2)).map((group, gIdx) => {
                 const isExpanded = !!expandedGroups[gIdx];
                 const allOpts = group.options || [];
                 const MAX_OPTS = 5;
@@ -788,6 +795,14 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                   </VGroupRow>
                 );
               })}
+              {!expandedAllGroups && variationGroups.length > 2 && (
+                <MoreGroupsBtn
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); setExpandedAllGroups(true); }}
+                >
+                  {tp("moreVariants", { n: variationGroups.length - 2 })}
+                </MoreGroupsBtn>
+              )}
             </VariantGroups>
           ) : (
             /* Legacy: flat pill list */
@@ -823,7 +838,6 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             </Pills>
           )
         )}
-        </VariantSlot>
       </Info>
 
       <QtyRow>

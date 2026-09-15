@@ -232,7 +232,6 @@ export function getLandingEditorCopy(locale) {
     collapse: x("Collapse", "Daralt", "Réduire", "Contraer", "Comprimi", "Einklappen"),
     edit: x("Edit", "Düzenle", "Modifier", "Editar", "Modifica", "Bearbeiten"),
     remove: x("Remove", "Kaldır", "Retirer", "Quitar", "Rimuovi", "Entfernen"),
-    closeInspector: x("Close", "Kapat", "Fermer", "Cerrar", "Chiudi", "Schließen"),
     removeContainerConfirm: x("Remove this container?", "Bu konteyner kaldırılsın mı?", "Retirer ce conteneur ?", "¿Eliminar este contenedor?", "Rimuovere questo contenitore?", "Container entfernen?"),
     desktop: x("Desktop", "Masaüstü", "Bureau", "Escritorio", "Desktop", "Desktop"),
     tablet: x("Tablet", "Tablet", "Tablette", "Tablet", "Tablet", "Tablet"),
