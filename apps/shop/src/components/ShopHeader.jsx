@@ -125,6 +125,13 @@ const HeaderWrap = styled.header`
    * Status-bar / notch strip (in-viewport). Must sit at top:0 inside the padded
    * header — NOT at top:-safe-area (that paints above the screen and never shows).
    * Paint uses the same value as the navbar surface (--narrow-header-safe-fill).
+   *
+   * Transparent by default: the header's own background (solid color, or the
+   * hero-blend gradient set via landingHeaderBg) already covers this same region
+   * natively — painting a second, separately-computed flat fill on top of it is
+   * what created a visible seam against a gradient header. This solid fill is only
+   * needed in standalone/home-screen (PWA) mode, where iOS can otherwise render
+   * black behind the notch/status-bar area instead of the page's own background.
    */
   &::before {
     content: "";
@@ -133,12 +140,16 @@ const HeaderWrap = styled.header`
     left: 0;
     right: 0;
     height: env(safe-area-inset-top, 0px);
-    background: var(
-      --narrow-header-safe-fill,
-      var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}))
-    );
+    background: transparent;
     pointer-events: none;
     z-index: 0;
+
+    @media (display-mode: standalone) {
+      background: var(
+        --narrow-header-safe-fill,
+        var(--header-chrome-bg, var(--header-bg, ${MIDDLE_BAR_BG}))
+      );
+    }
   }
 
   &[data-mobile-compact="true"] {

@@ -4857,9 +4857,50 @@ export default function LandingPageEditor() {
                               v === "mobile" ? copy.mobile : v === "tablet" ? copy.tablet : v === "desktop" ? copy.desktop : null
                             );
                             return (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+                                {/* ── Inspector: full page width, above tree/preview so it never
+                                     squeezes them into a cramped three-column row. ── */}
+                                {selectedNode && (
+                                  <div style={{ width: "100%" }}>
+                                    <Card>
+                                      <BlockStack gap="300">
+                                        <InlineStack align="space-between" blockAlign="center">
+                                          <InlineStack gap="200" blockAlign="center">
+                                            <Text as="h3" variant="headingSm">{selectedInfo.label}</Text>
+                                            <Badge tone={selectedNode.visible ? "success" : undefined}>{selectedNode.visible ? copy.visible : copy.hidden}</Badge>
+                                          </InlineStack>
+                                          <InlineStack gap="200" blockAlign="center">
+                                            <Button
+                                              size="slim"
+                                              tone="critical"
+                                              onClick={async () => { if (await confirmDelete(copy.removeContainerConfirm)) treeRemoveById(selectedNode.id); }}
+                                            >
+                                              {copy.remove}
+                                            </Button>
+                                            <Button
+                                              size="slim"
+                                              accessibilityLabel={copy.closeInspector}
+                                              onClick={() => setExpandedId(null)}
+                                            >
+                                              ×
+                                            </Button>
+                                          </InlineStack>
+                                        </InlineStack>
+                                        <Divider />
+                                        <ContainerEditor
+                                          container={selectedNode}
+                                          onChange={(updated) => treeUpdateById(selectedNode.id, () => updated)}
+                                          deviceTab={seitenDeviceTab}
+                                          editLang={contentEditLang}
+                                        />
+                                      </BlockStack>
+                                    </Card>
+                                  </div>
+                                )}
+
                               <div style={{ display: "flex", gap: 16, alignItems: "flex-start", width: "100%", flexWrap: "wrap" }}>
                                 {/* ── Left: tree ── */}
-                                <div style={{ flex: "1 1 280px", minWidth: 260, maxWidth: 340 }}>
+                                <div style={{ flex: "1 1 320px", minWidth: 300, maxWidth: 420 }}>
                                   <Card>
                                     <BlockStack gap="300">
                                       <InlineStack align="space-between" blockAlign="center">
@@ -4942,9 +4983,9 @@ export default function LandingPageEditor() {
                                   </Card>
                                 </div>
 
-                                {/* ── Middle: live vitrin — grows to fill the space the inspector
-                                     gives up when nothing is selected. */}
-                                <div style={{ flex: selectedNode ? "3 1 420px" : "1 1 600px", minWidth: 320 }}>
+                                {/* ── Right: live vitrin — full remaining width; inspector no longer
+                                     shares this row, so it always gets generous space. */}
+                                <div style={{ flex: "2 1 380px", minWidth: 300 }}>
                                   <Card>
                                     <BlockStack gap="200">
                                       <Text as="h3" variant="headingSm">{copy.livePreviewTitle}</Text>
@@ -4957,37 +4998,7 @@ export default function LandingPageEditor() {
                                     </BlockStack>
                                   </Card>
                                 </div>
-
-                                {/* ── Right: inspector — only reserves column width once a block
-                                     is actually selected, so it doesn't squeeze the preview. */}
-                                {selectedNode && (
-                                  <div style={{ flex: "2 1 340px", minWidth: 300, position: "sticky", top: 16 }}>
-                                    <Card>
-                                      <BlockStack gap="300">
-                                        <InlineStack align="space-between" blockAlign="center">
-                                          <InlineStack gap="200" blockAlign="center">
-                                            <Text as="h3" variant="headingSm">{selectedInfo.label}</Text>
-                                            <Badge tone={selectedNode.visible ? "success" : undefined}>{selectedNode.visible ? copy.visible : copy.hidden}</Badge>
-                                          </InlineStack>
-                                          <Button
-                                            size="slim"
-                                            tone="critical"
-                                            onClick={async () => { if (await confirmDelete(copy.removeContainerConfirm)) treeRemoveById(selectedNode.id); }}
-                                          >
-                                            {copy.remove}
-                                          </Button>
-                                        </InlineStack>
-                                        <Divider />
-                                        <ContainerEditor
-                                          container={selectedNode}
-                                          onChange={(updated) => treeUpdateById(selectedNode.id, () => updated)}
-                                          deviceTab={seitenDeviceTab}
-                                          editLang={contentEditLang}
-                                        />
-                                      </BlockStack>
-                                    </Card>
-                                  </div>
-                                )}
+                              </div>
                               </div>
                             );
                           })()}

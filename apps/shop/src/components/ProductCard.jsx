@@ -323,6 +323,19 @@ const OriginalPrice = styled.span`
   text-decoration: line-through;
 `;
 
+/* Fixed-height slot for the variant pills — always rendered (even with 0 variants) so the
+   qty stepper below always lands at the same height across every card, regardless of how
+   many variation groups (or none) a given product has. Overflow scrolls internally instead
+   of growing the card. */
+const VariantSlot = styled.div`
+  height: 50px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  &::-webkit-scrollbar {
+    width: 3px;
+  }
+`;
+
 /* Variant groups area */
 const VariantGroups = styled.div`
   display: flex;
@@ -692,6 +705,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           </CurrentPrice>
         </Prices>
 
+        <VariantSlot>
         {showPills && (
           variationGroups ? (
             /* Grouped display: one row per variation group */
@@ -809,6 +823,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             </Pills>
           )
         )}
+        </VariantSlot>
       </Info>
 
       <QtyRow>
