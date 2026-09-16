@@ -99,7 +99,9 @@ export default function ContentPagesPage({ blogOnly = false }) {
     meta_description_i18n: {},
   });
   const [editLang, setEditLang] = useState("de");
-  const [sort, setSort] = useState("newest");
+  // Pages: alphabetical by default (a flat page list is easiest to scan A–Z). Blog posts
+  // stay newest-first — a chronological feed is the natural default there.
+  const [sort, setSort] = useState(blogOnly ? "newest" : "alpha");
   const langOptions = getLandingEditorCopy(locale).shopContentLangOptions();
   const client = getMedusaAdminClient();
   const searchParams = useSearchParams();

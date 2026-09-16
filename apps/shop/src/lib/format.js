@@ -58,12 +58,27 @@ function pickTranslatedField(tr, meta, field, locale, base) {
  * Localized category name/description from metadata.translations.
  */
 export function getLocalizedCategory(category, locale) {
-  if (!category) return { name: "", description: "" };
+  if (!category) return { name: "", description: "", long_content: "", keywords: "" };
   const meta = category.metadata && typeof category.metadata === "object" ? category.metadata : {};
   const tr = meta.translations;
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const seoLoc = meta.seo_i18n && typeof meta.seo_i18n === "object" ? meta.seo_i18n[loc] : null;
   return {
     name: pickTranslatedField(tr, meta, "name", locale, category.name),
     description: pickTranslatedField(tr, meta, "description", locale, category.description),
+    long_content:
+      pickTranslatedField(tr, meta, "long_content", locale, null) ||
+      pickTranslatedField(tr, meta, "description", locale, null) ||
+      category.long_content ||
+      meta.richtext ||
+      "",
+    keywords:
+      (seoLoc && (seoLoc.keywords || seoLoc.meta_keywords)) ||
+      pickTranslatedField(tr, meta, "keywords", locale, null) ||
+      pickTranslatedField(tr, meta, "seo_keywords", locale, null) ||
+      category.seo_keywords ||
+      meta.keywords ||
+      "",
   };
 }
 

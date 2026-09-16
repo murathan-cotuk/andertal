@@ -17,26 +17,50 @@ const requireSuperuser = (req, res, next) => {
 
 // ── Brands ───────────────────────────────────────────────────────────────────
 
-const BRAND_SELECT_COLS = 'id, name, handle, logo_image, banner_image, address, seller_id, status, brand_type, trademark_number, trademark_jurisdiction, approved_at, approved_by, rejection_reason, verification_level, created_at'
+const BRAND_SELECT_COLS = 'id, name, handle, logo_image, banner_image, address, seller_id, status, brand_type, trademark_number, trademark_jurisdiction, approved_at, approved_by, rejection_reason, verification_level, metadata, created_at'
 
-const mapBrandRow = (row) => ({
-  id: row.id,
-  name: row.name,
-  handle: row.handle,
-  logo_image: row.logo_image || null,
-  banner_image: row.banner_image || null,
-  address: row.address || null,
-  seller_id: row.seller_id || null,
-  status: row.status || 'active',
-  brand_type: row.brand_type || 'own',
-  trademark_number: row.trademark_number || null,
-  trademark_jurisdiction: row.trademark_jurisdiction || null,
-  approved_at: row.approved_at || null,
-  approved_by: row.approved_by || null,
-  rejection_reason: row.rejection_reason || null,
-  verification_level: row.verification_level || null,
-  created_at: row.created_at,
-})
+const AUTH_DOC_TYPES = [
+  'trademark_certificate',
+  'trademark_image',
+  'product_packaging',
+  'authorization_letter',
+  'distribution_agreement',
+  'purchase_invoice',
+]
+
+const mapBrandRow = (row) => {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : null
+  const verification = metadata && metadata.verification && typeof metadata.verification === 'object'
+    ? metadata.verification
+    : null
+  return {
+    id: row.id,
+    name: row.name,
+    handle: row.handle,
+    logo_image: row.logo_image || null,
+    banner_image: row.banner_image || null,
+    address: row.address || null,
+    seller_id: row.seller_id || null,
+    status: row.status || 'active',
+    brand_type: row.brand_type || 'own',
+    trademark_number: row.trademark_number || null,
+    trademark_jurisdiction: row.trademark_jurisdiction || null,
+    approved_at: row.approved_at || null,
+    approved_by: row.approved_by || null,
+    rejection_reason: row.rejection_reason || null,
+    verification_level: row.verification_level || null,
+    verification,
+    created_at: row.created_at,
+  }
+}
+
+function isBrandVerified(brand) {
+  return brand?.verification_level === 'verified' || brand?.verification_level === 'reseller'
+}
+
+function isBrandVerifyInFlight(brand) {
+  return brand?.status === 'pending' || brand?.verification_level === 'pending_review'
+}
 
 const adminBrandsGET = async (req, res) => {
   const client = getCategoriesPgClient()
@@ -139,8 +163,7 @@ const brandAuthDocsPOST = async (req, res) => {
   const fileUrl = (body.file_url || '').trim()
   if (!fileUrl) return res.status(400).json({ message: 'file_url is required' })
   let docType = String(body.document_type || '').trim().toLowerCase()
-  const allowedTypes = ['purchase_invoice', 'distribution_agreement', 'trademark_certificate', 'authorization_letter']
-  if (!allowedTypes.includes(docType)) docType = 'purchase_invoice'
+  if (!AUTH_DOC_TYPES.includes(docType)) docType = 'purchase_invoice'
   const fileName = (body.file_name || '').trim() || null
   const callerSellerId = req.sellerUser?.seller_id || null
   const isSuperuser = req.sellerUser?.is_superuser === true
@@ -170,13 +193,192 @@ const brandAuthDocsPOST = async (req, res) => {
   }
 }
 
+const brandVerifyPOST = async (req, res) => {
+  const brandId = (req.params.id || '').trim()
+  if (!brandId) return res.status(400).json({ message: 'brand id required' })
+  const body = req.body || {}
+  const callerSellerId = req.sellerUser?.seller_id || null
+  const isSuperuser = req.sellerUser?.is_superuser === true
+  const reviewerId = req.sellerUser?.id || callerSellerId || 'superuser'
+
+  let brandType = String(body.brand_type || 'own_registered').trim().toLowerCase()
+  if (!['own_registered', 'authorized_reseller'].includes(brandType)) {
+    return res.status(400).json({ message: 'brand_type must be own_registered or authorized_reseller' })
+  }
+
+  const trademarkNumber = (body.trademark_number || '').trim() || null
+  const trademarkJurisdiction = (body.trademark_jurisdiction || '').trim() || null
+  const trademarkStatus = String(body.trademark_status || 'registered').trim().toLowerCase()
+  const trademarkOwnerName = (body.trademark_owner_name || '').trim() || null
+  const ownershipRole = String(body.ownership_role || '').trim().toLowerCase() || (brandType === 'authorized_reseller' ? 'authorized_reseller' : 'owner')
+  const website = (body.website || '').trim() || null
+  const docs = Array.isArray(body.documents) ? body.documents : []
+
+  if (brandType === 'own_registered') {
+    if (!trademarkNumber) return res.status(400).json({ message: 'trademark_number is required' })
+    if (!trademarkJurisdiction) return res.status(400).json({ message: 'trademark_jurisdiction is required' })
+    if (!['registered', 'pending'].includes(trademarkStatus)) {
+      return res.status(400).json({ message: 'trademark_status must be registered or pending' })
+    }
+    if (!trademarkOwnerName) return res.status(400).json({ message: 'trademark_owner_name is required' })
+    if (!['owner', 'licensee', 'authorized_agent'].includes(ownershipRole)) {
+      return res.status(400).json({ message: 'ownership_role must be owner, licensee, or authorized_agent' })
+    }
+  }
+
+  const normalizedDocs = docs
+    .map((d) => ({
+      document_type: AUTH_DOC_TYPES.includes(String(d?.document_type || '').trim().toLowerCase())
+        ? String(d.document_type).trim().toLowerCase()
+        : null,
+      file_url: String(d?.file_url || '').trim(),
+      file_name: String(d?.file_name || '').trim() || null,
+    }))
+    .filter((d) => d.document_type && d.file_url)
+
+  if (!isSuperuser) {
+    const types = new Set(normalizedDocs.map((d) => d.document_type))
+    if (brandType === 'own_registered') {
+      if (!types.has('trademark_certificate')) {
+        return res.status(400).json({ message: 'trademark_certificate is required' })
+      }
+      if (!types.has('product_packaging')) {
+        return res.status(400).json({ message: 'product_packaging photo is required (brand permanently affixed)' })
+      }
+      if ((ownershipRole === 'licensee' || ownershipRole === 'authorized_agent') && !types.has('authorization_letter') && !types.has('distribution_agreement')) {
+        return res.status(400).json({ message: 'authorization_letter or distribution_agreement is required when you are not the trademark owner' })
+      }
+    } else if (!types.has('authorization_letter') && !types.has('distribution_agreement')) {
+      return res.status(400).json({ message: 'authorization_letter or distribution_agreement is required' })
+    }
+  }
+
+  const client = getCategoriesPgClient()
+  if (!client) return res.status(500).json({ message: 'Database unavailable' })
+  try {
+    await client.connect()
+    const existing = await client.query(`SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands WHERE id = $1`, [brandId])
+    if (!existing.rows || !existing.rows[0]) {
+      await client.end()
+      return res.status(404).json({ message: 'Brand not found' })
+    }
+    const brand = existing.rows[0]
+    const mapped = mapBrandRow(brand)
+    const isOwner = callerSellerId && brand.seller_id === callerSellerId
+    if (!isSuperuser && !isOwner) {
+      await client.end()
+      return res.status(403).json({ message: 'You can only verify brands you added' })
+    }
+    if (isBrandVerified(mapped)) {
+      await client.end()
+      return res.status(409).json({ message: 'Brand is already verified' })
+    }
+    if (isBrandVerifyInFlight(mapped) && !isSuperuser) {
+      await client.end()
+      return res.status(409).json({ message: 'Verification is already in review' })
+    }
+
+    const prevMeta = brand.metadata && typeof brand.metadata === 'object' ? brand.metadata : {}
+    const metadata = {
+      ...prevMeta,
+      verification: {
+        trademark_status: brandType === 'own_registered' ? trademarkStatus : null,
+        trademark_owner_name: trademarkOwnerName,
+        ownership_role: ownershipRole,
+        website,
+        submitted_at: new Date().toISOString(),
+        submitted_by: callerSellerId || reviewerId,
+      },
+    }
+
+    const instant = isSuperuser === true
+    const wasLive = brand.status === 'active' || brand.status == null
+    const nextStatus = instant ? 'active' : (wasLive ? 'active' : 'pending')
+    const nextLevel = instant
+      ? (brandType === 'authorized_reseller' ? 'reseller' : 'verified')
+      : 'pending_review'
+
+    await client.query(
+      `UPDATE admin_hub_brands SET
+         brand_type = $1,
+         trademark_number = $2,
+         trademark_jurisdiction = $3,
+         status = $4,
+         verification_level = $5,
+         rejection_reason = NULL,
+         approved_at = $6,
+         approved_by = $7,
+         metadata = $8::jsonb,
+         updated_at = now()
+       WHERE id = $9`,
+      [
+        brandType,
+        trademarkNumber,
+        trademarkJurisdiction,
+        nextStatus,
+        nextLevel,
+        instant ? new Date() : null,
+        instant ? reviewerId : null,
+        JSON.stringify(metadata),
+        brandId,
+      ]
+    )
+
+    for (const d of normalizedDocs) {
+      await client.query(
+        `INSERT INTO admin_hub_brand_authorization_documents (brand_id, seller_id, document_type, file_url, file_name)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [brandId, callerSellerId, d.document_type, d.file_url, d.file_name]
+      ).catch(() => {})
+    }
+
+    if (instant) {
+      await client.query(
+        `UPDATE admin_hub_brand_authorization_documents SET status = 'approved', reviewer_id = $1, reviewed_at = now() WHERE brand_id = $2 AND status = 'pending'`,
+        [reviewerId, brandId]
+      ).catch(() => {})
+      if (brand.seller_id) {
+        await client.query(
+          `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+           VALUES ('brand_authorization_reviewed', $1, $2, $3, $4)`,
+          [
+            'Marke verifiziert',
+            `Ihre Marke "${brand.name}" wurde verifiziert.`,
+            brand.seller_id,
+            brandId,
+          ]
+        ).catch(() => {})
+      }
+    } else {
+      const notifBody = brandType === 'own_registered'
+        ? `Bir satıcı tescilli marka "${brand.name}" (${trademarkJurisdiction || '?'}, no: ${trademarkNumber || '?'}) için doğrulama gönderdi.`
+        : `Bir satıcı "${brand.name}" markası için yetkili bayi doğrulaması gönderdi.`
+      await client.query(
+        `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+         VALUES ('brand_authorization_pending', $1, $2, $3, $4)`,
+        ['Marka doğrulama bekliyor', notifBody, callerSellerId, brandId]
+      ).catch(() => {})
+    }
+
+    const r = await client.query(`SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands WHERE id = $1`, [brandId])
+    await client.end()
+    res.json({ brand: r.rows && r.rows[0] ? mapBrandRow(r.rows[0]) : null, instant })
+  } catch (e) {
+    try { await client.end() } catch (_) {}
+    console.error('Brand verify POST:', e)
+    res.status(500).json({ message: (e && e.message) || 'Internal server error' })
+  }
+}
+
 const brandPendingAuthorizationsGET = async (req, res) => {
   const client = getCategoriesPgClient()
   if (!client) return res.status(500).json({ message: 'Database unavailable' })
   try {
     await client.connect()
     const brands = await client.query(
-      `SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands WHERE status = 'pending' ORDER BY created_at DESC`
+      `SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands
+       WHERE status = 'pending' OR verification_level = 'pending_review'
+       ORDER BY created_at DESC`
     )
     const ids = (brands.rows || []).map((b) => b.id)
     let docsByBrand = {}
@@ -241,7 +443,7 @@ const brandAuthReview = async (req, res, approve) => {
       ).catch(() => {})
     } else {
       await client.query(
-        `UPDATE admin_hub_brands SET status = 'rejected', rejection_reason = $1, approved_by = $2, updated_at = now() WHERE id = $3`,
+        `UPDATE admin_hub_brands SET status = 'rejected', rejection_reason = $1, approved_by = $2, verification_level = 'unverified', updated_at = now() WHERE id = $3`,
         [reason, reviewerId, brandId]
       )
       await client.query(
@@ -431,6 +633,7 @@ module.exports = function createBrandsRouter() {
   router.get('/admin-hub/brands/pending-authorizations', requireSuperuser, brandPendingAuthorizationsGET)
   router.post('/admin-hub/brands', adminBrandsPOST)
   router.post('/admin-hub/brands/:id/authorization-documents', brandAuthDocsPOST)
+  router.post('/admin-hub/brands/:id/verify', brandVerifyPOST)
   router.post('/admin-hub/brands/:id/authorization/approve', requireSuperuser, (req, res) => brandAuthReview(req, res, true))
   router.post('/admin-hub/brands/:id/authorization/reject', requireSuperuser, (req, res) => brandAuthReview(req, res, false))
   router.patch('/admin-hub/brands/:id', (req, res) => adminBrandsPatchDelete(req, res, true))

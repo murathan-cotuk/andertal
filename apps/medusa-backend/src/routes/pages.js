@@ -576,7 +576,7 @@ const storePageBySlugGET = async (req, res) => {
     const r = await client.query(
       `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords,
               title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, updated_at
-       FROM admin_hub_pages WHERE slug = $1 AND status = 'published'`,
+       FROM admin_hub_pages WHERE lower(slug) = lower($1) AND status = 'published'`,
       [req.params.slug]
     )
     if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })

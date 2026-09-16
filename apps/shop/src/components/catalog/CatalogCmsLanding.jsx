@@ -9,11 +9,8 @@ import LandingContainers from '@/components/landing/LandingContainers'
 import { SectionErrorBoundary } from '@/components/ErrorBoundary'
 import { getMedusaClient } from '@/lib/medusa-client'
 import { useShopStyles } from '@/context/ShopStylesContext'
-
-function lt(page, field, locale) {
-  if (!locale || locale === 'de') return page?.[field] || ''
-  return page?.[`${field}_i18n`]?.[locale]?.[field] || page?.[field] || ''
-}
+import { localizedCmsField } from '@/lib/seo'
+import { catalogAliasesForHub, catalogCmsSeo } from '@/lib/catalog-cms-page'
 
 function sanitizeHtml(html) {
   if (!html || typeof html !== 'string') return ''
@@ -34,17 +31,9 @@ function cmsPagePadding(tmpl) {
   }
 }
 
-/**
- * Decide whether CMS landing containers should paint above the native catalog body.
- *
- * TASKS §8: catalog_hub stacks were pushed onto bestsellers/sales and sat on top of
- * the old sidebar+carousel templates. Pages that pass `preferNativeCatalog` only opt
- * into CMS when the intentional category layout is present.
- */
 function shouldUseLandingContainers(landing, { preferNativeCatalog }) {
   const containers = Array.isArray(landing?.containers) ? landing.containers : []
   if (!containers.length) return false
-
   if (!preferNativeCatalog) return true
 
   const settings = landing?.settings && typeof landing.settings === 'object' ? landing.settings : {}
@@ -73,11 +62,33 @@ function hasBrandsDirectoryContainer(landing) {
   )
 }
 
+async function loadCatalogPage(client, slug) {
+  const aliases = catalogAliasesForHub(slug)
+  for (const alias of aliases) {
+    const data = await client.getPageBySlug(alias)
+    if (data?.id) return data
+  }
+  try {
+    const list = await fetch('/api/store-pages', { cache: 'no-store' }).then((r) => r.json())
+    const pages = Array.isArray(list?.pages) ? list.pages : []
+    const wanted = new Set(aliases.map((s) => s.toLowerCase()))
+    const bySlug = pages.find((p) => wanted.has(String(p.slug || '').toLowerCase()))
+    if (bySlug?.id) return bySlug
+    if (slug === 'brands') {
+      const byTitle = pages.find((p) =>
+        /^(marken|brands|markalar)$/i.test(String(p.title || '').trim()),
+      )
+      if (byTitle?.id) return byTitle
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
 /**
  * CMS + chrome shell for catalog hubs (bestsellers, sales, neuheiten, brands).
- *
- * TASKS §7: Seiteninhalt (page body / richtext from Content → Pages) always renders
- * at the very bottom — after containers and after any native body.
+ * Order: landing containers → native catalog body → Seiten richtext (always last).
  */
 export default function CatalogCmsLanding({
   slug,
@@ -88,7 +99,10 @@ export default function CatalogCmsLanding({
 }) {
   const locale = useLocale()
   const shopStyles = useShopStyles()
-  const pagePad = cmsPagePadding(shopStyles?.cms_page_template)
+  const tmpl = shopStyles?.cms_page_template && typeof shopStyles.cms_page_template === 'object'
+    ? shopStyles.cms_page_template
+    : {}
+  const pagePad = cmsPagePadding(tmpl)
   const [page, setPage] = useState(null)
   const [landing, setLanding] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -100,13 +114,15 @@ export default function CatalogCmsLanding({
       try {
         setLoading(true)
         const client = getMedusaClient()
-        const data = await client.getPageBySlug(slug)
+        const data = await loadCatalogPage(client, slug)
         if (cancelled) return
         setPage(data || null)
         if (data?.id) {
           try {
-            const lp = await fetch(`/api/store-landing-page/${encodeURIComponent(data.id)}`).then((r) => r.json())
-            if (!cancelled) setLanding(lp || null)
+            const lp = await fetch(`/api/store-landing-page/${encodeURIComponent(data.id)}`, {
+              cache: 'no-store',
+            }).then((r) => r.json())
+            if (!cancelled) setLanding(lp && !lp.__error ? lp : null)
           } catch {
             if (!cancelled) setLanding(null)
           }
@@ -125,14 +141,30 @@ export default function CatalogCmsLanding({
     return () => { cancelled = true }
   }, [slug])
 
-  const title = (page ? lt(page, 'title', locale) : '') || fallbackTitle || slug
+  useEffect(() => {
+    if (!page) return
+    const seo = catalogCmsSeo(page, locale, fallbackTitle)
+    if (seo.title) document.title = seo.title
+    if (seo.description) {
+      let meta = document.querySelector('meta[name="description"]')
+      if (!meta) {
+        meta = document.createElement('meta')
+        meta.setAttribute('name', 'description')
+        document.head.appendChild(meta)
+      }
+      meta.setAttribute('content', seo.description)
+    }
+  }, [page, locale, fallbackTitle])
+
+  const title = (page ? localizedCmsField(page, 'title', locale) : '') || fallbackTitle || slug
+  const containers = Array.isArray(landing?.containers) ? landing.containers : []
   const useContainers = shouldUseLandingContainers(landing, { preferNativeCatalog })
-  // Brands: if CMS already has brands_directory (or legacy seller_carousel→directory),
-  // skip native fallback to avoid a double grid.
   const brandsDirInCms = slug === 'brands' && hasBrandsDirectoryContainer(landing)
   const showNativeBody = hasChildren && (!useContainers || (slug === 'brands' && !brandsDirInCms))
   const showTitle = showTitleWhenNoContainers && !useContainers
-  const safeBody = sanitizeHtml(page ? lt(page, 'body', locale) : '')
+  const safeBody = sanitizeHtml(page ? localizedCmsField(page, 'body', locale) : '')
+  const richtextAlign = tmpl.richtext_align || 'left'
+  const richtextMaxW = tmpl.richtext_max_width || '700px'
 
   if (loading) {
     return (
@@ -150,7 +182,11 @@ export default function CatalogCmsLanding({
       <main className="flex-1">
         {useContainers && page?.id ? (
           <SectionErrorBoundary>
-            <LandingContainers pageId={page.id} />
+            <LandingContainers
+              pageId={page.id}
+              initialContainers={containers}
+              initialSettings={landing?.settings || {}}
+            />
           </SectionErrorBoundary>
         ) : null}
         {showTitle ? (
@@ -160,14 +196,15 @@ export default function CatalogCmsLanding({
         ) : null}
         {showNativeBody ? children : null}
 
-        {/* TASKS §7: Seiteninhalt always last — below every container / native block */}
         {safeBody ? (
           <div
-            className="container mx-auto px-4 max-w-3xl w-full"
+            className="container mx-auto px-4 w-full"
             style={{
+              maxWidth: richtextMaxW === 'full' ? 1200 : 800,
               paddingTop: Math.max(24, pagePad.paddingTop || 0),
               paddingBottom: pagePad.paddingBottom,
               boxSizing: 'border-box',
+              textAlign: richtextAlign,
             }}
           >
             <div

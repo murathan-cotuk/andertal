@@ -6,7 +6,11 @@ import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { BrandCard } from "@/components/BrandCard";
 
 const Container = styled.div`
-  max-width: ${(p) => p.$maxWidth || 1440}px;
+  max-width: ${(p) => {
+    const w = p.$maxWidth;
+    if (w == null || w === "") return "1440px";
+    return /^[\d.]+$/.test(String(w)) ? `${w}px` : String(w);
+  }};
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;

@@ -1065,7 +1065,8 @@ export default function CategoryTemplate() {
   }, [slug]);
 
   const meta = parseCategoryMetadata(category);
-  const localizedName = getLocalizedCategory(category, locale).name;
+  const localizedCat = getLocalizedCategory(category, locale);
+  const localizedName = localizedCat.name;
   const displayTitle =
     (meta.display_title && String(meta.display_title).trim()) ||
     localizedName ||
@@ -1075,8 +1076,8 @@ export default function CategoryTemplate() {
   const bannerUrl = rawBanner ? resolveImageUrl(rawBanner) : "";
   const rawBannerVideo = safeUrl(category?.metadata?.banner_video_url);
   const bannerVideoUrl = rawBannerVideo ? resolveImageUrl(rawBannerVideo) : "";
-  const richtextHtml = category?.long_content
-    ? sanitizeHtml(rewriteImageUrlsInHtml(category.long_content))
+  const richtextHtml = localizedCat.long_content
+    ? sanitizeHtml(rewriteImageUrlsInHtml(localizedCat.long_content))
     : "";
 
   /* ── Category template settings ── */
@@ -1103,10 +1104,12 @@ export default function CategoryTemplate() {
     const docTitle = seo.title || dt;
     document.title = docTitle;
     const desc = seo.description || "";
-    const keywords =
-      (category.seo_keywords && String(category.seo_keywords).trim()) ||
-      (m.keywords && String(m.keywords).trim()) ||
-      "";
+    const keywords = String(
+      getLocalizedCategory(category, locale).keywords ||
+        (category.seo_keywords && String(category.seo_keywords).trim()) ||
+        (m.keywords && String(m.keywords).trim()) ||
+        "",
+    ).trim();
     const ensureMeta = (selector, create) => {
       let el = document.querySelector(selector);
       if (!el) {

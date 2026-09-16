@@ -8,7 +8,12 @@ export async function GET(request, context) {
   if (data?.__error) {
     return NextResponse.json(data, { status: data.status || 200 });
   }
+  const pageSpecific = Array.isArray(path) && path.length > 0;
   return NextResponse.json(data, {
-    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" },
+    headers: {
+      "Cache-Control": pageSpecific
+        ? "no-store"
+        : "public, s-maxage=30, stale-while-revalidate=120",
+    },
   });
 }

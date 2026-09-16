@@ -561,15 +561,20 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                   <BlockStack gap="200">
                     {categoryProducts.map((p) => (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f1f1f1" }}>
-                        {p.thumbnail ? (
-                          <Thumbnail source={resolveImageUrl(p.thumbnail)} alt={p.title} size="small" />
-                        ) : (
-                          <div style={{ width: 40, height: 40, background: "#f4f6f8", borderRadius: 4, flexShrink: 0 }} />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <Text as="p" variant="bodyMd" fontWeight="medium" truncate>{p.title}</Text>
-                          <Text as="p" variant="bodySm" tone="subdued">{p.handle}</Text>
-                        </div>
+                        <Link
+                          href={`/products/${p.id}`}
+                          style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}
+                        >
+                          {p.thumbnail ? (
+                            <Thumbnail source={resolveImageUrl(p.thumbnail)} alt={p.title} size="small" />
+                          ) : (
+                            <div style={{ width: 40, height: 40, background: "#f4f6f8", borderRadius: 4, flexShrink: 0 }} />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <Text as="p" variant="bodyMd" fontWeight="medium" truncate>{p.title}</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">{p.handle}</Text>
+                          </div>
+                        </Link>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
                           {p.status && (
                             <Badge tone={p.status === "published" ? "success" : "attention"}>

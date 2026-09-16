@@ -570,6 +570,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [eanMatchedOn, setEanMatchedOn] = useState("parent"); // "parent" | "variant" — which EAN the lookup matched on
   const [urlSearchTerm, setUrlSearchTerm] = useState(""); // shop URL or handle to search
   const [urlSearchState, setUrlSearchState] = useState(null); // null | "loading" | "found" | "not_found"
+  // Whether the product's category compliance profile actually calls for WEEE/EPREL — reported
+  // by ComplianceFieldsSection once it resolves the category's schema (default true while
+  // unknown, so an existing saved value is never hidden before the fetch lands).
+  const [complianceApplies, setComplianceApplies] = useState({ weee: true, eprel: true });
   // Variant image picker: null = closed, option_values[] = target variant being edited
   const [variantImgPickerTarget, setVariantImgPickerTarget] = useState(null);
   // Swatch image picker: null = closed, {gi, oi} = target group/option
@@ -1450,34 +1454,42 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         }));
       }
       const variantsToSave = product.variants || [];
-      const missingVariantEan = variantsToSave.find((row) => String(row?.ean || "").trim() === "");
-      if (missingVariantEan) {
-        setMessage({
-          type: "warning",
-          text: lt(locale, "Enter EAN for all variants before saving.", "Kaydetmek için tüm varyantlarda EAN girilmelidir.", "Saisissez un EAN pour toutes les variantes avant d'enregistrer.", "Introduce EAN para todas las variantes antes de guardar.", "Inserisci l'EAN per tutte le varianti prima di salvare.", "Bitte EAN für alle Varianten eintragen, um zu speichern."),
-        });
-        setActiveTabIndex(2);
-        return false;
-      }
-      // Soft GPSR gate: missing required fields must NEVER discard the seller's work.
-      // The product is saved as a draft (never left/made "published") and the seller is
-      // warned instead. The backend enforces the same rule and can also downgrade.
+      // Soft gates only, from here down: missing required fields (GPSR or EAN) must NEVER
+      // discard the seller's work or block Save outright — the product is saved as a draft
+      // (never left/made "published") and the seller is warned instead. The backend enforces
+      // the same rule and can also downgrade.
+      const missingVariantEan = variantsToSave.some((row) => String(row?.ean || "").trim() === "");
       const gpsrMissing = [];
       if (!String(metadata.hersteller || "").trim()) gpsrMissing.push("Hersteller");
       if (!String(metadata.hersteller_information || "").trim()) gpsrMissing.push("Hersteller-Informationen");
       if (!String(metadata.verantwortliche_person_information || "").trim()) gpsrMissing.push("Verantwortliche Person (EU)");
       let effectiveStatus = nextStatus;
       let softComplianceWarning = "";
-      if (gpsrMissing.length > 0) {
+      if (gpsrMissing.length > 0 || missingVariantEan) {
         if (String(effectiveStatus).toLowerCase() === "published") effectiveStatus = "draft";
+        const parts = [];
+        if (gpsrMissing.length > 0) {
+          parts.push(lt(
+            locale,
+            `these GPSR fields: ${gpsrMissing.join(", ")}`,
+            `şu GPSR alanları: ${gpsrMissing.join(", ")}`,
+            `ces champs GPSR : ${gpsrMissing.join(", ")}`,
+            `estos campos GPSR: ${gpsrMissing.join(", ")}`,
+            `questi campi GPSR: ${gpsrMissing.join(", ")}`,
+            `diese GPSR-Felder: ${gpsrMissing.join(", ")}`,
+          ));
+        }
+        if (missingVariantEan) {
+          parts.push(lt(locale, "the EAN on every variant", "her varyantta EAN", "l'EAN de chaque variante", "el EAN de cada variante", "l'EAN di ogni variante", "die EAN bei jeder Variante"));
+        }
         softComplianceWarning = lt(
           locale,
-          `Saved as draft — fill these GPSR fields to publish: ${gpsrMissing.join(", ")}`,
-          `Taslak olarak kaydedildi — yayınlamak için şu GPSR alanlarını doldurun: ${gpsrMissing.join(", ")}`,
-          `Enregistré en brouillon — remplissez ces champs GPSR pour publier : ${gpsrMissing.join(", ")}`,
-          `Guardado como borrador — complete estos campos GPSR para publicar: ${gpsrMissing.join(", ")}`,
-          `Salvato come bozza — compila questi campi GPSR per pubblicare: ${gpsrMissing.join(", ")}`,
-          `Als Entwurf gespeichert — diese GPSR-Felder für die Veröffentlichung ausfüllen: ${gpsrMissing.join(", ")}`,
+          `Saved as draft — fill in ${parts.join(" and ")} to publish.`,
+          `Taslak olarak kaydedildi — yayınlamak için ${parts.join(" ve ")} doldurun.`,
+          `Enregistré en brouillon — remplissez ${parts.join(" et ")} pour publier.`,
+          `Guardado como borrador — complete ${parts.join(" y ")} para publicar.`,
+          `Salvato come bozza — compila ${parts.join(" e ")} per pubblicare.`,
+          `Als Entwurf gespeichert — ${parts.join(" und ")} für die Veröffentlichung ausfüllen.`,
         );
       }
       // Build the "jump to the error" list: parent GPSR gaps (Legal tab) + variants still
@@ -1495,6 +1507,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             optionValues: vv.option_values,
             errKey: "gpsr",
             label: lt(locale, "Variant", "Varyant", "Variante", "Variante", "Variante", "Variante") + ": " + vv.option_values.join(" / ") + " — GPSR",
+          });
+        }
+        if (String(vv?.ean || "").trim() === "") {
+          errList.push({
+            tab: 2,
+            anchor: "vm-matrix",
+            optionValues: vv.option_values,
+            errKey: "ean",
+            label: lt(locale, "Variant", "Varyant", "Variante", "Variante", "Variante", "Variante") + ": " + (Array.isArray(vv.option_values) ? vv.option_values.join(" / ") : "—") + " — EAN",
           });
         }
       });
@@ -3054,11 +3075,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   <div>
                     <BlockStack gap="400">
                       <Divider />
-                      {variantGroups.length > 0 ? (
+                      {variantGroups.length > 0 && (
                         <Banner tone="info">
-                          {locale === "en" ? "This product has variations — category, brand and shipping group are now set per variant (each variant is its own product). Open a variant below to edit them." : locale === "tr" ? "Bu ürünün varyasyonları var — kategori, marka ve kargo grubu artık varyant başına ayarlanıyor (her varyant kendi ürünüdür). Düzenlemek için aşağıdan bir varyant açın." : locale === "fr" ? "Ce produit a des variations — catégorie, marque et groupe d'expédition sont désormais définis par variante (chaque variante est son propre produit). Ouvrez une variante ci-dessous pour les modifier." : locale === "es" ? "Este producto tiene variaciones — categoría, marca y grupo de envío ahora se definen por variante (cada variante es su propio producto). Abre una variante abajo para editarlos." : locale === "it" ? "Questo prodotto ha variazioni — categoria, marca e gruppo di spedizione sono ora impostati per variante (ogni variante è un proprio prodotto). Apri una variante qui sotto per modificarli." : "Dieses Produkt hat Variationen — Kategorie, Marke und Versandgruppe werden jetzt pro Variante gesetzt (jede Variante ist ihr eigenes Produkt). Öffne unten eine Variante, um sie zu bearbeiten."}
+                          {locale === "en" ? "This product has variations — brand and shipping group are set per variant (each variant is its own product); category applies to the whole family and must match on every variant. Open a variant below to edit its brand/shipping." : locale === "tr" ? "Bu ürünün varyasyonları var — marka ve kargo grubu varyant başına ayarlanıyor (her varyant kendi ürünüdür); kategori tüm aileye uygulanır ve her varyantta aynı olmalıdır. Marka/kargoyu düzenlemek için aşağıdan bir varyant açın." : locale === "fr" ? "Ce produit a des variations — marque et groupe d'expédition sont définis par variante (chaque variante est son propre produit) ; la catégorie s'applique à toute la famille et doit être identique sur chaque variante. Ouvrez une variante ci-dessous pour éditer sa marque/expédition." : locale === "es" ? "Este producto tiene variaciones — marca y grupo de envío se definen por variante (cada variante es su propio producto); la categoría aplica a toda la familia y debe coincidir en cada variante. Abre una variante abajo para editar su marca/envío." : locale === "it" ? "Questo prodotto ha variazioni — marca e gruppo di spedizione sono impostati per variante (ogni variante è un proprio prodotto); la categoria si applica a tutta la famiglia e deve corrispondere su ogni variante. Apri una variante qui sotto per modificarne marca/spedizione." : "Dieses Produkt hat Variationen — Marke und Versandgruppe werden pro Variante gesetzt (jede Variante ist ihr eigenes Produkt); die Kategorie gilt für die ganze Familie und muss bei jeder Variante gleich sein. Öffne unten eine Variante, um Marke/Versand zu bearbeiten."}
                         </Banner>
-                      ) : (
+                      )}
                       <InlineStack gap="500" wrap>
                         <Box minWidth="240px" flex="1">
                           <Text as="p" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie"}</Text>
@@ -3081,43 +3102,46 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             </Box>
                           )}
                         </Box>
-                        <Box minWidth="240px" flex="1">
-                          <Select
-                            label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
-                            options={[
-                              { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" },
-                              ...(brands || [])
-                                .filter((b) => (b.status || "active") === "active" || b.id === getMeta(product, "brand_id"))
-                                .map((b) => {
-                                  const pending = (b.status || "active") !== "active";
-                                  const pendingSuffix = pending
-                                    ? ` (${locale === "en" ? "pending authorization" : locale === "tr" ? "onay bekliyor" : locale === "fr" ? "autorisation en attente" : locale === "es" ? "autorización pendiente" : locale === "it" ? "autorizzazione in attesa" : "Autorisierung ausstehend"})`
-                                    : "";
-                                  return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
-                                }),
-                            ]}
-                            value={getMeta(product, "brand_id") || ""}
-                            onChange={(v) => updateMeta("brand_id", v || undefined)}
-                            helpText={
-                              (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
-                                ? (locale === "en" ? "This brand is pending authorization and can't be published yet." : locale === "tr" ? "Bu marka onay bekliyor, henüz yayınlanamaz." : locale === "fr" ? "Cette marque est en attente d'autorisation et ne peut pas encore être publiée." : locale === "es" ? "Esta marca está pendiente de autorización y aún no se puede publicar." : locale === "it" ? "Questo brand è in attesa di autorizzazione e non può ancora essere pubblicato." : "Diese Marke wartet auf Autorisierung und kann noch nicht veröffentlicht werden.")
-                                : undefined
-                            }
-                          />
-                        </Box>
-                        <Box minWidth="240px" flex="1">
-                          <Select
-                            label={locale === "en" ? "Shipping group" : locale === "tr" ? "Kargo grubu" : locale === "fr" ? "Groupe d'expédition" : locale === "es" ? "Grupo de envío" : locale === "it" ? "Gruppo di spedizione" : "Versandgruppe"}
-                            options={[
-                              { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucun —" : locale === "es" ? "— Ninguno —" : locale === "it" ? "— Nessuno —" : "— Keine —", value: "" },
-                              ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
-                            ]}
-                            value={meta.shipping_group_id ?? ""}
-                            onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
-                          />
-                        </Box>
+                        {variantGroups.length === 0 && (
+                          <>
+                            <Box minWidth="240px" flex="1">
+                              <Select
+                                label={locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"}
+                                options={[
+                                  { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucune —" : locale === "es" ? "— Ninguna —" : locale === "it" ? "— Nessuna —" : "— Keine —", value: "" },
+                                  ...(brands || [])
+                                    .filter((b) => (b.status || "active") === "active" || b.id === getMeta(product, "brand_id"))
+                                    .map((b) => {
+                                      const pending = (b.status || "active") !== "active";
+                                      const pendingSuffix = pending
+                                        ? ` (${locale === "en" ? "pending authorization" : locale === "tr" ? "onay bekliyor" : locale === "fr" ? "autorisation en attente" : locale === "es" ? "autorización pendiente" : locale === "it" ? "autorizzazione in attesa" : "Autorisierung ausstehend"})`
+                                        : "";
+                                      return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
+                                    }),
+                                ]}
+                                value={getMeta(product, "brand_id") || ""}
+                                onChange={(v) => updateMeta("brand_id", v || undefined)}
+                                helpText={
+                                  (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
+                                    ? (locale === "en" ? "This brand is pending authorization and can't be published yet." : locale === "tr" ? "Bu marka onay bekliyor, henüz yayınlanamaz." : locale === "fr" ? "Cette marque est en attente d'autorisation et ne peut pas encore être publiée." : locale === "es" ? "Esta marca está pendiente de autorización y aún no se puede publicar." : locale === "it" ? "Questo brand è in attesa di autorizzazione e non può ancora essere pubblicato." : "Diese Marke wartet auf Autorisierung und kann noch nicht veröffentlicht werden.")
+                                    : undefined
+                                }
+                              />
+                            </Box>
+                            <Box minWidth="240px" flex="1">
+                              <Select
+                                label={locale === "en" ? "Shipping group" : locale === "tr" ? "Kargo grubu" : locale === "fr" ? "Groupe d'expédition" : locale === "es" ? "Grupo de envío" : locale === "it" ? "Gruppo di spedizione" : "Versandgruppe"}
+                                options={[
+                                  { label: locale === "en" ? "— None —" : locale === "tr" ? "— Yok —" : locale === "fr" ? "— Aucun —" : locale === "es" ? "— Ninguno —" : locale === "it" ? "— Nessuno —" : "— Keine —", value: "" },
+                                  ...shippingGroupsList.map((g) => ({ label: g.name, value: g.id })),
+                                ]}
+                                value={meta.shipping_group_id ?? ""}
+                                onChange={(v) => updateMeta("shipping_group_id", v || undefined)}
+                              />
+                            </Box>
+                          </>
+                        )}
                       </InlineStack>
-                      )}
 
                       {isSuperuser && (
                         <>
@@ -4561,6 +4585,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 product={product}
                 getMeta={getMeta}
                 updateMeta={updateMeta}
+                onResolved={setComplianceApplies}
               />
             </BlockStack>
             </div>
@@ -4571,30 +4596,36 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             <BlockStack gap="400">
               <ProductSectionHeading>{locale === "en" ? "Product documents & compliance" : locale === "tr" ? "Ürün belgeleri ve uyumluluk" : locale === "fr" ? "Documents produit & conformité" : locale === "es" ? "Documentos de producto y cumplimiento" : locale === "it" ? "Documenti prodotto e conformità" : "Produktdokumente & Compliance"}</ProductSectionHeading>
               <Text as="p" variant="bodySm" tone="subdued">
-                {locale === "en" ? "WEEE registration number, EPREL number and product files (e.g. product data sheet, energy label). Files are shown in the shop below the product description." : locale === "tr" ? "WEEE kayıt numarası, EPREL numarası ve ürün dosyaları (örn. ürün veri sayfası, enerji etiketi). Dosyalar mağazada ürün açıklamasının altında gösterilir." : locale === "fr" ? "Numéro d'enregistrement WEEE, numéro EPREL et fichiers produit (ex. fiche technique, étiquette énergétique). Les fichiers sont affichés dans la boutique sous la description du produit." : locale === "es" ? "Número de registro WEEE, número EPREL y archivos de producto (ej. ficha técnica, etiqueta energética). Los archivos se muestran en la tienda debajo de la descripción del producto." : locale === "it" ? "Numero di registrazione WEEE, numero EPREL e file prodotto (es. scheda tecnica, etichetta energetica). I file vengono mostrati nel negozio sotto la descrizione del prodotto." : "WEEE-Reg.-Nummer, EPREL-Nummer und Produktdateien (z. B. Produktdatenblatt, EEK-Label). Dateien werden im Shop unter der Produktbeschreibung angezeigt."}
+                {locale === "en" ? "Product files (e.g. product data sheet, energy label) — shown in the shop below the product description. WEEE/EPREL registration numbers only appear here when the product's category requires them." : locale === "tr" ? "Ürün dosyaları (örn. ürün veri sayfası, enerji etiketi) — mağazada ürün açıklamasının altında gösterilir. WEEE/EPREL kayıt numaraları yalnızca ürünün kategorisi gerektiriyorsa burada görünür." : locale === "fr" ? "Fichiers produit (ex. fiche technique, étiquette énergétique) — affichés dans la boutique sous la description. Les numéros WEEE/EPREL n'apparaissent ici que si la catégorie du produit les exige." : locale === "es" ? "Archivos de producto (ej. ficha técnica, etiqueta energética), mostrados en la tienda debajo de la descripción. Los números WEEE/EPREL solo aparecen aquí si la categoría del producto los exige." : locale === "it" ? "File prodotto (es. scheda tecnica, etichetta energetica), mostrati nel negozio sotto la descrizione. I numeri WEEE/EPREL compaiono qui solo se richiesti dalla categoria del prodotto." : "Produktdateien (z. B. Produktdatenblatt, EEK-Label) — werden im Shop unter der Produktbeschreibung angezeigt. WEEE-/EPREL-Registrierungsnummern erscheinen hier nur, wenn die Kategorie des Produkts sie verlangt."}
               </Text>
-              <InlineStack gap="300" wrap>
-                <Box minWidth="240px" flex="1">
-                  <TextField
-                    label="WEEE-Reg.-Nummer"
-                    value={getMeta(product, "weee_number") || ""}
-                    onChange={(v) => updateMeta("weee_number", v || null)}
-                    placeholder="DE12345678"
-                    helpText={locale === "en" ? "Electrical waste registration number (ElektroG)" : locale === "tr" ? "Elektronik atık kayıt numarası (ElektroG)" : locale === "fr" ? "Numéro d'enregistrement déchets électroniques (ElektroG)" : locale === "es" ? "Número de registro de residuos eléctricos (ElektroG)" : locale === "it" ? "Numero di registrazione rifiuti elettrici (ElektroG)" : "Elektroaltgeräte-Registrierungsnummer (ElektroG)"}
-                    autoComplete="off"
-                  />
-                </Box>
-                <Box minWidth="240px" flex="1">
-                  <TextField
-                    label="EPREL-Nummer"
-                    value={getMeta(product, "eprel_number") || ""}
-                    onChange={(v) => updateMeta("eprel_number", v || null)}
-                    placeholder="123456"
-                    helpText={locale === "en" ? "EU energy label registration number" : locale === "tr" ? "AB enerji etiketi kayıt numarası" : locale === "fr" ? "Numéro d'enregistrement étiquette énergie UE" : locale === "es" ? "Número de registro etiqueta energética UE" : locale === "it" ? "Numero di registrazione etichetta energetica UE" : "EU-Energielabel-Registrierungsnummer"}
-                    autoComplete="off"
-                  />
-                </Box>
-              </InlineStack>
+              {(complianceApplies.weee || getMeta(product, "weee_number") || complianceApplies.eprel || getMeta(product, "eprel_number")) && (
+                <InlineStack gap="300" wrap>
+                  {(complianceApplies.weee || getMeta(product, "weee_number")) && (
+                    <Box minWidth="240px" flex="1">
+                      <TextField
+                        label="WEEE-Reg.-Nummer"
+                        value={getMeta(product, "weee_number") || ""}
+                        onChange={(v) => updateMeta("weee_number", v || null)}
+                        placeholder="DE12345678"
+                        helpText={locale === "en" ? "Electrical waste registration number (ElektroG)" : locale === "tr" ? "Elektronik atık kayıt numarası (ElektroG)" : locale === "fr" ? "Numéro d'enregistrement déchets électroniques (ElektroG)" : locale === "es" ? "Número de registro de residuos eléctricos (ElektroG)" : locale === "it" ? "Numero di registrazione rifiuti elettrici (ElektroG)" : "Elektroaltgeräte-Registrierungsnummer (ElektroG)"}
+                        autoComplete="off"
+                      />
+                    </Box>
+                  )}
+                  {(complianceApplies.eprel || getMeta(product, "eprel_number")) && (
+                    <Box minWidth="240px" flex="1">
+                      <TextField
+                        label="EPREL-Nummer"
+                        value={getMeta(product, "eprel_number") || ""}
+                        onChange={(v) => updateMeta("eprel_number", v || null)}
+                        placeholder="123456"
+                        helpText={locale === "en" ? "EU energy label registration number" : locale === "tr" ? "AB enerji etiketi kayıt numarası" : locale === "fr" ? "Numéro d'enregistrement étiquette énergie UE" : locale === "es" ? "Número de registro etiqueta energética UE" : locale === "it" ? "Numero di registrazione etichetta energetica UE" : "EU-Energielabel-Registrierungsnummer"}
+                        autoComplete="off"
+                      />
+                    </Box>
+                  )}
+                </InlineStack>
+              )}
 
               {/* Product files */}
               <Text as="h3" variant="bodySm" fontWeight="semibold">{locale === "en" ? "Product files" : locale === "tr" ? "Ürün dosyaları" : locale === "fr" ? "Fichiers produit" : locale === "es" ? "Archivos de producto" : locale === "it" ? "File prodotto" : "Produktdateien"}</Text>

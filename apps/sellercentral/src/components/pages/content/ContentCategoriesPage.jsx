@@ -28,6 +28,7 @@ import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
 import { categoryDisplayName, categoryNameForEditForm, normalizeCategoryLocale } from "@/lib/category-locale";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
+import { lt } from "@/lib/locale-text";
 
 function slugFromName(name) {
   return titleToHandle(name || "");
@@ -228,11 +229,70 @@ export default function ContentCategoriesPage() {
   const [importCsvOpen, setImportCsvOpen] = useState(false);
   const [importCsvFile, setImportCsvFile] = useState(null);
   const [importProgress, setImportProgress] = useState(null); // { total, done, error } | null
+  const [excelOpen, setExcelOpen] = useState(false);
+  const [excelFile, setExcelFile] = useState(null);
+  const [excelBusy, setExcelBusy] = useState("");
+  const [excelResult, setExcelResult] = useState(null);
+  const excelInputRef = React.useRef(null);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [mainImgPickerOpen, setMainImgPickerOpen] = useState(false);
   const [bannerImgPickerOpen, setBannerImgPickerOpen] = useState(false);
   const client = getMedusaAdminClient();
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
+  const copy = {
+    title: lt(locale, "Categories", "Kategoriler", "Catégories", "Categorías", "Categorie", "Kategorien"),
+    excelTemplate: lt(locale, "Excel template", "Excel şablonu", "Modèle Excel", "Plantilla Excel", "Modello Excel", "Excel-Vorlage"),
+    excelExport: lt(locale, "Export Excel", "Excel dışa aktar", "Exporter Excel", "Exportar Excel", "Esporta Excel", "Excel exportieren"),
+    excelImport: lt(locale, "Import Excel", "Excel içe aktar", "Importer Excel", "Importar Excel", "Importa Excel", "Excel importieren"),
+    csvImport: lt(locale, "Import tree CSV", "Ağaç CSV içe aktar", "Importer CSV arborescence", "Importar CSV árbol", "Importa CSV albero", "Baum-CSV importieren"),
+    excelTitle: lt(locale, "Import categories from Excel", "Excel ile kategori içe aktar", "Importer des catégories via Excel", "Importar categorías desde Excel", "Importa categorie da Excel", "Kategorien per Excel importieren"),
+    excelHelp: lt(
+      locale,
+      "Same layout as the product Excel: row 1 = language, row 2 = column keys. parent_id is language-independent — paste a parent UUID or slug. Empty cells do not overwrite. Index sheet lists existing IDs.",
+      "Ürün Excel’i gibi: 1. satır dil, 2. satır sütun adları. parent_id dile bağlı değil — üst kategorinin UUID veya slug’ını yaz. Boş hücre üzerine yazmaz. Index sayfasında mevcut ID’ler var.",
+      "Comme l’Excel produits : ligne 1 = langue, ligne 2 = clés. parent_id est indépendant de la langue (UUID ou slug). Les cellules vides n’écrasent pas.",
+      "Como el Excel de productos: fila 1 = idioma, fila 2 = claves. parent_id es independiente del idioma (UUID o slug). Las celdas vacías no se sobrescriben.",
+      "Come l’Excel prodotti: riga 1 = lingua, riga 2 = chiavi. parent_id è indipendente dalla lingua (UUID o slug). Le celle vuote non sovrascrivono.",
+      "Wie das Produkt-Excel: Zeile 1 = Sprache, Zeile 2 = Spaltenkeys. parent_id ist sprachunabhängig — UUID oder Slug der übergeordneten Kategorie. Leere Zellen überschreiben nichts. Das Blatt Index listet vorhandene IDs.",
+    ),
+    pickFile: lt(locale, "Excel file (.xlsx)", "Excel dosyası (.xlsx)", "Fichier Excel (.xlsx)", "Archivo Excel (.xlsx)", "File Excel (.xlsx)", "Excel-Datei (.xlsx)"),
+    importNow: lt(locale, "Import", "İçe aktar", "Importer", "Importar", "Importa", "Importieren"),
+    cancel: lt(locale, "Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen"),
+    downloadFail: lt(locale, "Download failed", "İndirme başarısız", "Échec du téléchargement", "Error al descargar", "Download non riuscito", "Download fehlgeschlagen"),
+  };
+
+  const sellerToken = () => (typeof window !== "undefined" ? localStorage.getItem("sellerToken") || "" : "");
+
+  const downloadExcelPost = async (url, filenameFallback) => {
+    setExcelBusy(url);
+    setError(null);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale, sellerToken: sellerToken() }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || copy.downloadFail);
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="([^"]+)"/);
+      const name = match?.[1] || filenameFallback;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+    } catch (err) {
+      setError(err?.message || copy.downloadFail);
+    } finally {
+      setExcelBusy("");
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -440,6 +500,28 @@ export default function ContentCategoriesPage() {
     }
   };
 
+  const runExcelImport = async () => {
+    if (!excelFile) return;
+    setExcelBusy("import");
+    setExcelResult(null);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", excelFile);
+      fd.append("sellerToken", sellerToken());
+      fd.append("locale", locale);
+      const res = await fetch("/api/import-export/categories/import", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Import failed");
+      setExcelResult(data);
+      await fetchCategories();
+    } catch (err) {
+      setExcelResult({ error: err?.message || "Import failed" });
+    } finally {
+      setExcelBusy("");
+    }
+  };
+
   const tree = buildTree(categories);
   const parentOptions = [
     { label: "— None (top level) —", value: "" },
@@ -455,14 +537,28 @@ export default function ContentCategoriesPage() {
 
   return (
     <Page
-      title="Categories"
+      title={copy.title}
       primaryAction={{
         content: "Add category",
         onAction: openCreate,
       }}
       secondaryActions={[
         {
-          content: "Import from CSV",
+          content: copy.excelTemplate,
+          onAction: () => downloadExcelPost("/api/import-export/categories/template", "andertal-kategorien-vorlage.xlsx"),
+          loading: excelBusy.includes("/template"),
+        },
+        {
+          content: copy.excelExport,
+          onAction: () => downloadExcelPost("/api/import-export/categories/export", "andertal-kategorien-export.xlsx"),
+          loading: excelBusy.includes("/export"),
+        },
+        {
+          content: copy.excelImport,
+          onAction: () => { setExcelOpen(true); setExcelResult(null); setExcelFile(null); },
+        },
+        {
+          content: copy.csvImport,
           onAction: () => setImportCsvOpen(true),
         },
       ]}
@@ -537,6 +633,67 @@ export default function ContentCategoriesPage() {
           </Card>
         </Layout.Section>
       </Layout>
+
+      <Modal
+        open={excelOpen}
+        onClose={() => {
+          if (excelBusy) return;
+          setExcelOpen(false);
+          setExcelFile(null);
+          setExcelResult(null);
+        }}
+        title={copy.excelTitle}
+        primaryAction={{
+          content: copy.importNow,
+          onAction: runExcelImport,
+          loading: excelBusy === "import",
+          disabled: !excelFile || !!excelBusy,
+        }}
+        secondaryActions={[
+          {
+            content: copy.cancel,
+            onAction: () => {
+              if (excelBusy) return;
+              setExcelOpen(false);
+              setExcelFile(null);
+              setExcelResult(null);
+            },
+          },
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <Text as="p" tone="subdued">{copy.excelHelp}</Text>
+            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <Text as="span" variant="bodyMd" fontWeight="medium">{copy.pickFile}</Text>
+              <input
+                ref={excelInputRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => {
+                  setExcelFile(e.target.files?.[0] || null);
+                  setExcelResult(null);
+                }}
+              />
+            </label>
+            {excelResult?.error && (
+              <Banner tone="critical" onDismiss={() => setExcelResult(null)}>{excelResult.error}</Banner>
+            )}
+            {excelResult && !excelResult.error && (
+              <Banner tone={excelResult.failed ? "warning" : "success"} onDismiss={() => setExcelResult(null)}>
+                {`Created ${excelResult.created || 0}, updated ${excelResult.updated || 0}, failed ${excelResult.failed || 0}`}
+                {Array.isArray(excelResult.errors) && excelResult.errors.length > 0 && (
+                  <div style={{ marginTop: 8, fontSize: 12 }}>
+                    {excelResult.errors.slice(0, 8).map((err, i) => (
+                      <div key={i}>{err.row ? `Row ${err.row}: ` : ""}{err.error || String(err)}</div>
+                    ))}
+                  </div>
+                )}
+              </Banner>
+            )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
 
       <Modal
         open={importCsvOpen}

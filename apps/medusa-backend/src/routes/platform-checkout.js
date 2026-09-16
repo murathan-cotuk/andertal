@@ -1,7 +1,9 @@
 'use strict'
 const { Router } = require('express')
-const { normalizeThresholdsObject, storePublishedStatusSql } = require('./seller-settings')
+const { normalizeThresholdsObject, isStorePublishedStatus } = require('./seller-settings')
 const { getSellerDbClient } = require('./seller-auth')
+const { mapAdminHubToStoreProduct } = require('./store-products')
+const { listAdminHubProductsDb } = require('./admin-products')
 
 const STRIPE_PM_TYPES = [
   'card','paypal','klarna','sepa_debit','ideal','bancontact','eps','p24','giropay',
@@ -320,12 +322,16 @@ const storeSellerProfileGET = async (req, res) => {
        WHERE r.seller_id = $1 ORDER BY r.created_at DESC LIMIT 30`,
       [seller_id]
     )
-    const prodR = await client.query(
-      `SELECT id, title, handle, price_cents, metadata FROM admin_hub_products WHERE seller_id = $1 AND ${storePublishedStatusSql('status')} ORDER BY created_at DESC LIMIT 16`,
-      [seller_id]
-    )
     await client.end()
-    const products = (prodR.rows || []).map((p) => ({ id: p.id, title: p.title, handle: p.handle, price_cents: p.price_cents, metadata: p.metadata || {} }))
+    client = null
+    // Same raw-row → storefront-product mapping every other product-card surface uses
+    // (brand pages, category pages, etc.) — this is what fills in variants/first-variant
+    // image/review data; a hand-picked column SELECT here previously left the card with
+    // no variants at all.
+    const rawProducts = await listAdminHubProductsDb({ seller_id, limit: 16 })
+    const products = rawProducts
+      .filter((p) => isStorePublishedStatus(p.status))
+      .map((p) => mapAdminHubToStoreProduct(p, 'DE'))
     // Distinct brands this seller lists products in (derived from product metadata — no extra query).
     const brandMap = new Map()
     for (const p of products) {

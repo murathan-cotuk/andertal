@@ -5,6 +5,7 @@ import {
   marketFromHeader,
   stripHtml,
 } from "@/lib/seo";
+import { catalogShopPathForSlug } from "@/lib/catalog-cms-page";
 
 const BACKEND = (
   process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
@@ -15,9 +16,10 @@ export async function generateMetadata({ params }) {
   const h = await headers();
   const market = marketFromHeader(h.get("x-andertal-market-prefix"), locale);
   if (!slug) return { title: "Andertal" };
+  const dest = catalogShopPathForSlug(slug);
   try {
     const r = await fetch(`${BACKEND}/store/pages/${encodeURIComponent(String(slug))}`, {
-      next: { revalidate: 120 },
+      cache: "no-store",
     });
     if (!r.ok) return { title: "Andertal" };
     const page = await r.json();
@@ -43,7 +45,7 @@ export async function generateMetadata({ params }) {
         description,
         market,
         locale,
-        path: `pages/${page.slug || slug}`,
+        path: dest ? dest.replace(/^\//, "") : `pages/${page.slug || slug}`,
       }),
       ...(keywords?.length ? { keywords } : {}),
     };

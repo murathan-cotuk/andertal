@@ -5,17 +5,19 @@ import Footer from "@/components/Footer";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useLocale } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import LandingContainers from "@/components/landing/LandingContainers";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
 import { useShopStyles } from "@/context/ShopStylesContext";
+import { localizedCmsField } from "@/lib/seo";
+import { catalogShopPathForSlug } from "@/lib/catalog-cms-page";
 
 /** DE lives on the plain field; other locales live under `${field}_i18n[locale][field]`, falling back to DE. */
 function lt(page, field, locale) {
-  if (!locale || locale === "de") return page?.[field] || "";
-  return page?.[`${field}_i18n`]?.[locale]?.[field] || page?.[field] || "";
+  return localizedCmsField(page, field, locale);
 }
 
 function sanitizeHtml(html) {
@@ -40,34 +42,40 @@ function cmsPagePadding(tmpl) {
 export default function CmsPageBySlug() {
   const params = useParams();
   const locale = useLocale();
+  const router = useRouter();
   const slug = params?.slug != null ? String(params.slug) : undefined;
+  const catalogDest = catalogShopPathForSlug(slug);
   const shopStyles = useShopStyles();
   const pagePad = cmsPagePadding(shopStyles?.cms_page_template);
 
   const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [hasContainers, setHasContainers] = useState(false);
+  const [landing, setLanding] = useState(null);
 
   useEffect(() => {
-    if (!slug) return;
+    if (catalogDest) router.replace(catalogDest);
+  }, [catalogDest, router]);
+
+  useEffect(() => {
+    if (!slug || catalogDest) return;
 
     const fetchPage = async () => {
       try {
         setLoading(true);
         setNotFound(false);
-        setHasContainers(false);
+        setLanding(null);
         const client = getMedusaClient();
         const data = await client.getPageBySlug(slug);
         setPage(data);
         if (data?.id) {
-          // A page built with the Sellercentral landing-page container editor (e.g. the
-          // "Kundenservice"/customer-support page) has its real content there, not in `body`.
           try {
-            const landing = await fetch(`/api/store-landing-page/${encodeURIComponent(data.id)}`).then((r) => r.json());
-            setHasContainers(Array.isArray(landing?.containers) && landing.containers.length > 0);
+            const next = await fetch(`/api/store-landing-page/${encodeURIComponent(data.id)}`, {
+              cache: "no-store",
+            }).then((r) => r.json());
+            setLanding(next && !next.__error ? next : null);
           } catch {
-            setHasContainers(false);
+            setLanding(null);
           }
         }
       } catch (err) {
@@ -79,9 +87,9 @@ export default function CmsPageBySlug() {
     };
 
     fetchPage();
-  }, [slug]);
+  }, [slug, catalogDest]);
 
-  if (loading) {
+  if (catalogDest || loading) {
     return (
       <div className="min-h-screen flex flex-col">
         <ShopHeader />
@@ -109,16 +117,20 @@ export default function CmsPageBySlug() {
   const localizedTitle = lt(page, "title", locale);
   const safeBody = sanitizeHtml(lt(page, "body", locale));
   const hero = page.featured_image ? resolveImageUrl(page.featured_image) : "";
+  const containers = Array.isArray(landing?.containers) ? landing.containers : [];
+  const hasContainers = containers.length > 0;
 
-  // Landing containers (Sellercentral) are the page body when present — avoid a second
-  // CMS chrome title/hero fighting the first container (e.g. Verkäufer werden hero).
   return (
     <div className="min-h-screen flex flex-col">
       <ShopHeader />
       <main className="flex-1">
         {hasContainers ? (
           <SectionErrorBoundary>
-            <LandingContainers pageId={page.id} />
+            <LandingContainers
+              pageId={page.id}
+              initialContainers={containers}
+              initialSettings={landing?.settings || {}}
+            />
           </SectionErrorBoundary>
         ) : null}
         <div

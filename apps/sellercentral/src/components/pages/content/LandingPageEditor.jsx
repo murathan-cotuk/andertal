@@ -25,6 +25,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import { mergeLoadedShopStyles } from "@andertal/shop-theme";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
+import SearchableGroupedSelect from "@/components/inputs/SearchableGroupedSelect";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
 import { getNewContainerSeed } from "@/lib/landing-page-editor-i18n";
@@ -193,12 +194,6 @@ function PaddingEditor({ label, value, onChange, defaultValue = "0px 0px 0px 0px
 function getContainerTypesFromLocale(locale) {
   return getContainerTypes(locale);
 }
-
-const CAT_HEADING = "__heading_categories__";
-const PAGE_HEADING = "__heading_cms_pages__";
-const BLOG_HEADING = "__heading_blog_posts__";
-const API_HEADING = "__heading_api_pages__";
-const SHOP_HEADING = "__heading_shop_pages__";
 
 function flattenCategoriesForSelect(nodes, depth = 0, acc = []) {
   if (!Array.isArray(nodes)) return acc;
@@ -4057,134 +4052,6 @@ function PopupEditor({ settings, onChange }) {
   );
 }
 
-// Shared with apps/shop/src/app/[locale]/cms-preview/page.jsx — keep both sides of this literal
-// in sync if it ever changes.
-const CMS_PREVIEW_MESSAGE_SOURCE = "andertal-cms-preview";
-// REAL device pixel widths — must match the shop's own responsive breakpoints (useIsNarrow(1023),
-// useIsTablet() = 600–1199px in apps/shop/src/hooks/useIsNarrow.js) so the iframe's OWN
-// window.matchMedia queries resolve exactly like a visitor's browser at that device size, not the
-// (much narrower) pixel width this editor column happens to have. The iframe is rendered at this
-// full intrinsic width, then visually scaled down to fit the column — see the scale-to-fit wrapper
-// below. Getting this wrong silently mis-selects which desktop/tablet/mobile containers render.
-const PREVIEW_DEVICE_WIDTH = { 0: 1280, 1: 900, 2: 390 };
-const PREVIEW_VISIBLE_HEIGHT = 640;
-
-/**
- * Middle panel of the vitrin editor shell (docs/TASKS.md §4.1): an iframe onto the shop's own
- * /:locale/cms-preview route, fed the current draft `containers`/`settings` via postMessage. This
- * is the REAL LandingContainers renderer, not a mock — see next.config.js for the narrow
- * frame-ancestors exception that makes embedding it possible at all.
- */
-function LandingLivePreview({ containers, settings, deviceTab = 0, locale = "de" }) {
-  const c = useLandingCopy();
-  const iframeRef = useRef(null);
-  const wrapRef = useRef(null);
-  const revRef = useRef(0);
-  const readyRef = useRef(false);
-  const [wrapWidth, setWrapWidth] = useState(0);
-  const shopUrl = (process.env.NEXT_PUBLIC_SHOP_URL || "").replace(/\/$/, "");
-  const shopOrigin = useMemo(() => {
-    try { return shopUrl ? new URL(shopUrl).origin : ""; } catch { return ""; }
-  }, [shopUrl]);
-  const previewSrc = shopUrl ? `${shopUrl}/${locale || "de"}/cms-preview` : "";
-
-  const post = useCallback(() => {
-    const win = iframeRef.current?.contentWindow;
-    if (!win || !shopOrigin) return;
-    revRef.current += 1;
-    win.postMessage(
-      { source: CMS_PREVIEW_MESSAGE_SOURCE, kind: "state", containers, settings, rev: revRef.current },
-      shopOrigin,
-    );
-  }, [containers, settings, shopOrigin]);
-
-  useEffect(() => {
-    function onMessage(event) {
-      if (!shopOrigin || event.origin !== shopOrigin) return;
-      const msg = event.data;
-      if (!msg || msg.source !== CMS_PREVIEW_MESSAGE_SOURCE || msg.kind !== "ready") return;
-      readyRef.current = true;
-      post();
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [shopOrigin, post]);
-
-  // Debounced re-send whenever the draft changes, once the iframe has confirmed it's ready.
-  useEffect(() => {
-    if (!readyRef.current) return;
-    const id = setTimeout(post, 350);
-    return () => clearTimeout(id);
-  }, [post]);
-
-  // Measure the available column width so the device frame below can be scaled to fit it — the
-  // iframe itself always renders at the REAL device width (see PREVIEW_DEVICE_WIDTH), so this
-  // scale is purely a visual fit, never a layout-affecting resize of the iframe's own viewport.
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect?.width;
-      if (w) setWrapWidth(w);
-    });
-    ro.observe(el);
-    setWrapWidth(el.clientWidth);
-    return () => ro.disconnect();
-  }, []);
-
-  if (!shopUrl) {
-    return (
-      <Box padding="600">
-        <Text as="p" tone="subdued" alignment="center">{c.previewUnavailable}</Text>
-      </Box>
-    );
-  }
-
-  const deviceWidth = PREVIEW_DEVICE_WIDTH[deviceTab] || PREVIEW_DEVICE_WIDTH[0];
-  // Clamped to a 0.15 floor: without it, a transient near-zero column width (mid-layout-shift,
-  // e.g. the instant the inspector column mounts/unmounts) would divide PREVIEW_VISIBLE_HEIGHT by
-  // a near-zero scale below and hand the iframe a runaway multi-thousand-px height.
-  const scale = wrapWidth > 20 ? Math.min(1, Math.max(0.15, wrapWidth / deviceWidth)) : 1;
-  const frameHeight = PREVIEW_VISIBLE_HEIGHT / scale;
-
-  return (
-    <div ref={wrapRef} style={{ background: "#f1f2f4", padding: 12, borderRadius: "var(--p-border-radius-300, 12px)" }}>
-      <div
-        style={{
-          width: "100%",
-          height: PREVIEW_VISIBLE_HEIGHT,
-          overflow: "hidden",
-          borderRadius: 8,
-          boxShadow: "0 0 0 1px var(--p-color-border, #e1e3e5)",
-          background: "#fff",
-          position: "relative",
-        }}
-      >
-        {/* Renders at the real device pixel width (so the shop's own responsive breakpoints
-            resolve correctly inside the iframe), then scaled down visually to fit the column —
-            same technique theme editors (e.g. Shopify) use for an accurate device preview. */}
-        <div
-          style={{
-            width: deviceWidth,
-            height: frameHeight,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-            transition: "width 0.2s ease, height 0.2s ease",
-          }}
-        >
-          <iframe
-            ref={iframeRef}
-            src={previewSrc}
-            title={c.livePreviewTitle}
-            style={{ width: deviceWidth, height: frameHeight, border: 0, display: "block" }}
-            onLoad={() => { readyRef.current = false; }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function LandingPageEditor() {
   const uiLocale = useLocale();
   const copy = useMemo(() => getLandingEditorCopy(uiLocale), [uiLocale]);
@@ -4326,7 +4193,8 @@ export default function LandingPageEditor() {
     if (!selectedPageId) return;
     if (String(selectedPageId).startsWith("api:")) {
       const slug = API_CMS_SLUG[selectedPageId];
-      const hit = pages.find((p) => String(p.slug) === slug);
+      const aliases = slug === "brands" ? ["brands", "marken", "markalar"] : [slug];
+      const hit = pages.find((p) => aliases.includes(String(p.slug || "").toLowerCase()));
       if (hit?.id) loadContainers(String(hit.id));
       else setContainers([]);
       return;
@@ -4337,7 +4205,8 @@ export default function LandingPageEditor() {
   const resolveSavePageId = useCallback(() => {
     if (String(selectedPageId).startsWith("api:")) {
       const slug = API_CMS_SLUG[selectedPageId];
-      const hit = pages.find((p) => String(p.slug) === slug);
+      const aliases = slug === "brands" ? ["brands", "marken", "markalar"] : [slug];
+      const hit = pages.find((p) => aliases.includes(String(p.slug || "").toLowerCase()));
       return hit?.id ? String(hit.id) : null;
     }
     return selectedPageId;
@@ -4555,24 +4424,42 @@ export default function LandingPageEditor() {
   const typeInfo = (type) => containerTypes.find((t) => t.type === type) || { label: type };
   const cmsPages  = sortCmsPagesForSelect(pages.filter((p) => p.page_type !== "blog"));
   const blogPosts = pages.filter((p) => p.page_type === "blog");
-  const pageOptions = [
-    { label: copy.selectPlaceholder, value: "" },
-    { label: copy.homepage, value: "__default__" },
-    { label: copy.cmsPagesHeading, value: PAGE_HEADING, disabled: true },
-    ...(cmsPages.length
-      ? cmsPages.map((p) => ({ label: `${p.title || copy.defaultPage} (/${p.slug || p.id})`, value: String(p.id) }))
-      : [{ label: copy.noCmsPages, value: "__no_page__", disabled: true }]),
-    { label: copy.blogPostsHeading, value: BLOG_HEADING, disabled: true },
-    ...(blogPosts.length
-      ? blogPosts.map((p) => ({ label: `${p.title || copy.defaultPost} (/${p.slug || p.id})`, value: String(p.id) }))
-      : [{ label: copy.noBlogPosts, value: "__no_blog__", disabled: true }]),
-    { label: copy.apiPagesHeading, value: API_HEADING, disabled: true },
-    { label: copy.apiBestsellerLabel, value: "api:bestsellers" },
-    { label: copy.apiSaleLabel, value: "api:sales" },
-    { label: copy.apiNeuheitenLabel, value: "api:neuheiten" },
-    { label: copy.apiBrandsLabel, value: "api:brands" },
-    { label: copy.shopPagesHeading || copy.apiPagesHeading, value: SHOP_HEADING, disabled: true },
-    { label: copy.productPageLabel || "Product page", value: "__product_page__" },
+  // Section titles reuse the same copy as the old flat <Select> headings, minus the
+  // "—— ——" divider dashes (Autocomplete renders real section headers, so the
+  // hand-drawn dividers that used to fake grouping in a plain <Select> would be noise here).
+  const stripHeadingDashes = (s) => String(s || "").replace(/^[—-]+\s*|\s*[—-]+$/g, "");
+  const pageSections = [
+    {
+      title: "",
+      options: [{ label: copy.homepage, value: "__default__" }],
+    },
+    {
+      title: copy.categoriesHeading,
+      options: categoryRows.length
+        ? categoryRows.map((c) => ({ label: c.label, value: c.value }))
+        : [],
+    },
+    {
+      title: stripHeadingDashes(copy.cmsPagesHeading),
+      options: cmsPages.map((p) => ({ label: `${p.title || copy.defaultPage} (/${p.slug || p.id})`, value: String(p.id) })),
+    },
+    {
+      title: stripHeadingDashes(copy.blogPostsHeading),
+      options: blogPosts.map((p) => ({ label: `${p.title || copy.defaultPost} (/${p.slug || p.id})`, value: String(p.id) })),
+    },
+    {
+      title: stripHeadingDashes(copy.apiPagesHeading),
+      options: [
+        { label: copy.apiBestsellerLabel, value: "api:bestsellers" },
+        { label: copy.apiSaleLabel, value: "api:sales" },
+        { label: copy.apiNeuheitenLabel, value: "api:neuheiten" },
+        { label: copy.apiBrandsLabel, value: "api:brands" },
+      ],
+    },
+    {
+      title: stripHeadingDashes(copy.shopPagesHeading || copy.apiPagesHeading),
+      options: [{ label: copy.productPageLabel || "Product page", value: "__product_page__" }],
+    },
   ];
   const isCategorySelection = String(selectedPageId).startsWith("cat:");
   const isApiSelection = String(selectedPageId).startsWith("api:");
@@ -4602,7 +4489,11 @@ export default function LandingPageEditor() {
   }, [containerTypeGroups, containerSearch, isSupportPageSelection]);
   const apiHasSettings = selectedPageId === "api:bestsellers" || selectedPageId === "api:sales";
   const linkedCmsForApi = isApiSelection
-    ? pages.find((p) => String(p.slug) === API_CMS_SLUG[selectedPageId])
+    ? (() => {
+        const slug = API_CMS_SLUG[selectedPageId];
+        const aliases = slug === "brands" ? ["brands", "marken", "markalar"] : [slug];
+        return pages.find((p) => aliases.includes(String(p.slug || "").toLowerCase())) || null;
+      })()
     : null;
   const showContainerEditor = selectedPageId && !isProductPageSelection && (!isApiSelection || !!linkedCmsForApi);
   const editorTabs = [
@@ -4658,17 +4549,19 @@ export default function LandingPageEditor() {
                 {copy.selectPageHelp}{" "}
                 <a href="/content/pages" style={{ color: "var(--p-color-text-emphasis)" }}>{copy.managePagesLink}</a>
               </Text>
-              <Select
+              <SearchableGroupedSelect
                 label={copy.pageLabel}
                 labelHidden
-                options={pageOptions}
+                sections={pageSections}
                 value={selectedPageId}
                 onChange={(v) => {
-                  if (!v || v === CAT_HEADING || v === PAGE_HEADING || v === BLOG_HEADING || v === API_HEADING || v === SHOP_HEADING || v === "__no_cat__" || v === "__no_page__" || v === "__no_blog__") return;
+                  if (!v) return;
                   setSelectedPageId(v);
                   setExpandedId(null);
                   setActiveTab(0);
                 }}
+                placeholder={copy.selectPageSearchPlaceholder}
+                emptyLabel={copy.selectPlaceholder}
               />
             </BlockStack>
           </Card>
@@ -4859,7 +4752,7 @@ export default function LandingPageEditor() {
                             return (
                               <div style={{ display: "flex", gap: 16, alignItems: "flex-start", width: "100%", flexWrap: "wrap" }}>
                                 {/* ── Left: tree ── */}
-                                <div style={{ flex: "1 1 280px", minWidth: 260, maxWidth: 340 }}>
+                                <div style={{ flex: selectedNode ? "1 1 320px" : "1 1 100%", minWidth: 280, maxWidth: selectedNode ? 420 : undefined }}>
                                   <Card>
                                     <BlockStack gap="300">
                                       <InlineStack align="space-between" blockAlign="center">
@@ -4942,26 +4835,10 @@ export default function LandingPageEditor() {
                                   </Card>
                                 </div>
 
-                                {/* ── Middle: live vitrin — grows to fill the space the inspector
-                                     gives up when nothing is selected. */}
-                                <div style={{ flex: selectedNode ? "3 1 420px" : "1 1 600px", minWidth: 320 }}>
-                                  <Card>
-                                    <BlockStack gap="200">
-                                      <Text as="h3" variant="headingSm">{copy.livePreviewTitle}</Text>
-                                      <LandingLivePreview
-                                        containers={containers}
-                                        settings={{}}
-                                        deviceTab={seitenDeviceTab}
-                                        locale={contentEditLang}
-                                      />
-                                    </BlockStack>
-                                  </Card>
-                                </div>
-
-                                {/* ── Right: inspector — only reserves column width once a block
-                                     is actually selected, so it doesn't squeeze the preview. */}
+                                {/* ── Right: inspector — only takes up column width once a block
+                                     is actually selected. */}
                                 {selectedNode && (
-                                  <div style={{ flex: "2 1 340px", minWidth: 300, position: "sticky", top: 16 }}>
+                                  <div style={{ flex: "2 1 420px", minWidth: 320, position: "sticky", top: 16 }}>
                                     <Card>
                                       <BlockStack gap="300">
                                         <InlineStack align="space-between" blockAlign="center">

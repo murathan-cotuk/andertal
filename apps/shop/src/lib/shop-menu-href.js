@@ -1,5 +1,7 @@
 /** Shared menu item → storefront path (SubNav, mobile rails, etc.) */
 
+import { catalogShopPathForSlug } from "@/lib/catalog-cms-page";
+
 function slugify(s) {
   return (s || "")
     .replace(/[äÄ]/g, "ae")
@@ -26,8 +28,8 @@ export function menuItemHref(item) {
   }
   if (item.link_type === "page") {
     const pageSlug = parsed?.slug || parsed?.label_slug || itemSlug || slugify(item.label);
-    // Dedicated CMS route localizes body/title via body_i18n / title_i18n.
-    // Catch-all /{slug} is reserved for products/categories/collections.
+    const catalogPath = catalogShopPathForSlug(pageSlug);
+    if (catalogPath) return catalogPath;
     return pageSlug ? `/pages/${pageSlug}` : "#";
   }
   if (item.link_type === "api") {

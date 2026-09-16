@@ -1462,8 +1462,9 @@ function BrandsDirectoryContainer({ container, locale = "de" }) {
   const maxRows = container.max_rows != null ? Number(container.max_rows) : 10;
   const gap = container.gap != null ? Number(container.gap) : 14;
   const padStyle = getContainerPadding(container, "22px 24px 40px");
-  const maxWRaw = normalizeContentMaxWidth(container.content_max_width, 1440);
-  const maxW = parseInt(String(maxWRaw), 10) || 1440;
+  // Keep the unit (e.g. "100%" for the mobile-authored row) — parseInt("100%") used to
+  // truncate this to a literal 100px max-width, crushing the whole section on phones.
+  const maxW = normalizeContentMaxWidth(container.content_max_width, 1440);
   return (
     <div style={padStyle}>
       <BrandsDirectoryBlock
@@ -2980,7 +2981,7 @@ const FETCH_GATED_CONTAINER_TYPES = new Set([
 // would make every child vanish on mobile unless explicitly overridden). `visible: false` (the
 // hard on/off switch, as opposed to device targeting) still applies to children as normal.
 function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
-  if (!c.visible) return null;
+  if (c.visible === false) return null;
   const isChild = !!opts.isChild;
   const v = c.visible_on || "desktop";
   // No tablet-specific container was authored for this page — a tablet visitor falls back to
@@ -3067,9 +3068,10 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
  * doesn't pass them and behaves exactly as before, unaffected.
  */
 export default function LandingContainers({ pageId, categoryId, initialContainers = null, initialSettings = null }) {
-  const hasSsrData = !pageId && !categoryId && Array.isArray(initialContainers);
-  const [containers, setContainers] = useState(hasSsrData ? initialContainers : null);
-  const [landingSettings, setLandingSettings] = useState(hasSsrData && initialSettings ? initialSettings : {});
+  const hasProvided = Array.isArray(initialContainers);
+  const hasSsrData = hasProvided;
+  const [containers, setContainers] = useState(hasProvided ? initialContainers : null);
+  const [landingSettings, setLandingSettings] = useState(hasProvided && initialSettings ? initialSettings : {});
   const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
   const [sidebarCategoryLinks, setSidebarCategoryLinks] = useState([]);
   const { setLandingHeaderFilterBar, setSecondNavDesktopClassic } = useLandingChrome();
@@ -3085,6 +3087,8 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
       const showBar = initialSettings?.show_filter_bar !== false;
       setLandingHeaderFilterBar(showBar);
       setSecondNavDesktopClassic(initialSettings?.second_nav_desktop_classic === true);
+      setContainers(initialContainers);
+      setLandingSettings(initialSettings && typeof initialSettings === "object" ? initialSettings : {});
       return;
     }
     let endpoint = "/api/store-landing-page";
@@ -3124,7 +3128,7 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
         setSecondNavDesktopClassic(false);
         setContainers([]);
       });
-  }, [pageId, categoryId, hasSsrData, initialSettings, setLandingHeaderFilterBar, setSecondNavDesktopClassic]);
+  }, [pageId, categoryId, hasSsrData, initialContainers, initialSettings, setLandingHeaderFilterBar, setSecondNavDesktopClassic]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3134,7 +3138,7 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
       const collectionTargets = new Map();
       const singleTargets = new Set();
       for (const c of containers) {
-        if (!c?.visible) continue;
+        if (c.visible === false) continue;
         if (c.type === "collection_carousel" || (c.type === "content_mosaic" && String(c.source || "images") === "collection")) {
           const key = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
           if (key === "|") continue;
@@ -3227,11 +3231,11 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
 
   // Sellers often only ever fill in desktop + mobile — if no container was ever scoped to
   // "tablet", a tablet visitor should see the mobile design rather than an empty section.
-  const hasTabletContainer = containers.some((c) => c?.visible && (c.visible_on || "desktop") === "tablet");
+  const hasTabletContainer = containers.some((c) => c && c.visible !== false && (c.visible_on || "desktop") === "tablet");
   const tabletFallsBackToMobile = isTablet && !hasTabletContainer;
 
   const deviceContainers = containers.filter((c) => {
-    if (!c?.visible) return false;
+    if (!c || c.visible === false) return false;
     const v = c.visible_on || "desktop";
     if (tabletFallsBackToMobile) return v === "mobile" || v === "both";
     if (v === "tablet") return isTablet;
@@ -3251,7 +3255,7 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
   // First container that will actually render on the current device (for header gradient)
   const firstVisibleId = (() => {
     for (const c of containers) {
-      if (!c.visible) continue;
+      if (c.visible === false) continue;
       const v = c.visible_on || "desktop";
       if (tabletFallsBackToMobile) {
         if (v === "mobile" || v === "both") return c.id;

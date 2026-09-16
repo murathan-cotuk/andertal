@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocale } from "next-intl";
 import { Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Spinner, Box, TextField, Select, Button } from "@shopify/polaris";
-import { useRouter } from "@/i18n/navigation";
+import { useRouter, Link } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 
 // Surfaces docs/HUKUKI.md's non-blocking "needs_compliance_review" advisory (Faz 2) grouped by
@@ -274,7 +274,15 @@ export default function ComplianceReviewPage() {
                             </td>
                             <td style={{ padding: "12px 16px", color: "#6d7175", fontSize: 12, width: "18%" }}>{fmtDate(p.checked_at, locale)}</td>
                             <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                              <span style={{ color: "#2563eb", fontWeight: 600, fontSize: 12 }}>{c.editProduct} →</span>
+                              <Link
+                                href={`/products/${p.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ color: "#2563eb", fontWeight: 600, fontSize: 12, textDecoration: "none" }}
+                              >
+                                {c.editProduct} →
+                              </Link>
                             </td>
                           </tr>
                         ))}

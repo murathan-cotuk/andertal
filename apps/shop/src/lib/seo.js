@@ -96,12 +96,18 @@ export function categorySeoFallback(category, locale) {
   const c = category || {};
   const m = c.metadata && typeof c.metadata === "object" ? c.metadata : {};
   const locKey = normalizeLocale(locale);
-  const seoLoc =
-    locKey && locKey !== "de" && m.seo_i18n && typeof m.seo_i18n === "object" ? m.seo_i18n[locKey] : null;
-  const localizedName = getLocalizedCategory(c, locale)?.name || "";
-  const localizedDesc = getLocalizedCategory(c, locale)?.description || "";
+  const seoI18n = m.seo_i18n && typeof m.seo_i18n === "object" ? m.seo_i18n : {};
+  const seoLoc = locKey && seoI18n[locKey] && typeof seoI18n[locKey] === "object" ? seoI18n[locKey] : null;
+  const trLoc =
+    locKey && m.translations && typeof m.translations === "object" && m.translations[locKey]
+      ? m.translations[locKey]
+      : null;
+  const localized = getLocalizedCategory(c, locale) || {};
+  const localizedName = localized.name || "";
+  const localizedDesc = localized.description || "";
   const title = String(
     (seoLoc && (seoLoc.meta_title || seoLoc.title)) ||
+      (trLoc && (trLoc.seo_title || trLoc.meta_title)) ||
       c.seo_title ||
       m.meta_title ||
       m.display_title ||
@@ -112,9 +118,11 @@ export function categorySeoFallback(category, locale) {
   ).trim();
   const description = stripHtml(
     (seoLoc && (seoLoc.meta_description || seoLoc.description)) ||
+      (trLoc && (trLoc.seo_description || trLoc.meta_description)) ||
       c.seo_description ||
       m.meta_description ||
       localizedDesc ||
+      localized.long_content ||
       c.long_content ||
       m.richtext ||
       c.description ||
@@ -442,12 +450,12 @@ export async function fetchStoreCategoryBySlug(slug, { revalidate = 60 } = {}) {
   }
 }
 
-export async function fetchStorePage(slug, { revalidate = 120 } = {}) {
+export async function fetchStorePage(slug, { revalidate = 0 } = {}) {
   const raw = String(slug || "").trim();
   if (!raw) return null;
   try {
     const res = await fetch(`${BACKEND}/store/pages/${encodeURIComponent(raw)}`, {
-      next: { revalidate },
+      ...(revalidate ? { next: { revalidate } } : { cache: "no-store" }),
     });
     if (!res.ok) return null;
     return await res.json().catch(() => null);
@@ -460,5 +468,9 @@ export function localizedCmsField(page, field, locale) {
   const loc = normalizeLocale(locale);
   if (!page) return "";
   if (loc === "de") return page?.[field] || "";
-  return page?.[`${field}_i18n`]?.[loc]?.[field] || page?.[field] || "";
+  const bag = page?.[`${field}_i18n`];
+  const entry = bag && typeof bag === "object" ? bag[loc] : null;
+  if (typeof entry === "string" && entry.trim()) return entry;
+  if (entry && typeof entry === "object" && entry[field]) return entry[field];
+  return page?.[field] || "";
 }

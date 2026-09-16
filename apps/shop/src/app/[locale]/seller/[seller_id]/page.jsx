@@ -319,13 +319,10 @@ export default function SellerProfilePage() {
 
   const seller = data?.seller;
   const reviews = data?.reviews || [];
-  const products = (data?.products || []).map((p) => ({
-    ...p,
-    slug: p.handle,
-    images: p.metadata?.media || [],
-    thumbnail: p.metadata?.thumbnail || "",
-    price: p.price_cents ? p.price_cents / 100 : 0,
-  }));
+  // Products already arrive fully shaped by the backend's shared mapAdminHubToStoreProduct
+  // (variants, images, price — same as brand/category pages); no re-mapping needed here,
+  // and overriding images/thumbnail from raw metadata would undo the variant-image resolution.
+  const products = data?.products || [];
   const dist = seller?.rating_distribution || {};
   const totalDist = Object.values(dist).reduce((s, v) => s + v, 0) || 1;
   const avg = seller?.review_avg || 0;

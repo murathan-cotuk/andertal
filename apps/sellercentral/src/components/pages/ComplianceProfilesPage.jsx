@@ -65,6 +65,21 @@ const copy = (locale) => {
     typeSelect: t("Dropdown", "Açılır liste", "Auswahlliste"),
     typeFile: t("File / URL", "Dosya / URL", "Datei / URL"),
     customSaveError: t("Could not save the field.", "Alan kaydedilemedi.", "Feld konnte nicht gespeichert werden."),
+    profileFieldsHint: t(
+      "Fields the profile normally requires for this category. Edit any of them (just for this category) or turn one off if it doesn't actually apply here — nothing here is locked.",
+      "Bu kategori için profilin normalde zorunlu tuttuğu alanlar. Herhangi birini (yalnızca bu kategori için) düzenleyin veya burada gerçekten geçerli değilse kapatın — hiçbiri sabit değildir.",
+      "Felder, die das Profil für diese Kategorie normalerweise verlangt. Bearbeiten Sie eines davon (nur für diese Kategorie) oder schalten Sie es aus, wenn es hier eigentlich nicht zutrifft — nichts davon ist fest vorgegeben.",
+    ),
+    requiredBadge: t("Required", "Zorunlu", "Pflicht"),
+    optionalBadge: t("Optional", "İsteğe bağlı", "Optional"),
+    editedBadge: t("Edited for this category", "Bu kategori için düzenlendi", "Für diese Kategorie angepasst"),
+    disabledBadge: t("Disabled for this category", "Bu kategori için kapalı", "Für diese Kategorie deaktiviert"),
+    editField: t("Edit", "Düzenle", "Bearbeiten"),
+    disableField: t("Disable for this category", "Bu kategori için kapat", "Für diese Kategorie deaktivieren"),
+    enableField: t("Enable", "Aç", "Aktivieren"),
+    resetField: t("Reset to profile default", "Profil varsayılanına dön", "Auf Profil-Standard zurücksetzen"),
+    cancelEdit: t("Cancel", "İptal", "Abbrechen"),
+    saveEdit: t("Save changes", "Değişiklikleri kaydet", "Änderungen speichern"),
   };
 };
 
@@ -88,6 +103,14 @@ export default function ComplianceProfilesPage() {
   const [newFieldType, setNewFieldType] = useState("text");
   const [newFieldOptions, setNewFieldOptions] = useState("");
   const [customSaving, setCustomSaving] = useState(false);
+
+  // Inline editor for a PROFILE field (edit label/type/options as a per-category override, or
+  // disable it outright) — keyed by the field's real key (e.g. "weee_number"), null = closed.
+  const [editingKey, setEditingKey] = useState(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editType, setEditType] = useState("text");
+  const [editOptions, setEditOptions] = useState("");
+  const [fieldSaving, setFieldSaving] = useState(null); // key currently being saved/toggled, or null
 
   useEffect(() => {
     const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
@@ -125,17 +148,111 @@ export default function ComplianceProfilesPage() {
     ...profiles.map((p) => ({ label: localizedLabel(p.label_i18n, locale, p.label), value: p.id })),
   ], [profiles, locale, c.inheritOption]);
 
-  const ownCustomKeys = useMemo(() => new Set((schema?.own_custom_fields || []).map((f) => f.key)), [schema]);
+  // Own custom/override fields keyed by field key for quick lookup while rendering profile rows.
+  const ownFieldsByKey = useMemo(() => {
+    const m = new Map();
+    for (const f of schema?.own_custom_fields || []) m.set(f.key, f);
+    return m;
+  }, [schema]);
+  const ownDisabledSet = useMemo(() => new Set(schema?.own_disabled_fields || []), [schema]);
 
-  const requiredFieldLabels = useMemo(() => {
-    if (!schema?.required_fields) return [];
-    return schema.required_fields
-      .filter((key) => !ownCustomKeys.has(key))
-      .map((key) => ({
-        key,
-        label: localizedLabel(schema.field_definitions?.[key]?.label_i18n, locale, key),
-      }));
-  }, [schema, locale, ownCustomKeys]);
+  // Every field the PROFILE itself defines for this category (required + optional), regardless
+  // of whether a superuser has since edited or disabled it — this is the full editable list
+  // ComplianceProfilesPage shows, separate from schema.required_fields/optional_fields (which
+  // have already had disabled ones filtered out for the actual product-editor rendering).
+  const profileFieldRows = useMemo(() => {
+    if (!schema) return [];
+    const required = schema.profile_required_fields || [];
+    const optional = schema.profile_optional_fields || [];
+    const defs = schema.profile_field_definitions || {};
+    return [...required.map((key) => ({ key, isRequired: true })), ...optional.map((key) => ({ key, isRequired: false }))]
+      .map(({ key, isRequired }) => {
+        const own = ownFieldsByKey.get(key);
+        const baseDef = defs[key] || {};
+        return {
+          key,
+          isRequired,
+          isOverridden: !!own?.override,
+          isDisabled: ownDisabledSet.has(key),
+          label: own?.override ? own.label : (localizedLabel(baseDef.label_i18n, locale, key)),
+          type: own?.override ? own.type : (baseDef.type || "text"),
+          options: own?.override ? (own.options || []) : (baseDef.options || []),
+        };
+      });
+  }, [schema, ownFieldsByKey, ownDisabledSet, locale]);
+
+  const startEditField = (row) => {
+    setEditingKey(row.key);
+    setEditLabel(row.label);
+    setEditType(row.type === "select" ? "select" : row.type);
+    setEditOptions((row.options || []).join(", "));
+    setMessage({ type: "", text: "" });
+  };
+  const cancelEditField = () => setEditingKey(null);
+
+  /**
+   * Saves the in-progress edit for `key`. `markOverride: true` is for a PROFILE field being
+   * edited for the first time (stamps override:true so it's recognized as a per-category
+   * override of that real field, not a brand-new one); editing an already-own field (an
+   * existing override, or a plain custom field) preserves whatever it already was.
+   */
+  const saveFieldEdit = async (key, { markOverride = false } = {}) => {
+    const label = editLabel.trim();
+    if (!label || !categoryId) return;
+    setFieldSaving(key);
+    setMessage({ type: "", text: "" });
+    try {
+      const existingEntry = (schema?.own_custom_fields || []).find((f) => f.key === key);
+      const existing = (schema?.own_custom_fields || []).filter((f) => f.key !== key);
+      const next = [
+        ...existing,
+        {
+          key,
+          ...(markOverride || existingEntry?.override ? { override: true } : {}),
+          label,
+          type: editType,
+          ...(editType === "select"
+            ? { options: editOptions.split(",").map((o) => o.trim()).filter(Boolean) }
+            : {}),
+        },
+      ];
+      await getMedusaAdminClient().setCategoryComplianceCustomFields(categoryId, next);
+      await loadSchema(categoryId);
+      setEditingKey(null);
+    } catch (e) {
+      setMessage({ type: "error", text: e?.message || c.customSaveError });
+    }
+    setFieldSaving(null);
+  };
+
+  const resetFieldOverride = async (key) => {
+    if (!categoryId) return;
+    setFieldSaving(key);
+    setMessage({ type: "", text: "" });
+    try {
+      const next = (schema?.own_custom_fields || []).filter((f) => f.key !== key);
+      await getMedusaAdminClient().setCategoryComplianceCustomFields(categoryId, next);
+      await loadSchema(categoryId);
+    } catch (e) {
+      setMessage({ type: "error", text: e?.message || c.customSaveError });
+    }
+    setFieldSaving(null);
+  };
+
+  const toggleFieldDisabled = async (key) => {
+    if (!categoryId) return;
+    setFieldSaving(key);
+    setMessage({ type: "", text: "" });
+    try {
+      const current = schema?.own_disabled_fields || [];
+      const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+      await getMedusaAdminClient().setCategoryComplianceCustomFields(categoryId, schema?.own_custom_fields || [], next);
+      await loadSchema(categoryId);
+    } catch (e) {
+      setMessage({ type: "error", text: e?.message || c.customSaveError });
+    }
+    setFieldSaving(null);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -247,16 +364,106 @@ export default function ComplianceProfilesPage() {
                 <InlineStack>
                   <Button variant="primary" onClick={handleSave} loading={saving}>{c.save}</Button>
                 </InlineStack>
-                <BlockStack gap="150">
-                  <Text as="h3" variant="headingSm">{c.requiredFields}</Text>
-                  {requiredFieldLabels.length === 0 ? (
+                <BlockStack gap="200">
+                  <BlockStack gap="100">
+                    <Text as="h3" variant="headingSm">{c.requiredFields}</Text>
+                    <Text as="p" tone="subdued" variant="bodySm">{c.profileFieldsHint}</Text>
+                  </BlockStack>
+                  {profileFieldRows.length === 0 ? (
                     <Text as="p" tone="subdued" variant="bodySm">{c.noProfileFields}</Text>
                   ) : (
-                    <InlineStack gap="150" wrap>
-                      {requiredFieldLabels.map((f) => (
-                        <Badge key={f.key}>{f.label}</Badge>
+                    <BlockStack gap="200">
+                      {profileFieldRows.map((row) => (
+                        <Box
+                          key={row.key}
+                          padding="200"
+                          background="bg-surface-secondary"
+                          borderRadius="200"
+                        >
+                          <BlockStack gap="150">
+                            <InlineStack align="space-between" blockAlign="center" wrap>
+                              <InlineStack gap="200" blockAlign="center">
+                                <Text as="span" fontWeight="medium" tone={row.isDisabled ? "subdued" : undefined}>
+                                  {row.label}
+                                </Text>
+                                <Badge tone={row.isRequired ? "critical" : undefined}>
+                                  {row.isRequired ? c.requiredBadge : c.optionalBadge}
+                                </Badge>
+                                {row.isOverridden && <Badge tone="attention">{c.editedBadge}</Badge>}
+                                {row.isDisabled && <Badge>{c.disabledBadge}</Badge>}
+                              </InlineStack>
+                              {editingKey !== row.key && (
+                                <InlineStack gap="150">
+                                  <Button size="slim" onClick={() => startEditField(row)} disabled={row.isDisabled}>
+                                    {c.editField}
+                                  </Button>
+                                  {row.isOverridden && (
+                                    <Button
+                                      size="slim"
+                                      variant="tertiary"
+                                      onClick={() => resetFieldOverride(row.key)}
+                                      loading={fieldSaving === row.key}
+                                    >
+                                      {c.resetField}
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="slim"
+                                    tone={row.isDisabled ? undefined : "critical"}
+                                    variant="tertiary"
+                                    onClick={() => toggleFieldDisabled(row.key)}
+                                    loading={fieldSaving === row.key}
+                                  >
+                                    {row.isDisabled ? c.enableField : c.disableField}
+                                  </Button>
+                                </InlineStack>
+                              )}
+                            </InlineStack>
+
+                            {editingKey === row.key && (
+                              <InlineStack gap="200" wrap blockAlign="end">
+                                <div style={{ minWidth: 200, flex: 1 }}>
+                                  <TextField
+                                    label={c.fieldLabel}
+                                    value={editLabel}
+                                    onChange={setEditLabel}
+                                    autoComplete="off"
+                                  />
+                                </div>
+                                <div style={{ minWidth: 150 }}>
+                                  <Select
+                                    label={c.fieldType}
+                                    options={CUSTOM_FIELD_TYPES.map((t) => ({ label: typeLabel(t), value: t }))}
+                                    value={editType}
+                                    onChange={setEditType}
+                                  />
+                                </div>
+                                {editType === "select" && (
+                                  <div style={{ minWidth: 200, flex: 1 }}>
+                                    <TextField
+                                      label={c.fieldOptions}
+                                      value={editOptions}
+                                      onChange={setEditOptions}
+                                      placeholder="A, B, C"
+                                      autoComplete="off"
+                                    />
+                                  </div>
+                                )}
+                                <Button
+                                  variant="primary"
+                                  onClick={() => saveFieldEdit(row.key, { markOverride: true })}
+                                  loading={fieldSaving === row.key}
+                                  disabled={!editLabel.trim()}
+                                >
+                                  {c.saveEdit}
+                                </Button>
+                                <Button onClick={cancelEditField}>{c.cancelEdit}</Button>
+                              </InlineStack>
+                            )}
+                          </BlockStack>
+                        </Box>
                       ))}
-                    </InlineStack>
+                    </BlockStack>
                   )}
                 </BlockStack>
               </BlockStack>
@@ -269,29 +476,82 @@ export default function ComplianceProfilesPage() {
                   <Text as="p" tone="subdued" variant="bodySm">{c.customFieldsHint}</Text>
                 </BlockStack>
 
-                {(schema.own_custom_fields || []).length === 0 ? (
+                {(schema.own_custom_fields || []).filter((f) => !f.override).length === 0 ? (
                   <Text as="p" tone="subdued" variant="bodySm">{c.noCustomFields}</Text>
                 ) : (
                   <BlockStack gap="200">
-                    {schema.own_custom_fields.map((f) => (
-                      <InlineStack key={f.key} align="space-between" blockAlign="center">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Text as="span" fontWeight="medium">{f.label}</Text>
-                          <Badge tone="attention">{typeLabel(f.type)}</Badge>
-                          {f.type === "select" && f.options?.length ? (
-                            <Text as="span" tone="subdued" variant="bodySm">{f.options.join(", ")}</Text>
-                          ) : null}
+                    {schema.own_custom_fields.filter((f) => !f.override).map((f) => (
+                      <BlockStack key={f.key} gap="150">
+                        <InlineStack align="space-between" blockAlign="center" wrap>
+                          <InlineStack gap="200" blockAlign="center">
+                            <Text as="span" fontWeight="medium">{f.label}</Text>
+                            <Badge tone="attention">{typeLabel(f.type)}</Badge>
+                            {f.type === "select" && f.options?.length ? (
+                              <Text as="span" tone="subdued" variant="bodySm">{f.options.join(", ")}</Text>
+                            ) : null}
+                          </InlineStack>
+                          {editingKey !== f.key && (
+                            <InlineStack gap="150">
+                              <Button
+                                size="slim"
+                                onClick={() => startEditField(f)}
+                              >
+                                {c.editField}
+                              </Button>
+                              <Button
+                                size="slim"
+                                tone="critical"
+                                variant="tertiary"
+                                onClick={() => handleRemoveCustomField(f.key)}
+                                loading={customSaving}
+                              >
+                                {c.removeField}
+                              </Button>
+                            </InlineStack>
+                          )}
                         </InlineStack>
-                        <Button
-                          size="slim"
-                          tone="critical"
-                          variant="tertiary"
-                          onClick={() => handleRemoveCustomField(f.key)}
-                          loading={customSaving}
-                        >
-                          {c.removeField}
-                        </Button>
-                      </InlineStack>
+
+                        {editingKey === f.key && (
+                          <InlineStack gap="200" wrap blockAlign="end">
+                            <div style={{ minWidth: 200, flex: 1 }}>
+                              <TextField
+                                label={c.fieldLabel}
+                                value={editLabel}
+                                onChange={setEditLabel}
+                                autoComplete="off"
+                              />
+                            </div>
+                            <div style={{ minWidth: 150 }}>
+                              <Select
+                                label={c.fieldType}
+                                options={CUSTOM_FIELD_TYPES.map((t) => ({ label: typeLabel(t), value: t }))}
+                                value={editType}
+                                onChange={setEditType}
+                              />
+                            </div>
+                            {editType === "select" && (
+                              <div style={{ minWidth: 200, flex: 1 }}>
+                                <TextField
+                                  label={c.fieldOptions}
+                                  value={editOptions}
+                                  onChange={setEditOptions}
+                                  placeholder="A, B, C"
+                                  autoComplete="off"
+                                />
+                              </div>
+                            )}
+                            <Button
+                              variant="primary"
+                              onClick={() => saveFieldEdit(f.key)}
+                              loading={fieldSaving === f.key}
+                              disabled={!editLabel.trim()}
+                            >
+                              {c.saveEdit}
+                            </Button>
+                            <Button onClick={cancelEditField}>{c.cancelEdit}</Button>
+                          </InlineStack>
+                        )}
+                      </BlockStack>
                     ))}
                   </BlockStack>
                 )}

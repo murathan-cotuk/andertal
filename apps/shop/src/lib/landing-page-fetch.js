@@ -8,12 +8,15 @@
 const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
-export async function fetchLandingPage(suffix = "") {
+export async function fetchLandingPage(suffix = "", { revalidate = 30 } = {}) {
   try {
     const base = getBackendUrl();
+    const pageSpecific = String(suffix || "").length > 0;
     const res = await fetch(`${base}/store/landing-page${suffix}`, {
       headers: { "Content-Type": "application/json" },
-      next: { revalidate: 30 },
+      ...(pageSpecific || revalidate === 0
+        ? { cache: "no-store" }
+        : { next: { revalidate } }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {

@@ -241,7 +241,14 @@ export function ledgerEntryLabel(entry, locale) {
     return t("Return shipping label", "İade kargo etiketi", "Étiquette de retour", "Etiqueta de devolución", "Etichetta di reso", "Rücksendeetikett");
   }
   if (type === "shipping_label" || entry?.description_key === "shipping_label_for_order") {
-    return t("Shipping label (Andertal)", "Kargo etiketi (Andertal)", "Étiquette d'expédition (Andertal)", "Etiqueta de envío (Andertal)", "Etichetta di spedizione (Andertal)", "Versandetikett (Andertal)");
+    return t(
+      "Platform shipping label",
+      "Platform kargo etiketi",
+      "Étiquette plateforme",
+      "Etiqueta de plataforma",
+      "Etichetta piattaforma",
+      "Plattform-Versandetikett",
+    );
   }
   if (type === "payout") {
     const ps = p.period_start ? String(p.period_start).slice(0, 10) : "";

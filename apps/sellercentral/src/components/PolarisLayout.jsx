@@ -1356,28 +1356,23 @@ export default function PolarisLayout({ children }) {
         })}
       />
       {isSuperuser && (
-        <div style={{ padding: "8px 8px 0" }}>
-          {[
-            { href: process.env.NEXT_PUBLIC_DEVELOPER_URL || "https://developer.andertal.com", icon: CodeIcon, label: lt(locale, "Developer", "Geliştirici", "Développeur", "Desarrollador", "Sviluppatore", "Entwickler") },
-            { href: process.env.NEXT_PUBLIC_AFFILIATE_URL || "https://affiliate.andertal.com", icon: AffiliateIcon, label: lt(locale, "Affiliate", "Affiliate", "Affilié", "Afiliado", "Affiliato", "Affiliate") },
-          ].map((entry) => (
-            <a
-              key={entry.href}
-              href={entry.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", marginBottom: 4,
-                borderRadius: 8, textDecoration: "none", color: "var(--p-color-text, #202223)", fontSize: 13, fontWeight: 500,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover, rgba(0,0,0,0.04))"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-            >
-              <Icon source={entry.icon} />
-              {entry.label}
-            </a>
-          ))}
-        </div>
+        <Navigation.Section
+          separator
+          items={[
+            {
+              url: process.env.NEXT_PUBLIC_DEVELOPER_URL || "https://developer.andertal.com",
+              icon: CodeIcon,
+              label: lt(locale, "Developer", "Geliştirici", "Développeur", "Desarrollador", "Sviluppatore", "Entwickler"),
+              external: true,
+            },
+            {
+              url: process.env.NEXT_PUBLIC_AFFILIATE_URL || "https://affiliate.andertal.com",
+              icon: AffiliateIcon,
+              label: lt(locale, "Affiliate", "Affiliate", "Affilié", "Afiliado", "Affiliato", "Affiliate"),
+              external: true,
+            },
+          ]}
+        />
       )}
       <Navigation.Section
         fill

@@ -36,6 +36,13 @@ const slugFromImportKeyPg = (key) =>
     .replace(/\|/g, '-').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-').replace(/^-|-$/g, '') || 'category').slice(0, 255)
 
+function slugFromCategoryName(name) {
+  let s = String(name || '').toLowerCase()
+  const map = { ü: 'ue', ö: 'oe', ä: 'ae', ß: 'ss', ç: 'c', ğ: 'g', ı: 'i', ş: 's', é: 'e', è: 'e', ê: 'e', à: 'a', ù: 'u', ò: 'o', ì: 'i' }
+  for (const [from, to] of Object.entries(map)) s = s.split(from).join(to)
+  return slugFromImportKeyPg(s)
+}
+
 async function syncCategoryCmsToCollectionFromBody(body) {
   try {
     const meta = (body && typeof body.metadata === 'object' && body.metadata) || {}
@@ -350,6 +357,319 @@ const adminHubCategoriesImportPOST_fallbackPg = async (req, res) => {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const EXCEL_LANGS = ['de', 'en', 'tr', 'fr', 'it', 'es']
+
+function isUuid(v) {
+  return UUID_RE.test(String(v || '').trim())
+}
+
+function parseExcelBool(v) {
+  if (v === true || v === false) return v
+  const s = String(v || '').trim().toLowerCase()
+  if (['1', 'true', 'yes', 'ja', 'evet', 'oui', 'si', 'sí'].includes(s)) return true
+  if (['0', 'false', 'no', 'nein', 'hayir', 'hayır', 'non'].includes(s)) return false
+  return null
+}
+
+function uniqueSlug(base, taken, excludeId) {
+  let slug = slugFromCategoryName(base)
+  if (!slug) slug = 'category'
+  let n = 0
+  while (true) {
+    const candidate = n === 0 ? slug : `${slug}-${n}`.slice(0, 255)
+    const owner = taken.get(candidate)
+    if (!owner || (excludeId && String(owner) === String(excludeId))) return candidate
+    n += 1
+  }
+}
+
+function applyExcelLocalePatch(tr, seoI18n, loc, patch) {
+  if (!patch || typeof patch !== 'object') return
+  const cur = { ...(tr[loc] && typeof tr[loc] === 'object' ? tr[loc] : {}) }
+  if (patch.name != null && String(patch.name).trim()) cur.name = String(patch.name).trim()
+  if (patch.long_content != null && String(patch.long_content).trim()) {
+    cur.long_content = String(patch.long_content)
+    cur.description = String(patch.long_content)
+  }
+  if (patch.seo_title != null && String(patch.seo_title).trim()) cur.seo_title = String(patch.seo_title).trim()
+  if (patch.seo_description != null && String(patch.seo_description).trim()) cur.seo_description = String(patch.seo_description).trim()
+  if (patch.seo_keywords != null && String(patch.seo_keywords).trim()) cur.keywords = String(patch.seo_keywords).trim()
+  tr[loc] = cur
+  if (loc !== 'de') {
+    const seo = { ...(seoI18n[loc] && typeof seoI18n[loc] === 'object' ? seoI18n[loc] : {}) }
+    if (patch.seo_title != null && String(patch.seo_title).trim()) seo.meta_title = String(patch.seo_title).trim()
+    if (patch.seo_description != null && String(patch.seo_description).trim()) seo.meta_description = String(patch.seo_description).trim()
+    if (patch.seo_keywords != null && String(patch.seo_keywords).trim()) seo.keywords = String(patch.seo_keywords).trim()
+    seoI18n[loc] = seo
+  }
+}
+
+function pickCanonicalFromTranslations(tr, existing) {
+  const de = tr.de && typeof tr.de === 'object' ? tr.de : {}
+  const firstName = de.name || EXCEL_LANGS.map((l) => tr[l]?.name).find(Boolean) || existing?.name
+  const longContent = de.long_content || de.description || existing?.long_content || null
+  const seoTitle = de.seo_title || existing?.seo_title || null
+  const seoDescription = de.seo_description || existing?.seo_description || null
+  return {
+    name: firstName ? String(firstName).trim() : existing?.name,
+    long_content: longContent,
+    seo_title: seoTitle,
+    seo_description: seoDescription,
+    meta_title: de.seo_title || null,
+    meta_description: de.seo_description || null,
+    keywords: de.keywords || null,
+  }
+}
+
+function topoSortExcelItems(items) {
+  const bySlug = new Map()
+  const byId = new Map()
+  for (const it of items) {
+    if (it._slug) bySlug.set(String(it._slug).toLowerCase(), it)
+    if (it.id && isUuid(it.id)) byId.set(String(it.id).toLowerCase(), it)
+  }
+  const visiting = new Set()
+  const seen = new Set()
+  const out = []
+  const visit = (it) => {
+    const key = it._key
+    if (seen.has(key)) return
+    if (visiting.has(key)) return
+    visiting.add(key)
+    const pref = String(it.parent_id || '').trim()
+    if (pref) {
+      const parent = isUuid(pref)
+        ? byId.get(pref.toLowerCase())
+        : bySlug.get(pref.toLowerCase())
+      if (parent && parent !== it) visit(parent)
+    }
+    visiting.delete(key)
+    seen.add(key)
+    out.push(it)
+  }
+  items.forEach(visit)
+  return out
+}
+
+const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
+  const { items } = req.body || {}
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ message: 'items array is required and must not be empty' })
+  }
+  const client = getCategoriesPgClient()
+  if (!client) return categoriesPgUnavailable(res)
+  const results = { created: 0, updated: 0, failed: 0, errors: [] }
+  try {
+    await client.connect()
+    await client.query('BEGIN')
+    const existing = await client.query('SELECT * FROM admin_hub_categories')
+    const byId = new Map()
+    const bySlug = new Map()
+    for (const row of existing.rows) {
+      byId.set(String(row.id).toLowerCase(), row)
+      if (row.slug) bySlug.set(String(row.slug).toLowerCase(), row)
+    }
+    const takenSlugs = new Map()
+    bySlug.forEach((row, slug) => takenSlugs.set(slug, row.id))
+
+    const prepared = items.map((raw, i) => {
+      const translations = raw?.translations && typeof raw.translations === 'object' ? raw.translations : {}
+      const deName = String(translations.de?.name || '').trim()
+      const anyName = deName || EXCEL_LANGS.map((l) => String(translations[l]?.name || '').trim()).find(Boolean) || ''
+      const requestedSlug = raw.slug != null ? String(raw.slug).trim() : ''
+      const id = raw.id != null && isUuid(raw.id) ? String(raw.id).trim() : ''
+      return {
+        ...raw,
+        id: id || undefined,
+        translations,
+        parent_id: raw.parent_id != null ? String(raw.parent_id).trim() : undefined,
+        _nameSeed: anyName,
+        _slug: requestedSlug || (anyName ? slugFromCategoryName(anyName) : ''),
+        _key: id || requestedSlug || anyName || `row-${raw.row || i + 1}`,
+        _row: raw.row || i + 1,
+      }
+    })
+
+    const ordered = topoSortExcelItems(prepared)
+    const createdBySlug = new Map()
+    const createdById = new Map()
+
+    const resolveParent = (pref) => {
+      if (!pref) return null
+      if (isUuid(pref)) {
+        const hit = byId.get(pref.toLowerCase()) || createdById.get(pref.toLowerCase())
+        return hit ? hit.id : null
+      }
+      const slugKey = pref.toLowerCase()
+      const hit = bySlug.get(slugKey) || createdBySlug.get(slugKey)
+      return hit ? hit.id : null
+    }
+
+    for (const item of ordered) {
+      try {
+        const translationsIn = item.translations || {}
+        const existingRow =
+          (item.id && byId.get(String(item.id).toLowerCase())) ||
+          (item._slug && bySlug.get(String(item._slug).toLowerCase())) ||
+          null
+
+        if (item.id && !existingRow) {
+          // create with provided uuid
+        }
+
+        const parentPref = item.parent_id
+        let parentId
+        if (parentPref === undefined) {
+          parentId = undefined
+        } else if (parentPref === '') {
+          parentId = null
+        } else {
+          parentId = resolveParent(parentPref)
+          if (!parentId) {
+            results.failed++
+            results.errors.push({ row: item._row, error: `Parent not found: ${parentPref}` })
+            continue
+          }
+        }
+
+        const tr = existingRow?.metadata?.translations && typeof existingRow.metadata.translations === 'object'
+          ? { ...existingRow.metadata.translations }
+          : {}
+        const seoI18n = existingRow?.metadata?.seo_i18n && typeof existingRow.metadata.seo_i18n === 'object'
+          ? { ...existingRow.metadata.seo_i18n }
+          : {}
+        for (const loc of EXCEL_LANGS) {
+          if (translationsIn[loc]) applyExcelLocalePatch(tr, seoI18n, loc, translationsIn[loc])
+        }
+        const canon = pickCanonicalFromTranslations(tr, existingRow)
+        if (!canon.name) {
+          results.failed++
+          results.errors.push({ row: item._row, error: 'Name is required (fill name_de or another language)' })
+          continue
+        }
+
+        const mergedMeta = existingRow?.metadata && typeof existingRow.metadata === 'object'
+          ? { ...existingRow.metadata }
+          : {}
+        mergedMeta.translations = tr
+        mergedMeta.seo_i18n = seoI18n
+        if (canon.meta_title) mergedMeta.meta_title = canon.meta_title
+        if (canon.meta_description) mergedMeta.meta_description = canon.meta_description
+        if (canon.keywords) mergedMeta.keywords = canon.keywords
+        if (item.image_url !== undefined) {
+          const n = normalizeUrlOrNull(item.image_url)
+          if (n) mergedMeta.image_url = n
+          else delete mergedMeta.image_url
+        }
+        if (item.banner_image_url !== undefined) {
+          const n = normalizeUrlOrNull(item.banner_image_url)
+          if (n) mergedMeta.banner_image_url = n
+          else delete mergedMeta.banner_image_url
+        }
+
+        const activeParsed = item.active !== undefined ? parseExcelBool(item.active) : null
+        const sortParsed = item.sort_order !== undefined ? parseInt(item.sort_order, 10) : null
+        const bannerCol = item.banner_image_url !== undefined
+          ? normalizeUrlOrNull(item.banner_image_url)
+          : (existingRow ? existingRow.banner_image_url : null)
+
+        if (existingRow) {
+          const nextSlug = item._slug && String(item._slug).toLowerCase() !== String(existingRow.slug || '').toLowerCase()
+            ? uniqueSlug(item._slug, takenSlugs, existingRow.id)
+            : existingRow.slug
+          const nextParent = parentId !== undefined ? parentId : existingRow.parent_id
+          if (nextParent && String(nextParent) === String(existingRow.id)) {
+            results.failed++
+            results.errors.push({ row: item._row, error: 'Category cannot be its own parent' })
+            continue
+          }
+          const ur = await client.query(
+            `UPDATE admin_hub_categories SET
+              name = $1, slug = $2, parent_id = $3, active = $4, sort_order = $5,
+              seo_title = $6, seo_description = $7, long_content = $8, banner_image_url = $9,
+              metadata = $10::jsonb, updated_at = now()
+             WHERE id = $11::uuid RETURNING *`,
+            [
+              canon.name,
+              nextSlug,
+              nextParent,
+              activeParsed != null ? activeParsed : existingRow.active !== false,
+              Number.isFinite(sortParsed) ? sortParsed : (existingRow.sort_order || 0),
+              canon.seo_title,
+              canon.seo_description,
+              canon.long_content,
+              bannerCol,
+              JSON.stringify(mergedMeta),
+              existingRow.id,
+            ],
+          )
+          const row = ur.rows[0]
+          takenSlugs.delete(String(existingRow.slug || '').toLowerCase())
+          takenSlugs.set(String(row.slug).toLowerCase(), row.id)
+          byId.set(String(row.id).toLowerCase(), row)
+          bySlug.set(String(row.slug).toLowerCase(), row)
+          createdById.set(String(row.id).toLowerCase(), row)
+          createdBySlug.set(String(row.slug).toLowerCase(), row)
+          results.updated++
+        } else {
+          const slug = uniqueSlug(item._slug || canon.name, takenSlugs, null)
+          const insertId = item.id && isUuid(item.id) ? String(item.id).trim() : null
+          const ir = insertId
+            ? await client.query(
+              `INSERT INTO admin_hub_categories
+                (id, name, slug, description, parent_id, active, is_visible, has_collection, sort_order,
+                 seo_title, seo_description, long_content, banner_image_url, metadata)
+               VALUES ($1::uuid,$2,$3,NULL,$4,$5,true,false,$6,$7,$8,$9,$10,$11::jsonb)
+               RETURNING *`,
+              [
+                insertId, canon.name, slug, parentId || null,
+                activeParsed != null ? activeParsed : true,
+                Number.isFinite(sortParsed) ? sortParsed : 0,
+                canon.seo_title, canon.seo_description, canon.long_content, bannerCol,
+                JSON.stringify(mergedMeta),
+              ],
+            )
+            : await client.query(
+              `INSERT INTO admin_hub_categories
+                (name, slug, description, parent_id, active, is_visible, has_collection, sort_order,
+                 seo_title, seo_description, long_content, banner_image_url, metadata)
+               VALUES ($1,$2,NULL,$3,$4,true,false,$5,$6,$7,$8,$9,$10::jsonb)
+               RETURNING *`,
+              [
+                canon.name, slug, parentId || null,
+                activeParsed != null ? activeParsed : true,
+                Number.isFinite(sortParsed) ? sortParsed : 0,
+                canon.seo_title, canon.seo_description, canon.long_content, bannerCol,
+                JSON.stringify(mergedMeta),
+              ],
+            )
+          const row = ir.rows[0]
+          takenSlugs.set(String(row.slug).toLowerCase(), row.id)
+          byId.set(String(row.id).toLowerCase(), row)
+          bySlug.set(String(row.slug).toLowerCase(), row)
+          createdById.set(String(row.id).toLowerCase(), row)
+          createdBySlug.set(String(row.slug).toLowerCase(), row)
+          results.created++
+        }
+      } catch (rowErr) {
+        results.failed++
+        results.errors.push({ row: item._row, error: (rowErr && rowErr.message) || 'Save failed' })
+      }
+    }
+
+    await client.query('COMMIT')
+    invalidateCategoryTreeCache().catch(() => {})
+    return res.status(200).json(results)
+  } catch (e) {
+    try { await client.query('ROLLBACK') } catch (_) {}
+    console.error('Admin Hub Categories excel-upsert:', e)
+    return res.status(500).json({ message: (e && e.message) || 'Import failed' })
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
+
 // ── Main handlers ─────────────────────────────────────────────────────────────
 
 const adminHubCategoriesGET = async (req, res) => {
@@ -537,16 +857,39 @@ function sanitizeCustomField(raw, existingKeys) {
   const label = String(raw?.label || '').trim()
   if (!label) return null
   const type = CUSTOM_FIELD_TYPES.has(raw?.type) ? raw.type : 'text'
-  let key = String(raw?.key || '').trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
-  if (!key) key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-  if (!key) key = 'field'
-  key = `custom_${key}`.slice(0, 80)
+  // Two shapes here: a brand-new field (auto-generated, `custom_`-prefixed, always unique) vs.
+  // an OVERRIDE of an existing profile-provided field (raw.override + raw.key = that field's real
+  // key, e.g. "weee_number") — an override keeps the real key verbatim so the merge below
+  // (mergedDefs = {...resolved.field_definitions, ...customFieldsToDefs(ownCustomFields)}) replaces
+  // that one field's label/type/options for this category instead of adding a duplicate.
+  const isOverride = raw?.override === true && String(raw?.key || '').trim() !== ''
+  let key
+  if (isOverride) {
+    key = String(raw.key).trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
+  } else {
+    // The editor round-trips the WHOLE fields array on every add/remove (existing fields already
+    // carry their real `custom_…` key from a prior save, not just the brand-new one). Re-deriving
+    // "custom_" + <that key as base> on every such round-trip used to re-prefix already-prefixed
+    // keys each time — "custom_x" → "custom_custom_x" → "custom_custom_custom_x" — so an existing
+    // custom_-prefixed key is kept verbatim; only a genuinely new field (no key, or a key that
+    // isn't already in our namespace) gets a fresh "custom_" prefix.
+    const existingRawKey = String(raw?.key || '').trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
+    if (existingRawKey.startsWith('custom_')) {
+      key = existingRawKey.slice(0, 80)
+    } else {
+      const base = existingRawKey || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'field'
+      key = `custom_${base}`.slice(0, 80)
+    }
+  }
   let uniqueKey = key
-  let n = 2
-  while (existingKeys.has(uniqueKey)) { uniqueKey = `${key}_${n}`; n += 1 }
+  if (!isOverride) {
+    let n = 2
+    while (existingKeys.has(uniqueKey)) { uniqueKey = `${key}_${n}`; n += 1 }
+  }
   existingKeys.add(uniqueKey)
   const help_text = String(raw?.help_text || '').trim()
   const out = { key: uniqueKey, label, type }
+  if (isOverride) out.override = true
   if (help_text) out.help_text = help_text
   if (type === 'select') {
     const options = Array.isArray(raw?.options) ? raw.options.map((o) => String(o || '').trim()).filter(Boolean) : []
@@ -555,14 +898,25 @@ function sanitizeCustomField(raw, existingKeys) {
   return out
 }
 
-/** Build a category's own custom_compliance_fields into the field_definitions shape ComplianceFieldsSection expects. */
-function customFieldsToDefs(fields) {
+/**
+ * Build a category's own custom_compliance_fields into the field_definitions shape
+ * ComplianceFieldsSection expects.
+ * @param {object} baseDefs - the resolved profile's field_definitions, so an OVERRIDE entry
+ *   (same key as a real profile field) can inherit that field's group (eprel/electrical/…)
+ *   instead of falling into the generic "custom" bucket.
+ */
+function customFieldsToDefs(fields, baseDefs = {}) {
   const out = {}
   for (const f of fields || []) {
     out[f.key] = {
       type: f.type,
       label_i18n: { de: f.label },
       help_text_i18n: f.help_text ? { de: f.help_text } : {},
+      // Category-specific ad-hoc fields (superuser-added via ComplianceProfilesPage) get their
+      // own group bucket in the product editor — they aren't part of any static profile's
+      // eprel/electrical/battery/… taxonomy, so lumping them into one of those would misfile them.
+      // An override of an existing profile field keeps that field's original group instead.
+      group: (f.override && baseDefs[f.key]?.group) || 'custom',
       ...(f.type === 'select' ? { options: f.options || [] } : {}),
     }
   }
@@ -589,13 +943,26 @@ const adminHubCategoryComplianceSchemaGET = async (req, res) => {
     const resolved = resolveComplianceProfile(profileId || DEFAULT_PROFILE_ID, marketplace)
 
     // Manually-added, category-own required fields (docs/HUKUKI.md follow-up — superuser can add
-    // ad-hoc mandatory fields per category beyond the static profile catalog). Not inherited by
-    // children on purpose: each category gets its own explicit set via ComplianceProfilesPage.
+    // ad-hoc mandatory fields per category beyond the static profile catalog), INCLUDING override
+    // entries that reuse an existing profile field's key to edit its label/type/options for just
+    // this category. Not inherited by children on purpose: each category gets its own explicit
+    // set via ComplianceProfilesPage.
     const ownCustomFields = Array.isArray(ownMeta.custom_compliance_fields) ? ownMeta.custom_compliance_fields : []
     const customKeys = ownCustomFields.map((f) => f.key).filter(Boolean)
+    // Fields a superuser turned OFF for this one category (e.g. a profile requires weee_number
+    // but this specific subcategory doesn't need it) — never inherited by children either.
+    const disabledFields = Array.isArray(ownMeta.disabled_compliance_fields)
+      ? ownMeta.disabled_compliance_fields.map((k) => String(k || '').trim()).filter(Boolean)
+      : []
+    const disabledSet = new Set(disabledFields)
+
     const mergedRequired = [...resolved.required_fields, ...customKeys.filter((k) => !resolved.required_fields.includes(k))]
+      .filter((k) => !disabledSet.has(k))
+    const mergedOptional = [...resolved.optional_fields, ...customKeys.filter((k) => !resolved.optional_fields.includes(k) && !mergedRequired.includes(k))]
+      .filter((k) => !disabledSet.has(k))
     const mergedBlocked = [...resolved.blocked_publish_without, ...customKeys.filter((k) => !resolved.blocked_publish_without.includes(k))]
-    const mergedDefs = { ...resolved.field_definitions, ...customFieldsToDefs(ownCustomFields) }
+      .filter((k) => !disabledSet.has(k))
+    const mergedDefs = { ...resolved.field_definitions, ...customFieldsToDefs(ownCustomFields, resolved.field_definitions) }
 
     res.json({
       category_id: id,
@@ -605,8 +972,16 @@ const adminHubCategoryComplianceSchemaGET = async (req, res) => {
       own_profile_id: ownMeta.compliance_profile_id || null,
       resolved_from: profileId ? 'category_or_ancestor' : 'default_fallback',
       own_custom_fields: ownCustomFields,
+      own_disabled_fields: disabledFields,
+      // Pre-override/pre-disable view of what the PROFILE alone defines — ComplianceProfilesPage's
+      // editor uses this (not the merged lists below) to let a superuser edit or disable any of
+      // them, since the merged lists have already had disabled ones filtered out.
+      profile_required_fields: resolved.required_fields,
+      profile_optional_fields: resolved.optional_fields,
+      profile_field_definitions: resolved.field_definitions,
       ...resolved,
       required_fields: mergedRequired,
+      optional_fields: mergedOptional,
       blocked_publish_without: mergedBlocked,
       field_definitions: mergedDefs,
     })
@@ -618,26 +993,36 @@ const adminHubCategoryComplianceSchemaGET = async (req, res) => {
 }
 
 // PATCH /admin-hub/v1/categories/:id/compliance-custom-fields — superuser only. Full-replace of
-// this category's OWN manually-added required fields (metadata.custom_compliance_fields). Not
-// inherited by children — see adminHubCategoryComplianceSchemaGET. Body: { fields: [{ key?, label, type, options?, help_text? }] }.
+// this category's OWN manually-added/overridden required fields (metadata.custom_compliance_fields)
+// and, optionally, which profile fields are disabled for this category (metadata.disabled_compliance_fields).
+// Not inherited by children — see adminHubCategoryComplianceSchemaGET.
+// Body: { fields: [{ key?, label, type, options?, help_text?, override? }], disabled_keys?: string[] }.
+// `disabled_keys` is only written when present in the body, so a caller that only manages the
+// fields list (older client) never accidentally clears it.
 const adminHubCategoryComplianceCustomFieldsPATCH = async (req, res) => {
   const id = (req.params.id || '').trim()
   if (!id) return res.status(400).json({ message: 'category id required' })
   const rawFields = Array.isArray(req.body?.fields) ? req.body.fields : []
   const existingKeys = new Set()
   const fields = rawFields.map((f) => sanitizeCustomField(f, existingKeys)).filter(Boolean)
+  const hasDisabledKeys = Array.isArray(req.body?.disabled_keys)
+  const disabledKeys = hasDisabledKeys
+    ? [...new Set(req.body.disabled_keys.map((k) => String(k || '').trim()).filter(Boolean))]
+    : null
   const client = getCategoriesPgClient()
   if (!client) return categoriesPgUnavailable(res)
   try {
     await client.connect()
     const exists = await client.query('SELECT id FROM admin_hub_categories WHERE id = $1', [id])
     if (!exists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Category not found' }) }
+    const metaPatch = { custom_compliance_fields: fields }
+    if (hasDisabledKeys) metaPatch.disabled_compliance_fields = disabledKeys
     await client.query(
-      `UPDATE admin_hub_categories SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('custom_compliance_fields', $1::jsonb) WHERE id = $2`,
-      [JSON.stringify(fields), id],
+      `UPDATE admin_hub_categories SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb WHERE id = $2`,
+      [JSON.stringify(metaPatch), id],
     )
     await client.end()
-    res.json({ success: true, category_id: id, fields })
+    res.json({ success: true, category_id: id, fields, disabled_keys: disabledKeys || undefined })
   } catch (e) {
     try { await client.end() } catch (_) {}
     console.error('Category compliance-custom-fields PATCH:', e)
@@ -774,6 +1159,7 @@ module.exports = function createCategoriesRouter() {
   router.get('/admin-hub/categories', (req, res) => adminHubCategoriesGET(req, res))
   router.post('/admin-hub/categories', (req, res) => adminHubCategoriesPOST(req, res))
   router.post('/admin-hub/categories/import', (req, res) => adminHubCategoriesImportPOST(req, res))
+  router.post('/admin-hub/categories/excel-upsert', requireSuperuser, adminHubCategoriesExcelUpsertPOST)
   router.get('/admin-hub/categories/:id/compliance-schema', (req, res) => adminHubCategoryComplianceSchemaGET(req, res))
   router.get('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))
   router.put('/admin-hub/categories/:id', (req, res) => adminHubCategoryByIdPUT(req, res))
@@ -781,6 +1167,7 @@ module.exports = function createCategoriesRouter() {
 
   router.get('/admin-hub/v1/categories', (req, res) => adminHubCategoriesGET(req, res))
   router.post('/admin-hub/v1/categories', (req, res) => adminHubCategoriesPOST(req, res))
+  router.post('/admin-hub/v1/categories/excel-upsert', requireSuperuser, adminHubCategoriesExcelUpsertPOST)
   router.get('/admin-hub/v1/categories/:id/compliance-schema', (req, res) => adminHubCategoryComplianceSchemaGET(req, res))
   router.get('/admin-hub/v1/categories/compliance-overview', requireSuperuser, adminHubComplianceOverviewGET)
   router.get('/admin-hub/v1/categories/:id', (req, res) => adminHubCategoryByIdGET(req, res))

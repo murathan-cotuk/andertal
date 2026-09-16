@@ -34,11 +34,23 @@ const EMPTY_FORM = {
   brand_type: "own", trademark_number: "", trademark_jurisdiction: "",
 };
 
+const EMPTY_VERIFY = {
+  brand_type: "own_registered",
+  trademark_number: "",
+  trademark_jurisdiction: "EUIPO",
+  trademark_status: "registered",
+  trademark_owner_name: "",
+  ownership_role: "owner",
+  website: "",
+};
+
 const BRANDS_PAGE_SIZE = 100; // 4 per row x 25 rows
 
 // Brand status/verification badge (docs/BRAND.md)
 function BrandStatusBadge({ brand, copy }) {
-  if (brand.status === "pending") return <Badge tone="attention">{copy.statusPending}</Badge>;
+  if (brand.status === "pending" || brand.verification_level === "pending_review") {
+    return <Badge tone="attention">{copy.statusPending}</Badge>;
+  }
   if (brand.status === "rejected") return <Badge tone="critical">{copy.statusRejected}</Badge>;
   if (brand.verification_level === "verified") return <Badge tone="success">{copy.statusVerified}</Badge>;
   if (brand.verification_level === "reseller") return <Badge tone="success">{copy.statusReseller}</Badge>;
@@ -46,8 +58,28 @@ function BrandStatusBadge({ brand, copy }) {
   return null;
 }
 
+function canVerifyBrand(brand, { isSuperuser, callerId }) {
+  if (!brand) return false;
+  if (brand.verification_level === "verified" || brand.verification_level === "reseller") return false;
+  if (brand.status === "pending" || brand.verification_level === "pending_review") return false;
+  if (isSuperuser) return true;
+  return !!(callerId && brand.seller_id && brand.seller_id === callerId);
+}
+
+function authDocLabel(type, authCopy) {
+  const map = {
+    trademark_certificate: authCopy.docTrademarkCert,
+    trademark_image: authCopy.docTrademarkImage,
+    product_packaging: authCopy.docPackaging,
+    authorization_letter: authCopy.docAuthLetter,
+    distribution_agreement: authCopy.docDistribution,
+    purchase_invoice: authCopy.docInvoice,
+  };
+  return map[type] || type;
+}
+
 // ── Brand card (grid tile) ─────────────────────────────────────────────────
-function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, isMine, copy }) {
+function BrandCard({ brand, baseUrl, onEdit, canEdit, canVerify, onVerify, isSuperuser, isMine, copy }) {
   const resolveUrl = (url) => {
     if (!url) return "";
     if (url.startsWith("http") || url.startsWith("data:")) return url;
@@ -83,6 +115,11 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, isSuperuser, isMine, copy 
           {isMine && <Badge tone="info">{copy.myBrands}</Badge>}
         </InlineStack>
 
+        {canVerify && (
+          <Button size="slim" variant="primary" fullWidth onClick={() => onVerify(brand)}>
+            {copy.verify}
+          </Button>
+        )}
         {canEdit && (
           <Button size="slim" variant="secondary" fullWidth onClick={() => onEdit(brand)}>
             {isSuperuser ? copy.edit : copy.logoBanner}
@@ -125,7 +162,14 @@ function PendingBrandCard({ brand, authCopy, baseUrl, onApprove, onReject, busy 
         {!isReseller && (brand.trademark_number || brand.trademark_jurisdiction) && (
           <Text as="p" variant="bodySm">
             {authCopy.trademark}: {brand.trademark_number || "—"} ({brand.trademark_jurisdiction || "—"})
+            {brand.verification?.trademark_status ? ` · ${brand.verification.trademark_status}` : ""}
           </Text>
+        )}
+        {brand.verification?.trademark_owner_name && (
+          <Text as="p" variant="bodySm">{authCopy.owner}: {brand.verification.trademark_owner_name}</Text>
+        )}
+        {brand.verification?.website && (
+          <Text as="p" variant="bodySm">{authCopy.website}: {brand.verification.website}</Text>
         )}
 
         <Divider />
@@ -138,7 +182,7 @@ function PendingBrandCard({ brand, authCopy, baseUrl, onApprove, onReject, busy 
             <BlockStack gap="100">
               {brand.documents.map((doc) => (
                 <InlineStack key={doc.id} gap="200" blockAlign="center">
-                  <Text as="span" variant="bodySm">{doc.document_type}{doc.file_name ? ` — ${doc.file_name}` : ""}</Text>
+                  <Text as="span" variant="bodySm">{authDocLabel(doc.document_type, authCopy)}{doc.file_name ? ` — ${doc.file_name}` : ""}</Text>
                   <Button size="slim" variant="plain" url={resolveUrl(doc.file_url)} target="_blank">
                     {authCopy.viewDocument}
                   </Button>
@@ -198,6 +242,14 @@ export default function BrandPage() {
   const [rejectTarget, setRejectTarget] = useState(null); // brand or null
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
+  const [verifyTarget, setVerifyTarget] = useState(null);
+  const [verifyForm, setVerifyForm] = useState(EMPTY_VERIFY);
+  const [verifySaving, setVerifySaving] = useState(false);
+  const [verifyCert, setVerifyCert] = useState(null);
+  const [verifyPack, setVerifyPack] = useState(null);
+  const [verifyExtra, setVerifyExtra] = useState(null);
+  const [verifyInvoice, setVerifyInvoice] = useState(null);
+  const [verifyUploading, setVerifyUploading] = useState("");
 
   const loadPending = () => {
     if (!isSuperuser) { setPendingLoading(false); return; }
@@ -244,6 +296,117 @@ export default function BrandPage() {
       setMessage({ type: "error", text: userError(e, locale, authCopy.actionError) });
     } finally {
       setRejecting(false);
+    }
+  };
+
+  const openVerify = (brand) => {
+    setVerifyTarget(brand);
+    setVerifyForm({
+      ...EMPTY_VERIFY,
+      trademark_number: brand.trademark_number || "",
+      trademark_jurisdiction: brand.trademark_jurisdiction || "EUIPO",
+      trademark_owner_name: brand.verification?.trademark_owner_name || "",
+      website: brand.verification?.website || "",
+      brand_type: brand.brand_type === "authorized_reseller" ? "authorized_reseller" : "own_registered",
+      ownership_role: brand.verification?.ownership_role || "owner",
+      trademark_status: brand.verification?.trademark_status || "registered",
+    });
+    setVerifyCert(null);
+    setVerifyPack(null);
+    setVerifyExtra(null);
+    setVerifyInvoice(null);
+    setMessage({ type: "", text: "" });
+  };
+
+  const closeVerify = () => {
+    setVerifyTarget(null);
+    setVerifyForm(EMPTY_VERIFY);
+    setVerifyCert(null);
+    setVerifyPack(null);
+    setVerifyExtra(null);
+    setVerifyInvoice(null);
+  };
+
+  const uploadVerifyFile = async (e, setter, key) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setVerifyUploading(key);
+    setMessage({ type: "", text: "" });
+    try {
+      const fd = new FormData();
+      appendMediaFileToFormData(fd, file);
+      const r = await client.uploadMedia(fd);
+      if (r.url) setter({ url: r.url, name: file.name });
+    } catch (e2) {
+      setMessage({ type: "error", text: userError(e2, locale, copy.documentUploadError) });
+    } finally {
+      setVerifyUploading("");
+    }
+  };
+
+  const handleVerifySubmit = async () => {
+    if (!verifyTarget) return;
+    const registered = verifyForm.brand_type === "own_registered";
+    if (registered) {
+      if (!verifyForm.trademark_number.trim()) {
+        setMessage({ type: "error", text: `${copy.trademarkNumber}: ${copy.nameRequired}` });
+        return;
+      }
+      if (!verifyForm.trademark_jurisdiction.trim()) {
+        setMessage({ type: "error", text: `${copy.trademarkOffice}: ${copy.nameRequired}` });
+        return;
+      }
+      if (!verifyForm.trademark_owner_name.trim()) {
+        setMessage({ type: "error", text: `${copy.trademarkOwnerName}: ${copy.nameRequired}` });
+        return;
+      }
+    }
+    if (!isSuperuser) {
+      if (registered && !verifyCert) {
+        setMessage({ type: "error", text: copy.certRequired });
+        return;
+      }
+      if (registered && !verifyPack) {
+        setMessage({ type: "error", text: copy.packagingRequired });
+        return;
+      }
+      if (registered && verifyForm.ownership_role !== "owner" && !verifyExtra) {
+        setMessage({ type: "error", text: copy.extraAuthRequired });
+        return;
+      }
+      if (!registered && !verifyExtra) {
+        setMessage({ type: "error", text: copy.resellerDocRequired });
+        return;
+      }
+    }
+    const documents = [];
+    if (verifyCert) documents.push({ document_type: "trademark_certificate", file_url: verifyCert.url, file_name: verifyCert.name });
+    if (verifyPack) documents.push({ document_type: "product_packaging", file_url: verifyPack.url, file_name: verifyPack.name });
+    if (verifyExtra) documents.push({ document_type: "authorization_letter", file_url: verifyExtra.url, file_name: verifyExtra.name });
+    if (verifyInvoice) documents.push({ document_type: "purchase_invoice", file_url: verifyInvoice.url, file_name: verifyInvoice.name });
+
+    setVerifySaving(true);
+    setMessage({ type: "", text: "" });
+    try {
+      await client.verifyBrand(verifyTarget.id, {
+        brand_type: verifyForm.brand_type,
+        trademark_number: registered ? verifyForm.trademark_number.trim() : undefined,
+        trademark_jurisdiction: registered ? verifyForm.trademark_jurisdiction.trim() : undefined,
+        trademark_status: registered ? verifyForm.trademark_status : undefined,
+        trademark_owner_name: verifyForm.trademark_owner_name.trim() || undefined,
+        ownership_role: registered ? verifyForm.ownership_role : "authorized_reseller",
+        website: verifyForm.website.trim() || undefined,
+        documents,
+      });
+      setMessage({ type: "success", text: isSuperuser ? copy.verifySuccessAdmin : copy.verifySuccess });
+      closeVerify();
+      loadBrands();
+      loadPending();
+    } catch (e) {
+      setMessage({ type: "error", text: userError(e, locale, copy.verifyError) });
+    } finally {
+      setVerifySaving(false);
     }
   };
 
@@ -315,6 +478,8 @@ export default function BrandPage() {
           baseUrl={baseUrl}
           onEdit={openEdit}
           canEdit={canEditBrand(brand)}
+          canVerify={canVerifyBrand(brand, { isSuperuser, callerId })}
+          onVerify={openVerify}
           isSuperuser={isSuperuser}
           isMine={isMineSection || (!!brand.seller_id && brand.seller_id === callerId)}
           copy={copy}
@@ -750,6 +915,158 @@ export default function BrandPage() {
                 multiline={2}
                 autoComplete="off"
               />
+            )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      {/* ── Verify brand (seller: own brands only; superuser: any) ──────── */}
+      <Modal
+        open={!!verifyTarget}
+        onClose={closeVerify}
+        title={verifyTarget ? `${copy.verifyModalTitle}: ${verifyTarget.name}` : copy.verifyModalTitle}
+        primaryAction={{
+          content: isSuperuser ? copy.verifySubmitAdmin : copy.verifySubmit,
+          onAction: handleVerifySubmit,
+          loading: verifySaving,
+        }}
+        secondaryActions={[{ content: copy.cancel, onAction: closeVerify }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            {message.text && (
+              <Banner tone={message.type === "success" ? "success" : "critical"}>{message.text}</Banner>
+            )}
+            <Text as="p" variant="bodySm" tone="subdued">{copy.verifyIntro}</Text>
+            <Select
+              label={copy.brandType}
+              value={verifyForm.brand_type}
+              onChange={(v) => setVerifyForm((p) => ({ ...p, brand_type: v }))}
+              options={[
+                { label: copy.brandTypeRegistered, value: "own_registered" },
+                { label: copy.brandTypeReseller, value: "authorized_reseller" },
+              ]}
+            />
+
+            {verifyForm.brand_type === "own_registered" && (
+              <>
+                <Select
+                  label={copy.trademarkOffice}
+                  value={verifyForm.trademark_jurisdiction}
+                  onChange={(v) => setVerifyForm((p) => ({ ...p, trademark_jurisdiction: v }))}
+                  options={[
+                    { label: copy.officeEuipo, value: "EUIPO" },
+                    { label: copy.officeDpma, value: "DPMA" },
+                    { label: copy.officeTurkpatent, value: "TÜRKPATENT" },
+                    { label: copy.officeInpi, value: "INPI" },
+                    { label: copy.officeUibm, value: "UIBM" },
+                    { label: copy.officeOepm, value: "OEPM" },
+                    { label: copy.officeUkipo, value: "UKIPO" },
+                    { label: copy.officeUspto, value: "USPTO" },
+                    { label: copy.officeWipo, value: "WIPO" },
+                    { label: copy.officeOther, value: "OTHER" },
+                  ]}
+                />
+                <TextField
+                  label={copy.trademarkNumber}
+                  value={verifyForm.trademark_number}
+                  onChange={(v) => setVerifyForm((p) => ({ ...p, trademark_number: v }))}
+                  placeholder={copy.trademarkNumberPlaceholder}
+                  autoComplete="off"
+                />
+                <Select
+                  label={copy.trademarkStatus}
+                  value={verifyForm.trademark_status}
+                  onChange={(v) => setVerifyForm((p) => ({ ...p, trademark_status: v }))}
+                  options={[
+                    { label: copy.trademarkRegistered, value: "registered" },
+                    { label: copy.trademarkPendingApp, value: "pending" },
+                  ]}
+                />
+                <TextField
+                  label={copy.trademarkOwnerName}
+                  value={verifyForm.trademark_owner_name}
+                  onChange={(v) => setVerifyForm((p) => ({ ...p, trademark_owner_name: v }))}
+                  helpText={copy.trademarkOwnerHelp}
+                  autoComplete="off"
+                />
+                <Select
+                  label={copy.ownershipRole}
+                  value={verifyForm.ownership_role}
+                  onChange={(v) => setVerifyForm((p) => ({ ...p, ownership_role: v }))}
+                  options={[
+                    { label: copy.roleOwner, value: "owner" },
+                    { label: copy.roleLicensee, value: "licensee" },
+                    { label: copy.roleAgent, value: "authorized_agent" },
+                  ]}
+                />
+              </>
+            )}
+
+            <TextField
+              label={copy.brandWebsite}
+              value={verifyForm.website}
+              onChange={(v) => setVerifyForm((p) => ({ ...p, website: v }))}
+              placeholder={copy.brandWebsitePlaceholder}
+              autoComplete="off"
+            />
+
+            {verifyForm.brand_type === "own_registered" && (
+              <>
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="medium">{copy.certDocument}</Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Button size="slim" onClick={() => document.getElementById("verify-cert-input")?.click()} loading={verifyUploading === "cert"}>
+                      {verifyCert ? verifyCert.name : copy.chooseFile}
+                    </Button>
+                    <input id="verify-cert-input" type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => uploadVerifyFile(e, setVerifyCert, "cert")} />
+                  </InlineStack>
+                </BlockStack>
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="medium">{copy.packagingDocument}</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">{copy.packagingHelp}</Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Button size="slim" onClick={() => document.getElementById("verify-pack-input")?.click()} loading={verifyUploading === "pack"}>
+                      {verifyPack ? verifyPack.name : copy.chooseFile}
+                    </Button>
+                    <input id="verify-pack-input" type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => uploadVerifyFile(e, setVerifyPack, "pack")} />
+                  </InlineStack>
+                </BlockStack>
+                {verifyForm.ownership_role !== "owner" && (
+                  <BlockStack gap="100">
+                    <Text as="p" variant="bodyMd" fontWeight="medium">{copy.extraAuthDocument}</Text>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Button size="slim" onClick={() => document.getElementById("verify-extra-input")?.click()} loading={verifyUploading === "extra"}>
+                        {verifyExtra ? verifyExtra.name : copy.chooseFile}
+                      </Button>
+                      <input id="verify-extra-input" type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => uploadVerifyFile(e, setVerifyExtra, "extra")} />
+                    </InlineStack>
+                  </BlockStack>
+                )}
+              </>
+            )}
+
+            {verifyForm.brand_type === "authorized_reseller" && (
+              <>
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="medium">{copy.resellerDocument}</Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Button size="slim" onClick={() => document.getElementById("verify-extra-input")?.click()} loading={verifyUploading === "extra"}>
+                      {verifyExtra ? verifyExtra.name : copy.chooseFile}
+                    </Button>
+                    <input id="verify-extra-input" type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => uploadVerifyFile(e, setVerifyExtra, "extra")} />
+                  </InlineStack>
+                </BlockStack>
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd" fontWeight="medium">{copy.invoiceDocument}</Text>
+                  <InlineStack gap="200" blockAlign="center">
+                    <Button size="slim" onClick={() => document.getElementById("verify-invoice-input")?.click()} loading={verifyUploading === "invoice"}>
+                      {verifyInvoice ? verifyInvoice.name : copy.chooseFile}
+                    </Button>
+                    <input id="verify-invoice-input" type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => uploadVerifyFile(e, setVerifyInvoice, "invoice")} />
+                  </InlineStack>
+                </BlockStack>
+              </>
             )}
           </BlockStack>
         </Modal.Section>

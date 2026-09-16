@@ -512,11 +512,17 @@ class MedusaAdminClient {
     })
   }
 
-  /** Superuser: full-replace this category's own manually-added required fields (not inherited by children). */
-  async setCategoryComplianceCustomFields(categoryId, fields) {
+  /**
+   * Superuser: full-replace this category's own manually-added/overridden required fields
+   * (not inherited by children). `disabledKeys` (optional) full-replaces which profile fields
+   * are turned off for this category — omit it to leave that list untouched.
+   */
+  async setCategoryComplianceCustomFields(categoryId, fields, disabledKeys) {
+    const body = { fields: fields || [] }
+    if (disabledKeys !== undefined) body.disabled_keys = disabledKeys || []
     return this.request(`/admin-hub/v1/categories/${categoryId}/compliance-custom-fields`, {
       method: 'PATCH',
-      body: JSON.stringify({ fields: fields || [] }),
+      body: JSON.stringify(body),
     })
   }
 
@@ -644,6 +650,11 @@ class MedusaAdminClient {
   async getPendingBrandAuthorizations() {
     const data = await this.request('/admin-hub/brands/pending-authorizations').catch(() => ({ brands: [] }))
     return { brands: data.brands || [] }
+  }
+
+  async verifyBrand(brandId, body) {
+    const res = await this.request(`/admin-hub/brands/${brandId}/verify`, { method: 'POST', body: JSON.stringify(body || {}) })
+    return res.brand ?? res
   }
 
   /** Superuser: approve a pending brand authorization claim */

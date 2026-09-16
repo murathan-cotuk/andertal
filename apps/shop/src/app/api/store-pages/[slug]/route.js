@@ -8,11 +8,11 @@ export async function GET(request, { params }) {
   if (!slug) return NextResponse.json({ message: "Not found" }, { status: 404 });
   try {
     const base = getBackendUrl();
-    const res = await fetch(`${base}/store/pages/${encodeURIComponent(slug)}`, { next: { revalidate: 120 } });
+    const res = await fetch(`${base}/store/pages/${encodeURIComponent(slug)}`, { cache: "no-store" });
     if (!res.ok) return NextResponse.json({ message: "Not found" }, { status: 404 });
     const data = await res.json();
     return NextResponse.json(data, {
-      headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300" },
+      headers: { "Cache-Control": "no-store" },
     });
   } catch {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
