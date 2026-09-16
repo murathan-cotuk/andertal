@@ -4364,13 +4364,13 @@ export default function LandingPageEditor() {
     setIsDirty(true);
   };
 
-  /** Reihenfolge nur innerhalb des aktuellen Desktop- bzw. Mobil-Reiters. */
   // Tree-wide operations (root OR any nested layout_section child) — used by the vitrin editor's
-  // tree/inspector panels below. The tree shows the WHOLE page (every device's root containers
-  // together, not just the current tab's), so reordering must walk the full sibling list too —
-  // moveSiblingInGroup already recurses to whichever level `id` lives at (root or nested), so one
-  // generic call covers both; `dir` can be any signed delta, not just ±1 (used by drag-and-drop
-  // below to jump straight to the drop target's position in one step).
+  // tree/inspector panels below. The tree only shows the CURRENT device tab's root containers
+  // (see filteredSeitenContainers), so reordering via the ↑/↓ buttons must be scoped to that same
+  // device group too — otherwise "move up" can silently swap a Mobil block past an interleaved
+  // Desktop/Tablet block in the underlying array, which has zero visible effect in the Mobil tab
+  // (moveSiblingInGroup already recurses past this and uses () => true once inside a nested
+  // layout_section, since children have no independent visible_on of their own).
   const treeUpdateById = (id, updater) => { setContainers((prev) => mapContainerById(prev, id, updater)); setIsDirty(true); };
   const treeRemoveById = (id) => {
     setContainers((prev) => removeContainerById(prev, id));
@@ -4378,7 +4378,7 @@ export default function LandingPageEditor() {
     setIsDirty(true);
   };
   const treeMove = (id, dir) => {
-    setContainers((prev) => moveSiblingInGroup(prev, id, dir, () => true));
+    setContainers((prev) => moveSiblingInGroup(prev, id, dir, (c) => matchContainerSeitenTab(c, seitenDeviceTab)));
     setIsDirty(true);
   };
   /** Drag-and-drop reorder: move `draggedId` to sit just before/after `targetId`, both must be
@@ -4696,7 +4696,7 @@ export default function LandingPageEditor() {
                                 { id: "seiten-m", content: copy.mobile },
                               ]}
                               selected={seitenDeviceTab}
-                              onSelect={setSeitenDeviceTab}
+                              onSelect={(v) => { setSeitenDeviceTab(v); setExpandedId(null); }}
                             />
                           </Card>
 
@@ -4737,14 +4737,12 @@ export default function LandingPageEditor() {
                             </Banner>
                           )}
 
-                          {containers.length > 0 && (() => {
-                            // The tree always shows the WHOLE page (every device's containers) —
-                            // filtering it down to only the current device tab hid most of the
-                            // page from the skeleton view, which is confusing (a Shopify-style
-                            // page tree shows everything; it's the live preview below, not the
-                            // tree, whose per-device rendering already reflects visible_on).
-                            const treeRows = flattenLandingTree(containers);
-                            const selectedNode = expandedId ? findContainerById(containers, expandedId) : null;
+                          {filteredSeitenContainers.length > 0 && (() => {
+                            // Tree shows only the blocks that belong to the CURRENT device tab
+                            // (Desktop/Tablet/Mobil) — a block added under Mobil must appear in
+                            // the Mobil tab only, not mixed in with Desktop/Tablet blocks.
+                            const treeRows = flattenLandingTree(filteredSeitenContainers);
+                            const selectedNode = expandedId ? findContainerById(filteredSeitenContainers, expandedId) : null;
                             const selectedInfo = selectedNode ? typeInfo(selectedNode.type) : null;
                             const deviceBadgeLabel = (v) => (
                               v === "mobile" ? copy.mobile : v === "tablet" ? copy.tablet : v === "desktop" ? copy.desktop : null
