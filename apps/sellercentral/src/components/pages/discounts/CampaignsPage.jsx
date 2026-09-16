@@ -588,20 +588,6 @@ export default function CampaignsPage() {
               </div>
             </InlineStack>
             <Checkbox
-              label={locale === "en" ? "Show discount badge in shop" : locale === "tr" ? "Mağazada indirim rozeti göster" : locale === "fr" ? "Afficher le badge de remise dans la boutique" : locale === "es" ? "Mostrar badge de descuento en la tienda" : locale === "it" ? "Mostra badge sconto nel negozio" : "Rabattbadge im Shop anzeigen"}
-              checked={form.settings.show_badge}
-              onChange={(v) => setSetting("show_badge", v)}
-            />
-            {form.settings.show_badge && (
-              <TextField
-                label={locale === "en" ? 'Badge text (e.g. "Sale", "−20%")' : locale === "tr" ? 'Rozet metni (örn. "İndirim", "−20%")' : locale === "fr" ? 'Texte du badge (ex. "Promo", "−20%")' : locale === "es" ? 'Texto del badge (ej. "Oferta", "−20%")' : locale === "it" ? 'Testo badge (es. "Offerta", "−20%")' : 'Badge-Text (z.B. "Aktion", "−20%")'}
-                value={form.settings.badge_text}
-                onChange={(v) => setSetting("badge_text", v)}
-                autoComplete="off"
-                placeholder={form.discount_type === "percentage" ? `−${form.discount_value || "?"}%` : (locale === "en" ? "Sale" : locale === "tr" ? "İndirim" : locale === "fr" ? "Promo" : locale === "es" ? "Oferta" : locale === "it" ? "Offerta" : "Aktion")}
-              />
-            )}
-            <Checkbox
               label={locale === "en" ? "Combinable with other promotions" : locale === "tr" ? "Diğer kampanyalarla birleştirilebilir" : locale === "fr" ? "Combinable avec d'autres promotions" : locale === "es" ? "Combinable con otras promociones" : locale === "it" ? "Combinabile con altre promozioni" : "Mit anderen Aktionen kombinierbar"}
               checked={form.settings.stackable}
               onChange={(v) => setSetting("stackable", v)}

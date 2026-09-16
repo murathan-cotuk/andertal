@@ -36,6 +36,8 @@ import {
   StoreIcon,
   EditIcon,
   QuestionCircleIcon,
+  CodeIcon,
+  AffiliateIcon,
 } from "@shopify/polaris-icons";
 import GroupedDropdownSearch from "./GroupedDropdownSearch";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
@@ -956,13 +958,10 @@ export default function PolarisLayout({ children }) {
     </div>
   ) : undefined;
 
-  const topBarMarkup = (
-    <TopBar
-      showNavigationToggle
-      onNavigationToggle={() => setShowMobileNav((v) => !v)}
-      contextControl={polarisLogoContextControl}
-      userMenu={
-        <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
+  // Language selector, inbox and notification bell — on mobile these move to the bottom of the
+  // hamburger drawer instead of the top bar, freeing up width for the search field there.
+  const topBarIconsRow = (
+    <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
           {/* Language selector */}
           {langSelector}
 
@@ -1203,6 +1202,17 @@ export default function PolarisLayout({ children }) {
               </div>
             )}
           </div>
+        </div>
+  );
+
+  const topBarMarkup = (
+    <TopBar
+      showNavigationToggle
+      onNavigationToggle={() => setShowMobileNav((v) => !v)}
+      contextControl={polarisLogoContextControl}
+      userMenu={
+        <div style={{ display: "flex", alignItems: "center", gap: 4, height: 56 }}>
+          {logoViewportTier !== "mobile" && topBarIconsRow}
 
           {/* Profile */}
           <TopBar.UserMenu
@@ -1218,6 +1228,11 @@ export default function PolarisLayout({ children }) {
       }
       searchField={
         <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", maxWidth: "100%" }}>
+          {logoViewportTier === "mobile" && (
+            <Link href="/dashboard" aria-label="Home" style={{ flexShrink: 0, display: "flex", alignItems: "center" }}>
+              <img src={shopAvatarUrl || "/icon-192.png"} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+            </Link>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <GroupedDropdownSearch placeholder="Search products, orders, customers..." />
           </div>
@@ -1340,6 +1355,30 @@ export default function PolarisLayout({ children }) {
           };
         })}
       />
+      {isSuperuser && (
+        <div style={{ padding: "8px 8px 0" }}>
+          {[
+            { href: process.env.NEXT_PUBLIC_DEVELOPER_URL || "https://developer.andertal.com", icon: CodeIcon, label: lt(locale, "Developer", "Geliştirici", "Développeur", "Desarrollador", "Sviluppatore", "Entwickler") },
+            { href: process.env.NEXT_PUBLIC_AFFILIATE_URL || "https://affiliate.andertal.com", icon: AffiliateIcon, label: lt(locale, "Affiliate", "Affiliate", "Affilié", "Afiliado", "Affiliato", "Affiliate") },
+          ].map((entry) => (
+            <a
+              key={entry.href}
+              href={entry.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", marginBottom: 4,
+                borderRadius: 8, textDecoration: "none", color: "var(--p-color-text, #202223)", fontSize: 13, fontWeight: 500,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--p-color-bg-surface-hover, rgba(0,0,0,0.04))"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              <Icon source={entry.icon} />
+              {entry.label}
+            </a>
+          ))}
+        </div>
+      )}
       <Navigation.Section
         fill
         separator
@@ -1361,6 +1400,11 @@ export default function PolarisLayout({ children }) {
           };
         })}
       />
+      {logoViewportTier === "mobile" && (
+        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--p-color-border-subdued, #e1e3e5)" }}>
+          {topBarIconsRow}
+        </div>
+      )}
     </Navigation>
   );
 

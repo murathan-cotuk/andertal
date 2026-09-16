@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { usePathname, Link } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { userError } from "@/lib/api-error-messages";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import {
   Card,
   Text,
@@ -101,6 +102,7 @@ export default function GeneralSettingsPage() {
   const t = useTranslations("locale");
   const [formData, setFormData] = useState({
     storeName: "",
+    shopLogoUrl: "",
     phone: "",
     companyName: "",
     taxId: "",
@@ -121,6 +123,7 @@ export default function GeneralSettingsPage() {
     documents: [],
   });
   const [saved, setSaved] = useState(false);
+  const [baselineSnapshot, setBaselineSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -132,6 +135,7 @@ export default function GeneralSettingsPage() {
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [maintenanceError, setMaintenanceError] = useState("");
   const [maintenancePickerOpen, setMaintenancePickerOpen] = useState(false);
+  const [logoPickerOpen, setLogoPickerOpen] = useState(false);
   const [localesSaving, setLocalesSaving] = useState(false);
   const [localesSaved, setLocalesSaved] = useState(false);
   const [localesError, setLocalesError] = useState("");
@@ -246,35 +250,44 @@ export default function GeneralSettingsPage() {
           const businessCity = (isSu && legalCityParsed.city) || businessAddress.city || "";
           const businessCountry = businessAddress.country || "";
 
-          setFormData((prev) => ({
-            ...prev,
-            storeName: data.store_name || "",
-            phone: sellerUser.phone || "",
-            companyName,
-            taxId,
-            vatId,
-            lucidNumber: sellerUser.lucid_number || "",
-            eprDocumentUrl: sellerUser.epr_document_url || "",
-            website: sellerUser.website || "",
-            businessStreet,
-            businessCity,
-            businessPostalCode,
-            businessCountry,
-            representative: platData.legal_representative || "",
-            tradeRegister: platData.legal_trade_register || "",
-            registerCourt: platData.legal_register_court || "",
-            legalEmail: platData.legal_email || "",
-            shopAbout: data.shop_about || "",
-            returnConditions: data.return_conditions || "",
-            documents,
-          }));
+          setFormData((prev) => {
+            const next = {
+              ...prev,
+              storeName: data.store_name || "",
+              shopLogoUrl: data.shop_logo_url || "",
+              phone: sellerUser.phone || "",
+              companyName,
+              taxId,
+              vatId,
+              lucidNumber: sellerUser.lucid_number || "",
+              eprDocumentUrl: sellerUser.epr_document_url || "",
+              website: sellerUser.website || "",
+              businessStreet,
+              businessCity,
+              businessPostalCode,
+              businessCountry,
+              representative: platData.legal_representative || "",
+              tradeRegister: platData.legal_trade_register || "",
+              registerCourt: platData.legal_register_court || "",
+              legalEmail: platData.legal_email || "",
+              shopAbout: data.shop_about || "",
+              returnConditions: data.return_conditions || "",
+              documents,
+            };
+            setBaselineSnapshot(JSON.stringify(next));
+            return next;
+          });
         }
       } catch (_) {
         if (!cancelled) {
-          setFormData((prev) => ({
-            ...prev,
-            storeName: typeof window !== "undefined" ? (localStorage.getItem("storeName") || "") : "",
-          }));
+          setFormData((prev) => {
+            const next = {
+              ...prev,
+              storeName: typeof window !== "undefined" ? (localStorage.getItem("storeName") || "") : "",
+            };
+            setBaselineSnapshot(JSON.stringify(next));
+            return next;
+          });
         }
       } finally {
         if (!cancelled) {
@@ -294,6 +307,7 @@ export default function GeneralSettingsPage() {
     try {
       await client.updateSellerSettings({
         store_name: formData.storeName.trim(),
+        shop_logo_url: formData.shopLogoUrl.trim() || "",
         shop_about: formData.shopAbout.trim() || "",
         return_conditions: formData.returnConditions.trim() || "",
       });
@@ -336,14 +350,53 @@ export default function GeneralSettingsPage() {
         localStorage.setItem("storeName", newName);
         window.dispatchEvent(new CustomEvent("sellerStoreNameChanged", { detail: { storeName: newName } }));
       }
+      setBaselineSnapshot(JSON.stringify(formData));
       setSaved(true);
+      setSaving(false);
       setTimeout(() => setSaved(false), 3000);
+      return true;
     } catch (err) {
       setSaveError(userError(err, locale, "Failed to save settings."));
-    } finally {
       setSaving(false);
+      return false;
     }
   };
+
+  // Top save/discard bar (next to the search bar) — same pattern as ProductEditPage etc.,
+  // instead of this form's own bottom Save button, which most settings pages never had wired up.
+  const isDirty = baselineSnapshot != null && JSON.stringify(formData) !== baselineSnapshot;
+  const unsaved = useUnsavedChanges();
+
+  const handleDiscard = useCallback(() => {
+    if (baselineSnapshot == null) return;
+    setFormData(JSON.parse(baselineSnapshot));
+    setSaveError("");
+  }, [baselineSnapshot]);
+
+  const saveRef = useRef(handleSubmit);
+  saveRef.current = handleSubmit;
+  const discardRef = useRef(handleDiscard);
+  discardRef.current = handleDiscard;
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setDirty(!!isDirty);
+  }, [isDirty, unsaved]);
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setHandlers({
+      onSave: () => saveRef.current?.(),
+      onDiscard: () => discardRef.current?.(),
+    });
+    return () => {
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
+    };
+    // Deliberately not depending on `unsaved` itself — see ProductEditPage.jsx for why (its
+    // memoized value changes identity on every isDirty toggle, which would re-run this cleanup
+    // and wipe the bar out right after it appears).
+  }, [unsaved?.setHandlers, unsaved?.clearHandlers, unsaved?.setDirty]);
 
   const handleLocaleToggle = async (code, nextOn) => {
     if (!isSuperuser) return;
@@ -560,6 +613,34 @@ export default function GeneralSettingsPage() {
                 placeholder="e.g. Mein Shop"
                 autoComplete="organization"
               />
+              <div>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {locale === "tr"
+                    ? "Mağaza logosu (herkese açık satıcı sayfanızda görünür)"
+                    : locale === "en"
+                      ? "Store logo (shown on your public seller page)"
+                      : "Shop-Logo (erscheint auf Ihrer öffentlichen Verkäuferseite)"}
+                </Text>
+                <InlineStack gap="300" blockAlign="center">
+                  {formData.shopLogoUrl ? (
+                    <img
+                      src={formData.shopLogoUrl}
+                      alt=""
+                      style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
+                    />
+                  ) : (
+                    <div style={{ width: 64, height: 64, borderRadius: 8, border: "1px dashed #d1d5db", background: "#f9fafb" }} />
+                  )}
+                  <Button size="slim" onClick={() => setLogoPickerOpen(true)}>
+                    {locale === "tr" ? "Görsel seç" : locale === "en" ? "Choose image" : "Bild auswählen"}
+                  </Button>
+                  {formData.shopLogoUrl ? (
+                    <Button size="slim" tone="critical" variant="plain" onClick={() => setFormData((p) => ({ ...p, shopLogoUrl: "" }))}>
+                      {ui.remove || (locale === "tr" ? "Kaldır" : locale === "en" ? "Remove" : "Entfernen")}
+                    </Button>
+                  ) : null}
+                </InlineStack>
+              </div>
               <InlineStack gap="300" wrap>
                 <Box minWidth="200px" width="100%">
                   <TextField
@@ -767,12 +848,6 @@ export default function GeneralSettingsPage() {
               )}
             </BlockStack>
           </Card>
-
-          <InlineStack gap="200">
-            <Button submit variant="primary" loading={saving}>
-              {ui.save || "Save"}
-            </Button>
-          </InlineStack>
         </BlockStack>
       </form>
 
@@ -871,6 +946,17 @@ export default function GeneralSettingsPage() {
           </BlockStack>
         </Card>
       )}
+
+      <MediaPickerModal
+        open={logoPickerOpen}
+        onClose={() => setLogoPickerOpen(false)}
+        multiple={false}
+        onSelect={(urls) => {
+          const url = urls?.[0];
+          setLogoPickerOpen(false);
+          if (url) setFormData((p) => ({ ...p, shopLogoUrl: url }));
+        }}
+      />
     </BlockStack>
   );
 }

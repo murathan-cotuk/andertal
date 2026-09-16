@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Banner, BlockStack, Box, Button, Card,
   InlineStack, Text, TextField,
 } from "@shopify/polaris";
 import { useTranslations } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 function validateIban(raw, t) {
   const v = raw.replace(/\s/g, "").toUpperCase();
@@ -82,6 +83,7 @@ function PayoutInfoBanner({ commissionRate }) {
 export default function PaymentSettingsPage() {
   const t = useTranslations("settings.payments");
   const client = getMedusaAdminClient();
+  const unsaved = useUnsavedChanges();
 
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
@@ -94,6 +96,7 @@ export default function PaymentSettingsPage() {
   const [savedBic, setSavedBic]           = useState("");
   const [savedBankName, setSavedBankName] = useState("");
   const [commissionRate, setCommissionRate] = useState(0.12);
+  const [initialSnapshot, setInitialSnapshot] = useState(null);
 
   const [iban, setIban]           = useState("");
   const [holder, setHolder]       = useState("");
@@ -115,6 +118,12 @@ export default function PaymentSettingsPage() {
         setHolder(seller.payment_account_holder || "");
         setBic(seller.payment_bic || "");
         setBankName(seller.payment_bank_name || "");
+        setInitialSnapshot(JSON.stringify({
+          iban: seller.iban || "",
+          holder: seller.payment_account_holder || "",
+          bic: seller.payment_bic || "",
+          bankName: seller.payment_bank_name || "",
+        }));
       } catch (e) {
         setError(e?.message || t("messages.loadError"));
       } finally {
@@ -123,12 +132,12 @@ export default function PaymentSettingsPage() {
     })();
   }, [client, t]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     setError(""); setSuccess("");
     const trimmed = iban.replace(/\s/g, "").toUpperCase();
     if (trimmed) {
       const { ok, error: ibanErr } = validateIban(trimmed, t);
-      if (!ok) { setIbanError(ibanErr); return; }
+      if (!ok) { setIbanError(ibanErr); return false; }
     }
     setIbanError("");
     setSaving(true);
@@ -145,21 +154,50 @@ export default function PaymentSettingsPage() {
       setSavedHolder(holder.trim());
       setSavedBic(bic.replace(/\s/g, "").toUpperCase());
       setSavedBankName(bankName.trim());
+      setInitialSnapshot(JSON.stringify({
+        iban: trimmed || "",
+        holder: holder.trim() || "",
+        bic: bic.replace(/\s/g, "").toUpperCase() || "",
+        bankName: bankName.trim() || "",
+      }));
       setSuccess(t("messages.saved"));
       setEditing(false);
+      return true;
     } catch (e) {
       setError(e?.message || t("messages.saveError"));
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [client, iban, holder, bic, bankName, t]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setIban(savedIban); setHolder(savedHolder);
     setBic(savedBic); setBankName(savedBankName);
     setIbanError(""); setError(""); setSuccess("");
     setEditing(false);
-  };
+  }, [savedIban, savedHolder, savedBic, savedBankName]);
+
+  // Top save/discard bar — mirrors IbanSection in app/[locale]/settings/payments/page.jsx (same
+  // IBAN edit-toggle shape): keep the local Cancel/Save buttons for the toggle panel itself, but
+  // also surface dirty state at the top so it's consistent with every other settings page.
+  const currentSnapshot = useMemo(() => JSON.stringify({
+    iban: (iban || "").replace(/\s/g, "").toUpperCase(),
+    holder: holder || "",
+    bic: (bic || "").replace(/\s/g, "").toUpperCase(),
+    bankName: bankName || "",
+  }), [iban, holder, bic, bankName]);
+  const isDirty = !loading && initialSnapshot !== null && currentSnapshot !== initialSnapshot;
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setDirty(isDirty);
+    unsaved.setHandlers({ onSave: handleSave, onDiscard: handleCancel });
+    return () => {
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
+    };
+  }, [unsaved, isDirty, handleSave, handleCancel]);
 
   if (loading) {
     return <Card><Text as="p" tone="subdued">{t("messages.loading")}</Text></Card>;

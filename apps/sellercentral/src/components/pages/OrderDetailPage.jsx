@@ -88,9 +88,11 @@ function InfoRow({ label, value }) {
 
 function StatusSelect({ label, value, options, onChange, saving, locale }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-      <span style={{ fontSize: 13, color: "#6b7280", minWidth: 120 }}>{label}</span>
-      <Badge value={value} locale={locale} />
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderBottom: "1px solid #f3f4f6" }}>
+      <span style={{ fontSize: 13, color: "#6b7280", minWidth: 120, flexShrink: 0 }}>{label}</span>
+      <div style={{ minWidth: 130, flexShrink: 0 }}>
+        <Badge value={value} locale={locale} />
+      </div>
       <select
         value={value || ""}
         onChange={e => onChange(e.target.value)}
@@ -463,11 +465,6 @@ export default function OrderDetailPage() {
             onOrderStatusChanged={loadOrder}
           />
 
-          {/* Payment info */}
-          <Section title={c.paymentInfo}>
-            <InfoRow label={ui.paymentMethod} value={formatPaymentMethod(order?.payment_method)} />
-          </Section>
-
           {/* Flows — superuser only: did the automation emails for this order actually send? */}
           {isSuperuser && (
             <Section title={c.flows}>
@@ -525,9 +522,9 @@ export default function OrderDetailPage() {
 
         {/* Right column */}
         <div>
-          {/* Customer */}
+          {/* Customer (+ account details, superuser only — merged into one card instead of two) */}
           <Section title={ui.customer}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: isSuperuser ? 10 : 0 }}>
               {isSuperuser ? (
                 <a
                   href={order?.customer_id ? `/${locale}/customers/${order.customer_id}` : `/${locale}/customers`}
@@ -546,18 +543,16 @@ export default function OrderDetailPage() {
               </div>
             )}
             {isSuperuser && order?.phone && (
-              <div style={{ fontSize: 13, color: "#6b7280" }}>{order.phone}</div>
+              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>{order.phone}</div>
+            )}
+            {isSuperuser && (
+              <>
+                <InfoRow label={ui.accountType} value={order?.is_guest !== false ? ui.guestCustomer : c.registeredCustomer} />
+                <InfoRow label={c.firstOrder} value={order?.is_first_order ? ui.yes : ui.no} />
+                <InfoRow label={c.newsletter} value={order?.newsletter_opted_in ? ui.yes : ui.no} />
+              </>
             )}
           </Section>
-
-          {/* Customer info — nur Superuser */}
-          {isSuperuser && (
-          <Section title={c.customerInfo}>
-            <InfoRow label={ui.accountType} value={order?.is_guest !== false ? ui.guestCustomer : c.registeredCustomer} />
-            <InfoRow label={c.firstOrder} value={order?.is_first_order ? ui.yes : ui.no} />
-            <InfoRow label={c.newsletter} value={order?.newsletter_opted_in ? ui.yes : ui.no} />
-          </Section>
-          )}
 
           {/* Shipping address */}
           <Section title={c.shippingAddress}>
@@ -587,28 +582,12 @@ export default function OrderDetailPage() {
             )}
           </Section>
 
-          {/* Summary */}
+          {/* Summary — reference data only; live/editable status lives in "Status management"
+              on the left, so it isn't shown twice. */}
           <Section title={c.summary}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>{ui.orderNumber}</span>
-              <span style={{ fontWeight: 600 }}>#{order?.order_number || "—"}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>{ui.colDate}</span>
-              <span>{fmtDate(order?.created_at, locale)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>{ui.orderStatus}</span>
-              <Badge value={order?.order_status} locale={locale} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>{ui.paymentStatus}</span>
-              <Badge value={order?.payment_status} locale={locale} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: "#6b7280" }}>{ui.deliveryStatus}</span>
-              <Badge value={order?.delivery_status} locale={locale} />
-            </div>
+            <InfoRow label={ui.orderNumber} value={`#${order?.order_number || "—"}`} />
+            <InfoRow label={ui.colDate} value={fmtDate(order?.created_at, locale)} />
+            <InfoRow label={ui.paymentMethod} value={formatPaymentMethod(order?.payment_method)} />
           </Section>
 
           {/* Danger zone — nur Superuser */}

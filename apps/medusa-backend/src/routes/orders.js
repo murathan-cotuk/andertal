@@ -769,6 +769,9 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
     }
 
     const adminHubOrderPOST = async (req, res) => {
+      // Manually creating an order lets the caller set payment/delivery status directly (including
+      // 'bezahlt' from the start) with no checkout involved — superuser-only, never a seller.
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       let client
       try {

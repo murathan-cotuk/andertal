@@ -6,6 +6,7 @@
 const fs = require('fs')
 const path = require('path')
 const { getOrderPdfStrings, getCountryName } = require('./order-pdf-i18n')
+const { displayCommissionRatePct, sellerCommissionRatePct } = require('./commission-rate')
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const ACCENT = '#1a2e44'
@@ -266,38 +267,62 @@ function collectLegalFooterColumns(sellerInfo, shopName, s) {
   return [col1, col2, col3, col4].filter((c) => c.length)
 }
 
+/** Paint in the margin strip without PDFKit auto-adding a blank first page. */
+function paintOutsideFlow(doc, fn) {
+  const savedX = doc.x
+  const savedY = doc.y
+  const margins = doc.page.margins
+  const prevTop = margins.top
+  const prevBottom = margins.bottom
+  margins.top = 0
+  margins.bottom = 0
+  try {
+    fn()
+  } finally {
+    margins.top = prevTop
+    margins.bottom = prevBottom
+    doc.x = savedX
+    doc.y = savedY
+  }
+}
+
 function drawLegalPageFooter(doc, {
-  sellerInfo, shopName, locale, hasUnicode, pageNo, docRef,
+  sellerInfo, shopName, locale, hasUnicode, pageNo,
 }) {
   const s = getOrderPdfStrings(locale)
   const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
   const { left, right, contentWidth } = pageMetrics(doc)
   const cols = collectLegalFooterColumns(sellerInfo, shopName, s)
   const footerTop = doc.page.height - 78
-  doc.moveTo(left, footerTop - 8).lineTo(right, footerTop - 8)
-    .lineWidth(0.4).strokeColor(BORDER).stroke()
 
-  if (cols.length) {
-    const gap = 10
-    const colW = (contentWidth - gap * (cols.length - 1)) / cols.length
-    cols.forEach((lines, i) => {
-      const x = left + i * (colW + gap)
-      let y = footerTop
-      lines.forEach((line) => {
-        doc.fillColor(MUTED).font(REG).fontSize(6)
-          .text(txt(line, hasUnicode), x, y, { width: colW, lineBreak: false })
-        y += 8
+  paintOutsideFlow(doc, () => {
+    doc.moveTo(left, footerTop - 8).lineTo(right, footerTop - 8)
+      .lineWidth(0.4).strokeColor(BORDER).stroke()
+
+    if (cols.length) {
+      const gap = 10
+      const colW = (contentWidth - gap * (cols.length - 1)) / cols.length
+      cols.forEach((lines, i) => {
+        const x = left + i * (colW + gap)
+        let y = footerTop
+        lines.forEach((line) => {
+          doc.fillColor(MUTED).font(REG).fontSize(6)
+            .text(txt(line, hasUnicode), x, y, { width: colW, lineBreak: false })
+          y += 8
+        })
       })
-    })
-  }
+    }
 
-  const pageText = s.pageLabel(pageNo) + (docRef ? ` (${docRef})` : '')
-  doc.fillColor(MUTED).font(REG).fontSize(6.5)
-    .text(txt(pageText, hasUnicode), left, doc.page.height - 16, {
-      width: contentWidth,
-      align: 'right',
-      lineBreak: false,
-    })
+    // Page 1 never gets a "Seite 1" mark (it used to overflow into the top-right of the next page).
+    if (pageNo > 1) {
+      doc.fillColor(MUTED).font(REG).fontSize(6.5)
+        .text(txt(s.pageLabel(pageNo), hasUnicode), left, footerTop - 18, {
+          width: contentWidth,
+          align: 'right',
+          lineBreak: false,
+        })
+    }
+  })
 }
 
 // ─── Seller address lines ─────────────────────────────────────────────────────
@@ -400,25 +425,22 @@ function renderRetailOrderDocument(doc, {
   const shipAt = row.shipped_at || row.fulfilled_at || row.delivery_date || null
   const carrier = String(carrierName || row.carrier_name || '').trim()
   const tracking = String(trackingNumber || row.tracking_number || '').trim()
-  const customerNo = row.customer_number != null && String(row.customer_number).trim() !== ''
-    ? String(row.customer_number)
-    : ''
-  const docRef = kind === 'invoice' ? `RE${rawNum}` : `LS${rawNum}`
   let pageNo = 1
 
   const stampPageChrome = () => {
-    if (shopLogoBuffer && !merchantDoc) {
-      try {
-        doc.image(shopLogoBuffer, right - 100, 28, { fit: [100, 26], align: 'right', valign: 'center' })
-      } catch (_) {}
-    }
-    drawLegalPageFooter(doc, {
-      sellerInfo,
-      shopName,
-      locale,
-      hasUnicode,
-      pageNo,
-      docRef,
+    paintOutsideFlow(doc, () => {
+      if (shopLogoBuffer && !merchantDoc) {
+        try {
+          doc.image(shopLogoBuffer, right - 100, 28, { fit: [100, 26], align: 'right', valign: 'center' })
+        } catch (_) {}
+      }
+      drawLegalPageFooter(doc, {
+        sellerInfo,
+        shopName,
+        locale,
+        hasUnicode,
+        pageNo,
+      })
     })
   }
   stampPageChrome()
@@ -457,20 +479,15 @@ function renderRetailOrderDocument(doc, {
   const metaLabelW = Math.min(110, Math.round(rightColW * 0.52))
   const metaValW = rightColW - metaLabelW
   let rightY = 48
+  const orderNoLabel = s.orderNoLabel.replace(/\s*$/, '') + (s.orderNoLabel.includes(':') ? '' : ':')
   const metaRows = kind === 'invoice'
     ? [
-        { label: s.orderJobLabel, value: orderNum },
         { label: s.issueDateLabel + ':', value: pdfFmtDate(row.created_at, locale) },
-        customerNo ? { label: s.customerNoLabel, value: customerNo } : null,
-        { label: s.deliveryNoteMetaLabel, value: rawNum },
         { label: s.deliveryDateLabel, value: pdfFmtDate(shipAt || row.created_at, locale) },
-        { label: s.orderNoLabel.replace(/\s*$/, '') + (s.orderNoLabel.includes(':') ? '' : ':'), value: orderNum },
+        { label: orderNoLabel, value: orderNum },
       ]
     : [
-        { label: s.orderJobLabel, value: orderNum },
         { label: s.deliveryDateLabel, value: pdfFmtDate(shipAt || row.created_at, locale) },
-        customerNo ? { label: s.customerNoLabel, value: customerNo } : null,
-        { label: s.orderNoLabel.replace(/\s*$/, '') + (s.orderNoLabel.includes(':') ? '' : ':'), value: orderNum },
         carrier ? { label: s.carrierLabel + ':', value: carrier } : null,
         tracking ? { label: s.trackingLabel + ':', value: tracking } : null,
       ]
@@ -479,7 +496,7 @@ function renderRetailOrderDocument(doc, {
   })
 
   let y = Math.max(leftY, rightY) + 16
-  const heading = `${docTitle} ${rawNum}`.trim()
+  const heading = kind === 'invoice' ? `${docTitle} ${rawNum}`.trim() : String(docTitle || '').trim()
   // A short accent-colored rule above the title is the one deliberate brand touch on an otherwise
   // strictly black/gray legal document — cheap to draw, doesn't touch any surrounding spacing math.
   doc.moveTo(left, y).lineTo(left + 34, y).lineWidth(2.5).strokeColor(ACCENT).stroke()
@@ -515,10 +532,7 @@ function renderRetailOrderDocument(doc, {
   } else {
     y = drawLines(doc, shippingLines, left, y, contentWidth, { hasUnicode, boldFirst: true, fontSize: 9 })
   }
-
-  doc.fillColor(INK).font(REG).fontSize(9)
-    .text(txt(`${s.orderNoLabel.replace(/:?\s*$/, '')}:${orderNum}`, hasUnicode), left, y + 6, { width: contentWidth })
-  y = doc.y + 10
+  y += 10
 
   const sellerHasVat = Number(goodsVatPercent) > 0 || !!(sellerInfo && sellerInfo.vat_id && String(sellerInfo.vat_id).trim())
   const goodsVatRate = goodsVatPercent != null && Number(goodsVatPercent) > 0
@@ -1156,6 +1170,7 @@ function renderCommissionSettlementDocument(doc, {
   bonusFundingCents = 0,
   customerPaidCents = 0,
   shippingCents = 0,
+  labelCents = 0,
   orderCount = null,
   refundCents = 0,
 }) {
@@ -1163,9 +1178,10 @@ function renderCommissionSettlementDocument(doc, {
   const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
   const BOLD = hasUnicode ? 'PdfBold' : 'Helvetica-Bold'
   const { left, right, contentWidth } = pageMetrics(doc)
-  const rate = Number.isFinite(commissionRatePct) && commissionRatePct > 0 ? commissionRatePct : 12
+  const rate = displayCommissionRatePct(commissionRatePct)
   const gross = Number(grossSalesCents || 0)
   const shipping = Math.max(0, Number(shippingCents || 0))
+  const labelCharge = Math.max(0, Number(labelCents || 0))
   const orderValue = gross + shipping
   const commission = Number(commissionCents || 0)
   const payout = Number.isFinite(payoutCents) ? Number(payoutCents) : Math.max(0, gross - commission)
@@ -1232,13 +1248,13 @@ function renderCommissionSettlementDocument(doc, {
   const cardsTop = boxTop + boxH + 16
   const cardW = Math.floor((contentWidth - 24) / 3)
   const cards = [
-    { label: 'BRUTTOUMSATZ', value: pdfCents(gross), sub: 'Warenverkäufe (Provisionsbasis)' },
-    { label: `PROVISION (${rate} %)`, value: pdfCents(commission), sub: 'Marktplatzgebühr (netto)' },
-    { label: 'AUSZAHLUNG AN VERKÄUFER', value: pdfCents(payout), sub: 'Bruttoumsatz abzüglich Provision (netto)' },
+    { label: 'WARENWERT (PROVISIONSBASIS)', value: pdfCents(gross), sub: 'Verkäufer-GMV — nicht Andertal-Umsatz' },
+    { label: 'PROVISION INKL. MWST.', value: pdfCents(commissionTotal), sub: `Fällig · netto ${pdfCents(commission)} + USt ${pdfCents(vatOnCommission)}` },
+    { label: 'AUSZAHLUNG AN VERKÄUFER', value: pdfCents(payout), sub: 'Ware − Provision netto + Versand Kunde (ohne Plattform-Versand)' },
   ]
   cards.forEach((card, i) => {
     const x = left + i * (cardW + 12)
-    doc.rect(x, cardsTop, cardW, 78).fill(i === 1 ? COMMISSION_ACCENT : '#ffffff').stroke(COMMISSION_BORDER)
+    doc.rect(x, cardsTop, cardW, 86).fill(i === 1 ? COMMISSION_ACCENT : '#ffffff').stroke(COMMISSION_BORDER)
     doc.fillColor(i === 1 ? '#e9d5ff' : '#64748b').font(BOLD).fontSize(7)
       .text(t(card.label), x + 10, cardsTop + 10, { width: cardW - 20 })
     doc.fillColor(i === 1 ? '#ffffff' : COMMISSION_ACCENT_DARK).font(BOLD).fontSize(14)
@@ -1247,7 +1263,7 @@ function renderCommissionSettlementDocument(doc, {
       .text(t(card.sub), x + 10, cardsTop + 52, { width: cardW - 20 })
   })
 
-  const tableTop = cardsTop + 96
+  const tableTop = cardsTop + 104
   doc.fillColor(COMMISSION_ACCENT_DARK).font(BOLD).fontSize(11)
     .text(t('ABRECHNUNG (GESAMT)'), left, tableTop)
   const tTop = tableTop + 18
@@ -1259,14 +1275,15 @@ function renderCommissionSettlementDocument(doc, {
 
   const refund = Math.max(0, Number(refundCents || 0))
   const detailRows = [
-    { label: 'Bruttoumsatz (Warenverkäufe — Provisionsbasis)', amount: gross },
-    shipping > 0 ? { label: 'zzgl. Versand', amount: shipping } : null,
-    shipping > 0 ? { label: 'Bestellwert (Ware + Versand)', amount: orderValue } : null,
+    { label: 'Warenwert / Provisionsbasis (Verkäufer-GMV)', amount: gross },
+    shipping > 0 ? { label: 'Versand (Kunde, vom Kunden gezahlt)', amount: shipping } : null,
+    shipping > 0 ? { label: 'Bestellwert (Ware + Kundenversand)', amount: orderValue } : null,
     { label: 'Vom Kunden gezahlt', amount: customerPaid },
     { label: 'Von Bonuspunkten gezahlt (Andertal)', amount: bonus, info: true },
     { label: `Provision ${rate} % (netto)`, amount: commission },
     { label: `zzgl. MwSt. ${vatPercent} % auf Provision (dem Verkäufer belastet)`, amount: vatOnCommission },
     { label: 'Provision inkl. MwSt. (fällig)', amount: commissionTotal, emphasis: true },
+    labelCharge > 0 ? { label: 'Versand (Plattform, Andertal bezahlt — nicht an Verkäufer)', amount: labelCharge } : null,
     { label: 'Auszahlung an Verkäufer', amount: payout },
     refund > 0 ? { label: 'Erstattungen im Zeitraum', amount: refund } : null,
   ].filter(Boolean)
@@ -1284,9 +1301,14 @@ function renderCommissionSettlementDocument(doc, {
     rowY += h
   })
 
-  doc.y = rowY + 16
-  doc.fillColor('#64748b').font(REG).fontSize(8)
-    .text(t('Bruttoumsatz ist der Warenwert (Provisionsbasis) — ohne Versand. Bestellwert = Ware + Versand. Vom Kunden gezahlt + Bonuspunkte decken den Bestellwert (abzüglich ggf. Coupons). Die Marktplatzprovision zuzüglich Umsatzsteuer wird dem Verkäufer belastet. Andertal versteuert ausschließlich diese Provision, nicht den Warenumsatz des Verkäufers.'), left, doc.y, { width: contentWidth })
+  doc.y = rowY + 12
+  const noteTop = doc.y
+  doc.rect(left, noteTop, contentWidth, 52).fill('#fef3c7').stroke('#f59e0b')
+  doc.fillColor('#92400e').font(BOLD).fontSize(8)
+    .text(t('HINWEIS FÜR DAS FINANZAMT / DIE BUCHHALTUNG'), left + 8, noteTop + 6, { width: contentWidth - 16 })
+  doc.fillColor('#78350f').font(REG).fontSize(7.5)
+    .text(t('Andertal ist Vermittler. Der Warenwert ist der Umsatz des Verkäufers (GMV), nicht der Umsatz von Andertal. Andertal versteuert ausschließlich die Marktplatzprovision zuzüglich Umsatzsteuer. Kundenversand auf Bestellungen mit Plattform-Versandetikett wird nicht an den Verkäufer ausgezahlt — Andertal hat das Etikett bezahlt. Die Provision inkl. MwSt. oben ist der fällige Betrag; Netto und USt stehen in der Tabelle.'), left + 8, noteTop + 20, { width: contentWidth - 16 })
+  doc.y = noteTop + 58
   doc.rect(left, doc.page.height - doc.page.margins.bottom + 8, contentWidth, 3).fill(COMMISSION_ACCENT)
 }
 
@@ -1310,6 +1332,7 @@ function renderCommissionInvoiceDocument(doc, opts) {
     bonusFundingCents: opts.bonusFundingCents || opts.order?.platform_bonus_funding_cents || 0,
     customerPaidCents: opts.customerPaidCents || 0,
     shippingCents: opts.shippingCents || opts.order?.shipping_cents || 0,
+    labelCents: opts.labelCents || 0,
     refundCents: opts.refundCents || 0,
   })
 }
@@ -1322,8 +1345,7 @@ function renderPeriodCommissionInvoiceDocument(doc, {
   invoiceNumber,
   periodLabel,
 }) {
-  const ratePct = Math.round(Number(payout.commission_rate || 0.12) * 1000) / 10
-  const displayRate = ratePct > 0 && ratePct <= 100 ? ratePct : 12
+  const displayRate = sellerCommissionRatePct(payout.commission_rate)
   const grossCents = Number(payout.total_cents || 0)
   const commissionCents = Number(payout.commission_cents || 0)
   const payoutCents = Number(payout.payout_cents || Math.max(0, grossCents - commissionCents))
@@ -1348,6 +1370,7 @@ function renderPeriodCommissionInvoiceDocument(doc, {
     bonusFundingCents: Number(payout.bonus_funding_cents || 0),
     customerPaidCents: Number(payout.customer_paid_cents || 0),
     shippingCents: Number(payout.shipping_cents || 0),
+    labelCents: Number(payout.label_cents || 0),
     orderCount: payout.order_count != null ? Number(payout.order_count) : null,
     refundCents: Number(payout.refund_cents || 0),
   })
@@ -1372,6 +1395,8 @@ function renderPlatformFinanzamtDocument(doc, {
 
   const gross = Number(totals.gross_sale_cents || 0)
   const shipping = Math.max(0, Number(totals.shipping_cents || 0))
+  const shippingPayout = Math.max(0, Number(totals.shipping_payout_cents || 0))
+  const labelCharge = Math.max(0, Number(totals.label_cents || 0))
   const customerPaid = Number(totals.customer_paid_cents || 0)
   const bonus = Math.max(0, Number(totals.bonus_funding_cents || 0))
   const orderValue = gross + shipping
@@ -1401,15 +1426,17 @@ function renderPlatformFinanzamtDocument(doc, {
     return cy
   }
 
-  doc.rect(left, 32, contentWidth, 52).fill(PLATFORM_HEADER).stroke(PLATFORM_BORDER)
-  doc.fillColor(PLATFORM_ACCENT_DARK).font(BOLD).fontSize(11)
-    .text(t(shopName || 'Andertal'), left + 14, 44)
-  doc.font(REG).fontSize(9).fillColor('#0284c7')
-    .text(t('Gesamtabrechnung aller Verkäufer'), left + 14, 58)
-  doc.fillColor(PLATFORM_ACCENT_DARK).font(BOLD).fontSize(13)
-    .text('PLATTFORMABRECHNUNG', right - 240, 44, { width: 226, align: 'right' })
-  doc.font(REG).fontSize(9).fillColor('#0284c7')
-    .text(t(invoiceNumber || 'PLAT'), right - 240, 62, { width: 226, align: 'right' })
+  paintOutsideFlow(doc, () => {
+    doc.rect(left, 32, contentWidth, 52).fill(PLATFORM_HEADER).stroke(PLATFORM_BORDER)
+    doc.fillColor(PLATFORM_ACCENT_DARK).font(BOLD).fontSize(11)
+      .text(t(shopName || 'Andertal'), left + 14, 44)
+    doc.font(REG).fontSize(9).fillColor('#0284c7')
+      .text(t('Gesamtabrechnung aller Verkäufer'), left + 14, 58)
+    doc.fillColor(PLATFORM_ACCENT_DARK).font(BOLD).fontSize(13)
+      .text('PLATTFORMABRECHNUNG', right - 240, 44, { width: 226, align: 'right' })
+    doc.font(REG).fontSize(9).fillColor('#0284c7')
+      .text(t(invoiceNumber || 'PLAT'), right - 240, 62, { width: 226, align: 'right' })
+  })
 
   let y = 100
   doc.fillColor('#334155').font(REG).fontSize(9.5)
@@ -1425,10 +1452,10 @@ function renderPlatformFinanzamtDocument(doc, {
     'Interne Plattformabrechnung',
     'Keine Verkäuferrechnung — Summe aller Marktplatzumsätze',
   ]
-  const boxH = Math.max(110, 36 + Math.max(recipientLines.length, issuerLines.length) * 12)
+  const boxH = Math.max(96, 32 + Math.max(recipientLines.length, issuerLines.length) * 12)
   const colW = Math.floor((contentWidth - 20) / 2)
   const col2X = left + colW + 20
-  const boxTop = y + 10
+  const boxTop = y + 8
 
   doc.rect(left, boxTop, colW, boxH).fill(PLATFORM_BG).stroke(PLATFORM_BORDER)
   _label('EMPFÄNGER', left + 10, boxTop + 10, colW - 20)
@@ -1438,65 +1465,72 @@ function renderPlatformFinanzamtDocument(doc, {
   _label('AUSSTELLER (PLATTFORM)', col2X + 10, boxTop + 10, colW - 20)
   _lines(issuerLines, col2X + 10, boxTop + 24, colW - 20)
 
-  const cardsTop = boxTop + boxH + 16
+  const cardsTop = boxTop + boxH + 12
   const cardW = Math.floor((contentWidth - 24) / 3)
   const cards = [
-    { label: 'BRUTTOUMSATZ', value: pdfCents(gross), sub: 'Warenverkäufe aller Verkäufer' },
-    { label: 'PROVISION (NETTO)', value: pdfCents(commission), sub: 'Andertal-Marktplatzgebühr' },
-    { label: 'AUSZAHLUNG AN VERKÄUFER', value: pdfCents(payout), sub: 'Summe der Händlerauszahlungen' },
+    { label: 'WARENWERT (VERKÄUFER-GMV)', value: pdfCents(gross), sub: 'Nicht Andertal-Umsatz — nur Provisionsbasis' },
+    { label: 'PROVISION INKL. MWST.', value: pdfCents(commissionTotal), sub: `Andertal-Umsatz · netto ${pdfCents(commission)} + USt ${pdfCents(vatOnCommission)}` },
+    { label: 'AUSZAHLUNG AN VERKÄUFER', value: pdfCents(payout), sub: 'Ware − Provision netto + Versand Kunde (ohne Plattform-Versand)' },
   ]
   cards.forEach((card, i) => {
     const x = left + i * (cardW + 12)
     const fill = i === 1 ? PLATFORM_ACCENT : '#ffffff'
-    doc.rect(x, cardsTop, cardW, 78).fill(fill).stroke(PLATFORM_BORDER)
+    doc.rect(x, cardsTop, cardW, 70).fill(fill).stroke(PLATFORM_BORDER)
     doc.fillColor(PLATFORM_ACCENT_DARK).font(BOLD).fontSize(7)
-      .text(t(card.label), x + 10, cardsTop + 10, { width: cardW - 20 })
-    doc.fillColor('#0c4a6e').font(BOLD).fontSize(14)
-      .text(card.value, x + 10, cardsTop + 28, { width: cardW - 20 })
-    doc.fillColor('#64748b').font(REG).fontSize(7.5)
-      .text(t(card.sub), x + 10, cardsTop + 52, { width: cardW - 20 })
+      .text(t(card.label), x + 10, cardsTop + 8, { width: cardW - 20 })
+    doc.fillColor('#0c4a6e').font(BOLD).fontSize(13)
+      .text(card.value, x + 10, cardsTop + 24, { width: cardW - 20 })
+    doc.fillColor('#64748b').font(REG).fontSize(7)
+      .text(t(card.sub), x + 10, cardsTop + 46, { width: cardW - 20 })
   })
 
-  const tableTop = cardsTop + 96
+  const tableTop = cardsTop + 82
   doc.fillColor(PLATFORM_ACCENT_DARK).font(BOLD).fontSize(11)
     .text(t('GESAMTABRECHNUNG (ALLE VERKÄUFER)'), left, tableTop)
-  const tTop = tableTop + 18
-  const labelW = Math.round(contentWidth * 0.62)
-  doc.rect(left, tTop, contentWidth, 18).fill(PLATFORM_ACCENT)
+  const tTop = tableTop + 16
+  const labelW = Math.round(contentWidth * 0.72)
+  doc.rect(left, tTop, contentWidth, 16).fill(PLATFORM_ACCENT)
   doc.fillColor('#0c4a6e').font(BOLD).fontSize(8)
-  doc.text(t('BESCHREIBUNG'), left + 8, tTop + 5, { width: labelW - 12 })
-  doc.text(t('BETRAG'), left + labelW, tTop + 5, { width: contentWidth - labelW - 8, align: 'right' })
+  doc.text(t('BESCHREIBUNG'), left + 8, tTop + 4, { width: labelW - 12 })
+  doc.text(t('BETRAG'), left + labelW, tTop + 4, { width: contentWidth - labelW - 8, align: 'right' })
 
   const detailRows = [
-    { label: 'Bruttoumsatz (Warenverkäufe — Provisionsbasis)', amount: gross },
-    shipping > 0 ? { label: 'zzgl. Versand', amount: shipping } : null,
-    shipping > 0 ? { label: 'Bestellwert (Ware + Versand)', amount: orderValue } : null,
+    { label: 'Warenwert (Verkäufer-GMV, nicht Andertal-Umsatz)', amount: gross },
+    { label: 'Versand (Kunde, vom Kunden gezahlt)', amount: shipping },
+    { label: 'Bestellwert (Ware + Kundenversand)', amount: orderValue },
     { label: 'Vom Kunden gezahlt', amount: customerPaid },
-    { label: 'Von Bonuspunkten gezahlt (Andertal)', amount: bonus, info: true },
+    { label: 'Von Bonuspunkten gezahlt (Andertal, Aufwand)', amount: bonus, info: true },
     { label: 'Provision netto (Andertal)', amount: commission },
     { label: `zzgl. MwSt. ${vatPercent} % auf Provision`, amount: vatOnCommission },
     { label: 'Provision inkl. MwSt. (Andertal-Umsatz, steuerpflichtig)', amount: commissionTotal, emphasis: true },
+    { label: 'Versand (Kunde) an Verkäufer ausgezahlt', amount: shippingPayout },
+    { label: 'Versand (Plattform, Andertal bezahlt — nicht an Verkäufer)', amount: labelCharge },
     { label: 'Auszahlung an Verkäufer', amount: payout },
     refund > 0 ? { label: 'Erstattungen im Zeitraum', amount: refund } : null,
   ].filter(Boolean)
 
-  let rowY = tTop + 22
+  let rowY = tTop + 18
+  const pageBottom = () => doc.page.height - 56
   detailRows.forEach((r) => {
-    const h = 22
+    const h = 18
+    if (rowY + h > pageBottom()) {
+      doc.addPage()
+      rowY = 48
+    }
     if (r.emphasis) doc.rect(left, rowY, contentWidth, h).fill(PLATFORM_ACCENT)
     else if (r.info) doc.rect(left, rowY, contentWidth, h).fill('#ecfeff')
     else doc.rect(left, rowY, contentWidth, h).fill(PLATFORM_BG)
     doc.fillColor(r.emphasis ? '#0c4a6e' : (r.info ? '#0e7490' : '#1f2937'))
-      .font(r.emphasis ? BOLD : REG).fontSize(9)
-      .text(t(r.label), left + 8, rowY + 6, { width: labelW - 12, lineBreak: false })
-    doc.text(pdfCents(r.amount), left + labelW, rowY + 6, { width: contentWidth - labelW - 8, align: 'right', lineBreak: false })
+      .font(r.emphasis ? BOLD : REG).fontSize(8.5)
+      .text(t(r.label), left + 8, rowY + 4, { width: labelW - 12, lineBreak: false })
+    doc.text(pdfCents(r.amount), left + labelW, rowY + 4, { width: contentWidth - labelW - 8, align: 'right', lineBreak: false })
     rowY += h
   })
 
   const oss = Array.isArray(ossByCountry) ? ossByCountry.filter((r) => r && Number(r.order_count || 0) > 0) : []
   if (oss.length) {
     rowY += 18
-    if (rowY > doc.page.height - 180) {
+    if (rowY > doc.page.height - 140) {
       doc.addPage()
       rowY = 48
     }
@@ -1504,7 +1538,7 @@ function renderPlatformFinanzamtDocument(doc, {
       .text(t('OSS — UMSATZ NACH BESTIMMUNGSLAND'), left, rowY)
     rowY += 16
     const cols = [0.18, 0.16, 0.22, 0.22, 0.22]
-    const headers = ['Land', 'Bestellungen', 'Brutto', 'Netto (Ware)', 'USt Ware']
+    const headers = ['Land', 'Bestellungen', 'Warenwert', 'Netto (Ware)', 'USt Ware']
     doc.rect(left, rowY, contentWidth, 16).fill(PLATFORM_ACCENT)
     let hx = left
     headers.forEach((h, i) => {
@@ -1516,6 +1550,10 @@ function renderPlatformFinanzamtDocument(doc, {
     rowY += 16
     oss.slice(0, 18).forEach((row, idx) => {
       const h = 16
+      if (rowY + h > doc.page.height - 72) {
+        doc.addPage()
+        rowY = 48
+      }
       doc.rect(left, rowY, contentWidth, h).fill(idx % 2 ? PLATFORM_BG : '#ffffff')
       const vals = [
         String(row.country || '—'),
@@ -1535,10 +1573,20 @@ function renderPlatformFinanzamtDocument(doc, {
     })
   }
 
-  doc.y = rowY + 16
-  doc.fillColor('#64748b').font(REG).fontSize(8)
-    .text(t('Diese Plattformabrechnung fasst den Gesamtumsatz aller Verkäufer zusammen. Bruttoumsatz ist der Warenwert (Provisionsbasis). Versand ist getrennt. Bestellwert = vom Kunden gezahlt + von Bonuspunkten gezahlt. Einzelne Provisionsrechnungen an Verkäufer stehen unter Provisionsrechnungen. Andertal versteuert ausschließlich die Marktplatzprovision zuzüglich Umsatzsteuer.'), left, doc.y, { width: contentWidth })
-  doc.rect(left, doc.page.height - doc.page.margins.bottom + 8, contentWidth, 3).fill(PLATFORM_ACCENT)
+  doc.y = rowY + 10
+  if (doc.y + 48 > doc.page.height - 36) {
+    doc.addPage()
+    doc.y = 48
+  }
+  const noteTop = doc.y
+  doc.rect(left, noteTop, contentWidth, 44).fill('#fef3c7').stroke('#f59e0b')
+  doc.fillColor('#92400e').font(BOLD).fontSize(7.5)
+    .text(t('HINWEIS FÜR DAS FINANZAMT'), left + 8, noteTop + 5, { width: contentWidth - 16 })
+  doc.fillColor('#78350f').font(REG).fontSize(7)
+    .text(t('Andertal ist Vermittler (P2B/DSA). Der Warenwert ist Durchlauf / Verkäufer-GMV, kein Andertal-Umsatz. Andertal versteuert ausschließlich die Marktplatzprovision zuzüglich Umsatzsteuer. Kundenversand mit Plattformetikett wird einbehalten, weil Andertal das Etikett bezahlt hat. Die Provision inkl. MwSt. ist der steuerpflichtige Andertal-Umsatz.'), left + 8, noteTop + 17, { width: contentWidth - 16 })
+  paintOutsideFlow(doc, () => {
+    doc.rect(left, doc.page.height - 14, contentWidth, 3).fill(PLATFORM_ACCENT)
+  })
 }
 
 module.exports = {

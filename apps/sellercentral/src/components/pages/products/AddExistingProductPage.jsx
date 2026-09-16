@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
@@ -45,6 +45,11 @@ const copy = {
   showVariants: { en: "Show all variants", tr: "Tüm varyasyonları göster", de: "Alle Varianten anzeigen" },
   hideVariants: { en: "Hide variants", tr: "Varyasyonları gizle", de: "Varianten ausblenden" },
   variantCount: { en: (n) => `${n} variants total`, tr: (n) => `Toplam ${n} varyasyon`, de: (n) => `${n} Varianten insgesamt` },
+  scanBarcode: { en: "Scan barcode", tr: "Barkod tara", de: "Barcode scannen" },
+  scanning: { en: "Point your camera at the barcode…", tr: "Kamerayı barkoda doğrult…", de: "Kamera auf den Barcode richten…" },
+  scanCancel: { en: "Cancel", tr: "İptal", de: "Abbrechen" },
+  scanNotSupported: { en: "Camera scanning isn't supported on this browser — enter the EAN manually below.", tr: "Bu tarayıcıda kamera ile tarama desteklenmiyor — EAN'ı aşağıya elle gir.", de: "Kamera-Scan wird in diesem Browser nicht unterstützt — EAN unten manuell eingeben." },
+  scanCameraError: { en: "Couldn't access the camera. Check permissions and try again.", tr: "Kameraya erişilemedi. İzinleri kontrol edip tekrar dene.", de: "Kamera konnte nicht geöffnet werden. Berechtigungen prüfen und erneut versuchen." },
 };
 
 function useT() {
@@ -132,8 +137,14 @@ export default function AddExistingProductPage() {
   const [foundProduct, setFoundProduct] = useState(null);
   const [siblingsOpen, setSiblingsOpen] = useState(false);
 
-  const search = useCallback(async () => {
-    const eanTrim = ean.trim();
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerError, setScannerError] = useState("");
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const scanLoopRef = useRef(null);
+
+  const search = useCallback(async (eanOverride) => {
+    const eanTrim = (eanOverride ?? ean).trim();
     const idTrim = productId.trim();
     const urlTrim = shopUrl.trim();
 
@@ -187,6 +198,70 @@ export default function AddExistingProductPage() {
     }
   }, [ean, productId, shopUrl, client]);
 
+  const stopScanner = useCallback(() => {
+    if (scanLoopRef.current) {
+      cancelAnimationFrame(scanLoopRef.current);
+      scanLoopRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setScannerOpen(false);
+  }, []);
+
+  // Camera-based barcode scan (native BarcodeDetector — no extra dependency). Falls back to a
+  // clear "not supported" message so manual EAN entry (already below) still works everywhere.
+  const startScanner = useCallback(async () => {
+    setScannerError("");
+    if (typeof window === "undefined" || !("BarcodeDetector" in window)) {
+      setScannerError(t("scanNotSupported"));
+      return;
+    }
+    setScannerOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      const detector = new window.BarcodeDetector({
+        formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "qr_code"],
+      });
+      const tick = async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2) {
+          scanLoopRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes && codes.length > 0) {
+            const value = String(codes[0].rawValue || "").trim();
+            if (value) {
+              stopScanner();
+              setEan(value);
+              setState(null);
+              setFoundProduct(null);
+              setSearchedEan("");
+              search(value);
+              return;
+            }
+          }
+        } catch (_) {
+          // transient decode error — keep scanning
+        }
+        scanLoopRef.current = requestAnimationFrame(tick);
+      };
+      scanLoopRef.current = requestAnimationFrame(tick);
+    } catch (_) {
+      setScannerError(t("scanCameraError"));
+      stopScanner();
+    }
+  }, [search, stopScanner, t]);
+
+  useEffect(() => () => stopScanner(), [stopScanner]);
+
   // Deep-linked from the "See other variations" button on the product edit page.
   useEffect(() => {
     const pid = searchParams?.get("product_id");
@@ -238,7 +313,16 @@ export default function AddExistingProductPage() {
                   onKeyDown={(e) => { if (e.key === "Enter") search(); }}
                 />
               </div>
+              <Button onClick={startScanner}>
+                📷 {t("scanBarcode")}
+              </Button>
             </InlineStack>
+
+            {scannerError && (
+              <Banner tone="warning" onDismiss={() => setScannerError("")}>
+                <Text as="p">{scannerError}</Text>
+              </Banner>
+            )}
 
             <InlineStack gap="200" blockAlign="end" wrap={false}>
               <div style={{ flex: 1 }}>
@@ -363,6 +447,37 @@ export default function AddExistingProductPage() {
           )}
         </BlockStack>
       </Card>
+
+      {scannerOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed", inset: 0, zIndex: 2000,
+            background: "rgba(0,0,0,0.85)",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            gap: 16, padding: 16, boxSizing: "border-box",
+          }}
+        >
+          <div style={{ position: "relative", width: "100%", maxWidth: 480, aspectRatio: "3 / 4", borderRadius: 12, overflow: "hidden", background: "#000" }}>
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+            <div
+              aria-hidden
+              style={{
+                position: "absolute", left: "10%", right: "10%", top: "35%", bottom: "35%",
+                border: "2px solid #fff", borderRadius: 8, boxShadow: "0 0 0 2000px rgba(0,0,0,0.35)",
+              }}
+            />
+          </div>
+          <Text as="p" tone="text-inverse">{t("scanning")}</Text>
+          <Button onClick={stopScanner}>{t("scanCancel")}</Button>
+        </div>
+      )}
     </Page>
   );
 }

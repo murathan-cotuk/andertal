@@ -21,6 +21,6 @@ export default function AuthGuard({ children }) {
     })
   }, [locale, router])
 
-  if (!ready) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#666' }}>Loading…</div>
+  if (!ready) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0a0a0a', color: '#9ca3af' }}>Loading…</div>
   return children
 }

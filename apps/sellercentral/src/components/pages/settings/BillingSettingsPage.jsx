@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Card, Text, BlockStack, InlineStack, Button, Box, Tabs, TextField,
-  Select, Banner, Spinner, Divider, Checkbox,
+  Select, Banner, Spinner, Divider, Checkbox, Modal,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { getOrderPdfDownloadUrl, downloadAuthenticatedPdf, downloadAuthenticatedPdfsAsZip } from "@/lib/order-pdf-url";
@@ -629,19 +629,19 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
               items={[
                 { label: lt(locale, "Orders", "Sipariş", "Commandes", "Pedidos", "Ordini", "Bestellungen"), value: String(periodTotals.count) },
                 { label: lt(locale, "Merchandise (commission basis)", "Mal (komisyon matrahı)", "Marchandises (base commission)", "Mercancía (base comisión)", "Merci (base commissione)", "Ware (Provisionsbasis)"), value: fmtCents(periodTotals.ware, locale) },
-                { label: lt(locale, "Shipping", "Kargo", "Livraison", "Envío", "Spedizione", "Versand"), value: fmtCents(periodTotals.ship, locale) },
+                { label: lt(locale, "Shipping (customer)", "Kargo (müşteri)", "Livraison (client)", "Envío (cliente)", "Spedizione (cliente)", "Versand (Kunde)"), value: fmtCents(periodTotals.ship, locale) },
                 { label: lt(locale, "Order value", "Sipariş tutarı", "Valeur commande", "Valor pedido", "Valore ordine", "Bestellwert"), value: fmtCents(periodTotals.bestellwert, locale) },
               ]}
             />
             <Text as="p" tone="subdued" variant="bodySm">
               {lt(
                 locale,
-                "Provisionsrechnung Bruttoumsatz = merchandise, not order value (shipping is extra).",
-                "Provisionsrechnung Bruttoumsatz = mal tutarı; Bestellwert kargo dahildir.",
-                "Bruttoumsatz Provisionsrechnung = marchandises, pas la valeur commande (livraison en plus).",
-                "Bruttoumsatz de la factura de comisión = mercancía, no el valor del pedido (envío aparte).",
-                "Bruttoumsatz della fattura commissione = merce, non il valore ordine (spedizione a parte).",
-                "Provisionsrechnung-Bruttoumsatz = Warenwert ohne Versand. Bestellwert enthält den Versand.",
+                "Commission invoice goods value = merchandise (seller GMV), not Andertal revenue. Customer shipping is shown separately from platform-paid shipping (Sendcloud labels).",
+                "Komisyon faturası mal tutarı = satıcı GMV, Andertal cirosu değil. Müşteri kargosu ile platformun ödediği kargo (Sendcloud) ayrı gösterilir.",
+                "Valeur marchandises = GMV vendeur, pas le CA Andertal. Livraison client et livraison plateforme (Sendcloud) sont séparées.",
+                "Valor mercancía = GMV del vendedor, no facturación de Andertal. Envío del cliente y envío de la plataforma (Sendcloud) van por separado.",
+                "Valore merce = GMV venditore, non fatturato Andertal. Spedizione cliente e spedizione piattaforma (Sendcloud) sono separate.",
+                "Warenwert der Provisionsrechnung = Verkäufer-GMV, nicht Andertal-Umsatz. Versand Kunde und Versand Plattform (Sendcloud) werden getrennt ausgewiesen.",
               )}
             </Text>
           </BlockStack>
@@ -1039,7 +1039,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
         </th>
         <ColHeader label={ui.period} field="period_start" sort={sort} onSort={toggleSort} />
         <ColHeader label={ui.type} field="type" sort={sort} onSort={toggleSort} />
-        <ColHeader label={lt(locale, "Gross", "Brüt", "Brut", "Bruto", "Lordo", "Brutto")} field="total_cents" sort={sort} onSort={toggleSort} align="right" />
+        <ColHeader label={lt(locale, "Goods value", "Mal tutarı", "Valeur marchandises", "Valor mercancía", "Valore merce", "Warenwert")} field="total_cents" sort={sort} onSort={toggleSort} align="right" />
         <ColHeader label={lt(locale, "Commission", "Komisyon", "Commission", "Comisión", "Commissione", "Provision")} field="amount_cents" sort={sort} onSort={toggleSort} align="right" />
         <ColHeader label={lt(locale, "Payout", "Ödeme", "Paiement", "Pago", "Pagamento", "Auszahlung")} field="payout_cents" sort={sort} onSort={toggleSort} align="right" />
         <th
@@ -1097,7 +1097,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
         <TotalsStrip
           items={[
             { label: lt(locale, "Invoices", "Fatura", "Factures", "Facturas", "Fatture", "Rechnungen"), value: String(invoiceTotals.count) },
-            { label: lt(locale, "Gross (merchandise)", "Brüt (mal)", "Brut (marchandises)", "Bruto (mercancía)", "Lordo (merci)", "Brutto (Ware)"), value: fmtCents(invoiceTotals.gross, locale) },
+            { label: lt(locale, "Goods value (seller GMV)", "Mal tutarı (satıcı GMV)", "Valeur marchandises (GMV vendeur)", "Valor mercancía (GMV vendedor)", "Valore merce (GMV venditore)", "Warenwert (Verkäufer-GMV)"), value: fmtCents(invoiceTotals.gross, locale) },
             { label: lt(locale, "Commission", "Komisyon", "Commission", "Comisión", "Commissione", "Provision"), value: fmtCents(invoiceTotals.commission, locale), color: "#dc2626" },
             { label: lt(locale, "Payout to seller", "Satıcı ödemesi", "Paiement vendeur", "Pago al vendedor", "Pagamento venditore", "Auszahlung an Verkäufer"), value: fmtCents(invoiceTotals.payout, locale), color: "#059669" },
           ]}
@@ -1185,6 +1185,54 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   );
 }
 
+function FinanzamtKpiCard({ label, value, hint, tone = "neutral", onOpen }) {
+  const palette = {
+    tax: { border: "#bbf7d0", bg: "#f0fdf4", label: "#15803d", value: "#14532d" },
+    pass: { border: "#e2e8f0", bg: "#f8fafc", label: "#64748b", value: "#0f172a" },
+    pay: { border: "#bae6fd", bg: "#f0f9ff", label: "#0369a1", value: "#0c4a6e" },
+    warn: { border: "#fde68a", bg: "#fffbeb", label: "#b45309", value: "#92400e" },
+    neutral: { border: "#e5e7eb", bg: "#ffffff", label: "#6b7280", value: "#111827" },
+  }[tone] || { border: "#e5e7eb", bg: "#ffffff", label: "#6b7280", value: "#111827" };
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        textAlign: "left",
+        border: `1px solid ${palette.border}`,
+        borderRadius: 10,
+        padding: "12px 14px",
+        background: palette.bg,
+        cursor: "pointer",
+        minHeight: 92,
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 600, color: palette.label, letterSpacing: 0.2 }}>{label}</span>
+      <span style={{ fontSize: 18, fontWeight: 700, color: palette.value, lineHeight: 1.2 }}>{value}</span>
+      {hint ? <span style={{ fontSize: 11, color: "#64748b", marginTop: "auto" }}>{hint}</span> : null}
+    </button>
+  );
+}
+
+function FinanzamtSection({ title, note, children }) {
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <BlockStack gap="100">
+          <Text as="h3" variant="headingSm">{title}</Text>
+          {note ? <Text as="p" tone="subdued" variant="bodySm">{note}</Text> : null}
+        </BlockStack>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+          {children}
+        </div>
+      </BlockStack>
+    </Card>
+  );
+}
+
 /* ─── Tab 3: Plattform / Finanzamt (superuser only) ──────────────────────────────
  * BonusPunkte.md §3.8: period totals across ALL sellers. These numbers are a straight
  * sum of Tab 2's per-seller Provisionsrechnungen (seller_payouts rows) — never an
@@ -1198,8 +1246,9 @@ function FinanzamtTab() {
   const selectedPeriod = periodKey !== PERIOD_ALL_KEY ? PAYOUT_PERIODS.find((p) => p.key === periodKey) : null;
   const periodStart = selectedPeriod?.start || "";
   const periodEnd = selectedPeriod?.end || "";
-  const [data, setData] = useState({ totals: null, sellers: [] });
+  const [data, setData] = useState({ totals: null, sellers: [], oss: [], b2b: null });
   const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1210,7 +1259,12 @@ function FinanzamtTab() {
       const res = await client
         .request(`/admin-hub/v1/billing/finanzamt${qs.toString() ? `?${qs}` : ""}`)
         .catch(() => ({ totals: null, sellers: [] }));
-      setData({ totals: res?.totals || null, sellers: res?.sellers || [] });
+      setData({
+        totals: res?.totals || null,
+        sellers: res?.sellers || [],
+        oss: res?.oss_by_country || [],
+        b2b: res?.b2b_reverse_charge || null,
+      });
     } finally {
       setLoading(false);
     }
@@ -1219,6 +1273,8 @@ function FinanzamtTab() {
   useEffect(() => { load(); }, [load]);
 
   const t = data.totals;
+  const sellers = data.sellers || [];
+  const oss = data.oss || [];
 
   const [exporting, setExporting] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -1268,6 +1324,31 @@ function FinanzamtTab() {
     }
   };
 
+  const openSellerMetric = (title, body, centsOf, format = "money") => {
+    const rows = sellers
+      .map((s) => ({
+        name: s.store_name || s.seller_id,
+        period: `${fmtDate(s.period_start, locale)} – ${fmtDate(s.period_end, locale)}`,
+        orders: Number(s.order_count || 0),
+        cents: Number(centsOf(s) || 0),
+      }))
+      .sort((a, b) => b.cents - a.cents);
+    setDetail({
+      title,
+      body,
+      kind: "sellers",
+      format,
+      rows,
+      totalCents: rows.reduce((sum, r) => sum + r.cents, 0),
+    });
+  };
+
+  const colSeller = lt(locale, "Seller", "Satıcı", "Vendeur", "Vendedor", "Venditore", "Verkäufer");
+  const colPeriod = lt(locale, "Period", "Dönem", "Période", "Período", "Periodo", "Zeitraum");
+  const colOrders = lt(locale, "Orders", "Sipariş", "Commandes", "Pedidos", "Ordini", "Bestellungen");
+  const colAmount = lt(locale, "Amount", "Tutar", "Montant", "Importe", "Importo", "Betrag");
+  const detailsHint = lt(locale, "Click for breakdown", "Kırılım için tıkla", "Cliquer pour le détail", "Clic para desglose", "Clic per il dettaglio", "Klicken für Aufschlüsselung");
+
   return (
     <BlockStack gap="400">
       <Card>
@@ -1300,41 +1381,261 @@ function FinanzamtTab() {
           {lt(locale, "No data for this period.", "Bu dönem için veri yok.", "Aucune donnée pour cette période.", "Sin datos para este período.", "Nessun dato per questo periodo.", "Keine Daten für diesen Zeitraum.")}
         </Banner>
       ) : (
-        <Card>
-          <BlockStack gap="200">
-            <Text as="p" tone="subdued">
-              {lt(
-                locale,
-                "Platform totals across all sellers. Per-seller commission invoices are under Commission invoices.",
-                "Tüm satıcıların platform toplamı. Satıcı bazlı komisyon faturaları Provisionsrechnungen sekmesindedir.",
-                "Totaux plateforme tous vendeurs. Les factures de commission par vendeur sont sous Factures de commission.",
-                "Totales de plataforma de todos los vendedores. Las facturas de comisión por vendedor están en Facturas de comisión.",
-                "Totali piattaforma di tutti i venditori. Le fatture commissione per venditore sono in Fatture commissione.",
-                "Plattformsumme aller Verkäufer. Einzelne Provisionsrechnungen finden Sie unter Provisionsrechnungen.",
+        <BlockStack gap="400">
+          <FinanzamtSection
+            title={lt(locale, "Andertal revenue (taxable)", "Andertal cirosu (vergiye tabi)", "CA Andertal (imposable)", "Facturación Andertal (imponible)", "Fatturato Andertal (imponibile)", "Andertal-Umsatz (steuerpflichtig)")}
+            note={lt(locale, "Book only commission including VAT as Andertal income. Goods value is not Andertal revenue.", "Andertal geliri olarak yalnızca KDV dahil komisyonu kaydet. Mal tutarı Andertal cirosu değildir.", "Comptabiliser uniquement la commission TTC comme CA Andertal.", "Contabiliza solo la comisión con IVA como ingreso Andertal.", "Registra solo la commissione IVA inclusa come fatturato Andertal.", "Nur die Provision inkl. MwSt. als Andertal-Umsatz buchen. Der Warenwert ist kein Andertal-Umsatz.")}
+          >
+            <FinanzamtKpiCard
+              tone="tax"
+              label={lt(locale, "Commission incl. VAT", "Komisyon KDV dahil", "Commission TTC", "Comisión IVA incl.", "Commissione IVA incl.", "Provision inkl. MwSt.")}
+              value={fmtCents((t.commission_net_cents || 0) + (t.commission_vat_cents || 0), locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Commission incl. VAT", "Komisyon KDV dahil", "Commission TTC", "Comisión IVA incl.", "Commissione IVA incl.", "Provision inkl. MwSt."),
+                lt(locale, "Taxable Andertal revenue: net commission plus VAT charged to the seller.", "Vergiye tabi Andertal cirosu: net komisyon + satıcıya yansıtılan KDV.", "CA imposable Andertal : commission nette + TVA.", "Ingreso imponible Andertal: comisión neta + IVA.", "Fatturato imponibile Andertal: commissione netta + IVA.", "Steuerpflichtiger Andertal-Umsatz: Provision netto zuzüglich dem Verkäufer belasteter USt."),
+                (s) => (s.commission_net_cents || 0) + (s.commission_vat_cents || 0),
               )}
-            </Text>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
-              {[
-                { label: lt(locale, "Gross merchandise", "Brüt mal satışı", "Vente brute (marchandises)", "Venta bruta (mercancía)", "Vendita lorda (merci)", "Bruttoumsatz (Ware)"), value: fmtCents(t.gross_sale_cents, locale) },
-                { label: lt(locale, "Shipping", "Kargo", "Livraison", "Envío", "Spedizione", "Versand"), value: fmtCents(t.shipping_cents, locale) },
-                { label: lt(locale, "Order value (goods + shipping)", "Sipariş değeri (mal + kargo)", "Valeur commande (marchandises + livraison)", "Valor pedido (mercancía + envío)", "Valore ordine (merci + spedizione)", "Bestellwert (Ware + Versand)"), value: fmtCents((t.gross_sale_cents || 0) + (t.shipping_cents || 0), locale) },
-                { label: lt(locale, "Paid by customer", "Müşteri ödedi", "Payé par le client", "Pagado por el cliente", "Pagato dal cliente", "Vom Kunden gezahlt"), value: fmtCents(t.customer_paid_cents, locale) },
-                { label: lt(locale, "Paid via bonus points (Andertal)", "Bonus puanla ödendi (Andertal)", "Payé en points bonus (Andertal)", "Pagado con puntos bonus (Andertal)", "Pagato con punti bonus (Andertal)", "Von Bonuspunkten gezahlt (Andertal)"), value: fmtCents(t.bonus_funding_cents, locale) },
-                { label: lt(locale, "Commission (net)", "Komisyon (net)", "Commission (net)", "Comisión (neta)", "Commissione (netta)", "Provision (netto)"), value: fmtCents(t.commission_net_cents, locale) },
-                { label: lt(locale, "Commission VAT", "Komisyon KDV", "TVA commission", "IVA comisión", "IVA commissione", "Provision USt"), value: fmtCents(t.commission_vat_cents, locale) },
-                { label: lt(locale, "Seller payouts", "Satıcı ödemeleri", "Paiements vendeurs", "Pagos a vendedores", "Pagamenti venditori", "Auszahlungen an Verkäufer"), value: fmtCents(t.seller_payout_cents, locale) },
-                { label: lt(locale, "Refunds", "İadeler", "Remboursements", "Reembolsos", "Rimborsi", "Erstattungen"), value: fmtCents(t.refund_cents, locale) },
-                { label: lt(locale, "Orders / Sellers", "Sipariş / Satıcı", "Commandes / Vendeurs", "Pedidos / Vendedores", "Ordini / Venditori", "Bestellungen / Verkäufer"), value: `${t.order_count} / ${t.seller_count}` },
-              ].map((s) => (
-                <div key={s.label} style={{ border: "1px solid #bae6fd", borderRadius: 8, padding: "8px 10px", background: "#f0f9ff" }}>
-                  <div style={{ fontSize: 11, color: "#0284c7", textTransform: "uppercase" }}>{s.label}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0c4a6e" }}>{s.value}</div>
-                </div>
-              ))}
-            </div>
-          </BlockStack>
-        </Card>
+            />
+            <FinanzamtKpiCard
+              tone="tax"
+              label={lt(locale, "Commission (net)", "Komisyon (net)", "Commission (net)", "Comisión (neta)", "Commissione (netta)", "Provision (netto)")}
+              value={fmtCents(t.commission_net_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Commission (net)", "Komisyon (net)", "Commission (net)", "Comisión (neta)", "Commissione (netta)", "Provision (netto)"),
+                lt(locale, "Net marketplace fee before VAT.", "KDV öncesi net pazar yeri ücreti.", "Frais marketplace nets hors TVA.", "Tarifa neta del marketplace sin IVA.", "Fee marketplace netta senza IVA.", "Netto-Marktplatzgebühr vor USt."),
+                (s) => s.commission_net_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="tax"
+              label={lt(locale, "Commission VAT", "Komisyon KDV", "TVA commission", "IVA comisión", "IVA commissione", "Provision USt")}
+              value={fmtCents(t.commission_vat_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Commission VAT", "Komisyon KDV", "TVA commission", "IVA comisión", "IVA commissione", "Provision USt"),
+                lt(locale, "VAT on the marketplace commission (Andertal output tax).", "Pazar yeri komisyonu KDV’si (Andertal çıktı vergisi).", "TVA sur la commission marketplace.", "IVA sobre la comisión del marketplace.", "IVA sulla commissione marketplace.", "USt auf die Marktplatzprovision (Andertal-Umsatzsteuer)."),
+                (s) => s.commission_vat_cents,
+              )}
+            />
+          </FinanzamtSection>
+
+          <FinanzamtSection
+            title={lt(locale, "Marketplace pass-through (not Andertal revenue)", "Pazar yeri devri (Andertal cirosu değil)", "Flux marketplace (pas le CA Andertal)", "Paso marketplace (no es facturación Andertal)", "Passaggio marketplace (non fatturato Andertal)", "Marktplatz-Durchlauf (kein Andertal-Umsatz)")}
+            note={lt(locale, "Seller GMV and customer shipping. Do not book these as Andertal turnover.", "Satıcı GMV ve müşteri kargosu. Bunları Andertal cirosu olarak kaydetme.", "GMV vendeur et livraison client — ne pas comptabiliser en CA Andertal.", "GMV del vendedor y envío del cliente: no contabilizar como facturación Andertal.", "GMV venditore e spedizione cliente: non registrare come fatturato Andertal.", "Verkäufer-GMV und Kundenversand. Nicht als Andertal-Umsatz buchen.")}
+          >
+            <FinanzamtKpiCard
+              tone="pass"
+              label={lt(locale, "Goods value (seller GMV)", "Mal tutarı (satıcı GMV)", "Valeur marchandises (GMV vendeur)", "Valor mercancía (GMV vendedor)", "Valore merce (GMV venditore)", "Warenwert (Verkäufer-GMV)")}
+              value={fmtCents(t.gross_sale_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Goods value (seller GMV)", "Mal tutarı (satıcı GMV)", "Valeur marchandises (GMV vendeur)", "Valor mercancía (GMV vendedor)", "Valore merce (GMV venditore)", "Warenwert (Verkäufer-GMV)"),
+                lt(locale, "Merchandise subtotal — commission basis, pass-through to the seller.", "Mal ara toplamı — komisyon matrahı, satıcıya devir.", "Sous-total marchandises — base de commission, flux vendeur.", "Subtotal de mercancía — base de comisión, paso al vendedor.", "Subtotale merce — base commissione, passaggio al venditore.", "Warensubtotal — Provisionsbasis, Durchlauf an den Verkäufer."),
+                (s) => s.gross_sale_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="pass"
+              label={lt(locale, "Shipping (customer)", "Kargo (müşteri)", "Livraison (client)", "Envío (cliente)", "Spedizione (cliente)", "Versand (Kunde)")}
+              value={fmtCents(t.shipping_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Shipping (customer)", "Kargo (müşteri)", "Livraison (client)", "Envío (cliente)", "Spedizione (cliente)", "Versand (Kunde)"),
+                lt(locale, "Shipping the customer paid. If the platform paid the label, this amount is not paid out to the seller.", "Müşterinin ödediği kargo. Platform etiketi ödediyse bu tutar satıcıya gönderilmez.", "Livraison payée par le client. Si la plateforme a payé l’étiquette, ce montant n’est pas versé au vendeur.", "Envío pagado por el cliente. Si la plataforma pagó la etiqueta, no se paga al vendedor.", "Spedizione pagata dal cliente. Se la piattaforma ha pagato l’etichetta, non viene pagata al venditore.", "Vom Kunden gezahlter Versand. Hat die Plattform das Etikett bezahlt, wird dieser Betrag nicht an den Verkäufer ausgezahlt."),
+                (s) => s.shipping_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="pass"
+              label={lt(locale, "Order value (goods + shipping)", "Sipariş değeri (mal + kargo)", "Valeur commande (marchandises + livraison)", "Valor pedido (mercancía + envío)", "Valore ordine (merci + spedizione)", "Bestellwert (Ware + Kundenversand)")}
+              value={fmtCents((t.gross_sale_cents || 0) + (t.shipping_cents || 0), locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Order value (goods + shipping)", "Sipariş değeri (mal + kargo)", "Valeur commande (marchandises + livraison)", "Valor pedido (mercancía + envío)", "Valore ordine (merci + spedizione)", "Bestellwert (Ware + Kundenversand)"),
+                lt(locale, "Goods plus customer shipping. Still not Andertal revenue.", "Mal + müşteri kargosu. Hâlâ Andertal cirosu değil.", "Marchandises + livraison client. Toujours pas le CA Andertal.", "Mercancía + envío del cliente. Sigue sin ser facturación Andertal.", "Merce + spedizione cliente. Non è fatturato Andertal.", "Ware plus Kundenversand. Weiterhin kein Andertal-Umsatz."),
+                (s) => (s.gross_sale_cents || 0) + (s.shipping_cents || 0),
+              )}
+            />
+          </FinanzamtSection>
+
+          <FinanzamtSection
+            title={lt(locale, "Settlement", "Mahsup / ödeme", "Règlement", "Liquidación", "Regolamento", "Abrechnung")}
+            note={lt(locale, "Payout = goods − net commission + customer shipping that the platform did not pay. Platform-paid shipping stays with Andertal — it left our pocket and was invoiced to the seller.", "Ödeme = mal − net komisyon + platformun ödemediği müşteri kargosu. Platformun ödediği kargo Andertal’de kalır — cebimizden çıktı ve satıcıya fatura edildi.", "Paiement = marchandises − commission nette + livraison client non payée par la plateforme. La livraison plateforme reste chez Andertal.", "Pago = mercancía − comisión neta + envío del cliente no pagado por la plataforma. El envío de la plataforma se queda en Andertal.", "Pagamento = merce − commissione netta + spedizione cliente non pagata dalla piattaforma. La spedizione piattaforma resta ad Andertal.", "Auszahlung = Ware − Provision netto + Kundenversand, den die Plattform nicht bezahlt hat. Plattform-Versand bleibt bei Andertal — aus unserer Tasche, dem Verkäufer berechnet.")}
+          >
+            <FinanzamtKpiCard
+              tone="pay"
+              label={lt(locale, "Seller payouts", "Satıcı ödemeleri", "Paiements vendeurs", "Pagos a vendedores", "Pagamenti venditori", "Auszahlungen an Verkäufer")}
+              value={fmtCents(t.seller_payout_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Seller payouts", "Satıcı ödemeleri", "Paiements vendeurs", "Pagos a vendedores", "Pagamenti venditori", "Auszahlungen an Verkäufer"),
+                lt(locale, "Amount paid out to sellers for this period.", "Bu dönem satıcılara ödenen tutar.", "Montant versé aux vendeurs pour la période.", "Importe pagado a vendedores en el período.", "Importo pagato ai venditori nel periodo.", "An Verkäufer ausgezahlter Betrag in diesem Zeitraum."),
+                (s) => s.seller_payout_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="pay"
+              label={lt(locale, "Customer shipping paid out", "Ödenen müşteri kargosu", "Livraison client versée", "Envío cliente pagado", "Spedizione cliente pagata", "Kundenversand ausgezahlt")}
+              value={fmtCents(t.shipping_payout_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Customer shipping paid out", "Ödenen müşteri kargosu", "Livraison client versée", "Envío cliente pagado", "Spedizione cliente pagata", "Kundenversand ausgezahlt"),
+                lt(locale, "Customer shipping on orders without a platform-paid label.", "Platform etiketinin Andertal tarafından ödenmediği siparişlerdeki müşteri kargosu.", "Livraison client sur commandes sans étiquette payée par la plateforme.", "Envío del cliente en pedidos sin etiqueta pagada por la plataforma.", "Spedizione cliente su ordini senza etichetta pagata dalla piattaforma.", "Kundenversand bei Bestellungen ohne von Andertal bezahltes Plattformetikett."),
+                (s) => s.shipping_payout_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="warn"
+              label={lt(locale, "Shipping (platform)", "Kargo (platform)", "Livraison (plateforme)", "Envío (plataforma)", "Spedizione (piattaforma)", "Versand (Plattform)")}
+              value={fmtCents(t.label_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Shipping (platform)", "Kargo (platform)", "Livraison (plateforme)", "Envío (plataforma)", "Spedizione (piattaforma)", "Versand (Plattform)"),
+                lt(locale, "Andertal paid the Sendcloud label. Not paid out to the seller — it left our pocket and was invoiced to the seller.", "Sendcloud etiketini Andertal ödedi. Satıcıya ödenmez — cebimizden çıktı ve satıcıya fatura edildi.", "Andertal a payé l’étiquette Sendcloud. Non versé au vendeur.", "Andertal pagó la etiqueta Sendcloud. No se paga al vendedor.", "Andertal ha pagato l’etichetta Sendcloud. Non viene pagata al venditore.", "Andertal hat das Sendcloud-Etikett bezahlt. Keine Auszahlung an den Verkäufer — aus unserer Tasche, dem Verkäufer berechnet."),
+                (s) => s.label_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="neutral"
+              label={lt(locale, "Paid by customer", "Müşteri ödedi", "Payé par le client", "Pagado por el cliente", "Pagato dal cliente", "Vom Kunden gezahlt")}
+              value={fmtCents(t.customer_paid_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Paid by customer", "Müşteri ödedi", "Payé par le client", "Pagado por el cliente", "Pagato dal cliente", "Vom Kunden gezahlt"),
+                lt(locale, "Card / PayPal / other customer payment methods.", "Kart / PayPal / diğer müşteri ödeme yöntemleri.", "Carte / PayPal / autres moyens de paiement client.", "Tarjeta / PayPal / otros métodos de pago del cliente.", "Carta / PayPal / altri metodi di pagamento del cliente.", "Karte / PayPal / andere Kundenzahlungsarten."),
+                (s) => s.customer_paid_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="warn"
+              label={lt(locale, "Paid via bonus points (Andertal)", "Bonus puanla ödendi (Andertal)", "Payé en points bonus (Andertal)", "Pagado con puntos bonus (Andertal)", "Pagato con punti bonus (Andertal)", "Von Bonuspunkten gezahlt (Andertal)")}
+              value={fmtCents(t.bonus_funding_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Paid via bonus points (Andertal)", "Bonus puanla ödendi (Andertal)", "Payé en points bonus (Andertal)", "Pagado con puntos bonus (Andertal)", "Pagato con punti bonus (Andertal)", "Von Bonuspunkten gezahlt (Andertal)"),
+                lt(locale, "Andertal-funded bonus — Andertal expense, not a seller price cut.", "Andertal’in finanse ettiği bonus — Andertal gideri, satıcı indirimi değil.", "Bonus financé par Andertal — charge Andertal, pas une remise vendeur.", "Bonus financiado por Andertal — gasto Andertal, no un descuento del vendedor.", "Bonus finanziato da Andertal — costo Andertal, non uno sconto venditore.", "Von Andertal finanzierte Bonuspunkte — Andertal-Aufwand, kein Verkäuferrabatt."),
+                (s) => s.bonus_funding_cents,
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="neutral"
+              label={lt(locale, "Refunds", "İadeler", "Remboursements", "Reembolsos", "Rimborsi", "Erstattungen")}
+              value={fmtCents(t.refund_cents, locale)}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Refunds", "İadeler", "Remboursements", "Reembolsos", "Rimborsi", "Erstattungen"),
+                lt(locale, "Refunds in this period.", "Bu dönemdeki iadeler.", "Remboursements sur la période.", "Reembolsos en el período.", "Rimborsi nel periodo.", "Erstattungen in diesem Zeitraum."),
+                (s) => s.refund_cents,
+              )}
+            />
+          </FinanzamtSection>
+
+          <FinanzamtSection
+            title={lt(locale, "Volume & OSS", "Hacim ve OSS", "Volume et OSS", "Volumen y OSS", "Volume e OSS", "Volumen & OSS")}
+          >
+            <FinanzamtKpiCard
+              tone="neutral"
+              label={lt(locale, "Orders / Sellers", "Sipariş / Satıcı", "Commandes / Vendeurs", "Pedidos / Vendedores", "Ordini / Venditori", "Bestellungen / Verkäufer")}
+              value={`${t.order_count || 0} / ${t.seller_count || 0}`}
+              hint={detailsHint}
+              onOpen={() => openSellerMetric(
+                lt(locale, "Orders / Sellers", "Sipariş / Satıcı", "Commandes / Vendeurs", "Pedidos / Vendedores", "Ordini / Venditori", "Bestellungen / Verkäufer"),
+                lt(locale, "Paid orders and sellers in the selected period.", "Seçilen dönemde ödenmiş siparişler ve satıcılar.", "Commandes payées et vendeurs sur la période.", "Pedidos pagados y vendedores en el período.", "Ordini pagati e venditori nel periodo.", "Bezahlte Bestellungen und Verkäufer im gewählten Zeitraum."),
+                (s) => s.order_count,
+                "count",
+              )}
+            />
+            <FinanzamtKpiCard
+              tone="neutral"
+              label={lt(locale, "OSS by destination country", "OSS hedef ülke", "OSS par pays de destination", "OSS por país de destino", "OSS per paese di destinazione", "OSS nach Bestimmungsland")}
+              value={`${oss.length}`}
+              hint={detailsHint}
+              onOpen={() => setDetail({
+                title: lt(locale, "OSS by destination country", "OSS hedef ülke", "OSS par pays de destination", "OSS por país de destino", "OSS per paese di destinazione", "OSS nach Bestimmungsland"),
+                body: lt(locale, "Customer-order VAT by ship-to country. This is seller goods VAT, not Andertal commission VAT.", "Teslim ülkesine göre müşteri sipariş KDV’si. Bu satıcı mal KDV’sidir, Andertal komisyon KDV’si değil.", "TVA des commandes client par pays de livraison. TVA marchandises vendeur, pas TVA commission Andertal.", "IVA de pedidos del cliente por país de envío. IVA de mercancía del vendedor, no IVA de comisión Andertal.", "IVA degli ordini cliente per paese di spedizione. IVA merce venditore, non IVA commissione Andertal.", "Kunden-USt nach Lieferland. Das ist Verkäufer-Waren-USt, nicht die Andertal-Provisions-USt."),
+                kind: "oss",
+                rows: oss,
+              })}
+            />
+          </FinanzamtSection>
+        </BlockStack>
       )}
+
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.title || ""}
+        large
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            {detail?.body ? <Text as="p" tone="subdued">{detail.body}</Text> : null}
+            {detail?.kind === "oss" ? (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      {[
+                        lt(locale, "Country", "Ülke", "Pays", "País", "Paese", "Land"),
+                        colOrders,
+                        lt(locale, "Goods value", "Mal tutarı", "Valeur marchandises", "Valor mercancía", "Valore merce", "Warenwert"),
+                        lt(locale, "Net", "Net", "Net", "Neto", "Netto", "Netto"),
+                        "USt",
+                      ].map((h, i) => (
+                        <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detail.rows || []).map((row) => (
+                      <tr key={row.country}>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6" }}>{row.country || "—"}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{row.order_count || 0}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{fmtCents(row.gross_cents, locale)}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{fmtCents(row.net_cents, locale)}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{fmtCents(row.vat_cents, locale)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colSeller}</th>
+                      <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colPeriod}</th>
+                      <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colOrders}</th>
+                      <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colAmount}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(detail?.rows || []).map((row, idx) => (
+                      <tr key={`${row.name}-${row.period}-${idx}`}>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6" }}>{row.name}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", color: "#6b7280" }}>{row.period}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{row.orders}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right", fontWeight: 600 }}>{detail?.format === "count" ? row.cents : fmtCents(row.cents, locale)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {detail?.kind === "sellers" ? (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={3} style={{ padding: "10px", fontWeight: 700 }}>{lt(locale, "Total", "Toplam", "Total", "Total", "Totale", "Summe")}</td>
+                        <td style={{ padding: "10px", textAlign: "right", fontWeight: 700 }}>{detail.format === "count" ? detail.totalCents : fmtCents(detail.totalCents, locale)}</td>
+                      </tr>
+                    </tfoot>
+                  ) : null}
+                </table>
+              </div>
+            )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
     </BlockStack>
   );
 }

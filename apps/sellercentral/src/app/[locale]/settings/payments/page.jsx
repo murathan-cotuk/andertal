@@ -10,13 +10,12 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import SellerCreditCardSection from "@/components/SellerCreditCardSection";
 import { confirmDelete } from "@/lib/confirm-delete";
-import { fmtDateShort, fmtDateTimeShort, fmtMoney } from "@/lib/locale-text";
+import { fmtDateShort, fmtMoney } from "@/lib/locale-text";
 import { getPaymentsCopy, payoutStatusLabel } from "@/lib/payments-i18n";
 import {
   generatePayoutPeriods,
   initialPayoutPeriodKey,
 } from "@/lib/payout-periods";
-import SellerPaymentsLedger from "@/components/pages/settings/SellerPaymentsLedger";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const DEFAULT_COMMISSION_RATE = 0.12;
@@ -24,13 +23,6 @@ const DEFAULT_COMMISSION_RATE = 0.12;
 // ── Formatters (locale-aware via component locale) ───────────────────────────
 const fmt = (cents, locale = "de") => fmtMoney(cents, locale);
 const fmtDate = (d, locale = "de") => fmtDateShort(d, locale);
-const fmtDateTime = (d, locale = "de") => fmtDateTimeShort(d, locale);
-
-const csvEscape = (v) => {
-  const s = v == null ? "" : String(v);
-  if (/[",\n;]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-};
 
 const PERIODS = generatePayoutPeriods(18);
 
@@ -106,27 +98,6 @@ function KpiCard({ label, value, sub, tone, highlight, icon }) {
           <Text variant="bodySm" tone="subdued">{sub}</Text>
         </div>
       )}
-    </div>
-  );
-}
-
-// ── Sortable Column Header ────────────────────────────────────────────────────
-function SortTh({ label, col, sortCol, sortDir, onSort, style }) {
-  const active = sortCol === col;
-  return (
-    <div
-      onClick={() => onSort(col)}
-      style={{
-        cursor: "pointer", userSelect: "none",
-        display: "flex", alignItems: "center", gap: 3,
-        color: active ? "#111827" : "#6b7280",
-        ...style,
-      }}
-    >
-      {label}
-      <span style={{ fontSize: 9, color: active ? "#2563eb" : "#d1d5db", lineHeight: 1 }}>
-        {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
-      </span>
     </div>
   );
 }
@@ -364,14 +335,11 @@ function SellerPaymentsView() {
     <Page title={txt.paymentsTitle}>
       <Layout>
         <Layout.Section>
-          <SellerPaymentsLedger />
-          <Box paddingBlockStart="400">
-            <IbanSection />
-            <Box paddingBlockStart="300">
-              <Card>
-                <SellerCreditCardSection />
-              </Card>
-            </Box>
+          <IbanSection />
+          <Box paddingBlockStart="300">
+            <Card>
+              <SellerCreditCardSection />
+            </Card>
           </Box>
         </Layout.Section>
       </Layout>
@@ -385,35 +353,20 @@ function AdminPaymentsView() {
   const txt = getPaymentsCopy(locale);
   const [periodKey, setPeriodKey] = useState(() => initialPayoutPeriodKey(PERIODS));
   const [sellers, setSellers]     = useState([]);
-  const [txRows, setTxRows]       = useState([]);
   const [loading, setLoading]     = useState(false);
   const [err, setErr]             = useState("");
   const [paying, setPaying]       = useState(null);
-
-  // Monitor filters
-  const [monitorSort, setMonitorSort]   = useState("created_at");
-  const [monitorDir, setMonitorDir]     = useState("desc");
-  const [monitorSearch, setMonitorSearch] = useState("");
-  const [monitorStatus, setMonitorStatus] = useState("all");
 
   const selectedPeriod = PERIODS.find((p) => p.key === periodKey) || PERIODS[0];
 
   const loadData = useCallback(async () => {
     setLoading(true); setErr("");
     try {
-      const [overview, tx] = await Promise.all([
-        getMedusaAdminClient().getAdminPayoutOverview({
-          period_start: selectedPeriod.startDate,
-          period_end: selectedPeriod.endDate,
-        }),
-        getMedusaAdminClient().getTransactions({
-          include_pending: "true",
-          period_start: selectedPeriod.startDate,
-          period_end: selectedPeriod.endDate,
-        }),
-      ]);
+      const overview = await getMedusaAdminClient().getAdminPayoutOverview({
+        period_start: selectedPeriod.startDate,
+        period_end: selectedPeriod.endDate,
+      });
       setSellers(overview?.sellers || []);
-      setTxRows(tx?.transactions || []);
     } catch (e) {
       setErr(e?.message || txt.loadError);
     } finally {
@@ -450,40 +403,6 @@ function AdminPaymentsView() {
   const totalPayout     = sellers.reduce((s, x) => s + (x.payout_cents || 0), 0);
   const totalPaid       = sellers.filter((s) => s.status === "bezahlt" || s.status === "paid").reduce((acc, x) => acc + (x.payout_cents || 0), 0);
   const totalPending    = totalPayout - totalPaid;
-
-  // Monitor filtered/sorted
-  const handleMonitorSort = (col) => {
-    setMonitorSort((prev) => { if (prev === col) setMonitorDir((d) => d === "asc" ? "desc" : "asc"); else setMonitorDir("desc"); return col; });
-  };
-
-  const displayMonitor = useMemo(() => {
-    let rows = txRows;
-    if (monitorSearch.trim()) {
-      const q = monitorSearch.toLowerCase();
-      rows = rows.filter((t) =>
-        String(t.order_number || "").toLowerCase().includes(q) ||
-        String(t.store_name || t.seller_id || "").toLowerCase().includes(q)
-      );
-    }
-    if (monitorStatus !== "all") {
-      rows = rows.filter((t) => (t.stripe_payout_status || "pending") === monitorStatus);
-    }
-    rows = [...rows].sort((a, b) => {
-      let av, bv;
-      if (monitorSort === "created_at") { av = new Date(a.created_at || 0).getTime(); bv = new Date(b.created_at || 0).getTime(); }
-      else if (monitorSort === "payout_cents") { av = a.payout_cents || 0; bv = b.payout_cents || 0; }
-      else { av = 0; bv = 0; }
-      return monitorDir === "asc" ? av - bv : bv - av;
-    });
-    return rows.slice(0, 200);
-  }, [txRows, monitorSearch, monitorStatus, monitorSort, monitorDir]);
-
-  // Status counts for badge summary
-  const payoutStatusCounts = txRows.reduce((acc, t) => {
-    const k = String(t?.stripe_payout_status || "pending");
-    acc[k] = (acc[k] || 0) + 1;
-    return acc;
-  }, {});
 
   const periodOptions = PERIODS.map((p) => ({ label: p.label, value: p.key }));
 
@@ -591,108 +510,6 @@ function AdminPaymentsView() {
                       </div>
                     );
                   })}
-                </>
-              )}
-            </Card>
-          </Box>
-
-          {/* IBAN Auszahlungsmonitor */}
-          <Box paddingBlockStart="400">
-            <Card padding="0">
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-                <InlineStack align="space-between" blockAlign="center">
-                  <BlockStack gap="050">
-                    <Text variant="headingMd" as="h2">{txt.ibanMonitorTitle}</Text>
-                    <Text variant="bodySm" tone="subdued">{txt.ibanMonitorSub}</Text>
-                  </BlockStack>
-                  <InlineStack gap="200" wrap={false}>
-                    {[
-                      { k: "paid",    t: "success",   l: txt.paidLabel },
-                      { k: "pending", t: "warning",   l: txt.pending },
-                      { k: "processing", t: "info",   l: payoutStatusLabel(locale, "processing") },
-                      { k: "failed",  t: "critical",  l: payoutStatusLabel(locale, "failed") },
-                    ].map(({ k, t, l }) => (payoutStatusCounts[k] || 0) > 0 ? (
-                      <Badge key={k} tone={t}>{l}: {payoutStatusCounts[k]}</Badge>
-                    ) : null)}
-                  </InlineStack>
-                </InlineStack>
-              </div>
-
-              {/* Monitor filters */}
-              <div style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-                <div style={{ flex: "1 1 200px", minWidth: 180 }}>
-                  <TextField
-                    label={txt.search}
-                    labelHidden
-                    value={monitorSearch}
-                    onChange={setMonitorSearch}
-                    placeholder={txt.adminSearchPlaceholder}
-                    clearButton
-                    onClearButtonClick={() => setMonitorSearch("")}
-                    autoComplete="off"
-                  />
-                </div>
-                <div style={{ width: 180 }}>
-                  <Select
-                    label={txt.colStatus}
-                    labelHidden
-                    options={[
-                      { label: txt.statusAll, value: "all" },
-                      { label: txt.pending, value: "pending" },
-                      { label: payoutStatusLabel(locale, "processing"), value: "processing" },
-                      { label: txt.paidLabel, value: "paid" },
-                      { label: payoutStatusLabel(locale, "failed"), value: "failed" },
-                    ]}
-                    value={monitorStatus}
-                    onChange={setMonitorStatus}
-                  />
-                </div>
-              </div>
-
-              {txRows.length === 0 ? (
-                <Box padding="500"><Text tone="subdued" alignment="center">{txt.noDataInPeriod}</Text></Box>
-              ) : (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "160px 1.2fr 1fr 100px 120px 1.2fr", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
-                    <SortTh label={txt.colDate} col="created_at" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} />
-                    <div>{txt.orderCol}</div>
-                    <div>{txt.sellerCol}</div>
-                    <SortTh label={txt.payoutCol} col="payout_cents" sortCol={monitorSort} sortDir={monitorDir} onSort={handleMonitorSort} style={{ justifyContent: "flex-end" }} />
-                    <div style={{ textAlign: "center" }}>{txt.colStatus}</div>
-                    <div>{txt.payoutIdCol}</div>
-                  </div>
-                  {displayMonitor.map((t, i) => (
-                    <div key={`${t.id || ""}-${i}`} style={{ display: "grid", gridTemplateColumns: "160px 1.2fr 1fr 100px 120px 1.2fr", gap: 8, padding: "11px 20px", borderBottom: "1px solid #f3f4f6", fontSize: 13, alignItems: "center" }}>
-                      <div style={{ color: "#374151" }}>
-                        <div>{fmtDate(t.created_at, locale)}</div>
-                        {t.delivery_date && <div style={{ fontSize: 11, color: "#9ca3af" }}>{txt.deliveryShort}: {fmtDate(t.delivery_date, locale)}</div>}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>#{t.order_number || t.id}</div>
-                      </div>
-                      <div style={{ color: "#374151" }}>{t.store_name || t.seller_id}</div>
-                      <div style={{ textAlign: "right", fontWeight: 600 }}>{fmt(t.payout_cents || 0, locale)}</div>
-                      <div style={{ textAlign: "center" }}>
-                        <Badge tone={statusTone(t.stripe_payout_status)}>
-                          {statusLabel(t.stripe_payout_status || "pending", locale)}
-                        </Badge>
-                      </div>
-                      <div>
-                        {t.stripe_payout_id ? (
-                          <code style={{ fontSize: 11, background: "#f3f4f6", padding: "2px 5px", borderRadius: 4, color: "#374151" }}>
-                            {t.stripe_payout_id}
-                          </code>
-                        ) : (
-                          <Text variant="bodySm" tone="subdued">—</Text>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {displayMonitor.length === 200 && (
-                    <Box padding="300">
-                      <Text variant="bodySm" tone="subdued" alignment="center">{txt.monitorHint}</Text>
-                    </Box>
-                  )}
                 </>
               )}
             </Card>

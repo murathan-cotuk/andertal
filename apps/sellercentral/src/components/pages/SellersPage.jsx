@@ -12,6 +12,9 @@ import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useSellerImpersonation } from "@/context/SellerImpersonationContext";
 import { userError } from "@/lib/api-error-messages";
+import { generatePayoutPeriods, ALL_PAYOUT_PERIODS_KEY } from "@/lib/payout-periods";
+
+const PAYOUT_PERIODS = generatePayoutPeriods(24);
 
 function getStatusMeta(status, locale) {
   const map = {
@@ -156,6 +159,7 @@ export default function SellersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [impersonateLoading, setImpersonateLoading] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [periodKey, setPeriodKey] = useState(ALL_PAYOUT_PERIODS_KEY);
 
   const handleDelete = async (seller) => {
     const label = seller.store_name || seller.email || seller.id;
@@ -200,11 +204,13 @@ export default function SellersPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    client.getSellers()
+    const period = PAYOUT_PERIODS.find((p) => p.key === periodKey);
+    const params = period ? { period_start: period.start, period_end: period.end } : {};
+    client.getSellers(params)
       .then((r) => { setSellers(r.sellers || []); setError(null); })
       .catch((e) => setError(userError(e, locale, "Error loading")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [periodKey]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -297,6 +303,18 @@ export default function SellersPage() {
                   options={statusOptions}
                   value={statusFilter}
                   onChange={setStatusFilter}
+                />
+              </div>
+              <div style={{ minWidth: 220 }}>
+                <Select
+                  label=""
+                  labelHidden
+                  options={[
+                    { label: lt(locale, "All time", "Tüm zamanlar", "All time", "All time", "All time", "Gesamter Zeitraum"), value: ALL_PAYOUT_PERIODS_KEY },
+                    ...PAYOUT_PERIODS.map((p) => ({ label: p.label, value: p.key })),
+                  ]}
+                  value={periodKey}
+                  onChange={setPeriodKey}
                 />
               </div>
               <Button onClick={load} loading={loading}>{ui.refresh}</Button>

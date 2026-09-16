@@ -210,10 +210,14 @@ export default function SellerPaymentsLedger() {
                 options={[
                   { label: txt.typeAll, value: "all" },
                   { label: ledgerEntryLabel({ type: "order_received" }, locale), value: "order_received" },
+                  { label: ledgerEntryLabel({ type: "shipping_customer" }, locale), value: "shipping_customer" },
                   { label: ledgerEntryLabel({ type: "commission", description_params: { rate_pct: 12 } }, locale), value: "commission" },
+                  { label: ledgerEntryLabel({ type: "commission_vat", description_params: { vat_pct: 19 } }, locale), value: "commission_vat" },
                   { label: ledgerEntryLabel({ type: "shipping_label" }, locale), value: "shipping_label" },
+                  { label: ledgerEntryLabel({ type: "return_shipping" }, locale), value: "return_shipping" },
                   { label: ledgerEntryLabel({ type: "refund" }, locale), value: "refund" },
                   { label: ledgerEntryLabel({ type: "commission_refund" }, locale), value: "commission_refund" },
+                  { label: ledgerEntryLabel({ type: "advertising" }, locale), value: "advertising" },
                   { label: ledgerEntryLabel({ type: "payout" }, locale), value: "payout" },
                 ]}
                 value={filterType}

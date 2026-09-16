@@ -462,6 +462,15 @@ export default function SecuritySettingsPage() {
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
 
+  // Superuser-only inline edit of Name/Email on the "Ihr Konto" card — everyone else keeps the
+  // plain read-only display above (explicit user instruction).
+  const [editingAccount, setEditingAccount] = useState(false);
+  const [accFirstName, setAccFirstName] = useState("");
+  const [accLastName, setAccLastName] = useState("");
+  const [accEmail, setAccEmail] = useState("");
+  const [accSaving, setAccSaving] = useState(false);
+  const [accErr, setAccErr] = useState("");
+
   const loadAccount = useCallback(async () => {
     setLoading(true);
     setErr("");
@@ -494,6 +503,37 @@ export default function SecuritySettingsPage() {
       : (locale === "en" ? "Seller account" : locale === "tr" ? "Satıcı hesabı" : "Verkäufer-Konto");
 
   const roleTone = account?.is_superuser ? "info" : account?.is_team_member ? "attention" : "success";
+
+  const startEditAccount = () => {
+    setAccFirstName(account?.first_name || "");
+    setAccLastName(account?.last_name || "");
+    setAccEmail(account?.email || "");
+    setAccErr("");
+    setEditingAccount(true);
+  };
+
+  const cancelEditAccount = () => {
+    setEditingAccount(false);
+    setAccErr("");
+  };
+
+  const saveAccount = async () => {
+    setAccErr("");
+    setAccSaving(true);
+    try {
+      const data = await getMedusaAdminClient().updateSellerAccount({
+        first_name: accFirstName.trim(),
+        last_name: accLastName.trim(),
+        email: accEmail.trim().toLowerCase(),
+      });
+      setAccount((a) => ({ ...a, ...(data?.user || {}) }));
+      setEditingAccount(false);
+    } catch (e) {
+      setAccErr(e?.message || (locale === "en" ? "Could not save." : locale === "tr" ? "Kaydedilemedi." : "Konnte nicht gespeichert werden."));
+    } finally {
+      setAccSaving(false);
+    }
+  };
 
   const submitPassword = async (e) => {
     e.preventDefault();
@@ -563,9 +603,66 @@ export default function SecuritySettingsPage() {
             <Text variant="headingMd" as="h2">
               {locale === "en" ? "Your account" : locale === "tr" ? "Hesabınız" : "Ihr Konto"}
             </Text>
-            <Badge tone={roleTone}>{roleLabel}</Badge>
+            <InlineStack gap="200" blockAlign="center">
+              <Badge tone={roleTone}>{roleLabel}</Badge>
+              {account?.is_superuser && !editingAccount ? (
+                <Button size="slim" onClick={startEditAccount}>
+                  {locale === "en" ? "Edit" : locale === "tr" ? "Düzenle" : "Bearbeiten"}
+                </Button>
+              ) : null}
+            </InlineStack>
           </InlineStack>
           <Divider />
+
+          {editingAccount ? (
+            <BlockStack gap="300">
+              <Text as="p" tone="subdued">
+                {locale === "en"
+                  ? "As a superuser you can edit your own name and login email directly."
+                  : locale === "tr"
+                  ? "Süper kullanıcı olarak kendi adını ve giriş e-postanı doğrudan düzenleyebilirsin."
+                  : "Als Superuser können Sie Ihren eigenen Namen und Ihre Anmelde-E-Mail direkt bearbeiten."}
+              </Text>
+              {accErr ? (
+                <Banner tone="critical" onDismiss={() => setAccErr("")}>
+                  <Text as="p">{accErr}</Text>
+                </Banner>
+              ) : null}
+              <InlineStack gap="300" wrap>
+                <div style={{ minWidth: 200, flex: 1 }}>
+                  <TextField
+                    label={locale === "en" ? "First name" : locale === "tr" ? "Ad" : "Vorname"}
+                    value={accFirstName}
+                    onChange={setAccFirstName}
+                    autoComplete="given-name"
+                  />
+                </div>
+                <div style={{ minWidth: 200, flex: 1 }}>
+                  <TextField
+                    label={locale === "en" ? "Last name" : locale === "tr" ? "Soyad" : "Nachname"}
+                    value={accLastName}
+                    onChange={setAccLastName}
+                    autoComplete="family-name"
+                  />
+                </div>
+              </InlineStack>
+              <TextField
+                label={locale === "en" ? "Email (login)" : locale === "tr" ? "E-posta (giriş)" : "E-Mail (Anmeldung)"}
+                type="email"
+                value={accEmail}
+                onChange={setAccEmail}
+                autoComplete="email"
+              />
+              <InlineStack gap="200">
+                <Button variant="primary" onClick={saveAccount} loading={accSaving}>
+                  {locale === "en" ? "Save" : locale === "tr" ? "Kaydet" : "Speichern"}
+                </Button>
+                <Button onClick={cancelEditAccount} disabled={accSaving}>
+                  {ui.cancel}
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          ) : (
           <BlockStack gap="200">
             <div>
               <Text variant="bodySm" tone="subdued">
@@ -610,6 +707,7 @@ export default function SecuritySettingsPage() {
               </Text>
             </div>
           </BlockStack>
+          )}
         </BlockStack>
       </Card>
 

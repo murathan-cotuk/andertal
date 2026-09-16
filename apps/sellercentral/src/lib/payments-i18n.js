@@ -130,6 +130,7 @@ export function getPaymentsCopy(locale) {
     noTransactionsPeriod: t("No transactions in this period.", "Bu dönemde işlem yok.", "Aucune transaction sur cette période.", "No hay transacciones en este periodo.", "Nessuna transazione in questo periodo.", "Keine Transaktionen in diesem Zeitraum."),
     colDeliveryDate: t("Delivery date", "Teslimat tarihi", "Date de livraison", "Fecha de entrega", "Data consegna", "Lieferdatum"),
     csvFilenamePrefix: t("transactions", "islemler", "transactions", "transacciones", "transazioni", "transaktionen"),
+    colDate: t("Date", "Tarih", "Date", "Fecha", "Data", "Datum"),
     colOrderNo: t("Order no.", "Sipariş no.", "N° commande", "N.º pedido", "N. ordine", "Bestellnr."),
     colCustomer: t("Customer", "Müşteri", "Client", "Cliente", "Cliente", "Kunde"),
     colGross: t("Gross", "Brüt", "Brut", "Bruto", "Lordo", "Brutto"),
@@ -200,32 +201,74 @@ export function ledgerEntryLabel(entry, locale) {
   const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
   const type = entry?.type;
   if (type === "order_received") {
-    return t("Order received", "Sipariş alındı", "Commande reçue", "Pedido recibido", "Ordine ricevuto", "Bestellung eingegangen");
+    return t("Goods value", "Mal tutarı", "Valeur marchandises", "Valor mercancía", "Valore merce", "Warenwert");
+  }
+  if (type === "shipping_customer") {
+    return t("Shipping (customer paid)", "Kargo (müşteri ödedi)", "Livraison (payée par le client)", "Envío (pagado por el cliente)", "Spedizione (pagata dal cliente)", "Versand (Kunde gezahlt)");
   }
   if (type === "commission") {
     const rate = p.rate_pct != null ? String(p.rate_pct).replace(/\.0$/, "") : "12";
     return t(
-      `Commission ${rate} % incl. VAT`,
-      `Komisyon ${rate} % KDV dahil`,
-      `Commission ${rate} % TTC`,
-      `Comisión ${rate} % IVA incl.`,
-      `Commissione ${rate} % IVA incl.`,
-      `Provision ${rate} % inkl. MwSt.`,
+      `Commission ${rate} % (net)`,
+      `Komisyon ${rate} % (net)`,
+      `Commission ${rate} % (net)`,
+      `Comisión ${rate} % (neto)`,
+      `Commissione ${rate} % (netto)`,
+      `Provision ${rate} % (netto)`,
+    );
+  }
+  if (type === "commission_vat") {
+    const vat = p.vat_pct != null ? String(p.vat_pct).replace(/\.0$/, "") : "19";
+    return t(
+      `Commission VAT ${vat} %`,
+      `Komisyon KDV ${vat} %`,
+      `TVA commission ${vat} %`,
+      `IVA comisión ${vat} %`,
+      `IVA commissione ${vat} %`,
+      `Provision USt. ${vat} %`,
     );
   }
   if (type === "commission_refund") {
     return t("Commission refunded", "Komisyon iade edildi", "Commission remboursée", "Comisión reembolsada", "Commissione rimborsata", "Provision erstattet");
   }
+  if (type === "commission_vat_refund") {
+    return t("Commission VAT refunded", "Komisyon KDV iade", "TVA commission remboursée", "IVA comisión reembolsada", "IVA commissione rimborsata", "Provision USt. erstattet");
+  }
   if (type === "refund") {
     return t("Refund", "İade", "Remboursement", "Reembolso", "Rimborso", "Erstattung");
+  }
+  if (type === "return_shipping" || entry?.description_key === "return_shipping_label") {
+    return t("Return shipping label", "İade kargo etiketi", "Étiquette de retour", "Etiqueta de devolución", "Etichetta di reso", "Rücksendeetikett");
   }
   if (type === "shipping_label" || entry?.description_key === "shipping_label_for_order") {
     return t("Shipping label (Andertal)", "Kargo etiketi (Andertal)", "Étiquette d'expédition (Andertal)", "Etiqueta de envío (Andertal)", "Etichetta di spedizione (Andertal)", "Versandetikett (Andertal)");
   }
   if (type === "payout") {
+    const ps = p.period_start ? String(p.period_start).slice(0, 10) : "";
+    const pe = p.period_end ? String(p.period_end).slice(0, 10) : "";
+    if (ps && pe) {
+      return t(
+        `Payout ${ps} – ${pe}`,
+        `Ödeme ${ps} – ${pe}`,
+        `Versement ${ps} – ${pe}`,
+        `Pago ${ps} – ${pe}`,
+        `Pagamento ${ps} – ${pe}`,
+        `Auszahlung ${ps} – ${pe}`,
+      );
+    }
     return t("Payout", "Ödeme", "Versement", "Pago", "Pagamento", "Auszahlung");
   }
   if (type === "advertising") {
+    if (p.campaign_name) {
+      return t(
+        `Advertising — ${p.campaign_name}`,
+        `Reklam — ${p.campaign_name}`,
+        `Publicité — ${p.campaign_name}`,
+        `Publicidad — ${p.campaign_name}`,
+        `Pubblicità — ${p.campaign_name}`,
+        `Werbung — ${p.campaign_name}`,
+      );
+    }
     return t("Advertising", "Reklam", "Publicité", "Publicidad", "Pubblicità", "Werbung");
   }
   if (entry?.description_key === "manual_note" && p.note) return String(p.note);

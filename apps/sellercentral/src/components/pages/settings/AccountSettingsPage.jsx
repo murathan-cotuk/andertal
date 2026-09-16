@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Page,
   Layout,
@@ -8,13 +8,11 @@ import {
   Text,
   BlockStack,
   Select,
-  Button,
   Banner,
-  InlineStack,
 } from "@shopify/polaris";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
-import { getUI } from "@/lib/ui-strings";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 const LOCALE_OPTIONS = [
   { label: "Deutsch", value: "de" },
@@ -29,7 +27,6 @@ export default function AccountSettingsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const currentLocale = useLocale();
-  const ui = getUI(currentLocale);
 
   const [locale, setLocale] = useState("de");
   const [saved, setSaved] = useState(false);
@@ -59,7 +56,7 @@ export default function AccountSettingsPage() {
     setSaved(false);
   };
 
-  const save = () => {
+  const save = useCallback(() => {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem("sellerLocale", locale);
     }
@@ -73,13 +70,39 @@ export default function AccountSettingsPage() {
       segments[1] = locale;
     }
     router.push(segments.join("/") || `/${locale}/settings/account`);
-  };
+    return true;
+  }, [locale, pathname, router]);
 
-  const discard = () => {
+  const discard = useCallback(() => {
     setLocale(initial);
     setDirty(false);
     setSaved(false);
-  };
+  }, [initial]);
+
+  // Top save/discard bar (next to the search bar) instead of this page's own bottom Save/Discard
+  // buttons, matching every other settings page.
+  const unsaved = useUnsavedChanges();
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  const discardRef = useRef(discard);
+  discardRef.current = discard;
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setDirty(!!dirty);
+  }, [dirty, unsaved]);
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setHandlers({
+      onSave: () => saveRef.current?.(),
+      onDiscard: () => discardRef.current?.(),
+    });
+    return () => {
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
+    };
+  }, [unsaved?.setHandlers, unsaved?.clearHandlers, unsaved?.setDirty]);
 
   const pageTitle = currentLocale === "en" ? "Account Settings" : currentLocale === "tr" ? "Hesap Ayarları" : "Konto-Einstellungen";
   const pageDesc = currentLocale === "en" ? "Personal settings for your Sellercentral account." : currentLocale === "tr" ? "Sellercentral hesabınız için kişisel ayarlar." : "Persönliche Einstellungen für Ihren Sellercentral-Account.";
@@ -87,7 +110,6 @@ export default function AccountSettingsPage() {
   const uiLangTitle = currentLocale === "en" ? "Interface language" : currentLocale === "tr" ? "Arayüz dili" : "Sprache der Benutzeroberfläche";
   const uiLangDesc = currentLocale === "en" ? "Choose the language in which Sellercentral should be displayed. The change takes effect immediately after saving." : currentLocale === "tr" ? "Sellercentral'ın hangi dilde görüntüleneceğini seçin. Değişiklik kaydetme sonrasında hemen geçerli olur." : "Wählen Sie die Sprache, in der Sellercentral angezeigt werden soll. Die Änderung tritt nach dem Speichern sofort in Kraft.";
   const langLabel = currentLocale === "en" ? "Language" : currentLocale === "tr" ? "Dil" : "Sprache";
-  const discardLabel = currentLocale === "en" ? "Discard" : currentLocale === "tr" ? "Vazgeç" : "Verwerfen";
 
   return (
     <Page title={pageTitle}>
@@ -120,16 +142,6 @@ export default function AccountSettingsPage() {
                     onChange={handleLocaleChange}
                   />
                 </div>
-                <InlineStack gap="300">
-                  <Button variant="primary" onClick={save} disabled={!dirty}>
-                    {ui.save}
-                  </Button>
-                  {dirty && (
-                    <Button variant="plain" onClick={discard}>
-                      {discardLabel}
-                    </Button>
-                  )}
-                </InlineStack>
               </BlockStack>
             </Card>
           </BlockStack>

@@ -3,7 +3,12 @@ const { Router } = require('express')
 const { resolveSellerScope } = require('../seller-scope')
 const { resolveOrderPaidTotalCents, orderBonusDiscountCents } = require('../order-money')
 const { salesInvoiceVat, resolvePlatformCommissionVatPercent } = require('../goods-vat')
-const { aggregateSellerPeriodSales, aggregateMarketplacePeriodSales } = require('../seller-billing')
+const {
+  aggregateSellerPeriodSales,
+  aggregateMarketplacePeriodSales,
+  sellerPeriodPayoutCents,
+  settleBalanceLabelsForPayout,
+} = require('../seller-billing')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -167,18 +172,40 @@ module.exports = function createPayoutsRouter({
         const agg = await aggregateSellerPeriodSales(client, sellerId, monthStart, monthEnd)
         const rate = Number(s.commission_rate) >= 0 ? Number(s.commission_rate) : 0.12
         const commissionCents = Math.round(agg.grossCents * rate)
-        const payoutCents = Math.max(0, agg.grossCents - commissionCents)
+        const payoutCents = sellerPeriodPayoutCents({
+          grossCents: agg.grossCents,
+          commissionCents,
+          shippingPayoutCents: agg.shippingPayoutCents,
+          labelBalanceCents: agg.labelBalanceCents,
+        })
         const commissionVatCents = Math.round(commissionCents * vatPct / 100)
-        const insRes = await client.query(
-          `INSERT INTO seller_payouts
-           (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents,
-            customer_paid_cents, bonus_funding_cents, commission_vat_cents, refund_cents, order_count, notes, status)
-           VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, 'Automatisch erstellt (Abrechnungszeitraum)', 'offen')
-           RETURNING id`,
-          [sellerId, monthStart, monthEnd, agg.grossCents, commissionCents, payoutCents,
-            agg.customerPaidCents, agg.bonusFundingCents, commissionVatCents, agg.refundCents, agg.orderCount],
-        )
-        createdIds.push(insRes.rows[0].id)
+        let insRes
+        try {
+          insRes = await client.query(
+            `INSERT INTO seller_payouts
+             (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents,
+              customer_paid_cents, bonus_funding_cents, commission_vat_cents, refund_cents, order_count,
+              shipping_cents, shipping_payout_cents, label_cents, notes, status)
+             VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'Automatisch erstellt (Abrechnungszeitraum)', 'offen')
+             RETURNING id`,
+            [sellerId, monthStart, monthEnd, agg.grossCents, commissionCents, payoutCents,
+              agg.customerPaidCents, agg.bonusFundingCents, commissionVatCents, agg.refundCents, agg.orderCount,
+              agg.shippingCents, agg.shippingPayoutCents, agg.labelCents],
+          )
+        } catch (_) {
+          insRes = await client.query(
+            `INSERT INTO seller_payouts
+             (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents,
+              customer_paid_cents, bonus_funding_cents, commission_vat_cents, refund_cents, order_count, notes, status)
+             VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, 'Automatisch erstellt (Abrechnungszeitraum)', 'offen')
+             RETURNING id`,
+            [sellerId, monthStart, monthEnd, agg.grossCents, commissionCents, payoutCents,
+              agg.customerPaidCents, agg.bonusFundingCents, commissionVatCents, agg.refundCents, agg.orderCount],
+          )
+        }
+        const payoutId = insRes.rows[0].id
+        await settleBalanceLabelsForPayout(client, { sellerId, payoutId, periodEnd: monthEnd })
+        createdIds.push(payoutId)
       }
       return { createdIds, skipped }
     }
@@ -343,21 +370,41 @@ module.exports = function createPayoutsRouter({
         if (period_end) { params.push(period_end); where.push(`p.period_end <= $${params.length}::date`) }
         if (seller_id) { params.push(seller_id); where.push(`p.seller_id = $${params.length}`) }
         const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
-        const r = await client.query(
-          `SELECT p.id, p.seller_id, p.period_start, p.period_end, p.status,
+        const selectCore = `p.id, p.seller_id, p.period_start, p.period_end, p.status,
                   p.total_cents, p.commission_cents, p.payout_cents,
-                  p.customer_paid_cents, p.bonus_funding_cents, p.commission_vat_cents, p.refund_cents, p.order_count,
-                  s.store_name
-             FROM seller_payouts p
-             LEFT JOIN seller_users s ON s.seller_id = p.seller_id
-             ${whereClause}
-             ORDER BY p.period_start DESC, s.store_name ASC
-             LIMIT 2000`,
-          params,
-        )
+                  p.customer_paid_cents, p.bonus_funding_cents, p.commission_vat_cents, p.refund_cents, p.order_count`
+        let r
+        try {
+          r = await client.query(
+            `SELECT ${selectCore},
+                    COALESCE(p.shipping_cents, 0) AS shipping_cents,
+                    COALESCE(p.shipping_payout_cents, 0) AS shipping_payout_cents,
+                    COALESCE(p.label_cents, 0) AS label_cents,
+                    s.store_name
+               FROM seller_payouts p
+               LEFT JOIN seller_users s ON s.seller_id = p.seller_id
+               ${whereClause}
+               ORDER BY p.period_start DESC, s.store_name ASC
+               LIMIT 2000`,
+            params,
+          )
+        } catch (_) {
+          r = await client.query(
+            `SELECT ${selectCore}, s.store_name
+               FROM seller_payouts p
+               LEFT JOIN seller_users s ON s.seller_id = p.seller_id
+               ${whereClause}
+               ORDER BY p.period_start DESC, s.store_name ASC
+               LIMIT 2000`,
+            params,
+          )
+        }
         const rows = r.rows || []
         let totals = rows.reduce((acc, row) => {
           acc.gross_sale_cents += Number(row.total_cents || 0)
+          acc.shipping_cents += Number(row.shipping_cents || 0)
+          acc.shipping_payout_cents += Number(row.shipping_payout_cents || 0)
+          acc.label_cents += Number(row.label_cents || 0)
           acc.customer_paid_cents += Number(row.customer_paid_cents || 0)
           acc.bonus_funding_cents += Number(row.bonus_funding_cents || 0)
           acc.commission_net_cents += Number(row.commission_cents || 0)
@@ -367,7 +414,8 @@ module.exports = function createPayoutsRouter({
           acc.order_count += Number(row.order_count || 0)
           return acc
         }, {
-          gross_sale_cents: 0, shipping_cents: 0, customer_paid_cents: 0, bonus_funding_cents: 0, commission_net_cents: 0,
+          gross_sale_cents: 0, shipping_cents: 0, shipping_payout_cents: 0, label_cents: 0,
+          customer_paid_cents: 0, bonus_funding_cents: 0, commission_net_cents: 0,
           commission_vat_cents: 0, seller_payout_cents: 0, refund_cents: 0, order_count: 0,
         })
         totals.seller_count = new Set(rows.map((row) => row.seller_id)).size
@@ -380,11 +428,19 @@ module.exports = function createPayoutsRouter({
               ...totals,
               gross_sale_cents: live.grossCents,
               shipping_cents: live.shippingCents,
+              shipping_payout_cents: live.shippingPayoutCents,
+              withheld_shipping_cents: live.withheldShippingCents,
               customer_paid_cents: live.customerPaidCents,
               bonus_funding_cents: live.bonusFundingCents,
               commission_net_cents: live.commissionCents,
               commission_vat_cents: Math.round(live.commissionCents * vatPct / 100),
-              seller_payout_cents: Math.max(0, live.grossCents - live.commissionCents),
+              seller_payout_cents: sellerPeriodPayoutCents({
+                grossCents: live.grossCents,
+                commissionCents: live.commissionCents,
+                shippingPayoutCents: live.shippingPayoutCents,
+                labelBalanceCents: live.labelBalanceCents,
+              }),
+              label_cents: live.labelCents,
               refund_cents: live.refundCents,
               order_count: live.orderCount,
               seller_count: live.sellerCount || totals.seller_count,
@@ -456,6 +512,9 @@ module.exports = function createPayoutsRouter({
             period_end: row.period_end,
             status: row.status,
             gross_sale_cents: Number(row.total_cents || 0),
+            shipping_cents: Number(row.shipping_cents || 0),
+            shipping_payout_cents: Number(row.shipping_payout_cents || 0),
+            label_cents: Number(row.label_cents || 0),
             customer_paid_cents: Number(row.customer_paid_cents || 0),
             bonus_funding_cents: Number(row.bonus_funding_cents || 0),
             commission_net_cents: Number(row.commission_cents || 0),
@@ -1091,6 +1150,111 @@ module.exports = function createPayoutsRouter({
 
     const runStripePayoutsIfDue = async () => {}
 
+    /**
+     * One seller's actual IBAN/SEPA payout: Stripe Custom account (create if missing) → transfer
+     * platform funds to it → payout from it to the seller's IBAN. Marks the eligible orders
+     * 'processing' first (idempotency guard — a concurrent call for the same seller finds nothing
+     * left to claim) then 'paid' on success, or resets to 'pending' on failure so the next run
+     * (scheduled or manual) retries. Shared by the scheduled Friday batch below and the on-demand
+     * "überweisen" button (POST /admin-hub/v1/payouts/seller-iban-now) — same money-movement code
+     * path either way, just a different trigger and no Friday/batch gate for the manual one.
+     */
+    const attemptSellerIbanPayout = async (client, stripeInst, row) => {
+      const { seller_id, iban, payment_account_holder, email } = row
+      let customAccountId = row.stripe_custom_account_id
+
+      if (!iban) return { ok: false, reason: 'no_iban', message: 'Seller has no IBAN on file.' }
+      const ibChk = validateSepaIbanChecksum(iban)
+      if (!ibChk.ok) return { ok: false, reason: 'invalid_iban', message: ibChk.message }
+
+      const payoutCents = Math.floor(Number(row.payout_cents_sum || 0))
+      if (payoutCents <= 50) return { ok: false, reason: 'below_minimum', message: 'Nothing eligible above the Stripe minimum payout.' }
+
+      // Idempotency: mark all eligible orders as processing first
+      const guard = await client.query(
+        `UPDATE store_orders SET stripe_payout_status = 'processing', updated_at = now()
+         WHERE seller_id = $1 AND stripe_payout_status = 'pending' AND stripe_account_id IS NULL
+           AND ${payoutEligibleOrderSql.replace(/\bo\./g, 'store_orders.')}`,
+        [seller_id]
+      )
+      if (!guard.rowCount) return { ok: false, reason: 'already_claimed', message: 'Nothing left to pay out (already processing or paid).' }
+
+      try {
+        // Create Stripe Custom account if missing
+        if (!customAccountId) {
+          const acct = await stripeInst.accounts.create({
+            type: 'custom',
+            country: 'DE',
+            email,
+            capabilities: { transfers: { requested: true } },
+            tos_acceptance: { service_agreement: 'full', date: Math.floor(Date.now() / 1000), ip: '127.0.0.1' },
+          })
+          customAccountId = acct.id
+          const sellerClient = getSellerDbClient()
+          if (sellerClient) {
+            await sellerClient.connect()
+            await sellerClient.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, seller_id])
+            await sellerClient.end()
+          }
+          // Add IBAN as external account
+          const cleanIban = iban.replace(/\s/g, '').toUpperCase()
+          await stripeInst.accounts.createExternalAccount(customAccountId, {
+            external_account: {
+              object: 'bank_account', country: 'DE', currency: 'eur',
+              account_number: cleanIban,
+              account_holder_name: payment_account_holder || 'Account Holder',
+              account_holder_type: 'individual',
+            },
+          })
+        }
+
+        // Transfer from platform to custom account
+        await stripeInst.transfers.create({
+          amount: payoutCents,
+          currency: 'eur',
+          destination: customAccountId,
+        })
+
+        // Payout from custom account to IBAN
+        const payout = await stripeInst.payouts.create(
+          { amount: payoutCents, currency: 'eur' },
+          { stripeAccount: customAccountId }
+        )
+
+        await client.query(
+          `UPDATE store_orders SET stripe_payout_status = 'paid', stripe_payout_id = $1, updated_at = now()
+           WHERE seller_id = $2 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
+          [payout.id, seller_id]
+        )
+        console.log(`attemptSellerIbanPayout: paid seller ${seller_id} ${payoutCents} EUR → ${customAccountId} (payout ${payout.id})`)
+        return { ok: true, payoutCents, payoutId: payout.id }
+      } catch (e) {
+        // Reset to pending so the next run (scheduled or manual) retries
+        await client.query(
+          `UPDATE store_orders SET stripe_payout_status = 'pending', updated_at = now()
+           WHERE seller_id = $1 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
+          [seller_id]
+        ).catch(() => {})
+        console.error(`attemptSellerIbanPayout: seller ${seller_id} failed:`, e?.message)
+        return { ok: false, reason: 'stripe_error', message: e?.message || 'Stripe transfer failed.' }
+      }
+    }
+
+    const SELLER_IBAN_PAYOUT_ROW_SQL = `
+           SELECT o.seller_id,
+                  SUM(
+                    GREATEST(0,
+                      COALESCE(o.seller_net_after_commission_cents::bigint,
+                        FLOOR(o.subtotal_cents::numeric * (1 - COALESCE(s.commission_rate, 0.12)))::bigint)
+                    )
+                  )::bigint AS payout_cents_sum,
+                  s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email
+           FROM store_orders o
+           JOIN seller_users s ON s.seller_id = o.seller_id
+           WHERE o.stripe_payout_status = 'pending'
+             AND o.stripe_account_id IS NULL
+             AND ${payoutEligibleOrderSql}`
+
     // IBAN / SEPA payout — Sellercentral bank account (seller_users.iban). Platform PI funds settle here.
     // Eligible: stripe_payout_status pending, order stripe_account_id NULL (all store orders today), 14d + no open return.
     const runSellerIbanPayoutsIfDue = async () => {
@@ -1114,105 +1278,12 @@ module.exports = function createPayoutsRouter({
 
         // Per-order seller net (stored at checkout); fallback = merchandise × (1 − commission).
         const due = await client.query(
-          `SELECT o.seller_id,
-                  SUM(
-                    GREATEST(0,
-                      COALESCE(o.seller_net_after_commission_cents::bigint,
-                        FLOOR(o.subtotal_cents::numeric * (1 - COALESCE(s.commission_rate, 0.12)))::bigint)
-                    )
-                  )::bigint AS payout_cents_sum,
-                  s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email
-           FROM store_orders o
-           JOIN seller_users s ON s.seller_id = o.seller_id
-           WHERE o.stripe_payout_status = 'pending'
-             AND o.stripe_account_id IS NULL
-             AND ${payoutEligibleOrderSql}
+          `${SELLER_IBAN_PAYOUT_ROW_SQL}
            GROUP BY o.seller_id, s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email`
         )
 
         for (const row of due.rows || []) {
-          const { seller_id, iban, payment_account_holder, email } = row
-          let customAccountId = row.stripe_custom_account_id
-
-          if (!iban) {
-            console.warn(`runSellerIbanPayoutsIfDue: seller ${seller_id} has no IBAN, skipping`)
-            continue
-          }
-          const ibChk = validateSepaIbanChecksum(iban)
-          if (!ibChk.ok) {
-            console.warn(`runSellerIbanPayoutsIfDue: seller ${seller_id} invalid IBAN — ${ibChk.message}`)
-            continue
-          }
-
-          const payoutCents = Math.floor(Number(row.payout_cents_sum || 0))
-          if (payoutCents <= 50) continue // Stripe minimum payout
-
-          // Idempotency: mark all eligible orders as processing first
-          const guard = await client.query(
-            `UPDATE store_orders SET stripe_payout_status = 'processing', updated_at = now()
-             WHERE seller_id = $1 AND stripe_payout_status = 'pending' AND stripe_account_id IS NULL
-               AND ${payoutEligibleOrderSql.replace(/\bo\./g, 'store_orders.')}`,
-            [seller_id]
-          )
-          if (!guard.rowCount) continue
-
-          try {
-            // Create Stripe Custom account if missing
-            if (!customAccountId) {
-              const acct = await stripeInst.accounts.create({
-                type: 'custom',
-                country: 'DE',
-                email,
-                capabilities: { transfers: { requested: true } },
-                tos_acceptance: { service_agreement: 'full', date: Math.floor(Date.now() / 1000), ip: '127.0.0.1' },
-              })
-              customAccountId = acct.id
-              const sellerClient = getSellerDbClient()
-              if (sellerClient) {
-                await sellerClient.connect()
-                await sellerClient.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, seller_id])
-                await sellerClient.end()
-              }
-              // Add IBAN as external account
-              const cleanIban = iban.replace(/\s/g, '').toUpperCase()
-              await stripeInst.accounts.createExternalAccount(customAccountId, {
-                external_account: {
-                  object: 'bank_account', country: 'DE', currency: 'eur',
-                  account_number: cleanIban,
-                  account_holder_name: payment_account_holder || 'Account Holder',
-                  account_holder_type: 'individual',
-                },
-              })
-            }
-
-            // Transfer from platform to custom account
-            const transfer = await stripeInst.transfers.create({
-              amount: payoutCents,
-              currency: 'eur',
-              destination: customAccountId,
-            })
-
-            // Payout from custom account to IBAN
-            const payout = await stripeInst.payouts.create(
-              { amount: payoutCents, currency: 'eur' },
-              { stripeAccount: customAccountId }
-            )
-
-            await client.query(
-              `UPDATE store_orders SET stripe_payout_status = 'paid', stripe_payout_id = $1, updated_at = now()
-               WHERE seller_id = $2 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
-              [payout.id, seller_id]
-            )
-            console.log(`runSellerIbanPayoutsIfDue: paid seller ${seller_id} ${payoutCents} EUR → ${customAccountId} (payout ${payout.id})`)
-          } catch (e) {
-            // Reset to pending so next run retries
-            await client.query(
-              `UPDATE store_orders SET stripe_payout_status = 'pending', updated_at = now()
-               WHERE seller_id = $1 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
-              [seller_id]
-            ).catch(() => {})
-            console.error(`runSellerIbanPayoutsIfDue: seller ${seller_id} failed:`, e?.message)
-          }
+          await attemptSellerIbanPayout(client, stripeInst, row)
         }
         // Record that we ran this Friday so subsequent hourly ticks skip it
         await client.query(
@@ -1223,6 +1294,45 @@ module.exports = function createPayoutsRouter({
         await client.end()
       } catch (e) {
         console.error('runSellerIbanPayoutsIfDue:', e?.message || e)
+      }
+    }
+
+    /**
+     * POST /admin-hub/v1/payouts/seller-iban-now — superuser presses "überweisen" on a specific
+     * seller: pays out THAT seller's currently-eligible pending orders immediately via the exact
+     * same Stripe/IBAN path as the scheduled Friday batch, without waiting for Friday and without
+     * touching the batch's own idempotency key (so the next scheduled Friday run still processes
+     * every other seller, and this seller too if new eligible orders accumulate afterward).
+     */
+    const adminHubPayoutsSellerIbanNowPOST = async (req, res) => {
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const sellerId = String(req.body?.seller_id || '').trim()
+      if (!sellerId || sellerId === 'default') return res.status(400).json({ message: 'seller_id required' })
+      const client = getDbClient()
+      if (!client) return res.status(503).json({ message: 'DB not configured' })
+      try {
+        await client.connect()
+        const platformRow = await loadPlatformCheckoutRow(client)
+        const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+        if (!secretKey) { await client.end(); return res.status(503).json({ message: 'Stripe not configured' }) }
+        const stripeInst = new (require('stripe'))(secretKey)
+
+        const due = await client.query(
+          `${SELLER_IBAN_PAYOUT_ROW_SQL}
+             AND o.seller_id = $1
+           GROUP BY o.seller_id, s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email`,
+          [sellerId],
+        )
+        const row = due.rows?.[0]
+        if (!row) { await client.end(); return res.status(404).json({ message: 'No eligible pending orders for this seller.' }) }
+
+        const result = await attemptSellerIbanPayout(client, stripeInst, row)
+        await client.end()
+        if (!result.ok) return res.status(422).json({ message: result.message || 'Payout could not be sent.', reason: result.reason })
+        res.json({ ok: true, payout_cents: result.payoutCents, payout_id: result.payoutId })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        res.status(500).json({ message: e?.message || 'Error' })
       }
     }
 
@@ -1245,6 +1355,7 @@ module.exports = function createPayoutsRouter({
   router.post('/admin-hub/v1/payouts', adminHubPayoutsPOST)
   router.patch('/admin-hub/v1/payouts/:id', adminHubPayoutsPATCH)
   router.post('/admin-hub/v1/payouts/mark-paid', adminHubPayoutsMarkPaidPOST)
+  router.post('/admin-hub/v1/payouts/seller-iban-now', adminHubPayoutsSellerIbanNowPOST)
   router.post('/admin-hub/v1/payouts/backfill', adminHubPayoutsBackfillPOST)
   router.get('/admin-hub/v1/billing/finanzamt', adminHubBillingFinanzamtGET)
   router.get('/admin-hub/v1/billing/finanzamt/pdf', adminHubBillingFinanzamtPdfGET)

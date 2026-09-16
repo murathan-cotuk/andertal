@@ -25,6 +25,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { getUI } from "@/lib/ui-strings";
 import { lt } from "@/lib/locale-text";
+import SearchableSelect from "@/components/inputs/SearchableSelect";
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function fmtCents(c) {
@@ -1017,6 +1018,8 @@ export default function OrdersPage() {
   const [returnsMap, setReturnsMap] = useState({}); // order_id → has active return
   const [mySellerId, setMySellerId] = useState("");
   const [sellerLabelById, setSellerLabelById] = useState({});
+  const [sellerFilterOptions, setSellerFilterOptions] = useState([]);
+  const [filterSellerId, setFilterSellerId] = useState("");
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
   const [sellerGroupSort, setSellerGroupSort] = useState("created_at_desc");
   const [colWidths, setColWidths] = useState(() => COL_DEFS.map(c => c.defaultWidth));
@@ -1067,10 +1070,16 @@ export default function OrdersPage() {
       .getSellers()
       .then((d) => {
         const m = {};
+        const opts = [];
         for (const s of d.sellers || []) {
-          if (s.seller_id) m[s.seller_id] = s.store_name || s.company_name || s.email || s.seller_id;
+          if (!s.seller_id) continue;
+          const label = s.store_name || s.company_name || s.email || s.seller_id;
+          m[s.seller_id] = label;
+          // Only sellers who've actually received an order show up in the filter.
+          if (Number(s.order_count) > 0) opts.push({ label, value: s.seller_id });
         }
         setSellerLabelById(m);
+        setSellerFilterOptions(opts);
       })
       .catch(() => {});
   }, [isSuperuser]);
@@ -1106,11 +1115,12 @@ export default function OrdersPage() {
       if (filterOrderStatus && filterOrderStatus !== "retoure") params.order_status = filterOrderStatus;
       if (filterPayStatus) params.payment_status = filterPayStatus;
       if (filterDelivery) params.delivery_status = filterDelivery;
+      if (isSuperuser && filterSellerId) params.seller_id = filterSellerId;
       const data = await client.getOrders(params);
       setOrders(data.orders || []);
     } catch { setOrders([]); }
     setLoading(false);
-  }, [search, filterOrderStatus, filterPayStatus, filterDelivery, sort]);
+  }, [search, filterOrderStatus, filterPayStatus, filterDelivery, sort, isSuperuser, filterSellerId]);
 
   useEffect(() => { fetchOrders(); fetchReviews(); fetchReturns(); }, [fetchOrders, fetchReviews, fetchReturns]);
 
@@ -1365,11 +1375,11 @@ export default function OrdersPage() {
               })()}
             </td>
           )}
-          <td style={{ ...CELL, borderRight: "none", textAlign: "right", whiteSpace: "nowrap", overflow: "visible" }}>
+          <td style={{ ...CELL, borderRight: "none", paddingRight: 14, textAlign: "right", whiteSpace: "nowrap", overflow: "visible" }}>
             {(() => {
               const canShip = order.delivery_status !== "zugestellt" && order.delivery_status !== "versendet";
               return (
-                <div style={{ display: "inline-flex", gap: 4, justifyContent: "flex-end", alignItems: "center", flexWrap: "nowrap" }}>
+                <div style={{ display: "inline-flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "nowrap" }}>
                   {canShip && (
                     <button
                       type="button"
@@ -1416,32 +1426,36 @@ export default function OrdersPage() {
         <PageTitle>{ui.orders}</PageTitle>
         <HeaderMeta>
           <span style={{ fontSize: 12, color: "#6b7280" }}>{orders.length} {ui.orders}</span>
-          <div ref={colMenuRef} style={{ position: "relative" }}>
-            <button
-              onClick={() => setShowColMenu(v => !v)}
-              style={{ padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 500, color: "#374151", lineHeight: 1, height: 28 }}
-            >
-              {ui.colColumns} {hiddenCols.size > 0 ? `(${COL_DEFS.filter(c => c.hideable).length - hiddenCols.size}/${COL_DEFS.filter(c => c.hideable).length})` : ""}
-            </button>
-            {showColMenu && (
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 9999, minWidth: 190, padding: "6px 0" }}>
-                {COL_DEFS.filter(c => c.hideable).map(col => (
-                  <label
-                    key={col.key}
-                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", cursor: "pointer", fontSize: 13, color: "#111827", userSelect: "none" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <input type="checkbox" checked={!hiddenCols.has(col.key)} onChange={() => toggleColVisibility(col.key)} style={{ accentColor: "#2563eb", width: 15, height: 15, cursor: "pointer" }} />
-                    {col.labelKey ? (ui[col.labelKey] || col.labelKey) : col.label}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-          <Button variant="primary" size="slim" onClick={() => setShowNewOrder(true)}>
-            {ui.addOrder}
-          </Button>
+          {isSuperuser && (
+            <div ref={colMenuRef} style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowColMenu(v => !v)}
+                style={{ padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 500, color: "#374151", lineHeight: 1, height: 28 }}
+              >
+                {ui.colColumns} {hiddenCols.size > 0 ? `(${COL_DEFS.filter(c => c.hideable).length - hiddenCols.size}/${COL_DEFS.filter(c => c.hideable).length})` : ""}
+              </button>
+              {showColMenu && (
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 9999, minWidth: 190, padding: "6px 0" }}>
+                  {COL_DEFS.filter(c => c.hideable).map(col => (
+                    <label
+                      key={col.key}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", cursor: "pointer", fontSize: 13, color: "#111827", userSelect: "none" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    >
+                      <input type="checkbox" checked={!hiddenCols.has(col.key)} onChange={() => toggleColVisibility(col.key)} style={{ accentColor: "#2563eb", width: 15, height: 15, cursor: "pointer" }} />
+                      {col.labelKey ? (ui[col.labelKey] || col.labelKey) : col.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {isSuperuser && (
+            <Button variant="primary" size="slim" onClick={() => setShowNewOrder(true)}>
+              {ui.addOrder}
+            </Button>
+          )}
         </HeaderMeta>
       </PageHeader>
 
@@ -1493,18 +1507,30 @@ export default function OrdersPage() {
         </FilterSelect>
         {isSuperuser && (
           <>
-            <FilterSelect value={sellerGroupSort} onChange={(e) => setSellerGroupSort(e.target.value)} aria-label={ui.sellerGroups} title={ui.sellerGroups}>
-              <option value="created_at_desc">{ui.sortNewestFirst}</option>
-              <option value="created_at_asc">{ui.sortOldestFirst}</option>
-              <option value="total_desc">{ui.amountDesc}</option>
-              <option value="total_asc">{ui.amountAsc}</option>
-            </FilterSelect>
-            <FilterInput
-              placeholder={ui.searchSeller || lt(locale, "Name / ID…", "Ad / ID…", "Nom / ID…", "Nombre / ID…", "Nome / ID…", "Name / ID…")}
-              value={sellerSearchFilter}
-              onChange={(e) => setSellerSearchFilter(e.target.value)}
-              aria-label={ui.searchSeller}
-            />
+            <div style={{ minWidth: 220 }}>
+              <SearchableSelect
+                options={sellerFilterOptions}
+                value={filterSellerId}
+                onChange={setFilterSellerId}
+                placeholder={lt(locale, "Filter by seller…", "Satıcıya göre filtrele…", "Filtrer par vendeur…", "Filtrar por vendedor…", "Filtra per venditore…", "Nach Verkäufer filtern…")}
+              />
+            </div>
+            {!filterSellerId && (
+              <>
+                <FilterSelect value={sellerGroupSort} onChange={(e) => setSellerGroupSort(e.target.value)} aria-label={ui.sellerGroups} title={ui.sellerGroups}>
+                  <option value="created_at_desc">{ui.sortNewestFirst}</option>
+                  <option value="created_at_asc">{ui.sortOldestFirst}</option>
+                  <option value="total_desc">{ui.amountDesc}</option>
+                  <option value="total_asc">{ui.amountAsc}</option>
+                </FilterSelect>
+                <FilterInput
+                  placeholder={ui.searchSeller || lt(locale, "Name / ID…", "Ad / ID…", "Nom / ID…", "Nombre / ID…", "Nome / ID…", "Name / ID…")}
+                  value={sellerSearchFilter}
+                  onChange={(e) => setSellerSearchFilter(e.target.value)}
+                  aria-label={ui.searchSeller}
+                />
+              </>
+            )}
           </>
         )}
       </FilterBar>
@@ -1580,8 +1606,8 @@ export default function OrdersPage() {
             {!loading && orders.length === 0 && (
               <tr><td colSpan={visibleColCount} style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>{ui.noOrders}</td></tr>
             )}
-            {!loading && orders.length > 0 && !isSuperuser && renderOrderRows(visibleOrders)}
-            {!loading && orders.length > 0 && isSuperuser && (
+            {!loading && orders.length > 0 && (!isSuperuser || filterSellerId) && renderOrderRows(visibleOrders)}
+            {!loading && orders.length > 0 && isSuperuser && !filterSellerId && (
               <>
                 <tr>
                   <SuperuserSectionLabel colSpan={visibleColCount}>

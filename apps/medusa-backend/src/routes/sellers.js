@@ -1,5 +1,6 @@
 'use strict'
 const { Router } = require('express')
+const { aggregateSellerPeriodSales } = require('../seller-billing')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -23,10 +24,17 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
     `
 
     // GET /admin-hub/v1/sellers — list all sellers (superuser only)
+    // ?period_start=YYYY-MM-DD&period_end=YYYY-MM-DD scopes revenue/commission to that window;
+    // omitted = all-time. Always computed fresh from aggregateSellerPeriodSales (the same
+    // per-item attribution the payout/invoice system uses) — no caching anywhere in this path,
+    // so a seller's numbers here always match what their payout period actually contains, even
+    // for orders that only own SOME of their line items (multi-seller carts).
     const adminHubSellersGET = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const client = getDbClient ? getDbClient() : getSellerDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
+      const periodStart = /^\d{4}-\d{2}-\d{2}$/.test(req.query.period_start || '') ? req.query.period_start : '2000-01-01'
+      const periodEnd = /^\d{4}-\d{2}-\d{2}$/.test(req.query.period_end || '') ? req.query.period_end : new Date().toISOString().slice(0, 10)
       try {
         await client.connect()
         const r = await client.query(
@@ -45,21 +53,12 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
             )
             pc.rows.forEach(row => { productCounts[row.seller_id] = parseInt(row.cnt, 10) })
           } catch (_) {}
-          // revenue totals (paid orders)
-          try {
-            const rv = await client.query(
-              `SELECT seller_id, SUM(subtotal_cents) AS total_cents, COUNT(*) AS order_cnt
-               FROM store_orders WHERE seller_id = ANY($1) AND payment_status = 'bezahlt'
-               GROUP BY seller_id`,
-              [sellerIds]
-            )
-            rv.rows.forEach(row => {
-              revenueTotals[row.seller_id] = {
-                total_cents: parseInt(row.total_cents) || 0,
-                order_count: parseInt(row.order_cnt) || 0,
-              }
-            })
-          } catch (_) {}
+          for (const sid of sellerIds) {
+            try {
+              const agg = await aggregateSellerPeriodSales(client, sid, periodStart, periodEnd)
+              revenueTotals[sid] = { total_cents: agg.grossCents || 0, order_count: agg.orderCount || 0 }
+            } catch (_) {}
+          }
         }
         await client.end()
         const sellers = r.rows.map(s => ({
@@ -69,7 +68,8 @@ module.exports = function createSellersRouter({ getSellerDbClient, signSellerTok
           order_count: revenueTotals[s.seller_id]?.order_count || 0,
           commission_cents: Math.round((revenueTotals[s.seller_id]?.total_cents || 0) * (parseFloat(s.commission_rate) || 0.12)),
         }))
-        res.json({ sellers, count: sellers.length })
+        res.set('Cache-Control', 'no-store, max-age=0')
+        res.json({ sellers, count: sellers.length, period_start: periodStart, period_end: periodEnd })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })

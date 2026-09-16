@@ -40,6 +40,7 @@ export async function GET(req) {
       enabled_shop_locales: Array.isArray(data?.enabled_shop_locales) ? data.enabled_shop_locales : null,
       maintenance_mode_enabled: data?.maintenance_mode_enabled === true,
       maintenance_mode_image_url: data?.maintenance_mode_image_url || "",
+      not_found_image_url: data?.not_found_image_url || "",
     };
     settingsCache.set(sellerId, { data: result, expiresAt: now + SETTINGS_TTL });
     return NextResponse.json(result, { status: r.ok ? 200 : r.status });

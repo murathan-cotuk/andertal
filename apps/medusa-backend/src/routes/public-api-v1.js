@@ -79,6 +79,10 @@ module.exports = function createPublicApiV1Router() {
   router.use(resolveToken)
 
   // ── GET /orders ──────────────────────────────────────────────────────────────
+  // store_orders has no Medusa-core-style single `status`/`customer_email` — orders carry
+  // THREE independent statuses (order_status/payment_status/delivery_status) and the
+  // customer's address fields are flat columns (`email`, not `customer_email`). ?status=
+  // filters delivery_status, since that's what an ERP/fulfillment sync cares about.
   router.get('/orders', requireScope('read_orders'), async (req, res) => {
     const client = getDbClient()
     if (!client) return res.status(503).json({ error: 'Service unavailable' })
@@ -89,10 +93,11 @@ module.exports = function createPublicApiV1Router() {
       const status = req.query.status
       const params = [req.apiSellerId]
       let where = 'WHERE o.seller_id = $1'
-      if (status) { params.push(status); where += ` AND o.status = $${params.length}` }
+      if (status) { params.push(status); where += ` AND o.delivery_status = $${params.length}` }
       const r = await client.query(
-        `SELECT o.id, o.status, o.created_at, o.updated_at, o.total_cents, o.currency,
-                o.customer_email, o.delivery_status, o.tracking_number, o.carrier_name
+        `SELECT o.id, o.order_number, o.order_status, o.payment_status, o.delivery_status,
+                o.created_at, o.updated_at, o.total_cents, o.currency,
+                o.email, o.first_name, o.last_name, o.tracking_number, o.carrier_name
          FROM store_orders o ${where}
          ORDER BY o.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
         params
@@ -166,6 +171,10 @@ module.exports = function createPublicApiV1Router() {
   })
 
   // ── GET /products ────────────────────────────────────────────────────────────
+  // Catalog data actually lives in admin_hub_products (own listings) and
+  // admin_hub_seller_listings (this seller reselling another seller's shared catalog
+  // product, with their own price/inventory/sku override) — not a Medusa-core
+  // products/product_variants schema, which doesn't exist in this database at all.
   router.get('/products', requireScope('read_products'), async (req, res) => {
     const client = getDbClient()
     if (!client) return res.status(503).json({ error: 'Service unavailable' })
@@ -174,9 +183,21 @@ module.exports = function createPublicApiV1Router() {
       const limit = Math.min(Number(req.query.limit || 50), 250)
       const offset = Number(req.query.offset || 0)
       const r = await client.query(
-        `SELECT id, title, handle, status, created_at, updated_at, metadata
-         FROM products WHERE metadata->>'seller_id' = $1
-         ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+        `SELECT * FROM (
+           SELECT id, title, handle, sku, status, price_cents, inventory, variants,
+                  created_at, updated_at, 'own' AS source
+             FROM admin_hub_products WHERE seller_id = $1
+           UNION ALL
+           SELECT p.id, p.title, p.handle,
+                  COALESCE(l.sku, p.sku) AS sku, COALESCE(l.status, p.status) AS status,
+                  COALESCE(l.price_cents, p.price_cents) AS price_cents,
+                  COALESCE(l.inventory, p.inventory) AS inventory,
+                  p.variants, l.created_at, l.updated_at, 'listing' AS source
+             FROM admin_hub_seller_listings l
+             JOIN admin_hub_products p ON p.id = l.product_id
+            WHERE l.seller_id = $1
+         ) combined
+         ORDER BY updated_at DESC LIMIT ${limit} OFFSET ${offset}`,
         [req.apiSellerId]
       )
       await client.end()
@@ -188,27 +209,59 @@ module.exports = function createPublicApiV1Router() {
   })
 
   // ── PUT /inventory/:sku ──────────────────────────────────────────────────────
+  // Checked in order: (1) this seller's own admin_hub_products row by its top-level sku,
+  // (2) this seller's admin_hub_seller_listings row by sku (their override on a shared
+  // catalog product), (3) a variant SKU inside one of their own products' `variants` jsonb
+  // array (no dedicated variants table exists here — the array has to be read, patched in
+  // JS, and written back as a whole).
   router.put('/inventory/:sku', requireScope('write_inventory'), async (req, res) => {
     const { quantity } = req.body || {}
     if (quantity == null || !Number.isFinite(Number(quantity)) || Number(quantity) < 0) {
       return res.status(400).json({ error: 'invalid_request', error_description: 'quantity must be a non-negative number' })
     }
+    const qty = Math.round(Number(quantity))
+    const sku = req.params.sku
     const client = getDbClient()
     if (!client) return res.status(503).json({ error: 'Service unavailable' })
     try {
       await client.connect()
-      const r = await client.query(
-        `UPDATE product_variants SET inventory_quantity = $1, updated_at = now()
-         WHERE sku = $2 AND id IN (
-           SELECT pv.id FROM product_variants pv JOIN products p ON p.id = pv.product_id
-           WHERE p.metadata->>'seller_id' = $3
-         )
-         RETURNING id, sku, inventory_quantity`,
-        [Math.round(Number(quantity)), req.params.sku, req.apiSellerId]
+
+      const own = await client.query(
+        `UPDATE admin_hub_products SET inventory = $1, updated_at = now()
+         WHERE sku = $2 AND seller_id = $3 RETURNING id, sku, inventory`,
+        [qty, sku, req.apiSellerId]
       )
+      if (own.rows[0]) { await client.end(); return res.json({ product: own.rows[0] }) }
+
+      const listing = await client.query(
+        `UPDATE admin_hub_seller_listings SET inventory = $1, updated_at = now()
+         WHERE sku = $2 AND seller_id = $3 RETURNING id, sku, inventory`,
+        [qty, sku, req.apiSellerId]
+      )
+      if (listing.rows[0]) { await client.end(); return res.json({ listing: listing.rows[0] }) }
+
+      // Variant SKU inside one of this seller's own products
+      const candidates = await client.query(
+        `SELECT id, variants FROM admin_hub_products WHERE seller_id = $1 AND variants IS NOT NULL`,
+        [req.apiSellerId]
+      )
+      for (const row of candidates.rows) {
+        const variants = Array.isArray(row.variants) ? row.variants : []
+        const idx = variants.findIndex((v) => String(v?.sku || '').trim() === sku)
+        if (idx === -1) continue
+        // Real rows store the variant's stock as `inventory` (checked against live data),
+        // not `inventory_quantity` — match the field every other part of the app reads.
+        variants[idx] = { ...variants[idx], inventory: qty }
+        await client.query(
+          `UPDATE admin_hub_products SET variants = $1::jsonb, updated_at = now() WHERE id = $2`,
+          [JSON.stringify(variants), row.id]
+        )
+        await client.end()
+        return res.json({ variant: { product_id: row.id, sku, inventory: qty } })
+      }
+
       await client.end()
-      if (!r.rows[0]) return res.status(404).json({ error: 'variant_not_found' })
-      res.json({ variant: r.rows[0] })
+      res.status(404).json({ error: 'sku_not_found' })
     } catch (e) {
       try { await client.end() } catch (_) {}
       res.status(500).json({ error: 'server_error', message: e?.message })

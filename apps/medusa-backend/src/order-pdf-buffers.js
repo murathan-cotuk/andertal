@@ -6,6 +6,7 @@ const { resolveOrderPaidTotalCents, orderBonusDiscountCents, orderCouponDiscount
 const { getOrderPdfStrings, getOrderPdfFilename } = require('./order-pdf-i18n')
 const { resolveLocaleFromCountry } = require('./locale-from-country')
 const { salesInvoiceVat, resolvePlatformCommissionVatPercent } = require('./goods-vat')
+const { resolveSellerCommissionRate, sellerCommissionRatePct, displayCommissionRatePct } = require('./commission-rate')
 const { enrichOrderItemRows } = require('./order-items-seller')
 const {
   pdfCents,
@@ -291,7 +292,7 @@ function renderProvisionsfakturPdfDocument(doc, {
   const grossSalesCents = Number(order.subtotal_cents || order.total_cents || 0)
   const storedNet = Number(order.seller_net_after_commission_cents)
   const payoutCents = Number.isFinite(storedNet) && storedNet > 0 ? storedNet : Math.max(0, grossSalesCents - Number(commissionCents || 0))
-  const rate = Number.isFinite(commissionRatePct) && commissionRatePct > 0 ? commissionRatePct : 12
+  const rate = displayCommissionRatePct(commissionRatePct)
 
   renderCommissionInvoiceDocument(doc, {
     order,
@@ -355,7 +356,7 @@ async function _querySellerInfo(pgClient, sellerId) {
       const r = await pgClient.query(
         `SELECT su.store_name, su.company_name, su.first_name, su.last_name, su.vat_id, su.email, su.business_address, su.lucid_number,
                 su.phone, su.website, su.iban, su.payment_bic, su.payment_bank_name, su.payment_account_holder,
-                su.authorized_person_name, su.tax_id,
+                su.authorized_person_name, su.tax_id, su.commission_rate,
                 ss.store_name AS settings_store_name
            FROM seller_users su
            LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = su.seller_id
@@ -370,7 +371,7 @@ async function _querySellerInfo(pgClient, sellerId) {
       const r2 = await pgClient.query(
         `SELECT su.store_name, su.company_name, su.first_name, su.last_name, su.vat_id, su.email, su.business_address, su.lucid_number,
                 su.phone, su.website, su.iban, su.payment_bic, su.payment_bank_name, su.payment_account_holder,
-                su.authorized_person_name, su.tax_id,
+                su.authorized_person_name, su.tax_id, su.commission_rate,
                 ss.store_name AS settings_store_name
            FROM seller_users su
            LEFT JOIN admin_hub_seller_settings ss ON ss.seller_id = su.seller_id
@@ -499,12 +500,9 @@ async function buildProvisionsfakturPdfBuffer(pgClient, orderId) {
 
   const storedFee = Number(order.stripe_application_fee_cents)
   const subtotal = Number(order.subtotal_cents || order.total_cents || 0)
-  const commissionCents = Number.isFinite(storedFee) && storedFee > 0 ? storedFee : Math.round(subtotal * 0.12)
-
-  let commissionRatePct = 12
-  if (subtotal > 0 && commissionCents > 0) {
-    commissionRatePct = Math.round((commissionCents / subtotal) * 100 * 10) / 10
-  }
+  const sellerRate = resolveSellerCommissionRate(sellerInfo?.commission_rate)
+  const commissionCents = Number.isFinite(storedFee) && storedFee > 0 ? storedFee : Math.round(subtotal * sellerRate)
+  const commissionRatePct = sellerCommissionRatePct(sellerRate)
 
   const on = order.order_number != null ? String(order.order_number) : String(id).slice(0, 8)
 
@@ -543,18 +541,11 @@ async function buildSellerPayoutPdfBuffer(pgClient, payoutId) {
 
   const platform = await loadPlatformIssuer(pgClient)
   try {
-    const { aggregateSellerPeriodSales } = require('./seller-billing')
+    const { aggregateSellerPeriodSales, applySellerPeriodLiveFields } = require('./seller-billing')
     const live = await aggregateSellerPeriodSales(pgClient, payout.seller_id, payout.period_start, payout.period_end)
-    const rate = Number(payout.commission_rate) >= 0 ? Number(payout.commission_rate) : 0.12
+    const rate = Number(payout.commission_rate) >= 0 ? Number(payout.commission_rate) : resolveSellerCommissionRate(null)
     if (live.grossCents > 0 || Number(payout.total_cents || 0) === 0) {
-      payout.total_cents = live.grossCents
-      payout.commission_cents = Math.round(live.grossCents * rate)
-      payout.payout_cents = Math.max(0, live.grossCents - payout.commission_cents)
-      payout.bonus_funding_cents = live.bonusFundingCents
-      payout.customer_paid_cents = live.customerPaidCents
-      payout.shipping_cents = live.shippingCents
-      payout.refund_cents = live.refundCents
-      payout.order_count = live.orderCount
+      applySellerPeriodLiveFields(payout, live, rate)
     }
   } catch (_) {}
 
@@ -579,7 +570,7 @@ async function buildSellerPayoutPdfBuffer(pgClient, payoutId) {
 async function queryFinanzamtPeriodTotals(pgClient, periodStart, periodEnd) {
   const vatPercent = resolvePlatformCommissionVatPercent()
   try {
-    const { aggregateMarketplacePeriodSales } = require('./seller-billing')
+    const { aggregateMarketplacePeriodSales, sellerPeriodPayoutCents } = require('./seller-billing')
     const live = await aggregateMarketplacePeriodSales(pgClient, periodStart || null, periodEnd || null)
     if (live.orderCount > 0 || live.grossCents > 0) {
       return {
@@ -589,7 +580,15 @@ async function queryFinanzamtPeriodTotals(pgClient, periodStart, periodEnd) {
         bonus_funding_cents: live.bonusFundingCents,
         commission_net_cents: live.commissionCents,
         commission_vat_cents: Math.round(live.commissionCents * vatPercent / 100),
-        seller_payout_cents: Math.max(0, live.grossCents - live.commissionCents),
+        seller_payout_cents: sellerPeriodPayoutCents({
+          grossCents: live.grossCents,
+          commissionCents: live.commissionCents,
+          shippingPayoutCents: live.shippingPayoutCents,
+          labelBalanceCents: live.labelBalanceCents,
+        }),
+        shipping_payout_cents: live.shippingPayoutCents,
+        withheld_shipping_cents: live.withheldShippingCents,
+        label_cents: live.labelCents,
         refund_cents: live.refundCents,
         order_count: live.orderCount,
         seller_count: live.sellerCount,
@@ -605,7 +604,10 @@ async function queryFinanzamtPeriodTotals(pgClient, periodStart, periodEnd) {
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : ''
   const r = await pgClient.query(
     `SELECT p.seller_id, p.total_cents, p.commission_cents, p.payout_cents,
-            p.customer_paid_cents, p.bonus_funding_cents, p.commission_vat_cents, p.refund_cents, p.order_count
+            p.customer_paid_cents, p.bonus_funding_cents, p.commission_vat_cents, p.refund_cents, p.order_count,
+            COALESCE(p.shipping_cents, 0) AS shipping_cents,
+            COALESCE(p.shipping_payout_cents, 0) AS shipping_payout_cents,
+            COALESCE(p.label_cents, 0) AS label_cents
        FROM seller_payouts p
        ${whereClause}`,
     params,
@@ -613,6 +615,9 @@ async function queryFinanzamtPeriodTotals(pgClient, periodStart, periodEnd) {
   const rows = r.rows || []
   const totals = rows.reduce((acc, row) => {
     acc.gross_sale_cents += Number(row.total_cents || 0)
+    acc.shipping_cents += Number(row.shipping_cents || 0)
+    acc.shipping_payout_cents += Number(row.shipping_payout_cents || 0)
+    acc.label_cents += Number(row.label_cents || 0)
     acc.customer_paid_cents += Number(row.customer_paid_cents || 0)
     acc.bonus_funding_cents += Number(row.bonus_funding_cents || 0)
     acc.commission_net_cents += Number(row.commission_cents || 0)
@@ -622,7 +627,8 @@ async function queryFinanzamtPeriodTotals(pgClient, periodStart, periodEnd) {
     acc.order_count += Number(row.order_count || 0)
     return acc
   }, {
-    gross_sale_cents: 0, shipping_cents: 0, customer_paid_cents: 0, bonus_funding_cents: 0, commission_net_cents: 0,
+    gross_sale_cents: 0, shipping_cents: 0, shipping_payout_cents: 0, label_cents: 0,
+    customer_paid_cents: 0, bonus_funding_cents: 0, commission_net_cents: 0,
     commission_vat_cents: 0, seller_payout_cents: 0, refund_cents: 0, order_count: 0,
   })
   totals.seller_count = new Set(rows.map((row) => row.seller_id)).size

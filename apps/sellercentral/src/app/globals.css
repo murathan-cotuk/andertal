@@ -348,6 +348,14 @@ body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page-Header__Ti
     flex: none !important;
     overflow: visible !important;
     border-top-left-radius: 0 !important;
+    /* Safety net: whatever ends up on top of the drawer when it's open, this must win.
+       Polaris's own .Polaris-Frame__Navigation is already position:fixed with a high
+       z-index token, but our custom overrides on this wrapper (and other fixed/positioned
+       elements elsewhere on the page) can otherwise end up stacked above it. */
+    z-index: 2147483000 !important;
+  }
+  #AppFrameNav .Polaris-Frame__Navigation {
+    z-index: 2147483000 !important;
   }
   #AppFrameMain {
     padding-left: 0 !important;

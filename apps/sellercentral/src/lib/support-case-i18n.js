@@ -30,6 +30,8 @@ export function getSupportCaseText(locale) {
     reply: t("Reply", "Yanıt", "Réponse", "Respuesta", "Risposta", "Antwort"),
     replyPlaceholder: t("Write a plain-text reply…", "Düz metin yanıt yazın…", "Rédigez une réponse en texte brut…", "Escribe una respuesta de texto…", "Scrivi una risposta di testo…", "Schreiben Sie eine Textantwort…"),
     send: t("Send reply", "Yanıt gönder", "Envoyer la réponse", "Enviar respuesta", "Invia risposta", "Antwort senden"),
+    chooseTemplate: t("Choose a template…", "Bir şablon seçin…", "Choisir un modèle…", "Elegir una plantilla…", "Scegli un modello…", "Vorlage auswählen…"),
+    insertTemplate: t("Insert", "Ekle", "Insérer", "Insertar", "Inserisci", "Einfügen"),
     addFiles: t("Add files", "Dosya ekle", "Ajouter des fichiers", "Añadir archivos", "Aggiungi file", "Dateien hinzufügen"),
     fileRules: t("JPEG, PNG, WebP or PDF · up to 5 files · 10 MB each", "JPEG, PNG, WebP veya PDF · en fazla 5 dosya · dosya başına 10 MB", "JPEG, PNG, WebP ou PDF · 5 fichiers max. · 10 Mo chacun", "JPEG, PNG, WebP o PDF · máx. 5 archivos · 10 MB cada uno", "JPEG, PNG, WebP o PDF · max 5 file · 10 MB ciascuno", "JPEG, PNG, WebP oder PDF · max. 5 Dateien · je 10 MB"),
     invalidType: t("Only JPEG, PNG, WebP and PDF files are allowed.", "Yalnızca JPEG, PNG, WebP ve PDF dosyalarına izin verilir.", "Seuls les fichiers JPEG, PNG, WebP et PDF sont autorisés.", "Solo se permiten archivos JPEG, PNG, WebP y PDF.", "Sono consentiti solo file JPEG, PNG, WebP e PDF.", "Nur JPEG-, PNG-, WebP- und PDF-Dateien sind zulässig."),

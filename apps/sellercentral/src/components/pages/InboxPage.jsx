@@ -1274,6 +1274,7 @@ export default function InboxPage() {
   const [sellerUserIds, setSellerUserIds] = useState({});
   const [sellerOptions, setSellerOptions] = useState([]);
   const client = getMedusaAdminClient();
+  const { templates } = useMessageTemplates(client, locale);
 
   useEffect(() => {
     const su = typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
@@ -1323,7 +1324,7 @@ export default function InboxPage() {
       </div>
       <div style={{ marginTop: 12 }}>
         {activeTab === 0 && (
-          <SupportCaseInbox client={client} isSuperuser={isSuperuser} sellerOptions={sellerOptions} />
+          <SupportCaseInbox client={client} isSuperuser={isSuperuser} sellerOptions={sellerOptions} templates={templates} />
         )}
         {activeTab === 1 && (
           <SupportInbox

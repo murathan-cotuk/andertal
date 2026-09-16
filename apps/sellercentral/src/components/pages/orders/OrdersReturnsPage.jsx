@@ -609,47 +609,47 @@ export default function OrdersReturnsPage() {
   };
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: "1rem 0 1.5rem" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem", marginBottom: "0.75rem" }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{c.pageTitle}</h1>
-          <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{c.pageSubtitle}</p>
+          <h1 style={{ fontSize: "1.125rem", fontWeight: 650, margin: 0, color: "#111827" }}>{c.pageTitle}</h1>
+          <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.125rem 0 0" }}>{c.pageSubtitle}</p>
         </div>
         <button
           onClick={() => setShowNew(true)}
-          style={{ padding: "8px 16px", background: "#111827", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+          style={{ padding: "0.375rem 0.875rem", background: "#111827", color: "#fff", border: "none", borderRadius: "0.4375rem", cursor: "pointer", fontSize: "0.75rem", fontWeight: 600 }}
         >
           + {c.newReturn}
         </button>
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", marginBottom: "0.5rem" }}>
         {[
           { label: c.statTotal, value: returns.length, color: "#111" },
           { label: c.filterOpen, value: counts.offen || 0, color: "#c2410c" },
           { label: c.filterApproved, value: counts.genehmigt || 0, color: "#15803d" },
           { label: c.statRefunded, value: fmtMoney(totalRefunded, locale), color: "#1d4ed8" },
         ].map(s => (
-          <div key={s.label} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 18px" }}>
-            <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>{s.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: s.color, marginTop: 4 }}>{s.value}</div>
+          <div key={s.label} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "0.625rem", padding: "0.5rem 0.75rem" }}>
+            <div style={{ fontSize: "0.6875rem", color: "#9ca3af", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em" }}>{s.label}</div>
+            <div style={{ fontSize: "1.125rem", fontWeight: 700, color: s.color, marginTop: "0.125rem" }}>{s.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Filter pills */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      {/* Filter bar — same visual language as Orders (compact, bordered pill row) */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem", padding: "0.3125rem 0.5rem", marginBottom: "0.5rem", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.5rem" }}>
         {["alle", "offen", "genehmigt", "eingegangen", "abgelehnt", "abgeschlossen"].map(s => (
           <button
             key={s}
             onClick={() => setFilterStatus(s)}
             style={{
-              padding: "5px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer", fontWeight: filterStatus === s ? 700 : 400,
-              background: filterStatus === s ? "#111827" : "#f9fafb",
-              color: filterStatus === s ? "#fff" : "#6b7280",
-              border: filterStatus === s ? "none" : "1px solid #e5e7eb",
+              height: "1.75rem", padding: "0 0.625rem", borderRadius: "0.375rem", fontSize: "0.75rem", cursor: "pointer", fontWeight: filterStatus === s ? 650 : 500,
+              background: filterStatus === s ? "#111827" : "#fff",
+              color: filterStatus === s ? "#fff" : "#374151",
+              border: filterStatus === s ? "none" : "1px solid #d1d5db",
             }}
           >
             {filterPillLabels[s]} {s !== "alle" && counts[s] ? `(${counts[s]})` : ""}
@@ -657,24 +657,24 @@ export default function OrdersReturnsPage() {
         ))}
       </div>
 
-      {/* Table */}
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      {/* Table — compact/dense like Orders: tight cell padding, small uppercase header, hover rows */}
+      <div style={{ background: "#fff", borderRadius: "0.625rem", border: "1px solid #e5e7eb", overflow: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8125rem" }}>
           <thead>
             <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
               {COLS.map((c, i) => (
-                <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                <th key={i} style={{ padding: "0.375rem 0.625rem", textAlign: "left", fontWeight: 600, fontSize: "0.6875rem", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
                   {c}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>}
+            {loading && <tr><td colSpan={8} style={{ padding: "2.5rem", textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>}
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>↩️</div>
+                <td colSpan={8} style={{ padding: "3.75rem 1.25rem", textAlign: "center", color: "#9ca3af" }}>
+                  <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>↩️</div>
                   <div>{c.noReturns}</div>
                 </td>
               </tr>
@@ -689,30 +689,30 @@ export default function OrdersReturnsPage() {
                   onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
                   onMouseLeave={e => e.currentTarget.style.background = ""}
                 >
-                  <td style={{ padding: "10px 12px", fontWeight: 700, color: "#111" }}>
+                  <td style={{ padding: "0.375rem 0.625rem", fontWeight: 700, color: "#111" }}>
                     R-{ret.return_number || ret.id?.slice(0, 8)}
                   </td>
-                  <td style={{ padding: "10px 12px", fontWeight: 600, color: "#2563eb" }}>
+                  <td style={{ padding: "0.375rem 0.625rem", fontWeight: 600, color: "#2563eb" }}>
                     {ret.order_number ? `#${ret.order_number}` : "—"}
                   </td>
-                  <td style={{ padding: "10px 12px" }}>
-                    <div style={{ fontWeight: 500 }}>{customerName}</div>
-                    {isSuperuser && <div style={{ fontSize: 11, color: "#9ca3af" }}>{ret.email || ""}</div>}
+                  <td style={{ padding: "0.375rem 0.625rem" }}>
+                    <div style={{ fontWeight: 500, lineHeight: 1.25 }}>{customerName}</div>
+                    {isSuperuser && <div style={{ fontSize: "0.6875rem", color: "#9ca3af", lineHeight: 1.25 }}>{ret.email || ""}</div>}
                   </td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280", maxWidth: 180 }}>
+                  <td style={{ padding: "0.375rem 0.625rem", color: "#6b7280", maxWidth: "11.25rem" }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ret.reason || "—"}</div>
                   </td>
-                  <td style={{ padding: "10px 12px" }}>
+                  <td style={{ padding: "0.375rem 0.625rem" }}>
                     <Badge value={ret.status} locale={locale} />
                   </td>
-                  <td style={{ padding: "10px 12px" }}>
+                  <td style={{ padding: "0.375rem 0.625rem" }}>
                     {ret.refund_status
-                      ? <><Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} locale={locale} /><div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{fmtMoney(ret.refund_amount_cents, locale)}</div></>
+                      ? <><Badge value={ret.refund_status} map={REFUND_STATUS_COLORS} locale={locale} /><div style={{ fontSize: "0.6875rem", color: "#6b7280", marginTop: "0.125rem" }}>{fmtMoney(ret.refund_amount_cents, locale)}</div></>
                       : <span style={{ color: "#d1d5db" }}>—</span>}
                   </td>
-                  <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>{fmtDate(ret.created_at, locale)}</td>
-                  <td style={{ padding: "10px 12px" }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: "flex", gap: 6 }}>
+                  <td style={{ padding: "0.375rem 0.625rem", fontSize: "0.75rem", color: "#6b7280", whiteSpace: "nowrap" }}>{fmtDate(ret.created_at, locale)}</td>
+                  <td style={{ padding: "0.375rem 0.625rem" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", gap: "0.375rem" }}>
                       {ret.status === "offen" && (
                         <>
                           <button
@@ -721,7 +721,7 @@ export default function OrdersReturnsPage() {
                               const res = await client.updateReturn(ret.id, { status: "genehmigt" });
                               handleUpdate(res?.return ?? { ...ret, status: "genehmigt" });
                             }}
-                            style={{ padding: "3px 10px", background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}
+                            style={{ padding: "0.1875rem 0.625rem", background: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0", borderRadius: "0.375rem", cursor: "pointer", fontSize: "0.6875rem", fontWeight: 700 }}
                           >
                             ✓
                           </button>
@@ -731,7 +731,7 @@ export default function OrdersReturnsPage() {
                               const res = await client.updateReturn(ret.id, { status: "abgelehnt" });
                               handleUpdate(res?.return ?? { ...ret, status: "abgelehnt" });
                             }}
-                            style={{ padding: "3px 10px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700 }}
+                            style={{ padding: "0.1875rem 0.625rem", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: "0.375rem", cursor: "pointer", fontSize: "0.6875rem", fontWeight: 700 }}
                           >
                             ✕
                           </button>
@@ -742,7 +742,7 @@ export default function OrdersReturnsPage() {
                           <button
                             onClick={(e) => { e.stopPropagation(); downloadRetourenschein(ret); }}
                             title={c.downloadLabelTitle}
-                            style={{ padding: "3px 10px", background: "#f9fafb", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", fontSize: 11 }}
+                            style={{ padding: "0.1875rem 0.625rem", background: "#f9fafb", color: "#374151", border: "1px solid #e5e7eb", borderRadius: "0.375rem", cursor: "pointer", fontSize: "0.6875rem" }}
                           >
                             ⬇
                           </button>
@@ -757,7 +757,7 @@ export default function OrdersReturnsPage() {
                               } catch {}
                             }}
                             title={ret.label_sent_at ? c.labelAlreadySent : c.sendLabelByEmail}
-                            style={{ padding: "3px 10px", background: ret.label_sent_at ? "#f0fdf4" : "#eff6ff", color: ret.label_sent_at ? "#15803d" : "#2563eb", border: `1px solid ${ret.label_sent_at ? "#bbf7d0" : "#bfdbfe"}`, borderRadius: 6, cursor: ret.label_sent_at ? "default" : "pointer", fontSize: 11 }}
+                            style={{ padding: "0.1875rem 0.625rem", background: ret.label_sent_at ? "#f0fdf4" : "#eff6ff", color: ret.label_sent_at ? "#15803d" : "#2563eb", border: `1px solid ${ret.label_sent_at ? "#bbf7d0" : "#bfdbfe"}`, borderRadius: "0.375rem", cursor: ret.label_sent_at ? "default" : "pointer", fontSize: "0.6875rem" }}
                           >
                             ✉
                           </button>

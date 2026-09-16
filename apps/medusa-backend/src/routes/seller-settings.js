@@ -131,12 +131,14 @@ const sellerSettingsGET = async (req, res) => {
       // seller's own settings row.
       let maintenance_mode_enabled = false
       let maintenance_mode_image_url = ''
+      let not_found_image_url = ''
       try {
         const mm = await client.query(
-          `SELECT maintenance_mode_enabled, maintenance_mode_image_url FROM admin_hub_seller_settings WHERE seller_id = 'default'`,
+          `SELECT maintenance_mode_enabled, maintenance_mode_image_url, not_found_image_url FROM admin_hub_seller_settings WHERE seller_id = 'default'`,
         )
         maintenance_mode_enabled = !!mm.rows?.[0]?.maintenance_mode_enabled
         maintenance_mode_image_url = mm.rows?.[0]?.maintenance_mode_image_url || ''
+        not_found_image_url = mm.rows?.[0]?.not_found_image_url || ''
       } catch (_) {}
       const row = r.rows && r.rows[0]
       const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -186,6 +188,7 @@ const sellerSettingsGET = async (req, res) => {
         locale,
         maintenance_mode_enabled,
         maintenance_mode_image_url,
+        not_found_image_url,
         legal_company_name: row?.legal_company_name || '',
         legal_representative: row?.legal_representative || '',
         legal_street: row?.legal_street || '',
@@ -290,6 +293,15 @@ const sellerSettingsPATCH = async (req, res) => {
         maintenanceModeImageUrl = body.maintenance_mode_image_url ? String(body.maintenance_mode_image_url).trim() : null
       }
     }
+    let notFoundImageUrl = undefined
+    if (Object.prototype.hasOwnProperty.call(body, 'not_found_image_url')) {
+      if (!isSuperuser) {
+        return res.status(403).json({ message: 'Only superuser can change the 404 image' })
+      }
+      // Platform-wide setting — always stored on seller_id = default, same as maintenance mode.
+      sellerId = 'default'
+      notFoundImageUrl = body.not_found_image_url ? String(body.not_found_image_url).trim() : null
+    }
     let uiLocale = undefined
     if (Object.prototype.hasOwnProperty.call(body, 'locale')) {
       const raw = String(body.locale || '').trim().toLowerCase()
@@ -311,9 +323,9 @@ const sellerSettingsPATCH = async (req, res) => {
          seller_id, store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcement_bar_items, storefront_url, logo_config,
          legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcode_scanner_config, admin_notification_email, enabled_shop_locales,
          maintenance_mode_enabled, maintenance_mode_image_url,
-         return_conditions, shop_about,
+         return_conditions, shop_about, not_found_image_url,
          updated_at
-       ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, $26::jsonb, $27, $28, $29, $30, now())
+       ) VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25, $26::jsonb, $27, $28, $29, $30, $31, now())
        ON CONFLICT (seller_id) DO UPDATE SET
          store_name = COALESCE($2, admin_hub_seller_settings.store_name),
          free_shipping_thresholds = COALESCE($3::jsonb, admin_hub_seller_settings.free_shipping_thresholds),
@@ -344,6 +356,7 @@ const sellerSettingsPATCH = async (req, res) => {
          maintenance_mode_image_url = COALESCE($28, admin_hub_seller_settings.maintenance_mode_image_url),
          return_conditions = COALESCE($29, admin_hub_seller_settings.return_conditions),
          shop_about = COALESCE($30, admin_hub_seller_settings.shop_about),
+         not_found_image_url = COALESCE($31, admin_hub_seller_settings.not_found_image_url),
          updated_at = now()`,
       [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url, logoConfigJson !== undefined ? logoConfigJson : null,
        legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcodeConfigJson !== undefined ? barcodeConfigJson : null, admin_notification_email,
@@ -351,7 +364,8 @@ const sellerSettingsPATCH = async (req, res) => {
        maintenanceModeEnabled !== undefined ? maintenanceModeEnabled : null,
        maintenanceModeImageUrl !== undefined ? maintenanceModeImageUrl : null,
        return_conditions !== undefined ? return_conditions : null,
-       shop_about !== undefined ? shop_about : null]
+       shop_about !== undefined ? shop_about : null,
+       notFoundImageUrl !== undefined ? notFoundImageUrl : null]
     )
     if (uiLocale !== undefined) {
       // Persist Sellercentral UI language on the acting seller's settings row (not platform `default`
@@ -379,6 +393,7 @@ const sellerSettingsPATCH = async (req, res) => {
       locale: uiLocale !== undefined ? uiLocale : undefined,
       maintenance_mode_enabled: maintenanceModeEnabled !== undefined ? maintenanceModeEnabled : undefined,
       maintenance_mode_image_url: maintenanceModeImageUrl !== undefined ? maintenanceModeImageUrl : undefined,
+      not_found_image_url: notFoundImageUrl !== undefined ? notFoundImageUrl : undefined,
     })
   } catch (err) {
     console.error('sellerSettingsPATCH:', err)

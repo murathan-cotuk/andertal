@@ -3,7 +3,33 @@ import { Montserrat } from "next/font/google";
 
 const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "700"], display: "swap" });
 
-export default function NotFound() {
+const getBackendUrl = () =>
+  (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
+
+async function getNotFoundImageUrl() {
+  try {
+    const res = await fetch(`${getBackendUrl()}/store/seller-settings?seller_id=default`, { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    return typeof data?.not_found_image_url === "string" ? data.not_found_image_url.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+export default async function NotFound() {
+  const customImageUrl = await getNotFoundImageUrl();
+
+  if (customImageUrl) {
+    return (
+      <div style={{ margin: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fff", fontFamily: montserrat.style.fontFamily, padding: 24, boxSizing: "border-box" }}>
+        <img src={customImageUrl} alt="404" style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} />
+        <Link href="/" style={{ marginTop: 24, background: "#ff971c", color: "#fff", padding: "10px 28px", borderRadius: 10, fontWeight: 700, textDecoration: "none", border: "2px solid #000", boxShadow: "0 2px 0 2px #000", fontSize: 14 }}>
+          Zur Startseite
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div style={{ margin: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#fff", fontFamily: montserrat.style.fontFamily }}>
         <div className="main_wrapper">

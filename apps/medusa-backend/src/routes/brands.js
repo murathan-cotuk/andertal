@@ -289,6 +289,12 @@ const adminBrandsPatchDelete = async (req, res, isPatch) => {
     }
     const brandOwnerId = existing.rows[0].seller_id
     const isOwner = callerSellerId && brandOwnerId === callerSellerId
+    // Delete is superuser-only, even for a seller's own brand — editing (logo/banner/address)
+    // stays available to the owner, deletion does not (explicit user instruction).
+    if (!isPatch && !isSuperuserReq) {
+      await client.end()
+      return res.status(403).json({ message: 'Only a superuser can delete brands' })
+    }
     if (!isSuperuserReq && !isOwner) {
       await client.end()
       return res.status(403).json({ message: 'You can only edit your own brands' })

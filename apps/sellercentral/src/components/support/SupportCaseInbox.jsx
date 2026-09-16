@@ -5,6 +5,7 @@ import { Banner, Spinner, TextField } from "@shopify/polaris";
 import { useLocale } from "next-intl";
 import { dateLocaleFor } from "@/lib/locale-text";
 import { getSupportCaseText } from "@/lib/support-case-i18n";
+import { applyMessagePlaceholders } from "@/lib/message-template-placeholders";
 import styles from "./SupportCaseInbox.module.css";
 
 const TERMINAL = new Set(["resolved", "closed"]);
@@ -108,7 +109,7 @@ function CloseModal({ text, busy, onClose, onConfirm }) {
   );
 }
 
-export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = [] }) {
+export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = [], templates = [] }) {
   const locale = useLocale();
   const text = useMemo(() => getSupportCaseText(locale), [locale]);
   const [cases, setCases] = useState([]);
@@ -127,6 +128,7 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
   const [files, setFiles] = useState([]);
   const [sellerId, setSellerId] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const bottomRef = useRef(null);
   const autoOpenedRef = useRef(false);
   const limit = 20;
@@ -162,6 +164,7 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
     setError("");
     setReply("");
     setFiles([]);
+    setSelectedTemplateId("");
     try {
       const data = await client.getSupportCase(id);
       setDetail(data);
@@ -201,6 +204,16 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
     if (next.some((file) => file.size > MAX_BYTES)) return setError(text.fileTooLarge);
     setError("");
     setFiles(next);
+  };
+
+  const applySelectedTemplate = () => {
+    if (!selectedTemplateId) return;
+    const t = templates.find((it) => String(it.id) === String(selectedTemplateId));
+    if (!t?.body) return;
+    const supportCase = detail?.case;
+    setReply(applyMessagePlaceholders(t.body, {
+      order_number: supportCase?.order_number != null ? String(supportCase.order_number) : "",
+    }));
   };
 
   const sendReply = async () => {
@@ -330,9 +343,9 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
                   <span className={styles.rowSubject}>{entry.title || "—"}</span>
                   <span className={styles.rowMeta}>
                     <StatusPill status={entry.status} text={text} />
-                    <span>{entry.category || "—"}</span>
+                    {isSuperuser && <span>{entry.category || "—"}</span>}
                     {entry.order_number && <span>{text.order} #{entry.order_number}</span>}
-                    <span>{route}</span>
+                    {isSuperuser && <span>{route}</span>}
                     {entryItems.length > 0 && <span className={styles.thumbs}>{entryItems.slice(0, 3).map((item, index) => {
                       const src = safeUrl(item.image_snapshot || item.image || item.thumbnail);
                       return src ? <img key={item.id || index} className={styles.thumb} src={src} alt="" /> : null;
@@ -367,13 +380,19 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
                 </div>
               </header>
               <div className={styles.summary}>
-                <div className={styles.summaryBlock}><span className={styles.summaryLabel}>{text.customer}</span>{supportCase.customer_name || supportCase.customer_email || "—"}</div>
+                {isSuperuser && (
+                  <div className={styles.summaryBlock}><span className={styles.summaryLabel}>{text.customer}</span>{supportCase.customer_name || supportCase.customer_email || "—"}</div>
+                )}
                 <div className={styles.summaryBlock}><span className={styles.summaryLabel}>{text.order}</span>{supportCase.order_number || supportCase.order_id || "—"}</div>
-                <div className={styles.summaryBlock}><span className={styles.summaryLabel}>{text.category}</span>{[supportCase.category, supportCase.subcategory].filter(Boolean).join(" · ") || "—"}</div>
-                <div className={styles.summaryBlock}>
-                  <span className={styles.summaryLabel}>{text.routing}</span>
-                  {supportCase.seller_store_name || supportCase.seller_name || supportCase.seller_id || text.platformRouting}
-                </div>
+                {isSuperuser && (
+                  <div className={styles.summaryBlock}><span className={styles.summaryLabel}>{text.category}</span>{[supportCase.category, supportCase.subcategory].filter(Boolean).join(" · ") || "—"}</div>
+                )}
+                {isSuperuser && (
+                  <div className={styles.summaryBlock}>
+                    <span className={styles.summaryLabel}>{text.routing}</span>
+                    {supportCase.seller_store_name || supportCase.seller_name || supportCase.seller_id || text.platformRouting}
+                  </div>
+                )}
                 <div className={styles.summaryBlock}>
                   <span className={styles.summaryLabel}>{text.items}</span>
                   {items.length ? items.map((item) => item.title_snapshot || item.title).filter(Boolean).join(", ") : "—"}
@@ -424,6 +443,15 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
                 <div className={styles.composer}>
                   <p className={styles.locked} style={{ marginBottom: 10 }}>{text.reopenByReplyHint || text.conversationLocked}</p>
                   <label htmlFor="support-case-reply">{text.reply}</label>
+                  {templates.length > 0 && (
+                    <div className={styles.actions} style={{ marginBottom: 8 }}>
+                      <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+                        <option value="">{text.chooseTemplate}</option>
+                        {templates.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
+                      </select>
+                      <button type="button" className={styles.secondaryButton} onClick={applySelectedTemplate} disabled={!selectedTemplateId}>{text.insertTemplate}</button>
+                    </div>
+                  )}
                   <textarea id="support-case-reply" value={reply} onChange={(event) => setReply(event.target.value)} maxLength={10000} placeholder={text.replyPlaceholder} />
                   <div className={styles.attachments}>
                     <label className={styles.fileLabel}>
@@ -445,6 +473,15 @@ export default function SupportCaseInbox({ client, isSuperuser, sellerOptions = 
               ) : (
                 <div className={styles.composer}>
                   <label htmlFor="support-case-reply">{text.reply}</label>
+                  {templates.length > 0 && (
+                    <div className={styles.actions} style={{ marginBottom: 8 }}>
+                      <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+                        <option value="">{text.chooseTemplate}</option>
+                        {templates.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
+                      </select>
+                      <button type="button" className={styles.secondaryButton} onClick={applySelectedTemplate} disabled={!selectedTemplateId}>{text.insertTemplate}</button>
+                    </div>
+                  )}
                   <textarea id="support-case-reply" value={reply} onChange={(event) => setReply(event.target.value)} maxLength={10000} placeholder={text.replyPlaceholder} />
                   <div className={styles.attachments}>
                     <label className={styles.fileLabel}>

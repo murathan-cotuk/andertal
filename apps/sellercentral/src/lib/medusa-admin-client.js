@@ -1503,6 +1503,10 @@ class MedusaAdminClient {
   async updatePayout(id, data) {
     return this.request(`/admin-hub/v1/payouts/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
   }
+  /** Superuser "überweisen" — sends a real Stripe/IBAN transfer to this seller right now. */
+  async sendSellerIbanPayoutNow(sellerId) {
+    return this.request('/admin-hub/v1/payouts/seller-iban-now', { method: 'POST', body: JSON.stringify({ seller_id: sellerId }) })
+  }
   async getCoupons(params = {}) {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/coupons${qs}`)
@@ -1530,6 +1534,11 @@ class MedusaAdminClient {
       method: 'PATCH',
       body: JSON.stringify({ current_password, new_password }),
     })
+  }
+
+  /** Superuser-only: edit own Name/Email on Settings → Security → "Ihr Konto". */
+  async updateSellerAccount(data) {
+    return this.request('/admin-hub/v1/seller/account', { method: 'PATCH', body: JSON.stringify(data) })
   }
 
   async updateSellerIban(iban) {
@@ -1655,7 +1664,7 @@ class MedusaAdminClient {
   // ── Seller Management (superuser) ─────────────────────────────────────────
   async getSellers(params = {}) {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
-    return this.request(`/admin-hub/v1/sellers${qs}`)
+    return this.request(`/admin-hub/v1/sellers${qs}`, { cache: 'no-store' })
   }
 
   async getSellerById(id) {

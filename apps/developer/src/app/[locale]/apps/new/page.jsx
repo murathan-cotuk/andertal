@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import AuthGuard from '../../../../components/AuthGuard'
-import PortalNav from '../../../../components/PortalNav'
+import AppShell, { ORANGE, ORANGE_TINT, ORANGE_BORDER } from '../../../../components/AppShell'
 import { api } from '../../../../lib/api'
 
 const TIER1_SCOPES = new Set(['write_storefront', 'write_checkout'])
@@ -40,27 +39,26 @@ const CATEGORIES = [
 ]
 
 const S = {
-  page: { minHeight: '100vh', background: '#f7f8fa' },
   main: { maxWidth: 680, margin: '0 auto', padding: '36px 24px' },
-  back: { color: '#0070f3', fontSize: 14, textDecoration: 'none', display: 'inline-block', marginBottom: 20 },
-  h1: { fontSize: 26, fontWeight: 700, color: '#111', margin: '0 0 28px' },
-  card: { background: '#fff', borderRadius: 10, padding: '28px 28px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 20 },
-  sectionTitle: { fontSize: 15, fontWeight: 600, color: '#333', marginBottom: 18 },
-  label: { display: 'block', fontSize: 13, fontWeight: 500, color: '#333', marginBottom: 6 },
-  hint: { fontSize: 12, color: '#888', marginTop: 4 },
-  input: { width: '100%', padding: '10px 12px', border: '1.5px solid #e0e0e0', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' },
-  textarea: { width: '100%', padding: '10px 12px', border: '1.5px solid #e0e0e0', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box', resize: 'vertical', minHeight: 80 },
-  select: { width: '100%', padding: '10px 12px', border: '1.5px solid #e0e0e0', borderRadius: 8, fontSize: 14, background: '#fff', boxSizing: 'border-box' },
+  back: { color: ORANGE, fontSize: 14, textDecoration: 'none', display: 'inline-block', marginBottom: 20 },
+  h1: { fontSize: 26, fontWeight: 700, color: '#f5f5f5', margin: '0 0 28px' },
+  card: { background: '#161616', border: '1px solid #262626', borderRadius: 10, padding: '28px 28px', marginBottom: 20 },
+  sectionTitle: { fontSize: 15, fontWeight: 600, color: '#d4d4d8', marginBottom: 18 },
+  label: { display: 'block', fontSize: 13, fontWeight: 500, color: '#d4d4d8', marginBottom: 6 },
+  hint: { fontSize: 12, color: '#71717a', marginTop: 4 },
+  input: { width: '100%', padding: '10px 12px', background: '#0f0f0f', border: '1.5px solid #333', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box', color: '#f5f5f5' },
+  textarea: { width: '100%', padding: '10px 12px', background: '#0f0f0f', border: '1.5px solid #333', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box', resize: 'vertical', minHeight: 80, color: '#f5f5f5' },
+  select: { width: '100%', padding: '10px 12px', background: '#0f0f0f', border: '1.5px solid #333', borderRadius: 8, fontSize: 14, boxSizing: 'border-box', color: '#f5f5f5' },
   field: { marginBottom: 18 },
-  typeCard: (active) => ({ border: `2px solid ${active ? '#0070f3' : '#e0e0e0'}`, borderRadius: 8, padding: '12px 14px', cursor: 'pointer', marginBottom: 10, background: active ? '#eff6ff' : '#fff' }),
-  typeName: { fontSize: 14, fontWeight: 600, color: '#111' },
-  typeDesc: { fontSize: 12, color: '#666', marginTop: 3 },
+  typeCard: (active) => ({ border: `2px solid ${active ? ORANGE : '#333'}`, borderRadius: 8, padding: '12px 14px', cursor: 'pointer', marginBottom: 10, background: active ? ORANGE_TINT : 'transparent' }),
+  typeName: { fontSize: 14, fontWeight: 600, color: '#f5f5f5' },
+  typeDesc: { fontSize: 12, color: '#9ca3af', marginTop: 3 },
   scopesGrid: { display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 },
   footer: { display: 'flex', gap: 12, justifyContent: 'flex-end' },
-  btn: { padding: '11px 22px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: 'pointer' },
-  cancelBtn: { padding: '11px 22px', background: '#fff', color: '#333', border: '1.5px solid #e0e0e0', borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: 'pointer' },
+  btn: { padding: '11px 22px', background: ORANGE, color: '#111', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  cancelBtn: { padding: '11px 22px', background: 'transparent', color: '#d4d4d8', border: '1.5px solid #333', borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: 'pointer' },
   btnDisabled: { opacity: 0.6, cursor: 'not-allowed' },
-  err: { background: '#fee2e2', border: '1px solid #ef4444', borderRadius: 8, padding: '12px 14px', color: '#991b1b', fontSize: 14, marginBottom: 12 },
+  err: { background: 'rgba(239,68,68,0.1)', border: '1px solid #ef4444', borderRadius: 8, padding: '12px 14px', color: '#fca5a5', fontSize: 14, marginBottom: 12 },
 }
 
 export default function NewAppPage() {
@@ -133,132 +131,129 @@ export default function NewAppPage() {
   }
 
   return (
-    <AuthGuard>
-      <div style={S.page}>
-        <PortalNav />
-        <div style={S.main}>
-          <a href={`/${locale}/apps`} style={S.back}>← {tApps('title')}</a>
-          <h1 style={S.h1}>{t('title')}</h1>
-          <form onSubmit={submit}>
-            {/* Basic info */}
-            <div style={S.card}>
-              <div style={S.sectionTitle}>{t('step1')}</div>
-              <div style={S.field}>
-                <label style={S.label}>{t('name')} *</label>
-                <input style={S.input} value={form.name} onChange={set('name')} required />
-              </div>
-              <div style={S.field}>
-                <label style={S.label}>{t('handle')} *</label>
-                <input
-                  style={S.input}
-                  value={form.handle}
-                  onChange={e => setForm(f => ({ ...f, handle: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                  required
-                  minLength={3}
-                  maxLength={64}
-                  pattern="[a-z0-9][a-z0-9\-]{1,62}[a-z0-9]"
-                />
-                <div style={S.hint}>{t('handleHint')}</div>
-              </div>
-              <div style={S.field}>
-                <label style={S.label}>{t('type')}</label>
-                <div style={S.typeCard(form.type === 'integration_app')} onClick={() => setForm(f => ({ ...f, type: 'integration_app' }))}>
-                  <div style={S.typeName}>Integration App</div>
-                  <div style={S.typeDesc}>{t('typeIntegration')}</div>
-                </div>
-                {isSuperuser && (
-                  <div style={S.typeCard(form.type === 'shop_app')} onClick={() => setForm(f => ({ ...f, type: 'shop_app' }))}>
-                    <div style={S.typeName}>Shop App <span style={{ fontSize: 11, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: 4 }}>Tier 1</span></div>
-                    <div style={S.typeDesc}>{t('typeShop')}</div>
-                  </div>
-                )}
-              </div>
-              <div style={S.field}>
-                <label style={S.label}>{t('category')}</label>
-                <select style={S.select} value={form.category} onChange={set('category')}>
-                  {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-              </div>
-              <div style={S.field}>
-                <label style={S.label}>{t('description')} *</label>
-                <textarea style={S.textarea} value={form.description} onChange={set('description')} required />
-              </div>
+    <AppShell>
+      <div style={S.main}>
+        <a href={`/${locale}/apps`} style={S.back}>← {tApps('title')}</a>
+        <h1 style={S.h1}>{t('title')}</h1>
+        <form onSubmit={submit}>
+          {/* Basic info */}
+          <div style={S.card}>
+            <div style={S.sectionTitle}>{t('step1')}</div>
+            <div style={S.field}>
+              <label style={S.label}>{t('name')} *</label>
+              <input style={S.input} value={form.name} onChange={set('name')} required />
             </div>
-
-            {/* OAuth & support */}
-            <div style={S.card}>
-              <div style={S.sectionTitle}>{t('step3')}</div>
-              <div style={S.field}>
-                <label style={S.label}>{t('redirectUrls')}</label>
-                <textarea style={S.textarea} value={form.redirect_urls} onChange={set('redirect_urls')} placeholder="https://yourapp.com/oauth/callback" />
-                <div style={S.hint}>{t('redirectUrlsHint')}</div>
+            <div style={S.field}>
+              <label style={S.label}>{t('handle')} *</label>
+              <input
+                style={S.input}
+                value={form.handle}
+                onChange={e => setForm(f => ({ ...f, handle: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                required
+                minLength={3}
+                maxLength={64}
+                pattern="[a-z0-9][a-z0-9\-]{1,62}[a-z0-9]"
+              />
+              <div style={S.hint}>{t('handleHint')}</div>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>{t('type')}</label>
+              <div style={S.typeCard(form.type === 'integration_app')} onClick={() => setForm(f => ({ ...f, type: 'integration_app' }))}>
+                <div style={S.typeName}>Integration App</div>
+                <div style={S.typeDesc}>{t('typeIntegration')}</div>
               </div>
-              <div style={S.field}>
-                <label style={S.label}>{t('privacyUrl')} *</label>
-                <input style={S.input} type="url" value={form.privacy_policy_url} onChange={set('privacy_policy_url')} required placeholder="https://example.com/privacy" />
-              </div>
-              <div style={S.field}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <label style={{ ...S.label, marginBottom: 0 }}>{t('scopes')}</label>
-                  <button
-                    type="button"
-                    onClick={toggleAll}
-                    style={{ fontSize: 12, color: '#0070f3', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: '2px 6px' }}
-                  >
-                    {allSelected ? 'Deselect All' : 'Select All'}
-                  </button>
+              {isSuperuser && (
+                <div style={S.typeCard(form.type === 'shop_app')} onClick={() => setForm(f => ({ ...f, type: 'shop_app' }))}>
+                  <div style={S.typeName}>Shop App <span style={{ fontSize: 11, background: ORANGE_TINT, color: ORANGE, padding: '1px 6px', borderRadius: 4 }}>Tier 1</span></div>
+                  <div style={S.typeDesc}>{t('typeShop')}</div>
                 </div>
-                <div style={S.scopesGrid}>
-                  {ALL_SCOPES.map(s => {
-                    const isLocked = s.tier1 && !isSuperuser
-                    const checked = form.scopes.includes(s.value)
-                    return (
-                      <label
-                        key={s.value}
-                        onClick={() => toggleScope(s.value, isLocked)}
-                        style={{
-                          display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13,
-                          color: isLocked ? '#bbb' : '#333',
-                          cursor: isLocked ? 'not-allowed' : 'pointer',
-                          background: checked ? '#f0f9ff' : 'transparent',
-                          border: `1px solid ${checked ? '#bae6fd' : '#f0f0f0'}`,
-                          borderRadius: 6, padding: '7px 10px',
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={isLocked}
-                          onChange={() => toggleScope(s.value, isLocked)}
-                          style={{ marginTop: 2, flexShrink: 0 }}
-                        />
-                        <span>
-                          <strong style={{ fontSize: 12, display: 'block' }}>{s.value}</strong>
-                          <span style={{ color: isLocked ? '#bbb' : '#888', fontSize: 11 }}>
-                            {s.label}{s.tier1 ? ' — Tier 1' : ''}
-                          </span>
+              )}
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>{t('category')}</label>
+              <select style={S.select} value={form.category} onChange={set('category')}>
+                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>{t('description')} *</label>
+              <textarea style={S.textarea} value={form.description} onChange={set('description')} required />
+            </div>
+          </div>
+
+          {/* OAuth & support */}
+          <div style={S.card}>
+            <div style={S.sectionTitle}>{t('step3')}</div>
+            <div style={S.field}>
+              <label style={S.label}>{t('redirectUrls')}</label>
+              <textarea style={S.textarea} value={form.redirect_urls} onChange={set('redirect_urls')} placeholder="https://yourapp.com/oauth/callback" />
+              <div style={S.hint}>{t('redirectUrlsHint')}</div>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>{t('privacyUrl')} *</label>
+              <input style={S.input} type="url" value={form.privacy_policy_url} onChange={set('privacy_policy_url')} required placeholder="https://example.com/privacy" />
+            </div>
+            <div style={S.field}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <label style={{ ...S.label, marginBottom: 0 }}>{t('scopes')}</label>
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  style={{ fontSize: 12, color: ORANGE, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: '2px 6px' }}
+                >
+                  {allSelected ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+              <div style={S.scopesGrid}>
+                {ALL_SCOPES.map(s => {
+                  const isLocked = s.tier1 && !isSuperuser
+                  const checked = form.scopes.includes(s.value)
+                  return (
+                    <label
+                      key={s.value}
+                      onClick={() => toggleScope(s.value, isLocked)}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13,
+                        color: isLocked ? '#52525b' : '#d4d4d8',
+                        cursor: isLocked ? 'not-allowed' : 'pointer',
+                        background: checked ? ORANGE_TINT : 'transparent',
+                        border: `1px solid ${checked ? ORANGE_BORDER : '#262626'}`,
+                        borderRadius: 6, padding: '7px 10px',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={isLocked}
+                        onChange={() => toggleScope(s.value, isLocked)}
+                        style={{ marginTop: 2, flexShrink: 0, accentColor: ORANGE }}
+                      />
+                      <span>
+                        <strong style={{ fontSize: 12, display: 'block', color: isLocked ? '#52525b' : '#f5f5f5' }}>{s.value}</strong>
+                        <span style={{ color: isLocked ? '#52525b' : '#9ca3af', fontSize: 11 }}>
+                          {s.label}{s.tier1 ? ' — Tier 1' : ''}
                         </span>
-                      </label>
-                    )
-                  })}
-                </div>
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
             </div>
+          </div>
 
-            {error && (
-              <div style={S.err}>
-                {error.split('\n').map((line, i) => <div key={i}>{line}</div>)}
-              </div>
-            )}
-            <div style={S.footer}>
-              <button type="button" style={S.cancelBtn} onClick={() => router.push(`/${locale}/apps`)}>{t('cancel')}</button>
-              <button type="submit" style={{ ...S.btn, ...(loading ? S.btnDisabled : {}) }} disabled={loading}>
-                {loading ? t('creating') : t('create')}
-              </button>
+          {error && (
+            <div style={S.err}>
+              {error.split('\n').map((line, i) => <div key={i}>{line}</div>)}
             </div>
-          </form>
-        </div>
+          )}
+          <div style={S.footer}>
+            <button type="button" style={S.cancelBtn} onClick={() => router.push(`/${locale}/apps`)}>{t('cancel')}</button>
+            <button type="submit" style={{ ...S.btn, ...(loading ? S.btnDisabled : {}) }} disabled={loading}>
+              {loading ? t('creating') : t('create')}
+            </button>
+          </div>
+        </form>
       </div>
-    </AuthGuard>
+    </AppShell>
   )
 }

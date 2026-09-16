@@ -123,11 +123,24 @@ function publicCase(row) {
   }
 }
 
-function inboxCase(row) {
+// A seller (non-superuser) handling a case must never see the customer's contact details or
+// internal routing/category metadata — only the superuser support team decides/sees that; the
+// seller only needs the order/items to help the customer (explicit user instruction).
+function redactForSeller(obj) {
+  delete obj.customer_id
+  delete obj.customer_email
+  delete obj.category
+  delete obj.subcategory
+  delete obj.seller_display_name
+  delete obj.seller_id
+  return obj
+}
+
+function inboxCase(row, { redact = false } = {}) {
   const base = publicCase(row)
   delete base.customer_id
   delete base.customer_email
-  return {
+  const out = {
     ...base,
     order_number: row.order_number == null ? null : Number(row.order_number),
     seller_display_name: row.seller_display_name || 'Andertal Support',
@@ -142,6 +155,7 @@ function inboxCase(row) {
     } : null,
     unread_count: Number(row.unread_count || 0),
   }
+  return redact ? redactForSeller(out) : out
 }
 
 function parseAttachmentIds(value) {
@@ -1068,7 +1082,7 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
         params,
       )).rows
     })
-    res.json({ cases: rows.map(inboxCase), page, limit, total: rows[0]?.total || 0 })
+    res.json({ cases: rows.map((row) => inboxCase(row, { redact: !actor.isSuperuser })), page, limit, total: rows[0]?.total || 0 })
   }))
 
   router.post('/admin-hub/v1/support-cases/attachments/upload', requireSeller, uploadLimit, upload.array('files', MAX_ATTACHMENTS), asyncRoute(async (req, res) => {
@@ -1100,6 +1114,9 @@ module.exports = function createSupportCasesRouter({ verifyCustomerToken }) {
     const detail = await withClient(async (client) => {
       const loaded = await loadCaseDetail(client, id, { includeEvents: actor.isSuperuser })
       if (!loaded || !canAccessCase(actor, loaded.case)) return null
+      // Redact only after the access check above (which needs the real seller_id on
+      // loaded.case to verify ownership) — never redact before authorization runs.
+      if (!actor.isSuperuser) redactForSeller(loaded.case)
       return loaded
     })
     if (!detail) return res.status(404).json({ message: 'Case not found' })

@@ -230,6 +230,47 @@ module.exports = function createSellerAccountRouter({
       }
     }
 
+    const AccountUpdateSchema = z.object({
+      first_name: z.string().trim().max(120).optional(),
+      last_name:  z.string().trim().max(120).optional(),
+      email:      z.string().trim().toLowerCase().email('Invalid email address').max(254).optional(),
+    })
+    /**
+     * PATCH /admin-hub/v1/seller/account — edit your own Name/Email on the "Ihr Konto" card.
+     * Superuser-only: a regular seller's identity fields stay display-only there (explicit user
+     * instruction) — Name/Email for normal sellers still change only through support/registration.
+     */
+    const adminHubSellerAccountPATCH = async (req, res) => {
+      const userId = req.sellerUser?.id
+      if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+      if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+      const parsed = validate(AccountUpdateSchema, req.body || {}, res)
+      if (!parsed) return
+      const sets = []
+      const params = []
+      if (parsed.first_name !== undefined) { params.push(parsed.first_name || null); sets.push(`first_name = $${params.length}`) }
+      if (parsed.last_name !== undefined) { params.push(parsed.last_name || null); sets.push(`last_name = $${params.length}`) }
+      if (parsed.email !== undefined) { params.push(parsed.email); sets.push(`email = $${params.length}`) }
+      if (!sets.length) return res.status(400).json({ message: 'Nothing to update' })
+      const client = getSellerDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      try {
+        await client.connect()
+        params.push(userId)
+        const r = await client.query(
+          `UPDATE seller_users SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING id, email, first_name, last_name`,
+          params,
+        )
+        await client.end()
+        if (!r.rows.length) return res.status(404).json({ message: 'User not found' })
+        res.json({ user: r.rows[0] })
+      } catch (e) {
+        try { await client.end() } catch (_) {}
+        if (e?.code === '23505') return res.status(409).json({ message: 'This email address is already in use.' })
+        res.status(500).json({ message: e?.message || 'Error' })
+      }
+    }
+
     const PasswordChangeSchema = z.object({
       current_password: z.string().min(1, 'Current password is required').max(256),
       new_password:     zPassword,
@@ -459,6 +500,7 @@ module.exports = function createSellerAccountRouter({
   const router = Router()
   router.patch('/admin-hub/v1/seller/iban', adminHubSellerIbanPATCH)
   router.get('/admin-hub/v1/seller/account', adminHubSellerAccountGET)
+  router.patch('/admin-hub/v1/seller/account', adminHubSellerAccountPATCH)
   router.patch('/admin-hub/v1/seller/password', adminHubSellerPasswordPATCH)
   router.get('/admin-hub/v1/seller/profile', adminHubSellerProfileGET)
   router.post('/admin-hub/users/invite', adminHubUsersInvitePOST)

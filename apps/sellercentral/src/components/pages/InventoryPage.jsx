@@ -35,7 +35,7 @@ import {
 } from "@/lib/product-change-request-format";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
 
-const INVENTORY_ROW_GRID = "40px 56px 110px 72px minmax(320px, 2fr) minmax(140px, 0.9fr) minmax(150px, 1fr) minmax(200px, 1.2fr) 148px";
+const INVENTORY_ROW_GRID = "2.5rem 3.5rem 6.875rem 4.5rem minmax(20rem, 2fr) minmax(8.75rem, 0.9fr) minmax(9.375rem, 1fr) minmax(12.5rem, 1.2fr) 9.25rem";
 const EXCEL_BORDER = "1px solid #e5e7eb";
 
 const DEFAULT_DUPLICATE_OPTIONS = {
@@ -718,21 +718,21 @@ function InventoryProductRow({
           onClick={() => hasVariants && setVariantsOpen((v) => !v)}
           disabled={!hasVariants}
           style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
+            width: "1.75rem",
+            height: "1.75rem",
+            borderRadius: "0.375rem",
             border: "1px solid #d1d5db",
             background: hasVariants ? "#fff" : "#f3f4f6",
             color: hasVariants ? "#374151" : "#9ca3af",
             cursor: hasVariants ? "pointer" : "not-allowed",
-            fontSize: 14,
+            fontSize: "0.875rem",
             lineHeight: 1,
           }}
           title={hasVariants ? (variantsOpen ? i18n.closeVariants : i18n.openVariants) : i18n.noVariants}
         >
           {hasVariants ? (variantsOpen ? "▲" : "▼") : "—"}
         </button>
-          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
+          <div style={{ padding: "0.5rem 0.375rem", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
           <CustomCheckbox
             checked={selectedIds.includes(product.id)}
             onChange={(e) => {
@@ -745,20 +745,20 @@ function InventoryProductRow({
             style={{ margin: 0 }}
           />
           </div>
-          <div style={{ minWidth: 0, padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>
+          <div style={{ minWidth: 0, padding: "0.5rem 0.375rem", borderRight: EXCEL_BORDER, textAlign: "center" }}>
             {(() => {
               const c = statusColors(product.status);
               return (
-                <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 7px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.br}` }}>
+                <span style={{ display: "inline-flex", alignItems: "center", padding: "0.125rem 0.4375rem", borderRadius: "999px", fontSize: "0.6875rem", fontWeight: 600, background: c.bg, color: c.fg, border: `1px solid ${c.br}` }}>
                   {localizeStatus(statusLabel(product.status))}
                 </span>
               );
             })()}
           </div>
-          <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
+          <div style={{ padding: "0.5rem 0.375rem", borderRight: EXCEL_BORDER, display: "flex", justifyContent: "center" }}>
           <div
             style={{
-              width: 56, height: 56, flexShrink: 0, borderRadius: 8, overflow: "hidden",
+              width: "3.5rem", height: "3.5rem", flexShrink: 0, borderRadius: "0.5rem", overflow: "hidden",
               background: "#f4f4f5", border: "1px solid #e5e7eb",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
@@ -788,12 +788,12 @@ function InventoryProductRow({
             </div>
           </div>
           </div>
-          <div style={{ minWidth: 0, padding: "8px 8px", borderRight: EXCEL_BORDER }}>
+          <div style={{ minWidth: 0, padding: "0.5rem", borderRight: EXCEL_BORDER }}>
             <a
               href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
               target="_blank"
               rel="noreferrer"
-              style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", overflow: "hidden" }}
+              style={{ fontSize: "0.875rem", fontWeight: 600, color: "#111827", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.3125rem", whiteSpace: "nowrap", overflow: "hidden" }}
               title={`${getLocalizedTitle(product, locale)} · ${lt(locale, "opens in shop, new tab", "mağazada açılır, yeni sekme", "s'ouvre dans la boutique, nouvel onglet", "se abre en la tienda, pestaña nueva", "si apre nel negozio, nuova scheda", "öffnet im Shop, neuer Tab")}`}
               onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
               onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
@@ -806,22 +806,22 @@ function InventoryProductRow({
             </a>
             <I18nLink
               href={`/products/${product.id}`}
-              style={{ marginTop: 2, padding: 0, color: "#4b5563", fontSize: 12, textDecoration: "underline", display: "inline-block" }}
+              style={{ marginTop: "0.125rem", padding: 0, color: "#4b5563", fontSize: "0.75rem", textDecoration: "underline", display: "inline-block" }}
               title={lt(locale, "Open product edit page via SKU", "SKU ile ürün düzenleme sayfasına git", "Ouvrir la page produit via SKU", "Abrir edición de producto vía SKU", "Apri modifica prodotto tramite SKU", "SKU üzerinden ürün düzenleme sayfasına git")}
             >
               {i18n.sku}: {sku}
             </I18nLink>
-            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2 }}>{i18n.ean}: {ean}</div>
+            <div style={{ fontSize: "0.6875rem", color: "#6b7280", lineHeight: 1.2 }}>{i18n.ean}: {ean}</div>
             {product.an_id && (
-              <div style={{ fontSize: 10, color: "#9ca3af", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>AN-ID: {product.an_id}</div>
+              <div style={{ fontSize: "0.625rem", color: "#9ca3af", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>AN-ID: {product.an_id}</div>
             )}
           </div>
-          <div style={{ fontSize: 13, color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{inv}</div>
-          <div style={{ fontSize: 13, color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "8px 8px", borderRight: EXCEL_BORDER }}>?{formatDecimal(price)}</div>
-          <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "8px 8px", borderRight: EXCEL_BORDER, textAlign: "center" }}>
+          <div style={{ fontSize: "0.8125rem", color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>{inv}</div>
+          <div style={{ fontSize: "0.8125rem", color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>?{formatDecimal(price)}</div>
+          <div style={{ fontSize: "0.75rem", color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "0.5rem", borderRight: EXCEL_BORDER, textAlign: "center" }}>
             {variationSummary || "?"}
           </div>
-          <InlineStack gap="100" blockAlign="center" style={{ padding: "8px 6px", justifyContent: "flex-end" }}>
+          <InlineStack gap="100" blockAlign="center" style={{ padding: "0.5rem 0.375rem", justifyContent: "flex-end" }}>
           <I18nLink
             href={`/products/${product.id}`}
             aria-label="Edit product"
@@ -1056,32 +1056,32 @@ export default function InventoryPage() {
         zIndex: 2,
       }}
     >
-      <div style={{ borderRight: EXCEL_BORDER, padding: "8px 6px" }} />
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 6px", textAlign: "center" }}>{rowHead.select}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 6px", textAlign: "center" }}>{rowHead.status}</div>
-      <div style={{ borderRight: EXCEL_BORDER, padding: "8px 6px" }} />
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 8px", textAlign: "center" }}>{rowHead.details}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "8px 8px", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "inventory_desc" ? "inventory_asc" : "inventory_desc"))}>{rowHead.inventory}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "8px 8px", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "price_desc" ? "price_asc" : "price_desc"))}>{rowHead.price}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "8px 8px", textAlign: "center" }}>{rowHead.variations}</div>
-      <div style={{ padding: "8px 6px" }} />
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px" }} />
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px" }}>
-        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem" }} />
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.select}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.status}</div>
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem" }} />
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.details}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "inventory_desc" ? "inventory_asc" : "inventory_desc"))}>{rowHead.inventory}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "price_desc" ? "price_asc" : "price_desc"))}>{rowHead.price}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.variations}</div>
+      <div style={{ padding: "0.5rem 0.375rem" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem" }}>
+        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        <input value={inventoryMin} onChange={(e) => setInventoryMin(e.target.value)} placeholder="min" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
-        <input value={inventoryMax} onChange={(e) => setInventoryMax(e.target.value)} placeholder="max" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.375rem" }}>
+        <input value={inventoryMin} onChange={(e) => setInventoryMin(e.target.value)} placeholder="min" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={inventoryMax} onChange={(e) => setInventoryMax(e.target.value)} placeholder="max" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-        <input value={priceMin} onChange={(e) => setPriceMin(e.target.value)} placeholder="min" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
-        <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="max" style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 6px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.375rem" }}>
+        <input value={priceMin} onChange={(e) => setPriceMin(e.target.value)} placeholder="min" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="max" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
-      <div style={{ borderRight: EXCEL_BORDER, padding: "6px 8px" }}>
-        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "fr" ? "variante" : l === "es" ? "variante" : l === "it" ? "variante" : "variation"} style={{ width: "100%", height: 28, border: "1px solid #d1d5db", borderRadius: 4, padding: "0 8px", fontSize: 12, boxSizing: "border-box", textAlign: "center" }} />
+      <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem" }}>
+        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "fr" ? "variante" : l === "es" ? "variante" : l === "it" ? "variante" : "variation"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ padding: "6px" }} />
     </div>

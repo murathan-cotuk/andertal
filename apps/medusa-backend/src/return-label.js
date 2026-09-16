@@ -136,6 +136,7 @@ async function chargeReturnLabelOnCarrierMovement(pgClient, { returnId, stripe }
       amountCents: row.label_cost_cents,
       orderNumber: row.order_number,
       stripe,
+      descriptionKey: 'return_shipping_label',
     })
     await pgClient.query(
       `UPDATE store_returns SET label_charge_status = 'charged', label_charged_at = now(), updated_at = now() WHERE id = $1::uuid`,

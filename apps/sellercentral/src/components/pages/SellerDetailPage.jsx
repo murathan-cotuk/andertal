@@ -512,25 +512,36 @@ export default function SellerDetailPage({ sellerId }) {
     }
   };
 
-  const handleMarkPaid = async (payout) => {
+  const [sendingPayoutId, setSendingPayoutId] = useState(null);
+
+  // "Überweisen" — real Stripe/IBAN transfer, sent immediately, independent of the automatic
+  // biweekly (2nd/4th Friday) batch run, which keeps processing everyone else on its own schedule.
+  const handleSendPayoutNow = async (payout) => {
     const confirmMsg = locale === "en"
-      ? `Mark payout ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} as externally transferred?\n\nNote: This does not initiate a bank/Stripe transfer. First send the payment from the platform account to the seller IBAN, then mark as paid here.`
+      ? `Send a real bank transfer to this seller's IBAN now, for ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)}?\n\nThis moves real money immediately via Stripe and cannot be undone. The regular biweekly automatic payout continues on its own schedule for everything else.`
       : locale === "tr"
-      ? `${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} ödemesini dışarıdan havale edildi olarak işaretle?\n\nNot: Bu işlem banka/Stripe transferi başlatmaz. Önce ödemeyi platform hesabından seller IBAN'ına gerçekten gönderin, sonra burada işaretleyin.`
+      ? `${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} dönemi için satıcının IBAN'ına şimdi gerçek bir havale gönderilsin mi?\n\nBu, Stripe üzerinden anında gerçek para hareketi başlatır ve geri alınamaz. Normal 2 haftalık otomatik ödeme, diğer her şey için kendi takviminde devam eder.`
       : locale === "fr"
-      ? `Marquer le paiement ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} comme transféré extérieurement ?\n\nRemarque : Cela ne lance pas de virement bancaire/Stripe. Envoyez d'abord le paiement depuis le compte de la plateforme vers l'IBAN du vendeur, puis marquez-le ici.`
+      ? `Envoyer maintenant un virement bancaire réel vers l'IBAN de ce vendeur pour ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} ?\n\nCeci déplace de l'argent réel immédiatement via Stripe et ne peut pas être annulé.`
       : locale === "es"
-      ? `¿Marcar el pago ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} como transferido externamente?\n\nNota: Esto no inicia una transferencia bancaria/Stripe. Primero envíe el pago desde la cuenta de la plataforma al IBAN del vendedor y luego márquelo aquí.`
+      ? `¿Enviar ahora una transferencia bancaria real al IBAN de este vendedor para ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)}?\n\nEsto mueve dinero real de inmediato vía Stripe y no se puede deshacer.`
       : locale === "it"
-      ? `Contrassegnare il pagamento ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} come trasferito esternamente?\n\nNota: Questo non avvia un bonifico bancario/Stripe. Prima inviare il pagamento dal conto della piattaforma all'IBAN del venditore, poi contrassegnarlo qui.`
-      : `Auszahlung ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)} als extern überwiesen markieren?\n\nHinweis: Dies startet keine Bank-/Stripe-Überweisung. Erst die Zahlung vom Plattformkonto zur Seller-IBAN senden, dann hier als bezahlt markieren.`;
+      ? `Inviare ora un bonifico bancario reale sull'IBAN di questo venditore per ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)}?\n\nQuesto sposta denaro reale immediatamente tramite Stripe e non può essere annullato.`
+      : `Jetzt eine echte Überweisung auf die IBAN dieses Verkäufers senden, für ${fmtDate(payout.period_start, locale)}–${fmtDate(payout.period_end, locale)}?\n\nDies bewegt sofort echtes Geld über Stripe und kann nicht rückgängig gemacht werden. Die reguläre zweiwöchentliche automatische Auszahlung läuft für alles andere unabhängig davon weiter.`;
     if (!(await confirmDelete(confirmMsg))) return;
+    setSendingPayoutId(payout.id);
     try {
-      await client.updatePayout(payout.id, { status: "bezahlt" });
-      setMsg({ tone: "success", text: locale === "en" ? "Marked as externally transferred (paid)." : locale === "tr" ? "Dışarıdan havale edildi (ödendi) olarak işaretlendi." : locale === "fr" ? "Marqué comme transféré externalement (payé)." : locale === "es" ? "Marcado como transferido externamente (pagado)." : locale === "it" ? "Contrassegnato come trasferito esternamente (pagato)." : "Als extern überwiesen (bezahlt) markiert." });
+      const result = await client.sendSellerIbanPayoutNow(seller.seller_id);
+      // Real transfer succeeded — also record this specific invoice row as paid for the
+      // Sellercentral paper trail (the transfer itself isn't scoped to one period/row).
+      await client.updatePayout(payout.id, { status: "bezahlt" }).catch(() => {});
+      const amount = result?.payout_cents != null ? (result.payout_cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "";
+      setMsg({ tone: "success", text: locale === "en" ? `Transfer sent${amount ? ` (${amount})` : ""}.` : locale === "tr" ? `Havale gönderildi${amount ? ` (${amount})` : ""}.` : locale === "fr" ? `Virement envoyé${amount ? ` (${amount})` : ""}.` : locale === "es" ? `Transferencia enviada${amount ? ` (${amount})` : ""}.` : locale === "it" ? `Bonifico inviato${amount ? ` (${amount})` : ""}.` : `Überweisung gesendet${amount ? ` (${amount})` : ""}.` });
       load();
     } catch (e) {
       setMsg({ tone: "critical", text: e?.message || (locale === "en" ? "Error" : locale === "tr" ? "Hata" : locale === "fr" ? "Erreur" : locale === "es" ? "Error" : locale === "it" ? "Errore" : "Fehler") });
+    } finally {
+      setSendingPayoutId(null);
     }
   };
 
@@ -954,7 +965,7 @@ ${"=".repeat(50)}
                               <td style={{ padding: "8px 12px" }}>
                                 <InlineStack gap="200">
                                   {p.status !== "bezahlt" && (
-                                    <Button size="slim" variant="primary" onClick={() => handleMarkPaid(p)}>{locale === "en" ? "Mark as transferred" : locale === "tr" ? "Havale edildi olarak işaretle" : locale === "fr" ? "Marquer comme transféré" : locale === "es" ? "Marcar como transferido" : locale === "it" ? "Contrassegna come trasferito" : "Als überwiesen markieren"}</Button>
+                                    <Button size="slim" variant="primary" tone="success" loading={sendingPayoutId === p.id} disabled={sendingPayoutId != null} onClick={() => handleSendPayoutNow(p)}>{locale === "en" ? "Transfer" : locale === "tr" ? "Überweisen" : locale === "fr" ? "Überweisen" : locale === "es" ? "Überweisen" : locale === "it" ? "Überweisen" : "Überweisen"}</Button>
                                   )}
                                   <Button size="slim" onClick={() => generateInvoice(p)}>{locale === "en" ? "Invoice" : locale === "tr" ? "Fatura" : locale === "fr" ? "Facture" : locale === "es" ? "Factura" : locale === "it" ? "Fattura" : "Rechnung"}</Button>
                                 </InlineStack>

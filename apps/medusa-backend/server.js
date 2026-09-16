@@ -844,6 +844,8 @@ async function start() {
         // same convention as enabled_shop_locales (superuser-only, platform-wide toggle).
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS maintenance_mode_enabled boolean DEFAULT false`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS maintenance_mode_image_url text`).catch(() => {})
+        // Platform-wide custom 404 illustration — same convention (seller_id='default', superuser-only).
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS not_found_image_url text`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_banners (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1480,6 +1482,9 @@ async function start() {
         await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS commission_vat_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS refund_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS order_count integer NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS shipping_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS shipping_payout_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
+        await client.query(`ALTER TABLE seller_payouts ADD COLUMN IF NOT EXISTS label_cents bigint NOT NULL DEFAULT 0`).catch(() => {})
         // Non-payout ledger adjustments against a seller's account (e.g. shipping label charges) —
         // netted out of their next payout instead of moving real money at charge time when they
         // have enough unpaid revenue to cover it; otherwise the seller's saved card is charged.

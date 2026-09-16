@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 const COOKIE_NAME = "sc_token";
-const MAX_AGE    = 60 * 60 * 24 * 7; // 7 days
+// Must match (or exceed) SELLER_TOKEN_TTL_SECONDS in apps/medusa-backend/src/routes/seller-auth.js —
+// a shorter cookie would force a re-login before the underlying JWT itself even expires.
+const MAX_AGE    = 60 * 60 * 24 * 30; // 30 days
 
 /**
  * POST /api/auth/session

@@ -578,7 +578,8 @@ export default function BrandPage() {
           loading: saving,
         }}
         secondaryActions={[
-          ...(editingBrand && canEditBrand(editingBrand) ? [{ content: copy.delete, onAction: () => { closeModal(); handleDelete(editingBrand); }, destructive: true }] : []),
+          // Delete is superuser-only, even for a brand the seller created themselves.
+          ...(editingBrand && isSuperuser ? [{ content: copy.delete, onAction: () => { closeModal(); handleDelete(editingBrand); }, destructive: true }] : []),
           { content: copy.cancel, onAction: closeModal },
         ]}
       >

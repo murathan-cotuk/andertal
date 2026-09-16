@@ -1422,9 +1422,11 @@ export default function StylesPage() {
     sellercentral_favicon_url: "",
     announcement_bar_items: [],
     logo_config: defaultLogoConfig(),
+    not_found_image_url: "",
   });
   const [brandingSnapshot, setBrandingSnapshot] = useState(null);
   const [brandingPickerTarget, setBrandingPickerTarget] = useState(null); // e.g. "logo_shop_desktop"
+  const [notFoundPickerOpen, setNotFoundPickerOpen] = useState(false);
   const [logoActiveDevice, setLogoActiveDevice] = useState("desktop");
   const [headerScopeTab, setHeaderScopeTab] = useState("category");
   const [headerBgPickerScope, setHeaderBgPickerScope] = useState(null); // null | "global" | "category" | "collection"
@@ -1474,6 +1476,7 @@ export default function StylesPage() {
         sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
         announcement_bar_items: Array.isArray(settings?.announcement_bar_items) ? settings.announcement_bar_items : [],
         logo_config: mergeLogoConfig(savedLogoConfig),
+        not_found_image_url: settings?.not_found_image_url || "",
       };
       setBranding(loadedBranding);
       setBrandingSnapshot(JSON.stringify(loadedBranding));
@@ -1519,6 +1522,7 @@ export default function StylesPage() {
         sellercentral_favicon_url: branding.sellercentral_favicon_url,
         announcement_bar_items: branding.announcement_bar_items,
         logo_config: logoConfig,
+        not_found_image_url: branding.not_found_image_url || "",
         ...(String(desktopShopLogo?.url || "").trim()
           ? {
               shop_logo_url: desktopShopLogo.url,
@@ -1538,6 +1542,7 @@ export default function StylesPage() {
         sellercentral_favicon_url: settings?.sellercentral_favicon_url || "",
         announcement_bar_items: Array.isArray(settings?.announcement_bar_items) ? settings.announcement_bar_items : [],
         logo_config: mergeLogoConfig(settings?.logo_config || logoConfig),
+        not_found_image_url: settings?.not_found_image_url || "",
       };
       setBranding(reloadedBranding);
       setSavedSnapshot(JSON.stringify(styles));
@@ -1742,6 +1747,63 @@ export default function StylesPage() {
                   placeholder={locale === "de" ? "Kurze Beschreibung fuer Suchergebnisse und Social Preview" : "Short description for search results and social preview"}
                 />
               </BlockStack>
+          </AccordionCard>
+        )}
+        {isSuperuser && (
+          <AccordionCard
+            title={locale === "de" ? "404-Seite" : locale === "tr" ? "404 Sayfası" : locale === "fr" ? "Page 404" : locale === "es" ? "Página 404" : locale === "it" ? "Pagina 404" : "404 Page"}
+            subtitle={locale === "de"
+              ? "Eigenes Bild statt der Standard-404-Illustration im Shop"
+              : locale === "tr"
+                ? "Shop'ta varsayılan 404 illüstrasyonu yerine kendi görselin"
+                : locale === "fr"
+                  ? "Votre propre image au lieu de l'illustration 404 par défaut"
+                  : locale === "es"
+                    ? "Tu propia imagen en lugar de la ilustración 404 predeterminada"
+                    : locale === "it"
+                      ? "Una tua immagine invece dell'illustrazione 404 predefinita"
+                      : "Your own image instead of the shop's default 404 illustration"}
+          >
+            <BlockStack gap="300">
+              <InlineStack gap="300" blockAlign="center">
+                {branding.not_found_image_url ? (
+                  <img
+                    src={branding.not_found_image_url}
+                    alt=""
+                    style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
+                  />
+                ) : (
+                  <div style={{ width: 120, height: 120, borderRadius: 8, border: "1px dashed #d1d5db", background: "#f9fafb" }} />
+                )}
+                <BlockStack gap="150">
+                  <Button size="slim" onClick={() => setNotFoundPickerOpen(true)}>
+                    {locale === "de" ? "Bild auswählen" : locale === "tr" ? "Görsel seç" : locale === "fr" ? "Choisir une image" : locale === "es" ? "Elegir imagen" : locale === "it" ? "Scegli immagine" : "Choose image"}
+                  </Button>
+                  {branding.not_found_image_url ? (
+                    <Button size="slim" tone="critical" variant="plain" onClick={() => setBranding((p) => ({ ...p, not_found_image_url: "" }))}>
+                      {ui.remove}
+                    </Button>
+                  ) : null}
+                </BlockStack>
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                {locale === "de"
+                  ? "Ohne Bild bleibt die Standard-404-Animation im Shop erhalten."
+                  : locale === "tr"
+                    ? "Görsel seçilmezse shop'ta varsayılan 404 animasyonu gösterilir."
+                    : "Without an image, the shop keeps its default animated 404 illustration."}
+              </Text>
+            </BlockStack>
+            <MediaPickerModal
+              open={notFoundPickerOpen}
+              onClose={() => setNotFoundPickerOpen(false)}
+              multiple={false}
+              onSelect={(urls) => {
+                const url = urls?.[0];
+                setNotFoundPickerOpen(false);
+                if (url) setBranding((p) => ({ ...p, not_found_image_url: url }));
+              }}
+            />
           </AccordionCard>
         )}
         <AccordionCard title="Branding (Shop &amp; Sellercentral)" subtitle={locale === "de" ? "Logos, Favicons, Größe und Abstände — getrennt für Desktop, Tablet und Mobil" : locale === "tr" ? "Logolar, faviconlar, boyut ve boşluklar — masaüstü, tablet ve mobil için ayrı" : locale === "fr" ? "Logos, favicons, taille et espacements — séparés pour bureau, tablette et mobile" : locale === "es" ? "Logos, favicons, tamaño y márgenes — separados para escritorio, tablet y móvil" : locale === "it" ? "Loghi, favicon, dimensione e spaziature — separati per desktop, tablet e mobile" : "Logos, favicons, size and spacing — separate for desktop, tablet and mobile"}>

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Page,
   Layout,
@@ -19,6 +19,7 @@ import { getUI } from "@/lib/ui-strings";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { lt } from "@/lib/locale-text";
 import { userError } from "@/lib/api-error-messages";
+import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 
 export default function PlatformSettingsPage() {
   const locale = useLocale();
@@ -71,7 +72,7 @@ export default function PlatformSettingsPage() {
     snapshot !== null &&
     snapshot !== JSON.stringify({ pn: platformName, se: supportEmail, ae: adminNotificationEmail, sn: storeName, su: storefrontUrl });
 
-  const save = async () => {
+  const save = useCallback(async () => {
     setSaving(true);
     setErr("");
     setOk("");
@@ -86,14 +87,16 @@ export default function PlatformSettingsPage() {
       });
       setOk(t("Settings saved.", "Ayarlar kaydedildi.", "Paramètres enregistrés.", "Configuración guardada.", "Impostazioni salvate.", "Einstellungen gespeichert."));
       await load();
+      return true;
     } catch (e) {
       setErr(userError(e, locale, t("Saving failed.", "Kaydetme başarısız.", "Échec de l'enregistrement.", "Error al guardar.", "Salvataggio non riuscito.", "Speichern fehlgeschlagen.")));
+      return false;
     } finally {
       setSaving(false);
     }
-  };
+  }, [storeName, platformName, supportEmail, adminNotificationEmail, storefrontUrl, load, locale]);
 
-  const discard = () => {
+  const discard = useCallback(() => {
     if (!snapshot) return;
     const s = JSON.parse(snapshot);
     setPlatformName(s.pn);
@@ -103,7 +106,32 @@ export default function PlatformSettingsPage() {
     setStorefrontUrl(s.su);
     setErr("");
     setOk("");
-  };
+  }, [snapshot]);
+
+  // Top save/discard bar (next to the search bar) instead of this page's own bottom Save/Discard
+  // buttons, matching every other settings page.
+  const unsaved = useUnsavedChanges();
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  const discardRef = useRef(discard);
+  discardRef.current = discard;
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setDirty(!!isDirty);
+  }, [isDirty, unsaved]);
+
+  useEffect(() => {
+    if (!unsaved) return;
+    unsaved.setHandlers({
+      onSave: () => saveRef.current?.(),
+      onDiscard: () => discardRef.current?.(),
+    });
+    return () => {
+      unsaved.clearHandlers();
+      unsaved.setDirty(false);
+    };
+  }, [unsaved?.setHandlers, unsaved?.clearHandlers, unsaved?.setDirty]);
 
   const pageTitle = t("Platform Settings", "Platform Ayarları", "Paramètres de la plateforme", "Configuración de plataforma", "Impostazioni piattaforma", "Plattform-Einstellungen");
 
@@ -248,17 +276,6 @@ export default function PlatformSettingsPage() {
                 ))}
               </BlockStack>
             </Card>
-
-            <InlineStack gap="300">
-              <Button variant="primary" onClick={save} loading={saving} disabled={!isDirty}>
-                {ui.save}
-              </Button>
-              {isDirty && (
-                <Button variant="plain" onClick={discard}>
-                  {t("Discard", "Vazgeç", "Annuler les changements", "Descartar", "Annulla modifiche", "Verwerfen")}
-                </Button>
-              )}
-            </InlineStack>
           </BlockStack>
         </Layout.Section>
       </Layout>

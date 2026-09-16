@@ -1,10 +1,10 @@
 'use strict'
 const { Router } = require('express')
-const { resolveOrderPaidTotalCents, orderBonusDiscountCents } = require('../order-money')
 const { buildSellerPayoutPdfBuffer } = require('../order-pdf-buffers')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 const { resolveSellerScope, sqlOrderOwnedBySeller } = require('../seller-scope')
-const { salesInvoiceVat, resolvePlatformCommissionVatPercent } = require('../goods-vat')
+const { resolvePlatformCommissionVatPercent } = require('../goods-vat')
+const { allocateSellerShareOfOrder, sellerPeriodPayoutCents } = require('../seller-billing')
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -46,11 +46,11 @@ module.exports = function createTransactionsRouter({
         }
         if (req.query.period_start) {
           params.push(req.query.period_start)
-          where.push(`DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) >= $${params.length}::date`)
+          where.push(`o.created_at >= $${params.length}::date`)
         }
         if (req.query.period_end) {
           params.push(req.query.period_end)
-          where.push(`DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) <= $${params.length}::date`)
+          where.push(`o.created_at < ($${params.length}::date + interval '1 day')`)
         }
         let sellerParamNum = null
         if (filterSellerId) {
@@ -77,6 +77,7 @@ module.exports = function createTransactionsRouter({
                   COALESCE(o.seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents,
                   o.stripe_payout_status, o.stripe_payout_id, o.stripe_account_id,
                   o.first_name, o.last_name, o.email, o.currency,
+                  o.sendcloud_label_url,
                   s.store_name, s.commission_rate, s.iban, s.vat_id,
                   COALESCE((SELECT SUM(rr.refund_amount_cents) FROM store_returns rr WHERE rr.order_id = o.id), 0)::bigint AS refund_cents,
                   (o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days') AS payout_eligible
@@ -126,46 +127,85 @@ module.exports = function createTransactionsRouter({
           returnRows = rr.rows
         } catch (_) { /* returns table may not exist yet */ }
 
+        const labeled = { anyIds: new Set(), balanceIds: new Set(), cardIds: new Set(), amountByOrder: new Map() }
+        try {
+          const labelParams = [req.query.period_end || '9999-12-31']
+          let labelSellerSql = ''
+          if (filterSellerId) {
+            labelParams.push(filterSellerId)
+            labelSellerSql = ` AND seller_id = $${labelParams.length}`
+          }
+          const allLabeled = await client.query(
+            `SELECT order_id::text AS id,
+                    COALESCE(charge_method, 'balance') AS charge_method,
+                    COALESCE(SUM(-amount_cents), 0)::bigint AS cents
+               FROM seller_ledger_adjustments
+              WHERE type = 'shipping_label' AND order_id IS NOT NULL
+                AND amount_cents < 0
+                AND created_at < ($1::date + interval '1 day')
+                ${labelSellerSql}
+              GROUP BY order_id, charge_method`,
+            labelParams,
+          )
+          for (const row of allLabeled.rows || []) {
+            if (!row.id) continue
+            const id = String(row.id)
+            labeled.anyIds.add(id)
+            const cents = Math.max(0, Number(row.cents || 0))
+            labeled.amountByOrder.set(id, (labeled.amountByOrder.get(id) || 0) + cents)
+            if (String(row.charge_method || 'balance') === 'card') labeled.cardIds.add(id)
+            else labeled.balanceIds.add(id)
+          }
+        } catch (_) {}
+
         const transactions = await Promise.all(r.rows.map(async (row) => {
           const commRate = parseFloat(row.commission_rate ?? 0.12)
-          // A shared (multi-seller) order's basis must come from only THIS seller's own line
-          // items — sellerOrderRevenueBasisCents() operates on the whole order and would
-          // otherwise attribute another seller's revenue to this seller too.
-          const isSharedForeignOrder = !!filterSellerId && String(row.seller_id || '').trim() !== String(filterSellerId).trim()
+          const headerSid = String(row.seller_id || '').trim()
+          const ownerSid = filterSellerId || (headerSid && headerSid !== 'default' ? headerSid : null)
+          const ownsWholeOrder = !!ownerSid && headerSid === String(ownerSid).trim() && headerSid !== 'default'
           let sellerBasis = sellerOrderRevenueBasisCents(row)
-          if (isSharedForeignOrder) {
+          if (ownerSid && !ownsWholeOrder) {
             const iRes = await client.query(`SELECT * FROM store_order_items WHERE order_id = $1`, [row.id])
             const enriched = await enrichOrderItemRows(client, iRes.rows || [])
-            const mine = filterItemsForSeller(enriched, filterSellerId, { isSuperuser: false, orderSellerId: row.seller_id })
+            const mine = filterItemsForSeller(enriched, ownerSid, { isSuperuser: false, orderSellerId: row.seller_id })
             sellerBasis = itemsSubtotalCents(mine)
           }
-          const customerPaid = resolveOrderPaidTotalCents(row)
-          const commission = isSharedForeignOrder
-            ? Math.round(sellerBasis * commRate)
-            : resolvePlatformApplicationFeeCents(row, commRate)
-          const storedNet = Number(row.seller_net_after_commission_cents)
-          const payout = isSharedForeignOrder
-            ? Math.max(0, sellerBasis - commission)
-            : (Number.isFinite(storedNet) && storedNet >= 0 ? storedNet : Math.max(0, sellerBasis - commission))
-          // Bonus points are platform-funded, not a seller price cut — the real (legal) order
-          // value is the paid amount plus the bonus-funded portion (BonusPunkte.md §3.5/§3.6).
-          const bonusRedeemedCents = orderBonusDiscountCents(row)
-          const orderValueCents = Math.max(0, customerPaid + bonusRedeemedCents)
-          const sellerVatId = row.vat_id ? String(row.vat_id).trim() : ''
-          const customerVatId = row.customer_vat_id ? String(row.customer_vat_id).trim() : ''
-          const goodsVat = salesInvoiceVat(row, { sellerHasVatId: !!sellerVatId, taxableGrossCents: orderValueCents, customerVatId })
+          const share = allocateSellerShareOfOrder(row, sellerBasis)
+          const customerPaid = share.customerPaidCents
+          const commission = ownsWholeOrder
+            ? resolvePlatformApplicationFeeCents(row, commRate)
+            : Math.round(sellerBasis * commRate)
+          const oid = String(row.id)
+          const paidByCard = labeled.cardIds.has(oid)
+          const hasSendcloud = String(row.sendcloud_label_url || '').trim() !== ''
+          const platformPaidLabel = labeled.balanceIds.has(oid) || (hasSendcloud && !paidByCard)
+          const shippingCustomerCents = share.shippingCents
+          const shippingPlatformCents = platformPaidLabel || paidByCard
+            ? (labeled.amountByOrder.get(oid) || (platformPaidLabel ? shippingCustomerCents : 0))
+            : 0
+          const shippingPayoutCents = (paidByCard || !platformPaidLabel) ? shippingCustomerCents : 0
+          const payout = sellerPeriodPayoutCents({
+            grossCents: sellerBasis,
+            commissionCents: commission,
+            shippingPayoutCents,
+            labelBalanceCents: 0,
+          })
           const commissionVatCents = Math.round(commission * resolvePlatformCommissionVatPercent() / 100)
           return {
             id: row.id,
             order_id: row.id,
             type: 'order',
             order_number: row.order_number,
-            seller_id: row.seller_id,
+            seller_id: ownerSid || row.seller_id,
             customer_id: row.customer_id || null,
             store_name: row.store_name || row.seller_id,
             total_cents: sellerBasis,
             customer_paid_cents: customerPaid,
-            shipping_cents: row.shipping_cents || 0,
+            shipping_cents: shippingCustomerCents,
+            shipping_customer_cents: shippingCustomerCents,
+            shipping_platform_cents: shippingPlatformCents,
+            shipping_payout_cents: shippingPayoutCents,
+            platform_labeled: platformPaidLabel && !paidByCard,
             discount_cents: row.discount_cents || 0,
             commission_rate: commRate,
             commission_cents: commission,
@@ -176,15 +216,8 @@ module.exports = function createTransactionsRouter({
             stripe_transfer_or_payout_id: row.stripe_transfer_id || row.stripe_payout_id || null,
             settlement_breakdown: buildOrderSettlementBreakdown(row, commRate),
             gross_sale_cents: sellerBasis,
-            bonus_earned_points: Math.ceil(Number(customerPaid || 0) / 100),
-            bonus_redeemed_cents: bonusRedeemedCents,
-            platform_bonus_funding_cents: Number(row.platform_bonus_funding_cents || 0),
             refund_cents: Number(row.refund_cents || 0),
             destination_country: row.country ? String(row.country).trim().toUpperCase() : null,
-            vat_scheme: goodsVat.scheme,
-            goods_vat_rate_percent: goodsVat.exempt ? 0 : goodsVat.ratePercent,
-            goods_net_cents: goodsVat.netCents,
-            goods_vat_cents: goodsVat.vatCents,
             payout_eligible: row.payout_eligible === true || row.payout_eligible === 't',
             payment_status: row.payment_status || 'offen',
             delivery_status: row.delivery_status || null,
@@ -215,6 +248,9 @@ module.exports = function createTransactionsRouter({
             seller_id: row.seller_id,
             total_cents: -refund,
             shipping_cents: 0,
+            shipping_customer_cents: 0,
+            shipping_platform_cents: 0,
+            shipping_payout_cents: 0,
             discount_cents: 0,
             commission_rate: commRate,
             commission_cents: refund > 0 ? -Math.round(refund * commRate) : 0,
@@ -234,18 +270,27 @@ module.exports = function createTransactionsRouter({
         // localized via the same lt()/copy pattern used for every other Transactions string.
         try {
           const ledgerParams = []
-          let ledgerWhere = ''
+          const ledgerWhere = []
           if (filterSellerId) {
             ledgerParams.push(filterSellerId)
-            ledgerWhere = 'WHERE la.seller_id = $1'
+            ledgerWhere.push(`la.seller_id = $${ledgerParams.length}`)
           }
+          if (req.query.period_start) {
+            ledgerParams.push(req.query.period_start)
+            ledgerWhere.push(`la.created_at >= $${ledgerParams.length}::date`)
+          }
+          if (req.query.period_end) {
+            ledgerParams.push(req.query.period_end)
+            ledgerWhere.push(`la.created_at < ($${ledgerParams.length}::date + interval '1 day')`)
+          }
+          const ledgerSql = ledgerWhere.length ? `WHERE ${ledgerWhere.join(' AND ')}` : ''
           const lr = await client.query(
             `SELECT la.id, la.seller_id, la.type, la.amount_cents, la.description_key, la.description_params,
                     la.order_id, la.charge_method, la.created_at, o.order_number, s.store_name
              FROM seller_ledger_adjustments la
              LEFT JOIN store_orders o ON o.id = la.order_id
              LEFT JOIN seller_users s ON s.seller_id = la.seller_id
-             ${ledgerWhere}
+             ${ledgerSql}
              ORDER BY la.created_at DESC LIMIT 500`,
             ledgerParams,
           )
@@ -259,6 +304,9 @@ module.exports = function createTransactionsRouter({
               store_name: row.store_name || row.seller_id,
               total_cents: Number(row.amount_cents || 0),
               shipping_cents: 0,
+              shipping_customer_cents: 0,
+              shipping_platform_cents: row.type === 'shipping_label' ? Math.abs(Number(row.amount_cents || 0)) : 0,
+              shipping_payout_cents: 0,
               discount_cents: 0,
               commission_rate: 0,
               commission_cents: 0,
@@ -280,11 +328,13 @@ module.exports = function createTransactionsRouter({
         // Group by seller if superuser
         const summary = {}
         for (const t of transactions) {
+          if (t.type && t.type !== 'order') continue
+          if (String(t.payment_status || '').toLowerCase() !== 'bezahlt') continue
           const sid = t.seller_id
           if (!summary[sid]) summary[sid] = { seller_id: sid, store_name: t.store_name, total_cents: 0, commission_cents: 0, payout_cents: 0, order_count: 0, iban: t.iban }
-          summary[sid].total_cents += t.total_cents
-          summary[sid].commission_cents += t.commission_cents
-          summary[sid].payout_cents += t.payout_cents
+          summary[sid].total_cents += Number(t.total_cents || 0)
+          summary[sid].commission_cents += Number(t.commission_cents || 0)
+          summary[sid].payout_cents += Number(t.payout_cents || 0)
           summary[sid].order_count += 1
         }
         await client.end()
@@ -345,22 +395,32 @@ module.exports = function createTransactionsRouter({
       }
     }
 
-    // GET /admin-hub/v1/seller-ledger — Amazon-style money movements for the signed-in seller
+    // GET /admin-hub/v1/seller-ledger — Amazon-style money movements (one row per kalem)
     const adminHubSellerLedgerGET = async (req, res) => {
       const scope = resolveSellerScope(req.sellerUser)
       if (!scope) return res.status(403).json({ message: 'Forbidden' })
-      const sellerId = scope.isSuperuser
-        ? (String(req.query.seller_id || '').trim() || scope.sellerId)
-        : scope.sellerId
-      if (!sellerId) return res.status(400).json({ message: 'seller_id required' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const { buildSellerLedger } = require('../seller-ledger')
+        const { buildSellerLedger, buildMarketplaceLedger, listLedgerSellers } = require('../seller-ledger')
         const periodStart = String(req.query.period_start || '').trim() || null
         const periodEnd = String(req.query.period_end || '').trim() || null
+        const requestedSeller = String(req.query.seller_id || '').trim()
+        if (scope.isSuperuser && !requestedSeller) {
+          const result = await buildMarketplaceLedger(client, { periodStart, periodEnd })
+          await client.end()
+          return res.json(result)
+        }
+        const sellerId = scope.isSuperuser ? requestedSeller : scope.sellerId
+        if (!sellerId) {
+          await client.end()
+          return res.status(400).json({ message: 'seller_id required' })
+        }
         const result = await buildSellerLedger(client, sellerId, { periodStart, periodEnd })
+        if (scope.isSuperuser) {
+          result.sellers = await listLedgerSellers(client)
+        }
         await client.end()
         res.json(result)
       } catch (e) {

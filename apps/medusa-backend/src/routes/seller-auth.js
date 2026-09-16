@@ -40,7 +40,9 @@ const _SELLER_JWT_SECRET = (() => {
   return s || 'dev-only-seller-secret-do-not-use-in-prod'
 })()
 
-const SELLER_TOKEN_TTL_SECONDS = 7 * 24 * 3600
+// 30 days — same device shouldn't have to re-enter password + 2FA every week (explicit user
+// request); the session-revoke UI (seller_sessions) is the actual "kick a device out" control.
+const SELLER_TOKEN_TTL_SECONDS = 30 * 24 * 3600
 
 const INITIAL_SUPERUSER_EMAILS = (process.env.SUPERUSER_EMAILS || 'murathan.cotuk@gmail.com')
   .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
@@ -51,7 +53,7 @@ const INITIAL_SUPERUSER_EMAILS = (process.env.SUPERUSER_EMAILS || 'murathan.cotu
 // them. Each login now also writes a row here and embeds its id as `sid` in the token; requests
 // carrying a `sid` get checked against this table (revoked/missing → 401), so revoking a device
 // actually ends that session instead of just hiding it in a UI. Tokens issued before this change
-// have no `sid` and keep working un-tracked until they naturally expire (7 days) — no forced logout.
+// have no `sid` and keep working un-tracked until they naturally expire (30 days) — no forced logout.
 async function ensureSellerSessionsTable(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS seller_sessions (
