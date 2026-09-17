@@ -1505,6 +1505,43 @@ class MedusaAdminClient {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/payout-overview${qs}`)
   }
+  async getSellerHealth(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/seller-health${qs}`)
+  }
+  async recalculateSellerHealth(data = {}) {
+    return this.request('/admin-hub/v1/seller-health/recalculate', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async getSellerHealthHistory(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/seller-health/history${qs}`)
+  }
+  async getSellerHealthSellers() {
+    return this.request('/admin-hub/v1/seller-health/sellers')
+  }
+  async getSellerHealthConfig() {
+    return this.request('/admin-hub/v1/seller-health/config')
+  }
+  async updateSellerHealthConfig(data) {
+    return this.request('/admin-hub/v1/seller-health/config', { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async resetSellerHealthConfig() {
+    return this.request('/admin-hub/v1/seller-health/config/reset', { method: 'POST' })
+  }
+  async getSellerHealthAuditLog(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/seller-health/config/audit-log${qs}`)
+  }
+  async getSellerHealthEvents(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/seller-health/events${qs}`)
+  }
+  async createSellerHealthEvent(data) {
+    return this.request('/admin-hub/v1/seller-health/events', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async resolveSellerHealthEvent(id) {
+    return this.request(`/admin-hub/v1/seller-health/events/${encodeURIComponent(id)}/resolve`, { method: 'PATCH' })
+  }
   async markPayoutPaid(data) {
     return this.request('/admin-hub/v1/payouts/mark-paid', { method: 'POST', body: JSON.stringify(data) })
   }

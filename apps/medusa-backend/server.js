@@ -2407,6 +2407,10 @@ async function start() {
       resolveStripeSecretKeyFromPlatform,
     }))
 
+    // --- Seller Health (Analysen → Seller Health): scoring engine + config + history: src/routes/seller-health.js ---
+    const createSellerHealthRouter = require('./src/routes/seller-health')
+    httpApp.use('/', createSellerHealthRouter())
+
     // mapDhlStatus is also used below by the background tracking refresh job (pure function, no closure state).
     function mapDhlStatus(event) {
       const st = event?.status && typeof event.status === 'object' ? event.status : {}

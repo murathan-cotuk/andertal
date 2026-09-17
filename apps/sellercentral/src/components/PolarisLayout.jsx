@@ -352,6 +352,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       subNavigationItems: [
         { url: "/analytics/reports", label: tx("reports", "Reports") },
         { url: "/analytics/transactions", label: tx("transactions", "Transactions") },
+        { url: "/analytics/seller-health", label: tx("sellerHealth", "Seller Health") },
         { url: "/analytics/live-view", label: tx("liveView", "Live View"), superuserOnly: true },
         { url: "/analytics/ranking", label: tx("ranking", "Ranking") },
       ],
