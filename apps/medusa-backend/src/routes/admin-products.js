@@ -293,10 +293,21 @@ const queueMetafieldSuggestionsAndSanitizePayload = async (body, sellerId) => {
   } catch (_) {
     definitionRows = { rows: [] }
   }
-  const maps = buildCatalogMaps(definitionRows.rows)
-  const scanned = scanProductCatalogPending(result.body.metadata, result.body.variants, maps)
-  result.body.metadata = scanned.metadata
-  if (scanned.variants) result.body.variants = scanned.variants
+  // Everything below is a non-blocking side quest (flag unrecognized Eigenschaft/variation
+  // values for superuser review) — it must NEVER be able to fail the actual product save. Any
+  // unexpected data shape here used to throw straight out of this function, past this call's
+  // uncaught call site, into adminHubProductByIdPUT's outer catch → a 500 that discarded the
+  // seller's edits entirely instead of just skipping the review-queue step.
+  let maps, scanned
+  try {
+    maps = buildCatalogMaps(definitionRows.rows)
+    scanned = scanProductCatalogPending(result.body.metadata, result.body.variants, maps)
+    result.body.metadata = scanned.metadata
+    if (scanned.variants) result.body.variants = scanned.variants
+  } catch (e) {
+    console.warn('queueMetafieldSuggestionsAndSanitizePayload scan:', e && e.message)
+    return result
+  }
   if (scanned.pendingByKey.size > 0) {
     try {
       const existingPending = await dbQ(

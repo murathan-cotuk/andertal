@@ -1,6 +1,11 @@
 'use client'
 
-const BASE = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || 'http://localhost:9000') + '/affiliate-api/v1'
+// Same convention as apps/shop and apps/sellercentral: fall back to the real production
+// backend, not localhost — this app is public-facing, and a missing/not-yet-rebuilt
+// NEXT_PUBLIC_MEDUSA_BACKEND_URL in production used to make every fetch here try
+// http://localhost:9000 from the VISITOR's own browser (ERR_CONNECTION_REFUSED).
+const DEFAULT_PUBLIC_MEDUSA_URL = 'https://api.andertal.com'
+const BASE = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || DEFAULT_PUBLIC_MEDUSA_URL).replace(/\/$/, '') + '/affiliate-api/v1'
 
 function getToken() {
   if (typeof window === 'undefined') return null
