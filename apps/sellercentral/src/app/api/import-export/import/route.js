@@ -1162,7 +1162,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
   return { payload };
 }
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 const ALLOWED_XLSX_MIME = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/octet-stream", // some browsers / OS send this for .xlsx

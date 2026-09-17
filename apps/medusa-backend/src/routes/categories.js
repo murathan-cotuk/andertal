@@ -495,6 +495,7 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
     const ordered = topoSortExcelItems(prepared)
     const createdBySlug = new Map()
     const createdById = new Map()
+    let processed = 0
 
     const resolveParent = (pref) => {
       if (!pref) return null
@@ -655,6 +656,11 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
           createdById.set(String(row.id).toLowerCase(), row)
           createdBySlug.set(String(row.slug).toLowerCase(), row)
           results.created++
+        }
+        processed++
+        if (processed % 200 === 0) {
+          await client.query('COMMIT')
+          await client.query('BEGIN')
         }
       } catch (rowErr) {
         results.failed++

@@ -26,10 +26,9 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     // Allow larger multipart/form-data payloads for Excel import route handlers.
-    proxyClientMaxBodySize: 50 * 1024 * 1024, // 50MB
-    // Keep in sync for potential server action usage.
+    proxyClientMaxBodySize: 100 * 1024 * 1024, // 100MB — category Excel with i18n HTML
     serverActions: {
-      bodySizeLimit: "50mb",
+      bodySizeLimit: "100mb",
     },
   },
   transpilePackages: ["@andertal/ui", "@andertal/lib"],

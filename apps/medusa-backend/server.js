@@ -294,7 +294,7 @@ async function start() {
       })
     }
     let logSellerError = async () => {}
-    const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '10mb'
+    const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '100mb'
     // Preserve raw Buffer on req.rawBody for Stripe webhook signature verification.
     // express.json() still parses normally; webhook handler reads req.rawBody instead of req.body.
     app.use(express.json({
