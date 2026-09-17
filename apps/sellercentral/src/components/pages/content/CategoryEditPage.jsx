@@ -15,7 +15,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
 import { getCategoryEditCopy } from "@/lib/category-edit-i18n";
-import { categoryDisplayName, categoryNameForEditForm, normalizeCategoryLocale } from "@/lib/category-locale";
+import { categoryDisplayName, categoryFieldsForEditForm, mergeCategoryLocaleIntoMetadata, normalizeCategoryLocale } from "@/lib/category-locale";
 import { userError } from "@/lib/api-error-messages";
 import { productStatusLabel, productStatusBadgeTone } from "@/lib/product-status-labels";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
@@ -160,32 +160,33 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
 
   const meta = (initialCategory?.metadata && typeof initialCategory.metadata === "object") ? initialCategory.metadata : {};
   const linkedCollectionId = meta.collection_id || null;
+  const localeFields = categoryFieldsForEditForm(initialCategory, locale);
 
   const [form, setForm] = useState({
-    name: categoryNameForEditForm(initialCategory, locale),
+    name: localeFields.name,
     slug: initialCategory?.slug ?? "",
-    long_content: initialCategory?.long_content ?? "",
+    long_content: localeFields.long_content,
     parent_id: initialCategory?.parent_id ?? "",
     active: initialCategory?.active !== false,
     is_visible: initialCategory?.is_visible !== false,
-    meta_title: meta.meta_title ?? "",
-    meta_description: meta.meta_description ?? "",
-    keywords: meta.keywords ?? "",
+    meta_title: localeFields.meta_title,
+    meta_description: localeFields.meta_description,
+    keywords: localeFields.keywords,
     image_url: safeStoredUrl(meta.image_url ?? initialCategory?.image_url ?? ""),
     banner_image_url: safeStoredUrl(meta.banner_image_url ?? initialCategory?.banner_image_url ?? ""),
     banner_video_url: safeStoredUrl(meta.banner_video_url ?? ""),
   });
 
   const initialFormRef = useRef(JSON.parse(JSON.stringify({
-    name: categoryNameForEditForm(initialCategory, locale),
+    name: localeFields.name,
     slug: initialCategory?.slug ?? "",
-    long_content: initialCategory?.long_content ?? "",
+    long_content: localeFields.long_content,
     parent_id: initialCategory?.parent_id ?? "",
     active: initialCategory?.active !== false,
     is_visible: initialCategory?.is_visible !== false,
-    meta_title: meta.meta_title ?? "",
-    meta_description: meta.meta_description ?? "",
-    keywords: meta.keywords ?? "",
+    meta_title: localeFields.meta_title,
+    meta_description: localeFields.meta_description,
+    keywords: localeFields.keywords,
     image_url: safeStoredUrl(meta.image_url ?? initialCategory?.image_url ?? ""),
     banner_image_url: safeStoredUrl(meta.banner_image_url ?? initialCategory?.banner_image_url ?? ""),
     banner_video_url: safeStoredUrl(meta.banner_video_url ?? ""),
@@ -225,12 +226,19 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
     if (richtextMode === "visual" && richtextEditorRef.current) {
       richtextEditorRef.current.innerHTML = form.long_content || "";
     }
-  }, [richtextMode]);
+  }, [richtextMode, form.long_content]);
 
   useEffect(() => {
     if (!initialCategory) return;
-    const nextName = categoryNameForEditForm(initialCategory, locale);
-    setForm((prev) => ({ ...prev, name: nextName }));
+    const next = categoryFieldsForEditForm(initialCategory, locale);
+    setForm((prev) => ({
+      ...prev,
+      name: next.name,
+      long_content: next.long_content,
+      meta_title: next.meta_title,
+      meta_description: next.meta_description,
+      keywords: next.keywords,
+    }));
   }, [locale, initialCategory?.id]);
 
   // Load categories for parent selector
@@ -265,29 +273,33 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
       const existingMeta = initialCategory.metadata && typeof initialCategory.metadata === "object"
         ? { ...initialCategory.metadata }
         : {};
-      const tr = { ...(existingMeta.translations || {}) };
       const trimmedName = (form.name || "").trim();
-      tr[loc] = { ...(tr[loc] || {}), name: trimmedName };
+      const metadata = mergeCategoryLocaleIntoMetadata(existingMeta, loc, {
+        name: trimmedName,
+        long_content: form.long_content || "",
+        meta_title: form.meta_title || "",
+        meta_description: form.meta_description || "",
+        keywords: form.keywords || "",
+      });
+      metadata.image_url = form.image_url || null;
+      metadata.banner_image_url = form.banner_image_url || null;
+      metadata.banner_video_url = form.banner_video_url || null;
       const canonicalName = loc === "en" ? trimmedName : (initialCategory.name || "").trim();
-      await client.updateAdminHubCategory(initialCategory.id, {
+      const payload = {
         name: canonicalName || initialCategory.name,
         slug: form.slug,
-        long_content: form.long_content || null,
         parent_id: form.parent_id || null,
         active: form.active,
         is_visible: form.is_visible,
         banner_image_url: form.banner_image_url || null,
-        metadata: {
-          ...existingMeta,
-          translations: tr,
-          meta_title: form.meta_title || null,
-          meta_description: form.meta_description || null,
-          keywords: form.keywords || null,
-          image_url: form.image_url || null,
-          banner_image_url: form.banner_image_url || null,
-          banner_video_url: form.banner_video_url || null,
-        },
-      });
+        metadata,
+      };
+      if (loc === "de") {
+        payload.long_content = form.long_content || null;
+        payload.seo_title = (form.meta_title || "").trim() || null;
+        payload.seo_description = (form.meta_description || "").trim() || null;
+      }
+      await client.updateAdminHubCategory(initialCategory.id, payload);
       initialFormRef.current = JSON.parse(JSON.stringify(form));
       unsaved?.setDirty(false);
       if (onReload) await onReload();

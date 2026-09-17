@@ -51,7 +51,7 @@ export default function CategoryDrilldownSelect({
   const [openUpward, setOpenUpward] = useState(false);
   const [triggerRect, setTriggerRect] = useState(null);
   const [search, setSearch] = useState("");
-  const [pathIds, setPathIds] = useState([]);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
 
   const tree = useMemo(() => normalizeCategories(categories, locale), [categories, locale]);
   const byId = useMemo(() => {
@@ -91,19 +91,13 @@ export default function CategoryDrilldownSelect({
     return rev.reverse();
   };
 
-  const currentNodes = useMemo(() => {
-    if (!pathIds.length) return tree;
-    const last = byId.get(pathIds[pathIds.length - 1]);
-    return last?.children || [];
-  }, [pathIds, byId, tree]);
-
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
     const rows = [];
     for (const n of byId.values()) {
       const display = labelFor(n);
-      const hay = `${display} ${n.name || ""} ${n.slug || ""}`.toLowerCase();
+      const hay = `${display} ${n.name || ""} ${n.slug || ""} ${n.id || ""}`.toLowerCase();
       if (!hay.includes(q)) continue;
       const breadcrumb = buildPathIds(n.id)
         .map((id) => labelFor(byId.get(id) || { id }))
@@ -116,8 +110,24 @@ export default function CategoryDrilldownSelect({
 
   useEffect(() => {
     if (!open) return;
-    setPathIds(buildPathIds(value));
+    const ancestors = buildPathIds(value).slice(0, -1);
+    if (ancestors.length) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        ancestors.forEach((id) => next.add(id));
+        return next;
+      });
+    }
   }, [open, value]);
+
+  const toggleExpand = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -158,13 +168,73 @@ export default function CategoryDrilldownSelect({
   }, []);
 
   const handleSelect = (nodeId) => {
-    const node = byId.get(nodeId);
     onChange?.(nodeId);
-    if (!node) return;
-    setPathIds(buildPathIds(nodeId));
     setSearch("");
-    if (!node.children?.length) setOpen(false);
+    setOpen(false);
   };
+
+  const renderTreeNodes = (nodes, depth) =>
+    nodes.map((node) => {
+      const hasChildren = !!node.children?.length;
+      const isExpanded = expandedIds.has(node.id);
+      return (
+        <div key={node.id}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              paddingLeft: depth * 16,
+            }}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); if (hasChildren) toggleExpand(node.id); }}
+              style={{
+                flex: "0 0 20px",
+                width: 20,
+                height: 28,
+                border: "none",
+                background: "none",
+                cursor: hasChildren ? "pointer" : "default",
+                color: "#9ca3af",
+                fontSize: 11,
+                visibility: hasChildren ? "visible" : "hidden",
+              }}
+              aria-label={isExpanded ? "Collapse" : "Expand"}
+            >
+              {isExpanded ? "▾" : "▸"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelect(node.id)}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                border: "none",
+                background: value === node.id ? "#eff6ff" : "transparent",
+                textAlign: "left",
+                padding: "6px 10px",
+                borderRadius: 8,
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <span style={{ fontSize: 13, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {labelFor(node)}
+              </span>
+              {hasChildren && (
+                <span style={{ fontSize: 11, color: "#9ca3af", flex: "0 0 auto" }}>{node.children.length}</span>
+              )}
+            </button>
+          </div>
+          {hasChildren && isExpanded && renderTreeNodes(node.children, depth + 1)}
+        </div>
+      );
+    });
 
   return (
     <div ref={wrapperRef} style={{ position: "relative", width: "100%" }}>
@@ -222,43 +292,43 @@ export default function CategoryDrilldownSelect({
               labelHidden
               value={search}
               onChange={setSearch}
-              placeholder="Type to search categories..."
+              placeholder="Search by name or ID..."
               autoComplete="off"
+              clearButton
+              onClearButtonClick={() => setSearch("")}
             />
           </div>
 
           {!search.trim() && (
-            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
               <button
                 type="button"
                 onClick={() => {
                   onChange?.("");
-                  setPathIds([]);
                   setOpen(false);
                 }}
                 style={{ border: "none", background: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0 }}
               >
                 {noneLabel}
               </button>
-              {pathIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setPathIds((prev) => prev.slice(0, -1))}
-                  style={{ border: "none", background: "none", color: "#374151", cursor: "pointer", fontSize: 12, padding: 0 }}
-                >
-                  ← Back
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setExpandedIds(new Set(byId.keys()))}
+                style={{ border: "none", background: "none", color: "#374151", cursor: "pointer", fontSize: 12, padding: 0 }}
+              >
+                Expand all
+              </button>
+              <button
+                type="button"
+                onClick={() => setExpandedIds(new Set())}
+                style={{ border: "none", background: "none", color: "#374151", cursor: "pointer", fontSize: 12, padding: 0 }}
+              >
+                Collapse all
+              </button>
             </div>
           )}
 
-          {!search.trim() && pathIds.length > 0 && (
-            <div style={{ marginBottom: 8, fontSize: 12, color: "#6b7280" }}>
-              {pathIds.map((id) => labelFor(byId.get(id) || { id })).join(" > ")}
-            </div>
-          )}
-
-          <div style={{ maxHeight: 260, overflowY: "auto", borderTop: "1px solid #f1f2f4", paddingTop: 8 }}>
+          <div style={{ maxHeight: 320, overflowY: "auto", borderTop: "1px solid #f1f2f4", paddingTop: 8 }}>
             {search.trim()
               ? searchResults.map((row) => (
                   <button
@@ -277,37 +347,16 @@ export default function CategoryDrilldownSelect({
                   >
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{row.label}</div>
                     <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{row.breadcrumb}</div>
+                    <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>ID: {row.id}</div>
                   </button>
                 ))
-              : currentNodes.map((node) => (
-                  <button
-                    type="button"
-                    key={node.id}
-                    onClick={() => handleSelect(node.id)}
-                    style={{
-                      width: "100%",
-                      border: "none",
-                      background: value === node.id ? "#eff6ff" : "transparent",
-                      textAlign: "left",
-                      padding: "8px 10px",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
-                  >
-                    <span style={{ fontSize: 13, color: "#111827" }}>{labelFor(node)}</span>
-                    <span style={{ fontSize: 12, color: "#9ca3af" }}>{node.children?.length ? `${node.children.length} ›` : ""}</span>
-                  </button>
-                ))}
+              : renderTreeNodes(tree, 0)}
 
             {search.trim() && searchResults.length === 0 && (
               <div style={{ padding: "8px 10px", fontSize: 12, color: "#9ca3af" }}>No category found.</div>
             )}
-            {!search.trim() && currentNodes.length === 0 && (
-              <div style={{ padding: "8px 10px", fontSize: 12, color: "#9ca3af" }}>No child category in this level.</div>
+            {!search.trim() && tree.length === 0 && (
+              <div style={{ padding: "8px 10px", fontSize: 12, color: "#9ca3af" }}>No categories.</div>
             )}
           </div>
         </div>,

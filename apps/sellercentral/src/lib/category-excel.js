@@ -17,17 +17,65 @@ export function langLabelsFor(locale) {
   };
 }
 
+function richTextToStr(parts) {
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .map((rt) => {
+      if (rt == null) return "";
+      if (typeof rt === "string" || typeof rt === "number") return String(rt);
+      if (typeof rt === "object") return String(rt.text || rt.result || "");
+      return "";
+    })
+    .join("")
+    .trim();
+}
+
 export function excelCellStr(val) {
   if (val == null) return "";
+  if (typeof val === "string" || typeof val === "number" || typeof val === "boolean") {
+    return String(val).trim();
+  }
+  if (val instanceof Date) return val.toISOString();
+  if (Array.isArray(val)) return richTextToStr(val);
   if (typeof val === "object") {
-    if (val instanceof Date) return val.toISOString();
-    if (typeof val.hyperlink === "string" && val.hyperlink) return val.hyperlink.trim();
+    if (typeof val.hyperlink === "string" && val.hyperlink) {
+      const label = typeof val.text === "string" ? val.text.trim() : "";
+      return label || val.hyperlink.trim();
+    }
     if (typeof val.text === "string" && val.text) return val.text.trim();
     if (val.result != null) return String(val.result).trim();
-    if (Array.isArray(val.richText)) return val.richText.map((rt) => String(rt.text || "")).join("").trim();
-    return "";
+    if (Array.isArray(val.richText)) return richTextToStr(val.richText);
   }
-  return String(val).trim();
+  return "";
+}
+
+function cellPlain(cell) {
+  if (!cell) return "";
+  const fromVal = excelCellStr(cell.value);
+  if (fromVal) return fromVal;
+  try {
+    const t = cell.text;
+    if (t != null && String(t).trim()) return String(t).trim();
+  } catch (_) {
+    /* ExcelJS text getter can throw on some cell types */
+  }
+  return "";
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HINT_ROW_RE = /UUID oder Slug|Bestehende Kategorie|leave empty|Richtext HTML|URL-Slug|Übergeordnete|sprachunabhängig|empty to create|leer = neu/i;
+
+export function isCategoryExcelHintRow(get, vals) {
+  const id = get(vals, "id");
+  const slug = get(vals, "slug");
+  const parent = get(vals, "parent_id");
+  if (UUID_RE.test(id) || UUID_RE.test(parent)) return false;
+  if (slug && /^[a-z0-9][a-z0-9-]{0,80}$/i.test(slug) && !/\s/.test(slug)) return false;
+  const nameDe = get(vals, "name_de");
+  const nameEn = get(vals, "name_en");
+  if (/^(Name|İsim|Nom|Nombre|Nome)\s*\(/i.test(nameDe || nameEn)) return true;
+  const blob = [id, slug, parent, nameDe, nameEn].join("\n");
+  return HINT_ROW_RE.test(blob);
 }
 
 export function buildCategoryExcelColumns(locale) {
@@ -310,7 +358,7 @@ export function paintCategoryWorkbook(wb, { locale, rows = [], indexRows = [] })
 function rowValues(ws, rowNumber, maxCol) {
   const row = ws.getRow(rowNumber);
   const out = [];
-  for (let c = 1; c <= maxCol; c++) out.push(excelCellStr(row.getCell(c).value));
+  for (let c = 1; c <= maxCol; c++) out.push(cellPlain(row.getCell(c)));
   return out;
 }
 
@@ -321,6 +369,7 @@ export function parseCategoryExcelWorksheet(ws) {
       maxCol = Math.max(maxCol, colNumber);
     });
   });
+  maxCol = Math.max(maxCol, Number(ws.columnCount) || 0, Number(ws.actualColumnCount) || 0);
   if (maxCol < 1) return { items: [], errors: ["Empty sheet"] };
 
   let headerRow = 2;
@@ -335,11 +384,11 @@ export function parseCategoryExcelWorksheet(ws) {
   const headers = rowValues(ws, headerRow, maxCol).map((h) => String(h || "").trim());
   const idx = {};
   headers.forEach((h, i) => {
-    if (h) idx[h] = i;
+    if (h) idx[h.toLowerCase()] = i;
   });
 
   const get = (vals, key) => {
-    const i = idx[key];
+    const i = idx[String(key || "").toLowerCase()];
     if (i === undefined) return "";
     return excelCellStr(vals[i]);
   };
@@ -347,9 +396,7 @@ export function parseCategoryExcelWorksheet(ws) {
 
   let dataStart = headerRow + 1;
   const maybeHint = rowValues(ws, dataStart, maxCol);
-  const hintHasKey = present(maybeHint, "id") || present(maybeHint, "slug") || present(maybeHint, "name_de") || present(maybeHint, "parent_id");
-  const hintLooksLikeNote = maybeHint.some((v) => v.length > 40);
-  if (!hintHasKey && hintLooksLikeNote) dataStart = headerRow + 2;
+  if (isCategoryExcelHintRow(get, maybeHint)) dataStart = headerRow + 2;
 
   const items = [];
   const errors = [];
@@ -357,12 +404,14 @@ export function parseCategoryExcelWorksheet(ws) {
     const vals = rowValues(ws, r, maxCol);
     if (!vals.some((v) => v)) continue;
     if (get(vals, "id").startsWith("#") || get(vals, "slug").startsWith("#")) continue;
+    if (isCategoryExcelHintRow(get, vals)) continue;
 
     const translations = {};
     for (const lang of CATEGORY_EXCEL_LANGS) {
       const patch = {};
       if (present(vals, `name_${lang}`)) patch.name = get(vals, `name_${lang}`);
-      if (present(vals, `description_${lang}`)) patch.long_content = get(vals, `description_${lang}`);
+      const description = get(vals, `description_${lang}`) || get(vals, `long_content_${lang}`);
+      if (description) patch.long_content = description;
       if (present(vals, `seo_title_${lang}`)) patch.seo_title = get(vals, `seo_title_${lang}`);
       if (present(vals, `seo_description_${lang}`)) patch.seo_description = get(vals, `seo_description_${lang}`);
       if (present(vals, `seo_keywords_${lang}`)) patch.seo_keywords = get(vals, `seo_keywords_${lang}`);

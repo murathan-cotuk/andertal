@@ -26,7 +26,7 @@ import MediaPickerModal from "@/components/MediaPickerModal";
 import RichTextEditor from "@/components/RichTextEditor";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { useLocale } from "next-intl";
-import { categoryDisplayName, categoryNameForEditForm, normalizeCategoryLocale } from "@/lib/category-locale";
+import { categoryDisplayName, categoryFieldsForEditForm, mergeCategoryLocaleIntoMetadata, normalizeCategoryLocale } from "@/lib/category-locale";
 import { seoPlainPreview } from "@/lib/product-change-request-format";
 import { lt } from "@/lib/locale-text";
 
@@ -334,8 +334,9 @@ export default function ContentCategoriesPage() {
   const openEdit = (cat) => {
     setEditId(cat.id);
     setSlugManuallyEdited(false);
+    const locFields = categoryFieldsForEditForm(cat, locale);
     setForm({
-      name: categoryNameForEditForm(cat, locale) || cat.name || "",
+      name: locFields.name || cat.name || "",
       slug: cat.slug || slugFromName(cat.name || ""),
       description: cat.description || "",
       parent_id: cat.parent_id || "",
@@ -344,10 +345,10 @@ export default function ContentCategoriesPage() {
       is_visible: !!cat.is_visible,
       collection_id: (cat.metadata && cat.metadata.collection_id) || "",
       display_title: (cat.metadata && cat.metadata.display_title) || "",
-      meta_title: cat.seo_title || (cat.metadata && cat.metadata.meta_title) || "",
-      meta_description: cat.seo_description || (cat.metadata && cat.metadata.meta_description) || "",
-      keywords: (cat.metadata && cat.metadata.keywords) || "",
-      richtext: cat.long_content || (cat.metadata && cat.metadata.richtext) || "",
+      meta_title: locFields.meta_title,
+      meta_description: locFields.meta_description,
+      keywords: locFields.keywords,
+      richtext: locFields.long_content,
       image_url: cleanUrl(cat.metadata && cat.metadata.image_url),
       banner_image_url: cleanUrl(cat.banner_image_url ?? (cat.metadata && cat.metadata.banner_image_url)),
     });
@@ -415,38 +416,48 @@ export default function ContentCategoriesPage() {
       setError("Name and slug are required.");
       return;
     }
+    const loc = normalizeCategoryLocale(locale);
     const payload = {
-      name,
       slug,
       description: (form.description || "").trim() || undefined,
       parent_id: form.parent_id || null,
       has_collection: !!form.has_collection,
       active: !!form.active,
       is_visible: !!form.is_visible,
-      seo_title: (form.meta_title || "").trim() || null,
-      seo_description: (form.meta_description || "").trim() || null,
-      long_content: (form.richtext || "").trim() || null,
       banner_image_url: (form.banner_image_url || "").trim() || null,
       metadata: {
         ...(form.collection_id ? { collection_id: form.collection_id } : {}),
         display_title: (form.display_title || "").trim() || null,
-        meta_title: (form.meta_title || "").trim() || null,
-        meta_description: (form.meta_description || "").trim() || null,
-        keywords: (form.keywords || "").trim() || null,
-        richtext: (form.richtext || "").trim() || null,
         image_url: (form.image_url || "").trim() || null,
         banner_image_url: (form.banner_image_url || "").trim() || null,
       },
     };
+    if (loc === "de") {
+      payload.name = name;
+      payload.seo_title = (form.meta_title || "").trim() || null;
+      payload.seo_description = (form.meta_description || "").trim() || null;
+      payload.long_content = (form.richtext || "").trim() || null;
+    } else {
+      payload.name = editId
+        ? (categories.find((c) => c.id === editId)?.name || name)
+        : name;
+    }
 
     try {
       if (editId) {
         const existing = categories.find((c) => c.id === editId);
         const existingMeta = existing?.metadata && typeof existing.metadata === "object" ? { ...existing.metadata } : {};
-        const loc = normalizeCategoryLocale(locale);
-        const tr = { ...(existingMeta.translations || {}) };
-        tr[loc] = { ...(tr[loc] || {}), name };
-        payload.metadata = { ...existingMeta, ...payload.metadata, translations: tr };
+        payload.metadata = mergeCategoryLocaleIntoMetadata(existingMeta, loc, {
+          name,
+          long_content: form.richtext || "",
+          meta_title: form.meta_title || "",
+          meta_description: form.meta_description || "",
+          keywords: form.keywords || "",
+        });
+        if (form.collection_id) payload.metadata.collection_id = form.collection_id;
+        payload.metadata.display_title = (form.display_title || "").trim() || null;
+        payload.metadata.image_url = (form.image_url || "").trim() || null;
+        payload.metadata.banner_image_url = (form.banner_image_url || "").trim() || null;
         if (loc !== "en" && existing?.name) payload.name = existing.name;
         setSaving(true);
         setError(null);
@@ -454,6 +465,18 @@ export default function ContentCategoriesPage() {
         setModalOpen(false);
         await fetchCategories();
       } else {
+        payload.name = name;
+        payload.seo_title = (form.meta_title || "").trim() || null;
+        payload.seo_description = (form.meta_description || "").trim() || null;
+        payload.long_content = (form.richtext || "").trim() || null;
+        payload.metadata = mergeCategoryLocaleIntoMetadata(payload.metadata, loc, {
+          name,
+          long_content: form.richtext || "",
+          meta_title: form.meta_title || "",
+          meta_description: form.meta_description || "",
+          keywords: form.keywords || "",
+        });
+        if (form.collection_id) payload.metadata.collection_id = form.collection_id;
         setCreating(true);
         setError(null);
         await client.createAdminHubCategory(payload);

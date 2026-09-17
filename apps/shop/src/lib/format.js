@@ -67,6 +67,7 @@ export function getLocalizedCategory(category, locale) {
     name: pickTranslatedField(tr, meta, "name", locale, category.name),
     description: pickTranslatedField(tr, meta, "description", locale, category.description),
     long_content:
+      (tr && tr[loc] && (tr[loc].long_content || tr[loc].description)) ||
       pickTranslatedField(tr, meta, "long_content", locale, null) ||
       pickTranslatedField(tr, meta, "description", locale, null) ||
       category.long_content ||

@@ -394,15 +394,16 @@ function applyExcelLocalePatch(tr, seoI18n, loc, patch) {
   }
   if (patch.seo_title != null && String(patch.seo_title).trim()) cur.seo_title = String(patch.seo_title).trim()
   if (patch.seo_description != null && String(patch.seo_description).trim()) cur.seo_description = String(patch.seo_description).trim()
-  if (patch.seo_keywords != null && String(patch.seo_keywords).trim()) cur.keywords = String(patch.seo_keywords).trim()
-  tr[loc] = cur
-  if (loc !== 'de') {
-    const seo = { ...(seoI18n[loc] && typeof seoI18n[loc] === 'object' ? seoI18n[loc] : {}) }
-    if (patch.seo_title != null && String(patch.seo_title).trim()) seo.meta_title = String(patch.seo_title).trim()
-    if (patch.seo_description != null && String(patch.seo_description).trim()) seo.meta_description = String(patch.seo_description).trim()
-    if (patch.seo_keywords != null && String(patch.seo_keywords).trim()) seo.keywords = String(patch.seo_keywords).trim()
-    seoI18n[loc] = seo
+  if (patch.seo_keywords != null && String(patch.seo_keywords).trim()) {
+    cur.keywords = String(patch.seo_keywords).trim()
+    cur.seo_keywords = String(patch.seo_keywords).trim()
   }
+  tr[loc] = cur
+  const seo = { ...(seoI18n[loc] && typeof seoI18n[loc] === 'object' ? seoI18n[loc] : {}) }
+  if (patch.seo_title != null && String(patch.seo_title).trim()) seo.meta_title = String(patch.seo_title).trim()
+  if (patch.seo_description != null && String(patch.seo_description).trim()) seo.meta_description = String(patch.seo_description).trim()
+  if (patch.seo_keywords != null && String(patch.seo_keywords).trim()) seo.keywords = String(patch.seo_keywords).trim()
+  if (seo.meta_title || seo.meta_description || seo.keywords) seoI18n[loc] = seo
 }
 
 function pickCanonicalFromTranslations(tr, existing) {
@@ -533,11 +534,14 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
           }
         }
 
-        const tr = existingRow?.metadata?.translations && typeof existingRow.metadata.translations === 'object'
-          ? { ...existingRow.metadata.translations }
+        const rawMeta = existingRow?.metadata && typeof existingRow.metadata === 'object'
+          ? existingRow.metadata
           : {}
-        const seoI18n = existingRow?.metadata?.seo_i18n && typeof existingRow.metadata.seo_i18n === 'object'
-          ? { ...existingRow.metadata.seo_i18n }
+        const tr = rawMeta.translations && typeof rawMeta.translations === 'object'
+          ? JSON.parse(JSON.stringify(rawMeta.translations))
+          : {}
+        const seoI18n = rawMeta.seo_i18n && typeof rawMeta.seo_i18n === 'object'
+          ? JSON.parse(JSON.stringify(rawMeta.seo_i18n))
           : {}
         for (const loc of EXCEL_LANGS) {
           if (translationsIn[loc]) applyExcelLocalePatch(tr, seoI18n, loc, translationsIn[loc])
