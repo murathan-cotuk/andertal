@@ -14,6 +14,7 @@ const { resolveLocaleFromCountry } = require('../locale-from-country')
 const { createReturnLabelForOrder } = require('../return-label')
 const { pickCountryMerchandiseCents, normalizeCountryCode, isValidEuVatIdFormat } = require('../goods-vat')
 const { checkVatIdViaVies } = require('../vies-check')
+const { resolveProductCommissionOverride } = require('../commission-rate')
 
 /**
  * Runs the live VIES lookup for a 'gewerbe' customer's VAT-ID and returns the row values to
@@ -3691,14 +3692,44 @@ const storeOrdersPOST = async (req, res) => {
     // one seller_id is stamped on the order. seller_net_after_commission_cents must reflect only
     // THIS seller's own line items, not the whole cart's subtotal, or a shared order would pay out
     // the "primary" seller for merchandise that isn't theirs.
-    const sellerOwnItemsSubtotalCents = items
-      .filter((it) => cartLineSellerKey(it) === sellerId)
+    const sellerOwnItems = items.filter((it) => cartLineSellerKey(it) === sellerId)
+    const sellerOwnItemsSubtotalCents = sellerOwnItems
       .reduce((sum, it) => sum + Number(it.unit_price_cents || 0) * Number(it.quantity || 1), 0)
     const sellerScopedBasisCents = sellerOwnItemsSubtotalCents > 0 ? sellerOwnItemsSubtotalCents : subtotalCents
-    const platformFeeMerchandiseBasis = platformCommissionCentsFromMerchandise(
-      { subtotal_cents: sellerScopedBasisCents, total_cents: orderPaidTotalCents },
-      sellerCommissionRate,
-    )
+    // Per-product commission override (Sellercentral → Produkte → "Komisyon oranı ayarla",
+    // superuser only): each line item uses ITS OWN product's override rate when one is set,
+    // falling back to the seller's own commission_rate. Summed per item rather than applying
+    // one flat rate to the whole basis, since a cart can mix overridden and non-overridden
+    // products from the same seller.
+    let platformFeeMerchandiseBasis
+    if (sellerOwnItemsSubtotalCents > 0) {
+      const productIds = [...new Set(sellerOwnItems.map((it) => String(it.product_id || '')).filter(Boolean))]
+      const overrideByProduct = new Map()
+      if (productIds.length) {
+        try {
+          const ovR = await client.query(
+            `SELECT id, metadata->>'commission_rate_override' AS ov FROM admin_hub_products WHERE id::text = ANY($1::text[])`,
+            [productIds],
+          )
+          for (const row of ovR.rows || []) {
+            const ov = resolveProductCommissionOverride(row.ov)
+            if (ov != null) overrideByProduct.set(String(row.id), ov)
+          }
+        } catch (_) {}
+      }
+      platformFeeMerchandiseBasis = sellerOwnItems.reduce((sum, it) => {
+        const lineCents = Number(it.unit_price_cents || 0) * Number(it.quantity || 1)
+        const rate = overrideByProduct.has(String(it.product_id)) ? overrideByProduct.get(String(it.product_id)) : sellerCommissionRate
+        return sum + Math.max(0, Math.round(lineCents * rate))
+      }, 0)
+    } else {
+      // Fallback for the (legacy/edge-case) path where no cart line carries this seller's id —
+      // no per-item product lookup possible here, same as the original flat-rate behavior.
+      platformFeeMerchandiseBasis = platformCommissionCentsFromMerchandise(
+        { subtotal_cents: sellerScopedBasisCents, total_cents: orderPaidTotalCents },
+        sellerCommissionRate,
+      )
+    }
 
     // When piStripeAccountId is set, the payment was routed via Destination Charge.
     // The commission (application_fee_amount) was already deducted by Stripe.

@@ -1556,6 +1556,14 @@ class MedusaAdminClient {
     return this.request('/admin-hub/v1/seller/iban', { method: 'PATCH', body: JSON.stringify({ iban }) })
   }
 
+  /** Superuser-only: set (percent, e.g. 8 for 8%) or clear (null) a product's own commission rate. */
+  async setProductCommissionOverride(productId, ratePercent) {
+    return this.request(`/admin-hub/v1/products/${encodeURIComponent(productId)}/commission-override`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rate: ratePercent }),
+    })
+  }
+
   /** Devices/sessions for the logged-in account — Settings → Security. */
   async getSellerSessions() {
     return this.request('/admin-hub/v1/sessions')

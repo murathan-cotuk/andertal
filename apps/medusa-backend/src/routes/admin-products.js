@@ -9,6 +9,7 @@ const {
   patchPlaceholderTranslationHandles,
 } = require('../product-url-handle')
 const { assignAnId } = require('../an-id')
+const { resolveProductCommissionOverride, productCommissionOverridePct } = require('../commission-rate')
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -2052,6 +2053,54 @@ module.exports = function createAdminProductsRouter() {
       res.json({ claimed: true, product_id: productId, seller_id: sellerId })
     } catch (err) {
       console.error('claim-owner error:', err)
+      res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    } finally {
+      try { await client.end() } catch (_) {}
+    }
+  })
+
+  // PATCH /admin-hub/v1/products/:id/commission-override — superuser only. Sets (rate, a percent
+  // like 8 for 8%) or clears (rate: null) a per-product commission override, read at checkout by
+  // store-checkout.js instead of the seller's own commission_rate for that product's line items.
+  // Writes metadata directly (not via the full product-save pipeline) so this never triggers
+  // GPSR/metafield-suggestion side effects for what is otherwise a plain admin toggle.
+  router.patch('/admin-hub/v1/products/:id/commission-override', requireSuperuser, async (req, res) => {
+    const productId = String(req.params.id || '').trim()
+    if (!productId) return res.status(400).json({ message: 'product id required' })
+    const rawRate = req.body?.rate
+    const clearing = rawRate == null || rawRate === ''
+    const resolvedRate = clearing ? null : resolveProductCommissionOverride(rawRate)
+    if (!clearing && resolvedRate == null) {
+      return res.status(400).json({ message: 'rate must be a number between 0 and 100 (percent), or null to clear' })
+    }
+    const client = getProductsDbClient()
+    if (!client) return res.status(503).json({ message: 'Database not configured' })
+    try {
+      await client.connect()
+      const r = clearing
+        ? await client.query(
+            `UPDATE admin_hub_products
+             SET metadata = COALESCE(metadata, '{}'::jsonb) - 'commission_rate_override', updated_at = now()
+             WHERE id = $1::uuid
+             RETURNING id, metadata->>'commission_rate_override' AS commission_rate_override`,
+            [productId]
+          )
+        : await client.query(
+            `UPDATE admin_hub_products
+             SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb, updated_at = now()
+             WHERE id = $1::uuid
+             RETURNING id, metadata->>'commission_rate_override' AS commission_rate_override`,
+            [productId, JSON.stringify({ commission_rate_override: resolvedRate })]
+          )
+      if (!r.rows[0]) return res.status(404).json({ message: 'Product not found' })
+      const stored = r.rows[0].commission_rate_override
+      res.json({
+        product_id: productId,
+        commission_rate_override: stored == null ? null : Number(stored),
+        commission_rate_override_pct: productCommissionOverridePct(stored),
+      })
+    } catch (err) {
+      console.error('commission-override PATCH error:', err)
       res.status(500).json({ message: (err && err.message) || 'Internal server error' })
     } finally {
       try { await client.end() } catch (_) {}

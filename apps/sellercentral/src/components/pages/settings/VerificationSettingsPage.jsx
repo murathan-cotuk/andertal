@@ -43,6 +43,9 @@ const tByLocale = (l) => {
       vatId: "KDV numarası",
       vatIdHelp: "Örn. DE123456789 — KDV mükellefleri için. Uluslararası satış yapıyorsanız zorunludur.",
       iban: "IBAN",
+      accountHolder: "Hesap sahibinin adı",
+      bic: "BIC / SWIFT",
+      bicHelp: "İsteğe bağlı — çoğu SEPA ödemesi için gerekmez.",
       phone: "Telefon numarası",
       phoneCountry: "Ülke kodu",
       street: "Adres (sokak, bina no)",
@@ -120,6 +123,9 @@ const tByLocale = (l) => {
       vatId: "USt-IdNr.",
       vatIdHelp: "Z.B. DE123456789 — Umsatzsteuer-Identifikationsnummer, beginnt mit Ländercode + 9 Ziffern. Nur für USt-pflichtige Unternehmen.",
       iban: "IBAN",
+      accountHolder: "Kontoinhaber",
+      bic: "BIC / SWIFT",
+      bicHelp: "Optional — für die meisten SEPA-Zahlungen nicht nötig.",
       phone: "Telefonnummer",
       phoneCountry: "Vorwahl",
       street: "Straße und Hausnummer",
@@ -197,6 +203,9 @@ const tByLocale = (l) => {
       vatId: "Numéro de TVA",
       vatIdHelp: "Ex. FR12345678901 — requis pour les entreprises assujetties à la TVA.",
       iban: "IBAN",
+      accountHolder: "Titulaire du compte",
+      bic: "BIC / SWIFT",
+      bicHelp: "Facultatif — pas nécessaire pour la plupart des paiements SEPA.",
       phone: "Numéro de téléphone",
       phoneCountry: "Indicatif",
       street: "Adresse (rue, numéro)",
@@ -274,6 +283,9 @@ const tByLocale = (l) => {
       vatId: "NIF-IVA",
       vatIdHelp: "Ej. ES12345678A — requerido para empresas registradas a efectos del IVA.",
       iban: "IBAN",
+      accountHolder: "Titular de la cuenta",
+      bic: "BIC / SWIFT",
+      bicHelp: "Opcional — no necesario para la mayoría de pagos SEPA.",
       phone: "Número de teléfono",
       phoneCountry: "Prefijo",
       street: "Dirección (calle, número)",
@@ -351,6 +363,9 @@ const tByLocale = (l) => {
       vatId: "Partita IVA",
       vatIdHelp: "Es. IT12345678901 — richiesta per le imprese registrate ai fini IVA.",
       iban: "IBAN",
+      accountHolder: "Intestatario del conto",
+      bic: "BIC / SWIFT",
+      bicHelp: "Facoltativo — non necessario per la maggior parte dei pagamenti SEPA.",
       phone: "Numero di telefono",
       phoneCountry: "Prefisso",
       street: "Indirizzo (via, numero civico)",
@@ -427,6 +442,9 @@ const tByLocale = (l) => {
     vatId: "VAT ID",
     vatIdHelp: "e.g. DE123456789 — Required for VAT-registered businesses. Starts with country code + digits.",
     iban: "IBAN",
+    accountHolder: "Account holder name",
+    bic: "BIC / SWIFT",
+    bicHelp: "Optional — not needed for most SEPA payments.",
     phone: "Phone number",
     phoneCountry: "Country code",
     street: "Street address",
@@ -1138,6 +1156,8 @@ export default function VerificationSettingsPage() {
     vatId: "",
     lucidNumber: "",
     iban: "",
+    accountHolder: "",
+    bic: "",
     phone: "",
     street: "",
     city: "",
@@ -1156,6 +1176,8 @@ export default function VerificationSettingsPage() {
       vatId: nextForm.vatId || "",
       lucidNumber: nextForm.lucidNumber || "",
       iban: nextForm.iban || "",
+      accountHolder: nextForm.accountHolder || "",
+      bic: nextForm.bic || "",
       phone: nextForm.phone || "",
       street: nextForm.street || "",
       city: nextForm.city || "",
@@ -1197,6 +1219,8 @@ export default function VerificationSettingsPage() {
           vatId: seller?.vat_id || "",
           lucidNumber: seller?.lucid_number || "",
           iban: seller?.iban || "",
+          accountHolder: seller?.payment_account_holder || "",
+          bic: seller?.payment_bic || "",
           phone: number,
           street: addr?.street || "",
           city: addr?.city || "",
@@ -1325,6 +1349,8 @@ export default function VerificationSettingsPage() {
           country: form.country.trim() || null,
         },
         documents,
+        payment_account_holder: form.accountHolder.trim() || null,
+        payment_bic: form.bic.replace(/\s/g, "").toUpperCase() || null,
       });
       await client.updateSellerIban(form.iban.trim() || null);
       setSuccess(t.saveDraftOk);
@@ -1365,6 +1391,8 @@ export default function VerificationSettingsPage() {
           country: form.country.trim() || null,
         },
         documents,
+        payment_account_holder: form.accountHolder.trim() || null,
+        payment_bic: form.bic.replace(/\s/g, "").toUpperCase() || null,
       });
       await client.updateSellerIban(form.iban.trim() || null);
       let pipelineResult = null;
@@ -1427,6 +1455,8 @@ export default function VerificationSettingsPage() {
         vatId: snap.vatId || "",
         lucidNumber: snap.lucidNumber || "",
         iban: snap.iban || "",
+        accountHolder: snap.accountHolder || "",
+        bic: snap.bic || "",
         phone: snap.phone || "",
         street: snap.street || "",
         city: snap.city || "",
@@ -1636,6 +1666,20 @@ export default function VerificationSettingsPage() {
                 placeholder="DE1234567890123"
               />
               <TextField label={t.iban} value={form.iban} onChange={(v) => setForm((p) => ({ ...p, iban: v }))} autoComplete="off" />
+              <TextField
+                label={t.accountHolder}
+                value={form.accountHolder}
+                onChange={(v) => setForm((p) => ({ ...p, accountHolder: v }))}
+                autoComplete="off"
+              />
+              <TextField
+                label={t.bic}
+                value={form.bic}
+                onChange={(v) => setForm((p) => ({ ...p, bic: v.toUpperCase() }))}
+                autoComplete="off"
+                helpText={t.bicHelp}
+                placeholder="COBADEFFXXX"
+              />
             </BlockStack>
           </Card>
 

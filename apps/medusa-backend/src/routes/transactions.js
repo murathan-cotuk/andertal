@@ -70,7 +70,7 @@ module.exports = function createTransactionsRouter({
           `SELECT o.id, o.order_number, o.seller_id, o.customer_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
                   o.coupon_discount_cents, o.country, o.bonus_points_redeemed, o.customer_vat_id,
                   COALESCE(o.platform_bonus_funding_cents, 0)::bigint AS platform_bonus_funding_cents,
-                  o.payment_status, o.delivery_status, o.delivery_date, o.created_at,
+                  o.payment_status, o.order_status, o.delivery_status, o.delivery_date, o.created_at,
                   o.stripe_transfer_status, o.stripe_transfer_id, o.stripe_transfer_error, o.stripe_transfer_at,
                   o.payment_intent_id, COALESCE(o.checkout_payment_kind, 'stripe') AS checkout_payment_kind,
                   o.stripe_application_fee_cents,
@@ -80,7 +80,27 @@ module.exports = function createTransactionsRouter({
                   o.sendcloud_label_url,
                   s.store_name, s.commission_rate, s.iban, s.vat_id,
                   COALESCE((SELECT SUM(rr.refund_amount_cents) FROM store_returns rr WHERE rr.order_id = o.id), 0)::bigint AS refund_cents,
-                  (o.delivery_date IS NOT NULL AND o.delivery_date <= now() - interval '${limitDays} days') AS payout_eligible
+                  -- Must mirror payouts.js's payoutEligibleOrderSql exactly (same "is this order
+                  -- actually part of the next Friday IBAN payout run" gate) — a simple 14-day
+                  -- delivery check alone over-counts orders that are cancelled/refunded/mid-return.
+                  (o.payment_status = 'bezahlt'
+                    AND o.delivery_date IS NOT NULL
+                    AND o.delivery_date <= now() - interval '${limitDays} days'
+                    AND COALESCE(o.order_status, '') NOT IN ('storniert', 'refunded', 'retoure', 'retoure_anfrage')
+                    AND NOT EXISTS (
+                      SELECT 1 FROM store_returns r2
+                      WHERE r2.order_id = o.id AND COALESCE(r2.status, '') NOT IN ('abgelehnt', 'abgeschlossen')
+                    )
+                  ) AS payout_eligible,
+                  -- Distinguishes "still in the 14-day hold" from "will never be paid out"
+                  -- (cancelled/refunded/open return) — the frontend's "waiting" bucket must
+                  -- exclude the latter, not just anything with payout_eligible = false.
+                  (COALESCE(o.order_status, '') IN ('storniert', 'refunded', 'retoure', 'retoure_anfrage')
+                    OR EXISTS (
+                      SELECT 1 FROM store_returns r3
+                      WHERE r3.order_id = o.id AND COALESCE(r3.status, '') NOT IN ('abgelehnt', 'abgeschlossen')
+                    )
+                  ) AS payout_blocked
            FROM store_orders o
            ${sellerJoin}
            ${whereClause}
@@ -219,6 +239,8 @@ module.exports = function createTransactionsRouter({
             refund_cents: Number(row.refund_cents || 0),
             destination_country: row.country ? String(row.country).trim().toUpperCase() : null,
             payout_eligible: row.payout_eligible === true || row.payout_eligible === 't',
+            payout_blocked: row.payout_blocked === true || row.payout_blocked === 't',
+            order_status: row.order_status || null,
             payment_status: row.payment_status || 'offen',
             delivery_status: row.delivery_status || null,
             iban: isSuperuser ? row.iban : undefined,

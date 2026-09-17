@@ -43,7 +43,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** POST /store/back-in-stock-subscribe — public, guest-friendly (no login required). */
 const storeBackInStockSubscribePOST = async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase()
-  const productId = String(req.body?.product_id || '').trim()
+  // A product currently attributed to another seller's listing (shared-EAN "buy box" winner —
+  // see mapOtherSellersFromScored in store-products.js) ships to the shop as a composite id
+  // "<masterProductUuid>-listing-<sellerId>", not a real admin_hub_products.id. Strip that suffix
+  // so the alert still gets stored against the real master product instead of 400ing every time
+  // a sold-out product happens to currently be shown via a listing.
+  const rawProductId = String(req.body?.product_id || '').trim()
+  const productId = rawProductId.includes('-listing-') ? rawProductId.split('-listing-')[0] : rawProductId
   const variantId = String(req.body?.variant_id || '').trim()
   const locale = String(req.body?.locale || 'de').trim().slice(0, 5) || 'de'
   if (!EMAIL_RE.test(email)) return res.status(400).json({ message: 'Invalid email' })

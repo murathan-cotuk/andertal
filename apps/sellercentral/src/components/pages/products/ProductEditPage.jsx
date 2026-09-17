@@ -278,6 +278,25 @@ function productEditCopy(locale) {
     weightDims: lt(locale, "Weight & dimensions", "Ağırlık ve ölçü", "Poids et dimensions", "Peso y dimensiones", "Peso e dimensioni", "Gewicht & Maße"),
     contentPerUnit: lt(locale, "Content per unit", "Birim içeriği", "Contenu par unité", "Contenido por unidad", "Contenuto per unità", "Inhalt pro Einheit"),
     moreActions: lt(locale, "More actions", "Diğer işlemler", "Plus d'actions", "Más acciones", "Altre azioni", "Weitere Aktionen"),
+    commissionRateBtn: lt(locale, "Set commission rate", "Komisyon oranı ayarla", "Définir le taux de commission", "Definir tasa de comisión", "Imposta tasso di commissione", "Provisionssatz festlegen"),
+    commissionRateModalTitle: lt(locale, "Product commission rate", "Ürün komisyon oranı", "Taux de commission du produit", "Tasa de comisión del producto", "Tasso di commissione del prodotto", "Provisionssatz des Produkts"),
+    commissionRateModalHint: lt(
+      locale,
+      "Overrides the seller's own commission rate for this product only. Applies to new orders from the moment it's saved.",
+      "Sadece bu ürün için satıcının kendi komisyon oranını geçersiz kılar. Kaydedildiği andan itibaren yeni siparişlere uygulanır.",
+      "Remplace le taux de commission du vendeur pour ce produit uniquement. S'applique aux nouvelles commandes dès l'enregistrement.",
+      "Anula la tasa de comisión del vendedor solo para este producto. Se aplica a los nuevos pedidos desde que se guarda.",
+      "Sostituisce il tasso di commissione del venditore solo per questo prodotto. Si applica ai nuovi ordini dal momento del salvataggio.",
+      "Überschreibt den eigenen Provisionssatz des Sellers nur für dieses Produkt. Gilt für neue Bestellungen ab dem Speichern."
+    ),
+    commissionRateCurrentOverride: (pct) => lt(locale, `Custom rate: ${pct}%`, `Özel oran: %${pct}`, `Taux personnalisé : ${pct} %`, `Tasa personalizada: ${pct} %`, `Tasso personalizzato: ${pct}%`, `Individueller Satz: ${pct} %`),
+    commissionRateUsingDefault: (pct) => lt(locale, `Using the seller's own rate (${pct}%)`, `Satıcının kendi oranı kullanılıyor (%${pct})`, `Utilise le taux du vendeur (${pct} %)`, `Usa la tasa propia del vendedor (${pct} %)`, `Usa il tasso proprio del venditore (${pct}%)`, `Verwendet den eigenen Satz des Sellers (${pct} %)`),
+    commissionRateInputLabel: lt(locale, "Custom commission rate (%)", "Özel komisyon oranı (%)", "Taux de commission personnalisé (%)", "Tasa de comisión personalizada (%)", "Tasso di commissione personalizzato (%)", "Individueller Provisionssatz (%)"),
+    commissionRateClear: lt(locale, "Clear override (use seller's rate)", "Geçersiz kıl (satıcının oranını kullan)", "Réinitialiser (utiliser le taux du vendeur)", "Restablecer (usar la tasa del vendedor)", "Rimuovi (usa il tasso del venditore)", "Zurücksetzen (Seller-Satz verwenden)"),
+    commissionRateSave: lt(locale, "Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern"),
+    commissionRateSaved: lt(locale, "Commission rate saved.", "Komisyon oranı kaydedildi.", "Taux de commission enregistré.", "Tasa de comisión guardada.", "Tasso di commissione salvato.", "Provisionssatz gespeichert."),
+    commissionRateCleared: lt(locale, "Custom rate removed — using the seller's own rate again.", "Özel oran kaldırıldı — tekrar satıcının kendi oranı kullanılıyor.", "Taux personnalisé supprimé — le taux du vendeur est réutilisé.", "Tasa personalizada eliminada — se usa de nuevo la tasa del vendedor.", "Tasso personalizzato rimosso — si usa di nuovo il tasso del venditore.", "Individueller Satz entfernt — es gilt wieder der Satz des Sellers."),
+    commissionRateError: lt(locale, "Enter a rate between 0 and 100.", "0 ile 100 arasında bir oran girin.", "Saisissez un taux entre 0 et 100.", "Introduzca una tasa entre 0 y 100.", "Inserisci un tasso tra 0 e 100.", "Bitte einen Satz zwischen 0 und 100 eingeben."),
     addGroup: lt(locale, "+ Add Group", "+ Grup ekle", "+ Ajouter un groupe", "+ Añadir grupo", "+ Aggiungi gruppo", "+ Gruppe hinzufügen"),
     variationMatrix: lt(locale, "Variation matrix", "Varyasyon matrisi", "Matrice des variantes", "Matriz de variaciones", "Matrice varianti", "Variationsmatrix"),
     inventoryIds: lt(locale, "Inventory & identifiers", "Stok ve tanımlayıcılar", "Stock et identifiants", "Inventario e identificadores", "Inventario e identificatori", "Bestand & Kennungen"),
@@ -497,6 +516,16 @@ function setMeta(product, key, value) {
   return { ...product, metadata: m };
 }
 
+/** Mirrors apps/medusa-backend/src/commission-rate.js's productCommissionOverridePct — display
+ *  only, 0-100 with one decimal, or null when no override is stored (raw is "" / null / NaN). */
+function productCommissionOverridePct(raw) {
+  if (raw === "" || raw == null) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const fraction = n <= 1 ? n : n <= 100 ? n / 100 : null;
+  return fraction == null ? null : Math.round(fraction * 1000) / 10;
+}
+
 function descriptionVisualToHtml(html) {
   const s = (html || "").trim();
   if (!s) return "";
@@ -543,6 +572,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   }, [message]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [commissionModalOpen, setCommissionModalOpen] = useState(false);
+  const [commissionRateInput, setCommissionRateInput] = useState("");
+  const [commissionSellerRatePct, setCommissionSellerRatePct] = useState(null);
+  const [commissionSaving, setCommissionSaving] = useState(false);
+  const [commissionError, setCommissionError] = useState("");
   const [categories, setCategories] = useState([]);
   const [collections, setCollections] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -1660,6 +1694,67 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const openDuplicateModal = () => {
     setDuplicateOptions({ ...DEFAULT_DUPLICATE_OPTIONS });
     setDuplicateModalOpen(true);
+  };
+
+  const openCommissionModal = async () => {
+    setCommissionError("");
+    const overridePct = productCommissionOverridePct(getMeta(product, "commission_rate_override"));
+    setCommissionRateInput(overridePct != null ? String(overridePct) : "");
+    setCommissionModalOpen(true);
+    if (commissionSellerRatePct == null && productOwnerId) {
+      try {
+        const res = await client.getSellers();
+        const sellerRow = (res?.sellers || []).find((s) => String(s.seller_id) === String(productOwnerId));
+        const rate = sellerRow?.commission_rate != null ? Number(sellerRow.commission_rate) : 0.12;
+        setCommissionSellerRatePct(Math.round(rate * 1000) / 10);
+      } catch (_) {
+        setCommissionSellerRatePct(12);
+      }
+    }
+  };
+
+  const saveCommissionOverride = async () => {
+    setCommissionError("");
+    const trimmed = commissionRateInput.trim().replace(",", ".");
+    const n = Number(trimmed);
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      setCommissionError(pe.commissionRateError);
+      return;
+    }
+    setCommissionSaving(true);
+    try {
+      const res = await client.setProductCommissionOverride(product.id, n);
+      // Persisted via its own dedicated endpoint (not the product save pipeline), so update the
+      // dirty-tracking baseline together with local state — otherwise the page would immediately
+      // show a false "unsaved changes" prompt for a field that's already saved.
+      const nextProduct = setMeta(product, "commission_rate_override", res?.commission_rate_override ?? n / 100);
+      setProduct(nextProduct);
+      setBaselineSnapshot(productSnapshot(nextProduct));
+      setCommissionModalOpen(false);
+      setMessage({ type: "success", text: pe.commissionRateSaved });
+    } catch (e) {
+      setCommissionError(e?.message || pe.commissionRateError);
+    } finally {
+      setCommissionSaving(false);
+    }
+  };
+
+  const clearCommissionOverride = async () => {
+    setCommissionError("");
+    setCommissionSaving(true);
+    try {
+      await client.setProductCommissionOverride(product.id, null);
+      const nextProduct = setMeta(product, "commission_rate_override", undefined);
+      setProduct(nextProduct);
+      setBaselineSnapshot(productSnapshot(nextProduct));
+      setCommissionRateInput("");
+      setCommissionModalOpen(false);
+      setMessage({ type: "success", text: pe.commissionRateCleared });
+    } catch (e) {
+      setCommissionError(e?.message || pe.commissionRateError);
+    } finally {
+      setCommissionSaving(false);
+    }
   };
 
   const runDuplicate = async () => {
@@ -2899,6 +2994,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           <span className="product-edit-name">{isNew ? pe.newProduct : (product?.title || pe.productFallback)}</span>
         </Link>
         <span style={{ flex: 1 }} />
+        {!isNew && isSuperuser && (
+          <Button size="slim" onClick={openCommissionModal}>
+            {pe.commissionRateBtn}
+          </Button>
+        )}
         {!isNew && (
           <>
             {shopProductHandleForLocale(product, locale) && (
@@ -4980,6 +5080,48 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           </BlockStack>
         </Modal.Section>
       </Modal>
+
+      {isSuperuser && (
+        <Modal
+          open={commissionModalOpen}
+          onClose={() => setCommissionModalOpen(false)}
+          title={pe.commissionRateModalTitle}
+          primaryAction={{
+            content: pe.commissionRateSave,
+            onAction: saveCommissionOverride,
+            loading: commissionSaving,
+          }}
+          secondaryActions={[
+            ...(getMeta(product, "commission_rate_override")
+              ? [{ content: pe.commissionRateClear, destructive: true, onAction: clearCommissionOverride, loading: commissionSaving }]
+              : []),
+            { content: ui.cancel, onAction: () => setCommissionModalOpen(false) },
+          ]}
+        >
+          <Modal.Section>
+            <BlockStack gap="300">
+              <Text as="p" tone="subdued">{pe.commissionRateModalHint}</Text>
+              {commissionError && <Banner tone="critical">{commissionError}</Banner>}
+              <Text as="p" variant="bodySm" tone="subdued">
+                {getMeta(product, "commission_rate_override")
+                  ? pe.commissionRateCurrentOverride(productCommissionOverridePct(getMeta(product, "commission_rate_override")))
+                  : pe.commissionRateUsingDefault(commissionSellerRatePct ?? 12)}
+              </Text>
+              <TextField
+                label={pe.commissionRateInputLabel}
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={commissionRateInput}
+                onChange={setCommissionRateInput}
+                suffix="%"
+                autoComplete="off"
+              />
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
+      )}
     </Page>
   );
 }

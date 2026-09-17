@@ -324,6 +324,18 @@ const OriginalPrice = styled.span`
 `;
 
 /* Variant groups area */
+/*
+ * Reserves the SAME vertical space on every card — whether it has 0, 1 or 2 variation
+ * groups, a flat pill list, or no variants at all — so the qty stepper at the bottom of
+ * the card always sits at the same height and the gap above it never grows/shrinks card
+ * to card. Content taller than this (e.g. "+N weitere" expanded) still grows the card
+ * normally; this is a floor, never a cap/scroll — never reintroduce a fixed+scrollable
+ * variant box here, that was explicitly rejected before.
+ */
+const VariantSlot = styled.div`
+  min-height: 103px;
+`;
+
 const VariantGroups = styled.div`
   display: flex;
   flex-direction: column;
@@ -711,6 +723,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           </CurrentPrice>
         </Prices>
 
+        <VariantSlot>
         {showPills && (
           variationGroups ? (
             /* Grouped display: one row per variation group. More than 2 groups stay
@@ -838,6 +851,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
             </Pills>
           )
         )}
+        </VariantSlot>
       </Info>
 
       <QtyRow>

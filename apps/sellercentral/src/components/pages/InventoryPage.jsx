@@ -138,6 +138,16 @@ function effectiveAddedAt(product) {
   return product?.seller_listing_created_at || product?.created_at || 0;
 }
 
+/** Mirrors apps/medusa-backend/src/commission-rate.js's productCommissionOverridePct — display
+ *  only, 0-100 with one decimal, or null when no override is stored. */
+function productCommissionOverridePct(raw) {
+  if (raw === "" || raw == null) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const fraction = n <= 1 ? n : n <= 100 ? n / 100 : null;
+  return fraction == null ? null : Math.round(fraction * 1000) / 10;
+}
+
 function sortProductsList(list, locale, sortKey) {
   const arr = [...(list || [])];
   if (sortKey === "title_desc") {
@@ -549,6 +559,10 @@ function InventoryProductRow({
   pendingChangeRequests,
   onOpenChangeRequests,
   ui,
+  isSuperuser,
+  onOpenCommissionModal,
+  sellerCommissionRatePct,
+  inventoryI18n,
 }) {
   const [variantsOpen, setVariantsOpen] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
@@ -569,7 +583,7 @@ function InventoryProductRow({
       if (!el) return;
       const r = el.getBoundingClientRect();
       const menuW = 180;
-      const menuH = 160;
+      const menuH = 196;
       const gap = 6;
       let top = r.bottom + gap;
       let left = r.right - menuW;
@@ -681,6 +695,7 @@ function InventoryProductRow({
     return i18n.draft;
   };
   const meta = product.metadata && typeof product.metadata === "object" ? product.metadata : {};
+  const commissionOverridePct = productCommissionOverridePct(meta.commission_rate_override);
   const media = meta.media;
   const rawThumb =
     product.thumbnail ||
@@ -815,6 +830,13 @@ function InventoryProductRow({
             {product.an_id && (
               <div style={{ fontSize: "0.625rem", color: "#9ca3af", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>AN-ID: {product.an_id}</div>
             )}
+            {isSuperuser && commissionOverridePct != null && (
+              <div style={{ marginTop: "0.1875rem" }}>
+                <span style={{ display: "inline-block", padding: "0.0625rem 0.375rem", borderRadius: 999, fontSize: "0.625rem", fontWeight: 600, background: "#fef3c7", color: "#92400e" }}>
+                  {inventoryI18n.customCommissionBadge(commissionOverridePct)}
+                </span>
+              </div>
+            )}
           </div>
           <div style={{ fontSize: "0.8125rem", color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>{inv}</div>
           <div style={{ fontSize: "0.8125rem", color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>?{formatDecimal(price)}</div>
@@ -929,6 +951,29 @@ function InventoryProductRow({
                 >
                   {ui.duplicate}
                 </button>
+                {isSuperuser && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenCommissionModal(product);
+                    }}
+                    style={{
+                      width: "100%",
+                      height: 36,
+                      border: "none",
+                      borderTop: "1px solid #f1f5f9",
+                      background: "#fff",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      padding: "0 12px",
+                      fontSize: 13,
+                      color: "#111827",
+                    }}
+                  >
+                    {inventoryI18n.commissionRateBtn}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={async (e) => {
@@ -995,6 +1040,11 @@ export default function InventoryPage() {
   const [duplicateFullProduct, setDuplicateFullProduct] = useState(null);
   const [duplicateOptions, setDuplicateOptions] = useState(DEFAULT_DUPLICATE_OPTIONS);
   const [duplicateSaving, setDuplicateSaving] = useState(false);
+  const [commissionModalProduct, setCommissionModalProduct] = useState(null);
+  const [commissionRateInput, setCommissionRateInput] = useState("");
+  const [commissionSaving, setCommissionSaving] = useState(false);
+  const [commissionError, setCommissionError] = useState("");
+  const [showCustomCommissionOnly, setShowCustomCommissionOnly] = useState(false);
   const [combineModalOpen, setCombineModalOpen] = useState(false);
   const [combineParentId, setCombineParentId] = useState("");
   const [combineOptionName, setCombineOptionName] = useState("Variante");
@@ -1006,6 +1056,7 @@ export default function InventoryPage() {
   const [eanDuplicateMergingId, setEanDuplicateMergingId] = useState(null);
   const [mySellerId, setMySellerId] = useState("");
   const [sellerLabelById, setSellerLabelById] = useState({});
+  const [sellerCommissionRateById, setSellerCommissionRateById] = useState({});
   const [productListingsMap, setProductListingsMap] = useState({});
   const [sellerSearchFilter, setSellerSearchFilter] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -1029,6 +1080,17 @@ export default function InventoryPage() {
   const medusaClient = getMedusaAdminClient();
   const ui = getUI(locale);
   const l = String(locale || "en").toLowerCase();
+  const inventoryI18n = {
+    commissionRateBtn: l === "tr" ? "Komisyon oranı ayarla" : l === "de" ? "Provisionssatz festlegen" : l === "fr" ? "Définir le taux de commission" : l === "es" ? "Definir tasa de comisión" : l === "it" ? "Imposta tasso di commissione" : "Set commission rate",
+    commissionRateModalTitle: l === "tr" ? "Ürün komisyon oranı" : l === "de" ? "Provisionssatz des Produkts" : l === "fr" ? "Taux de commission du produit" : l === "es" ? "Tasa de comisión del producto" : l === "it" ? "Tasso di commissione del prodotto" : "Product commission rate",
+    commissionRateModalHint: l === "tr" ? "Sadece bu ürün için satıcının kendi komisyon oranını geçersiz kılar." : l === "de" ? "Überschreibt den eigenen Provisionssatz des Sellers nur für dieses Produkt." : l === "fr" ? "Remplace le taux de commission du vendeur pour ce produit uniquement." : l === "es" ? "Anula la tasa de comisión del vendedor solo para este producto." : l === "it" ? "Sostituisce il tasso di commissione del venditore solo per questo prodotto." : "Overrides the seller's own commission rate for this product only.",
+    commissionRateInputLabel: l === "tr" ? "Özel komisyon oranı (%)" : l === "de" ? "Individueller Provisionssatz (%)" : l === "fr" ? "Taux de commission personnalisé (%)" : l === "es" ? "Tasa de comisión personalizada (%)" : l === "it" ? "Tasso di commissione personalizzato (%)" : "Custom commission rate (%)",
+    commissionRateClear: l === "tr" ? "Geçersiz kıl (satıcının oranını kullan)" : l === "de" ? "Zurücksetzen (Seller-Satz verwenden)" : l === "fr" ? "Réinitialiser (utiliser le taux du vendeur)" : l === "es" ? "Restablecer (usar la tasa del vendedor)" : l === "it" ? "Rimuovi (usa il tasso del venditore)" : "Clear override (use seller's rate)",
+    commissionRateSave: l === "tr" ? "Kaydet" : l === "de" ? "Speichern" : l === "fr" ? "Enregistrer" : l === "es" ? "Guardar" : l === "it" ? "Salva" : "Save",
+    commissionRateError: l === "tr" ? "0 ile 100 arasında bir oran girin." : l === "de" ? "Bitte einen Satz zwischen 0 und 100 eingeben." : l === "fr" ? "Saisissez un taux entre 0 et 100." : l === "es" ? "Introduzca una tasa entre 0 y 100." : l === "it" ? "Inserisci un tasso tra 0 e 100." : "Enter a rate between 0 and 100.",
+    customCommissionFilter: l === "tr" ? "Farklı komisyonlu ürünler" : l === "de" ? "Produkte mit abweichender Provision" : l === "fr" ? "Produits à commission différente" : l === "es" ? "Productos con comisión distinta" : l === "it" ? "Prodotti con commissione diversa" : "Products with custom commission",
+    customCommissionBadge: (pct) => (l === "tr" ? `Komisyon: %${pct}` : l === "de" ? `Provision: ${pct} %` : l === "fr" ? `Commission : ${pct} %` : l === "es" ? `Comisión: ${pct} %` : l === "it" ? `Commissione: ${pct}%` : `Commission: ${pct}%`),
+  };
 
   const [pendingChangeRequestsByProductId, setPendingChangeRequestsByProductId] = useState({});
   const [changeRequestsModalOpen, setChangeRequestsModalOpen] = useState(false);
@@ -1164,10 +1226,14 @@ export default function InventoryPage() {
       .getSellers()
       .then((d) => {
         const m = {};
+        const rates = {};
         for (const s of d.sellers || []) {
-          if (s.seller_id) m[s.seller_id] = s.store_name || s.company_name || s.email || s.seller_id;
+          if (!s.seller_id) continue;
+          m[s.seller_id] = s.store_name || s.company_name || s.email || s.seller_id;
+          rates[s.seller_id] = s.commission_rate != null ? Number(s.commission_rate) : 0.12;
         }
         setSellerLabelById(m);
+        setSellerCommissionRateById(rates);
       })
       .catch(() => {});
     medusaClient
@@ -1363,8 +1429,15 @@ export default function InventoryPage() {
     const pr = Number(product?.price ?? 0);
     if (priceMin !== "" && Number.isFinite(Number(priceMin)) && pr < Number(priceMin)) return false;
     if (priceMax !== "" && Number.isFinite(Number(priceMax)) && pr > Number(priceMax)) return false;
+    if (showCustomCommissionOnly) {
+      const overridePct = productCommissionOverridePct(meta.commission_rate_override);
+      if (overridePct == null) return false;
+      const sellerRate = product?.seller_id != null ? sellerCommissionRateById[product.seller_id] : null;
+      const sellerPct = sellerRate != null ? Math.round(Number(sellerRate) * 1000) / 10 : 12;
+      if (Math.abs(overridePct - sellerPct) <= 0.01) return false;
+    }
     return true;
-  }, [statusFilter, productSearch, detailsFilter, variationFilter, inventoryMin, inventoryMax, priceMin, priceMax, locale]);
+  }, [statusFilter, productSearch, detailsFilter, variationFilter, inventoryMin, inventoryMax, priceMin, priceMax, locale, showCustomCommissionOnly, sellerCommissionRateById]);
 
   const { ownProducts, sellerGroups } = useMemo(() => {
     const own = [];
@@ -1428,6 +1501,59 @@ export default function InventoryPage() {
     );
   }, [ownProducts, locale, inventorySort]);
 
+  const openCommissionModal = (product) => {
+    setMenuOpenId(null);
+    setCommissionError("");
+    const overridePct = productCommissionOverridePct(product?.metadata?.commission_rate_override);
+    setCommissionRateInput(overridePct != null ? String(overridePct) : "");
+    setCommissionModalProduct(product);
+  };
+
+  const saveCommissionOverride = async () => {
+    if (!commissionModalProduct) return;
+    setCommissionError("");
+    const n = Number(commissionRateInput.trim().replace(",", "."));
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      setCommissionError(inventoryI18n.commissionRateError);
+      return;
+    }
+    setCommissionSaving(true);
+    try {
+      const res = await medusaClient.setProductCommissionOverride(commissionModalProduct.id, n);
+      const nextRate = res?.commission_rate_override ?? n / 100;
+      setProducts((prev) => prev.map((p) => (
+        p.id === commissionModalProduct.id
+          ? { ...p, metadata: { ...(p.metadata || {}), commission_rate_override: nextRate } }
+          : p
+      )));
+      setCommissionModalProduct(null);
+    } catch (e) {
+      setCommissionError(e?.message || inventoryI18n.commissionRateError);
+    } finally {
+      setCommissionSaving(false);
+    }
+  };
+
+  const clearCommissionOverride = async () => {
+    if (!commissionModalProduct) return;
+    setCommissionError("");
+    setCommissionSaving(true);
+    try {
+      await medusaClient.setProductCommissionOverride(commissionModalProduct.id, null);
+      setProducts((prev) => prev.map((p) => {
+        if (p.id !== commissionModalProduct.id) return p;
+        const nextMeta = { ...(p.metadata || {}) };
+        delete nextMeta.commission_rate_override;
+        return { ...p, metadata: nextMeta };
+      }));
+      setCommissionModalProduct(null);
+    } catch (e) {
+      setCommissionError(e?.message || inventoryI18n.commissionRateError);
+    } finally {
+      setCommissionSaving(false);
+    }
+  };
+
   const openDuplicateModal = (product) => {
     setMenuOpenId(null);
     setDuplicateSourceId(product.id);
@@ -1453,6 +1579,14 @@ export default function InventoryPage() {
         openChangeRequestsModal(pid);
       }}
       ui={ui}
+      isSuperuser={isSuperuser}
+      onOpenCommissionModal={openCommissionModal}
+      sellerCommissionRatePct={
+        product.seller_id && sellerCommissionRateById[product.seller_id] != null
+          ? Math.round(Number(sellerCommissionRateById[product.seller_id]) * 1000) / 10
+          : null
+      }
+      inventoryI18n={inventoryI18n}
     />
   );
 
@@ -1689,6 +1823,12 @@ export default function InventoryPage() {
                     onChange={setInventorySort}
                   />
                 </Box>
+                <Button
+                  pressed={showCustomCommissionOnly}
+                  onClick={() => setShowCustomCommissionOnly((v) => !v)}
+                >
+                  {inventoryI18n.customCommissionFilter}
+                </Button>
               </InlineStack>
             </Box>
           )}
@@ -2292,6 +2432,43 @@ export default function InventoryPage() {
                 ))}
               </BlockStack>
             )}
+          </Modal.Section>
+        </Modal>
+      )}
+
+      {isSuperuser && commissionModalProduct && (
+        <Modal
+          open
+          onClose={() => setCommissionModalProduct(null)}
+          title={inventoryI18n.commissionRateModalTitle}
+          primaryAction={{
+            content: inventoryI18n.commissionRateSave,
+            onAction: saveCommissionOverride,
+            loading: commissionSaving,
+          }}
+          secondaryActions={[
+            ...(commissionModalProduct.metadata?.commission_rate_override != null
+              ? [{ content: inventoryI18n.commissionRateClear, destructive: true, onAction: clearCommissionOverride, loading: commissionSaving }]
+              : []),
+            { content: ui.cancel, onAction: () => setCommissionModalProduct(null) },
+          ]}
+        >
+          <Modal.Section>
+            <BlockStack gap="300">
+              <Text as="p" tone="subdued">{inventoryI18n.commissionRateModalHint}</Text>
+              {commissionError && <Banner tone="critical">{commissionError}</Banner>}
+              <TextField
+                label={inventoryI18n.commissionRateInputLabel}
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={commissionRateInput}
+                onChange={setCommissionRateInput}
+                suffix="%"
+                autoComplete="off"
+              />
+            </BlockStack>
           </Modal.Section>
         </Modal>
       )}
