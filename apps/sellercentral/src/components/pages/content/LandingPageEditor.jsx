@@ -26,6 +26,7 @@ import RichTextEditor from "@/components/RichTextEditor";
 import { mergeLoadedShopStyles } from "@andertal/shop-theme";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import SearchableGroupedSelect from "@/components/inputs/SearchableGroupedSelect";
+import SearchableSelect from "@/components/inputs/SearchableSelect";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
 import { getNewContainerSeed } from "@/lib/landing-page-editor-i18n";
@@ -1091,6 +1092,7 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
   const [addColId, setAddColId] = useState("");
 
   const source = String(container.source || "images");
+  const isFreeGrid = source === "images" && container.mosaic_mode === "grid";
 
   useEffect(() => {
     if (source !== "collection") return;
@@ -1221,7 +1223,45 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
       <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.gridShop}</Text>
-          {source === "images" ? (
+          {source === "images" && (
+            <Select
+              label={c.mosaicLayoutMode}
+              options={[
+                { label: c.mosaicLayoutRows, value: "rows" },
+                { label: c.mosaicLayoutGrid, value: "grid" },
+              ]}
+              value={isFreeGrid ? "grid" : "rows"}
+              onChange={(v) => onChange({ ...container, mosaic_mode: v === "grid" ? "grid" : "rows" })}
+              helpText={isFreeGrid ? c.mosaicLayoutGridHelp : undefined}
+            />
+          )}
+          {isFreeGrid ? (
+            <div style={EDITOR_FIELD_GRID}>
+              <TextField
+                label={isMobileView ? c.gridColumnsMobile : c.gridColumnsDesktop}
+                type="number"
+                min={1}
+                max={6}
+                value={String(isMobileView ? (container.grid_cols_mobile ?? 2) : (container.grid_cols_desktop ?? 3))}
+                onChange={(v) => onChange({
+                  ...container,
+                  ...(isMobileView ? { grid_cols_mobile: Math.max(1, Math.min(6, Number(v) || 2)) } : { grid_cols_desktop: Math.max(1, Math.min(6, Number(v) || 3)) }),
+                })}
+                autoComplete="off"
+              />
+              <TextField
+                label={isMobileView ? c.gridRowHeightMobile : c.gridRowHeightDesktop}
+                type="number"
+                min={40}
+                value={String(isMobileView ? (container.grid_row_height_mobile ?? 120) : (container.grid_row_height_desktop ?? 160))}
+                onChange={(v) => onChange({
+                  ...container,
+                  ...(isMobileView ? { grid_row_height_mobile: Math.max(40, Number(v) || 120) } : { grid_row_height_desktop: Math.max(40, Number(v) || 160) }),
+                })}
+                autoComplete="off"
+              />
+            </div>
+          ) : source === "images" ? (
             <TextField
               label={c.pattern}
               value={String(isMobileView ? (container.layout_pattern_mobile || "1") : (container.layout_pattern_desktop || "1,2"))}
@@ -1283,9 +1323,38 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
                   <div style={{ flex: 1 }}>
                     <TextField label={c.linkUrlOptional} value={img.link || ""} onChange={(v) => updateImg(idx, "link", v)} placeholder="https://…" autoComplete="off" />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <Select label={c.aspectRatio} options={c.aspectRatioOptions()} value={img.aspect_ratio || "1/1"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
-                  </div>
+                  {isFreeGrid ? (
+                    <>
+                      <div style={{ flex: 1 }}>
+                        <TextField
+                          label={c.colSpan}
+                          type="number"
+                          min={1}
+                          max={6}
+                          value={String(img.col_span ?? 1)}
+                          onChange={(v) => updateImg(idx, "col_span", Math.max(1, Math.min(6, Number(v) || 1)))}
+                          autoComplete="off"
+                          helpText={c.colSpanHelp}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <TextField
+                          label={c.rowSpan}
+                          type="number"
+                          min={1}
+                          max={6}
+                          value={String(img.row_span ?? 1)}
+                          onChange={(v) => updateImg(idx, "row_span", Math.max(1, Math.min(6, Number(v) || 1)))}
+                          autoComplete="off"
+                          helpText={c.rowSpanHelp}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ flex: 1 }}>
+                      <Select label={c.aspectRatio} options={c.aspectRatioOptions()} value={img.aspect_ratio || "1/1"} onChange={(v) => updateImg(idx, "aspect_ratio", v)} />
+                    </div>
+                  )}
                 </InlineStack>
                 <TextField
                   label={c.captionUnderImage}
@@ -1294,7 +1363,9 @@ function ContentMosaicEditor({ container, onChange, deviceTab = 0, editLang = "d
                   autoComplete="off"
                   helpText={c.captionShopHelp}
                 />
-                <RichTextEditor label={c.textOptional} value={gi(img, "text", editLang)} onChange={(v) => updateImgI18n(idx, "text", v)} placeholder={c.enterText} minHeight="120px" />
+                {!isFreeGrid && (
+                  <RichTextEditor label={c.textOptional} value={gi(img, "text", editLang)} onChange={(v) => updateImgI18n(idx, "text", v)} placeholder={c.enterText} minHeight="120px" />
+                )}
                 <div style={EDITOR_FIELD_GRID}>
                   <TextField
                     label={c.imageAreaLeft}
@@ -2498,19 +2569,23 @@ function SingleProductEditor({ container, onChange, editLang = "de" }) {
     }).catch(() => {});
   }, [client]);
 
-  const opts = [
-    { label: c.chooseProduct, value: "" },
-    ...products.map((p) => ({ label: `${p.title || p.handle || p.id}`, value: p.id })),
-  ];
+  const opts = products.map((p) => ({
+    label: p.title || p.handle || p.id,
+    value: p.id,
+    // SearchableSelect matches label/sublabel/value, so putting SKU+EAN+id here is what makes
+    // the picker searchable by SKU, EAN, or id in addition to the product name.
+    sublabel: [p.sku, p.metadata?.ean, p.id].filter(Boolean).join(" · "),
+  }));
 
   return (
     <BlockStack gap="400">
       <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
-      <Select
+      <SearchableSelect
         label={c.product}
         options={opts}
         value={container.product_id || ""}
+        emptyLabel={c.chooseProduct}
         onChange={(id) => {
           const pr = products.find((p) => p.id === id);
           onChange({
@@ -3160,8 +3235,11 @@ function ContainerSpacingEditor({ container, onChange, embedded = false }) {
   const set = (k, v) => {
     const next = { ...m };
     const trimmed = v != null ? String(v).trim() : "";
+    // A bare number ("20") is not a valid CSS length — the shop silently drops a unitless
+    // margin, so a plain digit entry here is normalized to px before it's saved.
+    const normalized = /^-?\d+(\.\d+)?$/.test(trimmed) ? `${trimmed}px` : trimmed;
     if (trimmed === "") delete next[k];
-    else next[k] = v;
+    else next[k] = normalized;
     const keys = Object.keys(next);
     onChange({ ...container, margin: keys.length ? next : undefined });
   };
@@ -3500,8 +3578,21 @@ function SupportFaqEditor({ container, onChange, editLang = "de" }) {
   );
 }
 
-function PersonalizedProductRowEditor({ container, onChange, editLang = "de" }) {
+function PersonalizedProductRowEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   const c = useLandingCopy();
+  const isMobileView = deviceTab >= 1;
+  const displayMode = container.display_mode === "image_tiles" ? "image_tiles" : "product_cards";
+  const isImageTiles = displayMode === "image_tiles";
+  const visibleCount = Math.min(8, Math.max(2, Number(container.visible_count ?? 4) || 4));
+  const tileSpans = Array.isArray(container.tile_spans) ? container.tile_spans : [];
+
+  const updateTileSpan = (idx, key, val) => {
+    const next = [];
+    for (let i = 0; i < visibleCount; i++) next.push(tileSpans[i] || {});
+    next[idx] = { ...next[idx], [key]: Math.max(1, Math.min(key === "col_span" ? 4 : 3, Number(val) || 1)) };
+    onChange({ ...container, tile_spans: next });
+  };
+
   return (
     <BlockStack gap="400">
       <Card>
@@ -3526,7 +3617,7 @@ function PersonalizedProductRowEditor({ container, onChange, editLang = "de" }) 
             <TextField
               label={c.visibleCount}
               type="number"
-              value={String(container.visible_count ?? 4)}
+              value={String(visibleCount)}
               onChange={(v) => onChange({ ...container, visible_count: Math.min(8, Math.max(2, Number(v) || 4)) })}
               autoComplete="off"
             />
@@ -3540,10 +3631,99 @@ function PersonalizedProductRowEditor({ container, onChange, editLang = "de" }) 
           </div>
         </BlockStack>
       </Card>
-      <Divider />
-      <ContainerLayoutEditor container={container} onChange={onChange} embedded />
-      <Divider />
-      <ContainerSpacingEditor container={container} onChange={onChange} embedded />
+
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h3" variant="headingSm">{c.personalizedDisplayMode}</Text>
+          <Text as="p" variant="bodySm" tone="subdued">{c.personalizedDisplayModeHelp}</Text>
+          <Select
+            label={c.personalizedDisplayMode}
+            options={[
+              { label: c.personalizedDisplayModeCards, value: "product_cards" },
+              { label: c.personalizedDisplayModeTiles, value: "image_tiles" },
+            ]}
+            value={displayMode}
+            onChange={(v) => onChange({ ...container, display_mode: v })}
+          />
+          {!isImageTiles && (
+            <Select
+              label={c.personalizedOrientation}
+              options={[
+                { label: c.personalizedOrientationHorizontal, value: "horizontal" },
+                { label: c.personalizedOrientationVertical, value: "vertical" },
+              ]}
+              value={container.orientation === "vertical" ? "vertical" : "horizontal"}
+              onChange={(v) => onChange({ ...container, orientation: v })}
+            />
+          )}
+          {isImageTiles && (
+            <>
+              <div style={EDITOR_FIELD_GRID}>
+                <TextField
+                  label={isMobileView ? c.gridColumnsMobile : c.gridColumnsDesktop}
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={String(isMobileView ? (container.grid_cols_mobile ?? 2) : (container.grid_cols_desktop ?? 4))}
+                  onChange={(v) => onChange({
+                    ...container,
+                    ...(isMobileView ? { grid_cols_mobile: Math.max(1, Math.min(6, Number(v) || 2)) } : { grid_cols_desktop: Math.max(1, Math.min(6, Number(v) || 4)) }),
+                  })}
+                  autoComplete="off"
+                />
+                <TextField
+                  label={isMobileView ? c.gridRowHeightMobile : c.gridRowHeightDesktop}
+                  type="number"
+                  min={40}
+                  value={String(isMobileView ? (container.grid_row_height_mobile ?? 140) : (container.grid_row_height_desktop ?? 180))}
+                  onChange={(v) => onChange({
+                    ...container,
+                    ...(isMobileView ? { grid_row_height_mobile: Math.max(40, Number(v) || 140) } : { grid_row_height_desktop: Math.max(40, Number(v) || 180) }),
+                  })}
+                  autoComplete="off"
+                />
+              </div>
+              <Divider />
+              <Text as="h3" variant="headingSm">{c.personalizedTileSpans}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">{c.personalizedTileSpansHelp}</Text>
+              {Array.from({ length: visibleCount }).map((_, idx) => {
+                const span = tileSpans[idx] || {};
+                return (
+                  <InlineStack key={idx} gap="300" blockAlign="center" wrap={false}>
+                    <div style={{ minWidth: 64 }}><Text tone="subdued" variant="bodySm">{c.personalizedTileN(idx + 1)}</Text></div>
+                    <div style={{ flex: 1 }}>
+                      <TextField
+                        label={c.colSpan}
+                        labelHidden
+                        type="number"
+                        min={1}
+                        max={4}
+                        value={String(span.col_span ?? 1)}
+                        onChange={(v) => updateTileSpan(idx, "col_span", v)}
+                        autoComplete="off"
+                        prefix={c.colSpan}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <TextField
+                        label={c.rowSpan}
+                        labelHidden
+                        type="number"
+                        min={1}
+                        max={3}
+                        value={String(span.row_span ?? 1)}
+                        onChange={(v) => updateTileSpan(idx, "row_span", v)}
+                        autoComplete="off"
+                        prefix={c.rowSpan}
+                      />
+                    </div>
+                  </InlineStack>
+                );
+              })}
+            </>
+          )}
+        </BlockStack>
+      </Card>
     </BlockStack>
   );
 }

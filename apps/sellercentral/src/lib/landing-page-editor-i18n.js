@@ -623,6 +623,25 @@ export function getLandingEditorCopy(locale) {
     gridShop: x("Grid (shop)", "Izgara (shop)", "Grille (boutique)", "Cuadrícula (tienda)", "Griglia (negozio)", "Raster (Shop)"),
     patternHelpMobile: x("e.g. 1 or 2,2", "örn. 1 veya 2,2", "ex. 1 ou 2,2", "p. ej. 1 o 2,2", "es. 1 o 2,2", "Z. B. 1 oder 2,2"),
     patternHelpDesktop: x("e.g. 1,2,2", "örn. 1,2,2", "ex. 1,2,2", "p. ej. 1,2,2", "es. 1,2,2", "Z. B. 1,2,2"),
+    mosaicLayoutMode: x("Layout style", "Yerleşim stili", "Style de mise en page", "Estilo de diseño", "Stile di layout", "Layout-Stil"),
+    mosaicLayoutRows: x("Rows (classic)", "Satırlar (klasik)", "Lignes (classique)", "Filas (clásico)", "Righe (classico)", "Zeilen (klassisch)"),
+    mosaicLayoutGrid: x("Free grid (Amazon-style)", "Serbest ızgara (Amazon tarzı)", "Grille libre (façon Amazon)", "Cuadrícula libre (estilo Amazon)", "Griglia libera (stile Amazon)", "Freies Raster (Amazon-Stil)"),
+    mosaicLayoutGridHelp: x(
+      "Give each image its own width and height in grid cells — a tall image can sit beside two stacked smaller ones, or any other arrangement you like.",
+      "Her görsele kendi genişlik ve yükseklik (hücre cinsinden) değerini verin — uzun bir görsel, alt alta duran iki küçük görselin yanında durabilir, ya da istediğiniz başka bir düzen.",
+      "Donnez à chaque image sa propre largeur et hauteur en cellules de grille — une grande image peut se placer à côté de deux plus petites empilées, ou tout autre agencement.",
+      "Da a cada imagen su propio ancho y alto en celdas de cuadrícula — una imagen alta puede ir junto a dos más pequeñas apiladas, o cualquier otra disposición.",
+      "Assegna a ogni immagine la propria larghezza e altezza in celle della griglia — un'immagine alta può stare accanto a due più piccole impilate, o qualsiasi altra disposizione.",
+      "Gib jedem Bild seine eigene Breite und Höhe in Rasterzellen — ein hohes Bild kann neben zwei gestapelten kleineren stehen, oder jede andere Anordnung."
+    ),
+    gridColumnsDesktop: x("Columns (desktop)", "Sütun sayısı (masaüstü)", "Colonnes (bureau)", "Columnas (escritorio)", "Colonne (desktop)", "Spalten (Desktop)"),
+    gridColumnsMobile: x("Columns (mobile)", "Sütun sayısı (mobil)", "Colonnes (mobile)", "Columnas (móvil)", "Colonne (mobile)", "Spalten (Mobil)"),
+    gridRowHeightDesktop: x("Row height (desktop, px)", "Satır yüksekliği (masaüstü, px)", "Hauteur de ligne (bureau, px)", "Alto de fila (escritorio, px)", "Altezza riga (desktop, px)", "Zeilenhöhe (Desktop, px)"),
+    gridRowHeightMobile: x("Row height (mobile, px)", "Satır yüksekliği (mobil, px)", "Hauteur de ligne (mobile, px)", "Alto de fila (móvil, px)", "Altezza riga (mobile, px)", "Zeilenhöhe (Mobil, px)"),
+    colSpan: x("Width (columns)", "Genişlik (sütun)", "Largeur (colonnes)", "Ancho (columnas)", "Larghezza (colonne)", "Breite (Spalten)"),
+    rowSpan: x("Height (rows)", "Yükseklik (satır)", "Hauteur (lignes)", "Alto (filas)", "Altezza (righe)", "Höhe (Zeilen)"),
+    colSpanHelp: x("e.g. 2 = twice as wide as a normal cell", "örn. 2 = normal hücrenin iki katı genişlik", "ex. 2 = deux fois plus large qu'une cellule normale", "p. ej. 2 = el doble de ancho que una celda normal", "es. 2 = due volte più largo di una cella normale", "Z. B. 2 = doppelt so breit wie eine normale Zelle"),
+    rowSpanHelp: x("e.g. 3 = spans 3 rows tall", "örn. 3 = 3 satır boyunca uzanır", "ex. 3 = s'étend sur 3 lignes", "p. ej. 3 = ocupa 3 filas de alto", "es. 3 = si estende per 3 righe", "Z. B. 3 = erstreckt sich über 3 Zeilen"),
     // Layout section — "container within container": splits the block into columns, each column
     // holding any other container type (see docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §3.1).
     layoutSectionHeading: x("Columns", "Sütunlar", "Colonnes", "Columnas", "Colonne", "Spalten"),
@@ -881,6 +900,7 @@ export function getLandingEditorCopy(locale) {
       { label: x("Reorder — bought a while ago", "Yeniden sipariş — bir süre önce alınanlar", "Racheter — achetés il y a un moment", "Volver a comprar — comprados hace tiempo", "Riordina — acquistati tempo fa", "Nachbestellen — vor einer Weile gekauft"), value: "reorder" },
       { label: x("Others also bought", "Diğer müşteriler bunu da aldı", "D'autres ont aussi acheté", "Otros también compraron", "Altri hanno comprato anche", "Andere kauften auch"), value: "also_bought" },
       { label: x("Trending in categories you viewed", "İncelediğiniz kategorilerde trend olanlar", "Tendances dans vos catégories", "Tendencias en tus categorías", "Tendenze nelle tue categorie", "Trends in Ihren Kategorien"), value: "trending_in_your_categories" },
+      { label: x("Bestsellers from your top 5 browsed categories", "En çok gezdiğiniz 5 kategorideki çok satanlar", "Meilleures ventes de vos 5 catégories les plus parcourues", "Más vendidos de tus 5 categorías más visitadas", "Più venduti delle tue 5 categorie più visitate", "Bestseller aus Ihren 5 meistbesuchten Kategorien"), value: "top_categories_bestsellers" },
       { label: x("Bestsellers (overall)", "Çok satanlar (genel)", "Meilleures ventes (général)", "Más vendidos (general)", "Più venduti (generale)", "Bestseller (allgemein)"), value: "bestsellers" },
       { label: x("New arrivals", "Yeni eklenenler", "Nouveautés", "Novedades", "Novità", "Neuheiten"), value: "new_arrivals" },
       { label: x("On sale", "İndirimdekiler", "En promotion", "En oferta", "In offerta", "Im Angebot"), value: "on_sale" },
@@ -893,6 +913,30 @@ export function getLandingEditorCopy(locale) {
       { label: x("New arrivals in categories you viewed", "İncelediğiniz kategorilerde yeni gelenler", "Nouveautés dans vos catégories", "Novedades en tus categorías", "Novità nelle tue categorie", "Neuheiten in Ihren Kategorien"), value: "new_in_viewed_categories" },
       { label: x("Left in your cart", "Sepetinizde kalanlar", "Restés dans votre panier", "Quedados en tu carrito", "Rimasti nel carrello", "In Ihrem Warenkorb geblieben"), value: "abandoned_cart_items" },
     ],
+    personalizedDisplayMode: x("Display as", "Şu şekilde göster", "Afficher comme", "Mostrar como", "Mostra come", "Anzeigen als"),
+    personalizedDisplayModeHelp: x(
+      "Product cards: the usual scrollable row with price, rating, variants and add-to-cart. Image tiles: an editorial photo mosaic (like a magazine layout) where each tile links straight to its product — great for a bigger, more visual hero pick next to smaller ones.",
+      "Ürün kartları: fiyat, puan, varyant ve sepete ekle butonu olan alışılagelmiş kaydırmalı satır. Görsel karolar: her karonun doğrudan ürününe bağlandığı editoryal bir fotoğraf mozaiği (dergi düzeni gibi) — büyük bir öne çıkan ürünü küçüklerin yanına koymak için ideal.",
+      "Cartes produit : la ligne défilante habituelle avec prix, note, variantes et bouton d'achat. Tuiles image : une mosaïque éditoriale où chaque tuile mène directement à son produit.",
+      "Tarjetas de producto: la fila desplazable habitual con precio, valoración, variantes y botón de compra. Mosaicos de imagen: un mosaico editorial donde cada mosaico enlaza directo a su producto.",
+      "Schede prodotto: la solita riga scorrevole con prezzo, valutazione, varianti e pulsante acquista. Riquadri immagine: un mosaico editoriale dove ogni riquadro rimanda direttamente al prodotto.",
+      "Produktkarten: die gewohnte scrollbare Zeile mit Preis, Bewertung, Varianten und Warenkorb-Button. Bild-Kacheln: ein redaktionelles Foto-Mosaik (wie ein Magazin-Layout), bei dem jede Kachel direkt zum Produkt führt — ideal für eine größere Hero-Kachel neben kleineren."
+    ),
+    personalizedDisplayModeCards: x("Product cards", "Ürün kartları", "Cartes produit", "Tarjetas de producto", "Schede prodotto", "Produktkarten"),
+    personalizedDisplayModeTiles: x("Image tiles (mosaic)", "Görsel karolar (mozaik)", "Tuiles image (mosaïque)", "Mosaicos de imagen", "Riquadri immagine (mosaico)", "Bild-Kacheln (Mosaik)"),
+    personalizedOrientation: x("Orientation", "Yön", "Orientation", "Orientación", "Orientamento", "Ausrichtung"),
+    personalizedOrientationHorizontal: x("Horizontal (scrollable row)", "Yatay (kaydırılabilir satır)", "Horizontale (ligne défilante)", "Horizontal (fila desplazable)", "Orizzontale (riga scorrevole)", "Horizontal (scrollbare Zeile)"),
+    personalizedOrientationVertical: x("Vertical (stacked list)", "Dikey (alt alta liste)", "Verticale (liste empilée)", "Vertical (lista apilada)", "Verticale (elenco impilato)", "Vertikal (gestapelte Liste)"),
+    personalizedTileSpans: x("Tile sizes", "Karo boyutları", "Tailles des tuiles", "Tamaños de mosaico", "Dimensioni dei riquadri", "Kachelgrößen"),
+    personalizedTileSpansHelp: x(
+      "Each row below is one product slot, in the order they'll appear. Give a slot more width/height to make it a bigger hero tile — the grid fills the gaps around it automatically.",
+      "Aşağıdaki her satır, görünüm sırasına göre bir ürün yuvasıdır. Bir yuvaya daha fazla genişlik/yükseklik vererek onu daha büyük bir öne çıkan karo yapabilirsiniz — ızgara etrafındaki boşlukları otomatik doldurur.",
+      "Chaque ligne ci-dessous est un emplacement produit, dans l'ordre d'apparition. Donnez plus de largeur/hauteur à un emplacement pour en faire une grande tuile vedette.",
+      "Cada fila de abajo es un espacio de producto, en el orden de aparición. Da más ancho/alto a un espacio para convertirlo en un mosaico destacado más grande.",
+      "Ogni riga sotto è uno slot prodotto, nell'ordine di comparsa. Dai più larghezza/altezza a uno slot per renderlo un riquadro protagonista più grande.",
+      "Jede Zeile unten ist ein Produktplatz, in der Reihenfolge, in der sie erscheinen. Gib einem Platz mehr Breite/Höhe, um ihn zu einer größeren Hero-Kachel zu machen — das Raster füllt die Lücken automatisch."
+    ),
+    personalizedTileN: (n) => x(`Slot ${n}`, `Yuva ${n}`, `Emplacement ${n}`, `Espacio ${n}`, `Slot ${n}`, `Platz ${n}`),
   };
 }
 

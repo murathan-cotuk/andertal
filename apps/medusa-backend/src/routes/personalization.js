@@ -251,6 +251,44 @@ async function computeAlgorithm(client, algorithm, customerId, limit) {
       )
       return r.rows.map((x) => x.id)
     }
+    case 'top_categories_bestsellers': {
+      if (!customerId) return []
+      const topCatCount = 5
+      // Rank the customer's viewed categories by total view weight (sum of view_count across
+      // every product they viewed in that category) — "the 5 categories they actually browse
+      // the most", not just any category they happened to touch once.
+      const catRankR = await client.query(
+        `SELECT cat, SUM(v.view_count)::int AS weight
+           FROM store_customer_product_views v
+           JOIN admin_hub_products p ON p.id = v.product_id
+           CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(p.metadata->'category_ids', '[]'::jsonb)) AS cat
+          WHERE v.customer_id = $1::uuid
+          GROUP BY cat
+          ORDER BY weight DESC
+          LIMIT $2`,
+        [customerId, topCatCount],
+      )
+      const topCats = catRankR.rows.map((r) => r.cat)
+      if (!topCats.length) return []
+      // Round-robin one pass per top category (instead of one global sort by sales score) so
+      // the result actually spans all 5 categories — a single very popular category shouldn't
+      // crowd out the other 4 the customer also cares about.
+      const perCategory = Math.max(2, Math.ceil(limit / topCats.length))
+      const seen = new Set()
+      const ordered = []
+      for (const cat of topCats) {
+        const r = await client.query(
+          `SELECT id FROM admin_hub_products
+            WHERE status='published' AND metadata->'category_ids' ? $1
+            ORDER BY ${SALES_SCORE_SQL} DESC LIMIT $2`,
+          [cat, perCategory],
+        )
+        for (const row of r.rows) {
+          if (!seen.has(row.id)) { seen.add(row.id); ordered.push(row.id) }
+        }
+      }
+      return ordered.slice(0, limit)
+    }
     case 'also_bought': {
       if (!customerId) return []
       const r = await client.query(
@@ -335,9 +373,19 @@ function createPersonalizationRouter() {
     const algorithm = String(req.query.algorithm || 'bestsellers').trim()
     const limit = Math.min(20, Math.max(1, parseInt(req.query.limit, 10) || 8))
     const customerId = customerIdFromRequest(req)
+    // A personalized algorithm with no logged-in customer (or, below, a customer with no
+    // matching history yet) used to return an empty list, which made the whole landing-page
+    // container silently vanish — including for a superuser previewing the shop from their own
+    // Sellercentral session, which has no shop-customer identity at all. A block that renders
+    // nothing is never the right fallback for a merchandising slot: fall back to guest-safe
+    // bestsellers instead, and tell the caller it happened via `fallback`.
     if (!customerId && !GUEST_SAFE_ALGORITHMS.has(algorithm)) {
-      return res.json({ products: [], reason: 'login_required' })
+      return respondWithAlgorithm(res, req, 'bestsellers', null, limit, { requestedAlgorithm: algorithm, fallbackReason: 'login_required' })
     }
+    return respondWithAlgorithm(res, req, algorithm, customerId, limit)
+  }
+
+  async function respondWithAlgorithm(res, req, algorithm, customerId, limit, meta = {}) {
     const client = getDbClient()
     if (!client) return res.status(503).json({ message: 'DB not configured' })
     try {
@@ -355,16 +403,35 @@ function createPersonalizationRouter() {
         productIds = Array.isArray(row.product_ids) ? row.product_ids : []
       } else {
         productIds = await computeAlgorithm(client, algorithm, customerId, limit)
-        await client.query(
-          `INSERT INTO store_personalized_products_cache (cache_key, product_ids, computed_at)
-           VALUES ($1, $2::jsonb, now())
-           ON CONFLICT (cache_key) DO UPDATE SET product_ids = $2::jsonb, computed_at = now()`,
-          [cacheKey, JSON.stringify(productIds)],
-        )
+        // Never cache an empty result for the full TTL (48h) — an empty result is exactly the
+        // case most likely to change soon (the customer views more products, a bestseller flag
+        // gets set, etc.) and is cheap to recompute, so caching it just meant a container that
+        // came up empty once stayed empty for two days regardless of what changed underneath.
+        if (productIds.length > 0) {
+          await client.query(
+            `INSERT INTO store_personalized_products_cache (cache_key, product_ids, computed_at)
+             VALUES ($1, $2::jsonb, now())
+             ON CONFLICT (cache_key) DO UPDATE SET product_ids = $2::jsonb, computed_at = now()`,
+            [cacheKey, JSON.stringify(productIds)],
+          )
+        } else {
+          await client.query(`DELETE FROM store_personalized_products_cache WHERE cache_key = $1`, [cacheKey])
+        }
+      }
+      // Still nothing for this algorithm/customer (e.g. a brand-new customer with zero view or
+      // order history) — fall back to bestsellers rather than an empty container, same as the
+      // logged-out case above.
+      if (!productIds.length && algorithm !== 'bestsellers' && !meta.requestedAlgorithm) {
+        return respondWithAlgorithm(res, req, 'bestsellers', null, limit, { requestedAlgorithm: algorithm, fallbackReason: 'no_history' })
       }
       const products = await productsByIds(client, productIds, limit)
       await client.end()
-      res.json({ products, algorithm, cached: isFresh })
+      res.json({
+        products,
+        algorithm,
+        cached: isFresh,
+        ...(meta.requestedAlgorithm ? { requested_algorithm: meta.requestedAlgorithm, fallback_reason: meta.fallbackReason } : {}),
+      })
     } catch (e) {
       try { await client.end() } catch (_) {}
       res.status(500).json({ message: e?.message || 'Error', products: [] })
@@ -381,6 +448,7 @@ module.exports = { createPersonalizationRouter, ALGORITHM_KEYS: [
   'bestsellers', 'new_arrivals', 'on_sale',
   'reorder', 'favorited', 'favorited_low_stock', 'favorited_price_drop',
   'category_bestsellers_from_purchases', 'category_similar_from_favorites',
+  'top_categories_bestsellers',
   'also_bought', 'recently_viewed', 'trending_in_your_categories',
   'others_in_your_category', 'new_in_viewed_categories', 'abandoned_cart_items',
 ] }

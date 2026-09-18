@@ -10,6 +10,8 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { toSalesScore } from "@/lib/bestseller";
 import { isDiscountedProduct, getProductBasePriceCents } from "@/lib/catalog-listing";
+import { formatPriceCents } from "@/lib/format";
+import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
@@ -89,10 +91,16 @@ function parsePaddingParts(val) {
   return [parts[0], parts[1], parts[2], parts[3]];
 }
 
+// A bare number (no CSS unit) is invalid for padding and gets silently dropped by the browser —
+// same class of bug as the outer-margin one above. Normalize defensively here too.
+function cssLengthOrSelf(v) {
+  return v != null && /^-?\d+(\.\d+)?$/.test(String(v).trim()) ? `${v}px` : v;
+}
+
 // Inner padding from container.padding only. External gaps between containers use margin on the wrapper.
 function getContainerPadding(container, defaultPad) {
   const [t, r, b, l] = parsePaddingParts(container.padding || defaultPad || "0px");
-  return { paddingTop: t, paddingRight: r, paddingBottom: b, paddingLeft: l };
+  return { paddingTop: cssLengthOrSelf(t), paddingRight: cssLengthOrSelf(r), paddingBottom: cssLengthOrSelf(b), paddingLeft: cssLengthOrSelf(l) };
 }
 
 /** Innere Zeile: volle Breite innerhalb des Container-Paddings oder zentriert mit max-width (pro Block typischer Fallback in px). */
@@ -847,6 +855,13 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
   const patD = parseMosaicLayoutPattern(container.layout_pattern_desktop, [1, 2]);
   const patM = parseMosaicLayoutPattern(container.layout_pattern_mobile, [1]);
   const pattern = isNarrow ? patM : patD;
+  // Free grid ("Amazon-style" mosaic, TASKS: content_mosaic layout freedom): each image declares
+  // its own col_span/row_span instead of every row being an equal-width strip — CSS Grid's own
+  // auto-flow: dense packing does the actual layout work, so a tall hero image next to two
+  // stacked smaller ones (or any other asymmetric arrangement) needs zero custom placement logic.
+  const isFreeGrid = source === "images" && container.mosaic_mode === "grid";
+  const freeGridCols = Math.max(1, Math.min(6, Number(isNarrow ? (container.grid_cols_mobile ?? 2) : (container.grid_cols_desktop ?? 3)) || (isNarrow ? 2 : 3)));
+  const freeGridRowHeight = Math.max(40, Number(isNarrow ? (container.grid_row_height_mobile ?? 120) : (container.grid_row_height_desktop ?? 160)) || (isNarrow ? 120 : 160));
   const ratio = normalizeCollectionsCarouselAspectRatio(container.card_aspect_ratio);
   const imgObjectFit = container.card_image_object_fit === "contain" ? "contain" : "cover";
   const bg = container.bg_color || "#fff";
@@ -1007,13 +1022,72 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
     return <div key={key} style={{ minWidth: 0 }}>{block}</div>;
   };
 
+  const renderFreeGridImage = (img, key) => {
+    const src = resolveUrl(lt(img, "url", locale));
+    const imgTitle = lt(img, "title", locale);
+    const hasTitle = !!(imgTitle && String(imgTitle).trim());
+    const colSpan = Math.max(1, Math.min(freeGridCols, Number(img.col_span) || 1));
+    const rowSpan = Math.max(1, Math.min(6, Number(img.row_span) || 1));
+    const cell = (
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          borderRadius: 16,
+          overflow: "hidden",
+          background: "#f8f9fb",
+          border: "1px solid #e5e7eb",
+        }}
+      >
+        {src ? (
+          <Image src={src} alt={imgTitle || ""} fill sizes="(max-width: 768px) 50vw, 500px" style={{ objectFit: "cover" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #eef0f2 0%, #e2e5e9 100%)" }} />
+        )}
+        {hasTitle && (
+          <div style={{ position: "absolute", inset: "auto 0 0 0", padding: "14px 16px", background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.68) 100%)", color: "#fff" }}>
+            <div style={{ fontSize: rowSpan > 1 ? 20 : 15, fontWeight: 800, lineHeight: 1.2 }}>{imgTitle}</div>
+          </div>
+        )}
+      </div>
+    );
+    return (
+      <div
+        key={key}
+        style={{
+          gridColumn: `span ${colSpan}`,
+          gridRow: `span ${rowSpan}`,
+          minWidth: 0,
+          boxSizing: "border-box",
+          ...getImageCellPaddingStyle(img),
+        }}
+      >
+        {img.link ? <a href={img.link} style={{ display: "block", width: "100%", height: "100%", textDecoration: "none" }}>{cell}</a> : cell}
+      </div>
+    );
+  };
+
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
       <div style={getContentInnerStyle(container, 1280)}>
         {lt(container, "title", locale) && (
           <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
         )}
-        {isGridSource ? (
+        {isFreeGrid ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${freeGridCols}, minmax(0, 1fr))`,
+              gridAutoRows: `${freeGridRowHeight}px`,
+              gridAutoFlow: "dense",
+              gap,
+              width: "100%",
+            }}
+          >
+            {items.map((it, i) => renderFreeGridImage(it, `mg-${i}`))}
+          </div>
+        ) : isGridSource ? (
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%", alignItems: "start" }}>
             {items.map((it, i) =>
               source === "collection"
@@ -1385,13 +1459,35 @@ function PersonalizedProductRow({ container, locale = "de" }) {
   const gap = Number.isNaN(baseGap) ? 12 : baseGap;
   const visibleCount = Number(container.visible_count) || 4;
   const algorithm = container.algorithm || "top_picks";
+  // Two ways to present the same personalized product list — a normal scrollable row of full
+  // ProductCards (default, identical to before), or an editorial "image tile" mosaic (reusing
+  // ContentMosaic's free grid: every product gets its own col/row span, so a bigger "top pick"
+  // tile can sit beside smaller ones — see tile_spans below).
+  const displayMode = container.display_mode === "image_tiles" ? "image_tiles" : "product_cards";
+  const orientation = container.orientation === "vertical" ? "vertical" : "horizontal";
+  const freeGridCols = Math.max(1, Math.min(6, Number(isNarrow ? (container.grid_cols_mobile ?? 2) : (container.grid_cols_desktop ?? 4)) || (isNarrow ? 2 : 4)));
+  const freeGridRowHeight = Math.max(60, Number(isNarrow ? (container.grid_row_height_mobile ?? 140) : (container.grid_row_height_desktop ?? 180)) || (isNarrow ? 140 : 180));
+  const tileSpans = Array.isArray(container.tile_spans) ? container.tile_spans : [];
 
   const DEFAULT_TITLES = {
     recently_viewed:  { de: "Weitermachen, wo du aufgehört hast", en: "Continue where you left off" },
     reorder:          { de: "Schon früher bestellt — wieder bestellen?", en: "Order again?" },
     also_bought:      { de: "Andere kauften auch", en: "Others also bought" },
+    trending_in_your_categories: { de: "Trends in deinen Kategorien", en: "Trending in your categories" },
     trending_for_you: { de: "Trending für dich", en: "Trending for you" },
+    top_categories_bestsellers: { de: "Bestseller aus deinen Lieblingskategorien", en: "Bestsellers from your favorite categories" },
     top_picks:        { de: "Top-Empfehlungen", en: "Top picks for you" },
+    bestsellers:      { de: "Bestseller", en: "Bestsellers" },
+    new_arrivals:     { de: "Neuheiten für dich", en: "New arrivals for you" },
+    on_sale:          { de: "Angebote für dich", en: "Deals for you" },
+    favorited:        { de: "Deine Favoriten", en: "Your favorites" },
+    favorited_low_stock: { de: "Favoriten — bald ausverkauft", en: "Favorites — almost sold out" },
+    favorited_price_drop: { de: "Favoriten im Preis gesenkt", en: "Favorites with a price drop" },
+    category_bestsellers_from_purchases: { de: "Bestseller aus deinen Kaufkategorien", en: "Bestsellers from your purchase categories" },
+    category_similar_from_favorites: { de: "Ähnlich zu deinen Favoriten", en: "Similar to your favorites" },
+    others_in_your_category: { de: "Beliebt in deinen Kategorien", en: "Popular in your categories" },
+    new_in_viewed_categories: { de: "Neu in deinen Kategorien", en: "New in your categories" },
+    abandoned_cart_items: { de: "In deinem Warenkorb geblieben", en: "Left in your cart" },
   };
 
   function getTitle() {
@@ -1449,27 +1545,80 @@ function PersonalizedProductRow({ container, locale = "de" }) {
 
   const title = getTitle();
 
+  const renderTile = (product, i) => {
+    const handle = storefrontProductHandle(product, locale);
+    const href = handle ? `/${handle}` : null;
+    const priceCents = getProductBasePriceCents(product);
+    const span = tileSpans[i] || {};
+    const colSpan = Math.max(1, Math.min(freeGridCols, Number(span.col_span) || 1));
+    const rowSpan = Math.max(1, Math.min(4, Number(span.row_span) || 1));
+    const thumb = resolveUrl(product.thumbnail);
+    const cell = (
+      <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: 16, overflow: "hidden", background: "#f8f9fb", border: "1px solid #e5e7eb" }}>
+        {thumb ? (
+          <Image src={thumb} alt={product.title || ""} fill sizes="(max-width: 768px) 50vw, 500px" style={{ objectFit: "cover" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", background: "linear-gradient(135deg, #eef0f2 0%, #e2e5e9 100%)" }} />
+        )}
+        <div style={{ position: "absolute", inset: "auto 0 0 0", padding: "14px 16px", background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.7) 100%)", color: "#fff" }}>
+          <div style={{
+            fontSize: rowSpan > 1 ? 19 : 14, fontWeight: 800, lineHeight: 1.25, marginBottom: 4,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+          }}>
+            {product.title}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>{formatPriceCents(priceCents)} €</div>
+        </div>
+      </div>
+    );
+    return (
+      <div key={product.id || i} style={{ gridColumn: `span ${colSpan}`, gridRow: `span ${rowSpan}`, minWidth: 0 }}>
+        {href ? <a href={href} style={{ display: "block", width: "100%", height: "100%", textDecoration: "none" }}>{cell}</a> : cell}
+      </div>
+    );
+  };
+
   return (
     // See BestsellerCarousel — horizontal padding matches tokens.containerPadding (24px) so the
     // Carousel's navOnSides arrows line up with this row's own edge instead of sitting misaligned.
     <div style={{ ...getContainerPadding(container, "20px 24px"), background: "#fff" }}>
       <div style={getContentInnerStyle(container, 1280)}>
-        <Carousel
-          contained={false}
-          title={title || undefined}
-          itemWidth={200}
-          visibleCount={isNarrow ? undefined : visibleCount}
-          navOnSides
-          gap={gap}
-          showFade={false}
-          ariaLabel={title || "Personalized products"}
-        >
-          {products.map((product, i) => (
-            <div key={product.id || i} style={{ minWidth: 0 }}>
-              <ProductCard product={product} plainImage />
+        {displayMode === "image_tiles" ? (
+          <>
+            {title && <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${freeGridCols}, minmax(0, 1fr))`, gridAutoRows: `${freeGridRowHeight}px`, gridAutoFlow: "dense", gap, width: "100%" }}>
+              {products.map((product, i) => renderTile(product, i))}
             </div>
-          ))}
-        </Carousel>
+          </>
+        ) : orientation === "vertical" ? (
+          <>
+            {title && <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
+              {products.map((product, i) => (
+                <div key={product.id || i} style={{ minWidth: 0 }}>
+                  <ProductCard product={product} plainImage />
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <Carousel
+            contained={false}
+            title={title || undefined}
+            itemWidth={200}
+            visibleCount={isNarrow ? undefined : visibleCount}
+            navOnSides
+            gap={gap}
+            showFade={false}
+            ariaLabel={title || "Personalized products"}
+          >
+            {products.map((product, i) => (
+              <div key={product.id || i} style={{ minWidth: 0 }}>
+                <ProductCard product={product} plainImage />
+              </div>
+            ))}
+          </Carousel>
+        )}
       </div>
     </div>
   );
@@ -3072,11 +3221,15 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
     default: return null;
   }
   const m = c.margin || {};
+  // The Sellercentral "Outer margin" editor saves a bare number (e.g. "20"), not a CSS length —
+  // a unitless value is invalid for margin and the browser silently drops it, so it never showed
+  // up on the shop no matter what was typed. Bare numbers get "px" appended here; anything that
+  // already carries a unit (e.g. "2rem", "5%") passes through unchanged.
   const marginStyle = {
-    ...(m.top    ? { marginTop:    m.top }    : {}),
-    ...(m.bottom ? { marginBottom: m.bottom } : {}),
-    ...(m.left   ? { marginLeft:   m.left }   : {}),
-    ...(m.right  ? { marginRight:  m.right }  : {}),
+    ...(m.top    ? { marginTop:    cssLengthOrSelf(m.top) }    : {}),
+    ...(m.bottom ? { marginBottom: cssLengthOrSelf(m.bottom) } : {}),
+    ...(m.left   ? { marginLeft:   cssLengthOrSelf(m.left) }   : {}),
+    ...(m.right  ? { marginRight:  cssLengthOrSelf(m.right) }  : {}),
   };
   const hasMargin = Object.keys(marginStyle).length > 0;
   return <div key={c.id} className={visClass || undefined} style={hasMargin ? marginStyle : undefined}>{inner}</div>;

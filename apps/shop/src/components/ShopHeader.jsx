@@ -597,10 +597,11 @@ const CategoryMegaSidebarHead = styled.div`
     justify-content: space-between;
     flex-shrink: 0;
     padding: 14px 16px;
-    border-bottom: 1px solid #e5e7eb;
+    background: var(--shop-primary, #1b8880);
     font-size: 15px;
     font-weight: 700;
-    color: ${tokens.dark[800]};
+    color: #fff;
+    letter-spacing: 0.01em;
     font-family: ${tokens.fontFamily.sans};
   }
 `;
@@ -611,20 +612,20 @@ const CategoryMegaSidebarClose = styled.button`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    margin: -8px -10px -8px 0;
+    width: 36px;
+    height: 36px;
+    margin: -6px -8px -6px 0;
     padding: 0;
     border: none;
-    border-radius: 10px;
-    background: transparent;
-    color: ${tokens.dark[600]};
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
     cursor: pointer;
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1;
+    transition: background 0.13s ease;
     &:hover {
-      background: ${tokens.background.soft};
-      color: ${tokens.dark[800]};
+      background: rgba(255, 255, 255, 0.26);
     }
   }
 `;
@@ -679,26 +680,28 @@ const CategoryMegaLink = styled(Link)`
 
   @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
     white-space: normal;
-    padding: 10px 14px;
+    padding: 8px 12px;
     border-radius: 8px;
-    min-height: 56px;
+    min-height: 48px;
   }
 `;
 
 const CategoryMegaThumb = styled.img`
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   object-fit: cover;
   background: #e5e7eb;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   flex-shrink: 0;
 `;
 
 const CategoryMegaThumbPlaceholder = styled.div`
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   flex-shrink: 0;
 `;
 
@@ -746,7 +749,9 @@ const CategoryMegaRootLink = styled(Link)`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 10px;
+  border-left: 2px solid transparent;
+  border-left-color: ${(p) => (p.$active ? "var(--shop-primary, " + tokens.primary.DEFAULT + ")" : "transparent")};
   font-size: 13.5px;
   font-family: ${tokens.fontFamily.sans};
   color: ${(p) => (p.$active ? "var(--shop-primary, " + tokens.primary.DEFAULT + ")" : tokens.dark[700])};
@@ -755,7 +760,7 @@ const CategoryMegaRootLink = styled(Link)`
   text-decoration: none;
   border-radius: 6px;
   white-space: nowrap;
-  transition: background 0.13s ease, color 0.13s ease;
+  transition: background 0.13s ease, color 0.13s ease, border-color 0.13s ease;
   cursor: pointer;
 
   &:hover {

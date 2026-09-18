@@ -166,8 +166,8 @@ const css = {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    minHeight: 56,
-    padding: "10px 16px",
+    minHeight: 48,
+    padding: "8px 16px",
     fontSize: 15,
     fontWeight: 600,
     color: "#111827",
@@ -191,19 +191,21 @@ const css = {
   },
 
   categoryThumb: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 8,
     objectFit: "cover",
     background: "#e5e7eb",
+    border: "1px solid rgba(0,0,0,0.06)",
     flexShrink: 0,
   },
 
   categoryThumbPlaceholder: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 8,
     background: "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
+    border: "1px solid rgba(0,0,0,0.06)",
     flexShrink: 0,
   },
 
