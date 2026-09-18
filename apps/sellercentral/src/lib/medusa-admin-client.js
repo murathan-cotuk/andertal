@@ -537,6 +537,18 @@ class MedusaAdminClient {
     })
   }
 
+  async excelUpsertAdminHubCategories(items) {
+    const opts = { method: 'POST', body: JSON.stringify({ items }) }
+    try {
+      return await this.request('/admin-hub/v1/categories/excel-upsert', opts)
+    } catch (err) {
+      if (err?.statusCode === 404 || String(err?.originalMessage || err?.message || '').includes('404')) {
+        return await this.request('/admin-hub/categories/excel-upsert', opts)
+      }
+      throw err
+    }
+  }
+
   /**
    * Create Admin Hub category (POST)
    */

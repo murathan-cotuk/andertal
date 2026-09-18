@@ -39,7 +39,6 @@ import {
 import { groupContainerTypes } from "@/lib/landing-container-catalog";
 import {
   MAX_LANDING_CONTAINER_DEPTH,
-  findContainerById,
   mapContainerById,
   removeContainerById,
   moveSiblingInGroup,
@@ -4742,128 +4741,123 @@ export default function LandingPageEditor() {
                             // (Desktop/Tablet/Mobil) — a block added under Mobil must appear in
                             // the Mobil tab only, not mixed in with Desktop/Tablet blocks.
                             const treeRows = flattenLandingTree(filteredSeitenContainers);
-                            const selectedNode = expandedId ? findContainerById(filteredSeitenContainers, expandedId) : null;
-                            const selectedInfo = selectedNode ? typeInfo(selectedNode.type) : null;
                             const deviceBadgeLabel = (v) => (
                               v === "mobile" ? copy.mobile : v === "tablet" ? copy.tablet : v === "desktop" ? copy.desktop : null
                             );
                             return (
-                              <div style={{ display: "flex", gap: 16, alignItems: "flex-start", width: "100%", flexWrap: "wrap" }}>
-                                {/* ── Left: tree ── */}
-                                <div style={{ flex: selectedNode ? "1 1 320px" : "1 1 100%", minWidth: 280, maxWidth: selectedNode ? 420 : undefined }}>
-                                  <Card>
-                                    <BlockStack gap="300">
-                                      <InlineStack align="space-between" blockAlign="center">
-                                        <Text as="h3" variant="headingSm">{copy.tabContainers}</Text>
-                                        <Button size="slim" onClick={() => setAddModalOpen(true)}>{copy.addContainerShort}</Button>
-                                      </InlineStack>
-                                      {!selectedNode && (
-                                        <Text as="p" variant="bodySm" tone="subdued">{copy.selectBlockHint}</Text>
-                                      )}
-                                      <Divider />
-                                      <BlockStack gap="100">
-                                        {treeRows.map(({ node, depth, index, siblingCount }) => {
-                                          const info = typeInfo(node.type);
-                                          const isSelected = expandedId === node.id;
-                                          const deviceLabel = depth === 0 ? deviceBadgeLabel(node.visible_on) : null;
-                                          const isDragging = dragTreeId === node.id;
-                                          const isDragOver = dragOverTreeId === node.id && dragTreeId && dragTreeId !== node.id;
-                                          return (
-                                            <div
-                                              key={node.id}
-                                              onClick={() => setExpandedId(node.id)}
-                                              draggable
-                                              onDragStart={(e) => {
-                                                e.stopPropagation();
-                                                setDragTreeId(node.id);
-                                                e.dataTransfer.effectAllowed = "move";
-                                              }}
-                                              onDragOver={(e) => {
-                                                if (!dragTreeId || dragTreeId === node.id) return;
-                                                e.preventDefault();
-                                                e.dataTransfer.dropEffect = "move";
-                                                setDragOverTreeId(node.id);
-                                              }}
-                                              onDragLeave={() => setDragOverTreeId((cur) => (cur === node.id ? null : cur))}
-                                              onDrop={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                if (dragTreeId && dragTreeId !== node.id) treeMoveToPosition(dragTreeId, node.id, false);
-                                                setDragTreeId(null);
-                                                setDragOverTreeId(null);
-                                              }}
-                                              onDragEnd={() => { setDragTreeId(null); setDragOverTreeId(null); }}
-                                              style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 8,
-                                                padding: "6px 8px",
-                                                paddingLeft: 8 + depth * 18,
-                                                borderRadius: 8,
-                                                cursor: "grab",
-                                                opacity: isDragging ? 0.4 : 1,
-                                                background: isSelected ? "var(--p-color-bg-surface-selected, #f1f5ff)" : "transparent",
-                                                border: isSelected ? "1px solid var(--p-color-border-emphasis, #2c6ecb)" : "1px solid transparent",
-                                                borderTop: isDragOver ? "2px solid var(--p-color-border-emphasis, #2c6ecb)" : undefined,
-                                              }}
-                                            >
-                                              <Text as="span" tone="subdued">⠿</Text>
-                                              <div style={{ transform: "scale(0.6)", transformOrigin: "left center", flexShrink: 0, width: 68 }}>
-                                                <ContainerTypePreview type={node.type} label={info.label} />
-                                              </div>
-                                              <div style={{ flex: 1, minWidth: 0 }}>
-                                                <InlineStack gap="100" blockAlign="center" wrap={false}>
-                                                  <Text as="span" variant="bodySm" fontWeight={isSelected ? "semibold" : "regular"} truncate>{info.label}</Text>
-                                                  {deviceLabel && <Badge>{deviceLabel}</Badge>}
-                                                </InlineStack>
-                                                {!node.visible && <Text as="span" variant="bodySm" tone="subdued"> · {copy.hidden}</Text>}
-                                              </div>
-                                              <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                                                <Button size="micro" onClick={() => treeUpdateById(node.id, (n) => ({ ...n, visible: !n.visible }))}>
-                                                  {node.visible ? copy.hide : copy.show}
-                                                </Button>
-                                                <Button size="micro" disabled={index === 0} onClick={() => treeMove(node.id, -1)}>↑</Button>
-                                                <Button size="micro" disabled={index === siblingCount - 1} onClick={() => treeMove(node.id, 1)}>↓</Button>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </BlockStack>
-                                    </BlockStack>
-                                  </Card>
-                                </div>
-
-                                {/* ── Right: inspector — only takes up column width once a block
-                                     is actually selected. */}
-                                {selectedNode && (
-                                  <div style={{ flex: "2 1 420px", minWidth: 320, position: "sticky", top: 16 }}>
-                                    <Card>
-                                      <BlockStack gap="300">
-                                        <InlineStack align="space-between" blockAlign="center">
-                                          <InlineStack gap="200" blockAlign="center">
-                                            <Text as="h3" variant="headingSm">{selectedInfo.label}</Text>
-                                            <Badge tone={selectedNode.visible ? "success" : undefined}>{selectedNode.visible ? copy.visible : copy.hidden}</Badge>
-                                          </InlineStack>
-                                          <Button
-                                            size="slim"
-                                            tone="critical"
-                                            onClick={async () => { if (await confirmDelete(copy.removeContainerConfirm)) treeRemoveById(selectedNode.id); }}
+                              <Card>
+                                <BlockStack gap="300">
+                                  <InlineStack align="space-between" blockAlign="center">
+                                    <Text as="h3" variant="headingSm">{copy.tabContainers}</Text>
+                                    <Button size="slim" onClick={() => setAddModalOpen(true)}>{copy.addContainerShort}</Button>
+                                  </InlineStack>
+                                  <Text as="p" variant="bodySm" tone="subdued">{copy.selectBlockHint}</Text>
+                                  <Divider />
+                                  <BlockStack gap="200">
+                                    {treeRows.map(({ node, depth, index, siblingCount }) => {
+                                      const info = typeInfo(node.type);
+                                      const isSelected = expandedId === node.id;
+                                      const deviceLabel = depth === 0 ? deviceBadgeLabel(node.visible_on) : null;
+                                      const isDragging = dragTreeId === node.id;
+                                      const isDragOver = dragOverTreeId === node.id && dragTreeId && dragTreeId !== node.id;
+                                      return (
+                                        <div key={node.id}>
+                                          <div
+                                            onClick={() => setExpandedId(isSelected ? null : node.id)}
+                                            draggable
+                                            onDragStart={(e) => {
+                                              e.stopPropagation();
+                                              setDragTreeId(node.id);
+                                              e.dataTransfer.effectAllowed = "move";
+                                            }}
+                                            onDragOver={(e) => {
+                                              if (!dragTreeId || dragTreeId === node.id) return;
+                                              e.preventDefault();
+                                              e.dataTransfer.dropEffect = "move";
+                                              setDragOverTreeId(node.id);
+                                            }}
+                                            onDragLeave={() => setDragOverTreeId((cur) => (cur === node.id ? null : cur))}
+                                            onDrop={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              if (dragTreeId && dragTreeId !== node.id) treeMoveToPosition(dragTreeId, node.id, false);
+                                              setDragTreeId(null);
+                                              setDragOverTreeId(null);
+                                            }}
+                                            onDragEnd={() => { setDragTreeId(null); setDragOverTreeId(null); }}
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 8,
+                                              padding: "6px 8px",
+                                              paddingLeft: 8 + depth * 18,
+                                              borderRadius: 8,
+                                              cursor: "grab",
+                                              opacity: isDragging ? 0.4 : 1,
+                                              background: isSelected ? "var(--p-color-bg-surface-selected, #f1f5ff)" : "transparent",
+                                              border: isSelected ? "1px solid var(--p-color-border-emphasis, #2c6ecb)" : "1px solid transparent",
+                                              borderTop: isDragOver ? "2px solid var(--p-color-border-emphasis, #2c6ecb)" : undefined,
+                                            }}
                                           >
-                                            {copy.remove}
-                                          </Button>
-                                        </InlineStack>
-                                        <Divider />
-                                        <ContainerEditor
-                                          container={selectedNode}
-                                          onChange={(updated) => treeUpdateById(selectedNode.id, () => updated)}
-                                          deviceTab={seitenDeviceTab}
-                                          editLang={contentEditLang}
-                                        />
-                                      </BlockStack>
-                                    </Card>
-                                  </div>
-                                )}
-                              </div>
+                                            <Text as="span" tone="subdued">⠿</Text>
+                                            <div style={{ transform: "scale(0.6)", transformOrigin: "left center", flexShrink: 0, width: 68 }}>
+                                              <ContainerTypePreview type={node.type} label={info.label} />
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                              <InlineStack gap="100" blockAlign="center" wrap={false}>
+                                                <Text as="span" variant="bodySm" fontWeight={isSelected ? "semibold" : "regular"} truncate>{info.label}</Text>
+                                                {deviceLabel && <Badge>{deviceLabel}</Badge>}
+                                              </InlineStack>
+                                              {!node.visible && <Text as="span" variant="bodySm" tone="subdued"> · {copy.hidden}</Text>}
+                                            </div>
+                                            <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                                              <Button size="micro" onClick={() => treeUpdateById(node.id, (n) => ({ ...n, visible: !n.visible }))}>
+                                                {node.visible ? copy.hide : copy.show}
+                                              </Button>
+                                              <Button size="micro" disabled={index === 0} onClick={() => treeMove(node.id, -1)}>↑</Button>
+                                              <Button size="micro" disabled={index === siblingCount - 1} onClick={() => treeMove(node.id, 1)}>↓</Button>
+                                            </div>
+                                          </div>
+
+                                          {/* Settings render full-width directly below the row that was
+                                              clicked — accordion-in-place, not a side/above panel. */}
+                                          {isSelected && (
+                                            <div style={{ paddingTop: 8, paddingLeft: 8 + depth * 18 }}>
+                                              <Card background="bg-surface-secondary">
+                                                <BlockStack gap="300">
+                                                  <InlineStack align="space-between" blockAlign="center">
+                                                    <InlineStack gap="200" blockAlign="center">
+                                                      <Text as="h3" variant="headingSm">{info.label}</Text>
+                                                      <Badge tone={node.visible ? "success" : undefined}>{node.visible ? copy.visible : copy.hidden}</Badge>
+                                                    </InlineStack>
+                                                    <InlineStack gap="200" blockAlign="center">
+                                                      <Button
+                                                        size="slim"
+                                                        tone="critical"
+                                                        onClick={async () => { if (await confirmDelete(copy.removeContainerConfirm)) { treeRemoveById(node.id); setExpandedId(null); } }}
+                                                      >
+                                                        {copy.remove}
+                                                      </Button>
+                                                      <Button size="slim" onClick={() => setExpandedId(null)}>{copy.collapse}</Button>
+                                                    </InlineStack>
+                                                  </InlineStack>
+                                                  <Divider />
+                                                  <ContainerEditor
+                                                    container={node}
+                                                    onChange={(updated) => treeUpdateById(node.id, () => updated)}
+                                                    deviceTab={seitenDeviceTab}
+                                                    editLang={contentEditLang}
+                                                  />
+                                                </BlockStack>
+                                              </Card>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </BlockStack>
+                                </BlockStack>
+                              </Card>
                             );
                           })()}
 

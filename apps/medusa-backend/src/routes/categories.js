@@ -453,10 +453,19 @@ function topoSortExcelItems(items) {
   return out
 }
 
+const EXCEL_UPSERT_MAX_ITEMS = 400
+const EXCEL_UPSERT_RETURNING =
+  'id, slug, parent_id, name, active, sort_order, seo_title, seo_description, long_content, banner_image_url, metadata'
+
 const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
   const { items } = req.body || {}
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: 'items array is required and must not be empty' })
+  }
+  if (items.length > EXCEL_UPSERT_MAX_ITEMS) {
+    return res.status(400).json({
+      message: `Send at most ${EXCEL_UPSERT_MAX_ITEMS} items per request (got ${items.length})`,
+    })
   }
   const client = getCategoriesPgClient()
   if (!client) return categoriesPgUnavailable(res)
@@ -464,7 +473,10 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
   try {
     await client.connect()
     await client.query('BEGIN')
-    const existing = await client.query('SELECT * FROM admin_hub_categories')
+    const existing = await client.query(
+      `SELECT id, slug, parent_id, name, active, sort_order, seo_title, seo_description, long_content, banner_image_url
+       FROM admin_hub_categories`,
+    )
     const byId = new Map()
     const bySlug = new Map()
     for (const row of existing.rows) {
@@ -493,6 +505,27 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
     })
 
     const ordered = topoSortExcelItems(prepared)
+    const idsNeedingMeta = []
+    for (const item of ordered) {
+      const hit =
+        (item.id && byId.get(String(item.id).toLowerCase())) ||
+        (item._slug && bySlug.get(String(item._slug).toLowerCase())) ||
+        null
+      if (hit?.id) idsNeedingMeta.push(hit.id)
+    }
+    if (idsNeedingMeta.length) {
+      const metaRes = await client.query(
+        `SELECT id, metadata FROM admin_hub_categories WHERE id = ANY($1::uuid[])`,
+        [idsNeedingMeta],
+      )
+      for (const r of metaRes.rows) {
+        const cur = byId.get(String(r.id).toLowerCase())
+        if (!cur) continue
+        cur.metadata = r.metadata
+        byId.set(String(r.id).toLowerCase(), cur)
+        if (cur.slug) bySlug.set(String(cur.slug).toLowerCase(), cur)
+      }
+    }
     const createdBySlug = new Map()
     const createdById = new Map()
     let processed = 0
@@ -594,7 +627,7 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
               name = $1, slug = $2, parent_id = $3, active = $4, sort_order = $5,
               seo_title = $6, seo_description = $7, long_content = $8, banner_image_url = $9,
               metadata = $10::jsonb, updated_at = now()
-             WHERE id = $11::uuid RETURNING *`,
+             WHERE id = $11::uuid RETURNING ${EXCEL_UPSERT_RETURNING}`,
             [
               canon.name,
               nextSlug,
@@ -626,7 +659,7 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
                 (id, name, slug, description, parent_id, active, is_visible, has_collection, sort_order,
                  seo_title, seo_description, long_content, banner_image_url, metadata)
                VALUES ($1::uuid,$2,$3,NULL,$4,$5,true,false,$6,$7,$8,$9,$10,$11::jsonb)
-               RETURNING *`,
+               RETURNING ${EXCEL_UPSERT_RETURNING}`,
               [
                 insertId, canon.name, slug, parentId || null,
                 activeParsed != null ? activeParsed : true,
@@ -640,7 +673,7 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
                 (name, slug, description, parent_id, active, is_visible, has_collection, sort_order,
                  seo_title, seo_description, long_content, banner_image_url, metadata)
                VALUES ($1,$2,NULL,$3,$4,true,false,$5,$6,$7,$8,$9,$10::jsonb)
-               RETURNING *`,
+               RETURNING ${EXCEL_UPSERT_RETURNING}`,
               [
                 canon.name, slug, parentId || null,
                 activeParsed != null ? activeParsed : true,

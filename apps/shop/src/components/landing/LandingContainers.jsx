@@ -15,6 +15,22 @@ import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
 import CatalogHubFilterShell from "@/components/catalog/CatalogHubFilterShell";
+import { tokens } from "@/design-system/tokens";
+import styled from "styled-components";
+
+// "See all/more" link under a product carousel — matches the brand accent used across the shop
+// header/CTAs (var(--shop-primary), so a superuser's custom accent color still applies) instead
+// of a generic unbranded blue, and skips the permanent underline (hover-only) so it reads as a
+// designed link, not default browser-link styling.
+const SeeAllLink = styled(Link)`
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--shop-primary, ${tokens.primary.DEFAULT});
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+`;
 
 // Code-split: these are each their own module already (no internal refactor needed) and are
 // niche/rarely-rendered container types (support pages, become-seller landing, brands directory)
@@ -1321,7 +1337,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
           />
           {categoryUrl && (
             <div style={{ textAlign: "center", marginTop: 10 }}>
-              <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", textDecoration: "underline" }}>Mehr anzeigen</Link>
+              <SeeAllLink href={categoryUrl}>Mehr anzeigen</SeeAllLink>
             </div>
           )}
         </div>
@@ -1330,7 +1346,10 @@ function BestsellerCarousel({ container, locale = "de" }) {
   }
 
   return (
-    <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
+    // Horizontal padding matches tokens.containerPadding (24px) — Carousel's navOnSides bleed/
+    // arrow-inset math is hardcoded to that value, so a narrower side padding here (the old 16px)
+    // made the desktop nav arrows sit misaligned with this row's own edge.
+    <div style={{ ...getContainerPadding(container, "20px 24px"), background: "#fff" }}>
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}
@@ -1350,7 +1369,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
         </Carousel>
         {categoryUrl && (
           <div style={{ textAlign: "center", marginTop: 12 }}>
-            <Link href={categoryUrl} style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", textDecoration: "underline" }}>Mehr anzeigen</Link>
+            <SeeAllLink href={categoryUrl}>Mehr anzeigen</SeeAllLink>
           </div>
         )}
       </div>
@@ -1431,7 +1450,9 @@ function PersonalizedProductRow({ container, locale = "de" }) {
   const title = getTitle();
 
   return (
-    <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
+    // See BestsellerCarousel — horizontal padding matches tokens.containerPadding (24px) so the
+    // Carousel's navOnSides arrows line up with this row's own edge instead of sitting misaligned.
+    <div style={{ ...getContainerPadding(container, "20px 24px"), background: "#fff" }}>
       <div style={getContentInnerStyle(container, 1280)}>
         <Carousel
           contained={false}

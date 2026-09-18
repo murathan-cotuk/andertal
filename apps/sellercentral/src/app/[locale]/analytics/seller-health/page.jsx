@@ -62,6 +62,7 @@ function getHealthCopy(locale) {
     reviews: t("reviews", "değerlendirme", "avis", "reseñas", "recensioni", "Bewertungen"),
     issuesTitle: t("Issues affecting your score", "Puanınızı etkileyen sorunlar", "Problèmes affectant votre score", "Problemas que afectan su puntuación", "Problemi che influenzano il punteggio", "Probleme, die deinen Score senken"),
     noIssues: t("No open issues — nice work.", "Açık sorun yok — güzel iş.", "Aucun problème ouvert — beau travail.", "Sin problemas abiertos — buen trabajo.", "Nessun problema aperto — ottimo lavoro.", "Keine offenen Probleme — sehr gut."),
+    viewDetails: t("View details", "Detayları gör", "Voir les détails", "Ver detalles", "Vedi dettagli", "Details ansehen"),
     pointsLost: (n) => t(`−${n} pts`, `−${n} puan`, `−${n} pts`, `−${n} pts`, `−${n} pt`, `−${n} Pkt.`),
     categories: t("Categories", "Kategoriler", "Catégories", "Categorías", "Categorie", "Kategorien"),
     currentValue: t("Current value", "Mevcut değer", "Valeur actuelle", "Valor actual", "Valore attuale", "Aktueller Wert"),
@@ -202,9 +203,14 @@ const SH_CSS = `
 .sh-ring { position: relative; width: 128px; height: 128px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
 .sh-ring-value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
 .sh-ring-max { font-size: 12px; color: #98a2b3; margin-top: -2px; }
-.sh-cat-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; cursor: pointer; }
-.sh-cat-row:hover { background: #fafafa; }
+.sh-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.sh-cat-card { text-align: left; background: #fff; border: 1px solid #e8eaed; border-left: 3px solid #d0d5dd; border-radius: 10px; padding: 14px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 8px; font: inherit; color: inherit; box-shadow: 0 1px 2px rgba(16,24,40,.04); transition: box-shadow .15s, border-color .15s; }
+.sh-cat-card:hover { box-shadow: 0 4px 12px rgba(16,24,40,.08); border-color: #d0d5dd; }
+.sh-cat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sh-cat-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
+.sh-cat-card-link { font-size: 11px; font-weight: 600; color: #1b8880; flex: 0 0 auto; }
 .sh-crit-row { padding: 10px 14px; border-top: 1px solid #f3f4f6; }
+.sh-crit-row:first-child { border-top: none; }
 .sh-issue-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-top: 1px solid #f3f4f6; }
 .sh-issue-row:first-child { border-top: none; }
 .sh-hist-bars { display: flex; align-items: flex-end; gap: 2px; height: 90px; }
@@ -347,35 +353,69 @@ function CriterionRow({ crit, copy, locale }) {
   );
 }
 
-function CategoryCard({ cat, copy, locale, openId, setOpenId }) {
-  const isOpen = openId === cat.id;
+function CategoryCard({ cat, copy, onOpen }) {
   const pct = cat.maxPoints > 0 && cat.score != null ? Math.round((cat.score / cat.maxPoints) * 100) : 0;
+  const barTone = cat.score == null ? undefined : pct >= 80 ? "success" : pct >= 40 ? "highlight" : "critical";
+  const accent = cat.score == null ? "#d0d5dd" : pct >= 80 ? "#059669" : pct >= 40 ? "#b45309" : "#dc2626";
+  const worstIssues = (cat.criteria || [])
+    .filter((c) => c.pointsLost > 0.05)
+    .sort((a, b) => b.pointsLost - a.pointsLost)
+    .slice(0, 2);
   return (
-    <Card padding="0">
-      <div className="sh-cat-row" onClick={() => setOpenId(isOpen ? null : cat.id)}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-        <BlockStack gap="100">
-          <InlineStack align="space-between" blockAlign="center">
-            <Text as="span" fontWeight="semibold">{cat.label}</Text>
-            <Text as="span" fontWeight="semibold" tone={cat.score == null ? "subdued" : (pct >= 80 ? "success" : pct >= 40 ? undefined : "critical")}>
-              {cat.score == null ? "—" : copy.scorePoints(cat.score, cat.maxPoints)}
-            </Text>
-          </InlineStack>
-          <ProgressBar progress={cat.score == null ? 0 : pct} size="small" tone={pct >= 80 ? "success" : pct >= 40 ? "highlight" : "critical"} />
-        </BlockStack>
-        </div>
-        <Text as="span" tone="subdued">{isOpen ? "▲" : "▼"}</Text>
+    <button type="button" className="sh-cat-card" style={{ borderLeftColor: accent }} onClick={() => onOpen(cat.id)}>
+      <div className="sh-cat-card-top">
+        <Text as="span" fontWeight="semibold">{cat.label}</Text>
+        <Text as="span" fontWeight="semibold" tone={cat.score == null ? "subdued" : (pct >= 80 ? "success" : pct >= 40 ? undefined : "critical")}>
+          {cat.score == null ? "—" : copy.scorePoints(cat.score, cat.maxPoints)}
+        </Text>
       </div>
-      {isOpen && (
-        <Box>
-          {(cat.criteria || []).length === 0 ? (
-            <Box padding="300"><Text tone="subdued">{copy.notEnoughData}</Text></Box>
+      <ProgressBar progress={cat.score == null ? 0 : pct} size="small" tone={barTone} />
+      <div className="sh-cat-card-bottom">
+        {cat.score == null ? (
+          <Text tone="subdued" variant="bodySm">{copy.notEnoughData}</Text>
+        ) : worstIssues.length ? (
+          <Text tone="subdued" variant="bodySm">
+            {worstIssues.map((c) => c.label).join(" · ")}
+          </Text>
+        ) : (
+          <Text tone="success" variant="bodySm">{copy.noIssues}</Text>
+        )}
+        <span className="sh-cat-card-link">{copy.viewDetails} →</span>
+      </div>
+    </button>
+  );
+}
+
+function CategoryDetailModal({ category, copy, locale, onClose }) {
+  if (!category) return null;
+  const pct = category.maxPoints > 0 && category.score != null ? Math.round((category.score / category.maxPoints) * 100) : 0;
+  return (
+    <Modal open={!!category} onClose={onClose} title={category.label} size="large">
+      <Modal.Section>
+        <BlockStack gap="300">
+          <Card>
+            <InlineStack align="space-between" blockAlign="center" gap="300" wrap={false}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <BlockStack gap="150">
+                  <Text as="span" variant="headingLg" fontWeight="bold" tone={category.score == null ? "subdued" : (pct >= 80 ? "success" : pct >= 40 ? undefined : "critical")}>
+                    {category.score == null ? "—" : copy.scorePoints(category.score, category.maxPoints)}
+                  </Text>
+                  <ProgressBar progress={category.score == null ? 0 : pct} size="small" tone={category.score == null ? undefined : pct >= 80 ? "success" : pct >= 40 ? "highlight" : "critical"} />
+                </BlockStack>
+              </div>
+            </InlineStack>
+          </Card>
+
+          {(category.criteria || []).length === 0 ? (
+            <Card><Box padding="400"><Text tone="subdued" alignment="center">{copy.notEnoughData}</Text></Box></Card>
           ) : (
-            cat.criteria.map((crit) => <CriterionRow key={crit.id} crit={crit} copy={copy} locale={locale} />)
+            <Card padding="0">
+              {category.criteria.map((crit) => <CriterionRow key={crit.id} crit={crit} copy={copy} locale={locale} />)}
+            </Card>
           )}
-        </Box>
-      )}
-    </Card>
+        </BlockStack>
+      </Modal.Section>
+    </Modal>
   );
 }
 
@@ -889,12 +929,18 @@ function SellerHealthPage({ isSuperuser, sellerId }) {
                     <IssuesPanel issues={health.issues} copy={copy} locale={locale} onJump={setOpenCatId} />
                   </Layout.Section>
                   <Layout.Section>
-                    <BlockStack gap="300">
+                    <div className="sh-cat-grid">
                       {(health.categories || []).map((cat) => (
-                        <CategoryCard key={cat.id} cat={cat} copy={copy} locale={locale} openId={openCatId} setOpenId={setOpenCatId} />
+                        <CategoryCard key={cat.id} cat={cat} copy={copy} onOpen={setOpenCatId} />
                       ))}
-                    </BlockStack>
+                    </div>
                   </Layout.Section>
+                  <CategoryDetailModal
+                    category={(health.categories || []).find((c) => c.id === openCatId) || null}
+                    copy={copy}
+                    locale={locale}
+                    onClose={() => setOpenCatId(null)}
+                  />
                 </>
               )}
             </>

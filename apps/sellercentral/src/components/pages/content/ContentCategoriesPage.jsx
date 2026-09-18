@@ -257,6 +257,17 @@ export default function ContentCategoriesPage() {
     ),
     pickFile: lt(locale, "Excel file (.xlsx)", "Excel dosyası (.xlsx)", "Fichier Excel (.xlsx)", "Archivo Excel (.xlsx)", "File Excel (.xlsx)", "Excel-Datei (.xlsx)"),
     importNow: lt(locale, "Import", "İçe aktar", "Importer", "Importar", "Importa", "Importieren"),
+    excelParsing: lt(locale, "Reading Excel…", "Excel okunuyor…", "Lecture Excel…", "Leyendo Excel…", "Lettura Excel…", "Excel wird gelesen…"),
+    excelSaving: (done, total) =>
+      lt(
+        locale,
+        `Saving ${done} / ${total}…`,
+        `${done} / ${total} kaydediliyor…`,
+        `Enregistrement ${done} / ${total}…`,
+        `Guardando ${done} / ${total}…`,
+        `Salvataggio ${done} / ${total}…`,
+        `Speichern ${done} / ${total}…`,
+      ),
     cancel: lt(locale, "Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen"),
     downloadFail: lt(locale, "Download failed", "İndirme başarısız", "Échec du téléchargement", "Error al descargar", "Download non riuscito", "Download fehlgeschlagen"),
   };
@@ -523,23 +534,119 @@ export default function ContentCategoriesPage() {
     }
   };
 
-  const runExcelImport = async () => {
-    if (!excelFile) return;
-    setExcelBusy("import");
-    setExcelResult(null);
-    setError(null);
+  const readImportResponse = async (res) => {
+    const text = await res.text();
+    let data = {};
     try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      const snippet = String(text || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 240);
+      throw new Error(snippet ? `HTTP ${res.status}: ${snippet}` : `HTTP ${res.status}`);
+    }
+    if (!res.ok) {
+      throw new Error(data.error || data.message || `HTTP ${res.status}`);
+    }
+    return data;
+  };
+
+  const upsertExcelBatch = async (items) => {
+    try {
+      return await client.excelUpsertAdminHubCategories(items);
+    } catch (err) {
+      if (err?.statusCode && err.statusCode >= 400) throw err;
+      const res = await fetch("/api/import-export/categories/upsert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sellerToken: sellerToken(), locale, items }),
+      });
+      return readImportResponse(res);
+    }
+  };
+
+  const importExcelByOffset = async (totals) => {
+    let offset = 0;
+    let total = 0;
+    while (true) {
       const fd = new FormData();
       fd.append("file", excelFile);
       fd.append("sellerToken", sellerToken());
       fd.append("locale", locale);
+      fd.append("offset", String(offset));
+      fd.append("limit", "80");
       const res = await fetch("/api/import-export/categories/import", { method: "POST", body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Import failed");
-      setExcelResult(data);
+      const data = await readImportResponse(res);
+      total = data.total || total;
+      totals.created += data.created || 0;
+      totals.updated += data.updated || 0;
+      totals.failed += data.failed || 0;
+      if (Array.isArray(data.errors) && data.errors.length) totals.errors.push(...data.errors);
+      const next = typeof data.nextOffset === "number" ? data.nextOffset : offset + 80;
+      setExcelResult({
+        ...totals,
+        progress: copy.excelSaving(Math.min(next, total || next), total || next),
+      });
+      if (data.done || next <= offset || (total && next >= total)) break;
+      offset = next;
+    }
+  };
+
+  const runExcelImport = async () => {
+    if (!excelFile) return;
+    setExcelBusy("import");
+    setExcelResult({ progress: copy.excelParsing });
+    setError(null);
+    const totals = { created: 0, updated: 0, failed: 0, errors: [] };
+    try {
+      try {
+        const ExcelJS = (await import("exceljs")).default;
+        const { CATEGORY_SHEET_NAME, orderCategoryExcelItems, parseCategoryExcelWorksheet } = await import("@/lib/category-excel");
+        const wb = new ExcelJS.Workbook();
+        await wb.xlsx.load(await excelFile.arrayBuffer());
+        const ws =
+          wb.getWorksheet(CATEGORY_SHEET_NAME) ||
+          wb.worksheets.find((s) => s.name !== "Index") ||
+          wb.worksheets[0];
+        if (!ws) throw new Error("No Categories sheet found");
+        const parsed = parseCategoryExcelWorksheet(ws);
+        if (parsed.errors?.length) totals.errors.push(...parsed.errors);
+        if (!parsed.items.length) {
+          throw new Error(parsed.errors?.[0]?.error || "No data rows found (fill from row 4)");
+        }
+        const ordered = orderCategoryExcelItems(parsed.items);
+        const BATCH = 80;
+        for (let i = 0; i < ordered.length; i += BATCH) {
+          const batch = ordered.slice(i, i + BATCH);
+          setExcelResult({
+            ...totals,
+            progress: copy.excelSaving(Math.min(i + batch.length, ordered.length), ordered.length),
+          });
+          const data = await upsertExcelBatch(batch);
+          totals.created += data.created || 0;
+          totals.updated += data.updated || 0;
+          totals.failed += data.failed || 0;
+          if (Array.isArray(data.errors) && data.errors.length) totals.errors.push(...data.errors);
+        }
+      } catch (parseOrClientErr) {
+        const msg = String(parseOrClientErr?.message || parseOrClientErr || "");
+        const canFallback =
+          /exceljs|Cannot find module|Failed to fetch dynamically imported|Can't resolve ['"]fs|fs is not defined|stream is not defined/i.test(
+            msg,
+          );
+        if (!canFallback) throw parseOrClientErr;
+        setExcelResult({ ...totals, progress: copy.excelParsing });
+        await importExcelByOffset(totals);
+      }
+      setExcelResult(totals);
       await fetchCategories();
     } catch (err) {
-      setExcelResult({ error: err?.message || "Import failed" });
+      setExcelResult({
+        ...totals,
+        error: err?.message || "Import failed",
+      });
     } finally {
       setExcelBusy("");
     }
@@ -699,10 +806,20 @@ export default function ContentCategoriesPage() {
                 }}
               />
             </label>
-            {excelResult?.error && (
-              <Banner tone="critical" onDismiss={() => setExcelResult(null)}>{excelResult.error}</Banner>
+            {excelResult?.progress && excelBusy === "import" && !excelResult.error && (
+              <Text as="p" tone="subdued">{excelResult.progress}</Text>
             )}
-            {excelResult && !excelResult.error && (
+            {excelResult?.error && (
+              <Banner tone="critical" onDismiss={() => setExcelResult(null)}>
+                {excelResult.error}
+                {(excelResult.created || excelResult.updated) ? (
+                  <div style={{ marginTop: 8, fontSize: 12 }}>
+                    {`Created ${excelResult.created || 0}, updated ${excelResult.updated || 0}, failed ${excelResult.failed || 0}`}
+                  </div>
+                ) : null}
+              </Banner>
+            )}
+            {excelResult && !excelResult.error && !excelBusy && (
               <Banner tone={excelResult.failed ? "warning" : "success"} onDismiss={() => setExcelResult(null)}>
                 {`Created ${excelResult.created || 0}, updated ${excelResult.updated || 0}, failed ${excelResult.failed || 0}`}
                 {Array.isArray(excelResult.errors) && excelResult.errors.length > 0 && (

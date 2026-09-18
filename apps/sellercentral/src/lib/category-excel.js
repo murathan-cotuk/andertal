@@ -500,3 +500,37 @@ export function flattenCategoryIndex(list) {
   walk(roots, "");
   return out;
 }
+
+/** Parents before children so batched upserts can resolve parent_id within earlier batches. */
+export function orderCategoryExcelItems(items) {
+  const list = Array.isArray(items) ? items : [];
+  const bySlug = new Map();
+  const byId = new Map();
+  const keyed = list.map((raw, i) => {
+    const slug = String(raw.slug || "").trim().toLowerCase();
+    const id = String(raw.id || "").trim().toLowerCase();
+    const it = { ...raw, _slug: slug, _id: id, _key: id || slug || `row-${raw.row || i + 1}` };
+    if (slug) bySlug.set(slug, it);
+    if (UUID_RE.test(id)) byId.set(id, it);
+    return it;
+  });
+  const visiting = new Set();
+  const seen = new Set();
+  const out = [];
+  const visit = (it) => {
+    const key = it._key;
+    if (seen.has(key) || visiting.has(key)) return;
+    visiting.add(key);
+    const pref = String(it.parent_id || "").trim();
+    if (pref) {
+      const parent = UUID_RE.test(pref) ? byId.get(pref.toLowerCase()) : bySlug.get(pref.toLowerCase());
+      if (parent && parent !== it) visit(parent);
+    }
+    visiting.delete(key);
+    seen.add(key);
+    const { _slug, _id, _key, ...rest } = it;
+    out.push(rest);
+  };
+  keyed.forEach(visit);
+  return out;
+}
