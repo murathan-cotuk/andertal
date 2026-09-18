@@ -1,1381 +1,1220 @@
-1) Andertal SellerCentral içinde `Analysen` altında yeni bir **`Seller Health`** sayfası geliştirmeni istiyorum.
+# ANDERTAL — LANDING PAGE CONTAINER TEMPLATE SYSTEM 2.0 + HOMEPAGE
 
-Amaç: Her satıcının genel performansını, müşteri deneyimini, operasyonel kalitesini, ürün/veri kalitesini, hukuki uyumluluğunu ve risk seviyesini **100 üzerinden tek bir Seller Health Score** ile ölçmek.
+## 0. GÖREVİN ÖZÜ
 
-Bu sistemi basit bir puan kutusu gibi değil, profesyonel bir **seller performance & risk management dashboard** olarak tasarla.
+Andertal SellerCentral içindeki mevcut **Landing Page / Container Template sistemini baştan sona analiz et, profesyonelleştir ve ardından bu sistem üzerinde Andertal'ın gerçek homepage'ini oluştur.**
 
-## 1. Temel mantık
+### ÇOK ÖNEMLİ SCOPE
 
-Her seller için:
+Bu görev **sadece homepage geliştirme görevi değildir.**
 
-* `Seller Health Score`: 0–100
-* `Status`: puana göre otomatik hesaplanan seviye
-* Her kriter için:
+SellerCentral'da oluşturulan:
 
-  * kriter adı
-  * ağırlığı / maksimum puanı
-  * seller'ın bu kriterden aldığı puan
-  * durum göstergesi
-  * detay aç/kapa
-* Kriter satırına tıklanınca accordion açılmalı.
-* Accordion içinde:
+* Homepage
+* Category Landing Pages
+* Campaign Pages
+* Brand Pages
+* Deals Pages
+* SEO Landing Pages
+* Seasonal Pages
+* gelecekte oluşturulacak diğer Landing Page'ler
 
-  * kriterin açıklaması
-  * seller'ın mevcut değeri
-  * hedef değer
-  * aldığı puan
-  * kaybettiği puan
-  * puanı düşüren spesifik problemler
-  * mümkünse ilgili sipariş/ürün/olay sayıları
-  * son 30/60/90 günlük trend
-* `Edit all` butonu ile tüm kriterlerin manuel konfigürasyonu/editlenmesi mümkün olmalı.
-* Kriterlerin puan ağırlıkları merkezi şekilde değiştirilebilir olmalı.
-* Sonuç her değişiklikte otomatik yeniden hesaplanmalı.
+aynı **Container Template altyapısını** kullanmaktadır.
 
-UI kesinlikle modern, premium, profesyonel ve Andertal SellerCentral tasarım sistemine uyumlu olmalı.
+Dolayısıyla asıl hedef:
 
-Schufa benzeri bir **score breakdown / risk overview** hissi olabilir, ancak birebir görsel kopyalama yapma. Kendi Andertal tasarım dilini kullan.
+> **Global, reusable, data-driven ve profesyonel bir Landing Page Container Template System oluşturmak.**
 
----
+Homepage ise bu sistemin kullanılarak oluşturulacağı **ilk ve ana örnek sayfa** olacaktır.
 
-# 2. Score seviyeleri
-
-Toplam skor maksimum 100.
-
-Başlangıçta şu status sistemini kullan:
-
-### 90–100
-
-`Mükemmel`
-
-Renk ve görünüm:
-
-* güçlü pozitif durum
-* “Top seller / Excellent health” benzeri destekleyici secondary label kullanılabilir.
-
-### 80–89
-
-`Çok iyi`
-
-### 70–79
-
-`İyi`
-
-### 60–69
-
-`Ortalama`
-
-### 40–59
-
-`Kötü`
-
-### 0–39
-
-`Riskli`
-
-Ancak ayrıca puandan bağımsız bir **hard-risk / blocked condition** sistemi oluştur.
-
-Örneğin:
-
-* ciddi hukuki ihlal
-* doğrulanmamış işletme
-* sahte ürün şüphesi
-* ciddi ödeme/fraud riski
-* sistematik sipariş dolandırıcılığı
-* tekrar tekrar ağır marketplace policy ihlali
-* gerekli seller verification'ın tamamlanmamış olması
-
-gibi durumlarda seller'ın status'u:
-
-`Bloke`
-
-olabilir.
-
-Yani:
-
-`Score = 92` olsa bile hard-block condition varsa:
-
-**Status = Bloke**
-
-Bu durumda skor yine 92 olarak gösterilebilir fakat üst tarafta kırmızı `BLOCKED` durumu açıkça gösterilmeli.
-
----
-
-# 3. Ana skor kategorileri
-
-Toplam 100 puanı anlamlı kategorilere böl.
-
-Başlangıç ağırlık dağılımı:
-
-### A. Product & Content Quality — 20 puan
-
-### B. Legal & Compliance — 15 puan
-
-### C. Order Fulfillment — 20 puan
-
-### D. Shipping Performance — 15 puan
-
-### E. Returns & Refunds — 10 puan
-
-### F. Customer Satisfaction — 10 puan
-
-### G. Seller Reliability & Communication — 5 puan
-
-### H. Risk & Trust — 5 puan
-
-Toplam:
-
-`20 + 15 + 20 + 15 + 10 + 10 + 5 + 5 = 100`
-
-Bu yapı hard-code edilmemeli. Database/config üzerinden değiştirilebilir olmalı.
-
----
-
-# 4. Product & Content Quality — 20 puan
-
-Bu kategori kendi içinde alt kriterlere ayrılmalı.
-
-## 4.1 Product Content Completeness — 5 puan
-
-Kontrol et:
-
-* title mevcut mu?
-* description mevcut mu?
-* bullet points mevcut mu?
-* product attributes dolu mu?
-* brand bilgisi mevcut mu?
-* manufacturer bilgisi mevcut mu?
-* GTIN/EAN mevcut mu?
-* SKU mevcut mu?
-* product images mevcut mu?
-* yeterli image sayısı var mı?
-* image resolution yeterli mi?
-* category doğru mu?
-* variant bilgileri eksiksiz mi?
-
-Örnek negatif durum:
-
-`37 products missing GTIN`
-`12 products have incomplete attributes`
-
-Accordion açıldığında bunlar listelenmeli.
-
----
-
-## 4.2 Product Content Quality — 4 puan
-
-Kontrol:
-
-* çok kısa açıklamalar
-* duplicate descriptions
-* duplicate titles
-* keyword stuffing
-* anlamsız metinler
-* HTML hataları
-* yazım hataları
-* düşük kaliteli görseller
-* eksik görseller
-* yanlış ürün bilgileri
-* aşırı büyük/küçük title
-* uygunsuz açıklama formatı
-
----
-
-## 4.3 Product Data Accuracy — 3 puan
-
-Kontrol:
-
-* yanlış brand
-* yanlış category
-* yanlış dimensions
-* yanlış weight
-* yanlış availability
-* yanlış price
-* stok bilgisi ile gerçek stok arasında fark
-* yanlış variant relationships
-
----
-
-## 4.4 Legal Product Data — 5 puan
-
-Özellikle Almanya/EU marketplace için:
-
-* Hersteller
-* Herstelleranschrift
-* verantwortliche Person / responsible person
-* GPSR bilgileri
-* warnings
-* age restrictions
-* CE bilgileri
-* safety documentation
-* WEEE
-* EPREL
-* energy label
-* battery information
-* VerpackG ile ilgili bilgiler
-* diğer kategoriye özel zorunlu bilgiler
-
-Eksik olan her şeyi nedenleriyle göster.
-
-Örnek:
-
-`24 Produkte ohne Herstelleranschrift`
-`8 Produkte mit fehlenden GPSR-Angaben`
-
----
-
-## 4.5 Catalog Quality Signals — 3 puan
-
-Kontrol:
-
-* duplicate products
-* duplicate EAN
-* malformed SKU
-* invalid variants
-* broken product relations
-* missing category mapping
-* invalid attributes
-
----
-
-# 5. Legal & Compliance — 15 puan
-
-Bu kategori çok önemli.
-
-Alt kriterler:
-
-## 5.1 Seller Verification — 3 puan
-
-* business verification
-* identity verification
-* bank verification
-* tax information
-* VAT data
-* USt-IdNr.
-* address verification
-* legal entity information
-
----
-
-## 5.2 Marketplace Compliance — 3 puan
-
-* seller terms accepted
-* marketplace agreement
-* required declarations
-* seller policies
-* prohibited products
-* restricted categories
-* documentation
-
----
-
-## 5.3 Product Compliance — 4 puan
-
-* GPSR
-* CE
-* WEEE
-* battery
-* energy labels
-* safety documents
-* category-specific legal data
-
----
-
-## 5.4 Legal Document Completeness — 2 puan
-
-Seller'ın gerekli hukuk alanları:
-
-* Impressum
-* privacy-related data where applicable
-* return policy
-* shipping policy
-* seller terms
-* warranty information
-* contact information
-
----
-
-## 5.5 Compliance Violations — 3 puan
-
-Negatif olaylar:
-
-* prohibited product
-* fake/counterfeit suspicion
-* regulatory warning
-* repeated policy breach
-* legal complaint
-* missing documents
-* misleading product information
-
-Bu bölümde sadece son skor değil, olay geçmişi de görünmeli.
-
----
-
-# 6. Order Fulfillment — 20 puan
-
-Bu kategori seller performansının ana bölümlerinden biri.
-
-## 6.1 Order Processing Time — 6 puan
-
-Ölç:
-
-* average processing time
-* median processing time
-* 90th percentile processing time
-* processing SLA breach rate
-
-Kategori örneği:
-
-`< 12h = excellent`
-`12–24h = very good`
-`24–48h = good`
-`48–72h = average`
-`> 72h = poor`
-
-Ancak değerler hard-code edilmemeli.
-
-Seller category / product category bazında farklı SLA tanımlanabilmeli.
-
----
-
-## 6.2 Order Cancellation Rate — 4 puan
-
-Ölç:
-
-* seller-cancelled orders
-* stock-out cancellations
-* seller-caused cancellations
-* cancellation rate
-
-Customer-requested cancellations seller'ın score'unu düşürmemeli.
-
----
-
-## 6.3 Order Defect Rate — 4 puan
-
-* wrong product
-* missing items
-* damaged product
-* incomplete order
-* incorrect quantity
-* incorrect variant
-* unusable item
-* seller caused issue
-
----
-
-## 6.4 Order Confirmation Accuracy — 2 puan
-
-* stock accuracy
-* inventory sync quality
-* accepted order vs available inventory
-* order confirmation delay
-
----
-
-## 6.5 SLA Compliance — 4 puan
-
-Seller'ın tanımlı marketplace SLA'larına uyumu.
-
-Örneğin:
-
-* processing SLA
-* dispatch SLA
-* stock accuracy
-* response SLA
-
----
-
-# 7. Shipping Performance — 15 puan
-
-## 7.1 Dispatch Time — 4 puan
-
-Sipariş → kargoya teslim süresi.
-
----
-
-## 7.2 Delivery Time — 4 puan
-
-Kargoya teslim → müşteriye ulaşma süresi.
-
----
-
-## 7.3 On-Time Delivery Rate — 3 puan
-
-Ölç:
-
-`on_time_deliveries / delivered_orders`
-
----
-
-## 7.4 Tracking Quality — 2 puan
-
-* tracking number exists
-* valid carrier
-* tracking updates available
-* fake/invalid tracking
-* tracking uploaded too late
-
----
-
-## 7.5 Shipping Incident Rate — 2 puan
-
-* lost shipment
-* damaged shipment
-* delayed shipment
-* undeliverable shipment
-
----
-
-# 8. Returns & Refunds — 10 puan
-
-## 8.1 Return Rate — 3 puan
-
-Ancak return reason'lara göre ayrıştır.
-
-Seller'ın kontrol edemediği:
-
-* customer remorse
-* wrong size
-* changed mind
-
-ile seller kaynaklı:
-
-* wrong item
-* defective item
-* misleading description
-* damaged product
-* missing parts
-
-aynı şekilde değerlendirilmemeli.
-
----
-
-## 8.2 Return Processing Time — 3 puan
-
-Ölç:
-
-`return received → refund completed`
-
----
-
-## 8.3 Refund SLA Compliance — 2 puan
-
-Yasal / marketplace refund sürelerine uyum.
-
----
-
-## 8.4 Refund Error Rate — 2 puan
-
-* wrong refund amount
-* duplicate refund
-* missing refund
-* delayed refund
-
----
-
-# 9. Customer Satisfaction — 10 puan
-
-## 9.1 Product Rating — 4 puan
-
-Average rating.
-
-Ancak sadece average kullanma.
-
-Örnek:
-
-* 4.8+
-* 4.5–4.79
-* 4.2–4.49
-* 4.0–4.19
-* <4.0
-
-Ayrıca review count'u da hesaba kat.
-
-10 review ile 4.9 ile 10.000 review ile 4.9 aynı confidence değerine sahip olmamalı.
-
----
-
-## 9.2 Negative Review Rate — 2 puan
-
-Özellikle 1–2 yıldız oranı.
-
----
-
-## 9.3 Customer Complaint Rate — 2 puan
-
-* formal complaints
-* customer support escalations
-* repeated complaint topics
-
----
-
-## 9.4 Customer Satisfaction Trend — 2 puan
-
-Son:
-
-* 30 gün
-* 90 gün
-* 12 ay
-
-trend karşılaştırması.
-
-Trend kötüleşiyorsa score üzerinde etkisi olmalı.
-
----
-
-# 10. Seller Reliability & Communication — 5 puan
-
-## 10.1 Seller Response Time — 2 puan
-
-Seller'ın mesajlara / support requests'e cevap süresi.
-
----
-
-## 10.2 Response Rate — 1 puan
-
----
-
-## 10.3 Issue Resolution Time — 1 puan
-
----
-
-## 10.4 Seller Activity / Availability — 1 puan
-
-Örneğin:
-
-* prolonged inactivity
-* frequent stock mismatches
-* integration offline
-* ERP sync failures
-
----
-
-# 11. Risk & Trust — 5 puan
-
-## 11.1 Fraud Signals — 2 puan
-
-* suspicious order patterns
-* unusual refund patterns
-* payment-related issues
-* suspicious seller activity
-
----
-
-## 11.2 Chargeback Rate — 1 puan
-
----
-
-## 11.3 Policy Violation History — 1 puan
-
----
-
-## 11.4 Trust Signals — 1 puan
-
-Pozitif:
-
-* long marketplace history
-* high completed order count
-* verified company
-* stable performance
-* low complaint rate
-* verified inventory
-
----
-
-# 12. Score hesaplama sistemi
-
-Scoring engine modüler olmalı.
-
-Her kriter:
-
-```ts
-{
-  id,
-  categoryId,
-  name,
-  description,
-  maxPoints,
-  currentValue,
-  targetValue,
-  score,
-  status,
-  severity,
-  calculationType,
-  config
-}
-```
-
-Örneğin:
-
-```ts
-{
-  id: "return_rate",
-  maxPoints: 3,
-  calculationType: "THRESHOLD",
-  config: {
-    excellent: 0.03,
-    good: 0.05,
-    average: 0.08,
-    poor: 0.12
-  }
-}
-```
-
-Ancak bu sadece örnek. Kategorilere göre doğru eşikler tanımlanabilir.
-
----
-
-# 13. Score'un sadece ortalama olmaması
-
-Naif bir average kullanma.
-
-Özellikle çok kötü davranışları cezalandıran bir sistem oluştur.
-
-Örneğin:
-
-Seller:
-
-* Product quality: 18/20
-* Compliance: 15/15
-* Orders: 19/20
-* Shipping: 14/15
-* Returns: 9/10
-* Reviews: 8/10
-* Communication: 5/5
-* Risk: 5/5
-
-Toplam:
-
-`93/100`
-
-Ama seller'ın hard compliance violation'ı varsa:
-
-`Score: 93`
-`Status: BLOCKED`
-
-Bu ayrımı UI'da açıkça göster.
-
----
-
-# 14. UI ana görünümü
-
-Sayfanın üst kısmında büyük bir score card:
+İstenen mimari:
 
 ```text
-SELLER HEALTH
-
-93 / 100
-
-MÜKEMMEL
-
-↑ 4 puan son 30 gün
-
-Low Risk
+SellerCentral
+    ↓
+Landing Pages
+    ↓
+Any Landing Page
+    ↓
+Container Instances
+    ↓
+Container Templates
+    ↓
+Reusable Renderers
 ```
 
-Altında:
+Homepage bu sistemin dışında özel olarak hardcode edilmiş bir React sayfası OLMAMALIDIR.
 
-* score trend chart
-* last 30 days
-* last 90 days
-* previous period comparison
+Homepage tamamen Landing Page + Container Instance sistemi üzerinden oluşturulmalıdır.
 
 ---
 
-# 15. Category cards
+# 1. İLK AŞAMA — MEVCUT SİSTEMİ AUDIT ET
 
-Ana bölüm:
+Önce hiçbir kodu değiştirme.
 
-```text
-Product & Content Quality        18 / 20
-██████████████████░░
-
-Legal & Compliance               15 / 15
-███████████████████
-
-Order Fulfillment                19 / 20
-███████████████████░
-
-Shipping Performance             14 / 15
-██████████████████░
-
-Returns & Refunds                 9 / 10
-██████████████████
-
-Customer Satisfaction             8 / 10
-████████████████
-
-Seller Reliability                5 / 5
-
-Risk & Trust                      5 / 5
-```
-
-Her satır clickable accordion olmalı.
-
----
-
-# 16. Accordion
-
-Örneğin:
-
-### Order Fulfillment — 19 / 20
-
-Açıldığında:
-
-```text
-Order Processing Time               5.6 / 6
-22.4h average
-Target < 24h
-
-Cancellation Rate                  3.8 / 4
-0.9%
-
-Order Defect Rate                  4 / 4
-0.7%
-
-Order Confirmation Accuracy        2 / 2
-99.8%
-
-SLA Compliance                     4 / 4
-98.9%
-```
-
-Bir kriterin üzerine tıklanınca daha derine inilebilmeli.
-
-Örneğin:
-
-### Product Content Completeness — 4.2 / 5
-
-```text
-1,284 active products
-
-1,247 complete
-37 incomplete
-```
-
-Aşağıda:
-
-```text
-37 products with missing GTIN
-
-12 products without manufacturer address
-8 products with missing product images
-17 products with incomplete attributes
-```
-
-Her hata mümkün olduğunca:
-
-**View products →**
-
-butonuyla ilgili ürün listesine götürmeli.
-
----
-
-# 17. “Problems” bölümü
-
-Sayfanın üst tarafında ayrıca:
-
-### Issues affecting your score
-
-Örneğin:
-
-```text
-⚠ 37 products missing mandatory legal data        -1.4 pts
-⚠ Average processing time increased to 31h        -0.8 pts
-⚠ Return processing SLA breached 14 times         -0.5 pts
-⚠ Rating dropped from 4.7 to 4.4                  -0.7 pts
-```
-
-En önemli problemler yukarıda görünmeli.
-
----
-
-# 18. Edit all
-
-Sağ üst:
-
-`Edit all`
-
-butonu.
-
-Buna basıldığında admin/configuration mode açılmalı.
-
-Buradan:
-
-* criterion enabled/disabled
-* maximum points
-* weight
-* thresholds
-* target values
-* severity
-* hard-block condition
-* calculation type
-
-değiştirilebilmeli.
-
-Örneğin:
-
-```text
-Order Processing Time
-
-Maximum points: 6
-Excellent: < 12h
-Good: < 24h
-Average: < 48h
-Poor: > 72h
-```
-
-Edit sonrası:
-
-`Save changes`
-
-ve:
-
-`Reset to defaults`
-
-olmalı.
-
----
-
-# 19. Edit yetkisi
-
-Normal seller kullanıcısı score konfigürasyonunu değiştiremez.
-
-Sadece:
-
-* super admin
-* marketplace admin
-* authorized analyst
-
-düzenleyebilir.
-
-Seller kendi score'unu yalnızca **görüntüleyebilmeli**.
-
----
-
-# 20. History / Audit Log
-
-Score değişikliklerinin geçmişi tutulmalı.
-
-Örneğin:
-
-```text
-Seller Health Score History
-
-Sep 17     93
-Sep 10     91
-Sep 03     89
-Aug 27     94
-Aug 20     95
-```
-
-Ayrıca manuel configuration değişiklikleri loglanmalı:
-
-```text
-Admin changed:
-Return Rate max points
-10 → 8
-
-Changed by:
-Murathan
-
-Date:
-17.09.2026
-```
-
----
-
-# 21. Trend sistemi
-
-Score yalnızca mevcut snapshot olmamalı.
-
-Her seller için günlük snapshot kaydet:
-
-```text
-seller_health_daily
-```
-
-Böylece:
-
-* 7 day trend
-* 30 day trend
-* 90 day trend
-* all-time trend
-
-gösterilebilir.
-
----
-
-# 22. Fairness / normalization
-
-Bazı seller'lar:
-
-* 20 sipariş
-* 10.000 sipariş
-
-aynı değerlendirilmemeli.
+Mevcut sistemi detaylı şekilde incele.
 
 Özellikle:
 
-* reviews
-* cancellations
-* returns
-* defect rate
-* chargebacks
+### SellerCentral
 
-gibi oran bazlı kriterlerde minimum sample size kullan.
+Araştır:
 
-Örneğin:
+* Landing Page yönetimi
+* `landing-page` ekranı
+* mevcut container yönetimi
+* mevcut Container Template yapısı
+* template seçimi
+* template configuration
+* ordering / sorting
+* duplicate
+* delete
+* enable/disable
+* preview
+* draft/publish
+* page selection
+* superuser permissions
+* API çağrıları
+* ilgili types/interfaces
+* validation
+* mevcut i18n sistemi
 
-`< 20 orders`
-→ düşük confidence
+### Backend / Database
 
-`20–100`
-→ medium confidence
+Varsa incele:
 
-`100+`
-→ high confidence
+* landing page modelleri
+* container modelleri
+* template modelleri
+* page → container ilişkisi
+* container → template ilişkisi
+* content/configuration storage
+* ordering
+* publishing
+* migration yapısı
 
-UI'da:
+### Shop / Frontend
 
-`Low confidence · 14 orders`
+Landing page'lerin gerçek kullanıcı tarafında nasıl render edildiğini incele.
 
-gibi gösterilebilir.
+Özellikle:
 
-Yeni seller'ları haksız yere cezalandırma.
+* container renderer
+* template renderer
+* product fetching
+* category fetching
+* brand fetching
+* collections
+* image handling
+* responsive rendering
+* SEO
+* caching
+* server/client component ayrımı
+
+### Audit sonunda bana şunları raporla:
+
+1. Mevcut architecture
+2. Mevcut data model
+3. Mevcut template sistemi
+4. Mevcut Landing Page flow
+5. Mevcut renderer yapısı
+6. Mevcut problemler
+7. Nelerin yeniden kullanılabileceği
+8. Nelerin refactor edilmesi gerektiği
+9. Gerekli migration olup olmadığı
+10. Backward compatibility riskleri
+11. Önerdiğin yeni architecture
+12. Dosya bazında yapılacak değişiklikler
+
+**Bu audit aşamasında kod değiştirme.**
 
 ---
 
-# 23. Yeni seller sistemi
+# 2. ANA MİMARİ HEDEF
 
-Yeni seller için:
+Yeni sistem şu mantıkta çalışmalı:
 
 ```text
-Not enough data
+Landing Page
+    │
+    ├── Container Instance #1
+    │       └── Template: Hero
+    │
+    ├── Container Instance #2
+    │       └── Template: Category Showcase
+    │
+    ├── Container Instance #3
+    │       └── Template: Product Carousel
+    │
+    ├── Container Instance #4
+    │       └── Template: Editorial
+    │
+    └── Container Instance #5
+            └── Template: Deals
 ```
 
-durumu olmalı.
+Bir **Container Template**, tekrar tekrar kullanılabilen bir layout + configuration tanımıdır.
 
-Skoru zorla 0 verme.
-
-Örneğin:
-
-```text
-Seller Health
-— / 100
-
-New seller
-Collecting data
-```
-
-Sonra yeterli data oluşunca gerçek score hesaplanmaya başlamalı.
-
----
-
-# 24. Seller comparison
-
-İleride hazırlanabilmesi için altyapıyı hazır bırak.
-
-Örneğin:
-
-* seller percentile
-* category percentile
-* marketplace average
-* category average
-
-hesaplanabilmeli.
-
-Ancak ilk versiyonda zorunlu değil.
-
----
-
-# 25. Data kaynakları
-
-Seller Health mümkün olduğunca mevcut Andertal verilerinden hesaplanmalı.
-
-Kullanılabilecek kaynaklar:
-
-* orders
-* order items
-* products
-* product attributes
-* product compliance data
-* inventory
-* shipments
-* tracking events
-* returns
-* refunds
-* reviews
-* customer messages
-* support tickets
-* disputes
-* chargebacks
-* seller verification
-* seller documents
-* ERP sync status
-* marketplace policy violations
-
-Mock data kullanıp bırakma.
-
-Mevcut database modellerini analiz et ve mümkün olduğunca gerçek veriye bağla.
-
-Eksik data modeli varsa bunu açıkça belirle ve gerekli migration/model/API'leri oluştur.
-
----
-
-# 26. Backend mimarisi
-
-Score hesaplamasını frontend'e gömme.
-
-Merkezi bir backend service oluştur.
+Bir **Container Instance**, belirli bir Landing Page üzerinde kullanılan template'in gerçek instance'ıdır.
 
 Örneğin:
 
 ```text
-SellerHealthService
+Template:
+Product Carousel
+
+Instance:
+Homepage → "Trending Products"
+
+Configuration:
+source = best_sellers
+category = null
+limit = 6
+title = "Trending now"
 ```
 
-Metotlar:
+Başka bir sayfada aynı template:
 
-```ts
-calculateSellerHealth(sellerId)
-calculateCategoryScore(...)
-calculateCriterionScore(...)
-getSellerHealthHistory(...)
-getSellerHealthIssues(...)
-evaluateHardBlockConditions(...)
+```text
+Category Page → "Phone Accessories"
+
+source = category
+category = phone-accessories
+limit = 8
+title = "Popular accessories"
 ```
 
-API örneği:
-
-```http
-GET /api/sellers/:sellerId/health
-GET /api/sellers/:sellerId/health/history
-GET /api/sellers/:sellerId/health/issues
-PATCH /api/admin/seller-health/config
-```
+şeklinde kullanılabilmelidir.
 
 ---
 
-# 27. Caching / performance
+# 3. CONTAINER TEMPLATE LIBRARY
 
-Seller Health sayfası her açıldığında yüz binlerce order'ı tekrar tarama.
+SellerCentral'da superuser'ın kullanabileceği profesyonel bir:
 
-Bunun yerine:
+**Container Template Library**
 
-* aggregate queries
-* materialized / cached metrics
-* scheduled calculations
-* incremental updates
+oluştur.
+
+Template'ler mümkün olduğunca reusable ve configurable olmalı.
+
+Örnek template ailesi:
+
+### Hero Templates
+
+* Hero — Full Width
+* Hero — Image + Content
+* Hero — Featured Product
+* Hero — Editorial
+* Hero — Split Layout
+
+### Product Templates
+
+* Product Carousel
+* Product Grid
+* Featured Product + Products
+* Best Sellers
+* New Arrivals
+* Recommended Products
+* Deals / Discount Products
+
+### Category Templates
+
+* Category Showcase
+* Category Grid
+* Featured Categories
+* Compact Category Strip
+
+### Brand Templates
+
+* Brand Showcase
+* Brand Logo Strip
+* Featured Brands
+
+### Editorial / Promotional Templates
+
+* Editorial Split
+* Promo Banner
+* Featured Collection
+* Campaign Banner
+
+### Trust / Information
+
+* Trust Bar
+* Marketplace Benefits
+* Service / Benefit Cards
+
+Bunlar örnektir.
+
+Mevcut architecture'a uygunsa bunları oluştur.
+
+Gereksiz şekilde onlarca template üretme.
+
+Önemli olan:
+
+> Az ama gerçekten kaliteli, reusable ve composable template'ler.
+
+---
+
+# 4. TEMPLATE CONFIGURATION
+
+Template'ler hardcoded içerik kullanmamalı.
+
+Örneğin Product Carousel:
+
+```text
+title
+subtitle
+source
+category
+collection
+products
+limit
+sort
+show_price
+show_rating
+show_discount
+show_seller
+show_badge
+link
+```
+
+gibi configuration seçeneklerine sahip olabilir.
+
+Hero:
+
+```text
+eyebrow
+title
+description
+image
+mobile_image
+primary_cta
+secondary_cta
+alignment
+layout
+background
+```
+
+Category Showcase:
+
+```text
+title
+categories
+source
+limit
+image
+display_style
+```
+
+gibi çalışabilir.
+
+Configuration yapısını mevcut projeye en uygun şekilde tasarla.
+
+Her template'in kendine ait güçlü bir configuration schema'sı olmalı.
+
+Validation uygulanmalı.
+
+---
+
+# 5. DYNAMIC DATA
+
+Template'ler gerçek Andertal datasıyla çalışmalı.
+
+Örneğin ürün kaynakları:
+
+```text
+manual selection
+best sellers
+new arrivals
+category
+collection
+discounted products
+recommended
+```
+
+Kategori kaynakları:
+
+```text
+manual
+parent category
+featured categories
+```
+
+Brand:
+
+```text
+manual
+featured brands
+```
+
+gibi olabilir.
+
+Ürünleri template içine hardcode etme.
+
+Kategori isimlerini hardcode etme.
+
+Brand isimlerini hardcode etme.
+
+Homepage'e özel fake data oluşturma.
+
+Mevcut catalog/data/API altyapısını kullan.
+
+---
+
+# 6. SELLERCENTRAL EDITOR UX
+
+Mevcut Landing Page editor'ünü modern bir page builder mantığına getir.
+
+Superuser:
+
+1. Landing Page seçebilmeli
+2. Container Template Library açabilmeli
+3. Template'i preview edebilmeli
+4. Sayfaya ekleyebilmeli
+5. Configuration yapabilmeli
+6. Sırasını değiştirebilmeli
+7. Duplicate edebilmeli
+8. Disable/enable edebilmeli
+9. Delete edebilmeli
+10. Preview yapabilmeli
+11. Draft olarak kaydedebilmeli
+12. Publish edebilmeli
+
+Mümkünse drag & drop ordering kullan.
+
+Ama mevcut teknolojiye gereksiz dependency ekleme.
+
+Mevcut yapı daha uygunsa mevcut altyapıyı geliştir.
+
+---
+
+# 7. TEMPLATE PREVIEW
+
+Template Library içinde her template'in görsel preview'u olmalı.
+
+Superuser template'i seçtiğinde:
+
+```text
+[Template Preview]
+
+Template Name
+Description
+
+[Add to Page]
+```
+
+gibi anlaşılır bir UI görmeli.
+
+Preview mümkün olduğunca gerçek sistemde kullanılan component ile render edilmeli.
+
+Ayrı bir sahte preview sistemi yapıp gerçek render ile farklılaşmasına izin verme.
+
+---
+
+# 8. GLOBAL VISUAL SYSTEM
+
+En önemli konulardan biri bu.
+
+Şu an container'lar arka arkaya geldiğinde:
+
+```text
+BOX
+BOX
+BOX
+BOX
+BOX
+```
+
+gibi görünüyorsa bunu düzelt.
+
+Andertal marketplace:
+
+* modern
+* premium
+* dense
+* trustworthy
+* European
+* professional
+* commercial
+
+görünmeli.
+
+Amazon'daki marketplace information density ve discovery mantığını al.
+
+Ama Amazon'u kopyalama.
+
+Andertal'ın kendi visual identity'sini oluştur.
+
+---
+
+# 9. LAYOUT RHYTHM
+
+Tüm template'ler ortak bir layout sistemi kullanmalı.
+
+Örneğin:
+
+```text
+Page
+ └── Content Max Width
+       └── Container
+             └── Content
+```
+
+Ortak:
+
+* max-width
+* horizontal padding
+* vertical spacing
+* typography
+* heading hierarchy
+* responsive breakpoints
 
 kullan.
 
-Örneğin günlük full recalculation + önemli eventlerde incremental update.
+Her template kendi kafasına göre farklı width kullanmasın.
 
----
-
-# 28. Event-driven güncelleme
-
-Aşağıdaki eventlerde seller score güncellenebilmeli:
-
-* order created
-* order confirmed
-* order cancelled
-* order shipped
-* order delivered
-* return created
-* refund issued
-* review created
-* dispute created
-* compliance issue created
-* product updated
-* tracking updated
-
-Ancak her eventte tüm score'u ağır şekilde yeniden hesaplama.
-
-İhtiyaç varsa ilgili metric'i incrementally güncelle.
-
----
-
-# 29. Status renkleri
-
-UI'da anlamlı status kullan:
-
-* Excellent
-* Very Good
-* Good
-* Average
-* Poor
-* Risky
-* Blocked
-
-Ancak sadece renge güvenme.
-
-Her zaman:
-
-* ikon
-* label
-* score
-
-birlikte göster.
-
-Accessibility'yi koru.
-
----
-
-# 30. Seller Health detay ekranı
-
-Ana seller health sayfasına ek olarak gelecekte:
+Yaklaşık:
 
 ```text
-Overview
-Performance
-Products
-Compliance
-Orders
-Shipping
-Returns
-Reviews
-Risk
-History
+Desktop max-width: ~1440px
+Large section spacing: 72–96px
+Normal section spacing: 48–72px
+Mobile section spacing: 24–32px
 ```
 
-tab yapısına dönüştürülebilecek şekilde component yapısını tasarla.
+gibi bir visual rhythm oluştur.
 
-İlk implementasyonda sadece `Overview` gerekli.
+Mevcut design system varsa önce onu incele ve mümkün olduğunca onun üzerinden ilerle.
 
 ---
 
-# 31. Önemli ürün kararı
+# 10. ANDERTAL COLORS
 
-Seller Health sadece seller'ı cezalandıran bir sistem gibi görünmemeli.
-
-Her negatif kriter için:
+Mevcut brand identity:
 
 ```text
-Problem
-Current value
-Target
-Points lost
-How to improve
+Primary: #1B8880
+Accent:  #FF971C
+Dark:    #1A1A1A
 ```
 
-göster.
+Bu renkleri bilinçli kullan.
+
+Her container'ı renkli kutuya dönüştürme.
+
+Özellikle:
+
+* beyaz / neutral backgrounds
+* dark text
+* subtle borders
+* controlled accent usage
+* product imagery
+
+ön planda olsun.
+
+---
+
+# 11. CARD SYSTEM
+
+Product card, category card, brand card vb. component'leri standardize et.
+
+Özellikle Product Card:
+
+```text
+Image
+Brand / badge
+Title
+Rating
+Price
+Old price
+Discount
+Availability
+Seller (gerekiyorsa)
+```
+
+gibi alanları destekleyebilir.
+
+Ama her şeyi her zaman göstermek zorunda değil.
+
+Configuration'a göre göster.
+
+### Çok önemli:
+
+Uzun ürün isimleri layout'u bozmamalı.
 
 Örneğin:
 
 ```text
-Return processing time
-
-Current: 4.8 days
-Target: < 2 days
-
-Points: 1.2 / 3
-
-Points lost: -1.8
-
-Why:
-14 refunds exceeded the 3-day SLA
-
-How to improve:
-Process returned items within 48 hours.
+Apple iPhone 17 Pro Max Original Silicone
+Protective Case with MagSafe...
 ```
 
-Bu Andertal'ın seller retention'ını ciddi şekilde iyileştirir.
+gibi uzun title'lar diğer card'ları aşağı itmemeli.
+
+Card yüksekliği ve text line clamp kontrol edilmeli.
+
+Tüm gridlerde:
+
+* aynı image ratio
+* aynı card height logic
+* aynı spacing
+* aynı typography
+
+kullan.
 
 ---
 
-# 32. “Why is my score not higher?” sistemi
+# 12. RESPONSIVE
 
-Seller bir tooltip/modal açıp görebilmeli:
+Her template:
 
-```text
-Why is my score 78?
+* desktop
+* tablet
+* mobile
 
-You currently lose 22 points because:
+için tasarlanmalı.
 
-Product content             -5
-Order processing            -4
-Shipping                    -3
-Returns                     -2
-Customer reviews            -4
-Compliance                  -2
-Risk                         0
-```
+Mobile'da:
 
-Her satır clickable olmalı.
+* horizontal overflow olmamalı
+* carousel düzgün çalışmalı
+* text taşmamalı
+* CTA'lar erişilebilir olmalı
+* image aspect ratio bozulmamalı
 
----
-
-# 33. Puanların şeffaflığı
-
-Seller'a görünür modda mümkün olduğunca transparent ol.
-
-Örneğin:
-
-```text
-Order processing score: 4.8 / 6
-
-Based on:
-1,284 fulfilled orders
-Average processing time: 18.4h
-SLA compliance: 96.7%
-```
-
-Böylece seller neden o puanı aldığını anlayabilir.
-
-Admin tarafında daha fazla detay gösterilebilir.
+Mobile için desktop tasarımını küçültmek yerine gerektiğinde layout değiştir.
 
 ---
 
-# 34. Fraud / manipulation protection
+# 13. ACCESSIBILITY
 
-Seller score'unu manipüle etmek mümkün olmamalı.
+Yeni component'lerde:
+
+* semantic HTML
+* keyboard navigation
+* visible focus states
+* alt text
+* aria labels
+* proper heading hierarchy
+* reduced motion
+
+gibi temel accessibility standartlarına uy.
+
+---
+
+# 14. PERFORMANCE
+
+Next.js architecture'a uygun şekilde:
+
+* Server Components mümkün olduğunca kullanılmalı
+* Client Components sadece gerektiğinde
+* `next/image`
+* lazy loading
+* minimal client-side JS
+* carousel için kontrollü client-side code
+* gereksiz rerender yok
+* mevcut caching stratejisini bozma
+
+uygula.
+
+---
+
+# 15. SEO
+
+Landing Page sistemi SEO'yu bozmamalı.
 
 Özellikle:
 
-* fake reviews
-* repeated cancellations
-* artificial order patterns
-* duplicated products
-* manipulated tracking
-* suspicious refunds
+* semantic headings
+* crawlable content
+* image alt text
+* internal links
+* metadata
+* canonical logic
+* server-rendered content
 
-için ayrı risk sinyalleri tutulmalı.
+korunmalı.
 
----
-
-# 35. İlk versiyon
-
-İlk versiyonda tüm gelecek fonksiyonları implement etmeye çalışma.
-
-Öncelikli olarak çalışan bir MVP oluştur:
-
-1. Seller Health page
-2. Total score
-3. Status
-4. 8 ana kategori
-5. Her kategori altında kriterler
-6. Accordion details
-7. Problems affecting score
-8. Edit all
-9. Configurable weights
-10. Score history
-11. Real database data
-12. Loading/empty/error states
-13. Responsive UI
-
-Sonrasında daha detaylı fraud/compliance engine genişletilebilir.
+Mevcut SEO architecture'ını önce incele.
 
 ---
 
-# 36. Tasarım talimatı
+# 16. LEGACY / BACKWARD COMPATIBILITY
 
-Tasarım:
+Bu çok önemli.
 
-* Andertal SellerCentral ile aynı design system
-* premium
-* clean
-* enterprise
-* fazla renk kullanma
-* gereksiz gradient kullanma
-* dashboard kalabalık olmasın
-* whitespace iyi kullan
-* score görsel olarak güçlü olsun
-* tablo ve accordion okunabilir olsun
-* mobile responsive olsun
-* dark mode varsa mevcut sisteme uyumlu olsun
+Mevcut Landing Page'ler ve mevcut Container verileri bozulmamalı.
 
-Andertal marka renkleri:
+Şunları yapma:
 
-* Primary teal: `#1b8880`
-* Accent orange: `#ff971c`
-* Charcoal: `#1A1A1A`
+* destructive migration
+* database reset
+* mevcut landing page'leri silme
+* mevcut container datalarını silme
+* mevcut page IDs değiştirme
+* eski content'i kaybetme
 
-Accent renklerini aşırı kullanma.
+Gerekirse migration yap ama:
 
-Risk / warning / success renkleri semantic design token'lar üzerinden gelsin.
+```text
+old data
+   ↓
+compatible migration
+   ↓
+new system
+```
 
----
+mantığında çalış.
 
-# 37. Teknik yaklaşım
-
-Kod yazmadan önce mevcut repository'yi analiz et.
-
-Özellikle:
-
-* seller modelleri
-* order modelleri
-* shipment modelleri
-* return modelleri
-* review modelleri
-* compliance modelleri
-* product modelleri
-* admin layout
-* existing analytics pages
-* existing charts
-* existing table components
-* API patterns
-* authentication / authorization
-* design system
-
-incelenmeli.
-
-Mevcut component'leri mümkün olduğunca yeniden kullan.
-
-Yeni bir paralel design system oluşturma.
+Legacy container'lar yeni sistem tarafından render edilemiyorsa önce compatibility layer oluştur.
 
 ---
 
-# 38. Sonuç
+# 17. HOMEPAGE — İKİNCİ AŞAMA
 
-Bu sistemin amacı yalnızca:
+Container Template System tamamlandıktan sonra **Andertal homepage'ini bu sistem kullanılarak oluştur.**
 
-`93/100`
+Tekrar:
 
-göstermek değil.
+> Homepage özel hardcoded React layout olmamalıdır.
+
+Homepage:
+
+```text
+Landing Page = Homepage
+
+Container Instance #1
+→ Hero
+
+Container Instance #2
+→ Popular Categories
+
+Container Instance #3
+→ Featured Products
+
+Container Instance #4
+→ Editorial / Campaign
+
+Container Instance #5
+→ Deals
+
+Container Instance #6
+→ Brand Showcase
+
+Container Instance #7
+→ New Arrivals
+
+Container Instance #8
+→ Category Discovery
+
+Container Instance #9
+→ Trust / Marketplace Benefits
+```
+
+gibi bir composition olabilir.
+
+Ancak bunun son halini mevcut gerçek catalog/data ve Andertal'ın tasarımına göre sen belirle.
 
 Amaç:
 
-**“Andertal bu seller'a neden 93 verdi, puanını hangi olaylar düşürdü ve seller ne yaparsa 97'ye çıkabilir?”**
+> Kullanıcı Andertal.com'a girdiğinde bunun gerçek bir Avrupa marketplace'i olduğunu ilk bakışta hissetmeli.
 
-sorusunu tek ekranda cevaplamak.
+---
 
-Bu nedenle implementation'ı:
+# 18. HOMEPAGE DESIGN PRINCIPLES
 
-**Score + Breakdown + Problems + Evidence + Trends + Configuration**
+Homepage:
 
-mantığıyla oluştur.
+* güçlü hero
+* hızlı category discovery
+* yüksek product density
+* deals
+* brands
+* discovery
+* editorial content
+* trust
 
-Önce mevcut kod tabanını analiz et.
+sunmalı.
 
-Ardından:
+Ama:
 
-1. hangi modeller/API'ler mevcut
-2. hangileri eksik
-3. hangi veriler doğrudan kullanılabilir
-4. hangi migration'lar gerekli
-5. hangi component'ler yeniden kullanılabilir
+```text
+Hero
+↓
+Card Box
+↓
+Card Box
+↓
+Card Box
+↓
+Card Box
+```
 
-bunları tespit et.
+gibi monoton bir yapı oluşturma.
 
-Sonra Seller Health'i uçtan uca implement et.
+Visual rhythm oluştur.
 
-Her aşamada gereksiz mock data bırakma; mevcut gerçek veriyi kullan. Eksik veri için migration/model gerekiyorsa oluştur.
+Bazı section'lar full-width olabilir.
 
-Son olarak test et:
+Bazıları max-width olabilir.
 
-* 100 score
-* 0 score
-* blocked seller
-* new seller / insufficient data
-* missing compliance
-* high returns
-* poor reviews
-* slow processing
-* multiple simultaneous issues
-* no orders
-* seller with huge order volume
+Bazıları borderless olabilir.
 
-senaryolarını doğrula.
+Bazıları editorial olabilir.
+
+Bazıları product-heavy olabilir.
+
+Sayfanın tamamında aynı card pattern'ini tekrar etme.
+
+---
+
+# 19. HOMEPAGE CONTENT
+
+Gerçek sistemde bulunan:
+
+* products
+* categories
+* brands
+* collections
+* prices
+* discounts
+* images
+
+kullanılabiliyorsa bunları kullan.
+
+Fake:
+
+```text
+Product A
+Product B
+Brand X
+Brand Y
+```
+
+oluşturma.
+
+Admin configuration ile hangi ürün/kategori/brand gösterilecekse oradan gelsin.
+
+Homepage'i daha sonra SellerCentral'dan değiştirebilmeliyim.
+
+Örneğin:
+
+```text
+Hero'yu kaldır
+Deals'i yukarı taşı
+Brand Showcase'i kaldır
+New Arrivals ekle
+```
+
+gibi değişiklikler kod değiştirmeden yapılabilmeli.
+
+---
+
+# 20. I18N
+
+Yeni user-facing text'leri hardcode etme.
+
+Mevcut i18n architecture'ını kullan.
+
+Andertal'ın desteklediği diller için:
+
+* German
+* English
+* Turkish
+
+uyumlu olacak şekilde geliştir.
+
+Template configuration'daki kullanıcı tarafından girilen içerikler mevcut localization architecture'a uygunsa localized content desteklemeli.
+
+---
+
+# 21. ADMIN EXPERIENCE
+
+Superuser'ın sistemle çalışması kolay olmalı.
+
+Kötü:
+
+```text
+JSON editor
+```
+
+ile her şeyi elle yazmak zorunda kalmak.
+
+İyi:
+
+```text
+Title
+[________________]
+
+Source
+[ Best Sellers ▼ ]
+
+Limit
+[ 6 ]
+
+Products
+[ Select products ]
+
+Display
+[ Show rating ✓ ]
+[ Show discount ✓ ]
+```
+
+gibi kontrollü form UI.
+
+JSON/raw configuration sadece gerektiğinde advanced option olabilir.
+
+---
+
+# 22. TEMPLATE REGISTRY
+
+Mümkün olduğunca temiz bir template architecture oluştur.
+
+Örneğin mantıksal olarak:
+
+```text
+Template
+ ├── metadata
+ ├── configuration schema
+ ├── editor configuration
+ └── renderer
+```
+
+şeklinde düşünülebilir.
+
+Template renderer ile editor configuration birbirinden gereksiz şekilde kopuk olmasın.
+
+Yeni bir template eklemek mümkün olduğunca:
+
+```text
+register template
+→ define schema
+→ define editor
+→ define renderer
+```
+
+mantığında yapılabilsin.
+
+Ancak bunu mevcut architecture'a bakmadan zorla uygulama.
+
+Önce mevcut yapıya uyumlu en doğru çözümü belirle.
+
+---
+
+# 23. CODE QUALITY
+
+Kod:
+
+* typed
+* reusable
+* modular
+* maintainable
+* clean
+
+olmalı.
+
+Aynı UI logic'ini 5 farklı template'te kopyalama.
+
+Ortak component'leri extract et.
+
+Örneğin:
+
+```text
+ProductCard
+ProductGrid
+ProductCarousel
+SectionHeader
+ContainerShell
+ResponsiveImage
+CTA
+PriceDisplay
+Badge
+```
+
+gibi reusable primitives oluşturulabilir.
+
+Ama gereksiz abstraction da yapma.
+
+---
+
+# 24. DO NOT BREAK EXISTING SYSTEMS
+
+Bu task sırasında aşağıdakilere dokunma:
+
+* authentication
+* seller management
+* checkout
+* payments
+* Stripe
+* inventory
+* ERP integrations
+* order processing
+* seller permissions
+* compliance
+* unrelated backend systems
+
+Bunlara yalnızca Landing Page sisteminin çalışması için gerçekten zorunluysa dokun.
+
+---
+
+# 25. GIT / SAFETY
+
+Kesinlikle:
+
+```text
+git reset --hard
+git clean -fd
+database reset
+mass delete
+```
+
+gibi destructive işlemler yapma.
+
+Mevcut kullanıcı değişikliklerini ezme.
+
+Mevcut branch/state'i koru.
+
+Önce mevcut kodu anla.
+
+---
+
+# 26. UYGULAMA SIRASI
+
+Şu sırayı takip et:
+
+### PHASE 1 — AUDIT
+
+Kod değişikliği yapmadan:
+
+* architecture
+* models
+* APIs
+* components
+* renderers
+* existing templates
+* landing page editor
+* shop rendering
+
+analiz et.
+
+Audit raporunu hazırla.
+
+---
+
+### PHASE 2 — ARCHITECTURE PLAN
+
+Audit sonucuna göre:
+
+* hangi dosyalar değişecek
+* hangi componentler oluşturulacak
+* hangi componentler refactor edilecek
+* data model değişecek mi
+* migration gerekli mi
+* legacy compatibility nasıl sağlanacak
+
+belirle.
+
+---
+
+### PHASE 3 — TEMPLATE SYSTEM
+
+Global Container Template sistemini geliştir.
+
+Önce reusable infrastructure.
+
+Sonra template'ler.
+
+---
+
+### PHASE 4 — SELLERCENTRAL EDITOR
+
+Template Library + configuration UI + ordering + duplicate + delete + preview + publish/draft akışını geliştir.
+
+---
+
+### PHASE 5 — SHOP RENDERING
+
+Template renderer'ları gerçek storefront üzerinde düzgün şekilde çalıştır.
+
+---
+
+### PHASE 6 — HOMEPAGE
+
+Yeni sistem üzerinde gerçek Andertal homepage'ini oluştur.
+
+Homepage tamamen:
+
+```text
+Landing Page
++
+Container Instances
++
+Container Templates
+```
+
+ile kurulmalı.
+
+---
+
+### PHASE 7 — QA
+
+Kontrol et:
+
+* desktop
+* tablet
+* mobile
+* empty states
+* missing images
+* missing products
+* long titles
+* no products
+* unpublished pages
+* legacy pages
+* SEO
+* accessibility
+* performance
+* i18n
+
+---
+
+# 27. EMPTY STATES
+
+Örneğin Best Sellers için hiç ürün yoksa:
+
+```text
+0 product
+0 product
+0 product
+```
+
+gösterme.
+
+Template:
+
+* gracefully hide
+* fallback source
+* veya uygun empty state
+
+kullanmalı.
+
+Boş içerik yüzünden homepage kırılmamalı.
+
+---
+
+# 28. BAŞARI KRİTERİ
+
+İş tamamlandığında şu mümkün olmalı:
+
+### SellerCentral
+
+```text
+Landing Pages
+    ↓
+Homepage
+    ↓
+Add Container
+    ↓
+Template Library
+```
+
+buradan herhangi bir template seçebileyim.
+
+Örneğin:
+
+```text
+Product Carousel
+```
+
+ekleyeyim.
+
+Sonra:
+
+```text
+Title: Best Sellers
+Source: Best Sellers
+Limit: 6
+```
+
+yapayım.
+
+Save.
+
+Homepage'e gelsin.
+
+Aynı template'i:
+
+```text
+Category Page
+Campaign Page
+Brand Page
+SEO Page
+```
+
+üzerinde de kullanabileyim.
+
+---
+
+# 29. EN ÖNEMLİ SONUÇ
+
+Son sistem şu olmamalı:
+
+```text
+Homepage React Component
+    ↓
+hardcoded sections
+```
+
+Olması gereken:
+
+```text
+Landing Page System
+        ↓
+Container Instances
+        ↓
+Reusable Container Templates
+        ↓
+Dynamic Data
+        ↓
+Reusable Renderers
+```
+
+Homepage sadece bu sistemin oluşturduğu bir composition olmalı.
+
+---
+
+# 30. SON TALİMAT
+
+Önce **PHASE 1 AUDIT** yap.
+
+Audit tamamlanmadan büyük çaplı kod değişikliğine başlama.
+
+Audit raporunda özellikle:
+
+* mevcut sistemin ne kadarının kullanılabileceğini
+* nerede refactor gerektiğini
+* hangi değişikliklerin riskli olduğunu
+* backward compatibility'nin nasıl korunacağını
+
+açıkça belirt.
+
+Daha sonra implementasyona geç.
+
+**Amaç sadece çalışan bir page builder yapmak değil.**
+
+Amaç:
+
+> **Andertal'ın bundan sonraki tüm Landing Page'lerini besleyecek, profesyonel, reusable, scalable ve görsel olarak güçlü bir Container Template altyapısı kurmak ve bu altyapıyı kullanarak gerçek Andertal Homepage'ini üretmek.**
+
+Mevcut projeyi bozma.
+
+Mevcut datayı koru.
+
+Mevcut architecture'a mümkün olduğunca uy.
+
+Gereksiz yere yeni teknoloji veya dependency ekleme.
+
+Ve en önemlisi:
+
+**Homepage'i hardcode etme. Homepage'i yeni Landing Page / Container Template sisteminin gerçek bir kullanıcısı olarak oluştur.**

@@ -348,6 +348,8 @@ class MedusaAdminClient {
       body: JSON.stringify({
         containers: body.containers || [],
         settings: body.settings && typeof body.settings === 'object' ? body.settings : {},
+        publish: body.publish === true,
+        discard_draft: body.discard_draft === true,
       }),
     });
   }
@@ -361,7 +363,11 @@ class MedusaAdminClient {
   async saveLandingPageCategoryContainers(categoryId, payload) {
     return this.request(`/admin-hub/landing-page/category/${encodeURIComponent(categoryId)}`, {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        publish: payload?.publish === true,
+        discard_draft: payload?.discard_draft === true,
+      }),
     });
   }
 

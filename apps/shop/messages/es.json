@@ -577,6 +577,18 @@
     "suggestions": "Sugerencias",
     "continueShopping": "Seguir comprando"
   },
+  "landing": {
+    "noPreview": "Sin vista previa",
+    "seeAll": "Ver todo",
+    "bestsellers": "Más vendidos",
+    "productCarousel": "Carrusel de productos",
+    "collectionsCarousel": "Colecciones",
+    "imageCarousel": "Carrusel de imágenes",
+    "blog": "Blog",
+    "carousel": "Carrusel",
+    "slide": "Diapositiva {n}",
+    "contentTabs": "Contenido"
+  },
   "newsletter": {
     "error": "Error al suscribirse. Inténtalo de nuevo.",
     "unsubscribeTitle": "Cancelar suscripción al boletín",

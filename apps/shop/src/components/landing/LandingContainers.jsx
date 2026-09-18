@@ -10,7 +10,8 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { toSalesScore } from "@/lib/bestseller";
 import { isDiscountedProduct, getProductBasePriceCents } from "@/lib/catalog-listing";
-import { formatPriceCents } from "@/lib/format";
+import { formatPriceCents, getLocalizedCategory } from "@/lib/format";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
@@ -106,7 +107,7 @@ function getContainerPadding(container, defaultPad) {
 /** Innere Zeile: volle Breite innerhalb des Container-Paddings oder zentriert mit max-width (pro Block typischer Fallback in px). */
 function normalizeContentMaxWidth(val, fallbackPx) {
   const n = Number(fallbackPx);
-  const fb = `${Number.isFinite(n) && n > 0 ? n : 1200}px`;
+  const fb = `${Number.isFinite(n) && n > 0 ? n : 1440}px`;
   if (val == null || val === "") return fb;
   const s = String(val).trim();
   if (/^\d+$/.test(s)) return `${s}px`;
@@ -144,6 +145,26 @@ function LandingItemSubtext({ html, marginTop: mt }) {
 function parseLandingProductCaptions(raw) {
   if (raw == null || raw === "") return [];
   return String(raw).split("\n").map((s) => s.trimEnd());
+}
+
+function catalogSectionStyle(container, defaultPad = "48px 24px") {
+  return {
+    ...getContainerPadding(container, defaultPad),
+    background: container.bg_color || "transparent",
+  };
+}
+
+function usePrefersReducedMotion() {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => setReduce(!!mq.matches);
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => mq.removeEventListener?.("change", apply);
+  }, []);
+  return reduce;
 }
 
 function getContentInnerStyle(container, fallbackMaxPx) {
@@ -193,6 +214,7 @@ function resolveMobilePagedGrid(container) {
  * Mobil (≤1023px): horizontale Snap-Seiten, jede Seite = CSS-Grid mit rows×cols
  */
 function MobilePagedGridScroll({ title, gap, rows, cols, items, itemKey, renderItem, ariaLabel }) {
+  const tLanding = useTranslations("landing");
   const pageSize = Math.max(1, rows * cols);
   const pages = useMemo(
     () => chunkArrayForMobilePages(items, pageSize),
@@ -217,7 +239,7 @@ function MobilePagedGridScroll({ title, gap, rows, cols, items, itemKey, renderI
       ) : null}
       <div
         role="region"
-        aria-label={ariaLabel || titleStr || "Karussell"}
+        aria-label={ariaLabel || titleStr || tLanding("carousel")}
         style={{
           display: "flex",
           overflowX: "auto",
@@ -322,6 +344,49 @@ function getPositionStyle(pos) {
   return map[pos] || map["center"];
 }
 
+const HERO_FALLBACK_BG = "linear-gradient(135deg, #163a38 0%, #1B8880 52%, #0f2f2d 100%)";
+
+function heroSlideHasContent(s, locale) {
+  if (!s) return false;
+  const hasMedia =
+    !!localizedAsset(s, "image", locale) ||
+    !!localizedAsset(s, "image_url", locale) ||
+    !!(s.video_url && String(s.video_url).trim());
+  const hasCopy =
+    !!String(lt(s, "title", locale) || "").trim() ||
+    !!String(lt(s, "subtitle", locale) || "").trim() ||
+    !!String(lt(s, "btn_text", locale) || "").trim();
+  return hasMedia || hasCopy;
+}
+
+function HeroSlideBackdrop({ s, locale, priority = false }) {
+  const videoSrc = s.video_url ? resolveUrl(s.video_url) : "";
+  const img = resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale));
+  const overlay = slideOverlayOpacity(s);
+  return (
+    <>
+      {videoSrc ? (
+        <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
+      ) : img ? (
+        <Image
+          src={img}
+          alt={lt(s, "title", locale) || ""}
+          fill
+          sizes="100vw"
+          priority={priority}
+          style={{ objectFit: "cover", userSelect: "none" }}
+          draggable="false"
+        />
+      ) : (
+        <div aria-hidden style={{ position: "absolute", inset: 0, background: s.bg_color || HERO_FALLBACK_BG }} />
+      )}
+      {overlay > 0 && (
+        <div aria-hidden style={{ position: "absolute", inset: 0, background: `rgba(13, 31, 26, ${overlay})`, pointerEvents: "none" }} />
+      )}
+    </>
+  );
+}
+
 // Resolve alignSelf for a button based on justifyContent
 function btnAlignSelf(justifyContent) {
   if (justifyContent === "flex-start") return "flex-start";
@@ -330,8 +395,10 @@ function btnAlignSelf(justifyContent) {
 }
 
 // ── Hero Banner Slider ────────────────────────────────────────────────────────
-function HeroBanner({ container, locale = "de" }) {
+function HeroBanner({ container, locale = "de", headingLevel = 2 }) {
   const tCommon = useTranslations("common");
+  const tLanding = useTranslations("landing");
+  const reduceMotion = usePrefersReducedMotion();
   const isMobile = useIsNarrow(767);
   const [current, setCurrent] = useState(0);
   const timerRef = useRef(null);
@@ -339,7 +406,7 @@ function HeroBanner({ container, locale = "de" }) {
   const userScrolling = useRef(false);
 
   const slidesRaw = Array.isArray(container.slides) ? container.slides : [];
-  let slides = slidesRaw.filter((s) => localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale) || (s.video_url && String(s.video_url).trim()));
+  let slides = slidesRaw.filter((s) => heroSlideHasContent(s, locale));
   // Flat hero fields (image_url + title on the container) — used by become-seller seed and older rows.
   if (!slides.length) {
     const flatImage = lt(container, "image", locale) || lt(container, "image_url", locale) || container.image_url || container.image || "";
@@ -365,10 +432,11 @@ function HeroBanner({ container, locale = "de" }) {
   // ── Auto-advance ──────────────────────────────────────────────────────────
   const scheduleNext = useCallback(() => {
     clearTimeout(timerRef.current);
+    if (reduceMotion) return;
     if (container.autoplay !== false && slides.length > 1) {
       timerRef.current = setTimeout(() => setCurrent((c) => (c + 1) % slides.length), container.delay || 4000);
     }
-  }, [slides.length, container.autoplay, container.delay]);
+  }, [slides.length, container.autoplay, container.delay, reduceMotion]);
 
   useEffect(() => {
     scheduleNext();
@@ -379,8 +447,8 @@ function HeroBanner({ container, locale = "de" }) {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !isMobile || userScrolling.current) return;
-    el.scrollTo({ left: current * el.offsetWidth, behavior: "smooth" });
-  }, [current, isMobile]);
+    el.scrollTo({ left: current * el.offsetWidth, behavior: reduceMotion ? "auto" : "smooth" });
+  }, [current, isMobile, reduceMotion]);
 
   // ── Update current index when user swipes ─────────────────────────────────
   const onScroll = useCallback(() => {
@@ -399,9 +467,9 @@ function HeroBanner({ container, locale = "de" }) {
     const el = scrollRef.current;
     userScrolling.current = false;
     setCurrent(idx);
-    if (el && isMobile) el.scrollTo({ left: idx * el.offsetWidth, behavior: "smooth" });
+    if (el && isMobile) el.scrollTo({ left: idx * el.offsetWidth, behavior: reduceMotion ? "auto" : "smooth" });
     scheduleNext();
-  }, [scheduleNext, isMobile]);
+  }, [scheduleNext, isMobile, reduceMotion]);
 
   if (slides.length === 0) return null;
 
@@ -412,9 +480,10 @@ function HeroBanner({ container, locale = "de" }) {
     const btnText = lt(s, "btn_text", locale);
     if (!title && !subtitle && !btnText) return null;
     const ps = getPositionStyle(s.text_position || "center");
+    const TitleTag = headingLevel === 1 ? "h1" : "h2";
     return (
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", padding: mobile ? "14px" : (s.content_padding || "32px 48px"), pointerEvents: "none", ...ps }}>
-        {title && <h2 style={{ fontSize: mobile ? "clamp(14px,5vw,26px)" : (s.title_size || "clamp(24px,4vw,56px)"), fontWeight: 900, color: s.title_color || s.text_color || "#fff", margin: 0, lineHeight: 1.15, marginBottom: subtitle ? 6 : (btnText ? 10 : 0), fontFamily: s.title_font ? undefined : undefined }}>{title}</h2>}
+        {title && <TitleTag style={{ fontSize: mobile ? "clamp(14px,5vw,26px)" : (s.title_size || "clamp(24px,4vw,56px)"), fontWeight: 900, color: s.title_color || s.text_color || "#fff", margin: 0, lineHeight: 1.15, marginBottom: subtitle ? 6 : (btnText ? 10 : 0) }}>{title}</TitleTag>}
         {subtitle && <p style={{ fontSize: mobile ? "clamp(11px,3vw,15px)" : (s.subtitle_size || "clamp(14px,2vw,22px)"), color: s.subtitle_color || s.text_color || "#fff", margin: btnText ? "0 0 10px" : 0, maxWidth: 600 }}>{subtitle}</p>}
         {btnText && (
           <a
@@ -455,7 +524,7 @@ function HeroBanner({ container, locale = "de" }) {
     return (
       <div style={{ position: "absolute", bottom: mobile ? 8 : 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: mobile ? 5 : 8, zIndex: 5, pointerEvents: "auto" }}>
         {slides.map((_, i) => (
-          <button key={i} type="button" onClick={() => goTo(i)} aria-label={`Slide ${i + 1}`} aria-current={i === current ? "true" : undefined}
+          <button key={i} type="button" onClick={() => goTo(i)} aria-label={tLanding("slide", { n: i + 1 })} aria-current={i === current ? "true" : undefined}
             style={{ width: i === current ? (mobile ? 18 : 24) : (mobile ? 6 : 10), height: mobile ? 6 : 10, borderRadius: mobile ? 3 : 5, border: "none", cursor: "pointer", background: i === current ? "#ff971c" : "rgba(255,255,255,0.65)", transition: "all .28s", padding: 0 }} />
         ))}
       </div>
@@ -483,22 +552,9 @@ function HeroBanner({ container, locale = "de" }) {
             }}
           >
             {slides.map((s, i) => {
-              const videoSrc = s.video_url ? resolveUrl(s.video_url) : "";
               const inner = (
                 <>
-                  {videoSrc ? (
-                    <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
-                  ) : (
-                    <Image
-                      src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))}
-                      alt={s.title || ""}
-                      fill
-                      sizes="100vw"
-                      priority={i === 0}
-                      style={{ objectFit: "cover", userSelect: "none" }}
-                      draggable="false"
-                    />
-                  )}
+                  <HeroSlideBackdrop s={s} locale={locale} priority={i === 0} />
                   <Overlay s={s} mobile />
                 </>
               );
@@ -526,21 +582,9 @@ function HeroBanner({ container, locale = "de" }) {
       <div style={getContentInnerStyle(container, 1600)}>
         <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
           {slides.map((s, i) => {
-            const videoSrc = s.video_url ? resolveUrl(s.video_url) : "";
             const mediaEl = (
               <>
-                {videoSrc
-                  ? <video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} autoPlay muted loop playsInline />
-                  : (
-                    <Image
-                      src={resolveUrl(localizedAsset(s, "image", locale) || localizedAsset(s, "image_url", locale))}
-                      alt={s.title || ""}
-                      fill
-                      sizes="100vw"
-                      priority={i === 0}
-                      style={{ objectFit: "cover" }}
-                    />
-                  )}
+                <HeroSlideBackdrop s={s} locale={locale} priority={i === 0} />
               </>
             );
             const wrapStyle = { position: "absolute", inset: 0, opacity: i === current ? 1 : 0, transition: "opacity 0.7s ease", pointerEvents: i === current ? "auto" : "none" };
@@ -570,7 +614,7 @@ function TextBlock({ container, locale = "de" }) {
   const body = lt(container, "body", locale);
   const btnText = lt(container, "btn_text", locale);
   return (
-    <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
+    <div style={{ background: container.bg_color || "transparent", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 800), textAlign: align }}>
         {title && (
           <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 16px" }}>
@@ -663,7 +707,7 @@ function VideoBlock({ container, locale = "de" }) {
   if (!hasEmbed && !hasFile) return null;
 
   const tc = container.text_color || "#111827";
-  const bg = container.bg_color || "#fff";
+  const bg = container.bg_color || "transparent";
   const autoplay = container.autoplay === true;
   const muted = container.muted !== false;
   const loop = container.loop === true;
@@ -746,7 +790,7 @@ function ImageText({ container, locale = "de" }) {
   const body = lt(container, "body", locale);
   const btnText = lt(container, "btn_text", locale);
   return (
-    <div style={{ background: container.bg_color || "#fff", ...getContainerPadding(container, "48px 24px") }}>
+    <div style={{ background: container.bg_color || "transparent", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 1100), display: "flex", flexDirection: imageLeft ? "row" : "row-reverse", gap: 40, alignItems: "center", flexWrap: "wrap" }}>
         {(videoSrc || imgSrc) && (
           <div style={{ flex: "0 0 auto", width: "min(45%, 480px)" }}>
@@ -864,7 +908,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
   const freeGridRowHeight = Math.max(40, Number(isNarrow ? (container.grid_row_height_mobile ?? 120) : (container.grid_row_height_desktop ?? 160)) || (isNarrow ? 120 : 160));
   const ratio = normalizeCollectionsCarouselAspectRatio(container.card_aspect_ratio);
   const imgObjectFit = container.card_image_object_fit === "contain" ? "contain" : "cover";
-  const bg = container.bg_color || "#fff";
+  const bg = container.bg_color || "transparent";
 
   const [liveCollections, setLiveCollections] = useState(null);
   const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
@@ -923,7 +967,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
   if (source === "collection" && products === undefined) {
     return (
       <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
-        <div style={getContentInnerStyle(container, 1280)}>
+        <div style={getContentInnerStyle(container, 1440)}>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
             {Array.from({ length: gridCols * 2 }).map((_, j) => (
               <div key={j} style={{ minHeight: 200, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
@@ -1070,7 +1114,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+      <div style={getContentInnerStyle(container, 1440)}>
         {lt(container, "title", locale) && (
           <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
         )}
@@ -1142,7 +1186,7 @@ function ImageGrid({ container, locale = "de" }) {
   const gapDesktop = Number(container.gap) || 16;
   const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
   const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : gapDesktop;
-  const bg = container.bg_color || "#fff";
+  const bg = container.bg_color || "transparent";
   const images = (container.images || []).filter((i) => localizedAsset(i, "url", locale));
   if (!images.length) return null;
   return (
@@ -1244,6 +1288,7 @@ function BannerCta({ container, locale = "de" }) {
 // ── Collection Carousel ───────────────────────────────────────────────────────
 function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
   const tNav = useTranslations("nav");
+  const tLanding = useTranslations("landing");
   // undefined = still loading, [] = loaded but empty, [...] = has products
   const [products, setProducts] = useState(preloadedProducts);
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
@@ -1271,7 +1316,7 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
   // Still loading → show skeleton placeholder row
   if (products === undefined) {
     return (
-      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+      <div style={catalogSectionStyle(container, "48px 24px")}>
         <div style={{ display: "flex", gap, overflow: "hidden" }}>
           {Array.from({ length: itemsPerRow }).map((_, i) => (
             <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 280, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
@@ -1298,8 +1343,8 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
   if (isNarrow && isGrid) {
     return (
-      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-        <div style={getContentInnerStyle(container, 1280)}>
+      <div style={catalogSectionStyle(container, "48px 24px")}>
+        <div style={getContentInnerStyle(container, 1440)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -1316,8 +1361,8 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
   }
 
   return (
-    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+    <div style={catalogSectionStyle(container, "48px 24px")}>
+      <div style={getContentInnerStyle(container, 1440)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
@@ -1325,7 +1370,7 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
           navOnSides
           gap={gap}
           showFade={false}
-          ariaLabel={lt(container, "title", locale) || "Collection carousel"}
+          ariaLabel={lt(container, "title", locale) || tLanding("productCarousel")}
         >
           {products.map((product, i) => (
             <div key={product.id || i} style={{ minWidth: 0 }}>
@@ -1349,31 +1394,45 @@ function discountPct(product) {
   return 1 - sale / base;
 }
 
+function productRecencyMs(product) {
+  const raw = product?.metadata?.publish_date || product?.created_at || product?.metadata?.created_at || 0;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
 function BestsellerCarousel({ container, locale = "de" }) {
+  const tLanding = useTranslations("landing");
   const [products, setProducts] = useState(undefined);
   const isNarrow = useIsNarrow(1023);
   const baseGap = container.gap != null ? Number(container.gap) : 10;
   const gap = Number.isNaN(baseGap) ? 10 : baseGap;
-  const mode = container.mode === "sale" ? "sale" : "bestseller";
+  const mode = container.mode === "sale" ? "sale" : container.mode === "newest" ? "newest" : "bestseller";
+  const slug = String(container.category_slug || "").trim();
 
   useEffect(() => {
-    if (!container.category_slug) { setProducts([]); return; }
-    cachedJsonFetch(`/api/store-products?category=${encodeURIComponent(container.category_slug)}&limit=50`, { ttlMs: 15000 })
+    const qs = new URLSearchParams({ limit: "50" });
+    if (slug) qs.set("category", slug);
+    cachedJsonFetch(`/api/store-products?${qs.toString()}`, { ttlMs: 15000 })
       .then((d) => {
         const all = Array.isArray(d?.products) ? d.products : [];
+        let next = all;
         if (mode === "sale") {
-          setProducts(all.filter(isDiscountedProduct).sort((a, b) => discountPct(b) - discountPct(a)));
+          next = all.filter(isDiscountedProduct).sort((a, b) => discountPct(b) - discountPct(a));
+        } else if (mode === "newest") {
+          next = [...all].sort((a, b) => productRecencyMs(b) - productRecencyMs(a));
         } else {
-          all.sort((a, b) => toSalesScore(b.metadata) - toSalesScore(a.metadata));
-          setProducts(all);
+          next = [...all].sort((a, b) => toSalesScore(b.metadata) - toSalesScore(a.metadata));
         }
+        const limit = Number(container.limit);
+        if (Number.isFinite(limit) && limit > 0) next = next.slice(0, limit);
+        setProducts(next);
       })
       .catch(() => setProducts([]));
-  }, [container.category_slug, mode]);
+  }, [slug, mode, container.limit]);
 
   if (products === undefined) {
     return (
-      <div style={{ ...getContainerPadding(container, "24px 16px"), background: "#fff" }}>
+      <div style={catalogSectionStyle(container, "48px 24px")}>
         <div style={{ display: "flex", gap, overflow: "hidden" }}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} style={{ flex: "0 0 180px", height: 240, borderRadius: 8, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
@@ -1385,20 +1444,26 @@ function BestsellerCarousel({ container, locale = "de" }) {
 
   if (!products.length) return null;
 
-  const categoryUrl = container.category_slug
-    ? (mode === "sale" ? `/${container.category_slug}` : `/${container.category_slug}?sort=bestseller`)
-    : null;
+  const seeAllHref = slug
+    ? (mode === "sale" ? `/${slug}` : mode === "newest" ? `/${slug}` : `/${slug}?sort=bestseller`)
+    : (mode === "sale" ? "/sales" : mode === "newest" ? "/neuheiten" : "/bestsellers");
 
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
   const renderItem = (product, i) =>
-    mode === "sale"
+    mode === "sale" || mode === "newest"
       ? <ProductCard product={product} plainImage />
       : <ProductCard product={product} plainImage isBestseller rank={i + 1} hideBestsellerBadge />;
 
+  const seeAll = (
+    <div style={{ textAlign: "center", marginTop: 12 }}>
+      <SeeAllLink href={seeAllHref}>{tLanding("seeAll")}</SeeAllLink>
+    </div>
+  );
+
   if (isNarrow && isGrid) {
     return (
-      <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
-        <div style={getContentInnerStyle(container, 1280)}>
+      <div style={{ ...getContainerPadding(container, "32px 16px"), background: container.bg_color || "transparent" }}>
+        <div style={getContentInnerStyle(container, 1440)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -1407,13 +1472,9 @@ function BestsellerCarousel({ container, locale = "de" }) {
             items={products}
             itemKey={(p, i) => p.id || i}
             renderItem={renderItem}
-            ariaLabel={lt(container, "title", locale) || "Bestseller"}
+            ariaLabel={lt(container, "title", locale) || tLanding("bestsellers")}
           />
-          {categoryUrl && (
-            <div style={{ textAlign: "center", marginTop: 10 }}>
-              <SeeAllLink href={categoryUrl}>Mehr anzeigen</SeeAllLink>
-            </div>
-          )}
+          {seeAll}
         </div>
       </div>
     );
@@ -1423,8 +1484,8 @@ function BestsellerCarousel({ container, locale = "de" }) {
     // Horizontal padding matches tokens.containerPadding (24px) — Carousel's navOnSides bleed/
     // arrow-inset math is hardcoded to that value, so a narrower side padding here (the old 16px)
     // made the desktop nav arrows sit misaligned with this row's own edge.
-    <div style={{ ...getContainerPadding(container, "20px 24px"), background: "#fff" }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+    <div style={{ ...getContainerPadding(container, "48px 24px"), background: container.bg_color || "transparent" }}>
+      <div style={getContentInnerStyle(container, 1440)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
@@ -1433,7 +1494,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
           navOnSides
           gap={gap}
           showFade={false}
-          ariaLabel={lt(container, "title", locale) || "Bestseller"}
+          ariaLabel={lt(container, "title", locale) || tLanding("bestsellers")}
         >
           {products.map((product, i) => (
             <div key={product.id || i} style={{ minWidth: 0 }}>
@@ -1441,11 +1502,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
             </div>
           ))}
         </Carousel>
-        {categoryUrl && (
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <SeeAllLink href={categoryUrl}>Mehr anzeigen</SeeAllLink>
-          </div>
-        )}
+        {seeAll}
       </div>
     </div>
   );
@@ -1470,31 +1527,32 @@ function PersonalizedProductRow({ container, locale = "de" }) {
   const tileSpans = Array.isArray(container.tile_spans) ? container.tile_spans : [];
 
   const DEFAULT_TITLES = {
-    recently_viewed:  { de: "Weitermachen, wo du aufgehört hast", en: "Continue where you left off" },
-    reorder:          { de: "Schon früher bestellt — wieder bestellen?", en: "Order again?" },
-    also_bought:      { de: "Andere kauften auch", en: "Others also bought" },
-    trending_in_your_categories: { de: "Trends in deinen Kategorien", en: "Trending in your categories" },
-    trending_for_you: { de: "Trending für dich", en: "Trending for you" },
-    top_categories_bestsellers: { de: "Bestseller aus deinen Lieblingskategorien", en: "Bestsellers from your favorite categories" },
-    top_picks:        { de: "Top-Empfehlungen", en: "Top picks for you" },
-    bestsellers:      { de: "Bestseller", en: "Bestsellers" },
-    new_arrivals:     { de: "Neuheiten für dich", en: "New arrivals for you" },
-    on_sale:          { de: "Angebote für dich", en: "Deals for you" },
-    favorited:        { de: "Deine Favoriten", en: "Your favorites" },
-    favorited_low_stock: { de: "Favoriten — bald ausverkauft", en: "Favorites — almost sold out" },
-    favorited_price_drop: { de: "Favoriten im Preis gesenkt", en: "Favorites with a price drop" },
-    category_bestsellers_from_purchases: { de: "Bestseller aus deinen Kaufkategorien", en: "Bestsellers from your purchase categories" },
-    category_similar_from_favorites: { de: "Ähnlich zu deinen Favoriten", en: "Similar to your favorites" },
-    others_in_your_category: { de: "Beliebt in deinen Kategorien", en: "Popular in your categories" },
-    new_in_viewed_categories: { de: "Neu in deinen Kategorien", en: "New in your categories" },
-    abandoned_cart_items: { de: "In deinem Warenkorb geblieben", en: "Left in your cart" },
+    recently_viewed:  { de: "Weitermachen, wo du aufgehört hast", en: "Continue where you left off", tr: "Kaldığın yerden devam et" },
+    reorder:          { de: "Schon früher bestellt — wieder bestellen?", en: "Order again?", tr: "Tekrar sipariş ver" },
+    also_bought:      { de: "Andere kauften auch", en: "Others also bought", tr: "Başkaları da aldı" },
+    trending_in_your_categories: { de: "Trends in deinen Kategorien", en: "Trending in your categories", tr: "Kategorilerinde trend" },
+    trending_for_you: { de: "Trending für dich", en: "Trending for you", tr: "Senin için trend" },
+    top_categories_bestsellers: { de: "Bestseller aus deinen Lieblingskategorien", en: "Bestsellers from your favorite categories", tr: "Favori kategorilerinden çok satanlar" },
+    top_picks:        { de: "Top-Empfehlungen", en: "Top picks for you", tr: "Senin için seçtiklerimiz" },
+    bestsellers:      { de: "Bestseller", en: "Bestsellers", tr: "Çok satanlar" },
+    new_arrivals:     { de: "Neuheiten für dich", en: "New arrivals for you", tr: "Senin için yenilikler" },
+    on_sale:          { de: "Angebote für dich", en: "Deals for you", tr: "Senin için fırsatlar" },
+    favorited:        { de: "Deine Favoriten", en: "Your favorites", tr: "Favorilerin" },
+    favorited_low_stock: { de: "Favoriten — bald ausverkauft", en: "Favorites — almost sold out", tr: "Favoriler — tükenmek üzere" },
+    favorited_price_drop: { de: "Favoriten im Preis gesenkt", en: "Favorites with a price drop", tr: "Favorilerinde fiyat düştü" },
+    category_bestsellers_from_purchases: { de: "Bestseller aus deinen Kaufkategorien", en: "Bestsellers from your purchase categories", tr: "Satın aldığın kategorilerden çok satanlar" },
+    category_similar_from_favorites: { de: "Ähnlich zu deinen Favoriten", en: "Similar to your favorites", tr: "Favorilerine benzer" },
+    others_in_your_category: { de: "Beliebt in deinen Kategorien", en: "Popular in your categories", tr: "Kategorilerinde popüler" },
+    new_in_viewed_categories: { de: "Neu in deinen Kategorien", en: "New in your categories", tr: "Kategorilerinde yeni" },
+    abandoned_cart_items: { de: "In deinem Warenkorb geblieben", en: "Left in your cart", tr: "Sepetinde kalanlar" },
   };
 
   function getTitle() {
     const custom = lt(container, "title", locale);
     if (custom) return custom;
     const algoTitles = DEFAULT_TITLES[algorithm] || DEFAULT_TITLES.top_picks;
-    return locale === "de" ? algoTitles.de : (algoTitles.en || algoTitles.de);
+    const loc = String(locale || "de").slice(0, 2).toLowerCase();
+    return algoTitles[loc] || algoTitles.en || algoTitles.de;
   }
 
   useEffect(() => {
@@ -1521,7 +1579,7 @@ function PersonalizedProductRow({ container, locale = "de" }) {
 
   if (products === undefined) {
     return (
-      <div style={{ ...getContainerPadding(container, "20px 16px"), background: "#fff" }}>
+      <div style={{ ...getContainerPadding(container, "20px 16px"), background: container.bg_color || "transparent" }}>
         <div style={{ display: "flex", gap, overflow: "hidden" }}>
           {Array.from({ length: 3 }).map((_, i) => (
             <div
@@ -1581,8 +1639,8 @@ function PersonalizedProductRow({ container, locale = "de" }) {
   return (
     // See BestsellerCarousel — horizontal padding matches tokens.containerPadding (24px) so the
     // Carousel's navOnSides arrows line up with this row's own edge instead of sitting misaligned.
-    <div style={{ ...getContainerPadding(container, "20px 24px"), background: "#fff" }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+    <div style={catalogSectionStyle(container, "48px 24px")}>
+      <div style={getContentInnerStyle(container, 1440)}>
         {displayMode === "image_tiles" ? (
           <>
             {title && <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
@@ -1670,7 +1728,7 @@ function SellerCarousel({ container, locale = "de" }) {
 
   if (sellers === undefined) {
     return (
-      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
+      <div style={catalogSectionStyle(container, "48px 24px")}>
         <div style={{ display: "flex", gap, overflow: "hidden" }}>
           {Array.from({ length: itemsPerRow }).map((_, i) => (
             <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 160, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
@@ -1685,8 +1743,8 @@ function SellerCarousel({ container, locale = "de" }) {
   const title = lt(container, "title", locale);
 
   return (
-    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+    <div style={catalogSectionStyle(container, "48px 24px")}>
+      <div style={getContentInnerStyle(container, 1440)}>
         <Carousel
           contained={false}
           title={title || undefined}
@@ -1727,6 +1785,7 @@ function SellerCarousel({ container, locale = "de" }) {
 
 function CollectionsCarousel({ container, locale = "de" }) {
   const tNav = useTranslations("nav");
+  const tLanding = useTranslations("landing");
   const snapshots = Array.isArray(container.collections) ? container.collections.filter(Boolean) : [];
   const desktopN = container.items_per_row != null ? Number(container.items_per_row) : 4;
   const mobileN = container.items_per_row_mobile != null ? Number(container.items_per_row_mobile) : 2;
@@ -1741,12 +1800,61 @@ function CollectionsCarousel({ container, locale = "de" }) {
 
   // Fetch live collection data so title/image changes in admin are reflected immediately.
   const [liveCollections, setLiveCollections] = useState(null);
+  const source = container.source === "categories"
+    ? "categories"
+    : container.source === "all"
+      ? "all"
+      : snapshots.length
+        ? "manual"
+        : (container.source === "manual" ? "manual" : "all");
+  const itemLimit = Number(container.limit);
+  const cap = Number.isFinite(itemLimit) && itemLimit > 0 ? itemLimit : 8;
 
   useEffect(() => {
-    if (!snapshots.length) return;
+    let cancelled = false;
+    if (source === "categories") {
+      cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 })
+        .then((data) => {
+          if (cancelled) return;
+          const tree = Array.isArray(data?.tree) ? data.tree : [];
+          setLiveCollections(tree.slice(0, cap).map((cat) => {
+            const locName = getLocalizedCategory(cat, locale).name || cat.name || cat.slug || "";
+            const meta = cat.metadata && typeof cat.metadata === "object" ? cat.metadata : {};
+            return {
+              id: cat.id,
+              title: locName,
+              handle: cat.slug || cat.handle || "",
+              image: cat.thumbnail || cat.image_url || meta.image_url || meta.image || "",
+            };
+          }));
+        })
+        .catch(() => { if (!cancelled) setLiveCollections([]); });
+      return () => { cancelled = true; };
+    }
+    if (source === "all") {
+      fetch("/api/store-collections")
+        .then((r) => r.json())
+        .then((data) => {
+          if (cancelled) return;
+          const all = Array.isArray(data?.collections) ? data.collections : [];
+          setLiveCollections(all.slice(0, cap).map((col) => ({
+            id: col.id,
+            title: col.display_title || col.title || col.handle || "",
+            handle: col.handle || "",
+            image: collectionCarouselCardImageFromLive(col),
+          })));
+        })
+        .catch(() => { if (!cancelled) setLiveCollections([]); });
+      return () => { cancelled = true; };
+    }
+    if (!snapshots.length) {
+      setLiveCollections([]);
+      return undefined;
+    }
     fetch("/api/store-collections")
       .then((r) => r.json())
       .then((data) => {
+        if (cancelled) return;
         const all = Array.isArray(data?.collections) ? data.collections : [];
         if (!all.length) return;
         const byId = new Map(all.map((c) => [c.id, c]));
@@ -1764,10 +1872,21 @@ function CollectionsCarousel({ container, locale = "de" }) {
         setLiveCollections(merged);
       })
       .catch(() => {});
-  }, [container.id]);
+    return () => { cancelled = true; };
+  }, [container.id, source, locale, cap, snapshots.length]);
 
-  const collections = liveCollections ?? snapshots;
-
+  const collections = source === "manual" ? (liveCollections ?? snapshots) : liveCollections;
+  if (collections == null) {
+    return (
+      <div style={{ ...getContainerPadding(container, "48px 24px"), background: container.bg_color || "transparent" }}>
+        <div style={{ display: "flex", gap, overflow: "hidden" }}>
+          {Array.from({ length: itemsPerRow }).map((_, i) => (
+            <div key={i} style={{ flex: `0 0 calc(${100 / itemsPerRow}% - 12px)`, height: 220, borderRadius: 12, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
   if (!collections.length) return null;
 
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
@@ -1791,7 +1910,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
             <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
           ) : (
             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
-              Keine Vorschau
+              {tLanding("noPreview")}
             </div>
           )}
           <div
@@ -1828,8 +1947,8 @@ function CollectionsCarousel({ container, locale = "de" }) {
       );
     };
     return (
-      <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-        <div style={getContentInnerStyle(container, 1280)}>
+      <div style={catalogSectionStyle(container, "48px 24px")}>
+        <div style={getContentInnerStyle(container, 1440)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -1846,15 +1965,15 @@ function CollectionsCarousel({ container, locale = "de" }) {
   }
 
   return (
-    <div style={{ ...getContainerPadding(container, "32px 24px"), background: "#fff" }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+    <div style={catalogSectionStyle(container, "48px 24px")}>
+      <div style={getContentInnerStyle(container, 1440)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
           visibleCount={itemsPerRow}
           navOnSides
           gap={gap}
-          ariaLabel={lt(container, "title", locale) || "Collections carousel"}
+          ariaLabel={lt(container, "title", locale) || tLanding("collectionsCarousel")}
         >
           {collections.map((collection, i) => {
             const href = collectionHref(collection.handle);
@@ -1875,7 +1994,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
                   <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
                 ) : (
                   <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
-                    Keine Vorschau
+                    {tLanding("noPreview")}
                   </div>
                 )}
                 <div
@@ -1935,14 +2054,14 @@ function SingleProduct({ container, preloadedProduct, locale = "de" }) {
   // Still loading → small skeleton
   if (product === undefined) {
     return (
-      <div style={{ ...getContainerPadding(container, "48px 24px"), background: container.bg_color || "#fff" }}>
+      <div style={{ ...getContainerPadding(container, "48px 24px"), background: container.bg_color || "transparent" }}>
         <div style={{ maxWidth: 420, margin: "0 auto", height: 360, borderRadius: 12, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
       </div>
     );
   }
   if (!product) return null;
 
-  const wrapBg = container.bg_color || "#fff";
+  const wrapBg = container.bg_color || "transparent";
   const title = lt(container, "title", locale);
 
   return (
@@ -1967,6 +2086,7 @@ function SingleProduct({ container, preloadedProduct, locale = "de" }) {
 
 // ── Featured blog posts (carousel: teaser ~3 lines + link to full post) ───────
 function BlogCarousel({ container, locale = "de" }) {
+  const tLanding = useTranslations("landing");
   const posts = Array.isArray(container.posts)
     ? container.posts.filter((p) => p && (p.title || p.image || p.excerpt || p.body))
     : [];
@@ -1977,7 +2097,7 @@ function BlogCarousel({ container, locale = "de" }) {
 
   if (!posts.length) return null;
 
-  const bg = container.bg_color || "#fff";
+  const bg = container.bg_color || "transparent";
   const textColor = container.text_color || "#111827";
 
   const previewClampStyle = {
@@ -1996,7 +2116,7 @@ function BlogCarousel({ container, locale = "de" }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "40px 24px"), background: bg }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+      <div style={getContentInnerStyle(container, 1440)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
@@ -2004,7 +2124,7 @@ function BlogCarousel({ container, locale = "de" }) {
           navOnSides
           gap={gap}
           fadeBgColor={bg}
-          ariaLabel={lt(container, "title", locale) || "Blog"}
+          ariaLabel={lt(container, "title", locale) || tLanding("blog")}
         >
           {posts.map((post, i) => {
           const id = post.id || `post-${i}`;
@@ -2379,9 +2499,11 @@ function Accordion({ container, locale = "de" }) {
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function Tabs({ container, locale = "de" }) {
+  const tLanding = useTranslations("landing");
   const [activeIdx, setActiveIdx] = useState(0);
   const tabs = container.tabs || [];
-  const bg = container.bg_color || "#ffffff";
+  if (!tabs.length) return null;
+  const bg = container.bg_color || "transparent";
   const textColor = container.text_color || "#111827";
   const activeColor = container.active_color || "#ff971c";
   const tabBg = container.tab_bg || "#f1f5f9";
@@ -2493,7 +2615,7 @@ function Tabs({ container, locale = "de" }) {
             ...(style === "underline" ? {} : { display: "flex", justifyContent: "flex-start", flexWrap: "wrap", gap: 12 }),
           }}
         >
-          <div role="tablist" aria-label="Inhalt" style={barWrap}>
+          <div role="tablist" aria-label={tLanding("contentTabs")} style={barWrap}>
             {tabs.map((tab, idx) => (
               <button
                 key={idx}
@@ -2534,33 +2656,40 @@ function Tabs({ container, locale = "de" }) {
 function FeatureGrid({ container, locale = "de" }) {
   const {
     title_align = "center",
-    cols = 3, card_style = "bordered",
+    cols = 3, card_style = "flat",
     icon_size = "40px",
-    bg_color = "#ffffff", card_bg = "#f9fafb",
+    bg_color, card_bg = "transparent",
     card_border_color = "#e5e7eb", text_color = "#111827",
     items = [],
+    variant = "cards",
   } = container;
   const title = lt(container, "title", locale);
   const subtitle = lt(container, "subtitle", locale);
+  const isStrip = variant === "stats_strip";
 
   const cardStyle = (() => {
     const base = {
-      background: card_bg,
+      background: isStrip ? "transparent" : card_bg,
       color: text_color,
-      padding: "28px 24px",
-      borderRadius: 16,
+      padding: isStrip ? "8px 4px" : "20px 8px",
+      borderRadius: isStrip ? 0 : 12,
       display: "flex",
       flexDirection: "column",
-      gap: 12,
+      gap: isStrip ? 6 : 10,
+      textAlign: isStrip || title_align === "center" ? "center" : "left",
+      alignItems: isStrip || title_align === "center" ? "center" : "flex-start",
     };
+    if (isStrip || card_style === "flat") return base;
     if (card_style === "bordered") return { ...base, border: `1px solid ${card_border_color}` };
     if (card_style === "shadow") return { ...base, boxShadow: "0 4px 24px -6px rgba(15,23,42,0.10), 0 1px 3px rgba(15,23,42,0.06)" };
-    return base; // flat
+    return base;
   })();
 
+  if (!Array.isArray(items) || items.length === 0) return null;
+
   return (
-    <div style={{ background: bg_color, ...getContainerPadding(container, "64px 24px") }}>
-      <div style={getContentInnerStyle(container, 1200)}>
+    <div style={{ background: bg_color || "transparent", ...getContainerPadding(container, "48px 24px") }}>
+      <div style={getContentInnerStyle(container, 1440)}>
         {(title || subtitle) && (
           <div style={{ textAlign: title_align, marginBottom: 40 }}>
             {title && (
@@ -2578,9 +2707,9 @@ function FeatureGrid({ container, locale = "de" }) {
         <div style={{
           display: "grid",
           gridTemplateColumns: `repeat(${Math.max(1, cols)}, 1fr)`,
-          gap: 20,
+          gap: isStrip ? 12 : 20,
         }}
-          className="landing-feature-grid"
+          className={isStrip ? "landing-feature-grid landing-feature-strip" : "landing-feature-grid"}
         >
           {items.map((item, i) => (
             <div key={i} style={cardStyle}>
@@ -2597,7 +2726,7 @@ function FeatureGrid({ container, locale = "de" }) {
           ))}
         </div>
       </div>
-      <style>{`@media(max-width:767px){.landing-feature-grid{grid-template-columns:1fr!important;}}@media(min-width:768px) and (max-width:1023px){.landing-feature-grid{grid-template-columns:repeat(2,1fr)!important;}}`}</style>
+      <style>{`@media(max-width:767px){.landing-feature-grid{grid-template-columns:1fr!important;}.landing-feature-strip{grid-template-columns:repeat(2,1fr)!important;}}@media(min-width:768px) and (max-width:1023px){.landing-feature-grid{grid-template-columns:repeat(2,1fr)!important;}.landing-feature-strip{grid-template-columns:repeat(4,1fr)!important;}}`}</style>
     </div>
   );
 }
@@ -2750,6 +2879,8 @@ function pickImageCarouselRatio(container, isNarrow) {
 }
 
 function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
+  const tLanding = useTranslations("landing");
+  const tCommon = useTranslations("common");
   const isNarrow = useIsNarrow(1023);
   const images = (container.images || []).filter((i) => localizedAsset(i, "url", locale));
   const { setLandingHeaderBg } = useLandingChrome();
@@ -2798,7 +2929,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   const baseGap = container.gap != null ? Number(container.gap) : 16;
   const gapMobile = container.gap_mobile != null ? Number(container.gap_mobile) : null;
   const gap = isNarrow && gapMobile != null && !Number.isNaN(gapMobile) ? gapMobile : (Number.isNaN(baseGap) ? 16 : baseGap);
-  const bg = container.bg_color || "#fff";
+  const bg = container.bg_color || "transparent";
   const { isGrid, rows, cols } = resolveMobilePagedGrid(container);
   const rawPad = getContainerPadding(container, "0px 24px 0px 24px");
   const carouselPadding = { ...rawPad, paddingTop: 0, paddingBottom: 0 };
@@ -2889,7 +3020,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     const shown = images.slice(0, gridCols * gridRows);
     return (
       <div style={{ ...carouselPadding, background: bg }}>
-        <div style={getContentInnerStyle(container, 1280)}>
+        <div style={getContentInnerStyle(container, 1440)}>
           {lt(container, "title", locale) && (
             <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.375rem)", fontWeight: 600, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
           )}
@@ -2908,7 +3039,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   if (isNarrow && isGrid) {
     return (
       <div style={{ ...carouselPadding, background: bg }}>
-        <div style={getContentInnerStyle(container, 1280)}>
+        <div style={getContentInnerStyle(container, 1440)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -2917,7 +3048,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
             items={images}
             itemKey={(_, i) => `img-${i}`}
             renderItem={renderImageCell}
-            ariaLabel={lt(container, "title", locale) || "Bild-Karussell"}
+            ariaLabel={lt(container, "title", locale) || tLanding("imageCarousel")}
           />
         </div>
       </div>
@@ -2980,7 +3111,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // still works with drag/wheel either way.
   return (
     <div style={{ ...carouselPadding, background: bg }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+      <div style={getContentInnerStyle(container, 1440)}>
         {lt(container, "title", locale) && (
           <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.375rem)", fontWeight: 600, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
         )}
@@ -3022,13 +3153,13 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
             <>
               <button
                 type="button"
-                aria-label="Zurück"
+                aria-label={tCommon("previous")}
                 onClick={() => scrollByOneItem(desktopScrollRef, -1)}
                 style={{ position: "absolute", left: -8, top: "50%", transform: "translate(-50%, -50%)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "50%", width: 40, height: 40, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 2px 8px rgba(0,0,0,0.14)" }}
               >‹</button>
               <button
                 type="button"
-                aria-label="Weiter"
+                aria-label={tCommon("next")}
                 onClick={() => scrollByOneItem(desktopScrollRef, 1)}
                 style={{ position: "absolute", right: -8, top: "50%", transform: "translate(50%, -50%)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "50%", width: 40, height: 40, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 2px 8px rgba(0,0,0,0.14)" }}
               >›</button>
@@ -3081,7 +3212,7 @@ function LayoutSection({ container, locale = "de", preload = {}, ctx = {} }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
-      <div style={getContentInnerStyle(container, 1280)}>
+      <div style={getContentInnerStyle(container, 1440)}>
         {title && (
           <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: container.text_color || "#111827", margin: "0 0 20px", textAlign: titleAlign }}>
             {title}
@@ -3188,7 +3319,7 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
   const collectionKey = `${String(c.collection_id || "").trim()}|${String(c.collection_handle || "").trim()}`;
   const singleKey = String(c.product_id || c.product_handle || "").trim();
   switch (c.type) {
-    case "hero_banner":          inner = <HeroBanner container={c} locale={locale} />; break;
+    case "hero_banner":          inner = <HeroBanner container={c} locale={locale} headingLevel={ctx.firstVisibleId === c.id ? 1 : 2} />; break;
     case "text_block":           inner = <TextBlock container={c} locale={locale} />; break;
     case "video_block":         inner = <VideoBlock container={c} locale={locale} />; break;
     case "image_text":           inner = <ImageText container={c} locale={locale} />; break;

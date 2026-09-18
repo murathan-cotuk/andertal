@@ -594,6 +594,18 @@
     "suggestions": "Öneriler",
     "continueShopping": "Alışverişe devam et"
   },
+  "landing": {
+    "noPreview": "Önizleme yok",
+    "seeAll": "Tümünü gör",
+    "bestsellers": "Çok satanlar",
+    "productCarousel": "Ürün karuseli",
+    "collectionsCarousel": "Koleksiyonlar",
+    "imageCarousel": "Görsel karusel",
+    "blog": "Blog",
+    "carousel": "Karusel",
+    "slide": "Slayt {n}",
+    "contentTabs": "İçerik"
+  },
   "newsletter": {
     "error": "Abonelik başarısız. Lütfen tekrar deneyin.",
     "unsubscribeTitle": "Bülten aboneliğini iptal et",

@@ -594,6 +594,18 @@
     "suggestions": "Suggestions",
     "continueShopping": "Continue shopping"
   },
+  "landing": {
+    "noPreview": "No preview",
+    "seeAll": "See all",
+    "bestsellers": "Bestsellers",
+    "productCarousel": "Product carousel",
+    "collectionsCarousel": "Collections",
+    "imageCarousel": "Image carousel",
+    "blog": "Blog",
+    "carousel": "Carousel",
+    "slide": "Slide {n}",
+    "contentTabs": "Content"
+  },
   "newsletter": {
     "error": "Subscription failed. Please try again.",
     "unsubscribeTitle": "Unsubscribe from newsletter",

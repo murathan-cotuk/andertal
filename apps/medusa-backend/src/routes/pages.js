@@ -700,16 +700,135 @@ const enrichLandingContainers = async (containers, client) => {
   return list
 }
 
+function isAdminHubLandingReq(req) {
+  const url = `${req.baseUrl || ''}${req.originalUrl || req.url || ''}`
+  return url.includes('/admin-hub/')
+}
+
+function publishedLandingSettings(row) {
+  return row?.settings && typeof row.settings === 'object' && !Array.isArray(row.settings) ? row.settings : {}
+}
+
+function resolveAdminLandingView(row) {
+  const publishedContainers = Array.isArray(row?.containers) ? row.containers : []
+  const publishedSettings = publishedLandingSettings(row)
+  const hasDraft = row != null && row.draft_containers != null
+  const draftContainers = hasDraft && Array.isArray(row.draft_containers) ? row.draft_containers : []
+  const draftSettings =
+    hasDraft && row.draft_settings && typeof row.draft_settings === 'object' && !Array.isArray(row.draft_settings)
+      ? row.draft_settings
+      : publishedSettings
+  return {
+    containers: hasDraft ? draftContainers : publishedContainers,
+    settings: hasDraft ? draftSettings : publishedSettings,
+    has_unpublished_draft: hasDraft,
+    published_containers: publishedContainers,
+    published_settings: publishedSettings,
+  }
+}
+
+function resolveStoreLandingView(row) {
+  return {
+    containers: Array.isArray(row?.containers) ? row.containers : [],
+    settings: publishedLandingSettings(row),
+    has_unpublished_draft: false,
+  }
+}
+
+async function landingGetJson(row, client, admin) {
+  const view = admin ? resolveAdminLandingView(row) : resolveStoreLandingView(row)
+  const containers = await enrichLandingContainers(view.containers || [], client)
+  const payload = {
+    containers,
+    settings: view.settings,
+    updated_at: row?.updated_at || null,
+  }
+  if (admin) {
+    payload.has_unpublished_draft = view.has_unpublished_draft
+    payload.published_containers = await enrichLandingContainers(view.published_containers || [], client)
+    payload.published_settings = view.published_settings
+  }
+  return payload
+}
+
+function landingDiscardQuery(kind, id) {
+  if (kind === 'home') {
+    return {
+      text: `UPDATE admin_hub_landing_page SET draft_containers = NULL, draft_settings = NULL, updated_at = NOW() WHERE id = 1`,
+      values: [],
+    }
+  }
+  if (kind === 'category') {
+    return {
+      text: `UPDATE admin_hub_landing_categories SET draft_containers = NULL, draft_settings = NULL, updated_at = NOW() WHERE category_id = $1`,
+      values: [id],
+    }
+  }
+  return {
+    text: `UPDATE admin_hub_landing_pages SET draft_containers = NULL, draft_settings = NULL, updated_at = NOW() WHERE page_id = $1`,
+    values: [id],
+  }
+}
+
+function landingWriteQuery(kind, { id, containersJson, settingsJson, publish }) {
+  if (kind === 'home') {
+    if (publish) {
+      return {
+        text: `INSERT INTO admin_hub_landing_page (id, containers, settings, draft_containers, draft_settings, updated_at)
+               VALUES (1, $1, $2, NULL, NULL, NOW())
+               ON CONFLICT (id) DO UPDATE SET containers = $1, settings = $2, draft_containers = NULL, draft_settings = NULL, updated_at = NOW()`,
+        values: [containersJson, settingsJson],
+      }
+    }
+    return {
+      text: `INSERT INTO admin_hub_landing_page (id, containers, settings, draft_containers, draft_settings, updated_at)
+             VALUES (1, '[]'::jsonb, '{}'::jsonb, $1, $2, NOW())
+             ON CONFLICT (id) DO UPDATE SET draft_containers = $1, draft_settings = $2, updated_at = NOW()`,
+      values: [containersJson, settingsJson],
+    }
+  }
+  if (kind === 'category') {
+    if (publish) {
+      return {
+        text: `INSERT INTO admin_hub_landing_categories (category_id, containers, settings, draft_containers, draft_settings, updated_at)
+               VALUES ($1, $2, $3, NULL, NULL, NOW())
+               ON CONFLICT (category_id) DO UPDATE SET containers = $2, settings = $3, draft_containers = NULL, draft_settings = NULL, updated_at = NOW()`,
+        values: [id, containersJson, settingsJson],
+      }
+    }
+    return {
+      text: `INSERT INTO admin_hub_landing_categories (category_id, containers, settings, draft_containers, draft_settings, updated_at)
+             VALUES ($1, '[]'::jsonb, '{}'::jsonb, $2, $3, NOW())
+             ON CONFLICT (category_id) DO UPDATE SET draft_containers = $2, draft_settings = $3, updated_at = NOW()`,
+      values: [id, containersJson, settingsJson],
+    }
+  }
+  if (publish) {
+    return {
+      text: `INSERT INTO admin_hub_landing_pages (page_id, containers, settings, draft_containers, draft_settings, updated_at)
+             VALUES ($1, $2, $3, NULL, NULL, NOW())
+             ON CONFLICT (page_id) DO UPDATE SET containers = $2, settings = $3, draft_containers = NULL, draft_settings = NULL, updated_at = NOW()`,
+      values: [id, containersJson, settingsJson],
+    }
+  }
+  return {
+    text: `INSERT INTO admin_hub_landing_pages (page_id, containers, settings, draft_containers, draft_settings, updated_at)
+           VALUES ($1, '[]'::jsonb, '{}'::jsonb, $2, $3, NOW())
+           ON CONFLICT (page_id) DO UPDATE SET draft_containers = $2, draft_settings = $3, updated_at = NOW()`,
+    values: [id, containersJson, settingsJson],
+  }
+}
+
+const LANDING_SELECT = 'containers, settings, draft_containers, draft_settings, updated_at'
+
 const landingPageGET = async (req, res) => {
   const client = getDbClient()
   if (!client) return res.status(503).json({ message: 'Database not configured' })
+  const admin = isAdminHubLandingReq(req)
   try {
     await client.connect()
-    const r = await client.query('SELECT containers, settings, updated_at FROM admin_hub_landing_page WHERE id = 1')
-    const containers = await enrichLandingContainers(r.rows[0]?.containers || [], client)
-    const settings =
-      r.rows[0]?.settings && typeof r.rows[0].settings === 'object' ? r.rows[0].settings : {}
-    res.json({ containers, settings, updated_at: r.rows[0]?.updated_at || null })
+    const r = await client.query(`SELECT ${LANDING_SELECT} FROM admin_hub_landing_page WHERE id = 1`)
+    res.json(await landingGetJson(r.rows[0] || null, client, admin))
   } catch (err) {
     console.error('Landing page GET error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -717,18 +836,40 @@ const landingPageGET = async (req, res) => {
     await client.end().catch(() => {})
   }
 }
+const landingHomepageCompositionGET = async (_req, res) => {
+  try {
+    const { homepageContainers, LAYOUT_VERSION } = require('../homepage-landing-seed')
+    res.json({
+      layout: LAYOUT_VERSION,
+      containers: homepageContainers(),
+      settings: { homepage_layout: LAYOUT_VERSION },
+    })
+  } catch (err) {
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
 const landingPagePUT = async (req, res) => {
   const client = getDbClient()
   if (!client) return res.status(503).json({ message: 'Database not configured' })
   try {
-    const { containers, settings } = sanitizeLandingPayload(req.body)
     await client.connect()
-    await client.query(
-      `INSERT INTO admin_hub_landing_page (id, containers, settings, updated_at) VALUES (1, $1, $2, NOW())
-       ON CONFLICT (id) DO UPDATE SET containers = $1, settings = $2, updated_at = NOW()`,
-      [JSON.stringify(containers), JSON.stringify(settings)]
-    )
-    res.json({ ok: true, containers, settings })
+    if (req.body?.discard_draft === true) {
+      const q = landingDiscardQuery('home')
+      await client.query(q.text, q.values)
+      const r = await client.query(`SELECT ${LANDING_SELECT} FROM admin_hub_landing_page WHERE id = 1`)
+      const payload = await landingGetJson(r.rows[0] || null, client, true)
+      return res.json({ ok: true, discarded: true, published: false, ...payload })
+    }
+    const { containers, settings } = sanitizeLandingPayload(req.body)
+    const publish = req.body?.publish === true
+    const q = landingWriteQuery('home', {
+      containersJson: JSON.stringify(containers),
+      settingsJson: JSON.stringify(settings),
+      publish,
+    })
+    await client.query(q.text, q.values)
+    res.json({ ok: true, containers, settings, published: publish, has_unpublished_draft: !publish })
   } catch (err) {
     if (err.statusCode === 400) return res.status(400).json({ message: err.message })
     console.error('Landing page PUT error:', err)
@@ -747,19 +888,13 @@ const landingCategoryGET = async (req, res) => {
   try {
     await client.connect()
     const r = await client.query(
-      'SELECT containers, settings, updated_at FROM admin_hub_landing_categories WHERE category_id = $1',
+      `SELECT ${LANDING_SELECT} FROM admin_hub_landing_categories WHERE category_id = $1`,
       [categoryId]
     )
     if (!r.rows[0]) {
-      return res.json({ containers: [], settings: {}, updated_at: null })
+      return res.json({ containers: [], settings: {}, updated_at: null, has_unpublished_draft: false })
     }
-    const rawSettings = r.rows[0].settings && typeof r.rows[0].settings === 'object' ? r.rows[0].settings : {}
-    const containers = await enrichLandingContainers(r.rows[0].containers || [], client)
-    res.json({
-      containers,
-      settings: rawSettings,
-      updated_at: r.rows[0].updated_at || null,
-    })
+    res.json(await landingGetJson(r.rows[0], client, isAdminHubLandingReq(req)))
   } catch (err) {
     console.error('Landing category GET error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -773,15 +908,27 @@ const landingCategoryPUT = async (req, res) => {
   const categoryId = (req.params.categoryId || '').trim()
   if (!categoryId) return res.status(400).json({ message: 'categoryId required' })
   try {
-    const { containers, settings } = sanitizeLandingPayload(req.body)
     await client.connect()
-    await client.query(
-      `INSERT INTO admin_hub_landing_categories (category_id, containers, settings, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (category_id) DO UPDATE SET containers = $2, settings = $3, updated_at = NOW()`,
-      [categoryId, JSON.stringify(containers), JSON.stringify(settings)]
-    )
-    res.json({ ok: true, containers, settings })
+    if (req.body?.discard_draft === true) {
+      const q = landingDiscardQuery('category', categoryId)
+      await client.query(q.text, q.values)
+      const r = await client.query(
+        `SELECT ${LANDING_SELECT} FROM admin_hub_landing_categories WHERE category_id = $1`,
+        [categoryId]
+      )
+      const payload = await landingGetJson(r.rows[0] || null, client, true)
+      return res.json({ ok: true, discarded: true, published: false, ...payload })
+    }
+    const { containers, settings } = sanitizeLandingPayload(req.body)
+    const publish = req.body?.publish === true
+    const q = landingWriteQuery('category', {
+      id: categoryId,
+      containersJson: JSON.stringify(containers),
+      settingsJson: JSON.stringify(settings),
+      publish,
+    })
+    await client.query(q.text, q.values)
+    res.json({ ok: true, containers, settings, published: publish, has_unpublished_draft: !publish })
   } catch (err) {
     if (err.statusCode === 400) return res.status(400).json({ message: err.message })
     console.error('Landing category PUT error:', err)
@@ -798,12 +945,9 @@ const landingPageByIdGET = async (req, res) => {
   try {
     await client.connect()
     const pageId = req.params.pageId
-    const r = await client.query('SELECT containers, settings, updated_at FROM admin_hub_landing_pages WHERE page_id = $1', [pageId])
+    const r = await client.query(`SELECT ${LANDING_SELECT} FROM admin_hub_landing_pages WHERE page_id = $1`, [pageId])
     if (r.rows[0]) {
-      const containers = await enrichLandingContainers(r.rows[0].containers || [], client)
-      const settings =
-        r.rows[0].settings && typeof r.rows[0].settings === 'object' ? r.rows[0].settings : {}
-      return res.json({ containers, settings, updated_at: r.rows[0].updated_at || null })
+      return res.json(await landingGetJson(r.rows[0], client, isAdminHubLandingReq(req)))
     }
     // One-time fallback: only for the oldest page when new table is completely empty
     const newCount = await client.query('SELECT COUNT(*) FROM admin_hub_landing_pages')
@@ -830,15 +974,25 @@ const landingPageByIdPUT = async (req, res) => {
   const client = getDbClient()
   if (!client) return res.status(503).json({ message: 'Database not configured' })
   try {
-    const { containers, settings } = sanitizeLandingPayload(req.body)
     await client.connect()
     const pageId = req.params.pageId
-    await client.query(
-      `INSERT INTO admin_hub_landing_pages (page_id, containers, settings, updated_at) VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (page_id) DO UPDATE SET containers = $2, settings = $3, updated_at = NOW()`,
-      [pageId, JSON.stringify(containers), JSON.stringify(settings)]
-    )
-    res.json({ ok: true, containers, settings })
+    if (req.body?.discard_draft === true) {
+      const q = landingDiscardQuery('page', pageId)
+      await client.query(q.text, q.values)
+      const r = await client.query(`SELECT ${LANDING_SELECT} FROM admin_hub_landing_pages WHERE page_id = $1`, [pageId])
+      const payload = await landingGetJson(r.rows[0] || null, client, true)
+      return res.json({ ok: true, discarded: true, published: false, ...payload })
+    }
+    const { containers, settings } = sanitizeLandingPayload(req.body)
+    const publish = req.body?.publish === true
+    const q = landingWriteQuery('page', {
+      id: pageId,
+      containersJson: JSON.stringify(containers),
+      settingsJson: JSON.stringify(settings),
+      publish,
+    })
+    await client.query(q.text, q.values)
+    res.json({ ok: true, containers, settings, published: publish, has_unpublished_draft: !publish })
   } catch (err) {
     if (err.statusCode === 400) return res.status(400).json({ message: err.message })
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
@@ -917,6 +1071,7 @@ module.exports = function createPagesRouter() {
   router.get('/admin-hub/landing-page', landingPageGET)
   router.put('/admin-hub/landing-page', landingPagePUT)
   router.get('/store/landing-page', landingPageGET)
+  router.get('/admin-hub/landing-page/homepage-composition', landingHomepageCompositionGET)
 
   router.get('/admin-hub/landing-page/category/:categoryId', landingCategoryGET)
   router.put('/admin-hub/landing-page/category/:categoryId', landingCategoryPUT)
@@ -929,3 +1084,6 @@ module.exports = function createPagesRouter() {
   return router
 }
 module.exports._sanitizeLandingPayload = sanitizeLandingPayload
+module.exports._resolveAdminLandingView = resolveAdminLandingView
+module.exports._resolveStoreLandingView = resolveStoreLandingView
+module.exports._isAdminHubLandingReq = isAdminHubLandingReq

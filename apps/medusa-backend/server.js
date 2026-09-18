@@ -1791,6 +1791,12 @@ async function start() {
 `).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_landing_page ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_landing_pages ADD COLUMN IF NOT EXISTS settings JSONB NOT NULL DEFAULT '{}'::jsonb`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_page ADD COLUMN IF NOT EXISTS draft_containers JSONB`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_page ADD COLUMN IF NOT EXISTS draft_settings JSONB`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_pages ADD COLUMN IF NOT EXISTS draft_containers JSONB`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_pages ADD COLUMN IF NOT EXISTS draft_settings JSONB`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_categories ADD COLUMN IF NOT EXISTS draft_containers JSONB`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_categories ADD COLUMN IF NOT EXISTS draft_settings JSONB`).catch(() => {})
         await client.query(`
   CREATE TABLE IF NOT EXISTS admin_hub_styles (
     key varchar(50) PRIMARY KEY,
@@ -1891,6 +1897,15 @@ async function start() {
           }
         } catch (e) {
           console.warn('[seed-customer-support]', e?.message || e)
+        }
+        try {
+          const { ensureHomepageLanding } = require('./src/homepage-landing-seed')
+          const hp = await ensureHomepageLanding(client)
+          if (hp?.seeded) {
+            console.log(`[seed-homepage] containers=${hp.added}`)
+          }
+        } catch (e) {
+          console.warn('[seed-homepage]', e?.message || e)
         }
         // Seller campaigns (Aktionen/Kampagnen)
         await client.query(`

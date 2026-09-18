@@ -295,9 +295,12 @@ const Name = styled.h3`
   color: #111;
   line-height: 1.4;
   margin: 0;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  min-height: calc(1.4em * 2);
 `;
 
 const Prices = styled.div`

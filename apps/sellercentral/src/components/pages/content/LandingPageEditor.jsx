@@ -38,6 +38,8 @@ import {
   ContainerTypePreview,
 } from "@/components/pages/content/ContainerTypePreview";
 import { groupContainerTypes } from "@/lib/landing-container-catalog";
+import { templatesForLibrary } from "@/lib/landing-template-registry";
+import LandingLivePreview from "@/components/pages/content/LandingLivePreview";
 import {
   MAX_LANDING_CONTAINER_DEPTH,
   mapContainerById,
@@ -344,6 +346,8 @@ function newContainer(type) {
         ...base,
         title: "",
         collections: [],
+        source: "manual",
+        limit: 8,
         items_per_row: 4,
         items_per_row_mobile: 2,
         gap: 16,
@@ -417,7 +421,7 @@ function newContainer(type) {
         lead: "",
         title_align: "center",
         cols: 3,
-        card_style: "bordered",
+        card_style: "flat",
         icon_size: "40px",
         bg_color: "#ffffff",
         card_bg: "#f9fafb",
@@ -2001,10 +2005,11 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
         options={[
           { label: c.carouselModeBestseller, value: "bestseller" },
           { label: c.carouselModeSale, value: "sale" },
+          { label: c.carouselModeNewest, value: "newest" },
         ]}
-        value={container.mode === "sale" ? "sale" : "bestseller"}
+        value={container.mode === "sale" || container.mode === "newest" ? container.mode : "bestseller"}
         onChange={(v) => onChange({ ...container, mode: v })}
-        helpText={container.mode === "sale" ? c.carouselModeSaleHelp : c.carouselModeBestsellerHelp}
+        helpText={container.mode === "sale" ? c.carouselModeSaleHelp : container.mode === "newest" ? c.carouselModeNewestHelp : c.carouselModeBestsellerHelp}
       />
       <div>
         <CategoryDrilldownSelect
@@ -2017,6 +2022,13 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
         />
         <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280" }}>{c.bestsellerCategoryHelp}</div>
       </div>
+      <TextField
+        label={c.catalogLimit}
+        type="number"
+        value={String(container.limit ?? 8)}
+        onChange={(v) => onChange({ ...container, limit: Math.max(1, Math.min(50, Number(v) || 8)) })}
+        autoComplete="off"
+      />
       <Divider />
       <EditorSectionLabel>{c.layout}</EditorSectionLabel>
       <div style={EDITOR_FIELD_GRID}>
@@ -2223,6 +2235,25 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
     <BlockStack gap="400">
       <EditorSectionLabel>{c.content}</EditorSectionLabel>
       <TextField label={`${c.heading} ${c.optional}`} value={gi(container, "title", editLang)} onChange={(v) => onChange(si(container, "title", editLang, v))} autoComplete="off" />
+      <Select
+        label={c.catalogSourceLabel}
+        options={[
+          { label: c.catalogSourceManual, value: "manual" },
+          { label: c.catalogSourceAll, value: "all" },
+          { label: c.catalogSourceCategories, value: "categories" },
+        ]}
+        value={container.source === "categories" || container.source === "all" ? container.source : "manual"}
+        onChange={(v) => onChange({ ...container, source: v })}
+      />
+      {(container.source === "all" || container.source === "categories") && (
+        <TextField
+          label={c.catalogLimit}
+          type="number"
+          value={String(container.limit ?? 8)}
+          onChange={(v) => onChange({ ...container, limit: Math.max(1, Math.min(24, Number(v) || 8)) })}
+          autoComplete="off"
+        />
+      )}
       <Select
         label={c.addCollection}
         options={availableOptions}
@@ -2895,7 +2926,7 @@ function FeatureGridEditor({ container, onChange, editLang = "de" }) {
             <Select
               label={c.cardStyle}
               options={c.cardStyleOptions()}
-              value={container.card_style || "bordered"}
+              value={container.card_style || "flat"}
               onChange={(v) => onChange({ ...container, card_style: v })}
             />
             <TextField label={c.iconSize} value={container.icon_size || "40px"} onChange={(v) => onChange({ ...container, icon_size: v })} autoComplete="off" helpText={c.eg48px} />
@@ -4302,6 +4333,9 @@ export default function LandingPageEditor() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveKind, setSaveKind] = useState("draft");
+  const [hasUnpublishedDraft, setHasUnpublishedDraft] = useState(false);
+  const [libraryPreviewTpl, setLibraryPreviewTpl] = useState(null);
   const [err, setErr] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
@@ -4360,8 +4394,10 @@ export default function LandingPageEditor() {
         setCategorySettings(normalizeLandingPageSettings(data?.settings));
       }
       setContainers(Array.isArray(data?.containers) ? data.containers : []);
+      setHasUnpublishedDraft(data?.has_unpublished_draft === true);
     } catch (e) {
       setContainers([]);
+      setHasUnpublishedDraft(false);
       setCategorySettings(normalizeLandingPageSettings({}));
       setErr(e?.message || copy.loadContainersError);
     }
@@ -4391,24 +4427,42 @@ export default function LandingPageEditor() {
     return selectedPageId;
   }, [selectedPageId, pages]);
 
-  const handleSave = useCallback(async () => {
+  const persistLanding = useCallback(async (mode) => {
     if (!selectedPageId) return;
+    const publish = mode === true || mode === "publish";
+    const discard = mode === "discard";
     setSaving(true);
     setErr("");
     setSaved(false);
     try {
+      const payload = {
+        containers,
+        settings: categorySettings,
+        publish,
+        discard_draft: discard,
+      };
+      let data;
       if (selectedPageId === DEFAULT_PAGE_ID) {
-        await client.request("/admin-hub/landing-page", {
+        data = await client.request("/admin-hub/landing-page", {
           method: "PUT",
-          body: JSON.stringify({ containers, settings: categorySettings }),
+          body: JSON.stringify(payload),
         });
       } else if (String(selectedPageId).startsWith("cat:")) {
         const cid = String(selectedPageId).slice(4);
-        await client.saveLandingPageCategoryContainers(cid, { containers, settings: categorySettings });
+        data = await client.saveLandingPageCategoryContainers(cid, payload);
       } else {
         const pageId = resolveSavePageId();
         if (!pageId) throw new Error(copy.loadContainersError);
-        await client.saveLandingPageContainers(pageId, { containers, settings: categorySettings });
+        data = await client.saveLandingPageContainers(pageId, payload);
+      }
+      if (discard) {
+        setContainers(Array.isArray(data?.containers) ? data.containers : []);
+        setCategorySettings(normalizeLandingPageSettings(data?.settings));
+        setSaveKind("discarded");
+        setHasUnpublishedDraft(false);
+      } else {
+        setSaveKind(publish ? "published" : "draft");
+        setHasUnpublishedDraft(!publish);
       }
       setSaved(true);
       setIsDirty(false);
@@ -4418,6 +4472,29 @@ export default function LandingPageEditor() {
     }
     setSaving(false);
   }, [selectedPageId, containers, categorySettings, client, resolveSavePageId, copy.loadContainersError, copy.saveError]);
+
+  const handleSave = useCallback(() => persistLanding(false), [persistLanding]);
+  const handlePublish = useCallback(() => persistLanding("publish"), [persistLanding]);
+  const handleDiscardDraft = useCallback(() => persistLanding("discard"), [persistLanding]);
+
+  const handleApplyHomepageComposition = useCallback(async () => {
+    setSaving(true);
+    setErr("");
+    try {
+      const data = await client.request("/admin-hub/landing-page/homepage-composition");
+      if (!Array.isArray(data?.containers) || !data.containers.length) {
+        throw new Error(copy.loadContainersError);
+      }
+      setContainers(data.containers);
+      setCategorySettings((prev) => ({ ...prev, ...(data.settings || {}) }));
+      setIsDirty(true);
+      setHasUnpublishedDraft(true);
+      setExpandedId(null);
+    } catch (e) {
+      setErr(e?.message || copy.saveError);
+    }
+    setSaving(false);
+  }, [client, copy.loadContainersError, copy.saveError]);
 
   const handleDiscard = useCallback(async () => {
     setIsDirty(false);
@@ -4459,7 +4536,7 @@ export default function LandingPageEditor() {
     return containers.filter((c) => matchContainerSeitenTab(c, seitenDeviceTab));
   }, [containers, seitenDeviceTab]);
 
-  const addContainer = (type) => {
+  const addContainer = (type, extraDefaults = {}) => {
     const created = newContainer(type);
     const seed = getNewContainerSeed(uiLocale, type);
     const base = { ...created, ...seed };
@@ -4479,7 +4556,7 @@ export default function LandingPageEditor() {
       ? { items_per_row: 2, items_per_row_mobile: 2 }
       : {};
     const visible_on = isMobileTab ? "mobile" : isTabletTab ? "tablet" : "desktop";
-    const c = { ...base, ...narrowOverrides, visible_on };
+    const c = { ...base, ...narrowOverrides, ...(extraDefaults && typeof extraDefaults === "object" ? extraDefaults : {}), visible_on };
     setContainers((prev) => [...prev, c]);
     setExpandedId(c.id);
     setAddModalOpen(false);
@@ -4704,11 +4781,32 @@ export default function LandingPageEditor() {
         onAction: saveTemplates,
         loading: tmplSaving,
         disabled: !tmplDirty,
-      } : undefined}
+      } : {
+        content: saving ? copy.saving : copy.saveDraft,
+        onAction: handleSave,
+        loading: saving,
+        disabled: !showContainerEditor,
+      }}
+      secondaryActions={mainTab === 0 && showContainerEditor ? [{
+        content: copy.publish,
+        onAction: handlePublish,
+        disabled: saving,
+      }] : undefined}
     >
       <Layout>
         {err && <Layout.Section><Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner></Layout.Section>}
-        {saved && <Layout.Section><Banner tone="success" onDismiss={() => setSaved(false)}>{copy.saved}</Banner></Layout.Section>}
+        {saved && <Layout.Section><Banner tone="success" onDismiss={() => setSaved(false)}>{saveKind === "published" ? copy.published : saveKind === "discarded" ? copy.discardedDraft : copy.saved}</Banner></Layout.Section>}
+        {hasUnpublishedDraft && !saved && mainTab === 0 && (
+          <Layout.Section>
+            <Banner
+              tone="info"
+              action={{ content: copy.publish, onAction: handlePublish }}
+              secondaryAction={{ content: copy.discardDraft, onAction: handleDiscardDraft }}
+            >
+              {copy.unpublishedDraftBanner}
+            </Banner>
+          </Layout.Section>
+        )}
         {tmplErr && <Layout.Section><Banner tone="critical" onDismiss={() => setTmplErr("")}>{tmplErr}</Banner></Layout.Section>}
         {tmplSaved && <Layout.Section><Banner tone="success" onDismiss={() => setTmplSaved(false)}>{copy.templateSaved}</Banner></Layout.Section>}
 
@@ -4742,6 +4840,14 @@ export default function LandingPageEditor() {
                 placeholder={copy.selectPageSearchPlaceholder}
                 emptyLabel={copy.selectPlaceholder}
               />
+              {selectedPageId === DEFAULT_PAGE_ID && (
+                <BlockStack gap="150">
+                  <Button onClick={handleApplyHomepageComposition} loading={saving}>
+                    {copy.applyHomepageComposition}
+                  </Button>
+                  <Text as="p" variant="bodySm" tone="subdued">{copy.applyHomepageCompositionHelp}</Text>
+                </BlockStack>
+              )}
             </BlockStack>
           </Card>
         </Layout.Section>}
@@ -5011,6 +5117,15 @@ export default function LandingPageEditor() {
                                                       <Badge tone={node.visible ? "success" : undefined}>{node.visible ? copy.visible : copy.hidden}</Badge>
                                                     </InlineStack>
                                                     <InlineStack gap="200" blockAlign="center">
+                                                      {seitenDeviceTab !== 2 && (
+                                                        <Button size="slim" onClick={() => duplicateToMobile(node.id)}>{copy.duplicateMobile}</Button>
+                                                      )}
+                                                      {seitenDeviceTab !== 1 && (
+                                                        <Button size="slim" onClick={() => duplicateToTablet(node.id)}>{copy.duplicateTablet}</Button>
+                                                      )}
+                                                      {seitenDeviceTab !== 0 && (
+                                                        <Button size="slim" onClick={() => duplicateToDesktop(node.id)}>{copy.duplicateDesktop}</Button>
+                                                      )}
                                                       <Button
                                                         size="slim"
                                                         tone="critical"
@@ -5040,6 +5155,15 @@ export default function LandingPageEditor() {
                               </Card>
                             );
                           })()}
+
+                          {filteredSeitenContainers.length > 0 && (
+                            <LandingLivePreview
+                              containers={filteredSeitenContainers}
+                              settings={categorySettings}
+                              locale={uiLocale}
+                              copy={copy}
+                            />
+                          )}
 
                           {!loading && containers.length > 0 && filteredSeitenContainers.length === 0 && (
                             <InlineStack>
@@ -5308,7 +5432,7 @@ export default function LandingPageEditor() {
 
         <Modal
           open={addModalOpen}
-          onClose={() => { setAddModalOpen(false); setContainerSearch(""); }}
+          onClose={() => { setAddModalOpen(false); setContainerSearch(""); setLibraryPreviewTpl(null); }}
           title={copy.selectContainer}
           size="large"
         >
@@ -5330,6 +5454,74 @@ export default function LandingPageEditor() {
               {filteredContainerTypeGroups.length === 0 && (
                 <Text as="p" tone="subdued" alignment="center">{copy.noContainersFound}</Text>
               )}
+              {(() => {
+                const recommended = templatesForLibrary(uiLocale).filter((tpl) => {
+                  if (tpl.group === "support" && !isSupportPageSelection) return false;
+                  if (containerSearch.trim()) {
+                    const q = containerSearch.trim().toLowerCase();
+                    const info = typeInfo(tpl.type);
+                    return (info.label || "").toLowerCase().includes(q) || (tpl.blurb || "").toLowerCase().includes(q);
+                  }
+                  return true;
+                });
+                if (!recommended.length) return null;
+                return (
+                  <BlockStack gap="300">
+                    <Text as="h3" variant="headingSm">{copy.templateLibraryHeading}</Text>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                      {recommended.map((tpl) => {
+                        const info = typeInfo(tpl.type);
+                        return (
+                          <div
+                            key={tpl.id}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setLibraryPreviewTpl(tpl)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLibraryPreviewTpl(tpl); } }}
+                            style={{
+                              border: libraryPreviewTpl?.id === tpl.id ? "2px solid var(--p-color-border-emphasis, #1B8880)" : "1px solid var(--p-color-border, #e1e3e5)",
+                              borderRadius: 10,
+                              background: "var(--p-color-bg-surface, #fff)",
+                              padding: 12,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 10,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <InlineStack gap="300" blockAlign="start" wrap={false}>
+                              <ContainerTypePreview type={tpl.type} label={info.label} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <BlockStack gap="100">
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{info.label}{tpl.defaults?.mode === "sale" ? " · deals" : tpl.defaults?.mode === "newest" ? " · new" : tpl.defaults?.source === "categories" ? " · categories" : ""}</Text>
+                                  <Text as="p" variant="bodySm" tone="subdued">{tpl.blurb || info.description}</Text>
+                                </BlockStack>
+                              </div>
+                            </InlineStack>
+                            <Button size="slim" onClick={(e) => { e.stopPropagation(); addContainer(tpl.type, tpl.defaults); }}>{copy.addToPage}</Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {libraryPreviewTpl && (() => {
+                      const created = newContainer(libraryPreviewTpl.type);
+                      const seed = getNewContainerSeed(uiLocale, libraryPreviewTpl.type);
+                      const preview = { ...created, ...seed, ...(libraryPreviewTpl.defaults || {}), visible_on: "both", visible: true };
+                      return (
+                        <BlockStack gap="200">
+                          <Text as="h3" variant="headingSm">{copy.templatePreviewHeading}</Text>
+                          <LandingLivePreview
+                            containers={[preview]}
+                            settings={categorySettings}
+                            locale={uiLocale}
+                            copy={copy}
+                          />
+                        </BlockStack>
+                      );
+                    })()}
+                  </BlockStack>
+                );
+              })()}
               {filteredContainerTypeGroups.map((group) => (
                 <BlockStack key={group.id} gap="300">
                   <Text as="h3" variant="headingSm">{group.label}</Text>

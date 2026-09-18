@@ -180,6 +180,11 @@ header[data-unified-header-chrome="true"] .second-nav {
   html {
     scroll-behavior: auto;
   }
+  .landing-skeleton,
+  [style*="animation:shimmer"],
+  [style*="animation: shimmer"] {
+    animation: none !important;
+  }
 }
 
 * {
