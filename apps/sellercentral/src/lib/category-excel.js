@@ -362,26 +362,31 @@ function rowValues(ws, rowNumber, maxCol) {
   return out;
 }
 
-export function parseCategoryExcelWorksheet(ws) {
+/** `rows[0]` = Excel row 1. Used by both ExcelJS (server) and the browser ZIP parser. */
+export function parseCategoryExcelMatrix(rows) {
+  const all = Array.isArray(rows) ? rows : [];
   let maxCol = 0;
-  ws.eachRow({ includeEmpty: false }, (row) => {
-    row.eachCell({ includeEmpty: false }, (_cell, colNumber) => {
-      maxCol = Math.max(maxCol, colNumber);
-    });
-  });
-  maxCol = Math.max(maxCol, Number(ws.columnCount) || 0, Number(ws.actualColumnCount) || 0);
+  for (const row of all) {
+    if (Array.isArray(row) && row.length > maxCol) maxCol = row.length;
+  }
   if (maxCol < 1) return { items: [], errors: ["Empty sheet"] };
 
-  let headerRow = 2;
-  for (let r = 1; r <= 5; r++) {
-    const vals = rowValues(ws, r, maxCol).map((v) => v.toLowerCase());
+  const pad = (row) => {
+    const out = Array.isArray(row) ? row.map((c) => excelCellStr(c)) : [];
+    while (out.length < maxCol) out.push("");
+    return out;
+  };
+
+  let headerRowIdx = Math.min(1, Math.max(0, all.length - 1));
+  for (let r = 0; r < Math.min(5, all.length); r++) {
+    const vals = pad(all[r]).map((v) => v.toLowerCase());
     if (vals.includes("parent_id") || vals.includes("name_de") || vals.includes("slug") || vals.includes("id")) {
-      headerRow = r;
+      headerRowIdx = r;
       break;
     }
   }
 
-  const headers = rowValues(ws, headerRow, maxCol).map((h) => String(h || "").trim());
+  const headers = pad(all[headerRowIdx]).map((h) => String(h || "").trim());
   const idx = {};
   headers.forEach((h, i) => {
     if (h) idx[h.toLowerCase()] = i;
@@ -394,14 +399,15 @@ export function parseCategoryExcelWorksheet(ws) {
   };
   const present = (vals, key) => get(vals, key) !== "";
 
-  let dataStart = headerRow + 1;
-  const maybeHint = rowValues(ws, dataStart, maxCol);
-  if (isCategoryExcelHintRow(get, maybeHint)) dataStart = headerRow + 2;
+  let dataStart = headerRowIdx + 1;
+  const maybeHint = pad(all[dataStart]);
+  if (isCategoryExcelHintRow(get, maybeHint)) dataStart = headerRowIdx + 2;
 
   const items = [];
   const errors = [];
-  for (let r = dataStart; r <= (ws.rowCount || dataStart); r++) {
-    const vals = rowValues(ws, r, maxCol);
+  for (let r = dataStart; r < all.length; r++) {
+    const vals = pad(all[r]);
+    const excelRow = r + 1;
     if (!vals.some((v) => v)) continue;
     if (get(vals, "id").startsWith("#") || get(vals, "slug").startsWith("#")) continue;
     if (isCategoryExcelHintRow(get, vals)) continue;
@@ -419,7 +425,7 @@ export function parseCategoryExcelWorksheet(ws) {
     }
 
     const item = {
-      row: r,
+      row: excelRow,
       id: present(vals, "id") ? get(vals, "id") : undefined,
       slug: present(vals, "slug") ? get(vals, "slug") : undefined,
       parent_id: present(vals, "parent_id") ? get(vals, "parent_id") : undefined,
@@ -432,13 +438,29 @@ export function parseCategoryExcelWorksheet(ws) {
 
     const hasName = CATEGORY_EXCEL_LANGS.some((l) => translations[l]?.name);
     if (!item.id && !item.slug && !hasName) {
-      errors.push({ row: r, error: "Need id, slug or name_de (or another language name)" });
+      errors.push({ row: excelRow, error: "Need id, slug or name_de (or another language name)" });
       continue;
     }
     items.push(item);
   }
 
   return { items, errors };
+}
+
+export function parseCategoryExcelWorksheet(ws) {
+  let maxCol = 0;
+  let maxRow = 0;
+  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    maxRow = Math.max(maxRow, rowNumber);
+    row.eachCell({ includeEmpty: false }, (_cell, colNumber) => {
+      maxCol = Math.max(maxCol, colNumber);
+    });
+  });
+  maxCol = Math.max(maxCol, Number(ws.columnCount) || 0, Number(ws.actualColumnCount) || 0);
+  if (maxCol < 1 || maxRow < 1) return { items: [], errors: ["Empty sheet"] };
+  const rows = [];
+  for (let r = 1; r <= maxRow; r++) rows[r - 1] = rowValues(ws, r, maxCol);
+  return parseCategoryExcelMatrix(rows);
 }
 
 export function categoryToExcelRow(cat) {

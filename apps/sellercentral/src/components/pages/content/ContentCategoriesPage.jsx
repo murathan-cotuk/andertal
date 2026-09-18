@@ -534,64 +534,13 @@ export default function ContentCategoriesPage() {
     }
   };
 
-  const readImportResponse = async (res) => {
-    const text = await res.text();
-    let data = {};
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      const snippet = String(text || "")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 240);
-      throw new Error(snippet ? `HTTP ${res.status}: ${snippet}` : `HTTP ${res.status}`);
+  const importErrorMessage = (err) => {
+    const status = err?.statusCode;
+    const raw = String(err?.originalMessage || err?.message || "").trim();
+    if (status === 413 || /\b413\b/.test(raw) || /payload too large|request entity too large/i.test(raw)) {
+      return "HTTP 413: request too large. The Excel file is not uploaded — it is read in the browser. Refresh the page (Ctrl+Shift+R) and try again.";
     }
-    if (!res.ok) {
-      throw new Error(data.error || data.message || `HTTP ${res.status}`);
-    }
-    return data;
-  };
-
-  const upsertExcelBatch = async (items) => {
-    try {
-      return await client.excelUpsertAdminHubCategories(items);
-    } catch (err) {
-      if (err?.statusCode && err.statusCode >= 400) throw err;
-      const res = await fetch("/api/import-export/categories/upsert", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sellerToken: sellerToken(), locale, items }),
-      });
-      return readImportResponse(res);
-    }
-  };
-
-  const importExcelByOffset = async (totals) => {
-    let offset = 0;
-    let total = 0;
-    while (true) {
-      const fd = new FormData();
-      fd.append("file", excelFile);
-      fd.append("sellerToken", sellerToken());
-      fd.append("locale", locale);
-      fd.append("offset", String(offset));
-      fd.append("limit", "80");
-      const res = await fetch("/api/import-export/categories/import", { method: "POST", body: fd });
-      const data = await readImportResponse(res);
-      total = data.total || total;
-      totals.created += data.created || 0;
-      totals.updated += data.updated || 0;
-      totals.failed += data.failed || 0;
-      if (Array.isArray(data.errors) && data.errors.length) totals.errors.push(...data.errors);
-      const next = typeof data.nextOffset === "number" ? data.nextOffset : offset + 80;
-      setExcelResult({
-        ...totals,
-        progress: copy.excelSaving(Math.min(next, total || next), total || next),
-      });
-      if (data.done || next <= offset || (total && next >= total)) break;
-      offset = next;
-    }
+    return raw || (status ? `HTTP ${status}` : "Import failed");
   };
 
   const runExcelImport = async () => {
@@ -601,51 +550,34 @@ export default function ContentCategoriesPage() {
     setError(null);
     const totals = { created: 0, updated: 0, failed: 0, errors: [] };
     try {
-      try {
-        const ExcelJS = (await import("exceljs")).default;
-        const { CATEGORY_SHEET_NAME, orderCategoryExcelItems, parseCategoryExcelWorksheet } = await import("@/lib/category-excel");
-        const wb = new ExcelJS.Workbook();
-        await wb.xlsx.load(await excelFile.arrayBuffer());
-        const ws =
-          wb.getWorksheet(CATEGORY_SHEET_NAME) ||
-          wb.worksheets.find((s) => s.name !== "Index") ||
-          wb.worksheets[0];
-        if (!ws) throw new Error("No Categories sheet found");
-        const parsed = parseCategoryExcelWorksheet(ws);
-        if (parsed.errors?.length) totals.errors.push(...parsed.errors);
-        if (!parsed.items.length) {
-          throw new Error(parsed.errors?.[0]?.error || "No data rows found (fill from row 4)");
-        }
-        const ordered = orderCategoryExcelItems(parsed.items);
-        const BATCH = 80;
-        for (let i = 0; i < ordered.length; i += BATCH) {
-          const batch = ordered.slice(i, i + BATCH);
-          setExcelResult({
-            ...totals,
-            progress: copy.excelSaving(Math.min(i + batch.length, ordered.length), ordered.length),
-          });
-          const data = await upsertExcelBatch(batch);
-          totals.created += data.created || 0;
-          totals.updated += data.updated || 0;
-          totals.failed += data.failed || 0;
-          if (Array.isArray(data.errors) && data.errors.length) totals.errors.push(...data.errors);
-        }
-      } catch (parseOrClientErr) {
-        const msg = String(parseOrClientErr?.message || parseOrClientErr || "");
-        const canFallback =
-          /exceljs|Cannot find module|Failed to fetch dynamically imported|Can't resolve ['"]fs|fs is not defined|stream is not defined/i.test(
-            msg,
-          );
-        if (!canFallback) throw parseOrClientErr;
-        setExcelResult({ ...totals, progress: copy.excelParsing });
-        await importExcelByOffset(totals);
+      const [{ xlsxNamedSheetMatrix }, { CATEGORY_SHEET_NAME, orderCategoryExcelItems, parseCategoryExcelMatrix }] =
+        await Promise.all([import("@/lib/xlsx-matrix"), import("@/lib/category-excel")]);
+      const { rows } = await xlsxNamedSheetMatrix(await excelFile.arrayBuffer(), CATEGORY_SHEET_NAME);
+      const parsed = parseCategoryExcelMatrix(rows);
+      if (parsed.errors?.length) totals.errors.push(...parsed.errors);
+      if (!parsed.items.length) {
+        throw new Error(parsed.errors?.[0]?.error || "No data rows found (fill from row 4)");
+      }
+      const ordered = orderCategoryExcelItems(parsed.items);
+      const BATCH = 40;
+      for (let i = 0; i < ordered.length; i += BATCH) {
+        const batch = ordered.slice(i, i + BATCH);
+        setExcelResult({
+          ...totals,
+          progress: copy.excelSaving(Math.min(i + batch.length, ordered.length), ordered.length),
+        });
+        const data = await client.excelUpsertAdminHubCategories(batch);
+        totals.created += data.created || 0;
+        totals.updated += data.updated || 0;
+        totals.failed += data.failed || 0;
+        if (Array.isArray(data.errors) && data.errors.length) totals.errors.push(...data.errors);
       }
       setExcelResult(totals);
       await fetchCategories();
     } catch (err) {
       setExcelResult({
         ...totals,
-        error: err?.message || "Import failed",
+        error: importErrorMessage(err),
       });
     } finally {
       setExcelBusy("");

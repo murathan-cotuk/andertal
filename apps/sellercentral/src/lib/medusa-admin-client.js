@@ -66,10 +66,17 @@ class MedusaAdminClient {
       const response = await fetch(url, config);
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({ message: response.statusText }));
-        const msg = errorBody?.message || errorBody?.error || response.statusText;
-        const rawMsg = typeof msg === 'string' ? msg : `HTTP ${response.status}`;
-        const err = new Error(formatApiError({ message: rawMsg }, getClientLocale()));
+        const errorText = await response.text().catch(() => "");
+        let errorBody = {};
+        try {
+          errorBody = errorText ? JSON.parse(errorText) : {};
+        } catch {
+          errorBody = {};
+        }
+        const msg = errorBody?.message || errorBody?.error || response.statusText || "";
+        const payloadHint = response.status === 413 ? "Payload too large (413)" : "";
+        const rawMsg = `HTTP ${response.status}${msg ? `: ${msg}` : payloadHint ? `: ${payloadHint}` : ""}`.trim();
+        const err = new Error(formatApiError({ message: rawMsg }, getClientLocale()) || rawMsg);
         err.originalMessage = rawMsg;
         err.statusCode = response.status;
         err.code = errorBody?.code || null;
