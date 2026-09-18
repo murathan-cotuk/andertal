@@ -140,6 +140,61 @@ function scoreColor(pct) {
   return "#dc2626";
 }
 
+// Backend calculators (seller-health/calculators.js) return structured issue objects —
+// {key, count, productIds?/orderIds?/eventId?/details?} — never plain strings, so the display
+// text is built here (backend owns stable keys, frontend owns translated labels, same convention
+// as status keys). Unknown/dynamic keys (compliance field names, event types) fall back to a
+// humanized version of the key itself rather than a blank/broken label.
+function issueKeyLabels(locale) {
+  const t = (en, tr, fr, es, it, de) => shT(locale, en, tr, fr, es, it, de);
+  return {
+    missing_title: t("Missing product title", "Eksik ürün başlığı", "Titre du produit manquant", "Falta el título del producto", "Titolo prodotto mancante", "Fehlender Produkttitel"),
+    missing_description: t("Missing description", "Eksik açıklama", "Description manquante", "Falta la descripción", "Descrizione mancante", "Fehlende Beschreibung"),
+    missing_bullets: t("Missing bullet points", "Eksik madde işaretleri", "Points clés manquants", "Faltan los puntos clave", "Punti elenco mancanti", "Fehlende Stichpunkte"),
+    missing_brand: t("Missing brand", "Eksik marka", "Marque manquante", "Falta la marca", "Marchio mancante", "Fehlende Marke"),
+    missing_manufacturer: t("Missing manufacturer", "Eksik üretici", "Fabricant manquant", "Falta el fabricante", "Produttore mancante", "Fehlender Hersteller"),
+    missing_ean: t("Missing EAN/GTIN", "Eksik EAN/GTIN", "EAN/GTIN manquant", "Falta el EAN/GTIN", "EAN/GTIN mancante", "Fehlende EAN/GTIN"),
+    missing_sku: t("Missing SKU", "Eksik SKU", "SKU manquant", "Falta el SKU", "SKU mancante", "Fehlende SKU"),
+    missing_images: t("Missing product images", "Eksik ürün görseli", "Images produit manquantes", "Faltan imágenes del producto", "Immagini prodotto mancanti", "Fehlende Produktbilder"),
+    short_description: t("Description too short", "Açıklama çok kısa", "Description trop courte", "Descripción demasiado corta", "Descrizione troppo breve", "Beschreibung zu kurz"),
+    duplicate_title: t("Duplicate product title", "Yinelenen ürün başlığı", "Titre de produit en double", "Título de producto duplicado", "Titolo prodotto duplicato", "Doppelter Produkttitel"),
+    no_images: t("No product images", "Ürün görseli yok", "Aucune image produit", "Sin imágenes de producto", "Nessuna immagine prodotto", "Keine Produktbilder"),
+    missing_category: t("Missing category", "Eksik kategori", "Catégorie manquante", "Falta la categoría", "Categoria mancante", "Fehlende Kategorie"),
+    missing_price: t("Missing price", "Eksik fiyat", "Prix manquant", "Falta el precio", "Prezzo mancante", "Fehlender Preis"),
+    duplicate_ean: t("Duplicate EAN/GTIN", "Yinelenen EAN/GTIN", "EAN/GTIN en double", "EAN/GTIN duplicado", "EAN/GTIN duplicato", "Doppelte EAN/GTIN"),
+    malformed_sku: t("Malformed SKU", "Hatalı biçimli SKU", "SKU mal formé", "SKU con formato incorrecto", "SKU malformato", "Fehlerhafte SKU"),
+    approved: t("Seller not yet approved", "Satıcı henüz onaylanmadı", "Vendeur pas encore approuvé", "Vendedor aún no aprobado", "Venditore non ancora approvato", "Seller noch nicht freigegeben"),
+    company_name: t("Missing company name", "Eksik şirket adı", "Nom de société manquant", "Falta el nombre de la empresa", "Ragione sociale mancante", "Fehlender Firmenname"),
+    tax_id: t("Missing tax ID", "Eksik vergi numarası", "Numéro fiscal manquant", "Falta el NIF", "Partita IVA mancante", "Fehlende Steuernummer"),
+    vat_id: t("Missing VAT ID", "Eksik KDV numarası", "Numéro de TVA manquant", "Falta el NIF-IVA", "Partita IVA mancante", "Fehlende USt-IdNr."),
+    iban: t("Missing IBAN", "Eksik IBAN", "IBAN manquant", "Falta el IBAN", "IBAN mancante", "Fehlende IBAN"),
+    business_address: t("Missing business address", "Eksik işletme adresi", "Adresse professionnelle manquante", "Falta la dirección comercial", "Indirizzo aziendale mancante", "Fehlende Geschäftsadresse"),
+    agreement_accepted: t("Marketplace agreement not accepted", "Pazar yeri sözleşmesi kabul edilmedi", "Accord marketplace non accepté", "Acuerdo de marketplace no aceptado", "Accordo marketplace non accettato", "Marktplatzvereinbarung nicht akzeptiert"),
+    documents_submitted: t("No documents submitted", "Belge gönderilmedi", "Aucun document soumis", "No se han enviado documentos", "Nessun documento inviato", "Keine Dokumente eingereicht"),
+    lucid_number: t("Missing LUCID number", "Eksik LUCID numarası", "Numéro LUCID manquant", "Falta el número LUCID", "Numero LUCID mancante", "Fehlende LUCID-Nummer"),
+    non_compliant_products: t("Products with compliance issues", "Uyumluluk sorunu olan ürünler", "Produits non conformes", "Productos con problemas de cumplimiento", "Prodotti non conformi", "Produkte mit Compliance-Problemen"),
+    trade_register: t("Missing trade register extract", "Eksik ticaret sicil belgesi", "Extrait de registre du commerce manquant", "Falta el extracto del registro mercantil", "Estratto registro imprese mancante", "Fehlender Handelsregisterauszug"),
+    id_passport: t("Missing ID/passport", "Eksik kimlik/pasaport", "Pièce d'identité manquante", "Falta el DNI/pasaporte", "Documento d'identità mancante", "Fehlender Ausweis/Reisepass"),
+    cancelled_orders: t("Cancelled orders", "İptal edilen siparişler", "Commandes annulées", "Pedidos cancelados", "Ordini annullati", "Stornierte Bestellungen"),
+    defect_orders: t("Orders with reported defects", "Kusur bildirilen siparişler", "Commandes avec défauts signalés", "Pedidos con defectos reportados", "Ordini con difetti segnalati", "Bestellungen mit gemeldeten Mängeln"),
+    stalled_orders: t("Orders stuck unconfirmed", "Onaylanmadan bekleyen siparişler", "Commandes bloquées non confirmées", "Pedidos atascados sin confirmar", "Ordini bloccati non confermati", "Unbestätigt hängengebliebene Bestellungen"),
+    missing_tracking: t("Shipments without tracking", "Takip numarası olmayan gönderiler", "Envois sans suivi", "Envíos sin seguimiento", "Spedizioni senza tracking", "Sendungen ohne Tracking"),
+    shipping_incidents: t("Shipping incidents (lost/damaged in transit)", "Kargo olayları (kayıp/hasarlı)", "Incidents de livraison (perdu/endommagé)", "Incidentes de envío (perdido/dañado)", "Incidenti di spedizione (perso/danneggiato)", "Versandvorfälle (verloren/beschädigt)"),
+    inactive_seller: t("No recent seller activity", "Son zamanlarda satıcı aktivitesi yok", "Aucune activité récente du vendeur", "Sin actividad reciente del vendedor", "Nessuna attività recente del venditore", "Keine kürzliche Seller-Aktivität"),
+  };
+}
+
+function humanizeIssueKey(key) {
+  return String(key || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function issueLabel(locale, issue) {
+  if (!issue) return "";
+  if (typeof issue === "string") return issue;
+  const label = issueKeyLabels(locale)[issue.key] || humanizeIssueKey(issue.key);
+  return issue.count > 1 ? `${label} (${issue.count})` : label;
+}
+
 const SH_CSS = `
 .sh-page { font-size: 12px; color: #111827; }
 .sh-page .Polaris-Header-Title { font-size: 18px !important; line-height: 1.25 !important; }
@@ -210,7 +265,7 @@ function ScoreHero({ data, copy, locale }) {
   );
 }
 
-function IssuesPanel({ issues, copy, onJump }) {
+function IssuesPanel({ issues, copy, locale, onJump }) {
   return (
     <Card padding="0">
       <Box padding="300" paddingBlockEnd="0">
@@ -220,15 +275,19 @@ function IssuesPanel({ issues, copy, onJump }) {
         <Box padding="400"><Text tone="subdued" alignment="center">{copy.noIssues}</Text></Box>
       ) : (
         <Box paddingBlockStart="200">
-          {issues.map((iss, i) => (
-            <div key={iss.criterionId || i} className="sh-issue-row" onClick={() => onJump?.(iss.categoryId)} style={{ cursor: onJump ? "pointer" : "default" }}>
-              <div style={{ minWidth: 0 }}>
-                <Text as="span" fontWeight="medium">{iss.label}</Text>
-                {iss.issueSummary && <div><Text tone="subdued" as="span" variant="bodySm">{iss.issueSummary}</Text></div>}
+          {issues.map((iss, i) => {
+            const summary = issueLabel(locale, iss.issueSummary);
+            const extra = (iss.issueCount || 0) > 1 ? ` +${iss.issueCount - 1}` : "";
+            return (
+              <div key={iss.criterionId || i} className="sh-issue-row" onClick={() => onJump?.(iss.categoryId)} style={{ cursor: onJump ? "pointer" : "default" }}>
+                <div style={{ minWidth: 0 }}>
+                  <Text as="span" fontWeight="medium">{iss.label}</Text>
+                  {summary && <div><Text tone="subdued" as="span" variant="bodySm">{summary}{extra}</Text></div>}
+                </div>
+                <Badge tone="critical">{copy.pointsLost(iss.pointsLost)}</Badge>
               </div>
-              <Badge tone="critical">{copy.pointsLost(iss.pointsLost)}</Badge>
-            </div>
-          ))}
+            );
+          })}
         </Box>
       )}
     </Card>
@@ -241,7 +300,7 @@ function confidenceText(copy, confidence, n) {
   return `${label} · ${n ?? 0} ${copy.dataPoints}`;
 }
 
-function CriterionRow({ crit, copy }) {
+function CriterionRow({ crit, copy, locale }) {
   const pct = crit.maxPoints > 0 ? Math.round((crit.score / crit.maxPoints) * 100) : 0;
   return (
     <div className="sh-crit-row">
@@ -278,8 +337,8 @@ function CriterionRow({ crit, copy }) {
         <Box paddingBlockStart="150">
           <BlockStack gap="050">
             <Text variant="bodySm" fontWeight="medium">{copy.howToImprove}</Text>
-            {crit.issues.slice(0, 5).map((msg, i) => (
-              <Text key={i} tone="subdued" variant="bodySm" as="p">• {msg}</Text>
+            {crit.issues.slice(0, 5).map((issue, i) => (
+              <Text key={issue.key || i} tone="subdued" variant="bodySm" as="p">• {issueLabel(locale, issue)}</Text>
             ))}
           </BlockStack>
         </Box>
@@ -288,7 +347,7 @@ function CriterionRow({ crit, copy }) {
   );
 }
 
-function CategoryCard({ cat, copy, openId, setOpenId }) {
+function CategoryCard({ cat, copy, locale, openId, setOpenId }) {
   const isOpen = openId === cat.id;
   const pct = cat.maxPoints > 0 && cat.score != null ? Math.round((cat.score / cat.maxPoints) * 100) : 0;
   return (
@@ -312,7 +371,7 @@ function CategoryCard({ cat, copy, openId, setOpenId }) {
           {(cat.criteria || []).length === 0 ? (
             <Box padding="300"><Text tone="subdued">{copy.notEnoughData}</Text></Box>
           ) : (
-            cat.criteria.map((crit) => <CriterionRow key={crit.id} crit={crit} copy={copy} />)
+            cat.criteria.map((crit) => <CriterionRow key={crit.id} crit={crit} copy={copy} locale={locale} />)
           )}
         </Box>
       )}
@@ -461,7 +520,7 @@ function ConfigEditorCard({ config, copy, onSaved }) {
                 <div className="sh-cat-row" onClick={() => setOpenCat(isOpen ? null : cat.id)}>
                   <InlineStack gap="200" blockAlign="center">
                     <Text fontWeight="semibold">{cat.label}</Text>
-                    {!cat.enabled && <Badge tone="subdued">{copy.enabled}: {copy.cancel}</Badge>}
+                    {!cat.enabled && <Badge>{copy.enabled}: {copy.cancel}</Badge>}
                   </InlineStack>
                   <InlineStack gap="300" blockAlign="center">
                     {editing ? (
@@ -827,12 +886,12 @@ function SellerHealthPage({ isSuperuser, sellerId }) {
               {health?.overallDataSufficient && (
                 <>
                   <Layout.Section>
-                    <IssuesPanel issues={health.issues} copy={copy} onJump={setOpenCatId} />
+                    <IssuesPanel issues={health.issues} copy={copy} locale={locale} onJump={setOpenCatId} />
                   </Layout.Section>
                   <Layout.Section>
                     <BlockStack gap="300">
                       {(health.categories || []).map((cat) => (
-                        <CategoryCard key={cat.id} cat={cat} copy={copy} openId={openCatId} setOpenId={setOpenCatId} />
+                        <CategoryCard key={cat.id} cat={cat} copy={copy} locale={locale} openId={openCatId} setOpenId={setOpenCatId} />
                       ))}
                     </BlockStack>
                   </Layout.Section>
