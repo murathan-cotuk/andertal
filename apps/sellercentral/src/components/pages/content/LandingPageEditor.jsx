@@ -39,7 +39,6 @@ import {
 } from "@/components/pages/content/ContainerTypePreview";
 import { groupContainerTypes } from "@/lib/landing-container-catalog";
 import { templatesForLibrary } from "@/lib/landing-template-registry";
-import LandingLivePreview from "@/components/pages/content/LandingLivePreview";
 import {
   MAX_LANDING_CONTAINER_DEPTH,
   mapContainerById,
@@ -4335,7 +4334,6 @@ export default function LandingPageEditor() {
   const [saved, setSaved] = useState(false);
   const [saveKind, setSaveKind] = useState("draft");
   const [hasUnpublishedDraft, setHasUnpublishedDraft] = useState(false);
-  const [libraryPreviewTpl, setLibraryPreviewTpl] = useState(null);
   const [err, setErr] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
@@ -5156,15 +5154,6 @@ export default function LandingPageEditor() {
                             );
                           })()}
 
-                          {filteredSeitenContainers.length > 0 && (
-                            <LandingLivePreview
-                              containers={filteredSeitenContainers}
-                              settings={categorySettings}
-                              locale={uiLocale}
-                              copy={copy}
-                            />
-                          )}
-
                           {!loading && containers.length > 0 && filteredSeitenContainers.length === 0 && (
                             <InlineStack>
                               <Button onClick={() => setAddModalOpen(true)}>{copy.addContainerShort}</Button>
@@ -5474,19 +5463,14 @@ export default function LandingPageEditor() {
                         return (
                           <div
                             key={tpl.id}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setLibraryPreviewTpl(tpl)}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLibraryPreviewTpl(tpl); } }}
                             style={{
-                              border: libraryPreviewTpl?.id === tpl.id ? "2px solid var(--p-color-border-emphasis, #1B8880)" : "1px solid var(--p-color-border, #e1e3e5)",
+                              border: "1px solid var(--p-color-border, #e1e3e5)",
                               borderRadius: 10,
                               background: "var(--p-color-bg-surface, #fff)",
                               padding: 12,
                               display: "flex",
                               flexDirection: "column",
                               gap: 10,
-                              cursor: "pointer",
                             }}
                           >
                             <InlineStack gap="300" blockAlign="start" wrap={false}>
@@ -5498,27 +5482,11 @@ export default function LandingPageEditor() {
                                 </BlockStack>
                               </div>
                             </InlineStack>
-                            <Button size="slim" onClick={(e) => { e.stopPropagation(); addContainer(tpl.type, tpl.defaults); }}>{copy.addToPage}</Button>
+                            <Button size="slim" onClick={() => addContainer(tpl.type, tpl.defaults)}>{copy.addToPage}</Button>
                           </div>
                         );
                       })}
                     </div>
-                    {libraryPreviewTpl && (() => {
-                      const created = newContainer(libraryPreviewTpl.type);
-                      const seed = getNewContainerSeed(uiLocale, libraryPreviewTpl.type);
-                      const preview = { ...created, ...seed, ...(libraryPreviewTpl.defaults || {}), visible_on: "both", visible: true };
-                      return (
-                        <BlockStack gap="200">
-                          <Text as="h3" variant="headingSm">{copy.templatePreviewHeading}</Text>
-                          <LandingLivePreview
-                            containers={[preview]}
-                            settings={categorySettings}
-                            locale={uiLocale}
-                            copy={copy}
-                          />
-                        </BlockStack>
-                      );
-                    })()}
                   </BlockStack>
                 );
               })()}
