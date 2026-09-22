@@ -1797,6 +1797,13 @@ function CollectionsCarousel({ container, locale = "de" }) {
   const ratio = normalizeCollectionsCarouselAspectRatio(container.card_aspect_ratio);
   const imgObjectFit =
     container.card_image_object_fit === "contain" ? "contain" : "cover";
+  // A background square smaller than the image lets the image visually overflow it (the
+  // "floating product" look) — 100% = no overflow, i.e. the old flush-background card.
+  const bgEnabled = container.card_bg_enabled !== false;
+  const bgColor = container.card_bg_color || "#f3f4f6";
+  const bgHoverColor = container.card_bg_hover_color || bgColor;
+  const bgSizePct = Math.min(100, Math.max(40, Number(container.card_bg_size) || 80));
+  const bgInset = (100 - bgSizePct) / 2;
 
   // Fetch live collection data so title/image changes in admin are reflected immediately.
   const [liveCollections, setLiveCollections] = useState(null);
@@ -1851,27 +1858,55 @@ function CollectionsCarousel({ container, locale = "de" }) {
       setLiveCollections([]);
       return undefined;
     }
-    fetch("/api/store-collections")
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        const all = Array.isArray(data?.collections) ? data.collections : [];
-        if (!all.length) return;
-        const byId = new Map(all.map((c) => [c.id, c]));
-        const merged = snapshots.map((snap) => {
-          const live = byId.get(snap.id);
-          if (!live) return snap;
-          const fromMain = collectionCarouselCardImageFromLive(live);
+    // Manual list can mix collections and categories (added via the two separate pickers in the
+    // editor) — only fetch each source when the list actually needs it.
+    const hasCategoryItems = snapshots.some((s) => s.kind === "category");
+    const hasCollectionItems = snapshots.some((s) => (s.kind || "collection") === "collection");
+    Promise.all([
+      hasCollectionItems ? fetch("/api/store-collections").then((r) => r.json()).catch(() => ({ collections: [] })) : Promise.resolve({ collections: [] }),
+      hasCategoryItems
+        ? cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 }).catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([colData, catData]) => {
+      if (cancelled) return;
+      const allCollections = Array.isArray(colData?.collections) ? colData.collections : [];
+      const byColId = new Map(allCollections.map((c) => [c.id, c]));
+      const flatCats = [];
+      (function flattenCats(list) {
+        (list || []).forEach((cat) => {
+          flatCats.push(cat);
+          if (cat.children?.length) flattenCats(cat.children);
+        });
+      })(Array.isArray(catData?.tree) ? catData.tree : []);
+      const byCatId = new Map(flatCats.map((c) => [c.id, c]));
+      const merged = snapshots.map((snap) => {
+        // A per-item custom image always wins; otherwise fall back to the collection's/category's
+        // own current image, then to whatever was last cached on the snapshot.
+        if ((snap.kind || "collection") === "category") {
+          const live = byCatId.get(snap.id);
+          if (!live) return { ...snap, image: snap.image_override || snap.image || "" };
+          const locCat = getLocalizedCategory(live, locale);
+          const meta = live.metadata && typeof live.metadata === "object" ? live.metadata : {};
+          const liveImage = live.thumbnail || live.image_url || meta.image_url || meta.image || "";
           return {
             ...snap,
-            title: live.display_title || live.title || snap.title,
-            handle: live.handle || snap.handle,
-            image: fromMain || "",
+            title: locCat.name || live.name || snap.title,
+            handle: live.slug || live.handle || snap.handle,
+            image: snap.image_override || liveImage || "",
           };
-        });
-        setLiveCollections(merged);
-      })
-      .catch(() => {});
+        }
+        const live = byColId.get(snap.id);
+        if (!live) return { ...snap, image: snap.image_override || snap.image || "" };
+        const fromMain = collectionCarouselCardImageFromLive(live);
+        return {
+          ...snap,
+          title: live.display_title || live.title || snap.title,
+          handle: live.handle || snap.handle,
+          image: snap.image_override || fromMain || "",
+        };
+      });
+      setLiveCollections(merged);
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [container.id, source, locale, cap, snapshots.length]);
 
@@ -1895,35 +1930,33 @@ function CollectionsCarousel({ container, locale = "de" }) {
       const href = collectionHref(collection.handle);
       const image = resolveUrl(collection.image);
       const card = (
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            aspectRatio: ratio,
-            borderRadius: 18,
-            overflow: "hidden",
-            background: "#f3f4f6",
-            border: "1px solid #ececec",
-          }}
-        >
-          {image ? (
-            <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
-          ) : (
-            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
-              {tLanding("noPreview")}
-            </div>
+        <div className="landing-cc-card" style={{ position: "relative", width: "100%", aspectRatio: ratio }}>
+          {bgEnabled && (
+            <div
+              className="landing-cc-bg-sq"
+              style={{ position: "absolute", inset: `${bgInset}%`, borderRadius: 14, background: bgColor, "--cc-bg-hover": bgHoverColor }}
+            />
           )}
-          <div
-            style={{
-              position: "absolute",
-              inset: "auto 0 0 0",
-              padding: "16px 18px",
-              background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
-              color: "#fff",
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
-              {collection.title || collection.handle || `${tNav("collection")} ${i + 1}`}
+          <div style={{ position: "absolute", inset: 0, borderRadius: 18, overflow: "hidden", border: "1px solid #ececec" }}>
+            {image ? (
+              <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
+            ) : (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#f3f4f6" }}>
+                {tLanding("noPreview")}
+              </div>
+            )}
+            <div
+              style={{
+                position: "absolute",
+                inset: "auto 0 0 0",
+                padding: "16px 18px",
+                background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
+                color: "#fff",
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
+                {collection.title || collection.handle || `${tNav("collection")} ${i + 1}`}
+              </div>
             </div>
           </div>
         </div>
@@ -1979,35 +2012,33 @@ function CollectionsCarousel({ container, locale = "de" }) {
             const href = collectionHref(collection.handle);
             const image = resolveUrl(collection.image);
             const card = (
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  aspectRatio: ratio,
-                  borderRadius: 18,
-                  overflow: "hidden",
-                  background: "#f3f4f6",
-                  border: "1px solid #ececec",
-                }}
-              >
-                {image ? (
-                  <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
-                ) : (
-                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
-                    {tLanding("noPreview")}
-                  </div>
+              <div className="landing-cc-card" style={{ position: "relative", width: "100%", aspectRatio: ratio }}>
+                {bgEnabled && (
+                  <div
+                    className="landing-cc-bg-sq"
+                    style={{ position: "absolute", inset: `${bgInset}%`, borderRadius: 14, background: bgColor, "--cc-bg-hover": bgHoverColor }}
+                  />
                 )}
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: "auto 0 0 0",
-                    padding: "16px 18px",
-                    background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
-                    color: "#fff",
-                  }}
-                >
-                  <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
-                    {collection.title || collection.handle || `${tNav("collection")} ${i + 1}`}
+                <div style={{ position: "absolute", inset: 0, borderRadius: 18, overflow: "hidden", border: "1px solid #ececec" }}>
+                  {image ? (
+                    <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#f3f4f6" }}>
+                      {tLanding("noPreview")}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: "auto 0 0 0",
+                      padding: "16px 18px",
+                      background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)",
+                      color: "#fff",
+                    }}
+                  >
+                    <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>
+                      {collection.title || collection.handle || `${tNav("collection")} ${i + 1}`}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2024,6 +2055,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
           })}
         </Carousel>
       </div>
+      <style>{`.landing-cc-bg-sq{transition:background-color .2s ease;}.landing-cc-card:hover .landing-cc-bg-sq{background-color:var(--cc-bg-hover);}`}</style>
     </div>
   );
 }

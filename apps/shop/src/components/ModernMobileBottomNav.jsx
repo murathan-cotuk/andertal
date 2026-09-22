@@ -94,7 +94,7 @@ export default function ModernMobileBottomNav({
         right: isFixed ? 0 : undefined,
         width: "100%",
         flexShrink: 0,
-        height: "calc(60px + env(safe-area-inset-bottom, 0px))",
+        height: "calc(58px + env(safe-area-inset-bottom, 0px))",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         background: surfaceBg ?? "#fff",
         borderTop: borderTop ?? "1px solid rgba(229,231,235,0.9)",
@@ -193,7 +193,7 @@ export default function ModernMobileBottomNav({
             {/* Line in normal flow at bottom of tab — avoids absolute+env() shifting on scroll / viewport changes */}
             <div
               style={{
-                height: 5,
+                height: 3,
                 flexShrink: 0,
                 display: "flex",
                 alignItems: "flex-end",

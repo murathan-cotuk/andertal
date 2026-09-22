@@ -691,6 +691,41 @@ const storeCartGET = async (req, res) => {
   }
 }
 
+/**
+ * GET /store/carts/me/active — the logged-in customer's most recent cart that still has items.
+ * Lets a shopper log in on a second device and see the cart they built on the first one, instead
+ * of each device being stuck on its own localStorage-only cart id forever.
+ */
+const storeCartMeActiveGET = async (req, res) => {
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  const payload = token ? verifyCustomerToken(token) : null
+  if (!payload?.id) return res.status(401).json({ message: 'Login required' })
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  if (!dbUrl || !dbUrl.startsWith('postgres')) return res.status(503).json({ message: 'Database not configured' })
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const r = await client.query(
+      `SELECT c.id FROM store_carts c
+       WHERE c.customer_id = $1::uuid
+         AND EXISTS (SELECT 1 FROM store_cart_items i WHERE i.cart_id = c.id AND i.removed_at IS NULL)
+       ORDER BY c.updated_at DESC LIMIT 1`,
+      [payload.id]
+    )
+    const cartId = r.rows?.[0]?.id
+    const cart = cartId ? await getCartWithItems(client, cartId) : null
+    await client.end()
+    res.json({ cart })
+  } catch (err) {
+    if (client) try { await client.end() } catch (_) {}
+    console.error('Store cart me/active GET:', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
 /** PATCH /store/carts/:id — bonus_points_reserved + customer contact info */
 const storeCartPATCH = async (req, res) => {
   const cartId = (req.params.id || req.params.cartId || '').toString().trim()
@@ -913,6 +948,7 @@ const storeCartLineItemsPOST = async (req, res) => {
     if (customerPayload?.id) {
       await client.query(
         `UPDATE store_carts SET
+           customer_id = COALESCE(customer_id, $1::uuid),
            email = COALESCE(NULLIF(email, ''), (SELECT email FROM store_customers WHERE id = $1::uuid)),
            first_name = COALESCE(NULLIF(first_name, ''), (SELECT first_name FROM store_customers WHERE id = $1::uuid)),
            last_name = COALESCE(NULLIF(last_name, ''), (SELECT last_name FROM store_customers WHERE id = $1::uuid)),
@@ -4000,6 +4036,7 @@ module.exports = function createStoreCheckoutRouter() {
 
   // Carts
   router.post('/store/carts', storeCartsPOST)
+  router.get('/store/carts/me/active', storeCartMeActiveGET)
   router.get('/store/carts/:id', storeCartGET)
   router.patch('/store/carts/:id', storeCartPATCH)
   router.post('/store/carts/:id/line-items', storeCartLineItemsPOST)

@@ -407,7 +407,7 @@ const pagesListGET = async (req, res) => {
     const sort = (req.query.sort || '').trim()
     const orderBy = sort === 'alpha' ? 'LOWER(title) ASC' : 'created_at DESC'
     let q = `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords,
-      title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at
+      title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n, created_at, updated_at
       FROM admin_hub_pages WHERE 1=1`
     const params = []
     if (status) { params.push(status); q += ` AND status = $${params.length}` }
@@ -453,13 +453,14 @@ const pagesCreatePOST = async (req, res) => {
   const excerpt_i18n = pagesI18nJsonbOrNull(b.excerpt_i18n)
   const meta_title_i18n = pagesI18nJsonbOrNull(b.meta_title_i18n)
   const meta_description_i18n = pagesI18nJsonbOrNull(b.meta_description_i18n)
+  const meta_keywords_i18n = pagesI18nJsonbOrNull(b.meta_keywords_i18n)
   try {
     await client.connect()
     const r = await client.query(
-      `INSERT INTO admin_hub_pages (title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-       RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at`,
-      [title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n]
+      `INSERT INTO admin_hub_pages (title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n, created_at, updated_at`,
+      [title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n]
     )
     res.status(201).json(r.rows[0])
   } catch (err) {
@@ -477,7 +478,7 @@ const pageByIdGET = async (req, res) => {
     await client.connect()
     const r = await client.query(
       `SELECT id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords,
-              title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at
+              title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n, created_at, updated_at
        FROM admin_hub_pages WHERE id = $1`,
       [req.params.id]
     )
@@ -512,13 +513,14 @@ const pageByIdPUT = async (req, res) => {
   if (b.excerpt_i18n !== undefined) { updates.push(`excerpt_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.excerpt_i18n)) }
   if (b.meta_title_i18n !== undefined) { updates.push(`meta_title_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.meta_title_i18n)) }
   if (b.meta_description_i18n !== undefined) { updates.push(`meta_description_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.meta_description_i18n)) }
+  if (b.meta_keywords_i18n !== undefined) { updates.push(`meta_keywords_i18n = $${i++}::jsonb`); values.push(pagesI18nJsonbOrNull(b.meta_keywords_i18n)) }
   if (updates.length === 0) return res.status(400).json({ message: 'No fields to update' })
   updates.push(`updated_at = now()`)
   values.push(req.params.id)
   try {
     await client.connect()
     const r = await client.query(
-      `UPDATE admin_hub_pages SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, created_at, updated_at`,
+      `UPDATE admin_hub_pages SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, title, slug, body, status, page_type, featured_image, excerpt, meta_title, meta_description, meta_keywords, title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n, created_at, updated_at`,
       values
     )
     if (r.rows.length === 0) return res.status(404).json({ message: 'Page not found' })
@@ -554,7 +556,7 @@ const storePagesListGET = async (req, res) => {
     await client.connect()
     const pageType = (req.query.page_type || '').trim() || null
     let q = `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords,
-      title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, updated_at
+      title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n, updated_at
       FROM admin_hub_pages WHERE status = $1`
     const params = ['published']
     if (pageType) { params.push(pageType); q += ` AND page_type = $2` }
@@ -575,7 +577,7 @@ const storePageBySlugGET = async (req, res) => {
     await client.connect()
     const r = await client.query(
       `SELECT id, title, slug, body, excerpt, featured_image, page_type, meta_title, meta_description, meta_keywords,
-              title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, updated_at
+              title_i18n, body_i18n, excerpt_i18n, meta_title_i18n, meta_description_i18n, meta_keywords_i18n, updated_at
        FROM admin_hub_pages WHERE lower(slug) = lower($1) AND status = 'published'`,
       [req.params.slug]
     )

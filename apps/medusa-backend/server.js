@@ -582,6 +582,7 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS excerpt_i18n jsonb;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_title_i18n jsonb;`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_description_i18n jsonb;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_pages ADD COLUMN IF NOT EXISTS meta_keywords_i18n jsonb;`).catch(() => {})
         await client.query(`UPDATE admin_hub_pages SET page_type = 'page' WHERE page_type IS NULL`).catch(() => {})
         // Editable settings for the hardcoded API-driven storefront pages (/bestsellers, /sales) —
         // these pages aren't container-based CMS pages, but Sellercentral still needs a place to
@@ -679,6 +680,13 @@ async function start() {
         await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS phone text`).catch(() => {})
         await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS coupon_code text`).catch(() => {})
         await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS coupon_discount_cents integer NOT NULL DEFAULT 0`).catch(() => {})
+        // Links a cart to the logged-in customer who last touched it, so the same account's cart
+        // can be found again from a different device (see storeCartLineItemsPOST backfill and
+        // GET /store/carts/me/active) — a cart was previously identified only by a per-browser
+        // localStorage id, so it never appeared on a second device even when logged into the same
+        // account there.
+        await client.query(`ALTER TABLE store_carts ADD COLUMN IF NOT EXISTS customer_id uuid`).catch(() => {})
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_store_carts_customer_id ON store_carts(customer_id)`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS coupon_code text`).catch(() => {})
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS coupon_discount_cents integer NOT NULL DEFAULT 0`).catch(() => {})
         await client.query(`

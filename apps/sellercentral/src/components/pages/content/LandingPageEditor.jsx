@@ -2161,12 +2161,21 @@ function SellerCarouselEditor({ container, onChange, deviceTab = 0, editLang = "
   );
 }
 
+/** Category's own default image — same priority order the shop uses when no per-item override is set. */
+function categoryOwnImage(cat) {
+  const meta = cat?.metadata && typeof cat.metadata === "object" ? cat.metadata : {};
+  return cat?.thumbnail || cat?.image_url || meta.image_url || meta.image || "";
+}
+
 function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   const c = useLandingCopy();
   const isMobileView = deviceTab >= 1;
   const client = getMedusaAdminClient();
   const [collections, setCollections] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [selectedId, setSelectedId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [imagePickerIdx, setImagePickerIdx] = useState(null);
 
   useEffect(() => {
     client.getMedusaCollections({ adminHub: true })
@@ -2174,14 +2183,33 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
         setCollections(Array.isArray(r?.collections) ? r.collections : []);
       })
       .catch(() => {});
+    client.getAdminHubCategories({ all: true }).then((r) => {
+      const flat = [];
+      function flatten(list) {
+        (list || []).forEach((cat) => {
+          flat.push(cat);
+          if (cat.children?.length) flatten(cat.children);
+        });
+      }
+      flatten(Array.isArray(r?.categories) ? r.categories : (Array.isArray(r) ? r : []));
+      setCategories(flat);
+    }).catch(() => {});
   }, [client]);
 
   const chosen = Array.isArray(container.collections) ? container.collections : [];
+  // Older entries predate `kind` — they were always collections.
+  const entryKind = (entry) => entry.kind || "collection";
   const availableOptions = [
     { label: c.chooseCollectionAdd, value: "" },
     ...collections
-      .filter((c) => !chosen.some((entry) => entry.id === c.id))
+      .filter((c) => !chosen.some((entry) => entryKind(entry) === "collection" && entry.id === c.id))
       .map((c) => ({ label: c.title || c.handle || c.id, value: c.id })),
+  ];
+  const availableCategoryOptions = [
+    { label: c.chooseCategoryItemAdd, value: "" },
+    ...categories
+      .filter((cat) => !chosen.some((entry) => entryKind(entry) === "category" && entry.id === cat.id))
+      .map((cat) => ({ label: cat.name || cat.slug || cat.id, value: cat.id })),
   ];
 
   const addCollection = (id) => {
@@ -2193,10 +2221,12 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
       collections: [
         ...chosen,
         {
+          kind: "collection",
           id: col.id,
           title: col.title || "",
           handle: col.handle || "",
           image: col.image_url || col.image || col.thumbnail || "",
+          image_override: "",
           item_heading: "",
         },
       ],
@@ -2204,10 +2234,32 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
     setSelectedId("");
   };
 
-  const removeCollection = (id) => {
+  const addCategoryItem = (id) => {
+    if (!id) return;
+    const cat = categories.find((x) => x.id === id);
+    if (!cat) return;
     onChange({
       ...container,
-      collections: chosen.filter((entry) => entry.id !== id),
+      collections: [
+        ...chosen,
+        {
+          kind: "category",
+          id: cat.id,
+          title: cat.name || "",
+          handle: cat.slug || cat.handle || "",
+          image: categoryOwnImage(cat),
+          image_override: "",
+          item_heading: "",
+        },
+      ],
+    });
+    setSelectedCategoryId("");
+  };
+
+  const removeCollection = (idx) => {
+    onChange({
+      ...container,
+      collections: chosen.filter((_, i) => i !== idx),
     });
   };
 
@@ -2253,15 +2305,26 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
           autoComplete="off"
         />
       )}
-      <Select
-        label={c.addCollection}
-        options={availableOptions}
-        value={selectedId}
-        onChange={(id) => {
-          setSelectedId(id);
-          addCollection(id);
-        }}
-      />
+      <div style={EDITOR_FIELD_GRID}>
+        <Select
+          label={c.addCollection}
+          options={availableOptions}
+          value={selectedId}
+          onChange={(id) => {
+            setSelectedId(id);
+            addCollection(id);
+          }}
+        />
+        <Select
+          label={c.addCategoryItem}
+          options={availableCategoryOptions}
+          value={selectedCategoryId}
+          onChange={(id) => {
+            setSelectedCategoryId(id);
+            addCategoryItem(id);
+          }}
+        />
+      </div>
       <Divider />
       <EditorSectionLabel>{c.layout}</EditorSectionLabel>
       <InlineStack gap="400" wrap>
@@ -2333,6 +2396,52 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
         />
       </BlockStack>
 
+      <Divider />
+      <BlockStack gap="200">
+        <Text as="h3" variant="headingSm">{c.cardBackgroundHeading}</Text>
+        <Checkbox
+          label={c.cardBackgroundEnabled}
+          checked={container.card_bg_enabled !== false}
+          onChange={(v) => onChange({ ...container, card_bg_enabled: v })}
+        />
+        {container.card_bg_enabled !== false && (
+          <>
+            <div style={EDITOR_FIELD_GRID}>
+              <ColorField
+                label={c.cardBackgroundColor}
+                value={container.card_bg_color || "#f3f4f6"}
+                onChange={(v) => onChange({ ...container, card_bg_color: v })}
+              />
+              <ColorField
+                label={c.cardBackgroundHoverColor}
+                value={container.card_bg_hover_color || container.card_bg_color || "#f3f4f6"}
+                onChange={(v) => onChange({ ...container, card_bg_hover_color: v })}
+              />
+            </div>
+            <TextField
+              label={c.cardBackgroundSize}
+              type="number"
+              value={String(container.card_bg_size ?? 80)}
+              onChange={(v) => onChange({ ...container, card_bg_size: Math.max(40, Math.min(100, Number(v) || 80)) })}
+              autoComplete="off"
+              helpText={c.cardBackgroundSizeHelp}
+            />
+          </>
+        )}
+      </BlockStack>
+
+      {imagePickerIdx !== null && (
+        <MediaPickerModal
+          open
+          multiple={false}
+          onClose={() => setImagePickerIdx(null)}
+          onSelect={(urls) => {
+            if (urls[0]) updateListCollectionEntry(imagePickerIdx, "image_override", urls[0]);
+            setImagePickerIdx(null);
+          }}
+        />
+      )}
+
       {chosen.length === 0 ? (
         <Card>
           <Box padding="400">
@@ -2340,17 +2449,20 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
           </Box>
         </Card>
       ) : chosen.map((entry, idx) => (
-        <Card key={entry.id || idx}>
+        <Card key={`${entryKind(entry)}-${entry.id || idx}`}>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <BlockStack gap="100">
-                <Text as="h3" variant="headingSm">{entry.title || entry.handle || c.collectionN(idx + 1)}</Text>
+                <InlineStack gap="150" blockAlign="center">
+                  <Badge>{entryKind(entry) === "category" ? c.itemKindCategory : c.itemKindCollection}</Badge>
+                  <Text as="h3" variant="headingSm">{entry.title || entry.handle || c.collectionN(idx + 1)}</Text>
+                </InlineStack>
                 <Text as="p" variant="bodySm" tone="subdued">/{entry.handle || c.withoutHandle}</Text>
               </BlockStack>
               <InlineStack gap="200">
                 <Button size="slim" disabled={idx === 0} onClick={() => moveCollection(idx, -1)}>{c.moveUp}</Button>
                 <Button size="slim" disabled={idx === chosen.length - 1} onClick={() => moveCollection(idx, 1)}>{c.moveDown}</Button>
-                <Button size="slim" tone="critical" onClick={() => removeCollection(entry.id)}>{c.remove}</Button>
+                <Button size="slim" tone="critical" onClick={() => removeCollection(idx)}>{c.remove}</Button>
               </InlineStack>
             </InlineStack>
             <TextField
@@ -2360,6 +2472,21 @@ function CollectionsCarouselEditor({ container, onChange, deviceTab = 0, editLan
               autoComplete="off"
               helpText={c.captionShopHelp}
             />
+            <InlineStack gap="300" blockAlign="end" wrap={false}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <TextField
+                  label={c.customImageOverride}
+                  value={entry.image_override || ""}
+                  onChange={(v) => updateListCollectionEntry(idx, "image_override", v)}
+                  autoComplete="off"
+                  helpText={c.customImageOverrideHelp}
+                />
+              </div>
+              <Button onClick={() => setImagePickerIdx(idx)}>{c.pickImageBtn}</Button>
+              {entry.image_override && (
+                <Button tone="critical" onClick={() => updateListCollectionEntry(idx, "image_override", "")}>{c.remove}</Button>
+              )}
+            </InlineStack>
           </BlockStack>
         </Card>
       ))}

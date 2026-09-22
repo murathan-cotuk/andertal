@@ -20,22 +20,39 @@ function lt(page, field, locale) {
   return localizedCmsField(page, field, locale);
 }
 
+// A rich-text editor leaves a trailing empty block (<p><br></p> etc.) behind almost every save —
+// harmless in the editor, but on the shop it renders as a real empty line, stacking with the
+// container's own bottom padding into a much bigger gap than the padding value alone suggests.
+const TRAILING_EMPTY_BLOCK = /(?:<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>|<br\s*\/?>)\s*$/i;
+function stripTrailingEmptyBlocks(html) {
+  let next = html;
+  let prev;
+  do {
+    prev = next;
+    next = prev.replace(TRAILING_EMPTY_BLOCK, "").trimEnd();
+  } while (next !== prev);
+  return next;
+}
+
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
-  return html
+  const clean = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, "")
     .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, "")
     .replace(/\s+on\w+\s*=\s*[^\s>]+/gi, "");
+  return stripTrailingEmptyBlocks(clean);
 }
 
+// 32px top/bottom matches the padding the landing-container blocks (text_block, image_text, …)
+// default to — the "ideal" gap the rest of the page-builder already uses between sections.
 function cmsPagePadding(tmpl) {
   const t = tmpl && typeof tmpl === "object" ? tmpl : {};
   const top = Number(t.padding_top);
   const bottom = Number(t.padding_bottom);
   return {
-    paddingTop: Number.isFinite(top) ? Math.max(0, top) : 0,
-    paddingBottom: Number.isFinite(bottom) ? Math.max(0, bottom) : 48,
+    paddingTop: Number.isFinite(top) ? Math.max(0, top) : 32,
+    paddingBottom: Number.isFinite(bottom) ? Math.max(0, bottom) : 32,
   };
 }
 
@@ -137,7 +154,7 @@ export default function CmsPageBySlug() {
           className="container mx-auto px-4 max-w-3xl w-full"
           style={{
             paddingTop: hasContainers ? Math.max(24, pagePad.paddingTop) : (hero ? 8 : pagePad.paddingTop),
-            paddingBottom: pagePad.paddingBottom,
+            paddingBottom: safeBody ? 0 : pagePad.paddingBottom,
           }}
         >
           {!hasContainers && hero ? (
@@ -150,17 +167,47 @@ export default function CmsPageBySlug() {
             </div>
           ) : null}
           {!hasContainers ? <h1>{localizedTitle}</h1> : null}
-          {safeBody ? (
+          {!safeBody && !hasContainers ? (
+            <p className="text-gray-500">No content.</p>
+          ) : null}
+        </div>
+        {/* Full-bleed backdrop behind the richtext block — spans the page's full width,
+            independent of the constrained title/hero box above it. */}
+        {safeBody ? (
+          <div style={{ width: "100%", background: "#f5f5f5", boxSizing: "border-box" }}>
             <div
-              className="prose prose-gray max-w-none"
+              className="cms-richtext container mx-auto px-4 max-w-3xl w-full"
+              style={{ paddingTop: 40, paddingBottom: pagePad.paddingBottom }}
               dangerouslySetInnerHTML={{ __html: safeBody }}
             />
-          ) : hasContainers ? null : (
-            <p className="text-gray-500">No content.</p>
-          )}
-        </div>
+          </div>
+        ) : null}
       </main>
       <Footer />
+      {/* @tailwindcss/typography isn't installed, so "prose" utility classes are no-ops here —
+          this file's own rules are the only thing normalizing the editor's raw HTML. The
+          :global() + last-child rule is what actually kills the leftover space below the text. */}
+      <style jsx>{`
+        .cms-richtext :global(p),
+        .cms-richtext :global(ul),
+        .cms-richtext :global(ol) {
+          margin: 0 0 1em;
+          line-height: 1.7;
+        }
+        .cms-richtext :global(h1),
+        .cms-richtext :global(h2),
+        .cms-richtext :global(h3),
+        .cms-richtext :global(h4) {
+          margin: 1.25em 0 0.5em;
+          line-height: 1.25;
+        }
+        .cms-richtext :global(> *:first-child) {
+          margin-top: 0;
+        }
+        .cms-richtext :global(> *:last-child) {
+          margin-bottom: 0;
+        }
+      `}</style>
     </div>
   );
 }

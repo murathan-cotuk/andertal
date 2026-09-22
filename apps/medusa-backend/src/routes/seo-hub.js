@@ -451,7 +451,7 @@ async function getEntity(client, type, id) {
   if (type === 'pages' || type === 'blogs') {
     const r = await client.query(
       `SELECT id, title, slug, body, status, page_type, meta_title, meta_description, meta_keywords,
-              meta_title_i18n, meta_description_i18n, updated_at
+              meta_title_i18n, meta_description_i18n, meta_keywords_i18n, updated_at
          FROM admin_hub_pages WHERE id = $1`,
       [id],
     )
@@ -478,6 +478,7 @@ async function getEntity(client, type, id) {
       meta_keywords: keywords,
       meta_title_i18n: row.meta_title_i18n && typeof row.meta_title_i18n === 'object' ? row.meta_title_i18n : {},
       meta_description_i18n: row.meta_description_i18n && typeof row.meta_description_i18n === 'object' ? row.meta_description_i18n : {},
+      meta_keywords_i18n: row.meta_keywords_i18n && typeof row.meta_keywords_i18n === 'object' ? row.meta_keywords_i18n : {},
       evaluation,
       score: scoreFromIssues(evaluation.issues),
       analysis: applyTemplateH1(analyzeHtml(row.body || ''), entityType),
@@ -605,7 +606,7 @@ async function patchEntity(client, type, id, body) {
 
   if (type === 'pages' || type === 'blogs') {
     const r = await client.query(
-      `SELECT id, page_type, slug, meta_title, meta_description, meta_keywords, meta_title_i18n, meta_description_i18n
+      `SELECT id, page_type, slug, meta_title, meta_description, meta_keywords, meta_title_i18n, meta_description_i18n, meta_keywords_i18n
          FROM admin_hub_pages WHERE id = $1`,
       [id],
     )
@@ -641,16 +642,19 @@ async function patchEntity(client, type, id, body) {
     } else {
       const titleI18n = { ...(r.rows[0].meta_title_i18n && typeof r.rows[0].meta_title_i18n === 'object' ? r.rows[0].meta_title_i18n : {}) }
       const descI18n = { ...(r.rows[0].meta_description_i18n && typeof r.rows[0].meta_description_i18n === 'object' ? r.rows[0].meta_description_i18n : {}) }
+      const kwI18n = { ...(r.rows[0].meta_keywords_i18n && typeof r.rows[0].meta_keywords_i18n === 'object' ? r.rows[0].meta_keywords_i18n : {}) }
       if (metaTitle !== undefined) titleI18n[locale] = { ...(titleI18n[locale] || {}), meta_title: metaTitle, title: metaTitle }
       if (metaDescription !== undefined) descI18n[locale] = { ...(descI18n[locale] || {}), meta_description: metaDescription, description: metaDescription }
+      if (metaKeywords !== undefined) kwI18n[locale] = { ...(kwI18n[locale] || {}), meta_keywords: metaKeywords }
       await client.query(
         `UPDATE admin_hub_pages SET
            meta_title_i18n = $1::jsonb,
            meta_description_i18n = $2::jsonb,
-           slug = $3,
+           meta_keywords_i18n = $3::jsonb,
+           slug = $4,
            updated_at = now()
-         WHERE id = $4`,
-        [JSON.stringify(titleI18n), JSON.stringify(descI18n), slug, id],
+         WHERE id = $5`,
+        [JSON.stringify(titleI18n), JSON.stringify(descI18n), JSON.stringify(kwI18n), slug, id],
       )
     }
     return { ok: true }

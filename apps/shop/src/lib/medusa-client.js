@@ -162,6 +162,16 @@ class MedusaClient {
     return res
   }
 
+  /** The logged-in customer's most recent cart with items — lets a second device pick up the same cart. */
+  async getCustomerActiveCart(token) {
+    if (!token) return { cart: null }
+    const res = await this.requestShopApi('/api/store-carts/me/active', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res?.__error) return { cart: null }
+    return res
+  }
+
   async addToCart(cartId, variantId, quantity = 1, sellerId = null, authToken = null, country = null) {
     const body = { variant_id: variantId, quantity }
     if (sellerId) body.seller_id = sellerId

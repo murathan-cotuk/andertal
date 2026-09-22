@@ -55,12 +55,20 @@ const Card = styled.article`
   display: flex;
   flex-direction: column;
   background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   height: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #d1d5db;
+  }
+
   @media (max-width: 767px) {
     border-radius: 8px;
   }
@@ -275,7 +283,7 @@ const Badge = styled.span`
 
 /* Info block below image — flex: 1 so all cards in a row share the same height */
 const Info = styled.div`
-  padding: 6px 6px 4px;
+  padding: 8px 9px 6px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -284,7 +292,7 @@ const Info = styled.div`
   width: 100%;
   box-sizing: border-box;
   @media (max-width: 767px) {
-    padding: 5px 5px 3px;
+    padding: 7px 7px 5px;
   }
 `;
 
@@ -710,10 +718,12 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
         </Link>
 
         <ReviewRow>
-          {reviewCount > 0 && (
+          {reviewCount > 0 ? (
             <Link href={productUrl ? `${productUrl}#reviews` : "#"} style={{ textDecoration: "none", display: "inline-flex" }}>
               <StarRating average={reviewAvg} count={reviewCount} />
             </Link>
+          ) : (
+            <StarRating average={0} count={0} />
           )}
         </ReviewRow>
 

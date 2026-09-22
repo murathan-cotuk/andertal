@@ -365,10 +365,11 @@ function draftFromEntity(e, lang) {
   if (e.type === "pages" || e.type === "blogs") {
     const t = e.meta_title_i18n?.[lang];
     const d = e.meta_description_i18n?.[lang];
+    const k = e.meta_keywords_i18n?.[lang];
     return {
       meta_title: (t && (t.meta_title || t.title)) || "",
       meta_description: (d && (d.meta_description || d.description)) || "",
-      meta_keywords: e.meta_keywords || "",
+      meta_keywords: (k && k.meta_keywords) || "",
       handle: e.handle || "",
     };
   }
@@ -924,7 +925,7 @@ export default function SeoHubPage() {
                   <input
                     value={draft.meta_keywords}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_keywords: e.target.value }))}
-                    placeholder="keyword1, keyword2, keyword3"
+                    placeholder={editLang === "de" ? "keyword1, keyword2, keyword3" : (entity.meta_keywords || "keyword1, keyword2, keyword3")}
                     style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
                   />
                 </label>

@@ -770,10 +770,20 @@ const PBtn = styled.button`
   }
 `;
 
+/* Full-bleed backdrop behind the category's richtext block — spans the page's full width,
+   independent of the sidebar+content column it used to sit inside. */
+const RichtextStrip = styled.div`
+  width: 100%;
+  background: #f5f5f5;
+  box-sizing: border-box;
+  padding-top: 40px;
+  padding-bottom: 48px;
+`;
+
 const Desc = styled.div`
-  margin-top: 56px;
-  padding-top: 28px;
-  border-top: 1px solid #e8e8e6;
+  margin-top: ${(p) => (p.$divider === false ? "0" : "56px")};
+  padding-top: ${(p) => (p.$divider === false ? "0" : "28px")};
+  border-top: ${(p) => (p.$divider === false ? "none" : "1px solid #e8e8e6")};
   font-size: var(--body-fs);
   line-height: var(--body-lh);
   color: var(--body-color);
@@ -1677,12 +1687,14 @@ export default function CategoryTemplate() {
               >›</PBtn>
             </Pager>
           )}
-
-          {richtextHtml ? (
-            <Desc $align={richtextAlign} $maxWidth={richtextMaxW} dangerouslySetInnerHTML={{ __html: richtextHtml }} />
-          ) : null}
         </Body>
       </ContentWrap>
+
+      {richtextHtml ? (
+        <RichtextStrip style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+          <Desc $divider={false} $align={richtextAlign} $maxWidth={richtextMaxW} dangerouslySetInnerHTML={{ __html: richtextHtml }} />
+        </RichtextStrip>
+      ) : null}
     </>
   );
 }

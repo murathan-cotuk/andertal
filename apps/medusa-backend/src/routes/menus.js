@@ -232,16 +232,10 @@ const menuItemsPOST = async (req, res) => {
 
 const menuItemByIdPUT = async (req, res) => {
   const body = req.body || {}
-  const svc = resolveMenuService()
-  if (svc) {
-    try {
-      const item = await svc.updateMenuItem(req.params.itemId, body)
-      return res.json({ item })
-    } catch (err) {
-      console.error('Menu item PUT error:', err)
-      return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
-    }
-  }
+  // DB path first (like every other handler in this file) — it's the only one that persists
+  // label_i18n. The menuService fallback below predates the *_i18n columns and silently drops
+  // that field, so trying it first (as this used to) accepted the save but never stored the
+  // translation: edits in non-German languages looked successful yet never showed up anywhere.
   const item = await runWithMenuDb(async (client) => {
     const updates = []
     const vals = []
@@ -261,8 +255,18 @@ const menuItemByIdPUT = async (req, res) => {
     const r = await client.query(`UPDATE admin_hub_menu_items SET ${updates.join(', ')}, updated_at = now() WHERE id = $${n} RETURNING id, menu_id, label, slug, link_type, link_value, parent_id, sort_order, label_i18n`, vals)
     return r.rows && r.rows[0] ? mapMenuItemRow(r.rows[0]) : null
   })
-  if (!item) return res.status(404).json({ message: 'Menu item not found' })
-  return res.json({ item })
+  if (item) return res.json({ item })
+  const svc = resolveMenuService()
+  if (svc) {
+    try {
+      const svcItem = await svc.updateMenuItem(req.params.itemId, body)
+      return res.json({ item: svcItem })
+    } catch (err) {
+      console.error('Menu item PUT error:', err)
+      return res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    }
+  }
+  return res.status(404).json({ message: 'Menu item not found' })
 }
 
 const menuItemByIdDELETE = async (req, res) => {

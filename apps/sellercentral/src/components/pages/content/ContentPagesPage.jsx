@@ -97,6 +97,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
     excerpt_i18n: {},
     meta_title_i18n: {},
     meta_description_i18n: {},
+    meta_keywords_i18n: {},
   });
   const [editLang, setEditLang] = useState("de");
   // Pages: alphabetical by default (a flat page list is easiest to scan A–Z). Blog posts
@@ -160,6 +161,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
       excerpt_i18n: {},
       meta_title_i18n: {},
       meta_description_i18n: {},
+      meta_keywords_i18n: {},
     });
     setModalOpen(true);
   };
@@ -184,6 +186,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
       excerpt_i18n: page.excerpt_i18n || {},
       meta_title_i18n: page.meta_title_i18n || {},
       meta_description_i18n: page.meta_description_i18n || {},
+      meta_keywords_i18n: page.meta_keywords_i18n || {},
     });
     setModalOpen(true);
   };
@@ -218,6 +221,7 @@ export default function ContentPagesPage({ blogOnly = false }) {
       excerpt_i18n: form.excerpt_i18n || {},
       meta_title_i18n: form.meta_title_i18n || {},
       meta_description_i18n: form.meta_description_i18n || {},
+      meta_keywords_i18n: form.meta_keywords_i18n || {},
     };
   };
 
@@ -513,9 +517,13 @@ export default function ContentPagesPage({ blogOnly = false }) {
                 />
                 <TextField
                   label={c.metaKeywords}
-                  value={form.meta_keywords}
-                  onChange={(value) => setForm((prev) => ({ ...prev, meta_keywords: value }))}
+                  value={giPageField(form, "meta_keywords", "meta_keywords_i18n", editLang)}
+                  onChange={(value) => {
+                    if (editLang === "de") { setForm((prev) => ({ ...prev, meta_keywords: value })); return; }
+                    setForm((prev) => ({ ...prev, meta_keywords_i18n: setPageI18nField(prev.meta_keywords_i18n, "meta_keywords", editLang, value) }));
+                  }}
                   autoComplete="off"
+                  placeholder={editLang !== "de" ? form.meta_keywords : undefined}
                 />
               </BlockStack>
             <Select

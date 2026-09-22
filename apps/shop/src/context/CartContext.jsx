@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useLocale } from "next-intl";
-import { getToken } from "@andertal/lib";
+import { getToken, useCustomerAuth } from "@andertal/lib";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { CHECKOUT_SHIPPING_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 
@@ -36,6 +36,7 @@ function CartLocaleRefetch() {
 
 export function CartProvider({ children }) {
   const locale = useLocale();
+  const { user } = useCustomerAuth();
   const [cart, setCart] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -95,6 +96,41 @@ export function CartProvider({ children }) {
       })
       .catch(() => {});
   }, []);
+
+  /**
+   * A cart was only ever known by a per-browser localStorage id, so logging into the same
+   * account on a second device showed an empty cart even after adding items on the first one.
+   * On login, adopt the account's most recent cart with items — merging in anything already
+   * sitting in this device's own (e.g. guest) cart first, so neither device loses items.
+   */
+  const syncCustomerCart = useCallback(async () => {
+    const authToken = getToken("customer");
+    if (!authToken) return;
+    const client = getMedusaClient();
+    const res = await client.getCustomerActiveCart(authToken);
+    const remote = res?.cart;
+    if (!remote?.id) return;
+    const localId = getStoredCartId();
+    if (remote.id === localId) return;
+    if (localId) {
+      try {
+        const localRes = await client.getCart(localId);
+        const localItems = Array.isArray(localRes?.cart?.items) ? localRes.cart.items : [];
+        const destCountry = readCartDestinationCountry(locale);
+        for (const item of localItems) {
+          if (item?.variant_id) {
+            await client.addToCart(remote.id, item.variant_id, item.quantity || 1, item.seller_id || null, authToken, destCountry);
+          }
+        }
+      } catch (_) {}
+    }
+    persistCartId(remote.id);
+    await fetchCart(remote.id);
+  }, [getStoredCartId, persistCartId, fetchCart, locale]);
+
+  useEffect(() => {
+    if (user?.id) syncCustomerCart();
+  }, [user?.id, syncCustomerCart]);
 
   const addToCart = useCallback(async (variantId, quantity = 1, sellerId = null) => {
     setLoading(true);

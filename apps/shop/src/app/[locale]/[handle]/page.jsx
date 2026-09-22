@@ -53,12 +53,27 @@ const RESERVED_HANDLES = [
 /** Diese Slugs sind Shop-Routen, keine Kollektionen — sonst 404 über notFound(). */
 const WISHLIST_SLUGS = new Set(["merkzettel", "wishlist", "favorites"]);
 
+// A rich-text editor leaves a trailing empty block (<p><br></p> etc.) behind almost every save —
+// harmless in the editor, but on the shop it renders as a real empty line, stacking with the
+// container's own bottom padding into a much bigger gap than the padding value alone suggests.
+const TRAILING_EMPTY_BLOCK = /(?:<p[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>|<br\s*\/?>)\s*$/i;
+function stripTrailingEmptyBlocks(html) {
+  let next = html;
+  let prev;
+  do {
+    prev = next;
+    next = prev.replace(TRAILING_EMPTY_BLOCK, "").trimEnd();
+  } while (next !== prev);
+  return next;
+}
+
 function sanitize(html) {
   if (!html) return "";
-  return html
+  const clean = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, "")
     .replace(/\s*on\w+=["'][^"']*["']/gi, "");
+  return stripTrailingEmptyBlocks(clean);
 }
 
 /* ─── Shimmer skeleton ───────────────────────────────────── */
@@ -663,11 +678,24 @@ const PBtn = styled.button`
   }
 `;
 
-/* ─── Description ────────────────────────────────────────── */
+/* Full-bleed backdrop behind the bottom richtext block (CMS page body / collection description)
+   — spans the page's full width, independent of whatever column layout sits above it. */
+const RichtextStrip = styled.div`
+  width: 100%;
+  background: #f5f5f5;
+  box-sizing: border-box;
+  padding-top: 40px;
+  padding-bottom: 48px;
+`;
+
+/* ─── Description ─────────────────────────────────────────
+   Also reused (with $divider={false}) for a plain CMS page's richtext body — same long-form
+   typography (headings, lists, trailing-margin reset), just without the "divider below a
+   product/category grid" framing that the collection description needs. ── */
 const Desc = styled.div`
-  margin-top: 56px;
-  padding-top: 28px;
-  border-top: 1px solid #e8e8e6;
+  margin-top: ${(p) => (p.$divider === false ? "0" : "56px")};
+  padding-top: ${(p) => (p.$divider === false ? "0" : "28px")};
+  border-top: ${(p) => (p.$divider === false ? "none" : "1px solid #e8e8e6")};
   font-size: var(--body-fs);
   line-height: var(--body-lh);
   color: var(--body-color);
@@ -1132,8 +1160,10 @@ function CollectionPage() {
   if (cmsPage) {
     const localizedBody = localizedCmsField(cmsPage, "body", locale);
     const cmsTmpl = shopStyles?.cms_page_template || {};
-    const cmsPadTop = Math.max(0, Number(cmsTmpl.padding_top) || 0);
-    const cmsPadBottom = Math.max(0, Number.isFinite(Number(cmsTmpl.padding_bottom)) ? Number(cmsTmpl.padding_bottom) : 48);
+    // 32px top/bottom matches the padding the landing-container blocks (text_block, image_text, …)
+    // default to — the "ideal" gap the rest of the page-builder already uses between sections.
+    const cmsPadTop = Number.isFinite(Number(cmsTmpl.padding_top)) ? Math.max(0, Number(cmsTmpl.padding_top)) : 32;
+    const cmsPadBottom = Number.isFinite(Number(cmsTmpl.padding_bottom)) ? Math.max(0, Number(cmsTmpl.padding_bottom)) : 32;
     const cmsBodyStyle = {
       maxWidth: 800,
       margin: "0 auto",
@@ -1142,15 +1172,6 @@ function CollectionPage() {
       paddingLeft: 24,
       paddingRight: 24,
     };
-    const pageBody = (
-      <>
-        <LandingContainers pageId={String(cmsPage.id)} />
-        {localizedBody ? (
-          <div style={cmsBodyStyle}
-            dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
-        ) : null}
-      </>
-    );
     return (
       <PageWrap>
         <ShopHeader />
@@ -1176,11 +1197,17 @@ function CollectionPage() {
                   </CmsPageSidebarLink>
                 ))}
               </CmsPageSidebar>
-              <CmsPageContent>{pageBody}</CmsPageContent>
+              <CmsPageContent><LandingContainers pageId={String(cmsPage.id)} /></CmsPageContent>
             </CmsPageWithSidebar>
           ) : (
-            pageBody
+            <LandingContainers pageId={String(cmsPage.id)} />
           )}
+          {localizedBody ? (
+            <RichtextStrip>
+              <Desc $divider={false} style={cmsBodyStyle}
+                dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
+            </RichtextStrip>
+          ) : null}
         </Main>
         <Footer />
       </PageWrap>
@@ -1514,13 +1541,15 @@ function CollectionPage() {
               </Pager>
             )}
 
-            {/* Description */}
-            {collection.description && (
-              <Desc $align={richtextAlign} $maxWidth={richtextMaxW}
-                dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
-            )}
           </Body>
         </ContentWrap>
+
+        {collection.description && (
+          <RichtextStrip style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+            <Desc $divider={false} $align={richtextAlign} $maxWidth={richtextMaxW}
+              dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
+          </RichtextStrip>
+        )}
       </Main>
       <Footer />
     </PageWrap>

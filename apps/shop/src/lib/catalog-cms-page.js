@@ -53,7 +53,7 @@ export function catalogCmsSeo(page, locale, fallbackTitle = "") {
     localizedCmsField(page, "meta_description", locale) ||
     stripHtml(localizedCmsField(page, "body", locale), 160) ||
     undefined;
-  const kwRaw = (page?.meta_keywords && String(page.meta_keywords).trim()) || "";
+  const kwRaw = (localizedCmsField(page, "meta_keywords", locale) || "").trim();
   const keywords = kwRaw
     ? kwRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
