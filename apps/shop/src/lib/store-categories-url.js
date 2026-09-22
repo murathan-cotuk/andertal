@@ -9,3 +9,31 @@ export function storeCategoriesQuery(locale, params = {}) {
   const s = q.toString();
   return s ? `?${s}` : "";
 }
+
+/** Amazon-style: roots only (no nested children). Menu drills fetch parent_id next. */
+export function shallowCategoriesQuery(locale, extra = {}) {
+  return storeCategoriesQuery(locale, {
+    tree: "true",
+    is_visible: "true",
+    depth: "1",
+    ...extra,
+  });
+}
+
+/** Direct children of one parent (one level). */
+export function childrenCategoriesQuery(locale, parentId) {
+  return storeCategoriesQuery(locale, {
+    tree: "true",
+    is_visible: "true",
+    depth: "1",
+    parent_id: parentId,
+  });
+}
+
+/** Breadcrumb path + direct children without downloading the full tree. */
+export function categoryPathQuery(locale, { slug, id } = {}) {
+  const params = {};
+  if (slug) params.path_for = String(slug);
+  if (id) params.path_for_id = String(id);
+  return storeCategoriesQuery(locale, params);
+}

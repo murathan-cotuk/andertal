@@ -648,19 +648,34 @@ export default function BrandPage() {
   }, [locale, brand?.handle, marketPrefixVal]);
 
   useEffect(() => {
+    if (!products.length) {
+      setCategoryTree([]);
+      setCategorySlugToName(new Map());
+      return undefined;
+    }
+    const ids = new Set();
+    for (const p of products) {
+      for (const id of productCategoryIds(p)) ids.add(id);
+    }
+    if (!ids.size) {
+      setCategoryTree([]);
+      setCategorySlugToName(new Map());
+      return undefined;
+    }
     let cancelled = false;
-    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 })
+    const idList = [...ids].slice(0, 200).join(",");
+    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { ids: idList })}`, { ttlMs: 60000 })
       .then((data) => {
         if (cancelled) return;
-        const tree = data.tree || [];
-        setCategoryTree(tree);
-        setCategorySlugToName(buildCategorySlugToNameMap(tree));
+        const nodes = Array.isArray(data?.categories) ? data.categories : (data?.tree || []);
+        setCategoryTree(nodes);
+        setCategorySlugToName(buildCategorySlugToNameMap(nodes));
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [locale]);
+  }, [products, locale]);
 
   useEffect(() => {
     let cancelled = false;

@@ -16,8 +16,6 @@ import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { baseHandleFromUrl, parseProductUrlHandle } from "@/lib/product-url-handle";
 import { getMedusaClient } from "@/lib/medusa-client";
-import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { SITE_URL, localizedCmsField } from "@/lib/seo";
 import {
@@ -863,21 +861,6 @@ function CollectionPage() {
     return null;
   };
 
-  const findCategoryBySlug = (nodes, slug, seen = new WeakSet()) => {
-    const wanted = String(slug || "").replace(/^\//, "").toLowerCase();
-    if (!wanted) return null;
-    for (const node of nodes || []) {
-      if (!node || typeof node !== "object") continue;
-      if (seen.has(node)) continue;
-      seen.add(node);
-      const nodeSlug = String(node?.slug || node?.handle || "").replace(/^\//, "").toLowerCase();
-      if (nodeSlug === wanted) return node;
-      const nested = findCategoryBySlug(node?.children || [], wanted, seen);
-      if (nested) return nested;
-    }
-    return null;
-  };
-
   /* ── Fetch ── */
   useEffect(() => {
     if (!handle) return;
@@ -937,15 +920,7 @@ function CollectionPage() {
             const pageData = await pageRes.json().catch(() => null);
             if (pageData?.id) { setCmsPage(pageData); setLoading(false); return; }
           }
-          // Fallback 3: full tree lookup
-          const catTreeData = await cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 }).catch(() => null);
-          if (catTreeData) {
-            const catTree = catTreeData?.tree || catTreeData?.categories || [];
-            if (findCategoryBySlug(catTree, handle)) {
-              setIsCategorySlug(true); setLoading(false); return;
-            }
-          }
-          // Fallback 4: product by handle (supports {handle}-{8char-id} URL format)
+          // Fallback 3: product by handle (supports {handle}-{8char-id} URL format)
           let productData = await tryProductHandle(handle);
           if (!productData?.product?.id) {
             const base = baseHandleFromUrl(handle);

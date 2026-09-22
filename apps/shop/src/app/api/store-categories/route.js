@@ -5,8 +5,9 @@ const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 const categoriesCache = new Map();
-/** Keep short — admin writes also POST /api/revalidate to clear this Map immediately. */
-const CACHE_TTL_MS = 15 * 1000;
+/** Keep short — admin writes also POST /api/revalidate to clear this Map immediately.
+ *  Shallow depth=1 payloads are tiny; longer CDN TTL is safe and cuts repeat hits. */
+const CACHE_TTL_MS = 60 * 1000;
 
 registerStoreApiCache("categories", () => categoriesCache.clear());
 
@@ -37,7 +38,7 @@ export async function GET(request) {
       const cached = categoriesCache.get(cacheKey);
       if (cached && cached.expiresAt > now) {
         return NextResponse.json(cached.data, {
-          headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" },
+          headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" },
         });
       }
     }
@@ -45,7 +46,7 @@ export async function GET(request) {
     const fetchOpts =
       isDev
         ? { cache: "no-store" }
-        : { next: { revalidate: 15 } };
+        : { next: { revalidate: 60 } };
 
     const res = await fetch(`${base}/store/categories${qs ? `?${qs}` : ""}`, {
       headers: { "Content-Type": "application/json" },
@@ -80,7 +81,7 @@ export async function GET(request) {
     }
     return NextResponse.json(
       data,
-      isDev ? undefined : { headers: { "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60" } },
+      isDev ? undefined : { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
     );
   } catch (e) {
     if (isDev) {

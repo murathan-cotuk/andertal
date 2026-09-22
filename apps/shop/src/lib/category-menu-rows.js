@@ -23,12 +23,13 @@ export function mapCategoryNodesToMenuRows(nodes, locale) {
       const kids = Array.isArray(n.children)
         ? n.children.filter((c) => c && c.has_products !== false)
         : [];
+      const hasChildren = n.has_children === true || kids.length > 0;
       return {
         key: String(n.id),
         id: String(n.id),
         label: getLocalizedCategory(n, locale).name || n.slug || n.name || "",
         slug: String(n.slug || n.handle || "").replace(/^\//, "").trim(),
-        hasChildren: kids.length > 0,
+        hasChildren,
         imageUrl: imageRaw ? resolveImageUrl(imageRaw) : "",
       };
     })

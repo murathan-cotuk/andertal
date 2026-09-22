@@ -9,7 +9,16 @@ const {
 } = require('../categories-helpers')
 const { getProductsDbClient } = require('./admin-products')
 const { resolveUploadUrl } = require('./store-products')
-const { loadSlimStoreCategoryTree } = require('../store-category-tree')
+const {
+  loadSlimStoreCategoryTree,
+  sliceStoreCategoryTree,
+  buildStoreCategoryPathPayload,
+  pickStoreCategoryNodesByIds,
+  findStoreCategoryNodeBySlug,
+  findStoreCategoryAncestors,
+  truncateStoreCategoryDepth,
+  slimPathNode,
+} = require('../store-category-tree')
 const { resolveMenuService } = require('./menus')
 const { applyMenuLocale, normalizeMenuLocale } = require('../menu-auto-translate')
 const { getPooledClient } = require('../db-pool')
@@ -92,20 +101,94 @@ const STORE_CATEGORIES_TREE_TTL_MS = 45_000
 // In-flight promise per cache key: without this, every concurrent request that
 // lands while the 45s cache is cold independently re-runs the same tree build.
 const storeCategoriesTreeInFlight = new Map()
+/** Load full slim localized tree (cached 45s per locale). Slicing happens per request. */
+const loadCachedStoreCategoryTree = async (req, requestLocale) => {
+  const cacheKey = requestLocale
+  const now = Date.now()
+  const cachedEntry = storeCategoriesTreeCache.get(cacheKey)
+  if (cachedEntry && now - cachedEntry.at < STORE_CATEGORIES_TREE_TTL_MS) {
+    return cachedEntry.payload
+  }
+
+  let payloadPromise = storeCategoriesTreeInFlight.get(cacheKey)
+  if (!payloadPromise) {
+    payloadPromise = (async () => {
+      const client = getPooledClient()
+      if (!client) return { categories: [], tree: [], count: 0 }
+      await client.connect()
+      try {
+        const tree = await loadSlimStoreCategoryTree({
+          query: (sql, params) => client.query(sql, params),
+          resolveUploadUrl,
+        })
+        await localizeCategoriesForRequest(tree, req, client)
+        const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
+        return { categories, tree, count: categories.length }
+      } finally {
+        try { await client.end() } catch (_) {}
+      }
+    })()
+      .then((result) => {
+        storeCategoriesTreeCache.set(cacheKey, { at: Date.now(), payload: result })
+        return result
+      })
+      .finally(() => {
+        storeCategoriesTreeInFlight.delete(cacheKey)
+      })
+    storeCategoriesTreeInFlight.set(cacheKey, payloadPromise)
+  }
+  return payloadPromise
+}
+
+const shapeSlicedCategoriesPayload = (fullPayload, { depth, parentId } = {}) => {
+  const fullTree = fullPayload?.tree || []
+  const tree = sliceStoreCategoryTree(fullTree, { depth, parentId })
+  const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
+  return { categories, tree, count: categories.length }
+}
+
 const storeCategoriesGET = async (req, res) => {
   const adminHubService = resolveAdminHub()
   const requestLocale = resolveCategoryRequestLocale(req) || 'en'
   try {
     const slug = (req.query.slug || '').toString().trim()
+    const pathFor = (req.query.path_for || '').toString().trim()
+    const pathForId = (req.query.path_for_id || '').toString().trim()
+    const idsParam = (req.query.ids || '').toString().trim()
+    const parentId = (req.query.parent_id || '').toString().trim()
+    const depthRaw = req.query.depth
+    const depth = depthRaw == null || depthRaw === '' ? null : Number(depthRaw)
+
+    // Breadcrumb / product path — tiny payload, no full tree over the wire.
+    if (pathFor || pathForId) {
+      const full = await loadCachedStoreCategoryTree(req, requestLocale)
+      const pathPayload = buildStoreCategoryPathPayload(full.tree || [], {
+        slug: pathFor || undefined,
+        id: pathForId || undefined,
+      })
+      if (!pathPayload) return res.status(404).json({ message: 'Category not found' })
+      return res.json(pathPayload)
+    }
+
+    // Flat id lookup for facet labels (brand/search) without shipping the whole tree.
+    if (idsParam) {
+      const full = await loadCachedStoreCategoryTree(req, requestLocale)
+      const nodes = pickStoreCategoryNodesByIds(full.tree || [], idsParam)
+      return res.json({ categories: nodes, tree: nodes, count: nodes.length })
+    }
+
     if (slug) {
+      let cat = null
       if (adminHubService) {
         const category = await adminHubService.getCategoryBySlug(slug)
-        if (!category || category.active === false || category.is_visible === false) return res.status(404).json({ message: 'Category not found' })
+        if (!category || category.active === false || category.is_visible === false) {
+          return res.status(404).json({ message: 'Category not found' })
+        }
         await localizeSingleCategoryForRequest(category, req, null)
         const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
         const collectionId = category.has_collection && meta.collection_id ? meta.collection_id : null
         const rawBanner = cleanImageValue(category.banner_image_url) ?? cleanImageValue(meta.banner_image_url)
-        const cat = {
+        cat = {
           id: category.id, name: category.name, slug: category.slug,
           title: category.name, handle: category.slug,
           description: category.description || null,
@@ -117,77 +200,70 @@ const storeCategoriesGET = async (req, res) => {
           seo_description: category.seo_description || null,
           metadata: meta,
         }
-        return res.json({ category: cat, categories: [cat], count: 1 })
-      }
-      // DB fallback
-      const client = getProductsDbClient()
-      if (!client) return res.status(404).json({ message: 'Category not found' })
-      await client.connect()
-      const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true LIMIT 1`, [slug])
-      if (!r.rows[0]) {
-        await client.end()
-        return res.status(404).json({ message: 'Category not found' })
-      }
-      const category = mapAdminHubCategoryPgRow(r.rows[0])
-      await localizeSingleCategoryForRequest(category, req, client)
-      await client.end()
-      const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
-      const rawBanner = cleanImageValue(category.banner_image_url) ?? cleanImageValue(meta.banner_image_url)
-      const cat = {
-        id: category.id, name: category.name, slug: category.slug,
-        title: category.name, handle: category.slug,
-        description: category.description || null,
-        long_content: category.long_content || null,
-        banner_image_url: resolveUploadUrl(rawBanner) || null,
-        has_collection: category.has_collection,
-        collection_id: category.has_collection && meta.collection_id ? meta.collection_id : null,
-        seo_title: category.seo_title || null,
-        seo_description: category.seo_description || null,
-        metadata: meta,
-      }
-      return res.json({ category: cat, categories: [cat], count: 1 })
-    }
-
-    const cacheKey = requestLocale
-    const now = Date.now()
-    const cachedEntry = storeCategoriesTreeCache.get(cacheKey)
-    if (cachedEntry && now - cachedEntry.at < STORE_CATEGORIES_TREE_TTL_MS) {
-      return res.json(cachedEntry.payload)
-    }
-
-    // Share one in-flight computation across all requests for this locale that
-    // land while the cache is cold. Tree is loaded via slim SQL (no long_content,
-    // no 10k full-product fetch) so the 12k-category catalog cannot OOM the shop menu.
-    let payloadPromise = storeCategoriesTreeInFlight.get(cacheKey)
-    if (!payloadPromise) {
-      payloadPromise = (async () => {
-        const client = getPooledClient()
-        if (!client) return { categories: [], tree: [], count: 0 }
+      } else {
+        const client = getProductsDbClient()
+        if (!client) return res.status(404).json({ message: 'Category not found' })
         await client.connect()
-        try {
-          const tree = await loadSlimStoreCategoryTree({
-            query: (sql, params) => client.query(sql, params),
-            resolveUploadUrl,
-          })
-          await localizeCategoriesForRequest(tree, req, client)
-          const categories = (tree || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug, title: c.name, handle: c.slug }))
-          return { categories, tree, count: categories.length }
-        } finally {
-          try { await client.end() } catch (_) {}
+        const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 AND active = true LIMIT 1`, [slug])
+        if (!r.rows[0]) {
+          await client.end()
+          return res.status(404).json({ message: 'Category not found' })
         }
-      })()
-        .then((result) => {
-          storeCategoriesTreeCache.set(cacheKey, { at: Date.now(), payload: result })
-          return result
-        })
-        .finally(() => {
-          storeCategoriesTreeInFlight.delete(cacheKey)
-        })
-      storeCategoriesTreeInFlight.set(cacheKey, payloadPromise)
+        const category = mapAdminHubCategoryPgRow(r.rows[0])
+        await localizeSingleCategoryForRequest(category, req, client)
+        await client.end()
+        const meta = category.metadata && typeof category.metadata === 'object' ? category.metadata : {}
+        const rawBanner = cleanImageValue(category.banner_image_url) ?? cleanImageValue(meta.banner_image_url)
+        cat = {
+          id: category.id, name: category.name, slug: category.slug,
+          title: category.name, handle: category.slug,
+          description: category.description || null,
+          long_content: category.long_content || null,
+          banner_image_url: resolveUploadUrl(rawBanner) || null,
+          has_collection: category.has_collection,
+          collection_id: category.has_collection && meta.collection_id ? meta.collection_id : null,
+          seo_title: category.seo_title || null,
+          seo_description: category.seo_description || null,
+          metadata: meta,
+        }
+      }
+
+      // Attach ancestors + direct children from the slim tree so category pages
+      // never need a second full-tree download.
+      let ancestors = []
+      let children = []
+      try {
+        const full = await loadCachedStoreCategoryTree(req, requestLocale)
+        const want = String(slug).trim().toLowerCase().replace(/^\//, '')
+        const node = findStoreCategoryNodeBySlug(full.tree || [], want)
+        if (node) {
+          ancestors = (findStoreCategoryAncestors(
+            full.tree || [],
+            (n) => String(n.slug || n.handle || '').trim().toLowerCase().replace(/^\//, '') === want,
+          ) || []).map(slimPathNode).filter(Boolean)
+          children = truncateStoreCategoryDepth(
+            Array.isArray(node.children) ? node.children : [],
+            1,
+          )
+          if (!cat.image_url && node.image_url) cat.image_url = node.image_url
+        }
+      } catch (_) {}
+
+      return res.json({
+        category: cat,
+        categories: [cat],
+        count: 1,
+        ancestors,
+        children,
+      })
     }
 
-    const payload = await payloadPromise
-    res.json(payload)
+    // Full tree is built once and cached; response is sliced by depth / parent_id.
+    const full = await loadCachedStoreCategoryTree(req, requestLocale)
+    res.json(shapeSlicedCategoriesPayload(full, {
+      depth: Number.isFinite(depth) && depth > 0 ? depth : null,
+      parentId: parentId || null,
+    }))
   } catch (err) {
     console.error('Store categories GET error:', err)
     res.status(200).json({ categories: [], tree: [], count: 0 })

@@ -129,4 +129,35 @@ describe('store-category-tree', () => {
       '/uploads/m.jpg',
     )
   })
+
+  it('slices tree by depth and parent_id with has_children', () => {
+    const {
+      sliceStoreCategoryTree,
+      buildStoreCategoryPathPayload,
+      pickStoreCategoryNodesByIds,
+    } = require('./store-category-tree')
+    const leaf = { id: 'leaf', slug: 'leaf', name: 'Leaf', has_products: true, children: [] }
+    const mid = { id: 'mid', slug: 'mid', name: 'Mid', has_products: true, children: [leaf] }
+    const root = { id: 'root', slug: 'root', name: 'Root', has_products: true, children: [mid] }
+    const shallow = sliceStoreCategoryTree([root], { depth: 1 })
+    assert.equal(shallow.length, 1)
+    assert.equal(shallow[0].id, 'root')
+    assert.equal(shallow[0].has_children, true)
+    assert.equal(shallow[0].children.length, 0)
+
+    const kids = sliceStoreCategoryTree([root], { parentId: 'root', depth: 1 })
+    assert.equal(kids.length, 1)
+    assert.equal(kids[0].id, 'mid')
+    assert.equal(kids[0].has_children, true)
+    assert.equal(kids[0].children.length, 0)
+
+    const path = buildStoreCategoryPathPayload([root], { slug: 'leaf' })
+    assert.equal(path.path.length, 3)
+    assert.equal(path.ancestors.length, 2)
+    assert.equal(path.category.id, 'leaf')
+
+    const picked = pickStoreCategoryNodesByIds([root], 'mid,leaf')
+    assert.equal(picked.length, 2)
+    assert.equal(picked.every((n) => n.children.length === 0), true)
+  })
 })

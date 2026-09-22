@@ -245,6 +245,182 @@ async function loadSlimStoreCategoryTree({ query, resolveUploadUrl }) {
   return slimStoreCategoryTree(pruned, resolveUploadUrl)
 }
 
+function findStoreCategoryNodeById(nodes, id) {
+  const want = String(id || '').trim().toLowerCase()
+  if (!want) return null
+  for (const n of nodes || []) {
+    if (!n) continue
+    if (String(n.id || '').trim().toLowerCase() === want) return n
+    const hit = findStoreCategoryNodeById(n.children, id)
+    if (hit) return hit
+  }
+  return null
+}
+
+function findStoreCategoryNodeBySlug(nodes, slug) {
+  const want = String(slug || '').trim().toLowerCase().replace(/^\//, '')
+  if (!want) return null
+  for (const n of nodes || []) {
+    if (!n) continue
+    const s = String(n.slug || n.handle || '').trim().toLowerCase().replace(/^\//, '')
+    if (s === want) return n
+    const hit = findStoreCategoryNodeBySlug(n.children, slug)
+    if (hit) return hit
+  }
+  return null
+}
+
+/** Ancestors from root → direct parent (excludes the matched node). */
+function findStoreCategoryAncestors(nodes, predicate, path = []) {
+  for (const n of nodes || []) {
+    if (!n) continue
+    if (predicate(n)) return path
+    const found = findStoreCategoryAncestors(n.children, predicate, [...path, n])
+    if (found) return found
+  }
+  return null
+}
+
+/**
+ * Amazon-style shallow slice of an already-built slim tree.
+ * depth=1 → current level only (children emptied, has_children set).
+ * parent_id → return that node's children as the new roots.
+ */
+function truncateStoreCategoryDepth(nodes, maxDepth, currentDepth = 1) {
+  const out = []
+  for (const n of nodes || []) {
+    if (!n) continue
+    const kids = Array.isArray(n.children) ? n.children : []
+    const hasKids = kids.some((c) => c && c.has_products !== false)
+    const subtreeIds = collectSubtreeIds(n)
+    if (currentDepth >= maxDepth) {
+      out.push({ ...n, children: [], has_children: hasKids, subtree_ids: subtreeIds })
+    } else {
+      out.push({
+        ...n,
+        has_children: hasKids,
+        subtree_ids: subtreeIds,
+        children: truncateStoreCategoryDepth(kids, maxDepth, currentDepth + 1),
+      })
+    }
+  }
+  return out
+}
+
+function collectSubtreeIds(node) {
+  const out = []
+  const walk = (n) => {
+    if (!n) return
+    if (n.id != null && String(n.id).trim()) out.push(String(n.id))
+    for (const c of n.children || []) walk(c)
+  }
+  walk(node)
+  return out
+}
+
+function annotateHasChildrenOnly(nodes) {
+  const out = []
+  for (const n of nodes || []) {
+    if (!n) continue
+    const kids = Array.isArray(n.children) ? n.children : []
+    out.push({
+      ...n,
+      has_children: kids.some((c) => c && c.has_products !== false),
+      children: annotateHasChildrenOnly(kids),
+    })
+  }
+  return out
+}
+
+function sliceStoreCategoryTree(tree, { depth, parentId } = {}) {
+  let nodes = Array.isArray(tree) ? tree : []
+  if (parentId != null && String(parentId).trim() !== '') {
+    const parent = findStoreCategoryNodeById(nodes, parentId)
+    nodes = parent && Array.isArray(parent.children) ? parent.children : []
+  }
+  const d = depth == null || depth === '' ? null : Number(depth)
+  if (Number.isFinite(d) && d > 0) {
+    // Truncated responses carry subtree_ids so search/facet filters still work.
+    nodes = truncateStoreCategoryDepth(nodes, d)
+  } else {
+    // Full tree: only annotate has_children — never attach subtree_ids (payload bloat).
+    nodes = annotateHasChildrenOnly(nodes)
+  }
+  return nodes
+}
+
+/** Strip nested children for breadcrumb path nodes (keep leaf children separately). */
+function slimPathNode(node) {
+  if (!node) return null
+  const { children, ...rest } = node
+  const kids = Array.isArray(children) ? children : []
+  return {
+    ...rest,
+    has_children: kids.some((c) => c && c.has_products !== false),
+    subtree_ids: collectSubtreeIds(node),
+    children: [],
+  }
+}
+
+function buildStoreCategoryPathPayload(tree, { slug, id } = {}) {
+  let current = null
+  let ancestors = []
+  if (id) {
+    current = findStoreCategoryNodeById(tree, id)
+    if (current) {
+      ancestors = findStoreCategoryAncestors(
+        tree,
+        (n) => String(n.id || '').trim().toLowerCase() === String(id).trim().toLowerCase(),
+      ) || []
+    }
+  }
+  if (!current && slug) {
+    const want = String(slug).trim().toLowerCase().replace(/^\//, '')
+    current = findStoreCategoryNodeBySlug(tree, want)
+    if (current) {
+      ancestors = findStoreCategoryAncestors(
+        tree,
+        (n) => String(n.slug || n.handle || '').trim().toLowerCase().replace(/^\//, '') === want,
+      ) || []
+    }
+  }
+  if (!current) return null
+  const children = truncateStoreCategoryDepth(
+    Array.isArray(current.children) ? current.children : [],
+    1,
+  )
+  return {
+    category: slimPathNode(current),
+    ancestors: ancestors.map(slimPathNode).filter(Boolean),
+    children,
+    path: [...ancestors.map(slimPathNode), slimPathNode(current)].filter(Boolean),
+  }
+}
+
+/** Flat lookup by ids (no deep nesting) — for brand/search facet labels. */
+function pickStoreCategoryNodesByIds(tree, ids) {
+  const want = new Set(
+    (Array.isArray(ids) ? ids : String(ids || '').split(','))
+      .map((x) => String(x || '').trim().toLowerCase())
+      .filter(Boolean),
+  )
+  if (want.size === 0) return []
+  const out = []
+  const walk = (nodes) => {
+    for (const n of nodes || []) {
+      if (!n) continue
+      if (want.has(String(n.id || '').trim().toLowerCase())) {
+        out.push(slimPathNode(n))
+        want.delete(String(n.id || '').trim().toLowerCase())
+        if (want.size === 0) return
+      }
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(tree)
+  return out
+}
+
 module.exports = {
   unwrapCategoryImageValue,
   pickCategoryImageRaw,
@@ -257,5 +433,15 @@ module.exports = {
   slimStoreCategoryNode,
   slimStoreCategoryTree,
   loadSlimStoreCategoryTree,
+  findStoreCategoryNodeById,
+  findStoreCategoryNodeBySlug,
+  findStoreCategoryAncestors,
+  truncateStoreCategoryDepth,
+  collectSubtreeIds,
+  annotateHasChildrenOnly,
+  sliceStoreCategoryTree,
+  slimPathNode,
+  buildStoreCategoryPathPayload,
+  pickStoreCategoryNodesByIds,
   STORE_TREE_SQL,
 }

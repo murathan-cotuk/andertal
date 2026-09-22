@@ -15,7 +15,7 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { SITE_URL } from "@/lib/seo";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { categoryPathQuery } from "@/lib/store-categories-url";
 import { optionDisplayLabel, optionCanonicalValue, variationGroupDisplayName } from "@/lib/variation-labels";
 import { enrichVariationGroups } from "@/lib/product-variations";
 import { localizeMetaKey, localizeSectionLabel } from "@/lib/prop-labels";
@@ -1198,7 +1198,7 @@ export default function ProductTemplate() {
     link.href = href;
   }, [product, locale, marketPrefixVal]);
 
-  // Breadcrumb: full category chain from admin_category_id / category_slug (no Home, no collection fallback).
+  // Breadcrumb: path_for / path_for_id — no full category tree download.
   useEffect(() => {
     const categorySlug = product?.metadata?.category_slug;
     const categoryId = product?.metadata?.admin_category_id || product?.metadata?.category_id;
@@ -1209,23 +1209,11 @@ export default function ProductTemplate() {
     }
 
     let cancelled = false;
-    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 })
+    cachedJsonFetch(`/api/store-categories${categoryPathQuery(locale, { slug: categorySlug, id: categoryId })}`, { ttlMs: 60000 })
       .then((data) => {
         if (cancelled) return;
-        const tree = data?.tree || data?.categories || [];
-        const roots = Array.isArray(tree) ? tree : [tree];
-        let currentNode = null;
-        let ancestors = [];
-        if (categorySlug) {
-          ancestors = findAncestors(roots, categorySlug) || [];
-          currentNode = findCategoryNodeBySlug(roots, categorySlug) || null;
-        }
-        if (!currentNode && categoryId) {
-          currentNode = findCategoryNodeById(roots, categoryId) || null;
-          ancestors = findAncestorsById(roots, categoryId) || [];
-        }
-        setCategoryAncestors(ancestors);
-        setCategoryCurrentNode(currentNode);
+        setCategoryAncestors(Array.isArray(data?.ancestors) ? data.ancestors : []);
+        setCategoryCurrentNode(data?.category || null);
       })
       .catch(() => {
         if (cancelled) return;

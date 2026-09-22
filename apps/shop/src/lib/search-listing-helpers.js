@@ -46,6 +46,9 @@ export function visibleSubcats(children) {
 }
 
 export function collectCategorySubtreeIds(node) {
+  if (Array.isArray(node?.subtree_ids) && node.subtree_ids.length) {
+    return new Set(node.subtree_ids.map(normCatId).filter(Boolean));
+  }
   const ids = new Set();
   const walk = (n) => {
     if (!n) return;

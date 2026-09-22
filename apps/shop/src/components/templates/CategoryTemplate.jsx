@@ -21,7 +21,6 @@ import {
 import { normCatId } from "@/lib/category-product-ids";
 import { getLocalizedCategory } from "@/lib/format";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
-import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import LandingContainers from "@/components/landing/LandingContainers";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
@@ -1024,17 +1023,13 @@ export default function CategoryTemplate() {
       try {
         setLoading(true);
         setError(null);
-        const [catResBySlug, catResTree, productRes] = await Promise.all([
+        const [catResBySlug, productRes] = await Promise.all([
           fetch(`/api/store-categories${storeCategoriesQuery(locale, { slug })}`).then((r) => r.json()).catch(() => ({ categories: [] })),
-          cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 }).catch(() => ({ tree: [] })),
           fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`).then((r) => r.json()).catch(() => ({ products: [] })),
         ]);
         if (cancelled) return;
         const cat = catResBySlug?.category || (Array.isArray(catResBySlug?.categories) ? catResBySlug.categories[0] : null);
-        const tree = catResTree.tree || catResTree.categories || [];
-        const roots = Array.isArray(tree) ? tree : [tree];
-        const currentFromTree = findCategoryNodeBySlug(roots, slug);
-        const resolvedCategory = cat || currentFromTree || null;
+        const resolvedCategory = cat || null;
         setCategory(resolvedCategory);
         if (!resolvedCategory) {
           setProducts([]);
@@ -1044,17 +1039,14 @@ export default function CategoryTemplate() {
           setLoading(false);
           return;
         }
-        const current = currentFromTree || findCategoryNodeById(roots, resolvedCategory.id);
 
-        // Ancestor chain (root → direct parent)
-        const ancestorChain = findAncestors(roots, slug) || [];
+        // Ancestors + children come on the slug payload (no full-tree download).
+        const ancestorChain = Array.isArray(catResBySlug?.ancestors) ? catResBySlug.ancestors : [];
         setAncestors(ancestorChain);
-        // Direct parent (last ancestor)
         const directParent = ancestorChain.length > 0 ? ancestorChain[ancestorChain.length - 1] : null;
         setParentCategory(directParent);
 
-        // Direct children of current category for sidebar navigation
-        const subs = visibleSubcats(current?.children).filter((s) => s && normCatId(s.id));
+        const subs = visibleSubcats(catResBySlug?.children).filter((s) => s && normCatId(s.id));
         setSubcategories(subs);
 
         setProducts(productRes?.products ?? []);

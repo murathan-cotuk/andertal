@@ -10,14 +10,14 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { shallowCategoriesQuery, childrenCategoriesQuery } from "@/lib/store-categories-url";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { LogoutButton } from "@andertal/ui";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
-import { findCategoryNodeById, mapCategoryNodesToMenuRows, shouldCategoryMenuDrill } from "@/lib/category-menu-rows";
+import { mapCategoryNodesToMenuRows, shouldCategoryMenuDrill } from "@/lib/category-menu-rows";
 import ModernMobileBottomNav from "@/components/ModernMobileBottomNav";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import {
@@ -318,6 +318,8 @@ export default function MobileNav({ layout = "fixed" }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTarget, setDrawerTarget] = useState("menu"); // "menu" | "account"
   const [categoryTree, setCategoryTree] = useState([]);
+  const [categoryChildrenById, setCategoryChildrenById] = useState(() => new Map());
+  const categoryChildrenLoadedRef = useRef(new Set());
   const [categoryDrillStack, setCategoryDrillStack] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -344,23 +346,46 @@ export default function MobileNav({ layout = "fixed" }) {
     return () => mq.removeEventListener("change", go);
   }, []);
 
-  /* Fetch data once — tracked with a loading flag so the "Menu" drawer's Kategorien section
-   * can show a placeholder instead of silently disappearing while this is in flight (it used
-   * to vanish entirely on categories.length === 0, leaving just the login/register block for
-   * a logged-out visitor who opened the drawer before this fetch settled). */
+  /* Fetch shallow roots once — drill loads children via parent_id. */
   useEffect(() => {
     let cancelled = false;
     setCategoriesLoading(true);
-    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 })
+    cachedJsonFetch(`/api/store-categories${shallowCategoriesQuery(locale)}`, { ttlMs: 60000 })
       .then((d) => {
         if (cancelled) return;
         setCategoryTree(Array.isArray(d?.tree) ? d.tree : []);
         setCategoryDrillStack([]);
+        setCategoryChildrenById(new Map());
+        categoryChildrenLoadedRef.current = new Set();
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setCategoriesLoading(false); });
     return () => { cancelled = true; };
   }, [locale]);
+
+  useEffect(() => {
+    const parentId = categoryDrillStack.length
+      ? String(categoryDrillStack[categoryDrillStack.length - 1].id)
+      : "";
+    if (!parentId || categoryChildrenLoadedRef.current.has(parentId)) return undefined;
+    categoryChildrenLoadedRef.current.add(parentId);
+    let cancelled = false;
+    cachedJsonFetch(`/api/store-categories${childrenCategoriesQuery(locale, parentId)}`, { ttlMs: 60000 })
+      .catch(() => ({ tree: [] }))
+      .then((res) => {
+        if (cancelled) return;
+        const kids = Array.isArray(res?.tree) ? res.tree : [];
+        setCategoryChildrenById((prev) => {
+          const next = new Map(prev);
+          next.set(parentId, kids);
+          return next;
+        });
+      })
+      .catch(() => {
+        categoryChildrenLoadedRef.current.delete(parentId);
+      });
+    return () => { cancelled = true; };
+  }, [categoryDrillStack, locale]);
 
   /* Close drawer on route change */
   useEffect(() => {
@@ -392,9 +417,9 @@ export default function MobileNav({ layout = "fixed" }) {
   }, []);
 
   const drillCurrent = categoryDrillStack.length ? categoryDrillStack[categoryDrillStack.length - 1] : null;
-  const drillParent = drillCurrent ? findCategoryNodeById(categoryTree, drillCurrent.id) : null;
+  const drillParentId = drillCurrent ? String(drillCurrent.id) : null;
   const categoryRows = mapCategoryNodesToMenuRows(
-    drillParent ? drillParent.children : categoryTree,
+    drillParentId ? (categoryChildrenById.get(drillParentId) || []) : categoryTree,
     locale,
   );
 

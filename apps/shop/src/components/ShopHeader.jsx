@@ -42,13 +42,13 @@ import { menuItemHref } from "@/lib/shop-menu-href";
 import { buildHeaderSurfaceCssVarsFromRoute, effectiveGradientEnabled, resolveSecondNavLinkStyles, resolveViewportTier, pickShopLogoSlot } from "@andertal/shop-theme";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { detectShopHeaderRouteScope } from "@/lib/header-route-scope";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { shallowCategoriesQuery, childrenCategoriesQuery } from "@/lib/store-categories-url";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import { resolveImageUrl } from "@/lib/image-url";
 import { pickCategoryListImageRaw } from "@/lib/category-list-image";
-import { findCategoryNodeById, mapCategoryNodesToMenuRows, shouldCategoryMenuDrill } from "@/lib/category-menu-rows";
+import { mapCategoryNodesToMenuRows, shouldCategoryMenuDrill } from "@/lib/category-menu-rows";
 
 /** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
 const SCROLL_UP_DELTA = 6;
@@ -1051,6 +1051,9 @@ export default function ShopHeader() {
   const [categorySlugToId, setCategorySlugToId] = useState(() => new Map());
   const [categoriesFetchDone, setCategoriesFetchDone] = useState(false);
   const [categoryTree, setCategoryTree] = useState([]);
+  /** parentId → direct children (lazy-loaded on drill). */
+  const [categoryChildrenById, setCategoryChildrenById] = useState(() => new Map());
+  const categoryChildrenLoadedRef = useRef(new Set());
   const [categoryDrillStack, setCategoryDrillStack] = useState([]); // [] = root level
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
@@ -1246,7 +1249,7 @@ export default function ShopHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 })
+    cachedJsonFetch(`/api/store-categories${shallowCategoriesQuery(locale)}`, { ttlMs: 60000 })
       .catch(() => ({ tree: [] }))
       .then((catRes) => {
         if (cancelled) return;
@@ -1267,6 +1270,36 @@ export default function ShopHeader() {
       });
     return () => { cancelled = true; };
   }, [locale]);
+
+  /* Lazy-load children when the mega-menu drills into a category. */
+  useEffect(() => {
+    const parentId = categoryDrillStack.length
+      ? String(categoryDrillStack[categoryDrillStack.length - 1].id)
+      : "";
+    if (!parentId || categoryChildrenLoadedRef.current.has(parentId)) return undefined;
+    categoryChildrenLoadedRef.current.add(parentId);
+    let cancelled = false;
+    cachedJsonFetch(`/api/store-categories${childrenCategoriesQuery(locale, parentId)}`, { ttlMs: 60000 })
+      .catch(() => ({ tree: [] }))
+      .then((res) => {
+        if (cancelled) return;
+        const kids = Array.isArray(res?.tree) ? res.tree : [];
+        setCategoryChildrenById((prev) => {
+          const next = new Map(prev);
+          next.set(parentId, kids);
+          return next;
+        });
+        setCategorySlugToId((prev) => {
+          const next = new Map(prev);
+          walkCategorySlugMap(kids, next);
+          return next;
+        });
+      })
+      .catch(() => {
+        categoryChildrenLoadedRef.current.delete(parentId);
+      });
+    return () => { cancelled = true; };
+  }, [categoryDrillStack, locale]);
 
   useEffect(() => {
     let ticking = false;
@@ -1453,17 +1486,20 @@ export default function ShopHeader() {
     url: "handle",
     image: "thumbnail",
   };
-  /** Tree payload is already roots with product-bearing children nested. */
+  /** Shallow roots for the first mega-menu panel. */
   const categoryPanelRows = useMemo(
     () => mapCategoryNodesToMenuRows(categoryTree, locale).map((r) => ({ ...r, href: `/${r.slug}` })),
     [categoryTree, locale],
   );
-  const categoryDrillParent = categoryDrillStack.length
-    ? findCategoryNodeById(categoryTree, categoryDrillStack[categoryDrillStack.length - 1].id)
+  const categoryDrillParentId = categoryDrillStack.length
+    ? String(categoryDrillStack[categoryDrillStack.length - 1].id)
     : null;
   const categoryDrillRows = useMemo(
-    () => mapCategoryNodesToMenuRows(categoryDrillParent?.children || [], locale).map((r) => ({ ...r, href: `/${r.slug}` })),
-    [categoryDrillParent, locale],
+    () => mapCategoryNodesToMenuRows(
+      categoryDrillParentId ? (categoryChildrenById.get(categoryDrillParentId) || []) : [],
+      locale,
+    ).map((r) => ({ ...r, href: `/${r.slug}` })),
+    [categoryDrillParentId, categoryChildrenById, locale],
   );
 
   /** slug/id → category image for menu-item fallback rows */
@@ -1485,8 +1521,9 @@ export default function ShopHeader() {
       }
     };
     walk(categoryTree);
+    for (const kids of categoryChildrenById.values()) walk(kids);
     return map;
-  }, [categoryTree]);
+  }, [categoryTree, categoryChildrenById]);
 
   // Root-level menu items (no parent) for direct link rendering
   const menuPanelItems = useMemo(
@@ -1497,14 +1534,14 @@ export default function ShopHeader() {
           if (String(i?.link_type || "").toLowerCase() !== "category") return true;
           const ref = categoryRefFromMenuItem(i);
           if (!ref) return false;
-          /* Ağaç yüklenene kadar slug haritası boş — tüm kategori satırlarını silme (yarış) */
+          /* Shallow tree only has roots — keep CMS category links visible even when
+           * the slug isn't in the root map (deep categories load on demand). */
           if (!categoriesFetchDone) return true;
-          // Only active/visible categories are present in categorySlugToId map.
           if (categorySlugToId.has(ref)) return true;
           for (const id of categorySlugToId.values()) {
             if (String(id).toLowerCase() === ref) return true;
           }
-          return false;
+          return true;
         }),
     [mainMenuAllItems, categorySlugToId, categoriesFetchDone],
   );

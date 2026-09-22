@@ -31,15 +31,12 @@ import {
 } from "@/lib/catalog-listing";
 import {
   dominantCategoryIdFromProducts,
-  findCategoryNodeById,
-  findCategoryNodeBySlug,
-  findAncestors,
   visibleSubcats,
   filterProductsByCategorySubtree,
 } from "@/lib/search-listing-helpers";
 import { normCatId } from "@/lib/category-product-ids";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { categoryPathQuery, childrenCategoriesQuery } from "@/lib/store-categories-url";
 import CustomCheckbox from "../ui/CustomCheckbox";
 
 const HEADER_H = 72;
@@ -702,8 +699,9 @@ export default function SearchTemplate() {
   const catParam = (searchParams?.get("cat") || "").trim();
 
   const { products, loading, error } = useMedusaProducts();
-  const [tree, setTree] = useState([]);
-  const [treeLoading, setTreeLoading] = useState(true);
+  const [pathInfo, setPathInfo] = useState(null); // { category, ancestors, children }
+  const [parentSiblings, setParentSiblings] = useState([]);
+  const [treeLoading, setTreeLoading] = useState(false);
   const [sort, setSort] = useState("default");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({});
@@ -735,52 +733,63 @@ export default function SearchTemplate() {
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
-    let c = true;
-    (async () => {
-      try {
-        setTreeLoading(true);
-        const j = await cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 }).catch(() => ({ tree: [] }));
-        if (!c) return;
-        const t = j.tree || j.categories || [];
-        setTree(Array.isArray(t) ? t : [t].filter(Boolean));
-      } catch {
-        if (c) setTree([]);
-      } finally {
-        if (c) setTreeLoading(false);
-      }
-    })();
-    return () => { c = false; };
-  }, [locale]);
-
   const textHits = useMemo(
     () => (loading ? [] : textMatchProducts(q, products || [])),
     [q, products, loading],
   );
-
-  const roots = useMemo(() => (Array.isArray(tree) ? tree : []), [tree]);
 
   const dominantId = useMemo(
     () => dominantCategoryIdFromProducts(textHits),
     [textHits],
   );
 
+  useEffect(() => {
+    if (!dominantId) {
+      setPathInfo(null);
+      setParentSiblings([]);
+      setTreeLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setTreeLoading(true);
+    cachedJsonFetch(`/api/store-categories${categoryPathQuery(locale, { id: dominantId })}`, { ttlMs: 60000 })
+      .then((data) => {
+        if (cancelled) return;
+        if (!data?.category) {
+          setPathInfo(null);
+          return;
+        }
+        setPathInfo({
+          category: data.category,
+          ancestors: Array.isArray(data.ancestors) ? data.ancestors : [],
+          children: Array.isArray(data.children) ? data.children : [],
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setPathInfo(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTreeLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [dominantId, locale]);
+
   const currentNode = useMemo(() => {
-    if (!dominantId) return null;
-    return findCategoryNodeById(roots, dominantId) || null;
-  }, [roots, dominantId]);
+    if (!pathInfo?.category) return null;
+    return { ...pathInfo.category, children: pathInfo.children || [] };
+  }, [pathInfo]);
 
   const currentSlug = currentNode
     ? String(currentNode.slug || currentNode.handle || "").replace(/^\//, "")
     : "";
 
   const { parentCategory, subcategories, hasSubcategories, branchNav } = useMemo(() => {
-    if (!currentNode || !currentSlug) {
+    if (!currentNode || !currentSlug || !pathInfo) {
       return { parentCategory: null, subcategories: [], hasSubcategories: false, branchNav: true };
     }
-    const chain = findAncestors(roots, currentSlug) || [];
+    const chain = pathInfo.ancestors || [];
     const directParent = chain.length > 0 ? chain[chain.length - 1] : null;
-    const subs = visibleSubcats(currentNode.children).filter((s) => s && normCatId(s.id));
+    const subs = visibleSubcats(pathInfo.children).filter((s) => s && normCatId(s.id));
     if (subs.length > 0) {
       return {
         parentCategory: directParent,
@@ -792,21 +801,48 @@ export default function SearchTemplate() {
     if (directParent) {
       return {
         parentCategory: directParent,
-        subcategories: visibleSubcats(directParent.children).filter((s) => s && normCatId(s.id)),
+        subcategories: visibleSubcats(parentSiblings).filter((s) => s && normCatId(s.id)),
         hasSubcategories: false,
         branchNav: false,
       };
     }
     return { parentCategory: null, subcategories: [], hasSubcategories: false, branchNav: true };
-  }, [roots, currentNode, currentSlug]);
+  }, [pathInfo, currentNode, currentSlug, parentSiblings]);
+
+  /* Leaf category: load siblings from parent for the branch nav. */
+  useEffect(() => {
+    const kids = pathInfo?.children || [];
+    const parentId = pathInfo?.ancestors?.length
+      ? pathInfo.ancestors[pathInfo.ancestors.length - 1]?.id
+      : null;
+    if (!parentId || kids.length > 0) {
+      setParentSiblings([]);
+      return undefined;
+    }
+    let cancelled = false;
+    cachedJsonFetch(`/api/store-categories${childrenCategoriesQuery(locale, parentId)}`, { ttlMs: 60000 })
+      .then((data) => {
+        if (cancelled) return;
+        setParentSiblings(Array.isArray(data?.tree) ? data.tree : []);
+      })
+      .catch(() => {
+        if (!cancelled) setParentSiblings([]);
+      });
+    return () => { cancelled = true; };
+  }, [pathInfo, locale]);
 
   const displayTitle =
     (currentNode && (currentNode.name || currentSlug)) || "";
 
-  const categorySlugToName = useMemo(
-    () => buildCategorySlugToNameMap(roots),
-    [roots],
-  );
+  const categorySlugToName = useMemo(() => {
+    const nodes = [
+      ...(pathInfo?.ancestors || []),
+      pathInfo?.category,
+      ...(pathInfo?.children || []),
+      ...parentSiblings,
+    ].filter(Boolean);
+    return buildCategorySlugToNameMap(nodes);
+  }, [pathInfo, parentSiblings]);
 
   const allowedCatSlugs = useMemo(() => {
     const s = new Set();
@@ -833,8 +869,17 @@ export default function SearchTemplate() {
 
   const catNodeForFilter = useMemo(() => {
     if (!effectiveCat) return null;
-    return findCategoryNodeBySlug(roots, effectiveCat);
-  }, [effectiveCat, roots]);
+    const pool = [
+      currentNode,
+      ...(pathInfo?.children || []),
+      ...parentSiblings,
+      ...(pathInfo?.ancestors || []),
+    ].filter(Boolean);
+    const hit = pool.find(
+      (n) => String(n.slug || n.handle || "").replace(/^\//, "") === effectiveCat,
+    );
+    return hit || null;
+  }, [effectiveCat, currentNode, pathInfo, parentSiblings]);
 
   const pushSearch = useCallback(
     (nextQ, nextCat) => {

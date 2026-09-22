@@ -11,7 +11,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { toSalesScore } from "@/lib/bestseller";
 import { isDiscountedProduct, getProductBasePriceCents } from "@/lib/catalog-listing";
 import { formatPriceCents, getLocalizedCategory } from "@/lib/format";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { shallowCategoriesQuery, storeCategoriesQuery } from "@/lib/store-categories-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
@@ -1820,7 +1820,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
   useEffect(() => {
     let cancelled = false;
     if (source === "categories") {
-      cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 })
+      cachedJsonFetch(`/api/store-categories${shallowCategoriesQuery(locale)}`, { ttlMs: 60000 })
         .then((data) => {
           if (cancelled) return;
           const tree = Array.isArray(data?.tree) ? data.tree : [];
@@ -1862,22 +1862,22 @@ function CollectionsCarousel({ container, locale = "de" }) {
     // editor) — only fetch each source when the list actually needs it.
     const hasCategoryItems = snapshots.some((s) => s.kind === "category");
     const hasCollectionItems = snapshots.some((s) => (s.kind || "collection") === "collection");
+    const categoryIds = snapshots
+      .filter((s) => s.kind === "category" && s.id)
+      .map((s) => String(s.id).trim())
+      .filter(Boolean);
     Promise.all([
       hasCollectionItems ? fetch("/api/store-collections").then((r) => r.json()).catch(() => ({ collections: [] })) : Promise.resolve({ collections: [] }),
-      hasCategoryItems
-        ? cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 }).catch(() => null)
+      hasCategoryItems && categoryIds.length
+        ? cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { ids: categoryIds.join(",") })}`, { ttlMs: 60000 }).catch(() => null)
         : Promise.resolve(null),
     ]).then(([colData, catData]) => {
       if (cancelled) return;
       const allCollections = Array.isArray(colData?.collections) ? colData.collections : [];
       const byColId = new Map(allCollections.map((c) => [c.id, c]));
-      const flatCats = [];
-      (function flattenCats(list) {
-        (list || []).forEach((cat) => {
-          flatCats.push(cat);
-          if (cat.children?.length) flattenCats(cat.children);
-        });
-      })(Array.isArray(catData?.tree) ? catData.tree : []);
+      const flatCats = Array.isArray(catData?.categories)
+        ? catData.categories
+        : (Array.isArray(catData?.tree) ? catData.tree : []);
       const byCatId = new Map(flatCats.map((c) => [c.id, c]));
       const merged = snapshots.map((snap) => {
         // A per-item custom image always wins; otherwise fall back to the collection's/category's

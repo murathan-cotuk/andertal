@@ -10,7 +10,7 @@ import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { isDiscountedProduct } from "@/lib/catalog-listing";
 import { getLocalizedCategory } from "@/lib/format";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
+import { shallowCategoriesQuery } from "@/lib/store-categories-url";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 
 /* ── Two-column layout ───────────────────────────────── */
@@ -250,7 +250,7 @@ export default function SalesPage() {
         setLoading(true);
         setError("");
         const [catData, prData, settingsRes] = await Promise.all([
-          cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { tree: "true", is_visible: "true" })}`, { ttlMs: 15000 }).catch(() => ({ tree: [] })),
+          cachedJsonFetch(`/api/store-categories${shallowCategoriesQuery(locale)}`, { ttlMs: 60000 }).catch(() => ({ tree: [] })),
           // Large catalog snapshot (up to 1200 products) — cached client-side for 2 min so
           // revisits/back-navigation don't re-pull the full payload from the backend each time.
           cachedJsonFetch("/api/store-products?limit=1200", { ttlMs: 15000 }).catch(() => ({ products: [] })),
