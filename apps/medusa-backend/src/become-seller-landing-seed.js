@@ -203,7 +203,6 @@ function becomeSellerContainers(visibleOn = 'desktop') {
       id: randomUUID(), type: 'feature_grid', visible: true, visible_on: visibleOn, padding: pad,
       variant: 'price_cards',
       btn_url: ctaUrl,
-      btn_text: value('Jetzt Verkäufer werden', 'Become a seller', 'Satıcı ol', 'Devenir vendeur', 'Hazte vendedor', 'Diventa venditore'),
       items: [
         localize({ icon: '0 €' }, { title: value('Shop eröffnen', 'Open a store', 'Mağaza aç', 'Ouvrir une boutique', 'Abrir tienda', 'Apri uno shop'), body: value('Registrierung und Start ohne Eintrittsgebühr.', 'Registration and start with no entry fee.', 'Kayıt ve başlangıç giriş ücreti olmadan.', 'Inscription et démarrage sans frais d’entrée.', 'Registro e inicio sin cuota de entrada.', 'Registrazione e avvio senza fee d’ingresso.') }),
         localize({ icon: 'Anteil' }, { title: value('pro Verkauf', 'per sale', 'satış başına', 'par vente', 'por venta', 'per vendita'), body: value('Marketplace-Gebühr erst, wenn Umsatz entsteht.', 'Marketplace fee only when revenue happens.', 'Marketplace ücreti yalnızca ciro oluşunca.', 'Frais marketplace seulement quand il y a du CA.', 'Comisión solo cuando hay ventas.', 'Fee marketplace solo quando c’è fatturato.') }),
@@ -214,6 +213,7 @@ function becomeSellerContainers(visibleOn = 'desktop') {
       title: value('Transparenz', 'Transparency', 'Şeffaflık', 'Transparence', 'Transparencia', 'Trasparenza'),
       subtitle: value('Du verkaufst. Die Logik bleibt nachvollziehbar.', 'You sell. The logic stays readable.', 'Sen satarsın. Mantık okunabilir kalır.', 'Vous vendez. La logique reste lisible.', 'Tú vendes. La lógica sigue legible.', 'Tu vendi. La logica resta leggibile.'),
       lead: value('Keine Startgebühr fürs Eröffnen. Marketplace-Anteil und Auszahlungsrhythmus sind so gedacht, dass du planen kannst.', 'No opening fee. Marketplace share and payout rhythm are built so you can plan.', 'Açılış ücreti yok. Marketplace payı ve ödeme ritmi planlanabilir.', 'Pas de frais d’ouverture. Part et rythme de paiement pensés pour planifier.', 'Sin cuota de apertura. Comisión y ritmo de pago pensados para planificar.', 'Nessun costo di apertura. Quota e ritmo di pagamento pensati per pianificare.'),
+      btn_text: value('Jetzt Verkäufer werden', 'Become a seller', 'Satıcı ol', 'Devenir vendeur', 'Hazte vendedor', 'Diventa venditore'),
     }),
 
     // 10 FAQ accordion

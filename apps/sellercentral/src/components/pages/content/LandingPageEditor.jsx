@@ -4010,6 +4010,10 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 const DEFAULT_PAGE_ID = "__default__"; // shop homepage (legacy single-row table)
+// Sentinel shown in "Seite auswählen" for the categories group — picking it never selects a real
+// category itself, it just reveals the CategoryDrilldownSelect (tree) next to it. This keeps the
+// flat, unwieldy list of every category out of the main page picker.
+const CATEGORY_PICKER_VALUE = "cat:__picker__";
 
 const TEMPLATE_DEFAULTS = {
   collection_template: {
@@ -4343,6 +4347,12 @@ export default function LandingPageEditor() {
   /** Seiten → Container: 0 = Desktop, 1 = Tablet (600–1199px), 2 = Mobil (≤599px) */
   const [seitenDeviceTab, setSeitenDeviceTab] = useState(0);
   const [categoryRows, setCategoryRows] = useState([]);
+  // Flat category objects (id/parent_id, undecorated) for CategoryDrilldownSelect — the tree
+  // widget rebuilds its own hierarchy from parent_id, unlike categoryRows' pre-indented labels.
+  const [categoriesFlat, setCategoriesFlat] = useState([]);
+  // True while the "Kategorie" sentinel is picked in "Seite auswählen" but no concrete category
+  // has been chosen in the tree yet — keeps the tree dropdown visible during that gap.
+  const [categoryPickerActive, setCategoryPickerActive] = useState(false);
   const [categorySettings, setCategorySettings] = useState({ show_submenu_left: false });
 
   useEffect(() => {
@@ -4357,8 +4367,17 @@ export default function LandingPageEditor() {
           const list = Array.isArray(r?.pages) ? r.pages : [];
           setPages(list);
           const tree = catRes?.tree || catRes?.categories || [];
-          const flat = flattenCategoriesForSelect(Array.isArray(tree) ? tree : []);
+          const treeArr = Array.isArray(tree) ? tree : [];
+          const flat = flattenCategoriesForSelect(treeArr);
           setCategoryRows(flat);
+          const rawFlat = [];
+          (function flattenRaw(nodes) {
+            (nodes || []).forEach((n) => {
+              rawFlat.push(n);
+              if (n.children?.length) flattenRaw(n.children);
+            });
+          })(treeArr);
+          setCategoriesFlat(rawFlat);
         })
         .catch((e) => {
           if (cancelled) return;
@@ -4689,8 +4708,10 @@ export default function LandingPageEditor() {
     },
     {
       title: copy.categoriesHeading,
+      // Not the flat category list — picking this reveals the category-tree dropdown
+      // (CategoryDrilldownSelect) next to the picker instead of selecting a category directly.
       options: categoryRows.length
-        ? categoryRows.map((c) => ({ label: c.label, value: c.value }))
+        ? [{ label: copy.category, value: CATEGORY_PICKER_VALUE }]
         : [],
     },
     {
@@ -4824,20 +4845,49 @@ export default function LandingPageEditor() {
                 {copy.selectPageHelp}{" "}
                 <a href="/content/pages" style={{ color: "var(--p-color-text-emphasis)" }}>{copy.managePagesLink}</a>
               </Text>
-              <SearchableGroupedSelect
-                label={copy.pageLabel}
-                labelHidden
-                sections={pageSections}
-                value={selectedPageId}
-                onChange={(v) => {
-                  if (!v) return;
-                  setSelectedPageId(v);
-                  setExpandedId(null);
-                  setActiveTab(0);
-                }}
-                placeholder={copy.selectPageSearchPlaceholder}
-                emptyLabel={copy.selectPlaceholder}
-              />
+              <InlineStack gap="300" blockAlign="start" wrap={false}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <SearchableGroupedSelect
+                    label={copy.pageLabel}
+                    labelHidden
+                    sections={pageSections}
+                    value={(categoryPickerActive || isCategorySelection) ? CATEGORY_PICKER_VALUE : selectedPageId}
+                    onChange={(v) => {
+                      if (!v) return;
+                      if (v === CATEGORY_PICKER_VALUE) {
+                        setCategoryPickerActive(true);
+                        setSelectedPageId("");
+                        setExpandedId(null);
+                        return;
+                      }
+                      setCategoryPickerActive(false);
+                      setSelectedPageId(v);
+                      setExpandedId(null);
+                      setActiveTab(0);
+                    }}
+                    placeholder={copy.selectPageSearchPlaceholder}
+                    emptyLabel={copy.selectPlaceholder}
+                  />
+                </div>
+                {(categoryPickerActive || isCategorySelection) && (
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <CategoryDrilldownSelect
+                      label={copy.category}
+                      labelHidden
+                      categories={categoriesFlat}
+                      value={isCategorySelection ? String(selectedPageId).slice(4) : ""}
+                      onChange={(id) => {
+                        if (!id) { setSelectedPageId(""); return; }
+                        setSelectedPageId(`cat:${id}`);
+                        setExpandedId(null);
+                        setActiveTab(0);
+                      }}
+                      noneLabel={copy.chooseCategory}
+                      placeholder={copy.chooseCategoryPh}
+                    />
+                  </div>
+                )}
+              </InlineStack>
               {selectedPageId === DEFAULT_PAGE_ID && (
                 <BlockStack gap="150">
                   <Button onClick={handleApplyHomepageComposition} loading={saving}>
