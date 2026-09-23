@@ -143,9 +143,13 @@ const listAdminHubProductsDb = async (query = {}) => {
     await client.connect()
     const categoryQ = (query.category || query.category_slug || '').toString().trim()
     const collScope = (query.collection_id || '').toString().trim()
-    const hasScope = !!(categoryQ || collScope)
+    const categoryIdAllowlist = Array.isArray(query.category_id_allowlist)
+      ? [...new Set(query.category_id_allowlist.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean))]
+      : []
+    const hasScope = !!(categoryQ || collScope || categoryIdAllowlist.length)
     const rawLimit = parseInt(query.limit, 10) || (hasScope ? 3000 : 100)
-    const maxCap = hasScope || rawLimit > 200 ? 5000 : 200
+    // Storefront category pages must not dump thousands of full product rows.
+    const maxCap = categoryIdAllowlist.length > 0 ? 120 : (hasScope || rawLimit > 200 ? 5000 : 200)
     const limit = Math.min(Math.max(rawLimit, 1), maxCap)
     const offset = parseInt(query.offset, 10) || 0
     const sellerId = (query.seller_id || query.seller || '').trim()
@@ -190,6 +194,26 @@ const listAdminHubProductsDb = async (query = {}) => {
       params.push(collectionId)
     }
     if (skuFilter) { where.push('LOWER(TRIM(COALESCE(sku,\'\'))) = LOWER($' + (params.length + 1) + ')'); params.push(skuFilter) }
+    if (categoryIdAllowlist.length > 0) {
+      params.push(categoryIdAllowlist)
+      const pIds = params.length
+      const slugNorm = categoryQ.replace(/^\//, '').trim().toLowerCase()
+      const catClauses = [
+        `LOWER(TRIM(COALESCE(metadata->>'admin_category_id',''))) = ANY($${pIds}::text[])`,
+        `LOWER(TRIM(COALESCE(metadata->>'category_id',''))) = ANY($${pIds}::text[])`,
+        `EXISTS (
+          SELECT 1 FROM jsonb_array_elements_text(
+            CASE WHEN jsonb_typeof(metadata->'category_ids') = 'array' THEN metadata->'category_ids' ELSE '[]'::jsonb END
+          ) AS cid(val)
+          WHERE LOWER(TRIM(cid.val)) = ANY($${pIds}::text[])
+        )`,
+      ]
+      if (slugNorm) {
+        params.push(slugNorm)
+        catClauses.push(`LOWER(TRIM(BOTH '/' FROM COALESCE(metadata->>'category_slug',''))) = $${params.length}`)
+      }
+      where.push('(' + catClauses.join(' OR ') + ')')
+    }
     if (where.length) sql += ' WHERE ' + where.join(' AND ')
     sql += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2)
     params.push(limit, offset)

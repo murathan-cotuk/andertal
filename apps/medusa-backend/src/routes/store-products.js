@@ -1,7 +1,7 @@
 'use strict'
 const { Router } = require('express')
-const { resolveAdminHub, mapAdminHubCategoryPgRow, buildAdminHubCategoryTreeFromFlat, getCategoriesPgClient } = require('../categories-helpers')
 const { getAdminHubProductByIdOrHandleDb, listAdminHubProductsDb, getProductsDbClient } = require('./admin-products')
+const { collectCategorySubtreeIdsBySlugSql } = require('../category-subtree-ids')
 const { normalizeAnId } = require('../an-id')
 const { getSellerStoreName, getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct, storePublishedStatusSql } = require('./seller-settings')
 const { isEuOriginVerified } = require('../eu-origin')
@@ -565,30 +565,6 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   }
 }
 
-const collectCategorySubtreeIdsBySlug = (tree, slug) => {
-  const norm = (s) => String(s || '').replace(/^\//, '').toLowerCase().trim()
-  const target = norm(slug)
-  const findNode = (nodes) => {
-    for (const n of nodes || []) {
-      if (!n) continue
-      if (norm(n.slug) === target || norm(n.handle) === target) return n
-      const x = findNode(n.children)
-      if (x) return x
-    }
-    return null
-  }
-  const ids = new Set()
-  const addTree = (n) => {
-    if (!n || n.id == null) return
-    ids.add(String(n.id).trim().toLowerCase())
-    for (const c of n.children || []) addTree(c)
-  }
-  const node = findNode(Array.isArray(tree) ? tree : [])
-  if (!node) return null
-  addTree(node)
-  return ids
-}
-
 const storeProductCategoryIds = (p) => {
   const meta = p?.metadata && typeof p.metadata === 'object' ? p.metadata : {}
   const out = []
@@ -854,24 +830,21 @@ const storeProductsFromAdminHubGET = async (req, res) => {
     let allowedCategoryIds = null
     // "all" is a reserved slug meaning no category filter — return every product
     if (categorySlugFilter && categorySlugFilter.toLowerCase() !== 'all') {
-      const subtreeIdsForSlug = (tree) => collectCategorySubtreeIdsBySlug(tree, categorySlugFilter)
-      const ah = resolveAdminHub()
-      if (ah) {
-        try { allowedCategoryIds = subtreeIdsForSlug(await ah.getCategoryTree({ is_visible: true })) } catch (_) { allowedCategoryIds = null }
-      }
-      if (!allowedCategoryIds || allowedCategoryIds.size === 0) {
-        let fbClient
-        try {
-          fbClient = getProductsDbClient()
-          if (fbClient) {
-            await fbClient.connect()
-            const cr = await fbClient.query(`SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`)
-            await fbClient.end()
-            fbClient = null
-            const flat = (cr.rows || []).map(mapAdminHubCategoryPgRow).filter((c) => c && c.is_visible !== false)
-            allowedCategoryIds = subtreeIdsForSlug(buildAdminHubCategoryTreeFromFlat(flat))
+      try {
+        const client = getProductsDbClient()
+        if (client) {
+          await client.connect()
+          try {
+            allowedCategoryIds = await collectCategorySubtreeIdsBySlugSql(
+              (sql, params) => client.query(sql, params),
+              categorySlugFilter,
+            )
+          } finally {
+            await client.end().catch(() => {})
           }
-        } catch (__) { try { if (fbClient) await fbClient.end() } catch (___) {} }
+        }
+      } catch (_) {
+        allowedCategoryIds = null
       }
     }
     let collectionId = (query.collection_id || '').toString().trim()
@@ -886,7 +859,8 @@ const storeProductsFromAdminHubGET = async (req, res) => {
     }
     const queryWithId = collectionId ? { ...query, collection_id: collectionId } : query
     const categoryIdAllowlist = allowedCategoryIds && allowedCategoryIds.size > 0 ? [...allowedCategoryIds] : undefined
-    let list = await listAdminHubProductsDb({ ...queryWithId, limit: searchQ ? 200 : (categorySlugFilter ? Math.max(parseInt(query.limit, 10) || 3000, 500) : (query.limit || 100)), category: categorySlugFilter || undefined, category_id_allowlist: categoryIdAllowlist })
+    const categoryListLimit = searchQ ? 200 : (categorySlugFilter ? Math.min(parseInt(query.limit, 10) || 96, 96) : (query.limit || 100))
+    let list = await listAdminHubProductsDb({ ...queryWithId, limit: categoryListLimit, category: categorySlugFilter || undefined, category_id_allowlist: categoryIdAllowlist })
     if (collectionId) {
       const norm = (s) => (s || '').toString().trim().toLowerCase()
       const cidNorm = norm(collectionId)
@@ -958,6 +932,7 @@ const storeProductsFromAdminHubGET = async (req, res) => {
       mapped.metadata = meta
     }
     const badgeCtx = await buildProductBadgeContext()
+    await getBestsellerProductIds()
     let products = []
     for (const p of list) {
       const mapped = mapAdminHubToStoreProduct(p, query.country || 'DE')

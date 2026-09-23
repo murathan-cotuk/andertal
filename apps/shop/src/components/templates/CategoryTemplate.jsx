@@ -1025,7 +1025,7 @@ export default function CategoryTemplate() {
         setError(null);
         const [catResBySlug, productRes] = await Promise.all([
           fetch(`/api/store-categories${storeCategoriesQuery(locale, { slug })}`).then((r) => r.json()).catch(() => ({ categories: [] })),
-          fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=5000`).then((r) => r.json()).catch(() => ({ products: [] })),
+          fetch(`/api/store-products?category=${encodeURIComponent(slug)}&limit=96`).then((r) => r.json()).catch(() => ({ products: [] })),
         ]);
         if (cancelled) return;
         const cat = catResBySlug?.category || (Array.isArray(catResBySlug?.categories) ? catResBySlug.categories[0] : null);
@@ -1064,7 +1064,7 @@ export default function CategoryTemplate() {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, locale]);
 
   const meta = parseCategoryMetadata(category);
   const localizedCat = getLocalizedCategory(category, locale);

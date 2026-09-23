@@ -9,6 +9,7 @@
  * crashes, and a shop menu that fell back to a single CMS item with no image.
  */
 
+const { collectCategorySubtreeIdsFromFlat, collectCategorySubtreeIdsBySlugSql, SUBTREE_IDS_SQL } = require('./category-subtree-ids')
 const { mapAdminHubCategoryPgRow, buildAdminHubCategoryTreeFromFlat } = require('./categories-helpers')
 
 function unwrapCategoryImageValue(raw, depth = 0) {
@@ -438,6 +439,9 @@ module.exports = {
   findStoreCategoryAncestors,
   truncateStoreCategoryDepth,
   collectSubtreeIds,
+  collectCategorySubtreeIdsFromFlat,
+  collectCategorySubtreeIdsBySlugSql,
+  SUBTREE_IDS_SQL,
   annotateHasChildrenOnly,
   sliceStoreCategoryTree,
   slimPathNode,

@@ -16,6 +16,7 @@ import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { baseHandleFromUrl, parseProductUrlHandle } from "@/lib/product-url-handle";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { SITE_URL, localizedCmsField } from "@/lib/seo";
 import {
@@ -898,19 +899,20 @@ function CollectionPage() {
           }
         }
 
-        // Fire all cheap requests in parallel.
-        const [categoryBySlugData, colData, productsData] = await Promise.all([
-          fetch(`/api/store-categories?slug=${encodeURIComponent(handle)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
-          fetch(`/api/store-collections?handle=${encodeURIComponent(handle)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
-          fetch(`/api/store-products?collection_handle=${encodeURIComponent(handle)}&limit=200`).then((r) => r.json()).catch(() => ({ products: [] })),
-        ]);
-
-        // Category slug match → delegate to CategoryTemplate.
+        // Resolve category first so we don't wait on collection product dumps.
+        const categoryBySlugData = await fetch(`/api/store-categories${storeCategoriesQuery(locale, { slug: handle })}`)
+          .then((r) => r.ok ? r.json() : null)
+          .catch(() => null);
         if (categoryBySlugData?.category?.id || categoryBySlugData?.categories?.length) {
           setIsCategorySlug(true);
           setLoading(false);
           return;
         }
+
+        const [colData, productsData] = await Promise.all([
+          fetch(`/api/store-collections?handle=${encodeURIComponent(handle)}`).then((r) => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/store-products?collection_handle=${encodeURIComponent(handle)}&limit=200`).then((r) => r.json()).catch(() => ({ products: [] })),
+        ]);
 
         const col = colData?.collection ?? null;
         if (!col) {
@@ -937,7 +939,7 @@ function CollectionPage() {
         setLoading(false);
       }
     })();
-  }, [handle]);
+  }, [handle, locale]);
 
   useEffect(() => {
     if (!collection?.id && !collection?.handle) {

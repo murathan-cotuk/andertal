@@ -149,7 +149,7 @@ const shapeSlicedCategoriesPayload = (fullPayload, { depth, parentId } = {}) => 
 
 const storeCategoriesGET = async (req, res) => {
   const adminHubService = resolveAdminHub()
-  const requestLocale = resolveCategoryRequestLocale(req) || 'en'
+  const requestLocale = resolveCategoryRequestLocale(req) || 'de'
   try {
     const slug = (req.query.slug || '').toString().trim()
     const pathFor = (req.query.path_for || '').toString().trim()
