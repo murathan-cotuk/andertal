@@ -34,7 +34,7 @@ export function getLocalizedCategory(category, locale) {
   }
 
   return {
-    name: pickField("name", category.name),
+    name: pickField("name", category.localized_name || category.name),
     description: pickField("description", category.description),
     long_content:
       (tr && tr[loc] && (tr[loc].long_content || tr[loc].description)) ||

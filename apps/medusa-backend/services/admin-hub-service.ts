@@ -10,6 +10,10 @@ import { AdminHubCategory } from "../models/admin-hub-category"
 import { AdminHubBanner } from "../models/admin-hub-banner"
 import { AdminHubBrand } from "../models/admin-hub-brand"
 
+const { mergeCategoryMetadata } = require("../src/category-list-light") as {
+  mergeCategoryMetadata: (existing: Record<string, any> | null | undefined, incoming: Record<string, any> | null | undefined) => Record<string, any>
+}
+
 type InjectedDependencies = {
   manager: EntityManager
   productCollectionService?: any // Medusa ProductCollectionService (optional)
@@ -196,7 +200,11 @@ export default class AdminHubService {
     }
 
     const oldHasCollection = category.has_collection
-    Object.assign(category, data)
+    const incoming: typeof data = { ...data }
+    if (incoming.metadata !== undefined) {
+      incoming.metadata = mergeCategoryMetadata(category.metadata, incoming.metadata)
+    }
+    Object.assign(category, incoming)
     const savedCategory = await this.categoryRepository_.save(category)
 
     // If a parent category is deactivated, cascade deactivate all descendants.

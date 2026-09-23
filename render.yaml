@@ -10,7 +10,7 @@ services:
     runtime: node
     rootDir: apps/medusa-backend
     buildCommand: NODE_OPTIONS=--max-old-space-size=8192 npm install --omit=dev --no-audit --no-fund
-    startCommand: node server.js
+    startCommand: node --max-old-space-size=1536 server.js
     envVars:
       - key: PORT
         generateValue: true

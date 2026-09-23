@@ -263,7 +263,7 @@ export default function AdminCategoriesPage() {
     try {
       setLoading(true);
       const client = getMedusaAdminClient();
-      const data = await client.getAdminHubCategories({ all: true });
+      const data = await client.getAdminHubCategories({ all: true, locale });
       setCategories(data.categories || []);
     } catch (error) {
       console.error("Error fetching categories:", error);

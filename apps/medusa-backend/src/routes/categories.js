@@ -3,6 +3,7 @@ const { Router } = require('express')
 const categoryAutoTranslate = require('../category-auto-translate')
 const {
   resolveAdminHub,
+  resolveCategoryRequestLocale,
   localizeCategoriesForRequest,
   localizeSingleCategoryForRequest,
   mapAdminHubCategoryPgRow,
@@ -10,6 +11,13 @@ const {
   getCategoriesPgClient,
   categoriesPgUnavailable,
 } = require('../categories-helpers')
+const {
+  normalizeListLocale,
+  wantsFullCategoryPayload,
+  mapLightCategoryRow,
+  lightCategorySelectSql,
+  mergeCategoryMetadata,
+} = require('../category-list-light')
 const { updateAdminHubCollectionDb } = require('../collections-db')
 const { invalidateCategoryTreeCache } = require('../category-tree-cache')
 
@@ -72,6 +80,8 @@ const adminHubCategoriesGET_fallbackPg = async (req, res) => {
   try {
     await client.connect()
     const { active, parent_id, tree, is_visible, slug } = req.query
+    const full = wantsFullCategoryPayload(req.query)
+    const loc = normalizeListLocale(resolveCategoryRequestLocale(req) || 'de')
 
     if (slug && typeof slug === 'string') {
       const r = await client.query(`SELECT * FROM admin_hub_categories WHERE slug = $1 LIMIT 1`, [slug])
@@ -82,6 +92,21 @@ const adminHubCategoriesGET_fallbackPg = async (req, res) => {
     }
 
     if (tree === 'true') {
+      if (!full) {
+        const r = await client.query(
+          `SELECT ${lightCategorySelectSql()}
+           FROM admin_hub_categories WHERE active = true
+           ORDER BY sort_order ASC, name ASC`,
+          [loc],
+        )
+        let filtered = (r.rows || []).map((row) => mapLightCategoryRow(row, loc))
+        if (is_visible !== undefined) {
+          const vis = is_visible === 'true'
+          filtered = filtered.filter((c) => c.is_visible === vis)
+        }
+        const categoryTree = buildAdminHubCategoryTreeFromFlat(filtered)
+        return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
+      }
       const r = await client.query(
         `SELECT * FROM admin_hub_categories WHERE active = true ORDER BY sort_order ASC, name ASC`
       )
@@ -93,6 +118,22 @@ const adminHubCategoriesGET_fallbackPg = async (req, res) => {
       const categoryTree = buildAdminHubCategoryTreeFromFlat(filtered)
       await localizeCategoriesForRequest(categoryTree, req, client)
       return res.json({ tree: categoryTree, categories: categoryTree, count: categoryTree.length })
+    }
+
+    if (!full) {
+      let sql = `SELECT ${lightCategorySelectSql()} FROM admin_hub_categories WHERE 1=1`
+      const params = [loc]
+      let i = 2
+      if (active !== undefined) { sql += ` AND active = $${i++}`; params.push(active === 'true') }
+      if (parent_id !== undefined) {
+        if (parent_id === 'null' || parent_id === '') { sql += ` AND parent_id IS NULL` }
+        else { sql += ` AND parent_id = $${i++}`; params.push(parent_id) }
+      }
+      if (is_visible !== undefined) { sql += ` AND is_visible = $${i++}`; params.push(is_visible === 'true') }
+      sql += ` ORDER BY sort_order ASC, name ASC`
+      const r = await client.query(sql, params)
+      const categories = (r.rows || []).map((row) => mapLightCategoryRow(row, loc))
+      return res.json({ categories, count: categories.length })
     }
 
     let sql = `SELECT * FROM admin_hub_categories WHERE 1=1`
@@ -219,7 +260,7 @@ const adminHubCategoryByIdPUT_fallbackPg = async (req, res) => {
     }
     let mergedMeta = row.metadata && typeof row.metadata === 'object' ? { ...row.metadata } : {}
     if (body.metadata !== undefined && body.metadata !== null && typeof body.metadata === 'object') {
-      mergedMeta = { ...mergedMeta, ...body.metadata }
+      mergedMeta = mergeCategoryMetadata(mergedMeta, body.metadata)
       // Cleared images arrive as null/"" — collapse them to real null so a removed
       // Kategoriebild/banner does not linger in the jsonb blob (and never as "null").
       for (const k of ['image_url', 'banner_image_url', 'banner_video_url']) {
@@ -716,6 +757,11 @@ const adminHubCategoriesExcelUpsertPOST = async (req, res) => {
 // ── Main handlers ─────────────────────────────────────────────────────────────
 
 const adminHubCategoriesGET = async (req, res) => {
+  // Slim list is Postgres-only on purpose: Admin Hub service would still hydrate full metadata
+  // and that dump is what OOMs Render at ~20k categories.
+  if (!wantsFullCategoryPayload(req.query)) {
+    return adminHubCategoriesGET_fallbackPg(req, res)
+  }
   const adminHubService = resolveAdminHub()
   if (adminHubService) {
     try {
@@ -1196,7 +1242,7 @@ const adminHubCategoryComplianceProfilePATCH = async (req, res) => {
 
 // ── Router ────────────────────────────────────────────────────────────────────
 
-module.exports = function createCategoriesRouter() {
+function createCategoriesRouter() {
   const router = Router()
 
   router.get('/admin-hub/categories', (req, res) => adminHubCategoriesGET(req, res))
@@ -1224,3 +1270,6 @@ module.exports = function createCategoriesRouter() {
 
   return router
 }
+
+createCategoriesRouter.adminHubCategoriesGET = adminHubCategoriesGET
+module.exports = createCategoriesRouter

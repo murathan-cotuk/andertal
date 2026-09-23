@@ -208,6 +208,27 @@ const emptyForm = {
   image_url: "",
   banner_image_url: "",
 };
+
+function formFromCategory(cat, locale) {
+  const locFields = categoryFieldsForEditForm(cat, locale);
+  return {
+    name: locFields.name || cat.name || "",
+    slug: cat.slug || slugFromName(cat.name || ""),
+    description: cat.description || "",
+    parent_id: cat.parent_id || "",
+    has_collection: !!cat.has_collection,
+    active: !!cat.active,
+    is_visible: !!cat.is_visible,
+    collection_id: (cat.metadata && cat.metadata.collection_id) || "",
+    display_title: (cat.metadata && cat.metadata.display_title) || "",
+    meta_title: locFields.meta_title,
+    meta_description: locFields.meta_description,
+    keywords: locFields.keywords,
+    richtext: locFields.long_content,
+    image_url: cleanUrl(cat.metadata && cat.metadata.image_url),
+    banner_image_url: cleanUrl(cat.banner_image_url ?? (cat.metadata && cat.metadata.banner_image_url)),
+  };
+}
 const initialSlugTouched = false;
 
 export default function ContentCategoriesPage() {
@@ -309,7 +330,7 @@ export default function ContentCategoriesPage() {
     try {
       setLoading(true);
       setError(null);
-      const data = await client.getAdminHubCategories({ all: true });
+      const data = await client.getAdminHubCategories({ all: true, locale });
       setCategories(data.categories || []);
     } catch (err) {
       setError(err?.message || "Failed to load categories");
@@ -342,28 +363,15 @@ export default function ContentCategoriesPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (cat) => {
+  const openEdit = async (cat) => {
     setEditId(cat.id);
     setSlugManuallyEdited(false);
-    const locFields = categoryFieldsForEditForm(cat, locale);
-    setForm({
-      name: locFields.name || cat.name || "",
-      slug: cat.slug || slugFromName(cat.name || ""),
-      description: cat.description || "",
-      parent_id: cat.parent_id || "",
-      has_collection: !!cat.has_collection,
-      active: !!cat.active,
-      is_visible: !!cat.is_visible,
-      collection_id: (cat.metadata && cat.metadata.collection_id) || "",
-      display_title: (cat.metadata && cat.metadata.display_title) || "",
-      meta_title: locFields.meta_title,
-      meta_description: locFields.meta_description,
-      keywords: locFields.keywords,
-      richtext: locFields.long_content,
-      image_url: cleanUrl(cat.metadata && cat.metadata.image_url),
-      banner_image_url: cleanUrl(cat.banner_image_url ?? (cat.metadata && cat.metadata.banner_image_url)),
-    });
+    setForm(formFromCategory(cat, locale));
     setModalOpen(true);
+    try {
+      const full = await client.getAdminHubCategory(cat.id);
+      if (full) setForm(formFromCategory(full, locale));
+    } catch (_) {}
   };
 
   const handleDeleteCategory = async () => {
@@ -456,7 +464,8 @@ export default function ContentCategoriesPage() {
 
     try {
       if (editId) {
-        const existing = categories.find((c) => c.id === editId);
+        const full = await client.getAdminHubCategory(editId).catch(() => null);
+        const existing = full || categories.find((c) => c.id === editId);
         const existingMeta = existing?.metadata && typeof existing.metadata === "object" ? { ...existing.metadata } : {};
         payload.metadata = mergeCategoryLocaleIntoMetadata(existingMeta, loc, {
           name,

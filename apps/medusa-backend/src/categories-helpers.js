@@ -1,6 +1,12 @@
 'use strict'
 const { container } = require('@medusajs/framework')
 const categoryAutoTranslate = require('./category-auto-translate')
+const {
+  normalizeListLocale,
+  wantsFullCategoryPayload,
+  mapLightCategoryRow,
+  lightCategorySelectSql,
+} = require('./category-list-light')
 
 function resolveAdminHub() {
   try { return container.resolve('adminHubService') } catch { return null }
@@ -87,6 +93,10 @@ function categoriesPgUnavailable(res) {
 module.exports = {
   resolveAdminHub,
   resolveCategoryRequestLocale,
+  normalizeListLocale,
+  wantsFullCategoryPayload,
+  mapLightCategoryRow,
+  lightCategorySelectSql,
   localizeCategoriesForRequest,
   localizeSingleCategoryForRequest,
   mapAdminHubCategoryPgRow,
