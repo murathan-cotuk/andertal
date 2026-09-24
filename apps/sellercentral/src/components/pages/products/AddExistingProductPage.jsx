@@ -108,6 +108,13 @@ function normalizeAnIdInput(value) {
   return /^AN-[ABCDEFGHJKMNPQRSTUVWXYZ2-9]{7}$/.test(s) ? s : "";
 }
 
+/** Digits only — matches the backend's normalizeStoreEan so a stored EAN with spaces/dashes
+ * still matches what the seller typed (and what the backend already matched on). */
+function normalizeEanDigits(value) {
+  const d = String(value || "").replace(/\D/g, "");
+  return d.length >= 8 ? d : "";
+}
+
 function VariantRow({ v, isMatch }) {
   const label = getVariantLabel(v);
   const ean = v.ean || v.metadata?.ean || "";
@@ -127,7 +134,9 @@ function VariantRow({ v, isMatch }) {
         {label && <Text as="p" variant="bodySm" fontWeight={isMatch ? "semibold" : "regular"}>{label}</Text>}
         {ean && <Text as="p" variant="bodySm" tone="subdued">EAN: {ean}</Text>}
         {anId && <Text as="p" variant="bodySm" tone="subdued">AN-ID: {anId}</Text>}
-        {v.sku && <Text as="p" variant="bodySm" tone="subdued">SKU: {v.sku}</Text>}
+        {/* No SKU here on purpose — it's the SKU of whichever seller originally listed this
+            sibling variant, not shared/catalog data. Showing it would leak one seller's SKU
+            to another seller just browsing the variation family. */}
       </BlockStack>
     </div>
   );
@@ -182,6 +191,10 @@ export default function AddExistingProductPage() {
       if (!found && eanTrim && !normalizeAnIdInput(eanTrim)) {
         const eanResult = await client.lookupProductByEan(eanTrim).catch(() => null);
         found = eanResult?.product || null;
+        // Trust the backend's own match (it normalized the EAN to find this product in the
+        // first place) instead of re-deriving it below with a plain string compare — that
+        // mismatch used to silently fail to lock onto the right child variant.
+        if (eanResult?.matched_variant_ean) setSearchedEan(eanResult.matched_variant_ean);
       }
 
       if (!found && idTrim) {
@@ -307,7 +320,7 @@ export default function AddExistingProductPage() {
   const matchedVariant = searchedAnId
     ? variants.find((v) => String(v?.an_id || "").trim().toUpperCase() === searchedAnId)
     : searchedEan
-    ? variants.find((v) => String(v?.ean || v?.metadata?.ean || "").trim() === searchedEan)
+    ? variants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === normalizeEanDigits(searchedEan))
     : null;
   const siblingVariants = matchedVariant
     ? variants.filter((v) => v !== matchedVariant)

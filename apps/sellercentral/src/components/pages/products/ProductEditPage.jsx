@@ -427,14 +427,15 @@ function withAutoTranslateNote(base, locale, locales) {
   return `${base} ${lt(locale, `Other languages updated: ${list}.`, `Diğer diller güncellendi: ${list}.`, `Autres langues mises à jour : ${list}.`, `Otros idiomas actualizados: ${list}.`, `Altre lingue aggiornate: ${list}.`, `Weitere Sprachen aktualisiert: ${list}.`)}`;
 }
 
-/** Seller-owned listing fields — never copy from another seller's catalog match (EAN / URL / existing_id). */
+/** Seller-owned listing fields — never copy from another seller's catalog match (EAN / URL / existing_id).
+ * Brand is deliberately NOT in this list: it's a fact about the product (tied to its EAN), not the
+ * listing seller, and must stay fixed for every seller who lists the same catalog product. */
 const SELLER_OWNED_META_KEYS = [
   "sku",
   "prices",
   "uvp_cents",
   "rabattpreis_cents",
   "shipping_group_id",
-  "brand_id",
   "publish_date",
   "seller_id",
   "seller",
@@ -442,6 +443,13 @@ const SELLER_OWNED_META_KEYS = [
   "shop_name",
   "related_product_ids",
 ];
+
+/** Digits only — matches the backend's normalizeStoreEan so a stored EAN with spaces/dashes
+ * still matches the value the backend already matched a lookup on. */
+function normalizeEanDigits(value) {
+  const d = String(value || "").replace(/\D/g, "");
+  return d.length >= 8 ? d : "";
+}
 
 function stripSellerOwnedFromCatalogMeta(meta) {
   const out = meta && typeof meta === "object" ? { ...meta } : {};
@@ -454,7 +462,6 @@ function sanitizeCatalogVariants(variants) {
   return variants.map((v) => {
     const vMeta = v?.metadata && typeof v.metadata === "object" ? { ...v.metadata } : {};
     delete vMeta.shipping_group_id;
-    delete vMeta.brand_id;
     delete vMeta.sku;
     delete vMeta.prices;
     return {
@@ -996,20 +1003,32 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           // child is what the seller intends to sell — list it alone, don't drag in every
           // sibling variant. "master_total_variants" powers the "See other variations" link.
           const singleChildMode = result.matched_on === "variant" && masterVariants.length > 1;
+          // Trust the backend's own match (same EAN normalization it used to find this product
+          // in the first place) rather than re-deriving it here with a plain string compare —
+          // that's what used to silently miss the child and fall back to dumping every sibling.
+          const matchedVariantEan = normalizeEanDigits(result.matched_variant_ean);
+          const matchedVariant = singleChildMode && matchedVariantEan
+            ? masterVariants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === matchedVariantEan) || null
+            : null;
           // Matched via the parent/grouping EAN: keep it as-is, seller wants the full family.
-          const parentEan = singleChildMode ? String(ean).trim() : (result.matched_on === "variant" ? (masterMeta.ean || "") : String(ean).trim());
-          if (singleChildMode) delete masterMeta.variation_groups;
+          const parentEan = singleChildMode ? (matchedVariant?.ean || String(ean).trim()) : (result.matched_on === "variant" ? (masterMeta.ean || "") : String(ean).trim());
+          // A matched child carries its own brand/description/bullets/images in its own metadata
+          // (see productRowToVariant on the backend) — the parent row is just a grouping shell and
+          // must never be used for these once we know exactly which child this is.
+          const childMeta = matchedVariant ? stripSellerOwnedFromCatalogMeta(matchedVariant.metadata || {}) : null;
+          const baseMeta = childMeta || masterMeta;
+          if (singleChildMode) delete baseMeta.variation_groups;
           // Catalog shared fields only — SKU / price / shipping stay empty for this seller
           const mergedMeta = {
-            ...masterMeta,
+            ...baseMeta,
             ean: parentEan,
             master_product_id: master.id,
             master_total_variants: masterVariants.length,
           };
           return {
             ...prev,
-            title: master.title || prev.title,
-            description: master.description || prev.description,
+            title: matchedVariant?.title || master.title || prev.title,
+            description: matchedVariant?.metadata?.description || master.description || prev.description,
             handle: master.handle || prev.handle,
             sku: "",
             price: 0,
@@ -1111,24 +1130,30 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         const { product: found } = await client.getAdminHubProductFull(existingId);
         if (!found?.id) return;
         const foundVariants = Array.isArray(found.variants) ? found.variants : [];
-        const matchedVariant = variantEanParam
-          ? foundVariants.find((v) => String(v?.ean || v?.metadata?.ean || "").trim() === variantEanParam)
+        const normalizedVariantEan = normalizeEanDigits(variantEanParam);
+        const matchedVariant = normalizedVariantEan
+          ? foundVariants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === normalizedVariantEan)
           : null;
         const singleChildMode = !!matchedVariant && foundVariants.length > 1;
         setProduct((prev) => {
           if (!prev) return prev;
+          // A matched child carries its own brand/description/bullets/images in its own
+          // metadata (see productRowToVariant on the backend) — "found" is the parent row,
+          // just a grouping shell, and must never be used for these once we know the child.
           const masterMeta = stripSellerOwnedFromCatalogMeta(found.metadata);
-          if (singleChildMode) delete masterMeta.variation_groups;
+          const childMeta = matchedVariant ? stripSellerOwnedFromCatalogMeta(matchedVariant.metadata || {}) : null;
+          const baseMeta = childMeta || masterMeta;
+          if (singleChildMode) delete baseMeta.variation_groups;
           const mergedMeta = {
-            ...masterMeta,
-            ean: singleChildMode ? variantEanParam : masterMeta.ean,
+            ...baseMeta,
+            ean: singleChildMode ? (matchedVariant?.ean || variantEanParam) : masterMeta.ean,
             master_product_id: existingId,
             master_total_variants: foundVariants.length,
           };
           return {
             ...prev,
-            title: found.title || prev.title,
-            description: found.description || prev.description,
+            title: matchedVariant?.title || found.title || prev.title,
+            description: matchedVariant?.metadata?.description || found.description || prev.description,
             handle: found.handle || prev.handle,
             sku: "",
             price: 0,
@@ -1179,6 +1204,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     eanLookupState === "found" || urlSearchState === "found" || Boolean(meta.master_product_id)
   );
   const showSharedCatalogNotice = isSecondSeller || isReusingCatalogOnCreate;
+  // Catalog facts (EAN, brand) are fixed for a given product regardless of which flow got the
+  // seller here — editing this listing (isSecondSeller) or creating a new one against a catalog
+  // match found via EAN/URL/existing_id search (isReusingCatalogOnCreate).
+  const isCatalogLocked = isSecondSeller || isReusingCatalogOnCreate;
 
   const changeRequestSubmittedMsg =
     locale === "tr"
@@ -3093,15 +3122,15 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       </InlineStack>
                     }
                     value={getMeta(product, "ean")}
-                    onChange={isSecondSeller ? undefined : (v) => { updateMeta("ean", v); setEanLookupState(null); }}
-                    onBlur={isSecondSeller ? undefined : handleEanBlur}
+                    onChange={isCatalogLocked ? undefined : (v) => { updateMeta("ean", v); setEanLookupState(null); }}
+                    onBlur={isCatalogLocked ? undefined : handleEanBlur}
                     placeholder="EAN / Barcode"
                     autoComplete="off"
-                    disabled={isSecondSeller}
+                    disabled={isCatalogLocked}
                     suffix={
                       isSecondSeller ? "🔒" :
+                      isReusingCatalogOnCreate ? "🔒 " + (locale === "en" ? "Existing product" : locale === "tr" ? "Mevcut ürün" : locale === "fr" ? "Produit existant" : locale === "es" ? "Producto existente" : locale === "it" ? "Prodotto esistente" : "Bestehendes Produkt") :
                       eanLookupState === "loading" ? "⏳" :
-                      eanLookupState === "found" ? (locale === "en" ? "✓ Product data loaded" : locale === "tr" ? "✓ Ürün verileri yüklendi" : locale === "fr" ? "✓ Données produit chargées" : locale === "es" ? "✓ Datos del producto cargados" : locale === "it" ? "✓ Dati prodotto caricati" : "✓ Produktdaten geladen") :
                       eanLookupState === "not_found" ? (locale === "en" ? "— New" : locale === "tr" ? "— Yeni" : locale === "fr" ? "— Nouveau" : locale === "es" ? "— Nuevo" : locale === "it" ? "— Nuovo" : "— Neu") : undefined
                     }
                   />
@@ -3225,9 +3254,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                     }),
                                 ]}
                                 value={getMeta(product, "brand_id") || ""}
-                                onChange={(v) => updateMeta("brand_id", v || undefined)}
+                                onChange={isCatalogLocked ? undefined : (v) => updateMeta("brand_id", v || undefined)}
+                                disabled={isCatalogLocked}
                                 helpText={
-                                  (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
+                                  isCatalogLocked
+                                    ? (locale === "en" ? "Fixed by the catalog product — can't be changed here." : locale === "tr" ? "Katalog ürünü tarafından belirlenir — burada değiştirilemez." : locale === "fr" ? "Défini par le produit catalogue — non modifiable ici." : locale === "es" ? "Definido por el producto del catálogo — no se puede cambiar aquí." : locale === "it" ? "Definito dal prodotto a catalogo — non modificabile qui." : "Wird vom Katalogprodukt vorgegeben — hier nicht änderbar.")
+                                    : (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
                                     ? (locale === "en" ? "This brand is pending authorization and can't be published yet." : locale === "tr" ? "Bu marka onay bekliyor, henüz yayınlanamaz." : locale === "fr" ? "Cette marque est en attente d'autorisation et ne peut pas encore être publiée." : locale === "es" ? "Esta marca está pendiente de autorización y aún no se puede publicar." : locale === "it" ? "Questo brand è in attesa di autorizzazione e non può ancora essere pubblicato." : "Diese Marke wartet auf Autorisierung und kann noch nicht veröffentlicht werden.")
                                     : undefined
                                 }
@@ -3545,9 +3577,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <Box minWidth="120px">
                   <TextField label={pe.quantity} type="number" value={product.inventory != null ? String(product.inventory) : "0"} onChange={(v) => update({ inventory: parseInt(v, 10) || 0 })} min={0} />
                 </Box>
-                <Box minWidth="180px">
-                  <TextField label={pe.minOrderQty} type="number" min={1} value={meta.minimum_order_quantity != null ? String(meta.minimum_order_quantity) : ""} onChange={(v) => updateMeta("minimum_order_quantity", v === "" ? undefined : Math.max(1, parseInt(v, 10) || 1))} placeholder="1" />
-                </Box>
+                {/* Not relevant when adding an existing catalog product to your own inventory —
+                    this listing is one seller's stock of an already-defined product, not a new
+                    product definition. */}
+                {!isCatalogLocked && (
+                  <Box minWidth="180px">
+                    <TextField label={pe.minOrderQty} type="number" min={1} value={meta.minimum_order_quantity != null ? String(meta.minimum_order_quantity) : ""} onChange={(v) => updateMeta("minimum_order_quantity", v === "" ? undefined : Math.max(1, parseInt(v, 10) || 1))} placeholder="1" />
+                  </Box>
+                )}
               </InlineStack>
               <Text as="p" variant="bodySm" tone="subdued">{pe.warehouseHint}</Text>
             </BlockStack>
