@@ -154,7 +154,40 @@ const pickCanonicalEanMatch = (matches) => {
 }
 
 /** Advisory stamp from stampComplianceReviewAsync — not a seller catalog edit. */
-const CHANGE_REQUEST_SKIP_META = ['compliance_review']
+// ean: never proposable — it's immutable and identifies the catalog product itself, never a
+// "shared field" a seller could reasonably suggest changing. seo_*: superuser-only fields a
+// regular seller's form never even sends — if one of these ever shows up in a diff, it was a
+// superuser edit and must never require its own approval.
+const CHANGE_REQUEST_SKIP_META = ['compliance_review', 'ean', 'seo_meta_title', 'seo_meta_description', 'seo_keywords']
+
+/**
+ * Recursively diffs two nested objects/arrays and pushes one { path, oldVal, newVal } entry per
+ * actual leaf-level change — used so a shared "translations" edit becomes individually
+ * approvable/rejectable change requests (one per field per locale) instead of a single row that
+ * stringifies the whole object and lumps dozens of unrelated field edits together.
+ * Arrays are 1-indexed in the emitted path to match how sellers see "bullet_points › 1" in the UI.
+ */
+function diffNestedForChangeRequests(oldVal, newVal, pathPrefix, out) {
+  const bothArrays = Array.isArray(oldVal) && Array.isArray(newVal)
+  const bothObjects = !bothArrays && oldVal && newVal && typeof oldVal === 'object' && typeof newVal === 'object'
+  if (bothArrays) {
+    const len = Math.max(oldVal.length, newVal.length)
+    for (let i = 0; i < len; i++) {
+      diffNestedForChangeRequests(oldVal[i], newVal[i], `${pathPrefix}.${i + 1}`, out)
+    }
+    return
+  }
+  if (bothObjects) {
+    const keys = new Set([...Object.keys(oldVal), ...Object.keys(newVal)])
+    for (const key of keys) {
+      diffNestedForChangeRequests(oldVal[key], newVal[key], `${pathPrefix}.${key}`, out)
+    }
+    return
+  }
+  const oldStr = oldVal == null ? '' : (typeof oldVal === 'object' ? JSON.stringify(oldVal) : String(oldVal))
+  const newStr = newVal == null ? '' : (typeof newVal === 'object' ? JSON.stringify(newVal) : String(newVal))
+  if (oldStr !== newStr) out.push({ path: pathPrefix, oldVal: oldStr, newVal: newStr })
+}
 function isChangeRequestSkipField(fieldName) {
   const f = String(fieldName || '').trim()
   if (!f) return false
@@ -1458,6 +1491,17 @@ const adminHubProductByIdPUT = async (req, res) => {
             let newVal = incomingMeta?.[metaKey]
             if (metaKey === 'prices') newVal = mergePrices(existingMeta?.prices, newVal)
             if (metaKey === 'translations') newVal = mergeTranslations(existingMeta?.translations, newVal)
+            if (metaKey === 'translations') {
+              // One row per actual changed field per locale — not one row for the whole object.
+              const leaves = []
+              diffNestedForChangeRequests(oldVal || {}, newVal || {}, 'metadata.translations', leaves)
+              for (const leaf of leaves) {
+                await qc.query(`INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending',$3,$4,$5)`, [
+                  existing.id, callerSellerId, leaf.path, leaf.oldVal || null, leaf.newVal,
+                ])
+              }
+              continue
+            }
             await qc.query(`INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending',$3,$4,$5)`, [
               existing.id, callerSellerId, `metadata.${metaKey}`,
               oldVal == null ? null : String(typeof oldVal === 'object' ? JSON.stringify(oldVal) : oldVal),

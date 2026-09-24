@@ -62,6 +62,53 @@ function isBrandVerifyInFlight(brand) {
   return brand?.status === 'pending' || brand?.verification_level === 'pending_review'
 }
 
+// A brand name just became officially registered/authorized (own_registered or
+// authorized_reseller, approved). Any OTHER seller still claiming the exact same
+// brand name under an unverified 'own' claim loses that right from this point on:
+// their claim is superseded and anything they listed under it goes to draft, since
+// the name is now a protected registered brand. Runs on the same client/transaction
+// as the approval so it never fires without the approval actually having committed.
+async function supersedeUnverifiedSameNameBrands(client, { brandId, brandName, reviewerId }) {
+  const others = await client.query(
+    `SELECT id, seller_id FROM admin_hub_brands
+     WHERE id <> $1 AND lower(trim(name)) = lower(trim($2)) AND brand_type = 'own' AND status = 'active'`,
+    [brandId, brandName]
+  )
+  for (const other of others.rows || []) {
+    await client.query(
+      `UPDATE admin_hub_brands SET status = 'superseded', verification_level = 'unverified',
+         approved_by = $1, rejection_reason = $2, updated_at = now() WHERE id = $3`,
+      [
+        reviewerId,
+        'Diese Marke wurde von einem anderen Verkäufer offiziell registriert/verifiziert. Ihr nicht verifizierter Markeneintrag ist nicht mehr gültig.',
+        other.id,
+      ]
+    ).catch(() => {})
+    await client.query(
+      `UPDATE admin_hub_products SET status = 'draft', updated_at = now()
+       WHERE seller_id = $1 AND metadata->>'brand_id' = $2`,
+      [other.seller_id, other.id]
+    ).catch(() => {})
+    if (other.seller_id) {
+      await client.query(
+        `UPDATE admin_hub_seller_listings SET status = 'draft', updated_at = now()
+         WHERE seller_id = $1 AND brand_id = $2`,
+        [other.seller_id, other.id]
+      ).catch(() => {})
+      await client.query(
+        `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
+         VALUES ('brand_superseded', $1, $2, $3, $4)`,
+        [
+          'Marke wurde registriert',
+          `Die Marke "${brandName}" wurde soeben von einem anderen Verkäufer offiziell registriert/verifiziert. Ihr nicht verifizierter Markeneintrag wurde deaktiviert und betroffene Produkte auf Entwurf gesetzt. Bitte reichen Sie einen Nachweis (Vertriebsberechtigung/Rechnung) ein, um weiter unter dieser Marke zu verkaufen.`,
+          other.seller_id,
+          other.id,
+        ]
+      ).catch(() => {})
+    }
+  }
+}
+
 const adminBrandsGET = async (req, res) => {
   const client = getCategoriesPgClient()
   if (!client) return res.status(500).json({ message: 'Database unavailable' })
@@ -337,6 +384,9 @@ const brandVerifyPOST = async (req, res) => {
         `UPDATE admin_hub_brand_authorization_documents SET status = 'approved', reviewer_id = $1, reviewed_at = now() WHERE brand_id = $2 AND status = 'pending'`,
         [reviewerId, brandId]
       ).catch(() => {})
+      await supersedeUnverifiedSameNameBrands(client, { brandId, brandName: brand.name, reviewerId }).catch((e) => {
+        console.error('supersedeUnverifiedSameNameBrands:', e)
+      })
       if (brand.seller_id) {
         await client.query(
           `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
@@ -441,6 +491,9 @@ const brandAuthReview = async (req, res, approve) => {
         `UPDATE admin_hub_brand_authorization_documents SET status = 'approved', reviewer_id = $1, reviewed_at = now() WHERE brand_id = $2 AND status = 'pending'`,
         [reviewerId, brandId]
       ).catch(() => {})
+      await supersedeUnverifiedSameNameBrands(client, { brandId, brandName: brand.name, reviewerId }).catch((e) => {
+        console.error('supersedeUnverifiedSameNameBrands:', e)
+      })
     } else {
       await client.query(
         `UPDATE admin_hub_brands SET status = 'rejected', rejection_reason = $1, approved_by = $2, verification_level = 'unverified', updated_at = now() WHERE id = $3`,

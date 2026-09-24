@@ -248,19 +248,66 @@ export function getProductBasePriceCents(product) {
   return 0;
 }
 
-export function isDiscountedProduct(product) {
+export function isDiscountedProduct(product, minPercent = 0) {
+  const minPct = Math.max(0, Math.min(99, Number(minPercent) || 0));
+  const meets = (base, sale) => {
+    if (base == null || sale == null || !(sale > 0) || !(base > 0) || sale >= base) return false;
+    if (minPct <= 0) return true;
+    return ((base - sale) / base) * 100 >= minPct;
+  };
   const meta = product?.metadata || {};
-  // New price structure: metadata.prices.DE.sale_cents vs brutto_cents
   const dePrice = meta.prices?.DE;
-  if (dePrice) {
-    const base = dePrice.brutto_cents != null ? Number(dePrice.brutto_cents) : null;
-    const sale = dePrice.sale_cents != null ? Number(dePrice.sale_cents) : null;
-    if (base != null && sale != null && sale > 0 && sale < base) return true;
+  if (dePrice && meets(dePrice.brutto_cents != null ? Number(dePrice.brutto_cents) : null, dePrice.sale_cents != null ? Number(dePrice.sale_cents) : null)) return true;
+  const prices = meta.prices && typeof meta.prices === "object" ? meta.prices : {};
+  for (const entry of Object.values(prices)) {
+    if (!entry || typeof entry !== "object") continue;
+    if (meets(entry.brutto_cents != null ? Number(entry.brutto_cents) : null, entry.sale_cents != null ? Number(entry.sale_cents) : null)) return true;
   }
-  // Legacy: metadata.rabattpreis_cents
   const base = getProductBasePriceCents(product);
   const sale = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null;
-  return sale != null && sale > 0 && sale < base;
+  return meets(base, sale);
+}
+
+export const DEFAULT_BESTSELLER_MIN_SOLD = 1;
+export const DEFAULT_SALE_MIN_DISCOUNT_PERCENT = 0;
+
+export async function loadCatalogBadgeRules() {
+  try {
+    const res = await fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    const minSold = Number(data?.bestseller_min_sold);
+    const salePct = Number(data?.sale_min_discount_percent);
+    return {
+      bestsellerMinSold: Number.isFinite(minSold) && minSold >= 1 ? Math.min(1000000, Math.round(minSold)) : DEFAULT_BESTSELLER_MIN_SOLD,
+      saleMinDiscountPercent: Number.isFinite(salePct) && salePct >= 0 ? Math.min(99, Math.round(salePct)) : DEFAULT_SALE_MIN_DISCOUNT_PERCENT,
+    };
+  } catch (_) {
+    return { bestsellerMinSold: DEFAULT_BESTSELLER_MIN_SOLD, saleMinDiscountPercent: DEFAULT_SALE_MIN_DISCOUNT_PERCENT };
+  }
+}
+
+export const DEFAULT_NEW_PRODUCT_WINDOW_DAYS = 15;
+
+/** Neu window from seller settings (Inventory, superuser). Falls back to 15 days. */
+export async function loadNewProductWindowDays() {
+  try {
+    const res = await fetch("/api/store-seller-settings?seller_id=default", { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    const n = Number(data?.new_product_window_days);
+    if (Number.isFinite(n) && n >= 1) return Math.min(3650, Math.round(n));
+  } catch (_) {}
+  return DEFAULT_NEW_PRODUCT_WINDOW_DAYS;
+}
+
+/** True while publish_date (else created_at) is within `days`. Same rule as the Neu badge. */
+export function isWithinNewWindow(product, days = DEFAULT_NEW_PRODUCT_WINDOW_DAYS) {
+  const windowDays = Math.max(1, Math.min(3650, Number(days) || DEFAULT_NEW_PRODUCT_WINDOW_DAYS));
+  const raw = product?.metadata?.publish_date || product?.created_at;
+  if (!raw) return false;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return false;
+  const ageMs = Date.now() - d.getTime();
+  return ageMs >= 0 && ageMs <= windowDays * 24 * 60 * 60 * 1000;
 }
 
 export function isRecentProduct(product, months = 2) {

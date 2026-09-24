@@ -41,6 +41,18 @@ export async function GET(req) {
       maintenance_mode_enabled: data?.maintenance_mode_enabled === true,
       maintenance_mode_image_url: data?.maintenance_mode_image_url || "",
       not_found_image_url: data?.not_found_image_url || "",
+      new_product_window_days: Number.isFinite(Number(data?.new_product_window_days)) && Number(data.new_product_window_days) >= 1
+        ? Math.min(3650, Math.round(Number(data.new_product_window_days)))
+        : 15,
+      bestseller_min_sold: Number.isFinite(Number(data?.bestseller_min_sold)) && Number(data.bestseller_min_sold) >= 1
+        ? Math.min(1000000, Math.round(Number(data.bestseller_min_sold)))
+        : 1,
+      bestseller_top_per_category: Number.isFinite(Number(data?.bestseller_top_per_category)) && Number(data.bestseller_top_per_category) >= 1
+        ? Math.min(50, Math.round(Number(data.bestseller_top_per_category)))
+        : 1,
+      sale_min_discount_percent: Number.isFinite(Number(data?.sale_min_discount_percent)) && Number(data.sale_min_discount_percent) >= 0
+        ? Math.min(99, Math.round(Number(data.sale_min_discount_percent)))
+        : 0,
     };
     settingsCache.set(sellerId, { data: result, expiresAt: now + SETTINGS_TTL });
     return NextResponse.json(result, { status: r.ok ? 200 : r.status });

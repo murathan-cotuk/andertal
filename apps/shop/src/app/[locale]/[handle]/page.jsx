@@ -27,7 +27,12 @@ import {
   filterProductsByFacets,
   applyCatalogSort,
   isDiscountedProduct,
-  isRecentProduct,
+  isWithinNewWindow,
+  loadNewProductWindowDays,
+  loadCatalogBadgeRules,
+  DEFAULT_NEW_PRODUCT_WINDOW_DAYS,
+  DEFAULT_BESTSELLER_MIN_SOLD,
+  DEFAULT_SALE_MIN_DISCOUNT_PERCENT,
   productSalesScore,
   getFacetGroupTitle,
   formatFacetOptionLabel,
@@ -799,6 +804,19 @@ function CollectionPage() {
   const tmpl = shopStyles?.collection_template || {};
   const saleOnly = (searchParams?.get("sale") || "").trim() === "1";
   const neuOnly = (searchParams?.get("neu") || "").trim() === "1";
+  const [newWindowDays, setNewWindowDays] = useState(DEFAULT_NEW_PRODUCT_WINDOW_DAYS);
+  const [bestsellerMinSold, setBestsellerMinSold] = useState(DEFAULT_BESTSELLER_MIN_SOLD);
+  const [saleMinPct, setSaleMinPct] = useState(DEFAULT_SALE_MIN_DISCOUNT_PERCENT);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([loadNewProductWindowDays(), loadCatalogBadgeRules()]).then(([days, rules]) => {
+      if (cancelled) return;
+      setNewWindowDays(days);
+      setBestsellerMinSold(rules.bestsellerMinSold);
+      setSaleMinPct(rules.saleMinDiscountPercent);
+    });
+    return () => { cancelled = true; };
+  }, []);
   const bestsellerOnly = (searchParams?.get("bestseller") || "").trim() === "1";
 
   const [collection,  setCollection]  = useState(null);
@@ -1096,13 +1114,13 @@ function CollectionPage() {
 
   let filtered = [...products];
   if (saleOnly) {
-    filtered = filtered.filter((p) => isDiscountedProduct(p));
+    filtered = filtered.filter((p) => isDiscountedProduct(p, saleMinPct));
   }
   if (neuOnly) {
-    filtered = filtered.filter((p) => isRecentProduct(p, 2));
+    filtered = filtered.filter((p) => isWithinNewWindow(p, newWindowDays));
   }
   if (bestsellerOnly) {
-    filtered = filtered.filter((p) => productSalesScore(p) > 0);
+    filtered = filtered.filter((p) => productSalesScore(p) >= bestsellerMinSold);
   }
   filtered = filterProductsByFacets(filtered, filters);
 

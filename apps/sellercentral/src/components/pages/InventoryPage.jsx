@@ -1051,6 +1051,12 @@ export default function InventoryPage() {
   const [combineLabels, setCombineLabels] = useState({});
   const [combineSaving, setCombineSaving] = useState(false);
   const [isSuperuser, setIsSuperuser] = useState(false);
+  const [newWindowDays, setNewWindowDays] = useState("15");
+  const [bestsellerMinSold, setBestsellerMinSold] = useState("1");
+  const [bestsellerTopPerCategory, setBestsellerTopPerCategory] = useState("1");
+  const [saleMinDiscountPercent, setSaleMinDiscountPercent] = useState("0");
+  const [newWindowSaving, setNewWindowSaving] = useState(false);
+  const [newWindowMsg, setNewWindowMsg] = useState("");
   const [eanDuplicateGroups, setEanDuplicateGroups] = useState([]);
   const [eanDuplicatesModalOpen, setEanDuplicatesModalOpen] = useState(false);
   const [eanDuplicateMergingId, setEanDuplicateMergingId] = useState(null);
@@ -1219,6 +1225,50 @@ export default function InventoryPage() {
     });
     return () => { cancelled = true; };
   }, [isSuperuser, medusaClient]);
+
+  useEffect(() => {
+    if (!isSuperuser) return;
+    let cancelled = false;
+    medusaClient.getSellerSettings("default").then((d) => {
+      if (cancelled) return;
+      const n = Number(d?.new_product_window_days);
+      if (Number.isFinite(n) && n >= 1) setNewWindowDays(String(Math.round(n)));
+      const sold = Number(d?.bestseller_min_sold);
+      if (Number.isFinite(sold) && sold >= 1) setBestsellerMinSold(String(Math.round(sold)));
+      const top = Number(d?.bestseller_top_per_category);
+      if (Number.isFinite(top) && top >= 1) setBestsellerTopPerCategory(String(Math.round(top)));
+      const pct = Number(d?.sale_min_discount_percent);
+      if (Number.isFinite(pct) && pct >= 0) setSaleMinDiscountPercent(String(Math.round(pct)));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [isSuperuser, medusaClient]);
+
+  const saveNewWindowDays = async () => {
+    const n = Math.max(1, Math.min(3650, Math.round(Number(newWindowDays) || 15)));
+    const sold = Math.max(1, Math.min(1000000, Math.round(Number(bestsellerMinSold) || 1)));
+    const top = Math.max(1, Math.min(50, Math.round(Number(bestsellerTopPerCategory) || 1)));
+    const pct = Math.max(0, Math.min(99, Math.round(Number(saleMinDiscountPercent) || 0)));
+    setNewWindowDays(String(n));
+    setBestsellerMinSold(String(sold));
+    setBestsellerTopPerCategory(String(top));
+    setSaleMinDiscountPercent(String(pct));
+    setNewWindowSaving(true);
+    setNewWindowMsg("");
+    try {
+      await medusaClient.updateSellerSettings({
+        seller_id: "default",
+        new_product_window_days: n,
+        bestseller_min_sold: sold,
+        bestseller_top_per_category: top,
+        sale_min_discount_percent: pct,
+      });
+      setNewWindowMsg(l === "tr" ? "Kaydedildi" : l === "de" ? "Gespeichert" : "Saved");
+    } catch (e) {
+      setNewWindowMsg(e?.message || "Error");
+    } finally {
+      setNewWindowSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!isSuperuser) return;
@@ -1773,6 +1823,81 @@ export default function InventoryPage() {
                   : (l === "tr" ? "Ödemelerinizin (Auszahlung) yatırılabilmesi için IBAN eklemediniz." : l === "de" ? "Sie haben noch keine IBAN für Ihre Auszahlungen hinterlegt." : "You haven't added an IBAN for your payouts yet.")}
               </p>
             </Banner>
+          </Layout.Section>
+        )}
+
+        {isSuperuser && (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+              <InlineStack gap="400" blockAlign="end" wrap>
+                <Box minWidth="160px">
+                  <TextField
+                    label={l === "tr" ? "Neu süresi (gün)" : l === "de" ? "Neu-Dauer (Tage)" : l === "fr" ? "Durée « nouveau » (jours)" : l === "es" ? "Duración «nuevo» (días)" : l === "it" ? "Durata «nuovo» (giorni)" : "New window (days)"}
+                    type="number"
+                    min={1}
+                    autoComplete="off"
+                    value={newWindowDays}
+                    onChange={setNewWindowDays}
+                    helpText={l === "tr"
+                      ? "Ürün bu kadar gün Neu rozeti alır, Neuheiten’de ve kategorideki Neu filtresinde kalır."
+                      : l === "de"
+                        ? "So viele Tage gilt ein Produkt als Neu: Badge, Neuheiten und Neu-Filter in der Kategorie."
+                        : "How many days a product stays New: badge, Neuheiten, and the category New filter."}
+                  />
+                </Box>
+                <Box minWidth="160px">
+                  <TextField
+                    label={l === "tr" ? "Bestseller min. satış" : l === "de" ? "Bestseller Mindestverkäufe" : "Bestseller min. sales"}
+                    type="number"
+                    min={1}
+                    autoComplete="off"
+                    value={bestsellerMinSold}
+                    onChange={setBestsellerMinSold}
+                    helpText={l === "tr"
+                      ? "Ödenmiş satış adedi bu sayının altındaysa ürün Bestseller olamaz."
+                      : l === "de"
+                        ? "Unter dieser Verkaufszahl wird kein Bestseller-Badge vergeben."
+                        : "Below this many paid units sold, a product cannot be a Bestseller."}
+                  />
+                </Box>
+                <Box minWidth="180px">
+                  <TextField
+                    label={l === "tr" ? "Kategori başına ilk N" : l === "de" ? "Top N je Kategorie" : "Top N per category"}
+                    type="number"
+                    min={1}
+                    autoComplete="off"
+                    value={bestsellerTopPerCategory}
+                    onChange={setBestsellerTopPerCategory}
+                    helpText={l === "tr"
+                      ? "Her kategoride en çok satan ilk N ürüne Bestseller etiketi verilir."
+                      : l === "de"
+                        ? "Die N meistverkauften Produkte jeder Kategorie erhalten das Bestseller-Badge."
+                        : "The top N sellers in each category get the Bestseller badge."}
+                  />
+                </Box>
+                <Box minWidth="180px">
+                  <TextField
+                    label={l === "tr" ? "Sale min. indirim %" : l === "de" ? "Sale Mindest-Rabatt %" : "Sale min. discount %"}
+                    type="number"
+                    min={0}
+                    autoComplete="off"
+                    value={saleMinDiscountPercent}
+                    onChange={setSaleMinDiscountPercent}
+                    helpText={l === "tr"
+                      ? "Normal fiyata göre en az bu kadar indirim varsa Sale etiketi verilir. 0 = herhangi bir indirim."
+                      : l === "de"
+                        ? "Sale-Badge ab diesem Rabatt auf den Normalpreis. 0 = jeder Rabatt."
+                        : "Sale badge when the discount vs the regular price is at least this percent. 0 = any discount."}
+                  />
+                </Box>
+                <Button variant="primary" loading={newWindowSaving} onClick={saveNewWindowDays}>
+                  {l === "tr" ? "Kaydet" : l === "de" ? "Speichern" : "Save"}
+                </Button>
+                {newWindowMsg ? <Text as="span" tone="subdued">{newWindowMsg}</Text> : null}
+              </InlineStack>
+              </BlockStack>
+            </Card>
           </Layout.Section>
         )}
 

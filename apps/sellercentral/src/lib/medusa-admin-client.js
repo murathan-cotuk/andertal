@@ -436,6 +436,19 @@ class MedusaAdminClient {
         : 'de',
       maintenance_mode_enabled: res?.maintenance_mode_enabled === true,
       maintenance_mode_image_url: res?.maintenance_mode_image_url ?? '',
+      not_found_image_url: res?.not_found_image_url ?? '',
+      new_product_window_days: Number.isFinite(Number(res?.new_product_window_days)) && Number(res.new_product_window_days) >= 1
+        ? Math.min(3650, Math.round(Number(res.new_product_window_days)))
+        : 15,
+      bestseller_min_sold: Number.isFinite(Number(res?.bestseller_min_sold)) && Number(res.bestseller_min_sold) >= 1
+        ? Math.min(1000000, Math.round(Number(res.bestseller_min_sold)))
+        : 1,
+      bestseller_top_per_category: Number.isFinite(Number(res?.bestseller_top_per_category)) && Number(res.bestseller_top_per_category) >= 1
+        ? Math.min(50, Math.round(Number(res.bestseller_top_per_category)))
+        : 1,
+      sale_min_discount_percent: Number.isFinite(Number(res?.sale_min_discount_percent)) && Number(res.sale_min_discount_percent) >= 0
+        ? Math.min(99, Math.round(Number(res.sale_min_discount_percent)))
+        : 0,
     };
   }
 
@@ -1559,6 +1572,10 @@ class MedusaAdminClient {
   }
   async getSellerHealthSellers() {
     return this.request('/admin-hub/v1/seller-health/sellers')
+  }
+  async getProductSellerAnalytics(params = {}) {
+    const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+    return this.request(`/admin-hub/v1/analytics/product-sellers${qs}`)
   }
   async getSellerHealthConfig() {
     return this.request('/admin-hub/v1/seller-health/config')

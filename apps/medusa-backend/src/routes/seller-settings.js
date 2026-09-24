@@ -132,13 +132,25 @@ const sellerSettingsGET = async (req, res) => {
       let maintenance_mode_enabled = false
       let maintenance_mode_image_url = ''
       let not_found_image_url = ''
+      let new_product_window_days = 15
+      let bestseller_min_sold = 1
+      let bestseller_top_per_category = 1
+      let sale_min_discount_percent = 0
       try {
         const mm = await client.query(
-          `SELECT maintenance_mode_enabled, maintenance_mode_image_url, not_found_image_url FROM admin_hub_seller_settings WHERE seller_id = 'default'`,
+          `SELECT maintenance_mode_enabled, maintenance_mode_image_url, not_found_image_url, new_product_window_days, bestseller_min_sold, bestseller_top_per_category, sale_min_discount_percent FROM admin_hub_seller_settings WHERE seller_id = 'default'`,
         )
         maintenance_mode_enabled = !!mm.rows?.[0]?.maintenance_mode_enabled
         maintenance_mode_image_url = mm.rows?.[0]?.maintenance_mode_image_url || ''
         not_found_image_url = mm.rows?.[0]?.not_found_image_url || ''
+        const rawNewDays = Number(mm.rows?.[0]?.new_product_window_days)
+        if (Number.isFinite(rawNewDays) && rawNewDays >= 1) new_product_window_days = Math.min(3650, Math.round(rawNewDays))
+        const rawMinSold = Number(mm.rows?.[0]?.bestseller_min_sold)
+        if (Number.isFinite(rawMinSold) && rawMinSold >= 1) bestseller_min_sold = Math.min(1000000, Math.round(rawMinSold))
+        const rawTop = Number(mm.rows?.[0]?.bestseller_top_per_category)
+        if (Number.isFinite(rawTop) && rawTop >= 1) bestseller_top_per_category = Math.min(50, Math.round(rawTop))
+        const rawSalePct = Number(mm.rows?.[0]?.sale_min_discount_percent)
+        if (Number.isFinite(rawSalePct) && rawSalePct >= 0) sale_min_discount_percent = Math.min(99, Math.round(rawSalePct))
       } catch (_) {}
       const row = r.rows && r.rows[0]
       const store_name = row && row.store_name != null ? String(row.store_name) : ''
@@ -189,6 +201,10 @@ const sellerSettingsGET = async (req, res) => {
         maintenance_mode_enabled,
         maintenance_mode_image_url,
         not_found_image_url,
+        new_product_window_days,
+        bestseller_min_sold,
+        bestseller_top_per_category,
+        sale_min_discount_percent,
         legal_company_name: row?.legal_company_name || '',
         legal_representative: row?.legal_representative || '',
         legal_street: row?.legal_street || '',
@@ -300,7 +316,41 @@ const sellerSettingsPATCH = async (req, res) => {
       }
       // Platform-wide setting — always stored on seller_id = default, same as maintenance mode.
       sellerId = 'default'
-      notFoundImageUrl = body.not_found_image_url ? String(body.not_found_image_url).trim() : null
+      notFoundImageUrl = body.not_found_image_url ? String(body.not_found_image_url).trim() : ''
+    }
+    let newProductWindowDays = undefined
+    if (Object.prototype.hasOwnProperty.call(body, 'new_product_window_days')) {
+      if (!isSuperuser) {
+        return res.status(403).json({ message: 'Only superuser can change how long products stay new' })
+      }
+      sellerId = 'default'
+      const rawDays = Number(body.new_product_window_days)
+      newProductWindowDays = Number.isFinite(rawDays) ? Math.max(1, Math.min(3650, Math.round(rawDays))) : 15
+    }
+    let bestsellerMinSold = undefined
+    let bestsellerTopPerCategory = undefined
+    let saleMinDiscountPercent = undefined
+    if (
+      Object.prototype.hasOwnProperty.call(body, 'bestseller_min_sold')
+      || Object.prototype.hasOwnProperty.call(body, 'bestseller_top_per_category')
+      || Object.prototype.hasOwnProperty.call(body, 'sale_min_discount_percent')
+    ) {
+      if (!isSuperuser) {
+        return res.status(403).json({ message: 'Only superuser can change bestseller and sale badge rules' })
+      }
+      sellerId = 'default'
+      if (Object.prototype.hasOwnProperty.call(body, 'bestseller_min_sold')) {
+        const n = Number(body.bestseller_min_sold)
+        bestsellerMinSold = Number.isFinite(n) ? Math.max(1, Math.min(1000000, Math.round(n))) : 1
+      }
+      if (Object.prototype.hasOwnProperty.call(body, 'bestseller_top_per_category')) {
+        const n = Number(body.bestseller_top_per_category)
+        bestsellerTopPerCategory = Number.isFinite(n) ? Math.max(1, Math.min(50, Math.round(n))) : 1
+      }
+      if (Object.prototype.hasOwnProperty.call(body, 'sale_min_discount_percent')) {
+        const n = Number(body.sale_min_discount_percent)
+        saleMinDiscountPercent = Number.isFinite(n) ? Math.max(0, Math.min(99, Math.round(n))) : 0
+      }
     }
     let uiLocale = undefined
     if (Object.prototype.hasOwnProperty.call(body, 'locale')) {
@@ -356,7 +406,7 @@ const sellerSettingsPATCH = async (req, res) => {
          maintenance_mode_image_url = COALESCE($28, admin_hub_seller_settings.maintenance_mode_image_url),
          return_conditions = COALESCE($29, admin_hub_seller_settings.return_conditions),
          shop_about = COALESCE($30, admin_hub_seller_settings.shop_about),
-         not_found_image_url = COALESCE($31, admin_hub_seller_settings.not_found_image_url),
+         not_found_image_url = CASE WHEN $31::text IS NULL THEN admin_hub_seller_settings.not_found_image_url ELSE $31 END,
          updated_at = now()`,
       [sellerId, store_name || null, thresholdsJson, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, platform_name, support_email, announcementJson !== undefined ? announcementJson : null, storefront_url, logoConfigJson !== undefined ? logoConfigJson : null,
        legal_company_name, legal_representative, legal_street, legal_city, legal_trade_register, legal_register_court, legal_vat_id, legal_tax_id, legal_email, barcodeConfigJson !== undefined ? barcodeConfigJson : null, admin_notification_email,
@@ -367,6 +417,23 @@ const sellerSettingsPATCH = async (req, res) => {
        shop_about !== undefined ? shop_about : null,
        notFoundImageUrl !== undefined ? notFoundImageUrl : null]
     )
+    if (newProductWindowDays !== undefined || bestsellerMinSold !== undefined || bestsellerTopPerCategory !== undefined || saleMinDiscountPercent !== undefined) {
+      await client.query(
+        `UPDATE admin_hub_seller_settings SET
+           new_product_window_days = COALESCE($1, new_product_window_days),
+           bestseller_min_sold = COALESCE($2, bestseller_min_sold),
+           bestseller_top_per_category = COALESCE($3, bestseller_top_per_category),
+           sale_min_discount_percent = COALESCE($4, sale_min_discount_percent),
+           updated_at = now()
+         WHERE seller_id = 'default'`,
+        [
+          newProductWindowDays !== undefined ? newProductWindowDays : null,
+          bestsellerMinSold !== undefined ? bestsellerMinSold : null,
+          bestsellerTopPerCategory !== undefined ? bestsellerTopPerCategory : null,
+          saleMinDiscountPercent !== undefined ? saleMinDiscountPercent : null,
+        ],
+      )
+    }
     if (uiLocale !== undefined) {
       // Persist Sellercentral UI language on the acting seller's settings row (not platform `default`
       // when a superuser toggles shop languages).
@@ -394,6 +461,10 @@ const sellerSettingsPATCH = async (req, res) => {
       maintenance_mode_enabled: maintenanceModeEnabled !== undefined ? maintenanceModeEnabled : undefined,
       maintenance_mode_image_url: maintenanceModeImageUrl !== undefined ? maintenanceModeImageUrl : undefined,
       not_found_image_url: notFoundImageUrl !== undefined ? notFoundImageUrl : undefined,
+      new_product_window_days: newProductWindowDays !== undefined ? newProductWindowDays : undefined,
+      bestseller_min_sold: bestsellerMinSold !== undefined ? bestsellerMinSold : undefined,
+      bestseller_top_per_category: bestsellerTopPerCategory !== undefined ? bestsellerTopPerCategory : undefined,
+      sale_min_discount_percent: saleMinDiscountPercent !== undefined ? saleMinDiscountPercent : undefined,
     })
   } catch (err) {
     console.error('sellerSettingsPATCH:', err)

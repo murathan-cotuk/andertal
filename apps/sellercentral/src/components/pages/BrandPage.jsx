@@ -52,6 +52,7 @@ function BrandStatusBadge({ brand, copy }) {
     return <Badge tone="attention">{copy.statusPending}</Badge>;
   }
   if (brand.status === "rejected") return <Badge tone="critical">{copy.statusRejected}</Badge>;
+  if (brand.status === "superseded") return <Badge tone="critical">{copy.statusSuperseded}</Badge>;
   if (brand.verification_level === "verified") return <Badge tone="success">{copy.statusVerified}</Badge>;
   if (brand.verification_level === "reseller") return <Badge tone="success">{copy.statusReseller}</Badge>;
   if (brand.verification_level === "unverified") return <Badge>{copy.statusUnverified}</Badge>;

@@ -457,29 +457,6 @@ function stripSellerOwnedFromCatalogMeta(meta) {
   return out;
 }
 
-function sanitizeCatalogVariants(variants) {
-  if (!Array.isArray(variants)) return [];
-  return variants.map((v) => {
-    const vMeta = v?.metadata && typeof v.metadata === "object" ? { ...v.metadata } : {};
-    delete vMeta.shipping_group_id;
-    delete vMeta.sku;
-    delete vMeta.prices;
-    return {
-      ...v,
-      sku: "",
-      inventory: 0,
-      inventory_quantity: 0,
-      price: undefined,
-      price_cents: 0,
-      compare_at_price: undefined,
-      compare_at_price_cents: undefined,
-      sale_price: undefined,
-      sale_price_cents: undefined,
-      metadata: vMeta,
-    };
-  });
-}
-
 function normalizeProductForCompare(p) {
   if (!p) return null;
   return {
@@ -680,6 +657,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [pendingChangeRequests, setPendingChangeRequests] = useState([]);
   const [changeRequestsModalOpen, setChangeRequestsModalOpen] = useState(false);
   const [changeRequestActionId, setChangeRequestActionId] = useState("");
+  const [selectedChangeRequestIds, setSelectedChangeRequestIds] = useState(() => new Set());
+  const [bulkChangeRequestBusy, setBulkChangeRequestBusy] = useState(false);
   const [fileUploading, setFileUploading] = useState(false);
   const [addingFile, setAddingFile] = useState(false);
   const [newFileUrl, setNewFileUrl] = useState("");
@@ -833,6 +812,64 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       setChangeRequestActionId("");
     }
   }, [client, product?.id, locale, refetchPendingChangeRequests]);
+
+  const toggleChangeRequestSelected = useCallback((id) => {
+    setSelectedChangeRequestIds((prev) => {
+      const next = new Set(prev);
+      const key = String(id);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleAllChangeRequestsSelected = useCallback(() => {
+    setSelectedChangeRequestIds((prev) =>
+      prev.size === pendingChangeRequests.length
+        ? new Set()
+        : new Set(pendingChangeRequests.map((cr) => String(cr.id)))
+    );
+  }, [pendingChangeRequests]);
+
+  const bulkActOnChangeRequests = useCallback(async (action) => {
+    if (!product?.id || selectedChangeRequestIds.size === 0) return;
+    const ids = [...selectedChangeRequestIds];
+    setBulkChangeRequestBusy(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) =>
+        client.request(`/admin-hub/v1/product-change-requests/${encodeURIComponent(id)}/${action}`, {
+          method: "POST",
+          body: JSON.stringify({ reviewer_note: action === "approve" ? "Bulk approved via product page" : "Bulk rejected via product page" }),
+        })
+      ));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      const fresh = await client.getAdminHubProduct(product.id);
+      const localized = mergeLocaleFields(fresh);
+      if (localized) {
+        setProduct(localized);
+        setBaselineSnapshot(productSnapshot(localized));
+      }
+      await refetchPendingChangeRequests(product.id);
+      setSelectedChangeRequestIds(new Set());
+      onReload?.();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("andertal-notifications-refresh"));
+      }
+      const okCount = ids.length - failed;
+      const actionLabel = action === "approve"
+        ? lt(locale, "approved", "onaylandı", "approuvé(s)", "aprobado(s)", "approvato/i", "genehmigt")
+        : lt(locale, "rejected", "reddedildi", "rejeté(s)", "rechazado(s)", "rifiutato/i", "abgelehnt");
+      setMessage({
+        type: failed > 0 ? "warning" : "success",
+        text: failed > 0
+          ? `${okCount}/${ids.length} ${actionLabel}${lt(locale, ", some failed.", ", bazıları başarısız oldu.", ", certains ont échoué.", ", algunos fallaron.", ", alcuni non riusciti.", ", einige fehlgeschlagen.")}`
+          : `${okCount} ${lt(locale, "changes", "değişiklik", "modifications", "cambios", "modifiche", "Änderungen")} ${actionLabel}.`,
+      });
+    } catch (err) {
+      setMessage({ type: "error", text: err?.message || lt(locale, "Bulk action failed.", "Toplu işlem başarısız.", "Action groupée échouée.", "Acción masiva fallida.", "Azione collettiva non riuscita.", "Massenaktion fehlgeschlagen.") });
+    } finally {
+      setBulkChangeRequestBusy(false);
+    }
+  }, [client, product?.id, locale, selectedChangeRequestIds, mergeLocaleFields, refetchPendingChangeRequests, onReload]);
 
   // Sync from server when we switch product (id/handle) or locale. Merge translations[locale] into title/description.
   const initialProductId = initialProduct?.id ?? initialProduct?.handle ?? "";
@@ -999,29 +1036,26 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           const master = result.product;
           const masterMeta = stripSellerOwnedFromCatalogMeta(master.metadata);
           const masterVariants = Array.isArray(master.variants) ? master.variants : [];
-          // Typed a child's own EAN directly (not the parent/grouping EAN): only that one
-          // child is what the seller intends to sell — list it alone, don't drag in every
-          // sibling variant. "master_total_variants" powers the "See other variations" link.
-          const singleChildMode = result.matched_on === "variant" && masterVariants.length > 1;
-          // Trust the backend's own match (same EAN normalization it used to find this product
-          // in the first place) rather than re-deriving it here with a plain string compare —
-          // that's what used to silently miss the child and fall back to dumping every sibling.
+          // A searched EAN always identifies exactly ONE product for this seller — whether the
+          // backend found it as the parent row's own EAN or as one child's EAN inside variants[]
+          // is just that OTHER seller's own internal organization, never this seller's problem.
+          // Never pull siblings in; "master_total_variants" only powers the informational
+          // "See other variations" link, it never adds anything to this seller's own listing.
           const matchedVariantEan = normalizeEanDigits(result.matched_variant_ean);
-          const matchedVariant = singleChildMode && matchedVariantEan
+          const matchedVariant = result.matched_on === "variant" && matchedVariantEan
             ? masterVariants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === matchedVariantEan) || null
             : null;
-          // Matched via the parent/grouping EAN: keep it as-is, seller wants the full family.
-          const parentEan = singleChildMode ? (matchedVariant?.ean || String(ean).trim()) : (result.matched_on === "variant" ? (masterMeta.ean || "") : String(ean).trim());
+          const resolvedEan = matchedVariant?.ean || String(ean).trim();
           // A matched child carries its own brand/description/bullets/images in its own metadata
           // (see productRowToVariant on the backend) — the parent row is just a grouping shell and
           // must never be used for these once we know exactly which child this is.
           const childMeta = matchedVariant ? stripSellerOwnedFromCatalogMeta(matchedVariant.metadata || {}) : null;
           const baseMeta = childMeta || masterMeta;
-          if (singleChildMode) delete baseMeta.variation_groups;
+          delete baseMeta.variation_groups;
           // Catalog shared fields only — SKU / price / shipping stay empty for this seller
           const mergedMeta = {
             ...baseMeta,
-            ean: parentEan,
+            ean: resolvedEan,
             master_product_id: master.id,
             master_total_variants: masterVariants.length,
           };
@@ -1034,11 +1068,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             price: 0,
             inventory: 0,
             metadata: mergedMeta,
-            variants: singleChildMode
-              ? []
-              : (masterVariants.length > 0
-                  ? sanitizeCatalogVariants(masterVariants)
-                  : prev.variants),
+            // Never the sibling family — this seller only ever gets the one EAN they searched.
+            variants: [],
           };
         });
       } else {
@@ -1088,9 +1119,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         setProduct((prev) => {
           if (!prev) return prev;
           const masterMeta = stripSellerOwnedFromCatalogMeta(match.metadata);
+          const matchVariants = Array.isArray(match.variants) ? match.variants : [];
           const mergedMeta = {
             ...masterMeta,
             master_product_id: match.id,
+            master_total_variants: matchVariants.length,
           };
           return {
             ...prev,
@@ -1101,9 +1134,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             price: 0,
             inventory: 0,
             metadata: mergedMeta,
-            variants: Array.isArray(match.variants) && match.variants.length > 0
-              ? sanitizeCatalogVariants(match.variants)
-              : prev.variants,
+            // Never the sibling family — this seller only ever gets the one product at this URL.
+            variants: [],
           };
         });
       } else {
@@ -1115,11 +1147,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     }
   }, [urlSearchTerm, client]);
 
-  // On mount: if ?existing_id is set, pre-fill form with that product's catalog data.
-  // If ?variant_ean is also set, the seller picked one specific child variant (e.g. via
-  // Add Existing Product) — list only that one item instead of the whole variant matrix,
-  // since only that child is what they intend to sell (see "master_total_variants" below,
-  // which powers the "See other variations" link back to Add Existing Product).
+  // On mount: if ?existing_id is set, the seller picked ONE specific catalog product via
+  // Add Existing Product — pre-fill this new product with ONLY that product's own data.
+  // Never the sibling family: whether the backend matched the searched EAN as the product's
+  // own top-level EAN or as one child's EAN inside its variants[] is that OTHER seller's own
+  // internal organization (their "parent" is just their grouping choice), never this seller's
+  // concern. "master_total_variants" only powers the informational "See other variations" link.
   useEffect(() => {
     if (!isNew) return;
     const existingId = searchParams?.get("existing_id");
@@ -1132,9 +1165,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         const foundVariants = Array.isArray(found.variants) ? found.variants : [];
         const normalizedVariantEan = normalizeEanDigits(variantEanParam);
         const matchedVariant = normalizedVariantEan
-          ? foundVariants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === normalizedVariantEan)
+          ? foundVariants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === normalizedVariantEan) || null
           : null;
-        const singleChildMode = !!matchedVariant && foundVariants.length > 1;
         setProduct((prev) => {
           if (!prev) return prev;
           // A matched child carries its own brand/description/bullets/images in its own
@@ -1143,10 +1175,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           const masterMeta = stripSellerOwnedFromCatalogMeta(found.metadata);
           const childMeta = matchedVariant ? stripSellerOwnedFromCatalogMeta(matchedVariant.metadata || {}) : null;
           const baseMeta = childMeta || masterMeta;
-          if (singleChildMode) delete baseMeta.variation_groups;
+          delete baseMeta.variation_groups;
           const mergedMeta = {
             ...baseMeta,
-            ean: singleChildMode ? (matchedVariant?.ean || variantEanParam) : masterMeta.ean,
+            ean: matchedVariant?.ean || variantEanParam || masterMeta.ean,
             master_product_id: existingId,
             master_total_variants: foundVariants.length,
           };
@@ -1159,11 +1191,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             price: 0,
             inventory: 0,
             metadata: mergedMeta,
-            variants: singleChildMode
-              ? []
-              : (foundVariants.length > 0
-                  ? sanitizeCatalogVariants(foundVariants)
-                  : prev.variants),
+            // Never the sibling family — this seller only ever gets the one product they picked.
+            variants: [],
           };
         });
       } catch (_) {}
@@ -1203,7 +1232,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const isReusingCatalogOnCreate = isNew && !isSuperuser && (
     eanLookupState === "found" || urlSearchState === "found" || Boolean(meta.master_product_id)
   );
-  const showSharedCatalogNotice = isSecondSeller || isReusingCatalogOnCreate;
   // Catalog facts (EAN, brand) are fixed for a given product regardless of which flow got the
   // seller here — editing this listing (isSecondSeller) or creating a new one against a catalog
   // match found via EAN/URL/existing_id search (isReusingCatalogOnCreate).
@@ -1211,29 +1239,16 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
 
   const changeRequestSubmittedMsg =
     locale === "tr"
-      ? "Değişiklik talebiniz ekibimize iletildi. İncelendikten sonra onaylanır veya reddedilir. Fiyat, SKU ve kargo gibi kendi alanlarınız hemen kaydedilir."
+      ? "Değişiklik talebiniz ekibimize iletildi. İncelendikten sonra onaylanır veya reddedilir."
       : locale === "de"
-      ? "Dein Änderungsantrag wurde an unser Team übermittelt und wird geprüft. Eigene Felder (Preis, SKU, Versand) wurden sofort gespeichert."
+      ? "Dein Änderungsantrag wurde an unser Team übermittelt und wird geprüft."
       : locale === "fr"
-      ? "Votre demande de modification a été transmise à notre équipe et sera examinée. Vos champs propres (prix, SKU, livraison) sont enregistrés immédiatement."
+      ? "Votre demande de modification a été transmise à notre équipe et sera examinée."
       : locale === "es"
-      ? "Tu solicitud de cambio se ha enviado a nuestro equipo y será revisada. Tus campos propios (precio, SKU, envío) se guardan de inmediato."
+      ? "Tu solicitud de cambio se ha enviado a nuestro equipo y será revisada."
       : locale === "it"
-      ? "La tua richiesta di modifica è stata inviata al nostro team e verrà esaminata. I tuoi campi (prezzo, SKU, spedizione) sono salvati subito."
-      : "Your change request has been sent to our team and will be reviewed. Your own fields (price, SKU, shipping) are saved immediately.";
-
-  const sharedCatalogNoticeMsg =
-    locale === "tr"
-      ? "Bu ürün katalogda başka bir satıcı tarafından zaten eklenmiş. Ürün adı, açıklama, görseller ve diğer ortak katalog alanlarını doğrudan değiştiremezsiniz — kaydettiğinizde değişiklik talebi olarak ekibimize iletilir ve incelenir. Fiyat, SKU ve kargo yönteminizi ise kendiniz girersiniz."
-      : locale === "de"
-      ? "Dieses Produkt wurde bereits von einem anderen Anbieter im Katalog erfasst. Titel, Beschreibung, Bilder und andere gemeinsame Katalogfelder kannst du nicht direkt ändern — beim Speichern wird ein Änderungsantrag an unser Team gesendet und geprüft. Preis, SKU und Versandmethode trägst du selbst ein."
-      : locale === "fr"
-      ? "Ce produit a déjà été ajouté au catalogue par un autre vendeur. Vous ne pouvez pas modifier directement le titre, la description, les images et les autres champs partagés — à l'enregistrement, une demande de modification est envoyée à notre équipe. Vous saisissez vous-même le prix, le SKU et la livraison."
-      : locale === "es"
-      ? "Este producto ya fue añadido al catálogo por otro vendedor. No puedes cambiar directamente el título, la descripción, las imágenes u otros campos compartidos — al guardar se envía una solicitud de cambio a nuestro equipo. Tú introduces tu propio precio, SKU y envío."
-      : locale === "it"
-      ? "Questo prodotto è già stato aggiunto al catalogo da un altro venditore. Non puoi modificare direttamente titolo, descrizione, immagini e altri campi condivisi — al salvataggio la richiesta di modifica viene inviata al nostro team. Inserisci tu prezzo, SKU e spedizione."
-      : "This product was already added to the catalog by another seller. You cannot directly change the title, description, images, or other shared catalog fields — when you save, a change request is sent to our team for review. Enter your own price, SKU, and shipping method.";
+      ? "La tua richiesta di modifica è stata inviata al nostro team e verrà esaminata."
+      : "Your change request has been sent to our team and will be reviewed.";
 
   // After create→redirect, show green success banner from query flag
   useEffect(() => {
@@ -2839,14 +2854,6 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </Box>
       )}
 
-      {showSharedCatalogNotice && (
-        <Box paddingBlockEnd="200">
-          <Banner tone="info">
-            {sharedCatalogNoticeMsg}
-          </Banner>
-        </Box>
-      )}
-
       {!isSuperuser && (meta._catalog_approval_pending || (Array.isArray(meta._pending_catalog_metafields) && meta._pending_catalog_metafields.length > 0)) && (
         <Box paddingBlockEnd="200">
           <Banner tone="warning">
@@ -2901,16 +2908,55 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         >
           <Modal.Section>
             <BlockStack gap="400">
+              {pendingChangeRequests.length > 0 && (
+                <InlineStack gap="300" align="space-between" blockAlign="center" wrap>
+                  <Checkbox
+                    label={
+                      selectedChangeRequestIds.size > 0
+                        ? `${lt(locale, "Selected", "Seçili", "Sélectionné", "Seleccionado", "Selezionato", "Ausgewählt")}: ${selectedChangeRequestIds.size}/${pendingChangeRequests.length}`
+                        : lt(locale, "Select all", "Tümünü seç", "Tout sélectionner", "Seleccionar todo", "Seleziona tutto", "Alle auswählen")
+                    }
+                    checked={selectedChangeRequestIds.size > 0 && selectedChangeRequestIds.size === pendingChangeRequests.length}
+                    onChange={toggleAllChangeRequestsSelected}
+                  />
+                  <InlineStack gap="200">
+                    <Button
+                      size="slim"
+                      tone="success"
+                      disabled={selectedChangeRequestIds.size === 0 || bulkChangeRequestBusy}
+                      loading={bulkChangeRequestBusy}
+                      onClick={() => bulkActOnChangeRequests("approve")}
+                    >
+                      {`${locale === "tr" ? "Seçilenleri onayla" : locale === "fr" ? "Approuver la sélection" : locale === "es" ? "Aprobar seleccionados" : locale === "it" ? "Approva selezionati" : locale === "de" ? "Auswahl freigeben" : "Approve selected"}${selectedChangeRequestIds.size > 0 ? ` (${selectedChangeRequestIds.size})` : ""}`}
+                    </Button>
+                    <Button
+                      size="slim"
+                      tone="critical"
+                      variant="secondary"
+                      disabled={selectedChangeRequestIds.size === 0 || bulkChangeRequestBusy}
+                      loading={bulkChangeRequestBusy}
+                      onClick={() => bulkActOnChangeRequests("reject")}
+                    >
+                      {`${locale === "tr" ? "Seçilenleri reddet" : locale === "fr" ? "Rejeter la sélection" : locale === "es" ? "Rechazar seleccionados" : locale === "it" ? "Rifiuta selezionati" : locale === "de" ? "Auswahl ablehnen" : "Reject selected"}${selectedChangeRequestIds.size > 0 ? ` (${selectedChangeRequestIds.size})` : ""}`}
+                    </Button>
+                  </InlineStack>
+                </InlineStack>
+              )}
+              <Divider />
               {pendingChangeRequests.map((cr, idx) => {
                 const busy = changeRequestActionId === String(cr.id);
+                const selected = selectedChangeRequestIds.has(String(cr.id));
                 return (
                   <React.Fragment key={cr.id}>
                     {idx > 0 && <Divider />}
                     <BlockStack gap="200">
                       <InlineStack gap="300" align="space-between" blockAlign="center" wrap>
-                        <Text as="p" variant="bodyMd" fontWeight="semibold">
-                          {fieldNameDisplayLabel(cr.field_name, locale)}
-                        </Text>
+                        <InlineStack gap="200" blockAlign="center">
+                          <Checkbox label="" labelHidden checked={selected} onChange={() => toggleChangeRequestSelected(cr.id)} />
+                          <Text as="p" variant="bodyMd" fontWeight="semibold">
+                            {fieldNameDisplayLabel(cr.field_name, locale)}
+                          </Text>
+                        </InlineStack>
                         <Text as="p" variant="bodyXs" tone="subdued">
                           {`${locale === "tr" ? "Satıcı" : locale === "fr" ? "Vendeur" : locale === "es" ? "Vendedor" : locale === "it" ? "Venditore" : locale === "de" ? "Verkäufer" : "Seller"}: ${changeRequestSellerLabel(cr)}`}
                         </Text>
@@ -3175,7 +3221,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 </Banner>
               )}
 
-              {Number(meta.master_total_variants || 0) > 1 && meta.master_product_id && (
+              {!isSuperuser && Number(meta.master_total_variants || 0) > 1 && meta.master_product_id && (
                 <Banner tone="info">
                   <InlineStack gap="300" blockAlign="center" align="space-between" wrap>
                     <Text as="p" variant="bodySm">
@@ -3247,7 +3293,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                     .filter((b) => (b.status || "active") === "active" || b.id === getMeta(product, "brand_id"))
                                     .map((b) => {
                                       const pending = (b.status || "active") !== "active";
-                                      const pendingSuffix = pending
+                                      const superseded = b.status === "superseded";
+                                      const pendingSuffix = superseded
+                                        ? ` (${locale === "en" ? "superseded by registered brand" : locale === "tr" ? "tescilli marka tarafından geçersiz kılındı" : locale === "fr" ? "remplacé par une marque déposée" : locale === "es" ? "reemplazado por marca registrada" : locale === "it" ? "sostituito da brand registrato" : "durch registrierte Marke ersetzt"})`
+                                        : pending
                                         ? ` (${locale === "en" ? "pending authorization" : locale === "tr" ? "onay bekliyor" : locale === "fr" ? "autorisation en attente" : locale === "es" ? "autorización pendiente" : locale === "it" ? "autorizzazione in attesa" : "Autorisierung ausstehend"})`
                                         : "";
                                       return { label: `${b.name}${pendingSuffix}`, value: b.id, disabled: pending };
@@ -3259,6 +3308,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                 helpText={
                                   isCatalogLocked
                                     ? (locale === "en" ? "Fixed by the catalog product — can't be changed here." : locale === "tr" ? "Katalog ürünü tarafından belirlenir — burada değiştirilemez." : locale === "fr" ? "Défini par le produit catalogue — non modifiable ici." : locale === "es" ? "Definido por el producto del catálogo — no se puede cambiar aquí." : locale === "it" ? "Definito dal prodotto a catalogo — non modificabile qui." : "Wird vom Katalogprodukt vorgegeben — hier nicht änderbar.")
+                                    : (brands || []).find((b) => b.id === getMeta(product, "brand_id") && b.status === "superseded")
+                                    ? (locale === "en" ? "This brand was superseded after another seller registered it officially. Submit your own proof to sell under it again." : locale === "tr" ? "Bu marka başka bir satıcı tarafından resmi olarak tescil edildiği için geçersiz kılındı. Bu marka altında tekrar satış yapmak için kendi belgenizi gönderin." : locale === "fr" ? "Cette marque a été remplacée après son enregistrement officiel par un autre vendeur. Soumettez votre propre preuve pour vendre à nouveau sous cette marque." : locale === "es" ? "Esta marca fue reemplazada después de que otro vendedor la registrara oficialmente. Envíe su propia prueba para volver a vender bajo esta marca." : locale === "it" ? "Questo brand è stato sostituito dopo che un altro venditore lo ha registrato ufficialmente. Invia una tua prova per tornare a vendere con questo brand." : "Diese Marke wurde ersetzt, nachdem ein anderer Verkäufer sie offiziell registriert hat. Reichen Sie einen eigenen Nachweis ein, um wieder unter dieser Marke zu verkaufen.")
                                     : (brands || []).find((b) => b.id === getMeta(product, "brand_id") && (b.status || "active") !== "active")
                                     ? (locale === "en" ? "This brand is pending authorization and can't be published yet." : locale === "tr" ? "Bu marka onay bekliyor, henüz yayınlanamaz." : locale === "fr" ? "Cette marque est en attente d'autorisation et ne peut pas encore être publiée." : locale === "es" ? "Esta marca está pendiente de autorización y aún no se puede publicar." : locale === "it" ? "Questo brand è in attesa di autorizzazione e non può ancora essere pubblicato." : "Diese Marke wartet auf Autorisierung und kann noch nicht veröffentlicht werden.")
                                     : undefined
@@ -3658,42 +3709,33 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                     ) : null}
                   </div>
               </div>
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Meta title</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_title" />
-                  </InlineStack>
-                }
-                value={meta.seo_meta_title ?? ""}
-                onChange={(v) => updateMeta("seo_meta_title", v)}
-                placeholder={editingTitle || product.title || "Meta title"}
-                autoComplete="off"
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Meta description</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_meta_description" />
-                  </InlineStack>
-                }
-                value={meta.seo_meta_description ?? ""}
-                onChange={(v) => updateMeta("seo_meta_description", v)}
-                placeholder={seoPlainPreview(editingDescription || product.description, 160) || "Meta description"}
-                multiline={2}
-              />
-              <TextField
-                label={
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <span>Keywords</span>
-                    <ChangeRequestFieldBadge requests={pendingChangeRequests} fieldName="metadata.seo_keywords" />
-                  </InlineStack>
-                }
-                value={meta.seo_keywords ?? ""}
-                onChange={(v) => updateMeta("seo_keywords", v)}
-                placeholder="keyword1, keyword2"
-                autoComplete="off"
-              />
+              {/* SEO meta fields are superuser-only — a regular seller's form never shows or
+                  sends these, so they can never end up as a "shared field" change request. */}
+              {isSuperuser && (
+                <>
+                  <TextField
+                    label={<span>Meta title</span>}
+                    value={meta.seo_meta_title ?? ""}
+                    onChange={(v) => updateMeta("seo_meta_title", v)}
+                    placeholder={editingTitle || product.title || "Meta title"}
+                    autoComplete="off"
+                  />
+                  <TextField
+                    label={<span>Meta description</span>}
+                    value={meta.seo_meta_description ?? ""}
+                    onChange={(v) => updateMeta("seo_meta_description", v)}
+                    placeholder={seoPlainPreview(editingDescription || product.description, 160) || "Meta description"}
+                    multiline={2}
+                  />
+                  <TextField
+                    label={<span>Keywords</span>}
+                    value={meta.seo_keywords ?? ""}
+                    onChange={(v) => updateMeta("seo_keywords", v)}
+                    placeholder="keyword1, keyword2"
+                    autoComplete="off"
+                  />
+                </>
+              )}
             </BlockStack>
             </div>
           </Card>

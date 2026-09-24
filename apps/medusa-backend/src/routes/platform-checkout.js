@@ -215,13 +215,25 @@ const storeSellerSettingsGET = async (req, res) => {
     let maintenance_mode_enabled = false
     let maintenance_mode_image_url = ''
     let not_found_image_url = ''
+    let new_product_window_days = 15
+    let bestseller_min_sold = 1
+    let bestseller_top_per_category = 1
+    let sale_min_discount_percent = 0
     try {
       const mm = await client.query(
-        `SELECT maintenance_mode_enabled, maintenance_mode_image_url, not_found_image_url FROM admin_hub_seller_settings WHERE seller_id = 'default'`,
+        `SELECT maintenance_mode_enabled, maintenance_mode_image_url, not_found_image_url, new_product_window_days, bestseller_min_sold, bestseller_top_per_category, sale_min_discount_percent FROM admin_hub_seller_settings WHERE seller_id = 'default'`,
       )
       maintenance_mode_enabled = !!mm.rows?.[0]?.maintenance_mode_enabled
       maintenance_mode_image_url = mm.rows?.[0]?.maintenance_mode_image_url || ''
       not_found_image_url = mm.rows?.[0]?.not_found_image_url || ''
+      const rawNewDays = Number(mm.rows?.[0]?.new_product_window_days)
+      if (Number.isFinite(rawNewDays) && rawNewDays >= 1) new_product_window_days = Math.min(3650, Math.round(rawNewDays))
+      const rawMinSold = Number(mm.rows?.[0]?.bestseller_min_sold)
+      if (Number.isFinite(rawMinSold) && rawMinSold >= 1) bestseller_min_sold = Math.min(1000000, Math.round(rawMinSold))
+      const rawTop = Number(mm.rows?.[0]?.bestseller_top_per_category)
+      if (Number.isFinite(rawTop) && rawTop >= 1) bestseller_top_per_category = Math.min(50, Math.round(rawTop))
+      const rawSalePct = Number(mm.rows?.[0]?.sale_min_discount_percent)
+      if (Number.isFinite(rawSalePct) && rawSalePct >= 0) sale_min_discount_percent = Math.min(99, Math.round(rawSalePct))
     } catch (_) {}
     // Platform language list always lives on seller_id=default
     let enabled_shop_locales = null
@@ -276,7 +288,7 @@ const storeSellerSettingsGET = async (req, res) => {
     if (row && row.logo_config != null) {
       logo_config = typeof row.logo_config === 'string' ? JSON.parse(row.logo_config) : row.logo_config
     }
-    res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config, enabled_shop_locales, maintenance_mode_enabled, maintenance_mode_image_url, not_found_image_url })
+    res.json({ store_name, free_shipping_thresholds, shop_logo_url, shop_favicon_url, sellercentral_logo_url, sellercentral_favicon_url, shop_logo_height, sellercentral_logo_height, announcement_bar_items, logo_config, enabled_shop_locales, maintenance_mode_enabled, maintenance_mode_image_url, not_found_image_url, new_product_window_days, bestseller_min_sold, bestseller_top_per_category, sale_min_discount_percent })
   } catch (err) {
     console.error('[storeSellerSettingsGET] error:', err && err.message)
     res.json({ store_name: '', free_shipping_thresholds: null, shop_logo_url: '', shop_favicon_url: '', sellercentral_logo_url: '', sellercentral_favicon_url: '', shop_logo_height: 34, sellercentral_logo_height: 30, logo_config: null, enabled_shop_locales: null, maintenance_mode_enabled: false, maintenance_mode_image_url: '', not_found_image_url: '' })

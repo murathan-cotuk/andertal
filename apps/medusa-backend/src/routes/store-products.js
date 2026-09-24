@@ -125,13 +125,14 @@ const salesScoreFromMetadata = (metadata) => {
 }
 
 const getBestsellerProductIds = async () => {
+  refreshCatalogBadgeRules()
   const now = Date.now()
   if (bestsellerCache.expiresAt > now && bestsellerCache.ids && bestsellerCache.ids.size > 0) return bestsellerCache.ids
 
   const sharedEntries = await bestsellerRedisCache.get('entries')
   if (Array.isArray(sharedEntries)) {
     const allScoresById = new Map(sharedEntries)
-    const ids = new Set([...allScoresById.entries()].filter(([, s]) => s >= 1).map(([id]) => id))
+    const ids = new Set([...allScoresById.entries()].filter(([, s]) => s >= _catalogBadgeRules.minSold).map(([id]) => id))
     bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids, scoresById: allScoresById }
     return ids
   }
@@ -168,7 +169,8 @@ const getBestsellerProductIds = async () => {
       await metaClient.end()
     } catch (_) { try { await metaClient.end() } catch (__) {} }
   }
-  const threshold = 1
+  refreshCatalogBadgeRules()
+  const threshold = _catalogBadgeRules.minSold
   const ids = new Set([...allScoresById.entries()].filter(([, s]) => s >= threshold).map(([id]) => id))
   bestsellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, ids, scoresById: allScoresById }
   bestsellerRedisCache.set('entries', [...allScoresById.entries()]).catch(() => {})
@@ -343,7 +345,7 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedLi
         const lc = require('../db-pool').getPooledClient()
         await lc.connect()
         const lr = await lc.query(
-          `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id, seller_metadata
+          `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id, seller_metadata, brand_id
            FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
           [productIdsForListings]
         )
@@ -357,7 +359,7 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedLi
           })
           .map((l) => {
             const baseRow = productById.get(String(l.product_id)) || masterRow || legacyOffers[0]
-            return { ...baseRow, id: String(l.product_id) + '-listing-' + l.seller_id, _listing_id: String(l.product_id), seller_id: l.seller_id, price_cents: l.price_cents, inventory: l.inventory, _orders_count: l.orders_count, _listing_ean: normalizeStoreEan(l.seller_metadata?.ean) || ean }
+            return { ...baseRow, id: String(l.product_id) + '-listing-' + l.seller_id, _listing_id: String(l.product_id), seller_id: l.seller_id, price_cents: l.price_cents, inventory: l.inventory, _orders_count: l.orders_count, _listing_ean: normalizeStoreEan(l.seller_metadata?.ean) || ean, _brand_id: l.brand_id || null }
           })
       } catch (_) {}
     }
@@ -366,18 +368,48 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedLi
   return [...listingOffers, ...legacyOffers.filter((o) => !sellersCoveredByListings.has(o.seller_id))]
 }
 
+// Brand claims a seller is allowed to sell under: no brand set = unrestricted, and a brand
+// claim that's still 'active' (own/unregistered OR officially registered) authorizes whoever
+// referenced it. Only a superseded/rejected claim (docs/BRAND.md — a brand became officially
+// registered and invalidated the older unregistered claims) disqualifies an offer from winning
+// the buybox; it still stays listed under "other sellers", it just can't be shown as THE price.
+const loadBrandAuthStatusBatch = async (brandIds) => {
+  const ids = [...new Set((brandIds || []).filter(Boolean).map((id) => String(id)))]
+  if (!ids.length) return new Map()
+  let client
+  try {
+    client = getBrandsDbClient()
+    await client.connect()
+    const r = await client.query(`SELECT id::text AS id, status FROM admin_hub_brands WHERE id = ANY($1::uuid[])`, [ids])
+    await client.end()
+    return new Map((r.rows || []).map((row) => [row.id, row.status]))
+  } catch (_) {
+    try { if (client) await client.end() } catch (__) {}
+    return new Map()
+  }
+}
+
+const offerBrandId = (p) => p._brand_id || (p.metadata && typeof p.metadata === 'object' ? p.metadata.brand_id : null) || null
+
 const scoreEanOffers = async (offers) => {
   if (!offers.length) return []
   const sellerKeys = offers.map((p) => String(p.seller_id || 'default').trim() || 'default')
-  const statsMap = await loadSellerReviewStatsBatch(sellerKeys)
+  const [statsMap, brandStatusMap] = await Promise.all([
+    loadSellerReviewStatsBatch(sellerKeys),
+    loadBrandAuthStatusBatch(offers.map(offerBrandId)),
+  ])
   const scored = offers.map((p) => {
     const sid = String(p.seller_id || 'default').trim() || 'default'
     const st = statsMap.get(sid) || { avg: 0, count: 0 }
     const price = primaryPriceCentsHubProduct(p)
     const inv = totalInventoryHubProduct(p)
-    return { p, score: computeBuyBoxScore(price, st.avg, st.count, inv), price, inv, stats: st, sid }
+    const brandId = offerBrandId(p)
+    const brandStatus = brandId ? brandStatusMap.get(String(brandId)) : null
+    const brandAuthorized = !brandId || brandStatus == null || brandStatus === 'active'
+    return { p, score: computeBuyBoxScore(price, st.avg, st.count, inv), price, inv, stats: st, sid, brandAuthorized }
   })
   scored.sort((a, b) => {
+    if (a.brandAuthorized !== b.brandAuthorized) return a.brandAuthorized ? -1 : 1
     const diff = b.score - a.score
     return diff !== 0 ? diff : new Date(a.p.created_at || 0) - new Date(b.p.created_at || 0)
   })
@@ -596,6 +628,7 @@ const getActiveProductBadges = () => getActiveProductBadgesCached(getDbClient)
  * rule, and every category's own #1 seller gets the badge (not top-5, no per-category rule
  * duplication). */
 const getCategoryTopSellerIds = async () => {
+  refreshCatalogBadgeRules()
   const now = Date.now()
   if (categoryTopSellerCache.expiresAt > now) return categoryTopSellerCache.topIdSet
 
@@ -617,18 +650,21 @@ const getCategoryTopSellerIds = async () => {
       for (const row of res.rows) {
         const pid = String(row.id).trim()
         const score = scoresById.get(pid) || 0
-        if (score <= 0) continue
+        if (score < _catalogBadgeRules.minSold) continue
+        const topN = _catalogBadgeRules.topPerCategory
         const catIds = storeProductCategoryIds({ metadata: row.metadata })
         for (const catId of catIds) {
           const key = String(catId).toLowerCase()
-          const cur = bestByCategory.get(key)
-          if (!cur || score > cur[1]) bestByCategory.set(key, [pid, score])
+          const cur = bestByCategory.get(key) || []
+          cur.push([pid, score])
+          cur.sort((a, b) => b[1] - a[1])
+          bestByCategory.set(key, cur.slice(0, topN))
         }
       }
       await client.end()
     } catch (_) { try { await client.end() } catch (__) {} }
   }
-  const topIdSet = new Set([...bestByCategory.values()].map(([pid]) => pid))
+  const topIdSet = new Set([...bestByCategory.values()].flatMap((list) => list.map(([pid]) => pid)))
   categoryTopSellerCache = { expiresAt: now + BESTSELLER_CACHE_TTL_MS, topIdSet }
   categoryTopSellerRedisCache.set('ids', [...topIdSet]).catch(() => {})
   return topIdSet
@@ -653,28 +689,56 @@ const getGroupProductIdSets = async (groupIds) => {
 }
 
 const hasSaleFromMapped = (mapped) => {
+  refreshCatalogBadgeRules()
   const meta = mapped?.metadata || {}
   const prices = meta.prices && typeof meta.prices === 'object' ? meta.prices : {}
   for (const entry of Object.values(prices)) {
     if (!entry || typeof entry !== 'object') continue
     const base = entry.brutto_cents != null ? Number(entry.brutto_cents) : null
     const sale = entry.sale_cents != null ? Number(entry.sale_cents) : null
-    if (Number.isFinite(base) && Number.isFinite(sale) && sale > 0 && sale < base) return true
+    if (saleMeetsMinDiscount(base, sale)) return true
   }
   const priceCents = Number(mapped?.price_cents || 0)
   const legacySale = meta.rabattpreis_cents != null ? Number(meta.rabattpreis_cents) : null
-  if (legacySale != null && Number.isFinite(legacySale) && legacySale > 0) {
-    if (!(priceCents > 0) || legacySale < priceCents) return true
-  }
+  if (saleMeetsMinDiscount(priceCents, legacySale)) return true
   const deSale = meta.prices?.DE?.sale_cents != null ? Number(meta.prices.DE.sale_cents) : null
   const deBase = meta.prices?.DE?.brutto_cents != null ? Number(meta.prices.DE.brutto_cents) : priceCents
-  return deSale != null && deSale > 0 && Number.isFinite(deBase) && deSale < deBase
+  return saleMeetsMinDiscount(deBase, deSale)
 }
 
-// "Neu" is active for this many days after a product's publish date (falls back to its
-// creation date) — algorithmic only, kept in sync with apps/shop/src/lib/bestseller.js's
-// NEW_BADGE_WINDOW_DAYS. No manual metadata.badge override anymore.
-const NEW_BADGE_WINDOW_DAYS = 15
+// Catalog badge rules (Neu / Bestseller / Sale). Superuser sets them on Inventory.
+const _catalogBadgeRules = { at: 0, newDays: 15, minSold: 1, topPerCategory: 1, saleMinPct: 0 }
+function currentNewProductWindowDays() {
+  refreshCatalogBadgeRules()
+  return _catalogBadgeRules.newDays
+}
+
+function refreshCatalogBadgeRules() {
+  if (Date.now() - _catalogBadgeRules.at < 20000) return
+  _catalogBadgeRules.at = Date.now()
+  const pool = require('../db-pool').getPool()
+  if (!pool) return
+  pool.query(`SELECT new_product_window_days, bestseller_min_sold, bestseller_top_per_category, sale_min_discount_percent FROM admin_hub_seller_settings WHERE seller_id = 'default'`)
+    .then((r) => {
+      const row = r.rows?.[0] || {}
+      const days = Number(row.new_product_window_days)
+      const minSold = Number(row.bestseller_min_sold)
+      const topN = Number(row.bestseller_top_per_category)
+      const salePct = Number(row.sale_min_discount_percent)
+      if (Number.isFinite(days) && days >= 1) _catalogBadgeRules.newDays = Math.min(3650, Math.round(days))
+      if (Number.isFinite(minSold) && minSold >= 1) _catalogBadgeRules.minSold = Math.min(1000000, Math.round(minSold))
+      if (Number.isFinite(topN) && topN >= 1) _catalogBadgeRules.topPerCategory = Math.min(50, Math.round(topN))
+      if (Number.isFinite(salePct) && salePct >= 0) _catalogBadgeRules.saleMinPct = Math.min(99, Math.round(salePct))
+    })
+    .catch(() => {})
+}
+
+function saleMeetsMinDiscount(base, sale) {
+  if (!Number.isFinite(base) || !Number.isFinite(sale) || !(sale > 0) || !(base > 0) || sale >= base) return false
+  const minPct = _catalogBadgeRules.saleMinPct
+  if (minPct <= 0) return true
+  return ((base - sale) / base) * 100 >= minPct
+}
 
 const isNewFromMapped = (mapped) => {
   const meta = mapped?.metadata || {}
@@ -684,7 +748,7 @@ const isNewFromMapped = (mapped) => {
   const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return false
   const ageMs = Date.now() - d.getTime()
-  return ageMs >= 0 && ageMs <= NEW_BADGE_WINDOW_DAYS * 24 * 60 * 60 * 1000
+  return ageMs >= 0 && ageMs <= currentNewProductWindowDays() * 24 * 60 * 60 * 1000
 }
 
 const buildProductBadgeContext = async () => {

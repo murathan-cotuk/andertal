@@ -8,7 +8,7 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
-import { isRecentProduct } from "@/lib/catalog-listing";
+import { isWithinNewWindow, loadNewProductWindowDays, DEFAULT_NEW_PRODUCT_WINDOW_DAYS } from "@/lib/catalog-listing";
 import { getLocalizedCategory } from "@/lib/format";
 import { shallowCategoriesQuery } from "@/lib/store-categories-url";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
@@ -163,7 +163,6 @@ const SeeAll = styled(Link)`
 const MAX_ITEMS_PER_CAROUSEL = 20;
 const CARD_WIDTH = 180;
 const CARD_GAP = 10;
-const NEW_ARRIVAL_MONTHS = 2;
 
 function buildCategoryRootMap(nodes, root = null) {
   const map = new Map();
@@ -201,6 +200,7 @@ export default function NeuheitenPage() {
   const l = String(locale || "en").toLowerCase();
   const copy = pageCopy[l] || pageCopy.en;
 
+  const [newWindowDays, setNewWindowDays] = useState(DEFAULT_NEW_PRODUCT_WINDOW_DAYS);
   const [categoryTree, setCategoryTree] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -214,13 +214,15 @@ export default function NeuheitenPage() {
       try {
         setLoading(true);
         setError("");
-        const [catData, prData] = await Promise.all([
+        const [catData, prData, windowDays] = await Promise.all([
           cachedJsonFetch(`/api/store-categories${shallowCategoriesQuery(locale)}`, { ttlMs: 60000 }).catch(() => ({ tree: [] })),
           // Large catalog snapshot (up to 1200 products) — cached client-side for 2 min so
           // revisits/back-navigation don't re-pull the full payload from the backend each time.
           cachedJsonFetch("/api/store-products?limit=1200", { ttlMs: 15000 }).catch(() => ({ products: [] })),
+          loadNewProductWindowDays(),
         ]);
         if (!cancelled) {
+          setNewWindowDays(windowDays);
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
         }
@@ -234,7 +236,7 @@ export default function NeuheitenPage() {
   }, [locale]);
 
   const rows = useMemo(() => {
-    const fresh = products.filter((p) => isRecentProduct(p, NEW_ARRIVAL_MONTHS));
+    const fresh = products.filter((p) => isWithinNewWindow(p, newWindowDays));
     if (!fresh.length || !categoryTree.length) return [];
 
     const rootCategories = categoryTree.filter((n) => n && n.has_products !== false);
@@ -262,7 +264,7 @@ export default function NeuheitenPage() {
       }))
       .filter((r) => r.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
-  }, [categoryTree, products]);
+  }, [categoryTree, products, newWindowDays]);
 
   // Sidebar active section via IntersectionObserver
   useEffect(() => {

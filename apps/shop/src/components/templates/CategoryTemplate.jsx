@@ -17,6 +17,8 @@ import {
   getFacetGroupTitle,
   formatFacetOptionLabel,
   isDiscountedProduct,
+  loadCatalogBadgeRules,
+  DEFAULT_SALE_MIN_DISCOUNT_PERCENT,
 } from "@/lib/catalog-listing";
 import { normCatId } from "@/lib/category-product-ids";
 import { getLocalizedCategory } from "@/lib/format";
@@ -965,6 +967,7 @@ export default function CategoryTemplate() {
   const [parentCategory, setParentCategory] = useState(null);
   const [ancestors, setAncestors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saleMinPct, setSaleMinPct] = useState(DEFAULT_SALE_MIN_DISCOUNT_PERCENT);
   const [error, setError] = useState(null);
   const initialSortVal = searchParams?.get("sort") || "";
   const [sort, setSort] = useState(
@@ -984,6 +987,12 @@ export default function CategoryTemplate() {
     setFilters({});
     setPage(1);
   }, [slug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadCatalogBadgeRules().then((rules) => { if (!cancelled) setSaleMinPct(rules.saleMinDiscountPercent); });
+    return () => { cancelled = true; };
+  }, []);
 
   // Mobile: auto-open sidebar when navigating from a category link
   useEffect(() => {
@@ -1202,7 +1211,7 @@ export default function CategoryTemplate() {
   const saleOnly = searchParams?.get("sale") === "1";
 
   let filtered = [...products];
-  if (saleOnly) filtered = filtered.filter(isDiscountedProduct);
+  if (saleOnly) filtered = filtered.filter((p) => isDiscountedProduct(p, saleMinPct));
   filtered = filterProductsByFacets(filtered, filters);
   const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
   const total = sorted.length;

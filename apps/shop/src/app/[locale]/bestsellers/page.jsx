@@ -13,6 +13,7 @@ import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { getLocalizedCategory } from "@/lib/format";
 import { shallowCategoriesQuery } from "@/lib/store-categories-url";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { loadCatalogBadgeRules, DEFAULT_BESTSELLER_MIN_SOLD } from "@/lib/catalog-listing";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 
 const FilterBar = styled.div`
@@ -68,8 +69,8 @@ function productSalesScore(product) {
   return Number(meta.sold_last_month || meta.sold || meta.sales_count || 0) || 0;
 }
 
-function isBestSellerProduct(product) {
-  return productSalesScore(product) > 0 || product?.metadata?.is_bestseller === true;
+function isBestSellerProduct(product, minSold = DEFAULT_BESTSELLER_MIN_SOLD) {
+  return productSalesScore(product) >= minSold || product?.metadata?.is_bestseller === true;
 }
 
 const MAX_ITEMS_PER_CAROUSEL = 20;
@@ -134,6 +135,7 @@ export default function BestsellersPage() {
   const [selectedCollections, setSelectedCollections] = useState(new Set());
   const [pageSettings, setPageSettings] = useState(null);
   const [showProductFilterBar, setShowProductFilterBar] = useState(false);
+  const [bestsellerMinSold, setBestsellerMinSold] = useState(DEFAULT_BESTSELLER_MIN_SOLD);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,7 +143,7 @@ export default function BestsellersPage() {
       try {
         setLoading(true);
         setError("");
-        const [catData, prData, settingsRes, landingFlag] = await Promise.all([
+        const [catData, prData, settingsRes, landingFlag, rules] = await Promise.all([
           cachedJsonFetch(`/api/store-categories${shallowCategoriesQuery(locale)}`, { ttlMs: 60000 }).catch(() => ({ tree: [] })),
           // Large catalog snapshot (up to 1200 products) — cached client-side for 2 min so
           // revisits/back-navigation don't re-pull the full payload from the backend each time.
@@ -158,6 +160,7 @@ export default function BestsellersPage() {
               return false;
             }
           })(),
+          loadCatalogBadgeRules(),
         ]);
         // catData already resolved above (cachedJsonFetch resolves to parsed JSON, with its own
         // .catch fallback to { tree: [] } on failure — no separate .ok/.json() step needed here).
@@ -167,6 +170,7 @@ export default function BestsellersPage() {
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
           setPageSettings(settingsData || null);
           setShowProductFilterBar(landingFlag === true);
+          setBestsellerMinSold(rules.bestsellerMinSold);
         }
       } catch (e) {
         if (!cancelled) setError(e?.message || "Error");
@@ -198,7 +202,7 @@ export default function BestsellersPage() {
   const pageText = textOverride || copy.text;
 
   const rows = useMemo(() => {
-    const bestsellers = products.filter((p) => isBestSellerProduct(p));
+    const bestsellers = products.filter((p) => isBestSellerProduct(p, bestsellerMinSold));
     if (!bestsellers.length || !categoryTree.length) return [];
 
     const rootCategories = categoryTree.filter((n) => n && n.has_products !== false);
@@ -232,7 +236,7 @@ export default function BestsellersPage() {
       })
       .filter((entry) => entry.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
-  }, [categoryTree, products, sortMode, scorer, maxItems]);
+  }, [categoryTree, products, sortMode, scorer, maxItems, bestsellerMinSold]);
 
   const filterCollections = useMemo(() => rows.map((r) => r.collection), [rows]);
 

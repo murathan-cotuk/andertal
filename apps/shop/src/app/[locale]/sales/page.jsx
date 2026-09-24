@@ -8,7 +8,7 @@ import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
-import { isDiscountedProduct } from "@/lib/catalog-listing";
+import { isDiscountedProduct, loadCatalogBadgeRules, DEFAULT_SALE_MIN_DISCOUNT_PERCENT } from "@/lib/catalog-listing";
 import { getLocalizedCategory } from "@/lib/format";
 import { shallowCategoriesQuery } from "@/lib/store-categories-url";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
@@ -241,6 +241,7 @@ export default function SalesPage() {
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState(null);
   const [pageSettings, setPageSettings] = useState(null);
+  const [saleMinPct, setSaleMinPct] = useState(DEFAULT_SALE_MIN_DISCOUNT_PERCENT);
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -249,18 +250,20 @@ export default function SalesPage() {
       try {
         setLoading(true);
         setError("");
-        const [catData, prData, settingsRes] = await Promise.all([
+        const [catData, prData, settingsRes, rules] = await Promise.all([
           cachedJsonFetch(`/api/store-categories${shallowCategoriesQuery(locale)}`, { ttlMs: 60000 }).catch(() => ({ tree: [] })),
           // Large catalog snapshot (up to 1200 products) — cached client-side for 2 min so
           // revisits/back-navigation don't re-pull the full payload from the backend each time.
           cachedJsonFetch("/api/store-products?limit=1200", { ttlMs: 15000 }).catch(() => ({ products: [] })),
           fetch("/api/store-api-page-settings/sales").catch(() => null),
+          loadCatalogBadgeRules(),
         ]);
         const settingsData = settingsRes && settingsRes.ok ? await settingsRes.json().catch(() => null) : null;
         if (!cancelled) {
           setCategoryTree(Array.isArray(catData?.tree) ? catData.tree : []);
           setProducts(Array.isArray(prData?.products) ? prData.products : []);
           setPageSettings(settingsData || null);
+          setSaleMinPct(rules.saleMinDiscountPercent);
         }
       } catch (e) {
         if (!cancelled) setError(e?.message || "Error");
@@ -283,7 +286,7 @@ export default function SalesPage() {
   const pageTitle = titleOverride || copy.title;
 
   const rows = useMemo(() => {
-    const discounted = products.filter(isDiscountedProduct);
+    const discounted = products.filter((p) => isDiscountedProduct(p, saleMinPct));
     if (!discounted.length || !categoryTree.length) return [];
 
     const rootCategories = categoryTree.filter((n) => n && n.has_products !== false);
@@ -318,7 +321,7 @@ export default function SalesPage() {
       })
       .filter((r) => r.products.length > 0)
       .sort((a, b) => b.products.length - a.products.length);
-  }, [categoryTree, products, sortMode, scorer, maxItems]);
+  }, [categoryTree, products, sortMode, scorer, maxItems, saleMinPct]);
 
   // Sidebar active section via IntersectionObserver
   useEffect(() => {

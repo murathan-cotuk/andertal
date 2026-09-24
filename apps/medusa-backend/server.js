@@ -854,6 +854,10 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS maintenance_mode_image_url text`).catch(() => {})
         // Platform-wide custom 404 illustration — same convention (seller_id='default', superuser-only).
         await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS not_found_image_url text`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS new_product_window_days integer DEFAULT 15`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS bestseller_min_sold integer DEFAULT 1`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS bestseller_top_per_category integer DEFAULT 1`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_seller_settings ADD COLUMN IF NOT EXISTS sale_min_discount_percent integer DEFAULT 0`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_banners (
             id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -2433,6 +2437,10 @@ async function start() {
     // --- Seller Health (Analysen → Seller Health): scoring engine + config + history: src/routes/seller-health.js ---
     const createSellerHealthRouter = require('./src/routes/seller-health')
     httpApp.use('/', createSellerHealthRouter())
+
+    // --- Analytics → Seller Comparison: per-product cross-seller buybox scoring (superuser only): src/routes/product-seller-analytics.js ---
+    const createProductSellerAnalyticsRouter = require('./src/routes/product-seller-analytics')
+    httpApp.use('/', createProductSellerAnalyticsRouter())
 
     // mapDhlStatus is also used below by the background tracking refresh job (pure function, no closure state).
     function mapDhlStatus(event) {

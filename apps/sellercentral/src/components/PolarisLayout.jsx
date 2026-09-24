@@ -174,6 +174,7 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/content/payout-risk",
   "/affiliate-admin",
   "/analytics/live-view",
+  "/analytics/seller-comparison",
 ];
 
 /** Polaris puts label color on inner Text/spans and CSS vars — anchor-only rules only showed on hover. */
@@ -355,6 +356,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
         { url: "/analytics/seller-health", label: tx("sellerHealth", "Seller Health") },
         { url: "/analytics/live-view", label: tx("liveView", "Live View"), superuserOnly: true },
         { url: "/analytics/ranking", label: tx("ranking", "Ranking") },
+        { url: "/analytics/seller-comparison", label: tx("sellerComparison", "Seller Comparison"), superuserOnly: true },
       ],
     },
     { url: "/import-export", label: tx("importExport", "Import/Export"), icon: ImportIcon },
@@ -732,6 +734,7 @@ export default function PolarisLayout({ children }) {
     "/content/payout-risk",
     "/affiliate-admin",
     "/analytics/live-view",
+    "/analytics/seller-comparison",
     "/orders/abandoned-checkouts",
     "/customers-menu",
     "/customers",
@@ -1291,6 +1294,7 @@ export default function PolarisLayout({ children }) {
     "/content/payout-risk",
     "/affiliate-admin",
     "/analytics/live-view",
+    "/analytics/seller-comparison",
     "/orders/abandoned-checkouts",
     "/customers-menu",
     "/customers",

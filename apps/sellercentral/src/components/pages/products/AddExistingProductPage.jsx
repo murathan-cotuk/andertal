@@ -41,9 +41,15 @@ const copy = {
   },
   notFound: { en: "No product found for this input.", tr: "Bu giriş için ürün bulunamadı.", de: "Für diese Eingabe wurde kein Produkt gefunden." },
   addBtn: { en: "Add to my products", tr: "Ürünlerime ekle", de: "Zu meinen Produkten hinzufügen" },
+  addBtnFor: { en: (ean) => `Add only EAN ${ean} to my products`, tr: (ean) => `Sadece EAN ${ean} ürününü ürünlerime ekle`, de: (ean) => `Nur EAN ${ean} zu meinen Produkten hinzufügen` },
   back: { en: "Back to inventory", tr: "Envantera dön", de: "Zurück zum Bestand" },
-  matchedVariant: { en: "Matched variant", tr: "Eşleşen varyasyon", de: "Übereinstimmende Variante" },
+  addingHeading: { en: "You are adding:", tr: "Ekleyeceğiniz ürün:", de: "Du fügst hinzu:" },
   otherVariants: { en: "Other variants in this product", tr: "Bu ürüne ait diğer varyasyonlar", de: "Weitere Varianten dieses Produkts" },
+  otherVariantsNotIncluded: {
+    en: "For reference only — these are NOT added to your inventory. Each is its own product; add one separately if you need it.",
+    tr: "Sadece bilgi amaçlıdır — bunlar envanterinize EKLENMEYECEK. Her biri kendi başına ayrı bir üründür; ihtiyacınız olursa ayrı ayrı eklemeniz gerekir.",
+    de: "Nur zur Information — diese werden NICHT zu deinem Bestand hinzugefügt. Jede ist ein eigenes Produkt; bei Bedarf separat hinzufügen.",
+  },
   showVariants: { en: "Show all variants", tr: "Tüm varyasyonları göster", de: "Alle Varianten anzeigen" },
   hideVariants: { en: "Hide variants", tr: "Varyasyonları gizle", de: "Varianten ausblenden" },
   variantCount: { en: (n) => `${n} variants total`, tr: (n) => `Toplam ${n} varyasyon`, de: (n) => `${n} Varianten insgesamt` },
@@ -309,19 +315,25 @@ export default function AddExistingProductPage() {
     }
   }, [productId]);
 
-  const handleAdd = () => {
-    if (!foundProduct?.id) return;
-    const variantEan = matchedVariant ? String(matchedVariant.ean || matchedVariant.metadata?.ean || "").trim() : "";
-    const suffix = variantEan ? `&variant_ean=${encodeURIComponent(variantEan)}` : "";
-    router.push(`/products/new?existing_id=${encodeURIComponent(foundProduct.id)}${suffix}`);
-  };
-
   const variants = Array.isArray(foundProduct?.variants) ? foundProduct.variants : [];
   const matchedVariant = searchedAnId
     ? variants.find((v) => String(v?.an_id || "").trim().toUpperCase() === searchedAnId)
     : searchedEan
     ? variants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === normalizeEanDigits(searchedEan))
     : null;
+  // The one, single, unambiguous EAN that will actually be added — never the whole family.
+  // Even when it matched the product's own top-level EAN rather than one child inside
+  // variants[] (matchedVariant is then null), this still resolves to that exact EAN.
+  const addingEan = String(
+    matchedVariant?.ean || matchedVariant?.metadata?.ean || searchedEan || ean || ""
+  ).trim();
+
+  const handleAdd = () => {
+    if (!foundProduct?.id) return;
+    const suffix = addingEan ? `&variant_ean=${encodeURIComponent(addingEan)}` : "";
+    router.push(`/products/new?existing_id=${encodeURIComponent(foundProduct.id)}${suffix}`);
+  };
+
   const siblingVariants = matchedVariant
     ? variants.filter((v) => v !== matchedVariant)
     : [];
@@ -438,11 +450,18 @@ export default function AddExistingProductPage() {
                 </BlockStack>
               </div>
 
-              {/* Matched variant highlight */}
-              {matchedVariant && (
+              {/* Unambiguous "this is the one product you're adding" block */}
+              {addingEan && (
                 <BlockStack gap="200">
-                  <Text as="p" variant="bodySm" fontWeight="semibold" tone="success">{t("matchedVariant")}</Text>
-                  <VariantRow v={matchedVariant} isMatch />
+                  <Text as="p" variant="bodySm" fontWeight="semibold" tone="success">{t("addingHeading")}</Text>
+                  {matchedVariant ? (
+                    <VariantRow v={matchedVariant} isMatch />
+                  ) : (
+                    <VariantRow
+                      v={{ title: foundProduct.title, ean: addingEan, an_id: foundProduct.an_id }}
+                      isMatch
+                    />
+                  )}
                 </BlockStack>
               )}
 
@@ -460,6 +479,9 @@ export default function AddExistingProductPage() {
                   </InlineStack>
                   {siblingsOpen && (
                     <BlockStack gap="150">
+                      <Banner tone="warning">
+                        <Text as="p" variant="bodySm">{t("otherVariantsNotIncluded")}</Text>
+                      </Banner>
                       {siblingVariants.map((v, i) => (
                         <VariantRow key={v.id || i} v={v} isMatch={false} />
                       ))}
@@ -482,6 +504,9 @@ export default function AddExistingProductPage() {
                   </InlineStack>
                   {siblingsOpen && (
                     <BlockStack gap="150">
+                      <Banner tone="warning">
+                        <Text as="p" variant="bodySm">{t("otherVariantsNotIncluded")}</Text>
+                      </Banner>
                       {variants.map((v, i) => (
                         <VariantRow key={v.id || i} v={v} isMatch={false} />
                       ))}
@@ -490,7 +515,9 @@ export default function AddExistingProductPage() {
                 </BlockStack>
               )}
 
-              <Button variant="primary" onClick={handleAdd}>{t("addBtn")}</Button>
+              <Button variant="primary" onClick={handleAdd}>
+                {addingEan && typeof t("addBtnFor") === "function" ? t("addBtnFor")(addingEan) : t("addBtn")}
+              </Button>
             </BlockStack>
           )}
 

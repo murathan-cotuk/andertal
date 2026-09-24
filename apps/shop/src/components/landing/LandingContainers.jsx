@@ -9,7 +9,7 @@ import { useLandingChrome } from "@/context/LandingChromeContext";
 import Carousel from "@/components/Carousel";
 import { ProductCard } from "@/components/ProductCard";
 import { toSalesScore } from "@/lib/bestseller";
-import { isDiscountedProduct, getProductBasePriceCents } from "@/lib/catalog-listing";
+import { isDiscountedProduct, getProductBasePriceCents, isWithinNewWindow, loadNewProductWindowDays, loadCatalogBadgeRules } from "@/lib/catalog-listing";
 import { formatPriceCents, getLocalizedCategory } from "@/lib/format";
 import { shallowCategoriesQuery, storeCategoriesQuery } from "@/lib/store-categories-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
@@ -1413,13 +1413,15 @@ function BestsellerCarousel({ container, locale = "de" }) {
     const qs = new URLSearchParams({ limit: "50" });
     if (slug) qs.set("category", slug);
     cachedJsonFetch(`/api/store-products?${qs.toString()}`, { ttlMs: 15000 })
-      .then((d) => {
+      .then(async (d) => {
         const all = Array.isArray(d?.products) ? d.products : [];
         let next = all;
         if (mode === "sale") {
-          next = all.filter(isDiscountedProduct).sort((a, b) => discountPct(b) - discountPct(a));
+          const rules = await loadCatalogBadgeRules();
+          next = all.filter((p) => isDiscountedProduct(p, rules.saleMinDiscountPercent)).sort((a, b) => discountPct(b) - discountPct(a));
         } else if (mode === "newest") {
-          next = [...all].sort((a, b) => productRecencyMs(b) - productRecencyMs(a));
+          const days = await loadNewProductWindowDays();
+          next = all.filter((p) => isWithinNewWindow(p, days)).sort((a, b) => productRecencyMs(b) - productRecencyMs(a));
         } else {
           next = [...all].sort((a, b) => toSalesScore(b.metadata) - toSalesScore(a.metadata));
         }

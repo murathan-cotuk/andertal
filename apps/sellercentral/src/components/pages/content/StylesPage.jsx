@@ -1753,31 +1753,42 @@ export default function StylesPage() {
           <AccordionCard
             title={locale === "de" ? "404-Seite" : locale === "tr" ? "404 Sayfası" : locale === "fr" ? "Page 404" : locale === "es" ? "Página 404" : locale === "it" ? "Pagina 404" : "404 Page"}
             subtitle={locale === "de"
-              ? "Eigenes Bild statt der Standard-404-Illustration im Shop"
+              ? "Eigenes Bild, GIF oder Video statt der Standard-404-Illustration im Shop"
               : locale === "tr"
-                ? "Shop'ta varsayılan 404 illüstrasyonu yerine kendi görselin"
+                ? "Shop'ta varsayılan 404 illüstrasyonu yerine kendi görselin, GIF'in veya videon"
                 : locale === "fr"
-                  ? "Votre propre image au lieu de l'illustration 404 par défaut"
+                  ? "Votre image, GIF ou vidéo à la place de l'illustration 404 par défaut"
                   : locale === "es"
-                    ? "Tu propia imagen en lugar de la ilustración 404 predeterminada"
+                    ? "Tu imagen, GIF o vídeo en lugar de la ilustración 404 predeterminada"
                     : locale === "it"
-                      ? "Una tua immagine invece dell'illustrazione 404 predefinita"
-                      : "Your own image instead of the shop's default 404 illustration"}
+                      ? "Una tua immagine, GIF o video invece dell'illustrazione 404 predefinita"
+                      : "Your own image, GIF, or video instead of the shop's default 404 illustration"}
           >
             <BlockStack gap="300">
               <InlineStack gap="300" blockAlign="center">
                 {branding.not_found_image_url ? (
-                  <img
-                    src={branding.not_found_image_url}
-                    alt=""
-                    style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
-                  />
+                  /\.(mp4|webm|mov|ogv|ogg)(\?.*)?$/i.test(branding.not_found_image_url) ? (
+                    <video
+                      src={branding.not_found_image_url}
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
+                      style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
+                    />
+                  ) : (
+                    <img
+                      src={branding.not_found_image_url}
+                      alt=""
+                      style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
+                    />
+                  )
                 ) : (
                   <div style={{ width: 120, height: 120, borderRadius: 8, border: "1px dashed #d1d5db", background: "#f9fafb" }} />
                 )}
                 <BlockStack gap="150">
                   <Button size="slim" onClick={() => setNotFoundPickerOpen(true)}>
-                    {locale === "de" ? "Bild auswählen" : locale === "tr" ? "Görsel seç" : locale === "fr" ? "Choisir une image" : locale === "es" ? "Elegir imagen" : locale === "it" ? "Scegli immagine" : "Choose image"}
+                    {locale === "de" ? "Bild, GIF oder Video" : locale === "tr" ? "Görsel, GIF veya video" : locale === "fr" ? "Image, GIF ou vidéo" : locale === "es" ? "Imagen, GIF o vídeo" : locale === "it" ? "Immagine, GIF o video" : "Image, GIF, or video"}
                   </Button>
                   {branding.not_found_image_url ? (
                     <Button size="slim" tone="critical" variant="plain" onClick={() => setBranding((p) => ({ ...p, not_found_image_url: "" }))}>
@@ -1788,10 +1799,10 @@ export default function StylesPage() {
               </InlineStack>
               <Text as="p" tone="subdued" variant="bodySm">
                 {locale === "de"
-                  ? "Ohne Bild bleibt die Standard-404-Animation im Shop erhalten."
+                  ? "Ohne Medium bleibt die Standard-404-Animation im Shop erhalten. GIF und Video werden wie im Shop abgespielt."
                   : locale === "tr"
-                    ? "Görsel seçilmezse shop'ta varsayılan 404 animasyonu gösterilir."
-                    : "Without an image, the shop keeps its default animated 404 illustration."}
+                    ? "Medya seçilmezse shop'ta varsayılan 404 animasyonu gösterilir. GIF ve video shop'taki 404 sayfasında da oynatılır."
+                    : "Without media, the shop keeps its default animated 404 illustration. GIF and video play on the shop 404 page too."}
               </Text>
             </BlockStack>
             <MediaPickerModal
