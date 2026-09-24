@@ -389,7 +389,7 @@ export default function AddExistingProductPage() {
             <Box>
               <Button
                 variant="primary"
-                onClick={search}
+                onClick={() => search()}
                 loading={state === "loading"}
                 disabled={!ean.trim() && !anId.trim() && !productId.trim() && !shopUrl.trim()}
               >
