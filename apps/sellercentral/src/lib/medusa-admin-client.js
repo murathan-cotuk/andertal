@@ -1577,6 +1577,19 @@ class MedusaAdminClient {
     const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
     return this.request(`/admin-hub/v1/analytics/product-sellers${qs}`)
   }
+  /** Inventory page's private per-seller "Produkte gruppieren" folders — cosmetic only, never shop-facing. */
+  async getInventoryGroups() {
+    return this.request('/admin-hub/inventory-groups')
+  }
+  async createInventoryGroup(data) {
+    return this.request('/admin-hub/inventory-groups', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async updateInventoryGroup(id, data) {
+    return this.request(`/admin-hub/inventory-groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async deleteInventoryGroup(id) {
+    return this.request(`/admin-hub/inventory-groups/${id}`, { method: 'DELETE' })
+  }
   async getSellerHealthConfig() {
     return this.request('/admin-hub/v1/seller-health/config')
   }

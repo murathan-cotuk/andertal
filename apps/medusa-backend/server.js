@@ -2442,6 +2442,10 @@ async function start() {
     const createProductSellerAnalyticsRouter = require('./src/routes/product-seller-analytics')
     httpApp.use('/', createProductSellerAnalyticsRouter())
 
+    // --- Inventory page: per-seller private product folders (cosmetic only, never shop-facing): src/routes/inventory-groups.js ---
+    const createInventoryGroupsRouter = require('./src/routes/inventory-groups')
+    httpApp.use('/', createInventoryGroupsRouter())
+
     // mapDhlStatus is also used below by the background tracking refresh job (pure function, no closure state).
     function mapDhlStatus(event) {
       const st = event?.status && typeof event.status === 'object' ? event.status : {}
@@ -2828,6 +2832,22 @@ async function start() {
     await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS seller_metadata jsonb DEFAULT NULL`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_product ON admin_hub_seller_listings(product_id)`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_seller  ON admin_hub_seller_listings(seller_id)`).catch(() => {})
+
+    // Inventory page: per-seller private, cosmetic-only product folders ("Produkte
+    // gruppieren") — never a product, never touches admin_hub_products/seller_listings,
+    // never shown on the shop. Just collapses several of a seller's own inventory rows
+    // into one row on their own Inventory table.
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_inventory_groups (
+      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      seller_id   varchar(255) NOT NULL,
+      name        text NOT NULL,
+      sku         text,
+      member_ids  jsonb NOT NULL DEFAULT '[]'::jsonb,
+      collapsed   boolean NOT NULL DEFAULT true,
+      created_at  timestamptz DEFAULT now(),
+      updated_at  timestamptz DEFAULT now()
+    )`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_inventory_groups_seller ON admin_hub_inventory_groups(seller_id)`).catch(() => {})
 
     // AN-ID — stable platform product identifier, one per canonical (master) product row.
     // Shared by every seller listing (admin_hub_seller_listings) of the same EAN-deduped product.

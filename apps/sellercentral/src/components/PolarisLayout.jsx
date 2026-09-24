@@ -175,6 +175,7 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
   "/affiliate-admin",
   "/analytics/live-view",
   "/analytics/seller-comparison",
+  "/settings/inventory",
 ];
 
 /** Polaris puts label color on inner Text/spans and CSS vars — anchor-only rules only showed on hover. */
@@ -735,6 +736,7 @@ export default function PolarisLayout({ children }) {
     "/affiliate-admin",
     "/analytics/live-view",
     "/analytics/seller-comparison",
+    "/settings/inventory",
     "/orders/abandoned-checkouts",
     "/customers-menu",
     "/customers",
@@ -1295,6 +1297,7 @@ export default function PolarisLayout({ children }) {
     "/affiliate-admin",
     "/analytics/live-view",
     "/analytics/seller-comparison",
+    "/settings/inventory",
     "/orders/abandoned-checkouts",
     "/customers-menu",
     "/customers",

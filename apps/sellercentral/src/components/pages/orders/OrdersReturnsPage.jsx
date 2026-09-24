@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useLocale } from "next-intl";
 import { getUI } from "@/lib/ui-strings";
 import { lt, dateLocaleFor } from "@/lib/locale-text";
@@ -563,6 +563,10 @@ export default function OrdersReturnsPage() {
   const [showNew, setShowNew] = useState(false);
   const [selected, setSelected] = useState(null); // selected return for detail panel
   const [filterStatus, setFilterStatus] = useState("alle");
+  const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sort, setSort] = useState("created_desc");
   const [isSuperuser, setIsSuperuser] = useState(false);
   useEffect(() => { setIsSuperuser(localStorage.getItem("sellerIsSuperuser") === "true"); }, []);
 
@@ -583,7 +587,32 @@ export default function OrdersReturnsPage() {
     if (selected?.id === updated.id) setSelected(prev => ({ ...prev, ...updated }));
   };
 
-  const filtered = filterStatus === "alle" ? returns : returns.filter(r => r.status === filterStatus);
+  const filtered = useMemo(() => {
+    let list = filterStatus === "alle" ? returns : returns.filter(r => r.status === filterStatus);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(r => {
+        const name = [r.first_name, r.last_name].filter(Boolean).join(" ").toLowerCase();
+        const hay = [r.return_number, r.order_number, name, r.email, r.reason].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      list = list.filter(r => r.created_at && new Date(r.created_at) >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      list = list.filter(r => r.created_at && new Date(r.created_at) <= to);
+    }
+    const sorted = [...list];
+    if (sort === "created_asc") sorted.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    else if (sort === "amount_desc") sorted.sort((a, b) => (b.total_cents || 0) - (a.total_cents || 0));
+    else if (sort === "amount_asc") sorted.sort((a, b) => (a.total_cents || 0) - (b.total_cents || 0));
+    else sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    return sorted;
+  }, [returns, filterStatus, search, dateFrom, dateTo, sort]);
 
   const counts = returns.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {});
   const totalRefunded = returns.filter(r => r.refund_status === "erstattet").reduce((s, r) => s + (r.refund_amount_cents || 0), 0);
@@ -639,7 +668,7 @@ export default function OrdersReturnsPage() {
         ))}
       </div>
 
-      {/* Filter bar — same visual language as Orders (compact, bordered pill row) */}
+      {/* Status pills — same visual language as Orders (compact, bordered pill row) */}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem", padding: "0.3125rem 0.5rem", marginBottom: "0.5rem", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.5rem" }}>
         {["alle", "offen", "genehmigt", "eingegangen", "abgelehnt", "abgeschlossen"].map(s => (
           <button
@@ -655,6 +684,55 @@ export default function OrdersReturnsPage() {
             {filterPillLabels[s]} {s !== "alle" && counts[s] ? `(${counts[s]})` : ""}
           </button>
         ))}
+      </div>
+
+      {/* Search / date range / sort — same filter-bar language as Orders */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.375rem", padding: "0.3125rem 0.5rem", marginBottom: "0.5rem", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "0.5rem" }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={c.searchPlaceholder}
+          aria-label={c.searchPlaceholder}
+          style={{ flex: "1 1 220px", minWidth: 180, maxWidth: 320, height: "1.75rem", padding: "0 0.5rem", border: "1px solid #d1d5db", borderRadius: "0.375rem", fontSize: "0.75rem", color: "#1f2937", background: "#fff", boxSizing: "border-box" }}
+        />
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "#6b7280" }}>
+          {c.dateFrom}
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            style={{ height: "1.75rem", padding: "0 0.375rem", border: "1px solid #d1d5db", borderRadius: "0.375rem", fontSize: "0.75rem", color: "#1f2937" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "#6b7280" }}>
+          {c.dateTo}
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            style={{ height: "1.75rem", padding: "0 0.375rem", border: "1px solid #d1d5db", borderRadius: "0.375rem", fontSize: "0.75rem", color: "#1f2937" }}
+          />
+        </label>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          aria-label={c.sortLabel}
+          title={c.sortLabel}
+          style={{ height: "1.75rem", padding: "0 0.375rem", border: "1px solid #d1d5db", borderRadius: "0.375rem", fontSize: "0.75rem", color: "#1f2937", background: "#fff", cursor: "pointer" }}
+        >
+          <option value="created_desc">{c.sortNewest}</option>
+          <option value="created_asc">{c.sortOldest}</option>
+          <option value="amount_desc">{c.sortAmountDesc}</option>
+          <option value="amount_asc">{c.sortAmountAsc}</option>
+        </select>
+        {(search || dateFrom || dateTo || sort !== "created_desc") && (
+          <button
+            onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setSort("created_desc"); }}
+            style={{ height: "1.75rem", padding: "0 0.625rem", borderRadius: "0.375rem", fontSize: "0.75rem", cursor: "pointer", background: "#fff", color: "#6b7280", border: "1px solid #d1d5db" }}
+          >
+            {ui.clearFilters || (locale === "tr" ? "Filtreleri temizle" : locale === "de" ? "Filter zurücksetzen" : "Clear filters")}
+          </button>
+        )}
       </div>
 
       {/* Table — compact/dense like Orders: tight cell padding, small uppercase header, hover rows */}

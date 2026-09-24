@@ -45,11 +45,6 @@ const copy = {
   back: { en: "Back to inventory", tr: "Envantera dön", de: "Zurück zum Bestand" },
   addingHeading: { en: "You are adding:", tr: "Ekleyeceğiniz ürün:", de: "Du fügst hinzu:" },
   otherVariants: { en: "Other variants in this product", tr: "Bu ürüne ait diğer varyasyonlar", de: "Weitere Varianten dieses Produkts" },
-  otherVariantsNotIncluded: {
-    en: "For reference only — these are NOT added to your inventory. Each is its own product; add one separately if you need it.",
-    tr: "Sadece bilgi amaçlıdır — bunlar envanterinize EKLENMEYECEK. Her biri kendi başına ayrı bir üründür; ihtiyacınız olursa ayrı ayrı eklemeniz gerekir.",
-    de: "Nur zur Information — diese werden NICHT zu deinem Bestand hinzugefügt. Jede ist ein eigenes Produkt; bei Bedarf separat hinzufügen.",
-  },
   showVariants: { en: "Show all variants", tr: "Tüm varyasyonları göster", de: "Alle Varianten anzeigen" },
   hideVariants: { en: "Hide variants", tr: "Varyasyonları gizle", de: "Varianten ausblenden" },
   variantCount: { en: (n) => `${n} variants total`, tr: (n) => `Toplam ${n} varyasyon`, de: (n) => `${n} Varianten insgesamt` },
@@ -479,9 +474,6 @@ export default function AddExistingProductPage() {
                   </InlineStack>
                   {siblingsOpen && (
                     <BlockStack gap="150">
-                      <Banner tone="warning">
-                        <Text as="p" variant="bodySm">{t("otherVariantsNotIncluded")}</Text>
-                      </Banner>
                       {siblingVariants.map((v, i) => (
                         <VariantRow key={v.id || i} v={v} isMatch={false} />
                       ))}
@@ -504,9 +496,6 @@ export default function AddExistingProductPage() {
                   </InlineStack>
                   {siblingsOpen && (
                     <BlockStack gap="150">
-                      <Banner tone="warning">
-                        <Text as="p" variant="bodySm">{t("otherVariantsNotIncluded")}</Text>
-                      </Banner>
                       {variants.map((v, i) => (
                         <VariantRow key={v.id || i} v={v} isMatch={false} />
                       ))}

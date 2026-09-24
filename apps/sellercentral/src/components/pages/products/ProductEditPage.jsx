@@ -1651,6 +1651,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           }
         }
         onReload?.();
+        // router.push here is a hard browser navigation (see i18n/navigation.js) — with isDirty
+        // still true, the native "leave site?" prompt fires on a save that already succeeded.
+        // Clear it first so a successful save never asks the seller to confirm leaving.
+        unsaved?.setDirty(false);
         if (created?.id) {
           const qs = res?.metafield_suggestions_submitted
             ? "?change_request=1"
@@ -3877,7 +3881,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
       </Layout>
       )}
 
-      {activeTabIndex === 2 && (
+      {activeTabIndex === 2 && !isCatalogLocked && (
       <Layout>
         <Layout.Section>
               {/* Variations — directly after Media so they are not buried under GPSR/SEO */}
@@ -4665,6 +4669,82 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             </div>
           </Card>
           </BlockStack>
+        </Layout.Section>
+      </Layout>
+      )}
+
+      {activeTabIndex === 2 && isSecondSeller && (
+      <Layout>
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="300">
+              <div>
+                <ProductSectionHeading>{pe.variations}</ProductSectionHeading>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {lt(locale,
+                    "Other sellers' variants of this catalog product — reference only. Adding a variant creates your own separate listing for that exact product; it never copies another seller's price, SKU or stock.",
+                    "Bu katalog ürününün diğer satıcılara ait varyasyonları — sadece bilgi amaçlıdır. Bir varyasyonu eklemek, o ürün için ayrı ve size ait bir listeleme oluşturur; başka satıcının fiyatını, SKU'sunu veya stoğunu asla kopyalamaz.",
+                    "Variantes de ce produit catalogue chez d'autres vendeurs — à titre indicatif. Ajouter une variante crée votre propre annonce distincte pour ce produit exact ; cela ne copie jamais le prix, le SKU ou le stock d'un autre vendeur.",
+                    "Variantes de este producto de catálogo de otros vendedores — solo como referencia. Añadir una variante crea tu propio listado independiente para ese producto exacto; nunca copia el precio, SKU o stock de otro vendedor.",
+                    "Varianti di questo prodotto a catalogo di altri venditori — solo a titolo informativo. Aggiungere una variante crea un tuo listing separato per quel prodotto esatto; non copia mai prezzo, SKU o stock di un altro venditore.",
+                    "Varianten dieses Katalogprodukts bei anderen Verkäufern — nur zur Information. Eine Variante hinzuzufügen erstellt dein eigenes, separates Listing für genau dieses Produkt; Preis, SKU oder Bestand eines anderen Verkäufers werden nie übernommen."
+                  )}
+                </Text>
+              </div>
+              {(() => {
+                const siblingMasterId = product?.id;
+                const myEan = normalizeEanDigits(meta.ean);
+                const siblings = Array.isArray(product?.variants)
+                  ? product.variants.filter((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) !== myEan)
+                  : [];
+                if (!siblingMasterId || siblings.length === 0) {
+                  return (
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {lt(locale, "No other variants for this product yet.", "Bu ürün için henüz başka varyasyon yok.", "Aucune autre variante pour ce produit pour le moment.", "Aún no hay otras variantes para este producto.", "Ancora nessun'altra variante per questo prodotto.", "Noch keine weiteren Varianten für dieses Produkt.")}
+                    </Text>
+                  );
+                }
+                return (
+                  <BlockStack gap="150">
+                    {siblings.map((v, i) => {
+                      const label = Array.isArray(v?.option_values) && v.option_values.length
+                        ? v.option_values.join(" / ")
+                        : (v?.title || v?.value || "");
+                      const vEan = String(v?.ean || v?.metadata?.ean || "").trim();
+                      const img = resolveImageUrl(v?.image_url || v?.metadata?.media?.[0]?.url || v?.metadata?.media?.[0] || "");
+                      return (
+                        <div
+                          key={v?.metadata?.source_product_id || vEan || i}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 10,
+                            padding: "8px 10px", borderRadius: 6,
+                            background: "var(--p-color-bg-surface-secondary)",
+                          }}
+                        >
+                          {img ? (
+                            <img src={img} alt="" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+                          ) : null}
+                          <BlockStack gap="025">
+                            {label && <Text as="p" variant="bodySm" fontWeight="medium">{label}</Text>}
+                            {vEan && <Text as="p" variant="bodySm" tone="subdued">EAN: {vEan}</Text>}
+                          </BlockStack>
+                          <div style={{ marginLeft: "auto" }}>
+                            <Button
+                              size="slim"
+                              disabled={!vEan}
+                              onClick={() => router.push(`/products/new?existing_id=${encodeURIComponent(siblingMasterId)}&variant_ean=${encodeURIComponent(vEan)}`)}
+                            >
+                              {lt(locale, "Add to my inventory", "Envanterime ekle", "Ajouter à mon inventaire", "Añadir a mi inventario", "Aggiungi al mio inventario", "Zu meinem Bestand hinzufügen")}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </BlockStack>
+                );
+              })()}
+            </BlockStack>
+          </Card>
         </Layout.Section>
       </Layout>
       )}

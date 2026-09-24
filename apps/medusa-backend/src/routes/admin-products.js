@@ -1149,38 +1149,42 @@ const adminHubProductsPOST = async (req, res) => {
           'sku', 'prices', 'uvp_cents', 'rabattpreis_cents', 'related_product_ids',
           ...CHANGE_REQUEST_SKIP_META,
         ]
-        const crFields = []
         const fillFields = {}
 
+        // This is a brand-new listing on an existing catalog product — the seller never
+        // consciously edited title/description/metadata, the "new product" form was just
+        // pre-filled with the matched product's own data and re-serialized (translations
+        // object rebuilt, handle re-derived, etc.) before being POSTed back. Comparing that
+        // reconstructed payload against the master and filing change-requests for every
+        // structural drift was firing on every single "add existing product" save, even when
+        // the seller only touched SKU/shipping/stock. Adding this listing must never itself
+        // propose shared-field changes — only filling in genuinely empty master fields still
+        // happens below; a seller who wants to propose an actual title/description edit does
+        // that from the product's own edit page (adminHubProductByIdPUT), which diffs their
+        // real edit against what they last saw, not against a freshly reconstructed payload.
         const masterTitle = (masterProduct.title || '').trim()
         const incomingTitle = (body.title || '').trim()
         if (incomingTitle && !masterTitle) { fillFields.title = incomingTitle }
-        else if (incomingTitle && masterTitle && incomingTitle !== masterTitle) {
-          // Superuser has direct edit authority over shared/master fields — applying it
-          // straight away instead of filing a change-request avoids them having to
-          // approve their own suggestion (mirrors adminHubProductByIdPUT's ownership gate).
-          if (isSuperuserCaller) fillFields.title = incomingTitle
-          else crFields.push({ field: 'title', old: masterTitle, val: incomingTitle })
+        else if (incomingTitle && masterTitle && incomingTitle !== masterTitle && isSuperuserCaller) {
+          fillFields.title = incomingTitle
         }
 
         const masterDesc = (masterProduct.description || '').trim()
         const incomingDesc = (body.description || '').trim()
         if (incomingDesc && !masterDesc) { fillFields.description = incomingDesc }
-        else if (incomingDesc && masterDesc && incomingDesc !== masterDesc) {
-          if (isSuperuserCaller) fillFields.description = incomingDesc
-          else crFields.push({ field: 'description', old: masterDesc, val: incomingDesc })
+        else if (incomingDesc && masterDesc && incomingDesc !== masterDesc && isSuperuserCaller) {
+          fillFields.description = incomingDesc
         }
 
         for (const mk of Object.keys(incomingMeta).filter((k) => !LISTING_ONLY_META.includes(k))) {
           const masterVal = masterMeta[mk]
           const incomingVal = incomingMeta[mk]
           const masterEmpty = masterVal == null || (typeof masterVal === 'string' && masterVal.trim() === '')
-          const incomingStr = JSON.stringify(incomingVal ?? null)
-          const masterStr = JSON.stringify(masterVal ?? null)
           if (masterEmpty && incomingVal != null) { fillFields[`metadata.${mk}`] = incomingVal }
-          else if (!masterEmpty && incomingStr !== masterStr) {
-            if (isSuperuserCaller) fillFields[`metadata.${mk}`] = incomingVal
-            else crFields.push({ field: `metadata.${mk}`, old: masterVal == null ? null : JSON.stringify(masterVal), val: incomingVal == null ? '' : JSON.stringify(incomingVal) })
+          else if (!masterEmpty && isSuperuserCaller) {
+            const incomingStr = JSON.stringify(incomingVal ?? null)
+            const masterStr = JSON.stringify(masterVal ?? null)
+            if (incomingStr !== masterStr) fillFields[`metadata.${mk}`] = incomingVal
           }
         }
 
@@ -1213,23 +1217,6 @@ const adminHubProductsPOST = async (req, res) => {
               }
             }
           } finally { try { await lcFill.end() } catch (_) {} }
-        }
-
-        if (crFields.length > 0) {
-          const dbUrlCr = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-          const { Client: ClientCr } = require('pg')
-          const qcr = new ClientCr({ connectionString: dbUrlCr, ssl: dbUrlCr.includes('render.com') ? { rejectUnauthorized: false } : false })
-          try {
-            await qcr.connect()
-            for (const { field, old: oldVal, val: newVal } of crFields) {
-              if (isChangeRequestSkipField(field)) continue
-              await qcr.query(
-                `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending',$3,$4,$5)`,
-                [masterProduct.id, callerSellerId, field, oldVal, newVal]
-              )
-              queuedMetaSuggestionCount += 1
-            }
-          } finally { try { await qcr.end() } catch (_) {} }
         }
       }
 
@@ -1385,7 +1372,7 @@ const adminHubProductsPOST = async (req, res) => {
 
 const adminHubProductByIdGET = async (req, res) => {
   try {
-    const product = await getAdminHubProductByIdOrHandleDb(req.params.id)
+    let product = await getAdminHubProductByIdOrHandleDb(req.params.id)
     if (!product) { res.status(404).json({ message: 'Product not found' }); return }
     let seller_listings = []
     try {
@@ -1395,6 +1382,7 @@ const adminHubProductByIdGET = async (req, res) => {
       await lc.connect()
       const lr = await lc.query(
         `SELECT sl.id, sl.seller_id, sl.price_cents, sl.inventory, sl.status, sl.sku, sl.created_at,
+                sl.brand_id, sl.shipping_group_id, sl.publish_date, sl.seller_metadata,
                 su.first_name, su.last_name, su.email,
                 COALESCE(su.store_name, su.shop_name) AS shop_name
          FROM admin_hub_seller_listings sl
@@ -1406,10 +1394,74 @@ const adminHubProductByIdGET = async (req, res) => {
       seller_listings = lr.rows || []
       await lc.end()
     } catch (_) {}
+
+    // A non-owning, non-superuser caller viewing a shared catalog product must see THEIR OWN
+    // commercial data (sku/price/inventory/status/brand/shipping), never the master row's —
+    // that belongs to whoever originally created it. Without this overlay, opening a listing
+    // you just added (or any second-seller listing) showed the original owner's SKU and price
+    // as if they were yours.
+    const isSuperuserCaller = req.sellerUser?.is_superuser === true
+    const callerSellerId = !isSuperuserCaller && req.sellerUser?.seller_id ? String(req.sellerUser.seller_id).trim() : null
+    if (callerSellerId && product.seller_id && String(product.seller_id).trim() !== callerSellerId) {
+      const myListing = seller_listings.find((l) => String(l.seller_id || '').trim() === callerSellerId)
+      if (myListing) {
+        product = {
+          ...product,
+          sku: myListing.sku || null,
+          price: myListing.price_cents != null ? myListing.price_cents / 100 : 0,
+          price_cents: myListing.price_cents ?? 0,
+          inventory: myListing.inventory ?? 0,
+          status: myListing.status || 'draft',
+          metadata: {
+            ...(product.metadata && typeof product.metadata === 'object' ? product.metadata : {}),
+            brand_id: myListing.brand_id || null,
+            shipping_group_id: myListing.shipping_group_id || null,
+            publish_date: myListing.publish_date || null,
+            ean: myListing.seller_metadata?.ean || (product.metadata && typeof product.metadata === 'object' ? product.metadata.ean : null) || null,
+          },
+        }
+      }
+    }
     res.json({ product, seller_listings })
   } catch (err) {
     console.error('Admin Hub product GET error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
+// Mirrors a merged child's live sku/price/inventory into its parent's variants[] snapshot —
+// the shop's variant selector reads that snapshot, not the child's own row, so without this an
+// edit to the child would silently do nothing customer-visible. Never touches option_values/
+// title (the variant's axis label, e.g. "Rot" — chosen once at combine time) or the child's EAN
+// (immutable) — only the commercial fields the seller can actually change from Inventory.
+const syncMergedChildIntoParentVariant = async (parentId, child) => {
+  const client = getProductsDbClient()
+  if (!client) return
+  try {
+    await client.connect()
+    const r = await client.query('SELECT id, variants FROM admin_hub_products WHERE id = $1 FOR UPDATE', [parentId])
+    const parentRow = r.rows[0]
+    if (!parentRow) return
+    const variants = Array.isArray(parentRow.variants) ? parentRow.variants : []
+    let changed = false
+    const nextVariants = variants.map((v) => {
+      if (!v || String(v?.metadata?.source_product_id || '') !== String(child.id)) return v
+      changed = true
+      return {
+        ...v,
+        sku: child.sku ? String(child.sku) : '',
+        inventory: Number(child.inventory || 0) || 0,
+        price_cents: Number(child.price_cents != null ? child.price_cents : Math.round(Number(child.price || 0) * 100)) || 0,
+      }
+    })
+    if (changed) {
+      await client.query('UPDATE admin_hub_products SET variants = $1::jsonb, updated_at = now() WHERE id = $2', [
+        JSON.stringify(nextVariants),
+        parentId,
+      ])
+    }
+  } finally {
+    try { await client.end() } catch (_) {}
   }
 }
 
@@ -1696,6 +1748,17 @@ const adminHubProductByIdPUT = async (req, res) => {
     const product = await updateAdminHubProductDb(req.params.id, body)
     if (product && product.__error) { res.status(400).json({ message: product.__error }); return }
     if (!product) { res.status(404).json({ message: 'Product not found' }); return }
+    // This row was folded into a variant group's parent (combine-as-variants) but stays an
+    // independently active, independently editable product — its own sku/price/inventory are
+    // what the seller actually manages. The parent's variants[] only holds a display SNAPSHOT
+    // (that's what the shop's variant selector reads), so an edit here does nothing visible on
+    // the shop unless it's mirrored into that snapshot too.
+    const mergedIntoId = product.metadata && typeof product.metadata === 'object' ? product.metadata.merged_into_id : null
+    if (mergedIntoId) {
+      syncMergedChildIntoParentVariant(String(mergedIntoId), product).catch((e) => {
+        console.warn('syncMergedChildIntoParentVariant:', e && e.message)
+      })
+    }
     if (!isSuperuserCaller && product) {
       const { pickEuOriginFields } = require('../eu-origin')
       const { enqueueEuOriginPending } = require('../eu-origin/queue')
