@@ -20,7 +20,7 @@ import {
   Select,
   Tabs,
 } from "@shopify/polaris";
-import { ProductIcon, LockIcon } from "@shopify/polaris-icons";
+import { ProductIcon, LockIcon, DuplicateIcon } from "@shopify/polaris-icons";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
@@ -838,7 +838,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
               <ProductSectionRule />
 
               <InlineStack gap="300" wrap>
-                <Box minWidth="220px" flex="1">
+                <Box minWidth="200px" flex="1">
                   <TextField
                     label="SKU"
                     value={v.sku ?? ""}
@@ -846,13 +846,29 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                     autoComplete="off"
                   />
                 </Box>
-                <Box minWidth="220px" flex="1">
+                <Box minWidth="200px" flex="1">
                   <TextField
                     label="EAN"
                     value={v.ean ?? ""}
                     onChange={(tVal) => patchVariant({ ean: tVal || undefined })}
                     autoComplete="off"
                     error={String(v.ean || "").trim() === "" ? "EAN required" : undefined}
+                  />
+                </Box>
+                <Box minWidth="200px" flex="1">
+                  <TextField
+                    label="AN-ID"
+                    value={v.an_id || t("assigned on save", "kayıtta atanır", "attribué à l'enregistrement", "asignado al guardar", "assegnato al salvataggio", "wird beim Speichern vergeben")}
+                    disabled
+                    autoComplete="off"
+                    helpText={t("Permanent platform ID for this variant — stable even if SKU or EAN change.", "Bu varyant için kalıcı platform kimliği — SKU veya EAN değişse de sabit kalır.", "Identifiant de plateforme permanent pour cette variante — stable même si le SKU ou l'EAN changent.", "ID de plataforma permanente para esta variante — estable aunque cambien el SKU o el EAN.", "ID piattaforma permanente per questa variante — stabile anche se SKU o EAN cambiano.", "Dauerhafte Plattform-ID für diese Variante — bleibt stabil, auch wenn sich SKU oder EAN ändern.")}
+                    connectedRight={v.an_id ? (
+                      <Button
+                        icon={DuplicateIcon}
+                        accessibilityLabel={t("Copy AN-ID", "AN-ID'yi kopyala", "Copier l'AN-ID", "Copiar AN-ID", "Copia AN-ID", "AN-ID kopieren")}
+                        onClick={() => { try { navigator.clipboard?.writeText(v.an_id); } catch (_) { /* ignore */ } }}
+                      />
+                    ) : undefined}
                   />
                 </Box>
               </InlineStack>

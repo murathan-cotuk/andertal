@@ -2,7 +2,7 @@
 const { Router } = require('express')
 const { getAdminHubProductByIdOrHandleDb, listAdminHubProductsDb, getProductsDbClient } = require('./admin-products')
 const { collectCategorySubtreeIdsBySlugSql } = require('../category-subtree-ids')
-const { normalizeAnId } = require('../an-id')
+const { normalizeAnId, findProductByAnId } = require('../an-id')
 const { getSellerStoreName, getApprovedSellerIdsSet, isStorePublishedStatus, isStoreVisibleSellerProduct, storePublishedStatusSql } = require('./seller-settings')
 const { isEuOriginVerified } = require('../eu-origin')
 const { createTieredCache } = require('../tiered-cache')
@@ -1054,13 +1054,18 @@ const storeProductByAnIdGET = async (req, res) => {
   if (!client) return res.status(503).json({ message: 'Database unavailable' })
   try {
     await client.connect()
-    const r = await client.query('SELECT id FROM admin_hub_products WHERE an_id = $1', [anId])
+    const found = await findProductByAnId(client, anId)
     await client.end()
-    const row = r.rows && r.rows[0]
-    if (!row) return res.status(404).json({ message: 'Unknown AN-ID' })
-    const product = await getAdminHubProductByIdOrHandleDb(row.id)
+    if (!found) return res.status(404).json({ message: 'Unknown AN-ID' })
+    const product = await getAdminHubProductByIdOrHandleDb(found.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
-    res.json({ id: product.id, handle: product.handle, an_id: product.an_id, metadata: product.metadata || {} })
+    res.json({
+      id: product.id,
+      handle: product.handle,
+      an_id: found.an_id,
+      matched_on: found.matched_on,
+      metadata: product.metadata || {},
+    })
   } catch (err) {
     try { await client.end() } catch (_) {}
     console.error('Store product by AN-ID GET error:', err)

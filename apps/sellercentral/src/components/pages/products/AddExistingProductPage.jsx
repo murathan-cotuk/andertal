@@ -21,12 +21,14 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 const copy = {
   title: { en: "Add Existing Product", tr: "Mevcut Ürün Ekle", de: "Bestehendes Produkt hinzufügen" },
   subtitle: {
-    en: "Search for an existing product in the catalog by EAN, product ID, or shop link. The form will be pre-filled with the product's data — add your own price, SKU, and shipping details.",
-    tr: "EAN, ürün kimliği veya shop linki ile mevcut bir ürünü kataloğda ara. Form ürün verileriyle doldurulur — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle.",
-    de: "Suche ein bestehendes Produkt im Katalog per EAN, Produkt-ID oder Shop-Link. Das Formular wird mit den Katalogdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu.",
+    en: "Search for an existing product in the catalog by AN-ID, EAN, product ID, or shop link. The form will be pre-filled with the product's data — add your own price, SKU, and shipping details.",
+    tr: "AN-ID, EAN, ürün kimliği veya shop linki ile mevcut bir ürünü kataloğda ara. Form ürün verileriyle doldurulur — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle.",
+    de: "Suche ein bestehendes Produkt im Katalog per AN-ID, EAN, Produkt-ID oder Shop-Link. Das Formular wird mit den Katalogdaten vorausgefüllt — füge deinen eigenen Preis, SKU und Versanddetails hinzu.",
   },
   eanLabel: { en: "EAN / Barcode", tr: "EAN / Barkod", de: "EAN / Barcode" },
   eanPlaceholder: { en: "e.g. 4012345678901", tr: "örn. 4012345678901", de: "z. B. 4012345678901" },
+  anIdLabel: { en: "AN-ID", tr: "AN-ID", de: "AN-ID" },
+  anIdPlaceholder: { en: "e.g. AN-K2N4P6X", tr: "örn. AN-K2N4P6X", de: "z. B. AN-K2N4P6X" },
   idLabel: { en: "Product ID", tr: "Ürün Kimliği", de: "Produkt-ID" },
   idPlaceholder: { en: "UUID from sellercentral", tr: "Sellercentral'dan UUID", de: "UUID aus dem Sellercentral" },
   urlLabel: { en: "Shop URL or handle", tr: "Shop URL veya handle", de: "Shop-URL oder Handle" },
@@ -99,9 +101,17 @@ function ProductThumb({ product }) {
   );
 }
 
+function normalizeAnIdInput(value) {
+  let s = String(value || "").trim().toUpperCase();
+  if (!s) return "";
+  if (!s.startsWith("AN-") && /^[ABCDEFGHJKMNPQRSTUVWXYZ2-9]{7}$/.test(s)) s = "AN-" + s;
+  return /^AN-[ABCDEFGHJKMNPQRSTUVWXYZ2-9]{7}$/.test(s) ? s : "";
+}
+
 function VariantRow({ v, isMatch }) {
   const label = getVariantLabel(v);
   const ean = v.ean || v.metadata?.ean || "";
+  const anId = v.an_id || "";
   return (
     <div style={{
       display: "flex",
@@ -116,6 +126,7 @@ function VariantRow({ v, isMatch }) {
       <BlockStack gap="050">
         {label && <Text as="p" variant="bodySm" fontWeight={isMatch ? "semibold" : "regular"}>{label}</Text>}
         {ean && <Text as="p" variant="bodySm" tone="subdued">EAN: {ean}</Text>}
+        {anId && <Text as="p" variant="bodySm" tone="subdued">AN-ID: {anId}</Text>}
         {v.sku && <Text as="p" variant="bodySm" tone="subdued">SKU: {v.sku}</Text>}
       </BlockStack>
     </div>
@@ -129,9 +140,11 @@ export default function AddExistingProductPage() {
   const client = getMedusaAdminClient();
 
   const [ean, setEan] = useState("");
+  const [anId, setAnId] = useState("");
   const [productId, setProductId] = useState("");
   const [shopUrl, setShopUrl] = useState("");
   const [searchedEan, setSearchedEan] = useState("");
+  const [searchedAnId, setSearchedAnId] = useState("");
 
   const [state, setState] = useState(null); // null | "loading" | "found" | "not_found"
   const [foundProduct, setFoundProduct] = useState(null);
@@ -145,20 +158,28 @@ export default function AddExistingProductPage() {
 
   const search = useCallback(async (eanOverride) => {
     const eanTrim = (eanOverride ?? ean).trim();
+    const anIdTrim = normalizeAnIdInput(anId) || normalizeAnIdInput(eanTrim);
     const idTrim = productId.trim();
     const urlTrim = shopUrl.trim();
 
-    if (!eanTrim && !idTrim && !urlTrim) return;
+    if (!eanTrim && !anId.trim() && !idTrim && !urlTrim) return;
 
     setState("loading");
     setFoundProduct(null);
     setSiblingsOpen(false);
-    setSearchedEan(eanTrim);
+    setSearchedEan(anIdTrim ? "" : eanTrim);
+    setSearchedAnId(anIdTrim);
 
     try {
       let found = null;
 
-      if (!found && eanTrim) {
+      if (!found && anIdTrim) {
+        const anResult = await client.lookupProductByAnId(anIdTrim).catch(() => null);
+        found = anResult?.product || null;
+        if (anResult?.matched_variant_an_id) setSearchedAnId(anResult.matched_variant_an_id);
+      }
+
+      if (!found && eanTrim && !normalizeAnIdInput(eanTrim)) {
         const eanResult = await client.lookupProductByEan(eanTrim).catch(() => null);
         found = eanResult?.product || null;
       }
@@ -196,7 +217,7 @@ export default function AddExistingProductPage() {
     } catch (_) {
       setState("not_found");
     }
-  }, [ean, productId, shopUrl, client]);
+  }, [ean, anId, productId, shopUrl, client]);
 
   const stopScanner = useCallback(() => {
     if (scanLoopRef.current) {
@@ -283,7 +304,9 @@ export default function AddExistingProductPage() {
   };
 
   const variants = Array.isArray(foundProduct?.variants) ? foundProduct.variants : [];
-  const matchedVariant = searchedEan
+  const matchedVariant = searchedAnId
+    ? variants.find((v) => String(v?.an_id || "").trim().toUpperCase() === searchedAnId)
+    : searchedEan
     ? variants.find((v) => String(v?.ean || v?.metadata?.ean || "").trim() === searchedEan)
     : null;
   const siblingVariants = matchedVariant
@@ -305,9 +328,22 @@ export default function AddExistingProductPage() {
             <InlineStack gap="200" blockAlign="end" wrap={false}>
               <div style={{ flex: 1 }}>
                 <TextField
+                  label={t("anIdLabel")}
+                  value={anId}
+                  onChange={(v) => { setAnId(v); setState(null); setFoundProduct(null); setSearchedEan(""); setSearchedAnId(""); }}
+                  placeholder={t("anIdPlaceholder")}
+                  autoComplete="off"
+                  onKeyDown={(e) => { if (e.key === "Enter") search(); }}
+                />
+              </div>
+            </InlineStack>
+
+            <InlineStack gap="200" blockAlign="end" wrap={false}>
+              <div style={{ flex: 1 }}>
+                <TextField
                   label={t("eanLabel")}
                   value={ean}
-                  onChange={(v) => { setEan(v); setState(null); setFoundProduct(null); setSearchedEan(""); }}
+                  onChange={(v) => { setEan(v); setState(null); setFoundProduct(null); setSearchedEan(""); setSearchedAnId(""); }}
                   placeholder={t("eanPlaceholder")}
                   autoComplete="off"
                   onKeyDown={(e) => { if (e.key === "Enter") search(); }}
@@ -329,7 +365,7 @@ export default function AddExistingProductPage() {
                 <TextField
                   label={t("idLabel")}
                   value={productId}
-                  onChange={(v) => { setProductId(v); setState(null); setFoundProduct(null); setSearchedEan(""); }}
+                  onChange={(v) => { setProductId(v); setState(null); setFoundProduct(null); setSearchedEan(""); setSearchedAnId(""); }}
                   placeholder={t("idPlaceholder")}
                   autoComplete="off"
                   onKeyDown={(e) => { if (e.key === "Enter") search(); }}
@@ -342,7 +378,7 @@ export default function AddExistingProductPage() {
                 <TextField
                   label={t("urlLabel")}
                   value={shopUrl}
-                  onChange={(v) => { setShopUrl(v); setState(null); setFoundProduct(null); setSearchedEan(""); }}
+                  onChange={(v) => { setShopUrl(v); setState(null); setFoundProduct(null); setSearchedEan(""); setSearchedAnId(""); }}
                   placeholder={t("urlPlaceholder")}
                   autoComplete="off"
                   onKeyDown={(e) => { if (e.key === "Enter") search(); }}
@@ -355,7 +391,7 @@ export default function AddExistingProductPage() {
                 variant="primary"
                 onClick={search}
                 loading={state === "loading"}
-                disabled={!ean.trim() && !productId.trim() && !shopUrl.trim()}
+                disabled={!ean.trim() && !anId.trim() && !productId.trim() && !shopUrl.trim()}
               >
                 {t("search")}
               </Button>
@@ -379,6 +415,9 @@ export default function AddExistingProductPage() {
                     <Text as="p" variant="bodySm" tone="subdued">
                       {typeof t("variantCount") === "function" ? t("variantCount")(variants.length) : `${variants.length} variants`}
                     </Text>
+                  )}
+                  {foundProduct.an_id && (
+                    <Text as="p" variant="bodySm" tone="subdued">AN-ID: {foundProduct.an_id}</Text>
                   )}
                   {(foundProduct.metadata?.ean || foundProduct.ean) && variants.length === 0 && (
                     <Text as="p" variant="bodySm" tone="subdued">EAN: {foundProduct.metadata?.ean || foundProduct.ean}</Text>

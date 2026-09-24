@@ -175,6 +175,13 @@ export function formatChangeRequestValuePreview(raw, maxLen = 100) {
   return `${oneLine.slice(0, Math.max(0, maxLen - 1))}…`;
 }
 
+export function isChangeRequestSkipField(fieldName) {
+  const f = String(fieldName || "").trim();
+  if (!f) return false;
+  const key = f.startsWith("metadata.") ? f.slice("metadata.".length) : f;
+  return key === "compliance_review";
+}
+
 export function fieldNameDisplayLabel(fieldName, locale = "de") {
   const f = String(fieldName || "").trim();
   if (!f) return "—";
@@ -192,7 +199,6 @@ export function fieldNameDisplayLabel(fieldName, locale = "de") {
       seo: "SEO",
       seo_i18n: lt(loc, "SEO (per language)", "SEO (dile göre)", "SEO (par langue)", "SEO (por idioma)", "SEO (per lingua)", "SEO (je Sprache)"),
       bullet_points: lt(loc, "Bullet points", "Madde işaretleri", "Points clés", "Puntos", "Punti elenco", "Aufzählungspunkte"),
-      compliance_review: lt(loc, "Compliance check", "Uygunluk kontrolü", "Contrôle de conformité", "Control de conformidad", "Controllo di conformità", "Compliance-Prüfung"),
       compliance_profile_id: lt(loc, "Compliance profile", "Uygunluk profili", "Profil de conformité", "Perfil de conformidad", "Profilo di conformità", "Compliance-Profil"),
       custom_fields: lt(loc, "Custom fields", "Özel alanlar", "Champs personnalisés", "Campos personalizados", "Campi personalizzati", "Benutzerdefinierte Felder"),
     };

@@ -184,6 +184,22 @@ class MedusaAdminClient {
     }
   }
 
+  /** Returns { product, matched_on: "parent"|"variant", matched_variant_an_id } or null. */
+  async lookupProductByAnId(anId) {
+    try {
+      const res = await this.request(`/admin-hub/products/an-id-lookup?an_id=${encodeURIComponent(anId)}`);
+      if (!res?.product) return null;
+      return {
+        product: res.product,
+        matched_on: res.matched_on || "parent",
+        matched_variant_an_id: res.matched_variant_an_id || null,
+      };
+    } catch (err) {
+      if (err?.statusCode === 404) return null;
+      return null;
+    }
+  }
+
   async createAdminHubProduct(data) {
     // Always tag the product with the current seller's ID (spread first so callers cannot overwrite seller_id)
     const sellerId = typeof window !== 'undefined' ? localStorage.getItem('sellerId') : null;

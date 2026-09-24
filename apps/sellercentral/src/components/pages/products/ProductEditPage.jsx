@@ -44,6 +44,7 @@ import {
   fieldNameDisplayLabel,
   buildChangeRequestDiff,
   seoPlainPreview,
+  isChangeRequestSkipField,
 } from "@/lib/product-change-request-format";
 import { EU_ORIGIN_STATUS } from "@andertal/shop-theme";
 import {
@@ -213,7 +214,7 @@ function filterMetaDefsForCatalog(definitions) {
 function stripSkuEanFromVariants(variants) {
   if (!Array.isArray(variants)) return [];
   return variants.map((v) => {
-    const { sku, ean, ...rest } = typeof v === "object" && v ? v : {};
+    const { sku, ean, an_id, ...rest } = typeof v === "object" && v ? v : {};
     const out = { ...rest };
     out.sku = "";
     out.ean = undefined;
@@ -719,7 +720,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     }
     try {
       const d = await client.request(`/admin-hub/v1/product-change-requests?status=pending&product_id=${encodeURIComponent(productId)}`);
-      const list = Array.isArray(d?.change_requests) ? d.change_requests : [];
+      const list = (Array.isArray(d?.change_requests) ? d.change_requests : []).filter(
+        (cr) => !isChangeRequestSkipField(cr?.field_name),
+      );
       setPendingChangeRequests(list);
       return list;
     } catch (_) {
@@ -2674,10 +2677,10 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vg-swatch-empty:hover { border-color: var(--p-color-border-info); background: rgba(0,113,227,0.04); }
         /* ── Variation engine — Matrix rows (aligned column grid) ── */
         .vm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .vm-list { border: 1px solid var(--p-color-border); border-radius: 10px; overflow: hidden; background: var(--p-color-bg-surface, #fff); min-width: 940px; }
+        .vm-list { border: 1px solid var(--p-color-border); border-radius: 10px; overflow: hidden; background: var(--p-color-bg-surface, #fff); min-width: 1050px; }
         .vm-head, .vm-row {
           display: grid;
-          grid-template-columns: 30px minmax(150px, 1.7fr) minmax(88px, 1fr) minmax(96px, 1fr) minmax(58px, 0.66fr) minmax(74px, 0.9fr) minmax(74px, 0.9fr) minmax(120px, auto) minmax(96px, auto);
+          grid-template-columns: 30px minmax(150px, 1.7fr) minmax(88px, 1fr) minmax(96px, 1fr) minmax(118px, 1fr) minmax(58px, 0.66fr) minmax(74px, 0.9fr) minmax(74px, 0.9fr) minmax(120px, auto) minmax(96px, auto);
           align-items: center;
           gap: 10px;
           padding: 7px 12px;
@@ -2699,6 +2702,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vm-inp:hover { background: var(--p-color-bg-fill-transparent-hover, rgba(0,0,0,.04)); }
         .vm-inp:focus { outline: none; border-color: var(--p-color-border-emphasis, #2c6ecb); background: var(--p-color-bg-surface, #fff); }
         .vm-inp.vm-err { border-color: var(--p-color-border-critical, #d82c0d); background: var(--p-color-bg-surface-critical, #fff4f4); }
+        .vm-inp[readonly] { cursor: default; color: var(--p-color-text-subdued); }
+        .vm-inp[readonly]:hover, .vm-inp[readonly]:focus { background: transparent; border-color: transparent; }
         .vm-inp-sku { font-weight: 600; }
         .vm-inp-n { text-align: right; }
         .vm-flag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px; cursor: help; white-space: nowrap; }
@@ -4023,6 +4028,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                           <span>{lt(locale, "Variant", "Varyant", "Variante", "Variante", "Variante", "Variante")}</span>
                           <span>SKU</span>
                           <span>EAN</span>
+                          <span>AN-ID</span>
                           <span className="vm-num-h">{pe.inventory}</span>
                           <span className="vm-num-h">{pe.sellingPrice}</span>
                           <span className="vm-num-h">{pe.discountPrice}</span>
@@ -4077,6 +4083,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                 <input className={"vm-inp" + (eanErr ? " vm-err" : "")} value={v.ean ?? ""} placeholder="EAN" autoComplete="off"
                                   title={eanErr ? lt(locale, "EAN required", "EAN gerekli", "EAN requis", "EAN obligatorio", "EAN obbligatorio", "EAN erforderlich") : undefined}
                                   onChange={(e) => updateMatrixVariant(v.option_values, "ean", e.target.value)} />
+                              </span>
+                              <span className="vm-cell">
+                                <input className="vm-inp" value={v.an_id || ""} placeholder="—" readOnly tabIndex={-1} autoComplete="off"
+                                  title={v.an_id
+                                    ? lt(locale, "Permanent platform ID for this variant", "Bu varyant için kalıcı platform kimliği", "Identifiant de plateforme permanent pour cette variante", "ID de plataforma permanente para esta variante", "ID piattaforma permanente per questa variante", "Dauerhafte Plattform-ID für diese Variante")
+                                    : lt(locale, "Assigned on save", "Kayıtta atanır", "Attribué à l'enregistrement", "Asignado al guardar", "Assegnato al salvataggio", "Wird beim Speichern vergeben")} />
                               </span>
                               <span className="vm-cell">
                                 <input className="vm-inp vm-inp-n" inputMode="numeric" value={v.inventory != null ? String(v.inventory) : "0"}

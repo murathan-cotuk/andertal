@@ -88,7 +88,12 @@ module.exports = function createSellerListingsRouter() {
           params
         )
         await c.end()
-        res.json({ change_requests: r.rows || [] })
+        const change_requests = (r.rows || []).filter((row) => {
+          const f = String(row?.field_name || '').trim()
+          const key = f.startsWith('metadata.') ? f.slice('metadata.'.length) : f
+          return key !== 'compliance_review'
+        })
+        res.json({ change_requests })
       } catch (e) {
         try { await c.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
@@ -99,6 +104,10 @@ module.exports = function createSellerListingsRouter() {
       if (!sellerId) return res.status(401).json({ message: 'Unauthorized' })
       const { product_id, field_name, new_value } = req.body || {}
       if (!product_id || !field_name || new_value == null) return res.status(400).json({ message: 'product_id, field_name, new_value required' })
+      const crFieldKey = String(field_name).startsWith('metadata.') ? String(field_name).slice('metadata.'.length) : String(field_name)
+      if (crFieldKey === 'compliance_review') {
+        return res.status(400).json({ message: 'compliance_review is not a change-request field' })
+      }
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
       const c = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })

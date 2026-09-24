@@ -950,6 +950,9 @@ module.exports = function createNotificationsRouter() {
         }
         const productChangeFeedItems = []
         for (const r of crQ.rows || []) {
+          const fn = String(r.field_name || '')
+          const fnKey = fn.startsWith('metadata.') ? fn.slice('metadata.'.length) : fn
+          if (fnKey === 'compliance_review') continue
           const pid = r.product_id ? String(r.product_id) : ''
           const sub = `${r.product_title || 'Produkt'} · ${crFieldDe(r.field_name)} — Aktuell: ${crShortVal(r.old_value)} → Vorschlag: ${crShortVal(r.new_value)}`
           productChangeFeedItems.push({

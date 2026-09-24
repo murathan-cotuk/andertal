@@ -8,7 +8,7 @@ const {
   resolveNonPlaceholderHandle,
   patchPlaceholderTranslationHandles,
 } = require('../product-url-handle')
-const { assignAnId } = require('../an-id')
+const { assignAnId, normalizeAnId, ensureVariantAnIds, findProductByAnId } = require('../an-id')
 const { resolveProductCommissionOverride, productCommissionOverridePct } = require('../commission-rate')
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -34,6 +34,79 @@ const parseVariantsArray = (p) => {
     try { const j = JSON.parse(v); return Array.isArray(j) ? j : [] } catch (_) { return [] }
   }
   return []
+}
+
+/** Parent column + every variants[] row get an AN-ID on first read/write. */
+async function ensureRowAnIds(client, r) {
+  if (!r) return r
+  let row = r
+  if (!row.an_id) {
+    try {
+      const anId = await assignAnId(client)
+      const upd = await client.query('UPDATE admin_hub_products SET an_id = $1 WHERE id = $2 RETURNING an_id', [anId, row.id])
+      if (upd.rows && upd.rows[0]) row = { ...row, an_id: upd.rows[0].an_id }
+    } catch (backfillErr) {
+      console.warn('AN-ID lazy backfill failed:', backfillErr && backfillErr.message)
+    }
+  }
+  const parsed = parseVariantsArray(row)
+  if (!parsed.length) return row
+  const reserved = new Set()
+  if (row.an_id) reserved.add(String(row.an_id).toUpperCase())
+  try {
+    const { variants: stamped, changed } = await ensureVariantAnIds(client, parsed, reserved)
+    if (changed) {
+      await client.query('UPDATE admin_hub_products SET variants = $1, updated_at = now() WHERE id = $2', [JSON.stringify(stamped), row.id])
+    }
+    row = { ...row, variants: stamped }
+  } catch (variantBackfillErr) {
+    console.warn('Variant AN-ID lazy backfill failed:', variantBackfillErr && variantBackfillErr.message)
+  }
+  return row
+}
+
+const CATALOG_LOOKUP_SELLER_OWNED_META = [
+  'sku', 'prices', 'uvp_cents', 'rabattpreis_cents',
+  'shipping_group_id', 'brand_id', 'publish_date',
+  'seller_id', 'seller', 'seller_name', 'shop_name', 'related_product_ids',
+]
+
+/** Catalog payload for "add existing product" — keep EAN/AN-ID, drop seller-owned commercials. */
+function catalogSafeProduct(master) {
+  const masterMeta = master.metadata && typeof master.metadata === 'object' ? master.metadata : {}
+  const safeMeta = { ...masterMeta }
+  for (const k of CATALOG_LOOKUP_SELLER_OWNED_META) delete safeMeta[k]
+  const sanitizeVariant = (v) => {
+    const vm = v?.metadata && typeof v.metadata === 'object' ? { ...v.metadata } : {}
+    delete vm.shipping_group_id
+    delete vm.brand_id
+    delete vm.sku
+    delete vm.prices
+    return {
+      ...v,
+      sku: undefined,
+      ean: (v && v.ean) || undefined,
+      an_id: (v && v.an_id) || undefined,
+      price: undefined,
+      price_cents: 0,
+      compare_at_price: undefined,
+      compare_at_price_cents: undefined,
+      sale_price: undefined,
+      sale_price_cents: undefined,
+      inventory: 0,
+      inventory_quantity: 0,
+      metadata: vm,
+    }
+  }
+  return {
+    id: master.id,
+    title: master.title,
+    handle: master.handle,
+    description: master.description,
+    an_id: master.an_id || null,
+    metadata: safeMeta,
+    variants: Array.isArray(master.variants) ? master.variants.map(sanitizeVariant) : parseVariantsArray(master).map(sanitizeVariant),
+  }
 }
 
 const extractEanFromHubProductRow = (p) => {
@@ -78,6 +151,15 @@ const pickCanonicalEanMatch = (matches) => {
     return new Date(a?.created_at || 0) - new Date(b?.created_at || 0)
   })
   return sorted[0]
+}
+
+/** Advisory stamp from stampComplianceReviewAsync — not a seller catalog edit. */
+const CHANGE_REQUEST_SKIP_META = ['compliance_review']
+function isChangeRequestSkipField(fieldName) {
+  const f = String(fieldName || '').trim()
+  if (!f) return false
+  const key = f.startsWith('metadata.') ? f.slice('metadata.'.length) : f
+  return CHANGE_REQUEST_SKIP_META.includes(key)
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -635,7 +717,6 @@ const createAdminHubProductDb = async (body) => {
       if (status.toLowerCase() === 'published') status = 'draft'
     }
     const metadata = metaObj ? JSON.stringify(metaObj) : null
-    const variants = variantsArr ? JSON.stringify(variantsArr) : null
     const eanValidation = await validateProductEansDb(client, metaObj && metaObj.ean, collectVariantEans(variantsArr || []), null)
     if (!eanValidation.ok) { await client.end(); return { __error: eanValidation.message || 'EAN validation failed' } }
     const brandGate = await validateBrandForPublish(client, metaObj || {}, status)
@@ -643,10 +724,16 @@ const createAdminHubProductDb = async (body) => {
       complianceWarning = complianceWarning ? `${complianceWarning} · ${brandGate.message}` : brandGate.message
       if (status.toLowerCase() === 'published') status = 'draft'
     }
-    // AN-ID: assigned once, here, for every new CANONICAL (master) product. A seller who
-    // later lists against the same EAN gets a row in admin_hub_seller_listings instead — this
-    // INSERT never runs for them, so the master's AN-ID stays the one shared reference.
-    const anId = await assignAnId(client)
+    // AN-ID: assigned once, here, for every new CANONICAL (master) product and each of
+    // its variations. A seller who later lists against the same EAN gets a row in
+    // admin_hub_seller_listings instead — this INSERT never runs for them.
+    const reserved = new Set()
+    const anId = await assignAnId(client, reserved)
+    let variantsJson = null
+    if (variantsArr) {
+      const { variants: stamped } = await ensureVariantAnIds(client, variantsArr, reserved)
+      variantsJson = JSON.stringify(stamped)
+    }
     const res = await client.query(
       `INSERT INTO admin_hub_products (title, handle, sku, description, status, seller_id, collection_id, price_cents, inventory, metadata, variants, an_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -654,7 +741,7 @@ const createAdminHubProductDb = async (body) => {
       [
         title, handle, (body.sku || '').trim() || null, description,
         status, (body.seller || body.seller_id || '').trim() || null,
-        body.collection_id || null, price, inventory, metadata, variants, anId,
+        body.collection_id || null, price, inventory, metadata, variantsJson, anId,
       ]
     )
     await client.end()
@@ -693,6 +780,13 @@ const getAdminHubProductByIdOrHandleDb = async (idOrHandle) => {
         [val]
       )
     } else {
+      const anIdKey = normalizeAnId(val)
+      if (anIdKey) {
+        const byAn = await findProductByAnId(client, anIdKey)
+        if (byAn && byAn.id) {
+          res = await client.query(`SELECT ${hubCols} FROM admin_hub_products WHERE id = $1`, [byAn.id])
+        }
+      }
       const parsed = parseProductUrlHandle(val)
       const attempts = []
       // Shop URLs are {handle}-a-{8chars} of the UUID. Resolve by suffix first so
@@ -720,24 +814,16 @@ const getAdminHubProductByIdOrHandleDb = async (idOrHandle) => {
         `SELECT ${hubCols} FROM admin_hub_products WHERE EXISTS (SELECT 1 FROM jsonb_each(COALESCE(metadata->'translations', '{}'::jsonb)) AS tr(locale_key, tr_data) WHERE tr_data ? 'handle' AND LENGTH(TRIM(COALESCE(tr_data->>'handle', ''))) > 0 AND LOWER(TRIM(tr_data->>'handle')) = LOWER($1)) LIMIT 1`,
         [parsed.base || val],
       ])
-      for (const [sql, params] of attempts) {
-        res = await client.query(sql, params)
-        if (res.rows && res.rows[0]) break
+      if (!(res && res.rows && res.rows[0])) {
+        for (const [sql, params] of attempts) {
+          res = await client.query(sql, params)
+          if (res.rows && res.rows[0]) break
+        }
       }
     }
-    let r = res.rows && res.rows[0]
+    let r = res && res.rows && res.rows[0]
     if (!r) { await client.end(); return null }
-    // Lazy backfill: products created before AN-ID existed get one assigned the first time
-    // they're opened/saved, instead of a slow one-time batch migration over the whole catalog.
-    if (!r.an_id) {
-      try {
-        const anId = await assignAnId(client)
-        const upd = await client.query('UPDATE admin_hub_products SET an_id = $1 WHERE id = $2 RETURNING an_id', [anId, r.id])
-        if (upd.rows && upd.rows[0]) r = { ...r, an_id: upd.rows[0].an_id }
-      } catch (backfillErr) {
-        console.warn('AN-ID lazy backfill failed:', backfillErr && backfillErr.message)
-      }
-    }
+    r = await ensureRowAnIds(client, r)
     await client.end()
     return {
       id: r.id, title: r.title, handle: r.handle, slug: r.handle, sku: r.sku,
@@ -828,7 +914,10 @@ const updateAdminHubProductDb = async (id, body) => {
       }
     }
     const metadata = Object.keys(metadataObj).length ? JSON.stringify(metadataObj) : null
-    const variants = body.variants !== undefined ? (Array.isArray(body.variants) ? JSON.stringify(body.variants) : null) : (existing.variants ? JSON.stringify(existing.variants) : null)
+    const reservedAnIds = new Set()
+    if (existing.an_id) reservedAnIds.add(String(existing.an_id).toUpperCase())
+    const { variants: stampedVariants } = await ensureVariantAnIds(client, nextVariantsArr, reservedAnIds)
+    const variants = JSON.stringify(stampedVariants)
     const collection_id = body.collection_id !== undefined ? body.collection_id || null : existing.collection_id
     await client.query(
       `UPDATE admin_hub_products SET title = $1, handle = $2, sku = $3, description = $4, status = $5, price_cents = $6, inventory = $7, metadata = $8, variants = $9, collection_id = $10, updated_at = now() WHERE id = $11`,
@@ -1025,6 +1114,7 @@ const adminHubProductsPOST = async (req, res) => {
           'shipping_group_id', 'brand_id', 'publish_date', 'seller_name', 'shop_name', 'seller_id', 'seller',
           // Per-seller commercial fields — must not create product change-requests / overwrite master
           'sku', 'prices', 'uvp_cents', 'rabattpreis_cents', 'related_product_ids',
+          ...CHANGE_REQUEST_SKIP_META,
         ]
         const crFields = []
         const fillFields = {}
@@ -1099,13 +1189,14 @@ const adminHubProductsPOST = async (req, res) => {
           try {
             await qcr.connect()
             for (const { field, old: oldVal, val: newVal } of crFields) {
+              if (isChangeRequestSkipField(field)) continue
               await qcr.query(
                 `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending',$3,$4,$5)`,
                 [masterProduct.id, callerSellerId, field, oldVal, newVal]
               )
+              queuedMetaSuggestionCount += 1
             }
           } finally { try { await qcr.end() } catch (_) {} }
-          queuedMetaSuggestionCount += crFields.length
         }
       }
 
@@ -1333,6 +1424,7 @@ const adminHubProductByIdPUT = async (req, res) => {
       'sku', 'prices', 'uvp_cents', 'rabattpreis_cents', 'related_product_ids',
       // Listed child EAN lives on seller_listings.seller_metadata, never on the master row
       'ean',
+      ...CHANGE_REQUEST_SKIP_META,
     ]
 
     if (callerSellerId && existing && existing.seller_id && String(existing.seller_id).trim() !== callerSellerId && !isSuperuserCaller) {
@@ -1361,6 +1453,7 @@ const adminHubProductByIdPUT = async (req, res) => {
           if (sharedTitleChanged) await qc.query(`INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending','title',$3,$4)`, [existing.id, callerSellerId, existing.title || null, body.title || ''])
           if (sharedDescChanged) await qc.query(`INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending','description',$3,$4)`, [existing.id, callerSellerId, existing.description || null, body.description || ''])
           for (const metaKey of sharedMetaKeysChanged) {
+            if (isChangeRequestSkipField(metaKey) || isChangeRequestSkipField(`metadata.${metaKey}`)) continue
             const oldVal = existingMeta?.[metaKey]
             let newVal = incomingMeta?.[metaKey]
             if (metaKey === 'prices') newVal = mergePrices(existingMeta?.prices, newVal)
@@ -1464,6 +1557,7 @@ const adminHubProductByIdPUT = async (req, res) => {
           await qc.connect()
           const sharedKeys = Object.keys(body || {}).filter((k) => !['price', 'inventory', 'status'].includes(k))
           for (const key of sharedKeys) {
+            if (isChangeRequestSkipField(key)) continue
             const oldVal = existing && existing[key] !== undefined ? existing[key] : (existing?.metadata && existing.metadata[key] !== undefined ? existing.metadata[key] : null)
             await qc.query(
               `INSERT INTO admin_hub_product_change_requests (product_id, seller_id, status, field_name, old_value, new_value) VALUES ($1,$2,'pending',$3,$4,$5)`,
@@ -1642,46 +1736,42 @@ module.exports = function createAdminProductsRouter() {
       const matchedVariant = matchedOnParent
         ? null
         : parseVariantsArray(master).find((v) => normalizeStoreEan(v && v.ean) === normEan) || null
-      // Strip seller-owned commercial fields so another seller never sees SKU/price/shipping
-      const SELLER_OWNED_META = [
-        'sku', 'prices', 'uvp_cents', 'rabattpreis_cents',
-        'shipping_group_id', 'brand_id', 'publish_date',
-        'seller_id', 'seller', 'seller_name', 'shop_name', 'related_product_ids',
-      ]
-      const safeMeta = { ...masterMeta }
-      for (const k of SELLER_OWNED_META) delete safeMeta[k]
-      const sanitizeVariant = (v) => {
-        const vm = v?.metadata && typeof v.metadata === 'object' ? { ...v.metadata } : {}
-        delete vm.shipping_group_id
-        delete vm.brand_id
-        delete vm.sku
-        delete vm.prices
-        return {
-          ...v,
-          sku: undefined,
-          ean: (v && v.ean) || undefined,
-          price: undefined,
-          price_cents: 0,
-          compare_at_price: undefined,
-          compare_at_price_cents: undefined,
-          sale_price: undefined,
-          sale_price_cents: undefined,
-          inventory: 0,
-          inventory_quantity: 0,
-          metadata: vm,
-        }
-      }
-      const catalogProduct = {
-        id: master.id, title: master.title, handle: master.handle, description: master.description,
-        metadata: safeMeta,
-        variants: Array.isArray(master.variants) ? master.variants.map(sanitizeVariant) : [],
-      }
       res.json({
-        product: catalogProduct,
+        product: catalogSafeProduct(master),
         found: true,
         matched_ean: normEan,
         matched_on: matchedOnParent ? 'parent' : 'variant',
         matched_variant_ean: matchedVariant ? normalizeStoreEan(matchedVariant.ean) : null,
+      })
+    } catch (err) { res.status(500).json({ message: err?.message || 'Lookup failed' }) }
+  })
+
+  // AN-ID lookup (parent column or any variant JSON an_id)
+  router.get('/admin-hub/products/an-id-lookup', async (req, res) => {
+    try {
+      const anId = normalizeAnId(req.query.an_id)
+      if (!anId) return res.status(400).json({ message: 'an_id query param required (AN-XXXXXXX)' })
+      const client = getProductsDbClient()
+      if (!client) return res.status(503).json({ message: 'Database not configured' })
+      await client.connect()
+      let found
+      try {
+        found = await findProductByAnId(client, anId)
+      } finally {
+        try { await client.end() } catch (_) {}
+      }
+      if (!found) return res.status(404).json({ message: 'No product found with this AN-ID' })
+      const master = await getAdminHubProductByIdOrHandleDb(found.id)
+      if (!master) return res.status(404).json({ message: 'No product found with this AN-ID' })
+      const matchedVariant = found.matched_on === 'variant'
+        ? parseVariantsArray(master).find((v) => normalizeAnId(v && v.an_id) === anId) || null
+        : null
+      res.json({
+        product: catalogSafeProduct(master),
+        found: true,
+        matched_an_id: anId,
+        matched_on: found.matched_on,
+        matched_variant_an_id: matchedVariant ? normalizeAnId(matchedVariant.an_id) : null,
       })
     } catch (err) { res.status(500).json({ message: err?.message || 'Lookup failed' }) }
   })
@@ -2237,7 +2327,10 @@ module.exports = function createAdminProductsRouter() {
       const client = getProductsDbClient()
       if (!client) return res.status(503).json({ message: 'Database not configured' })
       await client.connect()
-      await client.query('UPDATE admin_hub_products SET variants = $1, updated_at = now() WHERE id = $2', [JSON.stringify(body.variants), existing.id])
+      const reservedAnIds = new Set()
+      if (existing.an_id) reservedAnIds.add(String(existing.an_id).toUpperCase())
+      const { variants: stampedVariants } = await ensureVariantAnIds(client, incomingVariants, reservedAnIds)
+      await client.query('UPDATE admin_hub_products SET variants = $1, updated_at = now() WHERE id = $2', [JSON.stringify(stampedVariants), existing.id])
       await client.end()
       const updated = await getAdminHubProductByIdOrHandleDb(existing.id)
       res.json({ product: updated })
