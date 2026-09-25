@@ -1,0 +1,982 @@
+{
+  "Strength Training Leg Machines": {
+    "de": "Krafttraining-Beinmaschinen",
+    "es": "Máquinas de piernas para fuerza",
+    "fr": "Machines jambes musculation",
+    "it": "Macchine gambe per forza",
+    "tr": "Kuvvet Antrenmanı Bacak Makineleri"
+  },
+  "Strength Training Smith Machines": {
+    "de": "Krafttraining-Smith-Maschinen",
+    "es": "Máquinas Smith para fuerza",
+    "fr": "Machines Smith musculation",
+    "it": "Macchine Smith per forza",
+    "tr": "Kuvvet Antrenmanı Smith Makineleri"
+  },
+  "Stress Management Self-Help": {
+    "de": "Stressmanagement-Selbsthilfe",
+    "es": "Autoayuda para manejo del estrés",
+    "fr": "Auto-aide gestion du stress",
+    "it": "Autoaiuto gestione dello stress",
+    "tr": "Stres Yönetimi Kişisel Gelişim"
+  },
+  "Stretchers & Gurneys": {
+    "de": "Tragen & Fahrtragen",
+    "es": "Camillas y camillas con ruedas",
+    "fr": "Brancards et civières",
+    "it": "Barelle e lettighe",
+    "tr": "Sedye ve Hasta Arabaları"
+  },
+  "Stride Piano": {
+    "de": "Stride-Piano",
+    "es": "Piano stride",
+    "fr": "Piano stride",
+    "it": "Piano stride",
+    "tr": "Stride Piyano"
+  },
+  "Stringed Musical Instruments": {
+    "de": "Saiteninstrumente",
+    "es": "Instrumentos de cuerda",
+    "fr": "Instruments à cordes",
+    "it": "Strumenti a corda",
+    "tr": "Tellerli Çalgılar"
+  },
+  "Strut-Channel Nuts": {
+    "de": "Montageschienmuttern",
+    "es": "Tuercas para canal de perfil",
+    "fr": "Écrous pour rail de montage",
+    "it": "Dadi per canale strut",
+    "tr": "Strut-Kanal Somunları"
+  },
+  "Student Awards & Student Incentives": {
+    "de": "Schülerauszeichnungen & -anreize",
+    "es": "Premios e incentivos estudiantiles",
+    "fr": "Récompenses et incentives scolaires",
+    "it": "Premi e incentivi per studenti",
+    "tr": "Öğrenci Ödülleri ve Teşvikleri"
+  },
+  "Studio Microphones": {
+    "de": "Studiomikrofone",
+    "es": "Micrófonos de estudio",
+    "fr": "Microphones de studio",
+    "it": "Microfoni da studio",
+    "tr": "Stüdyo Mikrofonları"
+  },
+  "Suckers & Lollipops": {
+    "de": "Lutscher & Lollis",
+    "es": "Chupachups y piruletas",
+    "fr": "Sucettes et lollipops",
+    "it": "Lecca-lecca e lollipop",
+    "tr": "Emme Şekerler ve Lolipoplar"
+  },
+  "Super Nintendo Accessories": {
+    "de": "Super-Nintendo-Zubehör",
+    "es": "Accesorios Super Nintendo",
+    "fr": "Accessoires Super Nintendo",
+    "it": "Accessori Super Nintendo",
+    "tr": "Super Nintendo Aksesuarları"
+  },
+  "Super Nintendo Games": {
+    "de": "Super-Nintendo-Spiele",
+    "es": "Juegos Super Nintendo",
+    "fr": "Jeux Super Nintendo",
+    "it": "Giochi Super Nintendo",
+    "tr": "Super Nintendo Oyunları"
+  },
+  "Surf Rock": {
+    "de": "Surf-Rock",
+    "es": "Surf rock",
+    "fr": "Surf rock",
+    "it": "Surf rock",
+    "tr": "Surf Rock"
+  },
+  "Surface Roughness Gauges": {
+    "de": "Oberflächenrauheitsmessgeräte",
+    "es": "Medidores de rugosidad superficial",
+    "fr": "Rugosimètres de surface",
+    "it": "Misuratori rugosità superficiale",
+    "tr": "Yüzey Pürüzlülük Ölçerleri"
+  },
+  "Surge Protectors": {
+    "de": "Überspannungsschutz",
+    "es": "Protectores contra sobretensiones",
+    "fr": "Parasurtenseurs",
+    "it": "Protezioni da sovratensione",
+    "tr": "Aşırı Gerilim Koruyucuları"
+  },
+  "Surgical Equipment": {
+    "de": "Chirurgische Ausrüstung",
+    "es": "Equipo quirúrgico",
+    "fr": "Équipement chirurgical",
+    "it": "Attrezzatura chirurgica",
+    "tr": "Cerrahi Ekipman"
+  },
+  "Surgical Forceps & Hemostats": {
+    "de": "Chirurgische Pinzetten & Hämostaten",
+    "es": "Fórceps y hemostatos quirúrgicos",
+    "fr": "Pinces et hémostats chirurgicaux",
+    "it": "Pinze e emostati chirurgici",
+    "tr": "Cerrahi Pensler ve Hemostatlar"
+  },
+  "Surgical Needle Holders": {
+    "de": "Chirurgische Nadelhalter",
+    "es": "Portaagujas quirúrgicos",
+    "fr": "Porte-aiguilles chirurgicaux",
+    "it": "Porta-aghi chirurgici",
+    "tr": "Cerrahi İğne Tutucuları"
+  },
+  "Surround Sound Systems": {
+    "de": "Surround-Sound-Systeme",
+    "es": "Sistemas de sonido surround",
+    "fr": "Systèmes surround",
+    "it": "Sistemi surround",
+    "tr": "Surround Ses Sistemleri"
+  },
+  "Surveillance DVR Kits": {
+    "de": "Überwachungs-DVR-Kits",
+    "es": "Kits DVR de vigilancia",
+    "fr": "Kits DVR de surveillance",
+    "it": "Kit DVR di sorveglianza",
+    "tr": "Gözetim DVR Kitleri"
+  },
+  "Suspension Tools": {
+    "de": "Fahrwerkswerkzeuge",
+    "es": "Herramientas de suspensión",
+    "fr": "Outils de suspension",
+    "it": "Attrezzi per sospensioni",
+    "tr": "Süspansiyon Araçları"
+  },
+  "Sweets, Chocolate & Gum": {
+    "de": "Süßigkeiten, Schokolade & Kaugummi",
+    "es": "Dulces, chocolate y chicles",
+    "fr": "Bonbons, chocolat et chewing-gum",
+    "it": "Dolci, cioccolato e gomme",
+    "tr": "Tatlılar, Çikolata ve Sakız"
+  },
+  "Swimming Pool Basketball & Volleyball": {
+    "de": "Schwimmbad-Basketball & -Volleyball",
+    "es": "Baloncesto y voleibol de piscina",
+    "fr": "Basket et volley de piscine",
+    "it": "Basket e volley da piscina",
+    "tr": "Havuz Basketbolu ve Voleybolu"
+  },
+  "Swimming Pool Stain Removers": {
+    "de": "Schwimmbad-Fleckenentferner",
+    "es": "Quitamanchas para piscinas",
+    "fr": "Détachants pour piscines",
+    "it": "Smacchiatori per piscine",
+    "tr": "Havuz Leke Çıkarıcıları"
+  },
+  "Swimming Pool Test Strips": {
+    "de": "Schwimmbad-Teststreifen",
+    "es": "Tiras de prueba para piscinas",
+    "fr": "Bandelettes de test pour piscines",
+    "it": "Strisce di test per piscine",
+    "tr": "Havuz Test Şeritleri"
+  },
+  "Swimming Pools": {
+    "de": "Schwimmbecken",
+    "es": "Piscinas",
+    "fr": "Piscines",
+    "it": "Piscine",
+    "tr": "Yüzme Havuzları"
+  },
+  "Swimwear Cover-Ups & Wraps": {
+    "de": "Badebekleidungs-Überwürfe & Wickel",
+    "es": "Cubiertas y wraps de baño",
+    "fr": "Cache-maillots et wraps",
+    "it": "Copricostumi e wraps",
+    "tr": "Mayo Örtüleri ve Wrap'ler"
+  },
+  "Switzerland Travel Guides": {
+    "de": "Reiseführer Schweiz",
+    "es": "Guías de viaje de Suiza",
+    "fr": "Guides de voyage Suisse",
+    "it": "Guide di viaggio Svizzera",
+    "tr": "İsviçre Seyahat Rehberleri"
+  },
+  "Syringe Lab Filters": {
+    "de": "Spritzen-Laborfilter",
+    "es": "Filtros de jeringa de laboratorio",
+    "fr": "Filtres seringue de laboratoire",
+    "it": "Filtri siringa da laboratorio",
+    "tr": "Şırınga Laboratuvar Filtreleri"
+  },
+  "Syrups, Sugars & Sweeteners": {
+    "de": "Sirupe, Zucker & Süßstoffe",
+    "es": "Jarabes, azúcares y edulcorantes",
+    "fr": "Sirop, sucres et édulcorants",
+    "it": "Sciroppi, zuccheri e dolcificanti",
+    "tr": "Şuruplar, Şekerler ve Tatlandırıcılar"
+  },
+  "T-Slot Milling Cutters": {
+    "de": "T-Nut-Fräser",
+    "es": "Fresas de ranura en T",
+    "fr": "Fraises à rainure en T",
+    "it": "Frese a cava a T",
+    "tr": "T-Kanal Freze Uçları"
+  },
+  "TIG Welding Equipment": {
+    "de": "WIG-Schweißausrüstung",
+    "es": "Equipo de soldadura TIG",
+    "fr": "Équipement de soudage TIG",
+    "it": "Attrezzatura saldatura TIG",
+    "tr": "TIG Kaynak Ekipmanı"
+  },
+  "TV & Media Furniture": {
+    "de": "TV- & Medienmöbel",
+    "es": "Muebles para TV y multimedia",
+    "fr": "Meubles TV et multimédia",
+    "it": "Mobili TV e media",
+    "tr": "TV ve Medya Mobilyaları"
+  },
+  "TV Mounts": {
+    "de": "TV-Halterungen",
+    "es": "Soportes para TV",
+    "fr": "Supports TV",
+    "it": "Supporti TV",
+    "tr": "TV Askıları"
+  },
+  "TV References": {
+    "de": "TV-Nachschlagewerke",
+    "es": "Referencias de TV",
+    "fr": "Ouvrages de référence TV",
+    "it": "Riferimenti TV",
+    "tr": "TV Referansları"
+  },
+  "Table Tennis Accessories": {
+    "de": "Tischtennis-Zubehör",
+    "es": "Accesorios de tenis de mesa",
+    "fr": "Accessoires de tennis de table",
+    "it": "Accessori tennis tavolo",
+    "tr": "Masa Tenisi Aksesuarları"
+  },
+  "Tactical Paracord": {
+    "de": "Taktisches Paracord",
+    "es": "Paracord táctico",
+    "fr": "Paracorde tactique",
+    "it": "Paracord tattico",
+    "tr": "Taktik Paracord"
+  },
+  "Taffy Candy": {
+    "de": "Taffy-Bonbons",
+    "es": "Caramelos taffy",
+    "fr": "Bonbons taffy",
+    "it": "Caramelle taffy",
+    "tr": "Taffy Şekerleri"
+  },
+  "Taiwan Travel Guides": {
+    "de": "Reiseführer Taiwan",
+    "es": "Guías de viaje de Taiwán",
+    "fr": "Guides de voyage Taïwan",
+    "it": "Guide di viaggio Taiwan",
+    "tr": "Tayvan Seyahat Rehberleri"
+  },
+  "Tambourines": {
+    "de": "Tamburine",
+    "es": "Panderetas",
+    "fr": "Tambourins",
+    "it": "Tamburelli",
+    "tr": "Tefler"
+  },
+  "Tamper-Resistant Nuts": {
+    "de": "Manipulationssichere Muttern",
+    "es": "Tuercas antimanipulación",
+    "fr": "Écrous antiviolation",
+    "it": "Dadi antimanomissione",
+    "tr": "Kurcalamaya Dayanıklı Somunlar"
+  },
+  "Tampons": {
+    "de": "Tampons",
+    "es": "Tampones",
+    "fr": "Tampons",
+    "it": "Assorbenti interni",
+    "tr": "Tamponlar"
+  },
+  "Taoism": {
+    "de": "Taoismus",
+    "es": "Taoísmo",
+    "fr": "Taoïsme",
+    "it": "Taoismo",
+    "tr": "Taoculuk"
+  },
+  "Taoist Philosophy": {
+    "de": "Taoistische Philosophie",
+    "es": "Filosofía taoísta",
+    "fr": "Philosophie taoïste",
+    "it": "Filosofia taoista",
+    "tr": "Taoist Felsefe"
+  },
+  "Tap & Die Sets": {
+    "de": "Gewindeschneid- & Schneideisen-Sätze",
+    "es": "Juegos de machos y terrajas",
+    "fr": "Coffrets tarauds et filières",
+    "it": "Kit maschi e filiere",
+    "tr": "Kılavuz ve Pafta Setleri"
+  },
+  "Tap Extractors": {
+    "de": "Gewindebohrer-Auszieher",
+    "es": "Extractores de machos",
+    "fr": "Extracteurs de tarauds",
+    "it": "Estrattori di maschi",
+    "tr": "Kılavuz Çıkarıcılar"
+  },
+  "Tea Bag Coasters": {
+    "de": "Teebeutel-Untersetzer",
+    "es": "Posavasos para bolsitas de té",
+    "fr": "Sous-verres pour sachets de thé",
+    "it": "Sottobicchieri per bustine di tè",
+    "tr": "Çay Poşeti Altlıkları"
+  },
+  "Tea for Babies": {
+    "de": "Babytee",
+    "es": "Té para bebés",
+    "fr": "Thé pour bébés",
+    "it": "Tè per neonati",
+    "tr": "Bebek Çayı"
+  },
+  "Team Practice Vests": {
+    "de": "Trainingsleibchen",
+    "es": "Petos de entrenamiento",
+    "fr": "Chasubles d'entraînement",
+    "it": "Pettorine da allenamento",
+    "tr": "Takım Antrenman Yelekleri"
+  },
+  "Technical Drawing Templates": {
+    "de": "Technische Zeichenschablonen",
+    "es": "Plantillas de dibujo técnico",
+    "fr": "Gabarit de dessin technique",
+    "it": "Sagome per disegno tecnico",
+    "tr": "Teknik Çizim Şablonları"
+  },
+  "Teen & Young Adult Asian Historical Fiction": {
+    "de": "Jugend-Asien-Historienromane",
+    "es": "Ficción histórica asiática juvenil",
+    "fr": "Fiction historique asiatique ado",
+    "it": "Narrativa storica asiatica YA",
+    "tr": "Genç Asya Tarihi Kurgu"
+  },
+  "Teen & Young Adult Christianity": {
+    "de": "Jugend-Christentum",
+    "es": "Cristianismo juvenil",
+    "fr": "Christianisme ado & YA",
+    "it": "Cristianesimo YA",
+    "tr": "Genç Hristiyanlık"
+  },
+  "Teen & Young Adult Contemporary Fantasy": {
+    "de": "Jugend-Contemporary-Fantasy",
+    "es": "Fantasía contemporánea juvenil",
+    "fr": "Fantasy contemporaine ado",
+    "it": "Fantasy contemporanea YA",
+    "tr": "Genç Çağdaş Fantastik"
+  },
+  "Teen & Young Adult Contemporary Romance": {
+    "de": "Jugend-Contemporary-Romance",
+    "es": "Romance contemporáneo juvenil",
+    "fr": "Romance contemporaine ado",
+    "it": "Romance contemporanea YA",
+    "tr": "Genç Çağdaş Romantik"
+  },
+  "Teen & Young Adult Dark Fantasy": {
+    "de": "Jugend-Dark-Fantasy",
+    "es": "Fantasía oscura juvenil",
+    "fr": "Dark fantasy ado",
+    "it": "Dark fantasy YA",
+    "tr": "Genç Karanlık Fantastik"
+  },
+  "Teen & Young Adult Depression & Mental Health": {
+    "de": "Jugend-Depression & mentale Gesundheit",
+    "es": "Depresión y salud mental juvenil",
+    "fr": "Dépression et santé mentale ado",
+    "it": "Depressione e salute mentale YA",
+    "tr": "Genç Depresyon ve Ruh Sağlığı"
+  },
+  "Teen & Young Adult Epic Fantasy": {
+    "de": "Jugend-Epik-Fantasy",
+    "es": "Fantasía épica juvenil",
+    "fr": "Fantasy épique ado",
+    "it": "Fantasy epica YA",
+    "tr": "Genç Epik Fantastik"
+  },
+  "Teen & Young Adult European Historical Fiction": {
+    "de": "Jugend-Europa-Historienromane",
+    "es": "Ficción histórica europea juvenil",
+    "fr": "Fiction historique européenne ado",
+    "it": "Narrativa storica europea YA",
+    "tr": "Genç Avrupa Tarihi Kurgu"
+  },
+  "Teen & Young Adult Historical Biographies": {
+    "de": "Jugend-Historische Biografien",
+    "es": "Biografías históricas juveniles",
+    "fr": "Biographies historiques ado",
+    "it": "Biografie storiche YA",
+    "tr": "Genç Tarihi Biyografiler"
+  },
+  "Teen & Young Adult History of Exploration & Discovery": {
+    "de": "Jugend-Entdeckungsgeschichte",
+    "es": "Historia de exploración y descubrimiento juvenil",
+    "fr": "Histoire des explorations ado",
+    "it": "Storia di esplorazioni e scoperte YA",
+    "tr": "Genç Keşif ve Buluş Tarihi"
+  },
+  "Teen & Young Adult Medieval Historical Fiction": {
+    "de": "Jugend-Mittelalter-Historienromane",
+    "es": "Ficción histórica medieval juvenil",
+    "fr": "Fiction historique médiévale ado",
+    "it": "Narrativa storica medievale YA",
+    "tr": "Genç Ortaçağ Tarihi Kurgu"
+  },
+  "Teen & Young Adult Myths & Legends": {
+    "de": "Jugend-Mythen & Legenden",
+    "es": "Mitos y leyendas juveniles",
+    "fr": "Mythes et légendes ado",
+    "it": "Miti e leggende YA",
+    "tr": "Genç Mitler ve Efsaneler"
+  },
+  "Teen & Young Adult Paranormal & Urban Fantasy": {
+    "de": "Jugend-Paranormal & Urban Fantasy",
+    "es": "Fantasía paranormal y urbana juvenil",
+    "fr": "Fantasy paranormale et urbaine ado",
+    "it": "Fantasy paranormale e urbana YA",
+    "tr": "Genç Paranormal ve Kentsel Fantastik"
+  },
+  "Teen & Young Adult Personal Health": {
+    "de": "Jugend-Persönliche Gesundheit",
+    "es": "Salud personal juvenil",
+    "fr": "Santé personnelle ado",
+    "it": "Salute personale YA",
+    "tr": "Genç Kişisel Sağlık"
+  },
+  "Teen & Young Adult Romance": {
+    "de": "Jugend-Romance",
+    "es": "Romance juvenil",
+    "fr": "Romance ado",
+    "it": "Romance YA",
+    "tr": "Genç Romantik"
+  },
+  "Teen & Young Adult Romantic Mysteries & Thrillers": {
+    "de": "Jugend-Romantik-Krimis & Thriller",
+    "es": "Misterios y thrillers románticos juveniles",
+    "fr": "Mystères et thrillers romantiques ado",
+    "it": "Misteri e thriller romantici YA",
+    "tr": "Genç Romantik Gizem ve Gerilim"
+  },
+  "Teen & Young Adult Sculpture": {
+    "de": "Jugend-Bildhauerei",
+    "es": "Escultura juvenil",
+    "fr": "Sculpture ado",
+    "it": "Scultura YA",
+    "tr": "Genç Heykel"
+  },
+  "Teen & Young Adult Sports Biographies": {
+    "de": "Jugend-Sportbiografien",
+    "es": "Biografías deportivas juveniles",
+    "fr": "Biographies sportives ado",
+    "it": "Biografie sportive YA",
+    "tr": "Genç Spor Biyografileri"
+  },
+  "Teen & Young Adult Thrillers & Suspense": {
+    "de": "Jugend-Thriller & Spannung",
+    "es": "Thrillers y suspense juveniles",
+    "fr": "Thrillers et suspense ado",
+    "it": "Thriller e suspense YA",
+    "tr": "Genç Gerilim ve Suspense"
+  },
+  "Teen & Young Adult Travel": {
+    "de": "Jugend-Reisen",
+    "es": "Viajes juveniles",
+    "fr": "Voyage ado",
+    "it": "Viaggi YA",
+    "tr": "Genç Seyahat"
+  },
+  "Teen & Young Adult Vocabulary & Spelling": {
+    "de": "Jugend-Wortschatz & Rechtschreibung",
+    "es": "Vocabulario y ortografía juveniles",
+    "fr": "Vocabulaire et orthographe ado",
+    "it": "Vocabolario e ortografia YA",
+    "tr": "Genç Kelime Bilgisi ve Yazım"
+  },
+  "Teen & Young Adult Winter Sports Fiction": {
+    "de": "Jugend-Wintersport-Fiction",
+    "es": "Ficción de deportes de invierno juvenil",
+    "fr": "Fiction sports d'hiver ado",
+    "it": "Narrativa sport invernali YA",
+    "tr": "Genç Kış Sporları Kurgu"
+  },
+  "Teen & Young Adult Wizards & Witches Fantasy": {
+    "de": "Jugend-Zauberer- & Hexen-Fantasy",
+    "es": "Fantasía de magos y brujas juvenil",
+    "fr": "Fantasy sorciers et sorcières ado",
+    "it": "Fantasy maghi e streghe YA",
+    "tr": "Genç Büyücü ve Cadı Fantastik"
+  },
+  "Telecommunications & Sensors": {
+    "de": "Telekommunikation & Sensoren",
+    "es": "Telecomunicaciones y sensores",
+    "fr": "Télécommunications et capteurs",
+    "it": "Telecomunicazioni e sensori",
+    "tr": "Telekomünikasyon ve Sensörler"
+  },
+  "Telephone Answering Devices": {
+    "de": "Anrufbeantworter",
+    "es": "Contestadores telefónicos",
+    "fr": "Répondeurs téléphoniques",
+    "it": "Segreterie telefoniche",
+    "tr": "Telefon Cevaplama Cihazları"
+  },
+  "Telescope & Microscope Accessories": {
+    "de": "Teleskop- & Mikroskop-Zubehör",
+    "es": "Accesorios de telescopio y microscopio",
+    "fr": "Accessoires télescope et microscope",
+    "it": "Accessori telescopio e microscopio",
+    "tr": "Teleskop ve Mikroskop Aksesuarları"
+  },
+  "Telescope Refractors": {
+    "de": "Teleskop-Refraktoren",
+    "es": "Refractores de telescopio",
+    "fr": "Réfracteurs de télescope",
+    "it": "Rifrattori telescopici",
+    "tr": "Teleskop Refraktörleri"
+  },
+  "Television Comedy": {
+    "de": "Fernsehkomödie",
+    "es": "Comedia televisiva",
+    "fr": "Comédie télévisée",
+    "it": "Commedia televisiva",
+    "tr": "Televizyon Komedisi"
+  },
+  "Television Genres": {
+    "de": "Fernsehgenres",
+    "es": "Géneros televisivos",
+    "fr": "Genres télévisuels",
+    "it": "Generi televisivi",
+    "tr": "Televizyon Türleri"
+  },
+  "Television Stands": {
+    "de": "Fernsehständer",
+    "es": "Soportes de televisión",
+    "fr": "Meubles TV",
+    "it": "Supporti televisione",
+    "tr": "Televizyon Standları"
+  },
+  "Tennis Balls": {
+    "de": "Tennisbälle",
+    "es": "Pelotas de tenis",
+    "fr": "Balles de tennis",
+    "it": "Palline da tennis",
+    "tr": "Tenis Topları"
+  },
+  "Terminal Blocks": {
+    "de": "Reihenklemmen",
+    "es": "Regletas de bornes",
+    "fr": "Borniers",
+    "it": "Morsettiere",
+    "tr": "Klemens Blokları"
+  },
+  "Theater": {
+    "de": "Theater",
+    "es": "Teatro",
+    "fr": "Théâtre",
+    "it": "Teatro",
+    "tr": "Tiyatro"
+  },
+  "Thermometers & Timers": {
+    "de": "Thermometer & Timer",
+    "es": "Termómetros y temporizadores",
+    "fr": "Thermomètres et minuteries",
+    "it": "Termometri e timer",
+    "tr": "Termometreler ve Zamanlayıcılar"
+  },
+  "Thermometers & Weather Instruments": {
+    "de": "Thermometer & Wetterinstrumente",
+    "es": "Termómetros e instrumentos meteorológicos",
+    "fr": "Thermomètres et instruments météo",
+    "it": "Termometri e strumenti meteo",
+    "tr": "Termometreler ve Hava Durumu Aletleri"
+  },
+  "Thread Forming Taps": {
+    "de": "Gewindeformende Gewindebohrer",
+    "es": "Machos de formar rosca",
+    "fr": "Tarauds à former",
+    "it": "Maschi a rullare",
+    "tr": "Diş Biçimlendirici Kılavuzlar"
+  },
+  "Threaded Bumpers": {
+    "de": "Gewindepuffer",
+    "es": "Topes roscados",
+    "fr": "Butées filetées",
+    "it": "Paracolpi filettati",
+    "tr": "Dişli Tamponlar"
+  },
+  "Threaded Rods & Studs": {
+    "de": "Gewindestangen & -bolzen",
+    "es": "Varillas y espárragos roscados",
+    "fr": "Tiges et goujons filetés",
+    "it": "Barre e prigionieri filettati",
+    "tr": "Dişli Çubuklar ve Saplamalar"
+  },
+  "Threshold & Wheelchair Ramps": {
+    "de": "Schwellen- & Rollstuhlrampen",
+    "es": "Rampas de umbral y para sillas de ruedas",
+    "fr": "Rampes de seuil et fauteuil roulant",
+    "it": "Rampe soglia e carrozzina",
+    "tr": "Eşik ve Tekerlekli Sandalye Rampaları"
+  },
+  "Through-the-Wall Air Conditioners": {
+    "de": "Durch-die-Wand-Klimaanlagen",
+    "es": "Aires acondicionados de pared",
+    "fr": "Climatiseurs traversants",
+    "it": "Condizionatori a parete passante",
+    "tr": "Duvar Tipi Klimalar"
+  },
+  "Thumb Pianos": {
+    "de": "Daumenklaviere",
+    "es": "Pianos de pulgar",
+    "fr": "Pianos à pouces",
+    "it": "Pianoforti a pollice",
+    "tr": "Başparmak Piyanoları"
+  },
+  "Tie Clips": {
+    "de": "Krawattennadeln",
+    "es": "Pasadores de corbata",
+    "fr": "Épingles de cravate",
+    "it": "Fermacravatte",
+    "tr": "Kravat İğneleri"
+  },
+  "Tile Epoxy Adhesives": {
+    "de": "Fliesen-Epoxidkleber",
+    "es": "Adhesivos epoxi para azulejos",
+    "fr": "Adhésifs époxy pour carrelage",
+    "it": "Adesivi epoxi per piastrelle",
+    "tr": "Fayans Epoksi Yapıştırıcıları"
+  },
+  "Timpanis": {
+    "de": "Pauken",
+    "es": "Timpani",
+    "fr": "Timbales",
+    "it": "Timpani",
+    "tr": "Timpani"
+  },
+  "Tire & Wheel Assemblies": {
+    "de": "Reifen- & Radbaugruppen",
+    "es": "Conjuntos de neumático y llanta",
+    "fr": "Ensembles pneu et jante",
+    "it": "Assiemi pneumatico e cerchio",
+    "tr": "Lastik ve Jant Takımları"
+  },
+  "Tire Pens": {
+    "de": "Reifenstifte",
+    "es": "Bolígrafos para neumáticos",
+    "fr": "Stylos pour pneus",
+    "it": "Penne per pneumatici",
+    "tr": "Lastik Kalemleri"
+  },
+  "Titanium Sheets": {
+    "de": "Titanbleche",
+    "es": "Chapas de titanio",
+    "fr": "Tôles de titane",
+    "it": "Lamiere di titanio",
+    "tr": "Titanyum Levhalar"
+  },
+  "Toaster Oven Cookware": {
+    "de": "Mini-Ofen-Kochgeschirr",
+    "es": "Utensilios para horno tostador",
+    "fr": "Ustensiles pour mini-four",
+    "it": "Pentolame per fornetto",
+    "tr": "Tost Fırını Pişirme Kapları"
+  },
+  "Tobacco Pipes & Accessories": {
+    "de": "Tabakpfeifen & Zubehör",
+    "es": "Pipas de tabaco y accesorios",
+    "fr": "Pipes à tabac et accessoires",
+    "it": "Pipe da tabacco e accessori",
+    "tr": "Tütün Pipoları ve Aksesuarları"
+  },
+  "Toddler Bedding": {
+    "de": "Kleinkind-Bettwäsche",
+    "es": "Ropa de cama para niños pequeños",
+    "fr": "Literie pour tout-petits",
+    "it": "Biancheria da letto per bambini",
+    "tr": "Yürümeye Başlayan Çocuk Nevresimleri"
+  },
+  "Toilet Bowls": {
+    "de": "Toilettenbecken",
+    "es": "Tazas de inodoro",
+    "fr": "Cuvettes de toilettes",
+    "it": "Vasi WC",
+    "tr": "Klozet Kâseleri"
+  },
+  "Toilet Floor Caps": {
+    "de": "Toiletten-Bodenkappen",
+    "es": "Tapones de suelo para inodoro",
+    "fr": "Caches de sol pour toilettes",
+    "it": "Cappucci pavimento WC",
+    "tr": "Klozet Zemin Kapakları"
+  },
+  "Toilet Lid & Tank Covers": {
+    "de": "Toiletten-Deckel & Spülkastenabdeckungen",
+    "es": "Cubiertas de tapa y depósito de inodoro",
+    "fr": "Caches abattant et réservoir",
+    "it": "Copri sedile e cassetta WC",
+    "tr": "Klozet Kapak ve Rezervuar Örtüleri"
+  },
+  "Toilet Mounting Parts": {
+    "de": "Toiletten-Montageteile",
+    "es": "Piezas de montaje de inodoro",
+    "fr": "Pièces de montage pour toilettes",
+    "it": "Parti di montaggio WC",
+    "tr": "Klozet Montaj Parçaları"
+  },
+  "Toilet Paper": {
+    "de": "Toilettenpapier",
+    "es": "Papel higiénico",
+    "fr": "Papier toilette",
+    "it": "Carta igienica",
+    "tr": "Tuvalet Kağıdı"
+  },
+  "Toilet Paper Holders": {
+    "de": "Toilettenpapierhalter",
+    "es": "Portarrollos de papel higiénico",
+    "fr": "Porte-rouleaux de papier toilette",
+    "it": "Portarotolo carta igienica",
+    "tr": "Tuvalet Kağıdı Tutucuları"
+  },
+  "Toilet Paper Sprays": {
+    "de": "Toilettenpapier-Sprays",
+    "es": "Sprays para papel higiénico",
+    "fr": "Sprays pour papier toilette",
+    "it": "Spray per carta igienica",
+    "tr": "Tuvalet Kağıdı Spreyleri"
+  },
+  "Toilets & Toilet Parts": {
+    "de": "Toiletten & Toilettenteile",
+    "es": "Inodoros y piezas de inodoro",
+    "fr": "Toilettes et pièces détachées",
+    "it": "WC e parti WC",
+    "tr": "Klozetler ve Klozet Parçaları"
+  },
+  "Tool Sets": {
+    "de": "Werkzeugsätze",
+    "es": "Juegos de herramientas",
+    "fr": "Coffrets d'outils",
+    "it": "Kit di utensili",
+    "tr": "Alet Setleri"
+  },
+  "Tools & Home Improvement": {
+    "de": "Werkzeuge & Heimwerken",
+    "es": "Herramientas y bricolaje",
+    "fr": "Outils et bricolage",
+    "it": "Utensili e fai da te",
+    "tr": "Aletler ve Ev İyileştirme"
+  },
+  "Toothpaste": {
+    "de": "Zahnpasta",
+    "es": "Pasta de dientes",
+    "fr": "Dentifrice",
+    "it": "Dentifricio",
+    "tr": "Diş Macunu"
+  },
+  "Touchless Bathroom Sink Faucets": {
+    "de": "Berührungslose Waschtischarmaturen",
+    "es": "Grifos de lavabo sin contacto",
+    "fr": "Robinets lavabo sans contact",
+    "it": "Rubinetti lavabo senza contatto",
+    "tr": "Temassız Lavabo Bataryaları"
+  },
+  "Tourniquets": {
+    "de": "Tourniquets",
+    "es": "Torniquetes",
+    "fr": "Garrots",
+    "it": "Lacci emostatici",
+    "tr": "Turnikeler"
+  },
+  "Towing Hitch Wiring": {
+    "de": "Anhängerkupplungsverkabelung",
+    "es": "Cableado de enganche de remolque",
+    "fr": "Câblage d'attelage",
+    "it": "Cablaggio gancio traino",
+    "tr": "Çeki Demiri Kablolaması"
+  },
+  "Towing Hitches": {
+    "de": "Anhängerkupplungen",
+    "es": "Enganches de remolque",
+    "fr": "Attelages",
+    "it": "Ganci di traino",
+    "tr": "Çeki Demirleri"
+  },
+  "Towing Products & Winches": {
+    "de": "Abschleppprodukte & Winden",
+    "es": "Productos de remolque y cabrestantes",
+    "fr": "Produits de remorquage et treuils",
+    "it": "Prodotti di traino e verricelli",
+    "tr": "Çekme Ürünleri ve Vinçler"
+  },
+  "Towing Winch Fairleads": {
+    "de": "Abschleppwinden-Führungen",
+    "es": "Guías de cabrestante de remolque",
+    "fr": "Guides de treuil de remorquage",
+    "it": "Guide verricello di traino",
+    "tr": "Çekme Vinci Kılavuzları"
+  },
+  "Toy Baseball Products": {
+    "de": "Spielzeug-Baseballprodukte",
+    "es": "Productos de béisbol de juguete",
+    "fr": "Produits de baseball jouet",
+    "it": "Prodotti baseball giocattolo",
+    "tr": "Oyuncak Beyzbol Ürünleri"
+  },
+  "Toy Foam Ammunition": {
+    "de": "Spielzeug-Schaumstoffmunition",
+    "es": "Munición de espuma de juguete",
+    "fr": "Munitions en mousse jouet",
+    "it": "Munizioni in schiuma giocattolo",
+    "tr": "Oyuncak Köpük Mermileri"
+  },
+  "Toy Foam Blasters": {
+    "de": "Spielzeug-Schaumstoffblaster",
+    "es": "Lanzadores de espuma de juguete",
+    "fr": "Blasters en mousse jouet",
+    "it": "Blaster in schiuma giocattolo",
+    "tr": "Oyuncak Köpük Blasterlar"
+  },
+  "Toy Vehicles": {
+    "de": "Spielzeugfahrzeuge",
+    "es": "Vehículos de juguete",
+    "fr": "Véhicules jouets",
+    "it": "Veicoli giocattolo",
+    "tr": "Oyuncak Araçlar"
+  },
+  "Tracheostomy Care Kits": {
+    "de": "Tracheostomie-Pflegesets",
+    "es": "Kits de cuidado de traqueostomía",
+    "fr": "Kits de soins de trachéotomie",
+    "it": "Kit cura tracheostomia",
+    "tr": "Trakeostomi Bakım Kitleri"
+  },
+  "Track Lighting": {
+    "de": "Schienenbeleuchtung",
+    "es": "Iluminación de riel",
+    "fr": "Éclairage sur rail",
+    "it": "Illuminazione a binario",
+    "tr": "Ray Aydınlatma"
+  },
+  "Tractors": {
+    "de": "Traktoren",
+    "es": "Tractores",
+    "fr": "Tracteurs",
+    "it": "Trattori",
+    "tr": "Traktörler"
+  },
+  "Tragic Dramas & Plays": {
+    "de": "Tragische Dramen & Theaterstücke",
+    "es": "Dramas y obras trágicas",
+    "fr": "Drames et pièces tragiques",
+    "it": "Drammi e opere tragiche",
+    "tr": "Trajik Dramalar ve Oyunlar"
+  },
+  "Trailer Tires": {
+    "de": "Anhängerreifen",
+    "es": "Neumáticos de remolque",
+    "fr": "Pneus de remorque",
+    "it": "Pneumatici per rimorchio",
+    "tr": "Römork Lastikleri"
+  },
+  "Transportation in Medicine": {
+    "de": "Transport in der Medizin",
+    "es": "Transporte en medicina",
+    "fr": "Transport en médecine",
+    "it": "Trasporto in medicina",
+    "tr": "Tıpta Taşıma"
+  },
+  "Travel Dining Reference": {
+    "de": "Reise-Gastronomie-Nachschlagewerke",
+    "es": "Referencia gastronómica de viaje",
+    "fr": "Référence gastronomique voyage",
+    "it": "Riferimenti gastronomici di viaggio",
+    "tr": "Seyahat Yemek Referansı"
+  },
+  "Travel Garment Steamers": {
+    "de": "Reise-Kleidungsdämpfer",
+    "es": "Vaporeas de ropa de viaje",
+    "fr": "Défroisseurs vapeur de voyage",
+    "it": "Stiratori a vapore da viaggio",
+    "tr": "Seyahat Ütü Buharlayıcıları"
+  },
+  "Travel Pictorial Reference Books": {
+    "de": "Reise-Bildnachschlagewerke",
+    "es": "Libros de referencia pictórica de viaje",
+    "fr": "Ouvrages picturaux de voyage",
+    "it": "Libri di riferimento illustrati di viaggio",
+    "tr": "Seyahat Görsel Referans Kitapları"
+  },
+  "Travel Potties": {
+    "de": "Reise-Töpfchen",
+    "es": "Orinales de viaje",
+    "fr": "Pots de voyage",
+    "it": "Vasini da viaggio",
+    "tr": "Seyahat Lazımlıkları"
+  },
+  "Travel Wallets": {
+    "de": "Reisebrieftaschen",
+    "es": "Carteras de viaje",
+    "fr": "Portefeuilles de voyage",
+    "it": "Portafogli da viaggio",
+    "tr": "Seyahat Cüzdanları"
+  },
+  "Trees in Biological Sciences": {
+    "de": "Bäume in den Biowissenschaften",
+    "es": "Árboles en ciencias biológicas",
+    "fr": "Arbres en sciences biologiques",
+    "it": "Alberi nelle scienze biologiche",
+    "tr": "Biyolojik Bilimlerde Ağaçlar"
+  },
+  "Trinidad & Tobago History": {
+    "de": "Geschichte von Trinidad & Tobago",
+    "es": "Historia de Trinidad y Tobago",
+    "fr": "Histoire de Trinité-et-Tobago",
+    "it": "Storia di Trinidad e Tobago",
+    "tr": "Trinidad ve Tobago Tarihi"
+  },
+  "Trombone Bags & Cases": {
+    "de": "Posaunen-Taschen & -Kästen",
+    "es": "Fundas y estuches de trombón",
+    "fr": "Housses et étuis de trombone",
+    "it": "Borse e custodie per trombone",
+    "tr": "Trombon Çanta ve Kutuları"
+  },
+  "Truck Bed & Tailgate Bed Tents": {
+    "de": "Lkw-Ladeflächen- & Heckklappen-Zelte",
+    "es": "Tiendas de caja y portón de camioneta",
+    "fr": "Tentes de benne et hayon",
+    "it": "Tende cassone e portellone pickup",
+    "tr": "Kamyonet Kasa ve Bagaj Kapısı Çadırları"
+  },
+  "Truck Ladder Racks": {
+    "de": "Lkw-Leiternträger",
+    "es": "Portaescaleras para camionetas",
+    "fr": "Porte-échelles pour pick-up",
+    "it": "Portascale per pickup",
+    "tr": "Kamyonet Merdiven Rafları"
+  },
+  "Truck Tonneau Covers": {
+    "de": "Lkw-Ladeflächenabdeckungen",
+    "es": "Cubiertas de caja de camioneta",
+    "fr": "Couvre-bennes pour pick-up",
+    "it": "Coperture cassone pickup",
+    "tr": "Kamyonet Kasa Kapakları"
+  },
+  "Trumpets": {
+    "de": "Trompeten",
+    "es": "Trompetas",
+    "fr": "Trompettes",
+    "it": "Trombe",
+    "tr": "Trompetler"
+  },
+  "Turkey Sausages": {
+    "de": "Truthahnwürste",
+    "es": "Salchichas de pavo",
+    "fr": "Saucisses de dinde",
+    "it": "Salsicce di tacchino",
+    "tr": "Hindi Sosisleri"
+  }
+}

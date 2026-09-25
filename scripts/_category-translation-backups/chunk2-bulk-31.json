@@ -1,0 +1,989 @@
+{
+  "Turning Inserts": {
+    "de": "Drehschneideinsätze",
+    "es": "Insertos de torneado",
+    "fr": "Plaquettes de tournage",
+    "it": "Inserti di tornitura",
+    "tr": "Torna Insertleri"
+  },
+  "USB Cables": {
+    "de": "USB-Kabel",
+    "es": "Cables USB",
+    "fr": "Câbles USB",
+    "it": "Cavi USB",
+    "tr": "USB Kablolar"
+  },
+  "USB Computer Network Adapters": {
+    "de": "USB-Netzwerkadapter",
+    "es": "Adaptadores de red USB",
+    "fr": "Adaptateurs réseau USB",
+    "it": "Adattatori di rete USB",
+    "tr": "USB Bilgisayar Ağ Adaptörleri"
+  },
+  "USB-to-VGA Adapters": {
+    "de": "USB-zu-VGA-Adapter",
+    "es": "Adaptadores USB a VGA",
+    "fr": "Adaptateurs USB vers VGA",
+    "it": "Adattatori USB-VGA",
+    "tr": "USB-VGA Adaptörleri"
+  },
+  "Ultrafiltration Lab Filters": {
+    "de": "Ultrafiltrations-Laborfilter",
+    "es": "Filtros de laboratorio de ultrafiltración",
+    "fr": "Filtres de laboratoire d'ultrafiltration",
+    "it": "Filtri laboratorio ultrafiltrazione",
+    "tr": "Ultrafiltrasyon Laboratuvar Filtreleri"
+  },
+  "Undergarment Sewing Fasteners": {
+    "de": "Unterwäsche-Nähverschlüsse",
+    "es": "Cierres de costura para ropa interior",
+    "fr": "Fermetures de couture pour sous-vêtements",
+    "it": "Chiusure cucitura intimo",
+    "tr": "İç Giyim Dikiş Bağlantıları"
+  },
+  "Underwater Photography Cameras": {
+    "de": "Unterwasserfotografie-Kameras",
+    "es": "Cámaras de fotografía submarina",
+    "fr": "Appareils photo sous-marins",
+    "it": "Fotocamere fotografia subacquea",
+    "tr": "Sualtı Fotoğraf Makineleri"
+  },
+  "United States Atlases & Maps": {
+    "de": "USA-Atlanten & -Karten",
+    "es": "Atlas y mapas de Estados Unidos",
+    "fr": "Atlas et cartes des États-Unis",
+    "it": "Atlanti e mappe Stati Uniti",
+    "tr": "ABD Atlasları ve Haritaları"
+  },
+  "Universal Hose Fittings": {
+    "de": "Universelle Schlauchanschlüsse",
+    "es": "Racores universales para manguera",
+    "fr": "Raccords de tuyau universels",
+    "it": "Raccordi tubo universali",
+    "tr": "Evrensel Hortum Bağlantıları"
+  },
+  "Urban & Regional Economics": {
+    "de": "Stadt- & Regionalökonomie",
+    "es": "Economía urbana y regional",
+    "fr": "Économie urbaine et régionale",
+    "it": "Economia urbana e regionale",
+    "tr": "Kentsel ve Bölgesel Ekonomi"
+  },
+  "Urban Folk": {
+    "de": "Urban Folk",
+    "es": "Folk urbano",
+    "fr": "Folk urbain",
+    "it": "Folk urbano",
+    "tr": "Urban Folk"
+  },
+  "Urban Legends Humor": {
+    "de": "Urban-Legends-Humor",
+    "es": "Humor de leyendas urbanas",
+    "fr": "Humour légendes urbaines",
+    "it": "Umorismo leggende metropolitane",
+    "tr": "Şehir Efsaneleri Mizahı"
+  },
+  "Utopian Ideology": {
+    "de": "Utopische Ideologie",
+    "es": "Ideología utópica",
+    "fr": "Idéologie utopique",
+    "it": "Ideologia utopica",
+    "tr": "Ütopyacı İdeoloji"
+  },
+  "VGA Cables": {
+    "de": "VGA-Kabel",
+    "es": "Cables VGA",
+    "fr": "Câbles VGA",
+    "it": "Cavi VGA",
+    "tr": "VGA Kablolar"
+  },
+  "Vacuum & Dust Collector Replacement Parts": {
+    "de": "Staubsauger- & Absauger-Ersatzteile",
+    "es": "Piezas de repuesto de aspiradoras y colectores",
+    "fr": "Pièces aspirateurs et collecteurs de poussière",
+    "it": "Ricambi aspirapolvere e aspiratori",
+    "tr": "Süpürge ve Toz Toplayıcı Yedek Parçaları"
+  },
+  "Vacuum Brushes": {
+    "de": "Staubsaugerbürsten",
+    "es": "Cepillos de aspiradora",
+    "fr": "Brosses d'aspirateur",
+    "it": "Spazzole aspirapolvere",
+    "tr": "Süpürge Fırçaları"
+  },
+  "Vacuum Sealer Bags": {
+    "de": "Vakuumierbeutel",
+    "es": "Bolsas para envasadora al vacío",
+    "fr": "Sacs pour machine sous vide",
+    "it": "Sacchi per sottovuoto",
+    "tr": "Vakum Makinesi Torbaları"
+  },
+  "Vacuum Sealers": {
+    "de": "Vakuumierer",
+    "es": "Envasadoras al vacío",
+    "fr": "Machines sous vide",
+    "it": "Macchine sottovuoto",
+    "tr": "Vakum Makineleri"
+  },
+  "Vacuums": {
+    "de": "Staubsauger",
+    "es": "Aspiradoras",
+    "fr": "Aspirateurs",
+    "it": "Aspirapolvere",
+    "tr": "Süpürgeler"
+  },
+  "Vampire Horror": {
+    "de": "Vampir-Horror",
+    "es": "Terror de vampiros",
+    "fr": "Horreur vampires",
+    "it": "Horror vampiri",
+    "tr": "Vampir Korku"
+  },
+  "Vector Analysis Mathematics": {
+    "de": "Vektoranalysis-Mathematik",
+    "es": "Análisis vectorial matemáticas",
+    "fr": "Analyse vectorielle mathématiques",
+    "it": "Analisi vettoriale matematica",
+    "tr": "Vektör Analizi Matematiği"
+  },
+  "Vedas": {
+    "de": "Veden",
+    "es": "Vedas",
+    "fr": "Vedas",
+    "it": "Veda",
+    "tr": "Vedalar"
+  },
+  "Vegetable Cooking": {
+    "de": "Gemüsekochen",
+    "es": "Cocina de verduras",
+    "fr": "Cuisine des légumes",
+    "it": "Cucina di verdure",
+    "tr": "Sebze Yemekleri"
+  },
+  "Vegetable Plants & Seeds": {
+    "de": "Gemüsepflanzen & -samen",
+    "es": "Plantas y semillas de verduras",
+    "fr": "Plants et graines de légumes",
+    "it": "Piante e semi di ortaggi",
+    "tr": "Sebze Bitkileri ve Tohumları"
+  },
+  "Veterinary Anatomy & Physiology": {
+    "de": "Veterinäranatomie & -physiologie",
+    "es": "Anatomía y fisiología veterinaria",
+    "fr": "Anatomie et physiologie vétérinaires",
+    "it": "Anatomia e fisiologia veterinaria",
+    "tr": "Veteriner Anatomi ve Fizyoloji"
+  },
+  "Veterinary Diet Cat Food": {
+    "de": "Veterinär-Diät-Katzenfutter",
+    "es": "Comida dietética veterinaria para gatos",
+    "fr": "Aliments diététiques vétérinaires pour chats",
+    "it": "Cibo dietetico veterinario per gatti",
+    "tr": "Veteriner Diyet Kedi Maması"
+  },
+  "Video Camera Supports & Stabilizers": {
+    "de": "Videokamera-Stützen & Stabilisatoren",
+    "es": "Soportes y estabilizadores de videocámara",
+    "fr": "Supports et stabilisateurs caméra vidéo",
+    "it": "Supporti e stabilizzatori videocamera",
+    "tr": "Video Kamera Destekleri ve Stabilizatörleri"
+  },
+  "Video Game Art": {
+    "de": "Videospielkunst",
+    "es": "Arte de videojuegos",
+    "fr": "Art des jeux vidéo",
+    "it": "Arte dei videogiochi",
+    "tr": "Video Oyunu Sanatı"
+  },
+  "Video Projectors": {
+    "de": "Videoprojektoren",
+    "es": "Proyectores de vídeo",
+    "fr": "Vidéoprojecteurs",
+    "it": "Videoproiettori",
+    "tr": "Video Projektörler"
+  },
+  "Video Studio Equipment": {
+    "de": "Videostudio-Ausrüstung",
+    "es": "Equipo de estudio de vídeo",
+    "fr": "Équipement de studio vidéo",
+    "it": "Attrezzatura studio video",
+    "tr": "Video Stüdyo Ekipmanı"
+  },
+  "Vietnam War Biographies": {
+    "de": "Vietnamkrieg-Biografien",
+    "es": "Biografías de la guerra de Vietnam",
+    "fr": "Biographies de la guerre du Vietnam",
+    "it": "Biografie guerra del Vietnam",
+    "tr": "Vietnam Savaşı Biyografileri"
+  },
+  "Vine Plants": {
+    "de": "Kletterpflanzen",
+    "es": "Plantas trepadoras",
+    "fr": "Plantes grimpantes",
+    "it": "Piante rampicanti",
+    "tr": "Sarmaşık Bitkileri"
+  },
+  "Viola Parts": {
+    "de": "Bratschen-Teile",
+    "es": "Piezas de viola",
+    "fr": "Pièces d'alto",
+    "it": "Parti per viola",
+    "tr": "Viyola Parçaları"
+  },
+  "Violas": {
+    "de": "Bratschen",
+    "es": "Violas",
+    "fr": "Altos",
+    "it": "Viole",
+    "tr": "Viyolalar"
+  },
+  "Violin Bags & Cases": {
+    "de": "Geigen-Taschen & -Kästen",
+    "es": "Fundas y estuches de violín",
+    "fr": "Housses et étuis de violon",
+    "it": "Borse e custodie per violino",
+    "tr": "Keman Çanta ve Kutuları"
+  },
+  "Violin Shoulder & Chin Rests": {
+    "de": "Geigen-Schulter- & Kinnhalter",
+    "es": "Hombreras y mentoneras de violín",
+    "fr": "Épaulières et mentonnières de violon",
+    "it": "Spalliere e mentoniere per violino",
+    "tr": "Keman Omuz ve Çene Destekleri"
+  },
+  "Vision Products": {
+    "de": "Sehprodukte",
+    "es": "Productos de visión",
+    "fr": "Produits de vision",
+    "it": "Prodotti per la vista",
+    "tr": "Görme Ürünleri"
+  },
+  "Visor Accessories": {
+    "de": "Visier-Zubehör",
+    "es": "Accesorios de visera",
+    "fr": "Accessoires de visière",
+    "it": "Accessori per visiera",
+    "tr": "Siperlik Aksesuarları"
+  },
+  "Visual Basic Programming": {
+    "de": "Visual-Basic-Programmierung",
+    "es": "Programación Visual Basic",
+    "fr": "Programmation Visual Basic",
+    "it": "Programmazione Visual Basic",
+    "tr": "Visual Basic Programlama"
+  },
+  "Visual Impairment Aids": {
+    "de": "Sehbehinderungshilfen",
+    "es": "Ayudas para discapacidad visual",
+    "fr": "Aides pour déficience visuelle",
+    "it": "Ausili per ipovisione",
+    "tr": "Görme Engeli Yardımcıları"
+  },
+  "Vitamin B Supplements": {
+    "de": "Vitamin-B-Präparate",
+    "es": "Suplementos de vitamina B",
+    "fr": "Compléments de vitamine B",
+    "it": "Integratori di vitamina B",
+    "tr": "B Vitamini Takviyeleri"
+  },
+  "Vitamin D Supplements": {
+    "de": "Vitamin-D-Präparate",
+    "es": "Suplementos de vitamina D",
+    "fr": "Compléments de vitamine D",
+    "it": "Integratori di vitamina D",
+    "tr": "D Vitamini Takviyeleri"
+  },
+  "Vitamins & Dietary Supplements": {
+    "de": "Vitamine & Nahrungsergänzungsmittel",
+    "es": "Vitaminas y suplementos dietéticos",
+    "fr": "Vitamines et compléments alimentaires",
+    "it": "Vitamine e integratori alimentari",
+    "tr": "Vitaminler ve Diyet Takviyeleri"
+  },
+  "Voltage Monitoring Relays": {
+    "de": "Spannungsüberwachungsrelais",
+    "es": "Relés de supervisión de tensión",
+    "fr": "Relais de surveillance de tension",
+    "it": "Relè di monitoraggio tensione",
+    "tr": "Gerilim İzleme Röleleri"
+  },
+  "Walk-In Bathtubs": {
+    "de": "Begehbare Badewannen",
+    "es": "Bañeras de acceso fácil",
+    "fr": "Baignoires à porte",
+    "it": "Vashe da bagno walk-in",
+    "tr": "Girişli Küvetler"
+  },
+  "Walkers, Rollators & Accessories": {
+    "de": "Gehhilfen, Rollatoren & Zubehör",
+    "es": "Andadores, rollators y accesorios",
+    "fr": "Déambulateurs, rollators et accessoires",
+    "it": "Deambulatori, rollator e accessori",
+    "tr": "Yürüteçler, Rollatörler ve Aksesuarlar"
+  },
+  "Wall-Mounted Wine Racks": {
+    "de": "Wand-Weinregale",
+    "es": "Botelleros de pared",
+    "fr": "Casier à vin muraux",
+    "it": "Portabottiglie a parete",
+    "tr": "Duvara Monteli Şarap Rafları"
+  },
+  "Wallpaper Borders": {
+    "de": "Tapetenbordüren",
+    "es": "Cenefas de papel pintado",
+    "fr": "Frises de papier peint",
+    "it": "Bordi per carta da parati",
+    "tr": "Duvar Kağıdı Bordürleri"
+  },
+  "Wallpaper Hand Tools": {
+    "de": "Tapeten-Handwerkzeuge",
+    "es": "Herramientas manuales para papel pintado",
+    "fr": "Outils manuels pour papier peint",
+    "it": "Utensili manuali per carta da parati",
+    "tr": "Duvar Kağıdı El Aletleri"
+  },
+  "Waltzes": {
+    "de": "Walzer",
+    "es": "Valses",
+    "fr": "Valses",
+    "it": "Valzer",
+    "tr": "Valsler"
+  },
+  "War Fiction": {
+    "de": "Kriegsfiktion",
+    "es": "Ficción de guerra",
+    "fr": "Fiction de guerre",
+    "it": "Narrativa di guerra",
+    "tr": "Savaş Kurgu"
+  },
+  "Warhammer Game": {
+    "de": "Warhammer-Spiel",
+    "es": "Juego Warhammer",
+    "fr": "Jeu Warhammer",
+    "it": "Gioco Warhammer",
+    "tr": "Warhammer Oyunu"
+  },
+  "Warsaw Travel Guides": {
+    "de": "Reiseführer Warschau",
+    "es": "Guías de viaje de Varsovia",
+    "fr": "Guides de voyage Varsovie",
+    "it": "Guide di viaggio Varsavia",
+    "tr": "Varşova Seyahat Rehberleri"
+  },
+  "Washer Parts & Accessories": {
+    "de": "Waschmaschinen-Teile & Zubehör",
+    "es": "Piezas y accesorios de lavadora",
+    "fr": "Pièces et accessoires de lave-linge",
+    "it": "Parti e accessori lavatrice",
+    "tr": "Çamaşır Makinesi Parça ve Aksesuarları"
+  },
+  "Washers & Dryers": {
+    "de": "Waschmaschinen & Trockner",
+    "es": "Lavadoras y secadoras",
+    "fr": "Lave-linge et sèche-linge",
+    "it": "Lavatrici e asciugatrici",
+    "tr": "Çamaşır ve Kurutma Makineleri"
+  },
+  "Watch Accessories": {
+    "de": "Uhrenzubehör",
+    "es": "Accesorios para relojes",
+    "fr": "Accessoires pour montres",
+    "it": "Accessori per orologi",
+    "tr": "Saat Aksesuarları"
+  },
+  "Watch Winders": {
+    "de": "Uhrenbeweger",
+    "es": "Enrolladores de relojes",
+    "fr": "Remontoirs de montres",
+    "it": "Caricatori automatici orologi",
+    "tr": "Saat Kurma Cihazları"
+  },
+  "Water Bottles": {
+    "de": "Wasserflaschen",
+    "es": "Botellas de agua",
+    "fr": "Bouteilles d'eau",
+    "it": "Bottiglie d'acqua",
+    "tr": "Su Şişeleri"
+  },
+  "Water Garden & Pond Treatment": {
+    "de": "Wassergarten- & Teichpflege",
+    "es": "Tratamiento de jardín acuático y estanque",
+    "fr": "Traitement jardin aquatique et étang",
+    "it": "Trattamento giardino acquatico e stagno",
+    "tr": "Su Bahçesi ve Gölet Bakımı"
+  },
+  "Water Pump Accessories": {
+    "de": "Wasserpumpen-Zubehör",
+    "es": "Accesorios de bomba de agua",
+    "fr": "Accessoires de pompe à eau",
+    "it": "Accessori pompa acqua",
+    "tr": "Su Pompası Aksesuarları"
+  },
+  "Water Sports Accessories": {
+    "de": "Wassersport-Zubehör",
+    "es": "Accesorios de deportes acuáticos",
+    "fr": "Accessoires de sports nautiques",
+    "it": "Accessori sport acquatici",
+    "tr": "Su Sporları Aksesuarları"
+  },
+  "Waterskiing Equipment": {
+    "de": "Wasserski-Ausrüstung",
+    "es": "Equipo de esquí acuático",
+    "fr": "Équipement de ski nautique",
+    "it": "Attrezzatura sci nautico",
+    "tr": "Su Kayağı Ekipmanı"
+  },
+  "Waves & Wave Mechanics": {
+    "de": "Wellen & Wellenmechanik",
+    "es": "Ondas y mecánica ondulatoria",
+    "fr": "Ondes et mécanique des ondes",
+    "it": "Onde e meccanica ondulatoria",
+    "tr": "Dalgalar ve Dalga Mekaniği"
+  },
+  "Weatherproofing Products": {
+    "de": "Wetterschutzprodukte",
+    "es": "Productos de impermeabilización",
+    "fr": "Produits d'étanchéité",
+    "it": "Prodotti di impermeabilizzazione",
+    "tr": "Hava Yalıtım Ürünleri"
+  },
+  "Web Marketing": {
+    "de": "Web-Marketing",
+    "es": "Marketing web",
+    "fr": "Marketing web",
+    "it": "Web marketing",
+    "tr": "Web Pazarlama"
+  },
+  "Web Services": {
+    "de": "Webdienste",
+    "es": "Servicios web",
+    "fr": "Services web",
+    "it": "Servizi web",
+    "tr": "Web Hizmetleri"
+  },
+  "Web Slings": {
+    "de": "Gewebegurte",
+    "es": "Eslingas de tejido",
+    "fr": "Élingues en sangle",
+    "it": "Brache in tessuto",
+    "tr": "Dokuma Sapanlar"
+  },
+  "Weed Torches": {
+    "de": "Unkrautbrenner",
+    "es": "Antorchas para malezas",
+    "fr": "Désherbeurs thermiques",
+    "it": "Bruciatori per erbacce",
+    "tr": "Yabancı Ot Yakıcıları"
+  },
+  "Weight Loss Diets": {
+    "de": "Abnehmdiäten",
+    "es": "Dietas para adelgazar",
+    "fr": "Régimes minceur",
+    "it": "Diete dimagranti",
+    "tr": "Kilo Verme Diyetleri"
+  },
+  "Weight Loss Products": {
+    "de": "Abnehmprodukte",
+    "es": "Productos para adelgazar",
+    "fr": "Produits minceur",
+    "it": "Prodotti dimagranti",
+    "tr": "Kilo Verme Ürünleri"
+  },
+  "Welding Protective Equipment": {
+    "de": "Schweißschutzausrüstung",
+    "es": "Equipo de protección para soldadura",
+    "fr": "Équipement de protection soudage",
+    "it": "DPI per saldatura",
+    "tr": "Kaynak Koruyucu Ekipman"
+  },
+  "West African History": {
+    "de": "Geschichte Westafrikas",
+    "es": "Historia de África Occidental",
+    "fr": "Histoire de l'Afrique de l'Ouest",
+    "it": "Storia dell'Africa occidentale",
+    "tr": "Batı Afrika Tarihi"
+  },
+  "Wet Dog Food": {
+    "de": "Nasses Hundefutter",
+    "es": "Comida húmeda para perros",
+    "fr": "Nourriture humide pour chiens",
+    "it": "Cibo umido per cani",
+    "tr": "Yaş Köpek Maması"
+  },
+  "Wheel Alignment & Balancing Tools": {
+    "de": "Radausrichtungs- & Auswuchtwerkzeuge",
+    "es": "Herramientas de alineación y equilibrado",
+    "fr": "Outils d'alignement et d'équilibrage",
+    "it": "Attrezzi allineamento e equilibratura",
+    "tr": "Rot Balans ve Ayar Araçları"
+  },
+  "Wheel Hubs & Bearings": {
+    "de": "Radnaben & -lager",
+    "es": "Bujes y rodamientos de rueda",
+    "fr": "Moyeux et roulements de roue",
+    "it": "Mozzi e cuscinetti ruota",
+    "tr": "Tekerlek Göbekleri ve Rulmanları"
+  },
+  "Whiskey": {
+    "de": "Whiskey",
+    "es": "Whisky",
+    "fr": "Whisky",
+    "it": "Whisky",
+    "tr": "Viski"
+  },
+  "Whole Wheat Sandwich Bread": {
+    "de": "Vollkorn-Sandwichbrot",
+    "es": "Pan de sándwich integral",
+    "fr": "Pain de mie complet",
+    "it": "Pane per panini integrale",
+    "tr": "Tam Buğday Sandviç Ekmeği"
+  },
+  "Wii Headsets": {
+    "de": "Wii-Headsets",
+    "es": "Auriculares Wii",
+    "fr": "Casques Wii",
+    "it": "Cuffie Wii",
+    "tr": "Wii Kulaklıkları"
+  },
+  "Wii Memory": {
+    "de": "Wii-Speicher",
+    "es": "Memoria Wii",
+    "fr": "Mémoire Wii",
+    "it": "Memoria Wii",
+    "tr": "Wii Bellek"
+  },
+  "Wii U Batteries & Chargers": {
+    "de": "Wii-U-Akkus & Ladegeräte",
+    "es": "Baterías y cargadores Wii U",
+    "fr": "Batteries et chargeurs Wii U",
+    "it": "Batterie e caricabatterie Wii U",
+    "tr": "Wii U Batarya ve Şarj Cihazları"
+  },
+  "Window Gaskets": {
+    "de": "Fensterdichtungen",
+    "es": "Juntas de ventana",
+    "fr": "Joints de fenêtre",
+    "it": "Guarnizioni per finestre",
+    "tr": "Pencere Contaları"
+  },
+  "Window Hardware Rod Couplers": {
+    "de": "Fensterbeschlag-Stangenkupplungen",
+    "es": "Acopladores de varilla para herrajes de ventana",
+    "fr": "Coupleurs de tringle pour ferrures",
+    "it": "Giunti asta ferramenta finestra",
+    "tr": "Pencere Donanımı Çubuk Kaplinleri"
+  },
+  "Window Treatment Holdbacks": {
+    "de": "Fensterdekoration-Rückhalter",
+    "es": "Sujetadores de cortinas",
+    "fr": "Embrasses pour rideaux",
+    "it": "Fermatende",
+    "tr": "Pencere Dekoru Tutucuları"
+  },
+  "Window Treatments": {
+    "de": "Fensterdekorationen",
+    "es": "Tratamientos de ventana",
+    "fr": "Habillages de fenêtre",
+    "it": "Tende e decorazioni finestra",
+    "tr": "Pencere Dekorasyonları"
+  },
+  "Windows Registry": {
+    "de": "Windows-Registrierung",
+    "es": "Registro de Windows",
+    "fr": "Registre Windows",
+    "it": "Registro di Windows",
+    "tr": "Windows Kayıt Defteri"
+  },
+  "Windshield De-Icers": {
+    "de": "Windschutzscheiben-Enteiser",
+    "es": "Descongeladores de parabrisas",
+    "fr": "Dégivreurs de pare-brise",
+    "it": "Sbrinatori parabrezza",
+    "tr": "Cam Buz Çözücüler"
+  },
+  "Wine": {
+    "de": "Wein",
+    "es": "Vino",
+    "fr": "Vin",
+    "it": "Vino",
+    "tr": "Şarap"
+  },
+  "Wine Making Barrels": {
+    "de": "Weinherstellungsfässer",
+    "es": "Barriles para elaboración de vino",
+    "fr": "Fûts de vinification",
+    "it": "Botti per vinificazione",
+    "tr": "Şarap Yapım Fıçıları"
+  },
+  "Wine Stoppers & Pourers": {
+    "de": "Weinstopfen & Ausgießer",
+    "es": "Tapones y vertedores de vino",
+    "fr": "Bouchons et verseurs à vin",
+    "it": "Tappi e versatori per vino",
+    "tr": "Şarap Tıpaları ve Dökücüleri"
+  },
+  "Winter Products": {
+    "de": "Winterprodukte",
+    "es": "Productos de invierno",
+    "fr": "Produits d'hiver",
+    "it": "Prodotti invernali",
+    "tr": "Kış Ürünleri"
+  },
+  "Wire Rope Cutters": {
+    "de": "Drahtseilschneider",
+    "es": "Cortadores de cable de acero",
+    "fr": "Coupe-câbles métalliques",
+    "it": "Tagliacavi metallici",
+    "tr": "Çelik Halat Kesiciler"
+  },
+  "Wireless Microphones & Systems": {
+    "de": "Kabellose Mikrofone & Systeme",
+    "es": "Micrófonos y sistemas inalámbricos",
+    "fr": "Microphones et systèmes sans fil",
+    "it": "Microfoni e sistemi wireless",
+    "tr": "Kablosuz Mikrofonlar ve Sistemler"
+  },
+  "Witch & Wizard Mysteries": {
+    "de": "Hexen- & Zauberer-Krimis",
+    "es": "Misterios de brujas y magos",
+    "fr": "Mystères sorcières et sorciers",
+    "it": "Misteri di streghe e maghi",
+    "tr": "Cadı ve Büyücü Gizemleri"
+  },
+  "Witchcraft Religion & Spirituality": {
+    "de": "Hexenkunst Religion & Spiritualität",
+    "es": "Brujería religión y espiritualidad",
+    "fr": "Sorcellerie religion et spiritualité",
+    "it": "Stregoneria religione e spiritualità",
+    "tr": "Cadılık Din ve Maneviyat"
+  },
+  "WoD Mage": {
+    "de": "WoD Mage",
+    "es": "WoD Mage",
+    "fr": "WoD Mage",
+    "it": "WoD Mage",
+    "tr": "WoD Mage"
+  },
+  "Womens Anklets": {
+    "de": "Damen-Fußkettchen",
+    "es": "Tobilleras de mujer",
+    "fr": "Bracelets de cheville femme",
+    "it": "Cavigliere da donna",
+    "tr": "Kadın Ayak Bilezikleri"
+  },
+  "Womens Athletic Shoes": {
+    "de": "Damen-Sportschuhe",
+    "es": "Zapatillas deportivas de mujer",
+    "fr": "Chaussures de sport femme",
+    "it": "Scarpe sportive da donna",
+    "tr": "Kadın Spor Ayakkabıları"
+  },
+  "Womens Athletic Swimwear": {
+    "de": "Damen-Sportbadebekleidung",
+    "es": "Bañadores deportivos de mujer",
+    "fr": "Maillots de sport femme",
+    "it": "Costumi sportivi da donna",
+    "tr": "Kadın Spor Mayo"
+  },
+  "Womens Belts": {
+    "de": "Damen-Gürtel",
+    "es": "Cinturones de mujer",
+    "fr": "Ceintures femme",
+    "it": "Cinture da donna",
+    "tr": "Kadın Kemerleri"
+  },
+  "Womens Body Piercing Jewelry": {
+    "de": "Damen-Piercing-Schmuck",
+    "es": "Joyería de piercing de mujer",
+    "fr": "Bijoux de piercing femme",
+    "it": "Gioielli piercing da donna",
+    "tr": "Kadın Piercing Takıları"
+  },
+  "Womens Coin Purses & Pouches": {
+    "de": "Damen-Münzbörsen & Beutel",
+    "es": "Monederos y bolsitos de mujer",
+    "fr": "Porte-monnaie et pochettes femme",
+    "it": "Portamonete e borsellini da donna",
+    "tr": "Kadın Bozuk Para Cüzdanı ve Torbaları"
+  },
+  "Womens Cross Training Shoes": {
+    "de": "Damen-Cross-Training-Schuhe",
+    "es": "Zapatillas de cross training de mujer",
+    "fr": "Chaussures de cross training femme",
+    "it": "Scarpe cross training da donna",
+    "tr": "Kadın Cross Training Ayakkabıları"
+  },
+  "Womens Gloves & Mittens": {
+    "de": "Damen-Handschuhe & Fäustlinge",
+    "es": "Guantes y manoplas de mujer",
+    "fr": "Gants et mitaines femme",
+    "it": "Guanti e muffole da donna",
+    "tr": "Kadın Eldiven ve Mittenler"
+  },
+  "Womens Golf Shoes": {
+    "de": "Damen-Golfschuhe",
+    "es": "Zapatos de golf de mujer",
+    "fr": "Chaussures de golf femme",
+    "it": "Scarpe da golf da donna",
+    "tr": "Kadın Golf Ayakkabıları"
+  },
+  "Womens Gymnastics Clothing": {
+    "de": "Damen-Turnbekleidung",
+    "es": "Ropa de gimnasia de mujer",
+    "fr": "Vêtements de gymnastique femme",
+    "it": "Abbigliamento ginnastica da donna",
+    "tr": "Kadın Jimnastik Giyimi"
+  },
+  "Womens Hats & Caps": {
+    "de": "Damen-Hüte & Mützen",
+    "es": "Sombreros y gorras de mujer",
+    "fr": "Chapeaux et casquettes femme",
+    "it": "Cappelli e berretti da donna",
+    "tr": "Kadın Şapka ve Kapları"
+  },
+  "Womens Hiking & Trekking Shoes": {
+    "de": "Damen-Wander- & Trekkingschuhe",
+    "es": "Zapatos de senderismo y trekking de mujer",
+    "fr": "Chaussures de randonnée et trekking femme",
+    "it": "Scarpe hiking e trekking da donna",
+    "tr": "Kadın Yürüyüş ve Trekking Ayakkabıları"
+  },
+  "Womens Leggings": {
+    "de": "Damen-Leggings",
+    "es": "Leggings de mujer",
+    "fr": "Leggings femme",
+    "it": "Leggings da donna",
+    "tr": "Kadın Taytlar"
+  },
+  "Womens Mid-Calf Boots": {
+    "de": "Damen-Halbschaftstiefel",
+    "es": "Botas a media pantorrilla de mujer",
+    "fr": "Bottes mi-mollet femme",
+    "it": "Stivali a metà polpaccio da donna",
+    "tr": "Kadın Orta Baldır Botları"
+  },
+  "Womens Mules & Clogs": {
+    "de": "Damen-Mules & Clogs",
+    "es": "Mules y zuecos de mujer",
+    "fr": "Mules et sabots femme",
+    "it": "Mules e zoccoli da donna",
+    "tr": "Kadın Terlik ve Sabolar"
+  },
+  "Womens Oxfords": {
+    "de": "Damen-Oxfords",
+    "es": "Oxfords de mujer",
+    "fr": "Oxfords femme",
+    "it": "Oxford da donna",
+    "tr": "Kadın Oxford Ayakkabıları"
+  },
+  "Womens Promise Rings": {
+    "de": "Damen-Promise-Ringe",
+    "es": "Anillos de promesa de mujer",
+    "fr": "Bagues de promesse femme",
+    "it": "Anelli della promessa da donna",
+    "tr": "Kadın Söz Yüzükleri"
+  },
+  "Womens Shaving & Grooming Sets": {
+    "de": "Damen-Rasier- & Pflege-Sets",
+    "es": "Sets de afeitado y cuidado de mujer",
+    "fr": "Coffrets rasage et soins femme",
+    "it": "Kit rasatura e cura da donna",
+    "tr": "Kadın Tıraş ve Bakım Setleri"
+  },
+  "Womens Shaving Creams": {
+    "de": "Damen-Rasiercremes",
+    "es": "Cremas de afeitar de mujer",
+    "fr": "Crèmes de rasage femme",
+    "it": "Creme da barba da donna",
+    "tr": "Kadın Tıraş Kremleri"
+  },
+  "Womens Skullies & Beanies": {
+    "de": "Damen-Skullies & Beanies",
+    "es": "Gorros y beanies de mujer",
+    "fr": "Bonnets et beanies femme",
+    "it": "Berretti e beanies da donna",
+    "tr": "Kadın Bere ve Beaniler"
+  },
+  "Womens Slide Sandals": {
+    "de": "Damen-Slide-Sandalen",
+    "es": "Sandalias slide de mujer",
+    "fr": "Sandales slide femme",
+    "it": "Sandali slide da donna",
+    "tr": "Kadın Slide Sandaletler"
+  },
+  "Womens Stud Earrings": {
+    "de": "Damen-Ohrstecker",
+    "es": "Pendientes de botón de mujer",
+    "fr": "Boucles d'oreilles puces femme",
+    "it": "Orecchini a lobo da donna",
+    "tr": "Kadın Çivi Küpeler"
+  },
+  "Womens Sweaters": {
+    "de": "Damen-Pullover",
+    "es": "Jerseys de mujer",
+    "fr": "Pulls femme",
+    "it": "Maglioni da donna",
+    "tr": "Kadın Kazaklar"
+  },
+  "Womens Tunics": {
+    "de": "Damen-Tuniken",
+    "es": "Túnicas de mujer",
+    "fr": "Tuniques femme",
+    "it": "Tuniche da donna",
+    "tr": "Kadın Tunikler"
+  },
+  "Wood Carving Tools": {
+    "de": "Holzschnitzwerkzeuge",
+    "es": "Herramientas de tallado en madera",
+    "fr": "Outils de sculpture sur bois",
+    "it": "Utensili per intaglio legno",
+    "tr": "Ahşap Oyma Aletleri"
+  },
+  "Wood Drill Bit Sets": {
+    "de": "Holzbohrer-Sätze",
+    "es": "Juegos de brocas para madera",
+    "fr": "Coffrets de mèches à bois",
+    "it": "Kit punte per legno",
+    "tr": "Ahşap Matkap Ucu Setleri"
+  },
+  "Woodwind Instrument Cleaning & Care Products": {
+    "de": "Holzblasinstrument-Reinigungs- & Pflegeprodukte",
+    "es": "Productos de limpieza y cuidado de instrumentos de viento",
+    "fr": "Produits d'entretien instruments à vent",
+    "it": "Prodotti pulizia e cura fiati",
+    "tr": "Üflemeli Çalgı Temizlik ve Bakım Ürünleri"
+  },
+  "Wool Roving": {
+    "de": "Wollkammzug",
+    "es": "Mecha de lana",
+    "fr": "Mèche de laine",
+    "it": "Tops di lana",
+    "tr": "Yün Roving"
+  },
+  "Word Processing Books": {
+    "de": "Textverarbeitungsbücher",
+    "es": "Libros de procesamiento de textos",
+    "fr": "Livres de traitement de texte",
+    "it": "Libri di elaborazione testi",
+    "tr": "Kelime İşleme Kitapları"
+  },
+  "Wound Closure": {
+    "de": "Wundverschluss",
+    "es": "Cierre de heridas",
+    "fr": "Fermeture de plaies",
+    "it": "Chiusura ferite",
+    "tr": "Yara Kapatma"
+  },
+  "Wreaths": {
+    "de": "Kränze",
+    "es": "Coronas",
+    "fr": "Couronnes",
+    "it": "Ghirlande",
+    "tr": "Çelenkler"
+  },
+  "Wrestling Equipment": {
+    "de": "Ringkampf-Ausrüstung",
+    "es": "Equipo de lucha libre",
+    "fr": "Équipement de lutte",
+    "it": "Attrezzatura wrestling",
+    "tr": "Güreş Ekipmanı"
+  },
+  "Wrist Blood Pressure Monitors": {
+    "de": "Handgelenk-Blutdruckmessgeräte",
+    "es": "Tensiómetros de muñeca",
+    "fr": "Tensiomètres de poignet",
+    "it": "Misuratori pressione da polso",
+    "tr": "Bilek Tansiyon Aletleri"
+  },
+  "Writing Skill Reference": {
+    "de": "Schreibkompetenz-Nachschlagewerke",
+    "es": "Referencia de habilidades de escritura",
+    "fr": "Référence compétences d'écriture",
+    "it": "Riferimenti abilità di scrittura",
+    "tr": "Yazma Becerisi Referansı"
+  },
+  "Writing Supplies & Correction Supplies": {
+    "de": "Schreibwaren & Korrekturbedarf",
+    "es": "Material de escritura y corrección",
+    "fr": "Fournitures d'écriture et de correction",
+    "it": "Forniture scrittura e correzione",
+    "tr": "Yazı ve Düzeltme Malzemeleri"
+  },
+  "Xbox 360 Accessory Kits": {
+    "de": "Xbox-360-Zubehörkits",
+    "es": "Kits de accesorios Xbox 360",
+    "fr": "Kits d'accessoires Xbox 360",
+    "it": "Kit accessori Xbox 360",
+    "tr": "Xbox 360 Aksesuar Kitleri"
+  },
+  "Xbox 360 Cables & Adapters": {
+    "de": "Xbox-360-Kabel & Adapter",
+    "es": "Cables y adaptadores Xbox 360",
+    "fr": "Câbles et adaptateurs Xbox 360",
+    "it": "Cavi e adattatori Xbox 360",
+    "tr": "Xbox 360 Kablo ve Adaptörleri"
+  },
+  "Xbox 360 Downloadable Content": {
+    "de": "Xbox-360-Downloadinhalte",
+    "es": "Contenido descargable Xbox 360",
+    "fr": "Contenu téléchargeable Xbox 360",
+    "it": "Contenuti scaricabili Xbox 360",
+    "tr": "Xbox 360 İndirilebilir İçerik"
+  },
+  "Xbox One Batteries & Chargers": {
+    "de": "Xbox-One-Akkus & Ladegeräte",
+    "es": "Baterías y cargadores Xbox One",
+    "fr": "Batteries et chargeurs Xbox One",
+    "it": "Batterie e caricabatterie Xbox One",
+    "tr": "Xbox One Batarya ve Şarj Cihazları"
+  },
+  "Xbox One Memory": {
+    "de": "Xbox-One-Speicher",
+    "es": "Memoria Xbox One",
+    "fr": "Mémoire Xbox One",
+    "it": "Memoria Xbox One",
+    "tr": "Xbox One Bellek"
+  },
+  "Xbox Series X & S Accessories": {
+    "de": "Xbox-Series-X- & S-Zubehör",
+    "es": "Accesorios Xbox Series X y S",
+    "fr": "Accessoires Xbox Series X et S",
+    "it": "Accessori Xbox Series X e S",
+    "tr": "Xbox Series X ve S Aksesuarları"
+  },
+  "Xbox Series X & S Consoles": {
+    "de": "Xbox-Series-X- & S-Konsolen",
+    "es": "Consolas Xbox Series X y S",
+    "fr": "Consoles Xbox Series X et S",
+    "it": "Console Xbox Series X e S",
+    "tr": "Xbox Series X ve S Konsolları"
+  },
+  "Xbox Series X & S Games": {
+    "de": "Xbox-Series-X- & S-Spiele",
+    "es": "Juegos Xbox Series X y S",
+    "fr": "Jeux Xbox Series X et S",
+    "it": "Giochi Xbox Series X e S",
+    "tr": "Xbox Series X ve S Oyunları"
+  },
+  "Yard Signs": {
+    "de": "Gartenschilder",
+    "es": "Carteles de jardín",
+    "fr": "Panneaux de jardin",
+    "it": "Cartelli da giardino",
+    "tr": "Bahçe Tabelaları"
+  },
+  "Yoga Mat Straps": {
+    "de": "Yogamatten-Gurte",
+    "es": "Correas para esterilla de yoga",
+    "fr": "Sangles pour tapis de yoga",
+    "it": "Cinghie per tappetino yoga",
+    "tr": "Yoga Matı Askıları"
+  },
+  "Zener Diodes": {
+    "de": "Zenerdioden",
+    "es": "Diodos Zener",
+    "fr": "Diodes Zener",
+    "it": "Diodi Zener",
+    "tr": "Zener Diyotları"
+  }
+}
