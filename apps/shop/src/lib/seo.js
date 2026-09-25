@@ -45,17 +45,23 @@ export function absolutePublicUrl(market, locale, path = "") {
   return `${SITE_URL}${publicPath(market, locale, path)}`;
 }
 
-export function languageAlternates(market, pathForLocale) {
-  const resolvedMarket = normalizeMarket(market);
+/** hreflang that matches the one indexed URL for that language. English stays generic `en`. */
+export function hreflangForLocale(locale) {
+  const loc = normalizeLocale(locale);
+  if (loc === "en") return "en";
+  return `${loc}-${defaultMarketForLocale(loc).toUpperCase()}`;
+}
+
+export function languageAlternates(_market, pathForLocale) {
   const byLocale = Object.fromEntries(
     SEO_LOCALES.map((locale) => {
       const path =
         typeof pathForLocale === "function" ? pathForLocale(locale) : pathForLocale;
-      return [locale, absolutePublicUrl(resolvedMarket, locale, path)];
+      return [hreflangForLocale(locale), absolutePublicUrl(defaultMarketForLocale(locale), locale, path)];
     }),
   );
   byLocale["x-default"] = absolutePublicUrl(
-    resolvedMarket,
+    DEFAULT_MARKET,
     SEO_DEFAULT_LOCALE,
     typeof pathForLocale === "function"
       ? pathForLocale(SEO_DEFAULT_LOCALE)
@@ -208,10 +214,10 @@ export function buildPageMetadata({
   noIndex = false,
 }) {
   const loc = normalizeLocale(locale);
-  const mkt = normalizeMarket(market);
+  void market;
   const canonicalPath =
     typeof pathForLocale === "function" ? pathForLocale(loc) : path || "";
-  const canonical = absolutePublicUrl(mkt, loc, canonicalPath);
+  const canonical = absolutePublicUrl(defaultMarketForLocale(loc), loc, canonicalPath);
   const titleText =
     title && typeof title === "object" && title.absolute != null
       ? String(title.absolute)

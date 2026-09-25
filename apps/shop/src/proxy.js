@@ -5,14 +5,27 @@ import {
   parseMarketPath,
   DEFAULT_CURRENCY,
   DEFAULT_MARKET,
+  defaultLocaleForMarket,
   isValidCurrency,
   isValidLocale,
   isValidMarket,
   marketPrefix,
 } from "./lib/shop-market";
 
+const MARKET_COOKIE = "andertal_market_v2";
+
+function rememberMarket(response, mp) {
+  response.cookies.set("andertal_market_prefix", "", { path: "/", maxAge: 0 });
+  response.cookies.set(MARKET_COOKIE, mp, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
 function marketTripleFromCookie(request) {
-  const raw = (request.cookies.get("andertal_market_prefix")?.value || "").trim();
+  const raw = (request.cookies.get(MARKET_COOKIE)?.value || "").trim();
   if (!raw.startsWith("/")) return null;
   return parseMarketPath(raw);
 }
@@ -157,12 +170,7 @@ export default function proxy(request) {
       u.pathname = canonicalPath;
       const redirectRes = NextResponse.redirect(u);
       try {
-        redirectRes.cookies.set("andertal_market_prefix", mp, {
-          path: "/",
-          maxAge: 60 * 60 * 24 * 365,
-          sameSite: "lax",
-          secure: process.env.NODE_ENV === "production",
-        });
+        rememberMarket(redirectRes, mp);
         if (triple.currency && isValidCurrency(triple.currency)) {
           redirectRes.cookies.set("andertal_currency", triple.currency.toLowerCase(), {
             path: "/",
@@ -191,14 +199,7 @@ export default function proxy(request) {
     const rewriteRes = NextResponse.rewrite(rewriteUrl, {
       request: { headers: requestHeaders },
     });
-    try {
-      rewriteRes.cookies.set("andertal_market_prefix", mp, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      });
-    } catch (_) {}
+    rewriteRes.headers.set("CDN-Cache-Control", "public, max-age=120, stale-while-revalidate=600");
     return rewriteRes;
   }
 
@@ -223,16 +224,7 @@ export default function proxy(request) {
       if (curCookie && isValidCurrency(curCookie)) {
         requestHeaders.set("x-andertal-currency", curCookie);
       }
-      const flightRes = NextResponse.next({ request: { headers: requestHeaders } });
-      try {
-        flightRes.cookies.set("andertal_market_prefix", mp, {
-          path: "/",
-          maxAge: 60 * 60 * 24 * 365,
-          sameSite: "lax",
-          secure: process.env.NODE_ENV === "production",
-        });
-      } catch (_) {}
-      return flightRes;
+      return NextResponse.next({ request: { headers: requestHeaders } });
     }
 
     const destPath =
@@ -240,12 +232,7 @@ export default function proxy(request) {
     const dest = new URL(destPath, request.url);
     const redirectRes = NextResponse.redirect(dest);
     try {
-      redirectRes.cookies.set("andertal_market_prefix", mp, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      });
+      rememberMarket(redirectRes, mp);
     } catch (_) {}
     return redirectRes;
   }
@@ -258,21 +245,14 @@ export default function proxy(request) {
       return NextResponse.redirect(new URL(mp + "/", request.url));
     }
 
-    // 2. Language from browser only (not from geo).
-    const locale = localeFromAcceptLanguage(request) || DEFAULT_LOCALE;
-
-    // 3. Market (country segment) from geo IP; fallback default shop market.
+    // Country from IP, language from that country. A visitor in Germany gets /de/de.
     const market = marketFromGeoRequest(request) || DEFAULT_MARKET;
+    const locale = defaultLocaleForMarket(market);
 
     const mp = marketPrefix(market, locale, DEFAULT_CURRENCY);
     const redirectRes = NextResponse.redirect(new URL(mp + "/", request.url));
     try {
-      redirectRes.cookies.set("andertal_market_prefix", mp, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-      });
+      rememberMarket(redirectRes, mp);
     } catch (_) {}
     return redirectRes;
   }

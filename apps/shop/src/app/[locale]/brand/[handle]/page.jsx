@@ -11,6 +11,7 @@ import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { SITE_URL } from "@/lib/seo";
+import { canonicalMarketPrefix } from "@/lib/shop-market";
 import {
   SORT_OPTIONS,
   PER_PAGE,
@@ -641,7 +642,7 @@ export default function BrandPage() {
   /* ── Canonical (market-aware public URL) ── */
   useEffect(() => {
     if (typeof document === "undefined" || !brand?.handle) return;
-    const prefix = (marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`;
+    const prefix = canonicalMarketPrefix(locale);
     let el = document.querySelector('link[rel="canonical"]');
     if (!el) { el = document.createElement("link"); el.rel = "canonical"; document.head.appendChild(el); }
     el.href = `${SITE_URL}${prefix}/brand/${brand.handle}`;

@@ -13,6 +13,7 @@ import { resolveImageUrl } from "@/lib/image-url";
 import { colorSwatchFallback } from "@/lib/color-swatch";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { SITE_URL } from "@/lib/seo";
+import { canonicalMarketPrefix } from "@/lib/shop-market";
 import { localizedProductMediaList, variantImageUrlForLocale, variantMediaForLocale, variantLocaleContent } from "@/lib/product-locale-media";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 import { categoryPathQuery } from "@/lib/store-categories-url";
@@ -1221,7 +1222,7 @@ export default function ProductTemplateMobile() {
     if (typeof document === "undefined" || !product) return;
     const pathSlug = storefrontProductHandle(product, locale);
     if (!pathSlug) return;
-    const prefix = (marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`;
+    const prefix = canonicalMarketPrefix(locale);
     const href = `${SITE_URL}${prefix}/${pathSlug}`;
     let link = document.querySelector('link[rel="canonical"]');
     if (!link) {

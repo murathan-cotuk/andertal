@@ -1,11 +1,12 @@
 import {
   SEO_DEFAULT_LOCALE,
-  SEO_DEFAULT_MARKET,
   SEO_LOCALES,
   SITE_URL,
+  hreflangForLocale,
   productHandleForLocale,
   publicPath,
 } from "@/lib/seo";
+import { defaultMarketForLocale } from "@/lib/shop-market";
 import { fetchEnabledShopLocales } from "@/lib/enabled-shop-locales";
 
 export const revalidate = 3600;
@@ -33,18 +34,18 @@ function urlEntry(pathForLocale, lastmod, changefreq = "weekly", priority = "0.7
     typeof pathForLocale === "function"
       ? pathForLocale(defaultLocale)
       : pathForLocale;
-  const loc = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, defaultLocale, defaultPath)}`;
+  const loc = `${SITE_URL}${publicPath(defaultMarketForLocale(defaultLocale), defaultLocale, defaultPath)}`;
   const alternates = list.map((locale) => {
     const path =
       typeof pathForLocale === "function" ? pathForLocale(locale) : pathForLocale;
-    const href = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, locale, path)}`;
-    return `    <xhtml:link rel="alternate" hreflang="${locale}" href="${escapeXml(href)}"/>`;
+    const href = `${SITE_URL}${publicPath(defaultMarketForLocale(locale), locale, path)}`;
+    return `    <xhtml:link rel="alternate" hreflang="${hreflangForLocale(locale)}" href="${escapeXml(href)}"/>`;
   }).join("\n");
   const xDefaultPath =
     typeof pathForLocale === "function"
       ? pathForLocale(defaultLocale)
       : pathForLocale;
-  const xDefault = `${SITE_URL}${publicPath(SEO_DEFAULT_MARKET, defaultLocale, xDefaultPath)}`;
+  const xDefault = `${SITE_URL}${publicPath(defaultMarketForLocale(defaultLocale), defaultLocale, xDefaultPath)}`;
   return `  <url>
     <loc>${escapeXml(loc)}</loc>
     <lastmod>${escapeXml(lastmod)}</lastmod>

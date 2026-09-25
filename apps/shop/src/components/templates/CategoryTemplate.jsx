@@ -27,6 +27,7 @@ import LandingContainers from "@/components/landing/LandingContainers";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { SITE_URL, categorySeoFallback } from "@/lib/seo";
+import { canonicalMarketPrefix } from "@/lib/shop-market";
 import CustomCheckbox from "../ui/CustomCheckbox";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
@@ -1146,7 +1147,7 @@ export default function CategoryTemplate() {
 
   useEffect(() => {
     if (typeof document === "undefined" || !slug) return;
-    const prefix = (marketPrefixVal || "").replace(/\/$/, "") || `/${(locale || "de").toLowerCase()}`;
+    const prefix = canonicalMarketPrefix(locale);
     let el = document.querySelector('link[rel="canonical"]');
     if (!el) {
       el = document.createElement("link");

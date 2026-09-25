@@ -114,6 +114,12 @@ export function parseMarketPath(pathname) {
   return { country, lang, currency, rest };
 }
 
+/** One public URL per language, so Google does not split the same page across /us/en, /tr/tr, /at/de. */
+export function canonicalMarketPrefix(locale) {
+  const lang = String(locale || "de").toLowerCase();
+  return marketPrefix(defaultMarketForLocale(lang), lang);
+}
+
 /** Public storefront prefix (two segments). Third argument ignored — kept for call-site compatibility. */
 export function marketPrefix(country, lang, _currency) {
   void _currency;
