@@ -20,6 +20,7 @@ import {
   Modal,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import NotFoundDefaultPreview from "./NotFoundDefaultPreview";
 import { showToast } from "@/lib/toast";
 import {
   mergeLoadedShopStyles,
@@ -1784,7 +1785,7 @@ export default function StylesPage() {
                     />
                   )
                 ) : (
-                  <div style={{ width: 120, height: 120, borderRadius: 8, border: "1px dashed #d1d5db", background: "#f9fafb" }} />
+                  <NotFoundDefaultPreview />
                 )}
                 <BlockStack gap="150">
                   <Button size="slim" onClick={() => setNotFoundPickerOpen(true)}>
