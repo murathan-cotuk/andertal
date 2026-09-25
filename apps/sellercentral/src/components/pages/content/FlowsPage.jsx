@@ -1172,18 +1172,7 @@ const TRIGGER_GROUPS = [
   { id: "marketing", keys: ["abandoned_cart", "review_request", "win_back", "customer_birthday", "favorite_low_stock", "favorite_price_drop"] },
 ];
 
-const TRIGGER_CATEGORY = new Map();
-for (const g of TRIGGER_GROUPS) {
-  for (const k of g.keys) TRIGGER_CATEGORY.set(k, g.id);
-}
-
-const FLOW_LIST_GROUP_IDS = [...TRIGGER_GROUPS.map((g) => g.id), "other"];
-
-function listCategoryForFlow(flow) {
-  const fromApi = String(flow?.category || "").trim();
-  if (fromApi && fromApi !== "other") return fromApi;
-  return TRIGGER_CATEGORY.get(String(flow?.trigger || "").trim()) || "other";
-}
+const AUDIENCE_GROUP_IDS = ["customer", "seller", "admin"];
 
 function groupedTriggerOptions(flatOptions, allowedSet, titles) {
   const byValue = new Map(flatOptions.map((o) => [o.value, o]));
@@ -1220,8 +1209,6 @@ export default function FlowsPage() {
     () => Object.entries(t.triggers).map(([value, label]) => ({ label, value })),
     [t],
   );
-  const sellerTriggerValues = useMemo(() => new Set(["seller_signup", "seller_docs_submitted", "seller_verification_approved", "seller_verification_rejected", "seller_documents_required", "order_placed", "order_processing", "order_shipped", "order_delivered", "return_requested", "return_requested_customer_ships", "seller_new_customer_message", "seller_support_ticket_sent", "seller_support_ticket_replied", "seller_support_case_updated"]), []);
-
   const triggerGroupTitles = useMemo(() => ({
     orders: t.triggerGroupOrders,
     returns: t.triggerGroupReturns,
@@ -1241,15 +1228,15 @@ export default function FlowsPage() {
   const [stepTemplateLang, setStepTemplateLang] = useState({});
   const [translateBusyIdx, setTranslateBusyIdx] = useState(null);
 
-  const triggerOptionsForCreate = useMemo(() => {
-    const allowed = newAudience === "seller" ? sellerTriggerValues : null;
-    return groupedTriggerOptions(allTriggerOptions, allowed, triggerGroupTitles);
-  }, [allTriggerOptions, newAudience, sellerTriggerValues, triggerGroupTitles]);
+  const triggerOptionsForCreate = useMemo(
+    () => groupedTriggerOptions(allTriggerOptions, null, triggerGroupTitles),
+    [allTriggerOptions, triggerGroupTitles],
+  );
 
-  const triggerOptionsForEdit = useMemo(() => {
-    const allowed = editAudience === "seller" ? sellerTriggerValues : null;
-    return groupedTriggerOptions(allTriggerOptions, allowed, triggerGroupTitles);
-  }, [allTriggerOptions, editAudience, sellerTriggerValues, triggerGroupTitles]);
+  const triggerOptionsForEdit = useMemo(
+    () => groupedTriggerOptions(allTriggerOptions, null, triggerGroupTitles),
+    [allTriggerOptions, triggerGroupTitles],
+  );
 
   const statusEditOptions = [
     { label: t.statuses.draft, value: "draft" },
@@ -1315,23 +1302,28 @@ export default function FlowsPage() {
   }, [flows, flowAudienceFilter]);
 
   const groupedFilteredFlows = useMemo(() => {
-    const buckets = new Map(FLOW_LIST_GROUP_IDS.map((id) => [id, []]));
+    const buckets = new Map(AUDIENCE_GROUP_IDS.map((id) => [id, []]));
+    const titles = {
+      customer: t.filterCustomer,
+      seller: t.filterSeller,
+      admin: t.filterAdmin,
+    };
     for (const flow of filteredFlows) {
-      const cat = listCategoryForFlow(flow);
-      const key = buckets.has(cat) ? cat : "other";
+      const aud = String(flow.audience || "customer").toLowerCase();
+      const key = buckets.has(aud) ? aud : "customer";
       buckets.get(key).push(flow);
     }
     for (const list of buckets.values()) {
       list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }));
     }
-    return FLOW_LIST_GROUP_IDS
+    return AUDIENCE_GROUP_IDS
       .filter((id) => buckets.get(id).length)
       .map((id) => ({
         id,
-        title: triggerGroupTitles[id] || id,
+        title: titles[id],
         flows: buckets.get(id),
       }));
-  }, [filteredFlows, triggerGroupTitles]);
+  }, [filteredFlows, t.filterCustomer, t.filterSeller, t.filterAdmin]);
 
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState("");
@@ -1674,18 +1666,6 @@ export default function FlowsPage() {
       setTestSendingStepIdx(null);
     }
   };
-
-  useEffect(() => {
-    if (newAudience === "seller" && !sellerTriggerValues.has(newTrigger)) {
-      setNewTrigger("order_placed");
-    }
-  }, [newAudience, newTrigger, sellerTriggerValues]);
-
-  useEffect(() => {
-    if (editAudience === "seller" && !sellerTriggerValues.has(editTrigger)) {
-      setEditTrigger("order_placed");
-    }
-  }, [editAudience, editTrigger, sellerTriggerValues]);
 
   const patchEditStep = (idx, patch) => {
     setEditSteps((prev) =>

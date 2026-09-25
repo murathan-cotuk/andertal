@@ -980,6 +980,7 @@ export default function CategoryTemplate() {
   const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
   const [mobileDrawerTab, setMobileDrawerTab] = useState("categories");
   const [metafieldDefinitions, setMetafieldDefinitions] = useState({});
+  const [landingSettings, setLandingSettings] = useState({ show_product_filter_bar: true });
 
   const bodyRef = useRef(null);
 
@@ -1095,7 +1096,7 @@ export default function CategoryTemplate() {
   const catBannerStyle  = tmpl.banner_style || "strip";
   const catBannerPreset = CAT_BANNER_PRESETS[catBannerStyle] || CAT_BANNER_PRESETS.strip;
   const showCatBanner   = catBannerStyle !== "none" && (!!bannerUrl || !!bannerVideoUrl);
-  const showSidebar     = tmpl.show_sidebar !== false;
+  const showSidebar     = tmpl.show_sidebar !== false && landingSettings.show_product_filter_bar !== false;
   const sidebarWidth    = tmpl.sidebar_width || "280px";
   const colsPerRow      = Number(tmpl.products_per_row) || 4;
   const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;
@@ -1260,8 +1261,12 @@ export default function CategoryTemplate() {
   }
 
   return (
-    <>
-      {showCatBanner ? (
+    <LandingContainers
+      categoryId={String(category.id)}
+      applyCatalogDefaults
+      onSettingsChange={setLandingSettings}
+      catalogSlots={{
+        page_banner: showCatBanner ? (
         <HeroBanner $aspect={catBannerPreset.aspectRatio} $minH={catBannerPreset.minHeight} $maxH={catBannerPreset.maxHeight}>
           {bannerVideoUrl ? (
             <video autoPlay muted loop playsInline src={bannerVideoUrl} />
@@ -1276,10 +1281,9 @@ export default function CategoryTemplate() {
         <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <h1 className="shop-typo-catalog-title">{displayTitle}</h1>
         </ColHeader>
-      )}
-
-      {category?.id ? <LandingContainers categoryId={String(category.id)} /> : null}
-
+      ),
+        product_container: (
+          <>
       <SortBar>
         <SortBarInner>
           <SortBarLeft>
@@ -1690,12 +1694,14 @@ export default function CategoryTemplate() {
           )}
         </Body>
       </ContentWrap>
-
-      {richtextHtml ? (
+          </>
+        ),
+        page_richtext: richtextHtml ? (
         <RichtextStrip style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <Desc $divider={false} $align={richtextAlign} $maxWidth={richtextMaxW} dangerouslySetInnerHTML={{ __html: richtextHtml }} />
         </RichtextStrip>
-      ) : null}
-    </>
+      ) : null,
+      }}
+    />
   );
 }

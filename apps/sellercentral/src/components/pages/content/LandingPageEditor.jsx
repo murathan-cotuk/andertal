@@ -39,6 +39,7 @@ import {
 } from "@/components/pages/content/ContainerTypePreview";
 import { groupContainerTypes } from "@/lib/landing-container-catalog";
 import { templatesForLibrary } from "@/lib/landing-template-registry";
+import { resolveCatalogLandingContainers } from "@/lib/catalog-landing-layout";
 import {
   MAX_LANDING_CONTAINER_DEPTH,
   mapContainerById,
@@ -252,13 +253,16 @@ function normalizePopupConfig(raw) {
   };
 }
 
-function normalizeLandingPageSettings(raw) {
+function normalizeLandingPageSettings(raw, opts = {}) {
   const s = raw && typeof raw === "object" ? raw : {};
+  const catalogPage = opts.catalogPage === true;
   return {
     ...s,
     show_submenu_left: s.show_submenu_left === true,
     show_filter_bar: s.show_filter_bar !== false,
-    show_product_filter_bar: s.show_product_filter_bar === true,
+    show_product_filter_bar: catalogPage
+      ? s.show_product_filter_bar !== false
+      : s.show_product_filter_bar === true,
     second_nav_desktop_classic: s.second_nav_desktop_classic === true,
     page_padding_top: s.page_padding_top || "",
     popup: normalizePopupConfig(s.popup),
@@ -4121,6 +4125,11 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "support_topic_grid":        editor = <SupportTopicGridEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "support_faq":               editor = <SupportFaqEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "layout_section":       editor = <LayoutSectionEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
+    case "page_banner":
+    case "product_container":
+    case "page_richtext":
+      editor = <CatalogSlotEditor type={container.type} />;
+      break;
     default: return null;
   }
   return (
@@ -4135,12 +4144,22 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
   );
 }
 
+function CatalogSlotEditor({ type }) {
+  const c = useLandingCopy();
+  const help =
+    type === "page_banner" ? c.pageBannerHelp
+      : type === "product_container" ? c.productContainerHelp
+        : c.pageRichtextHelp;
+  return <Text as="p" variant="bodySm">{help}</Text>;
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 const DEFAULT_PAGE_ID = "__default__"; // shop homepage (legacy single-row table)
 // Sentinel shown in "Seite auswählen" for the categories group — picking it never selects a real
 // category itself, it just reveals the CategoryDrilldownSelect (tree) next to it. This keeps the
 // flat, unwieldy list of every category out of the main page picker.
 const CATEGORY_PICKER_VALUE = "cat:__picker__";
+const COLLECTION_PICKER_VALUE = "col:__picker__";
 
 const TEMPLATE_DEFAULTS = {
   collection_template: {
@@ -4463,8 +4482,6 @@ export default function LandingPageEditor() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [saveKind, setSaveKind] = useState("draft");
-  const [hasUnpublishedDraft, setHasUnpublishedDraft] = useState(false);
   const [err, setErr] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
@@ -4480,6 +4497,8 @@ export default function LandingPageEditor() {
   // True while the "Kategorie" sentinel is picked in "Seite auswählen" but no concrete category
   // has been chosen in the tree yet — keeps the tree dropdown visible during that gap.
   const [categoryPickerActive, setCategoryPickerActive] = useState(false);
+  const [collectionPickerActive, setCollectionPickerActive] = useState(false);
+  const [collectionRows, setCollectionRows] = useState([]);
   const [categorySettings, setCategorySettings] = useState({ show_submenu_left: false });
 
   useEffect(() => {
@@ -4488,8 +4507,9 @@ export default function LandingPageEditor() {
       Promise.all([
         client.getPages({ limit: 200 }),
         client.getAdminHubCategories().catch(() => ({ categories: [] })),
+        client.getMedusaCollections({ adminHub: true }).catch(() => ({ collections: [] })),
       ])
-        .then(([r, catRes]) => {
+        .then(([r, catRes, colRes]) => {
           if (cancelled) return;
           const list = Array.isArray(r?.pages) ? r.pages : [];
           setPages(list);
@@ -4505,10 +4525,12 @@ export default function LandingPageEditor() {
             });
           })(treeArr);
           setCategoriesFlat(rawFlat);
+          setCollectionRows(Array.isArray(colRes?.collections) ? colRes.collections : []);
         })
         .catch((e) => {
           if (cancelled) return;
           setPages([]);
+          setCollectionRows([]);
           setErr(copy.loadPagesError + ": " + (e?.message || copy.saveError));
         });
     load();
@@ -4526,22 +4548,26 @@ export default function LandingPageEditor() {
     setErr("");
     try {
       let data;
+      const catalogPage = String(pageId).startsWith("cat:") || String(pageId).startsWith("col:");
       if (pageId === DEFAULT_PAGE_ID) {
         data = await client.request("/admin-hub/landing-page");
         setCategorySettings(normalizeLandingPageSettings(data?.settings));
       } else if (String(pageId).startsWith("cat:")) {
         const cid = String(pageId).slice(4);
         data = await client.getLandingPageCategoryContainers(cid);
-        setCategorySettings(normalizeLandingPageSettings(data?.settings));
+        setCategorySettings(normalizeLandingPageSettings(data?.settings, { catalogPage: true }));
+      } else if (String(pageId).startsWith("col:")) {
+        const cid = String(pageId).slice(4);
+        data = await client.getLandingPageCollectionContainers(cid);
+        setCategorySettings(normalizeLandingPageSettings(data?.settings, { catalogPage: true }));
       } else {
         data = await client.getLandingPageContainers(pageId);
         setCategorySettings(normalizeLandingPageSettings(data?.settings));
       }
-      setContainers(Array.isArray(data?.containers) ? data.containers : []);
-      setHasUnpublishedDraft(data?.has_unpublished_draft === true);
+      const raw = Array.isArray(data?.containers) ? data.containers : [];
+      setContainers(catalogPage ? resolveCatalogLandingContainers(raw, data?.settings) : raw);
     } catch (e) {
       setContainers([]);
-      setHasUnpublishedDraft(false);
       setCategorySettings(normalizeLandingPageSettings({}));
       setErr(e?.message || copy.loadContainersError);
     }
@@ -4571,42 +4597,35 @@ export default function LandingPageEditor() {
     return selectedPageId;
   }, [selectedPageId, pages]);
 
-  const persistLanding = useCallback(async (mode) => {
+  const persistLanding = useCallback(async () => {
     if (!selectedPageId) return;
-    const publish = mode === true || mode === "publish";
-    const discard = mode === "discard";
     setSaving(true);
     setErr("");
     setSaved(false);
     try {
+      const catalogPage = String(selectedPageId).startsWith("cat:") || String(selectedPageId).startsWith("col:");
       const payload = {
         containers,
-        settings: categorySettings,
-        publish,
-        discard_draft: discard,
+        settings: catalogPage
+          ? { ...categorySettings, catalog_layout: "containers" }
+          : categorySettings,
+        publish: true,
       };
-      let data;
       if (selectedPageId === DEFAULT_PAGE_ID) {
-        data = await client.request("/admin-hub/landing-page", {
+        await client.request("/admin-hub/landing-page", {
           method: "PUT",
           body: JSON.stringify(payload),
         });
       } else if (String(selectedPageId).startsWith("cat:")) {
         const cid = String(selectedPageId).slice(4);
-        data = await client.saveLandingPageCategoryContainers(cid, payload);
+        await client.saveLandingPageCategoryContainers(cid, payload);
+      } else if (String(selectedPageId).startsWith("col:")) {
+        const cid = String(selectedPageId).slice(4);
+        await client.saveLandingPageCollectionContainers(cid, payload);
       } else {
         const pageId = resolveSavePageId();
         if (!pageId) throw new Error(copy.loadContainersError);
-        data = await client.saveLandingPageContainers(pageId, payload);
-      }
-      if (discard) {
-        setContainers(Array.isArray(data?.containers) ? data.containers : []);
-        setCategorySettings(normalizeLandingPageSettings(data?.settings));
-        setSaveKind("discarded");
-        setHasUnpublishedDraft(false);
-      } else {
-        setSaveKind(publish ? "published" : "draft");
-        setHasUnpublishedDraft(!publish);
+        await client.saveLandingPageContainers(pageId, payload);
       }
       setSaved(true);
       setIsDirty(false);
@@ -4617,9 +4636,7 @@ export default function LandingPageEditor() {
     setSaving(false);
   }, [selectedPageId, containers, categorySettings, client, resolveSavePageId, copy.loadContainersError, copy.saveError]);
 
-  const handleSave = useCallback(() => persistLanding(false), [persistLanding]);
-  const handlePublish = useCallback(() => persistLanding("publish"), [persistLanding]);
-  const handleDiscardDraft = useCallback(() => persistLanding("discard"), [persistLanding]);
+  const handleSave = useCallback(() => persistLanding(), [persistLanding]);
 
   const handleApplyHomepageComposition = useCallback(async () => {
     setSaving(true);
@@ -4632,7 +4649,6 @@ export default function LandingPageEditor() {
       setContainers(data.containers);
       setCategorySettings((prev) => ({ ...prev, ...(data.settings || {}) }));
       setIsDirty(true);
-      setHasUnpublishedDraft(true);
       setExpandedId(null);
     } catch (e) {
       setErr(e?.message || copy.saveError);
@@ -4842,6 +4858,12 @@ export default function LandingPageEditor() {
         : [],
     },
     {
+      title: copy.collectionsHeading,
+      options: collectionRows.length
+        ? [{ label: copy.collection, value: COLLECTION_PICKER_VALUE }]
+        : [],
+    },
+    {
       title: stripHeadingDashes(copy.cmsPagesHeading),
       options: cmsPages.map((p) => ({ label: `${p.title || copy.defaultPage} (/${p.slug || p.id})`, value: String(p.id) })),
     },
@@ -4864,13 +4886,14 @@ export default function LandingPageEditor() {
     },
   ];
   const isCategorySelection = String(selectedPageId).startsWith("cat:");
+  const isCollectionSelection = String(selectedPageId).startsWith("col:");
   const isApiSelection = String(selectedPageId).startsWith("api:");
   const isProductPageSelection = selectedPageId === "__product_page__";
   // The customer-support landing (docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md) is a normal CMS
   // page identified only by its slug — support_* container types only make sense there, so the
   // picker (below) hides that group everywhere else (homepage/CMS/category/blog/product page).
   const isSupportPageSelection =
-    !isCategorySelection && !isApiSelection && !isProductPageSelection &&
+    !isCategorySelection && !isCollectionSelection && !isApiSelection && !isProductPageSelection &&
     pages.find((p) => String(p.id) === String(selectedPageId))?.slug === "customer-support";
   // Picker: hide the "support" catalog group (support_hero/case_wizard/topic_grid/faq) everywhere
   // except the customer-support page itself — those types render nothing useful anywhere else.
@@ -4928,31 +4951,15 @@ export default function LandingPageEditor() {
         loading: tmplSaving,
         disabled: !tmplDirty,
       } : {
-        content: saving ? copy.saving : copy.saveDraft,
+        content: saving ? copy.saving : copy.save,
         onAction: handleSave,
         loading: saving,
         disabled: !showContainerEditor,
       }}
-      secondaryActions={mainTab === 0 && showContainerEditor ? [{
-        content: copy.publish,
-        onAction: handlePublish,
-        disabled: saving,
-      }] : undefined}
     >
       <Layout>
         {err && <Layout.Section><Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner></Layout.Section>}
-        {saved && <Layout.Section><Banner tone="success" onDismiss={() => setSaved(false)}>{saveKind === "published" ? copy.published : saveKind === "discarded" ? copy.discardedDraft : copy.saved}</Banner></Layout.Section>}
-        {hasUnpublishedDraft && !saved && mainTab === 0 && (
-          <Layout.Section>
-            <Banner
-              tone="info"
-              action={{ content: copy.publish, onAction: handlePublish }}
-              secondaryAction={{ content: copy.discardDraft, onAction: handleDiscardDraft }}
-            >
-              {copy.unpublishedDraftBanner}
-            </Banner>
-          </Layout.Section>
-        )}
+        {saved && <Layout.Section><Banner tone="success" onDismiss={() => setSaved(false)}>{copy.published}</Banner></Layout.Section>}
         {tmplErr && <Layout.Section><Banner tone="critical" onDismiss={() => setTmplErr("")}>{tmplErr}</Banner></Layout.Section>}
         {tmplSaved && <Layout.Section><Banner tone="success" onDismiss={() => setTmplSaved(false)}>{copy.templateSaved}</Banner></Layout.Section>}
 
@@ -4978,16 +4985,31 @@ export default function LandingPageEditor() {
                     label={copy.pageLabel}
                     labelHidden
                     sections={pageSections}
-                    value={(categoryPickerActive || isCategorySelection) ? CATEGORY_PICKER_VALUE : selectedPageId}
+                    value={
+                      (categoryPickerActive || isCategorySelection)
+                        ? CATEGORY_PICKER_VALUE
+                        : (collectionPickerActive || isCollectionSelection)
+                          ? COLLECTION_PICKER_VALUE
+                          : selectedPageId
+                    }
                     onChange={(v) => {
                       if (!v) return;
                       if (v === CATEGORY_PICKER_VALUE) {
                         setCategoryPickerActive(true);
+                        setCollectionPickerActive(false);
+                        setSelectedPageId("");
+                        setExpandedId(null);
+                        return;
+                      }
+                      if (v === COLLECTION_PICKER_VALUE) {
+                        setCollectionPickerActive(true);
+                        setCategoryPickerActive(false);
                         setSelectedPageId("");
                         setExpandedId(null);
                         return;
                       }
                       setCategoryPickerActive(false);
+                      setCollectionPickerActive(false);
                       setSelectedPageId(v);
                       setExpandedId(null);
                       setActiveTab(0);
@@ -5011,6 +5033,28 @@ export default function LandingPageEditor() {
                       }}
                       noneLabel={copy.chooseCategory}
                       placeholder={copy.chooseCategoryPh}
+                    />
+                  </div>
+                )}
+                {(collectionPickerActive || isCollectionSelection) && (
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <SearchableSelect
+                      label={copy.collection}
+                      labelHidden
+                      options={collectionRows.map((row) => ({
+                        label: row.title || row.handle || row.id,
+                        value: String(row.id),
+                        sublabel: row.handle ? `/${row.handle}` : "",
+                      }))}
+                      value={isCollectionSelection ? String(selectedPageId).slice(4) : ""}
+                      onChange={(id) => {
+                        if (!id) { setSelectedPageId(""); return; }
+                        setSelectedPageId(`col:${id}`);
+                        setExpandedId(null);
+                        setActiveTab(0);
+                      }}
+                      emptyLabel={copy.chooseCollection}
+                      placeholder={copy.chooseCollectionPh}
                     />
                   </div>
                 )}
@@ -5082,24 +5126,6 @@ export default function LandingPageEditor() {
                           setIsDirty(true);
                         }}
                       />
-                      <Checkbox
-                        label={copy.showFilterBar}
-                        helpText={copy.showFilterBarHelp}
-                        checked={categorySettings.show_filter_bar !== false}
-                        onChange={(checked) => {
-                          setCategorySettings((prev) => ({ ...prev, show_filter_bar: checked }));
-                          setIsDirty(true);
-                        }}
-                      />
-                      <Checkbox
-                        label={copy.secondNavClassic}
-                        helpText={copy.secondNavClassicHelp}
-                        checked={categorySettings.second_nav_desktop_classic === true}
-                        onChange={(checked) => {
-                          setCategorySettings((prev) => ({ ...prev, second_nav_desktop_classic: checked }));
-                          setIsDirty(true);
-                        }}
-                      />
                       <TextField
                         label={copy.pagePaddingTop}
                         helpText={copy.pagePaddingTopHelp}
@@ -5118,9 +5144,31 @@ export default function LandingPageEditor() {
                     <BlockStack gap="400">
                       <Text as="p" variant="bodySm" tone="subdued">{copy.filterBarTemplateHelp}</Text>
                       <Checkbox
+                        label={copy.showFilterBar}
+                        helpText={copy.showFilterBarHelp}
+                        checked={categorySettings.show_filter_bar !== false}
+                        onChange={(checked) => {
+                          setCategorySettings((prev) => ({ ...prev, show_filter_bar: checked }));
+                          setIsDirty(true);
+                        }}
+                      />
+                      <Checkbox
+                        label={copy.secondNavClassic}
+                        helpText={copy.secondNavClassicHelp}
+                        checked={categorySettings.second_nav_desktop_classic === true}
+                        onChange={(checked) => {
+                          setCategorySettings((prev) => ({ ...prev, second_nav_desktop_classic: checked }));
+                          setIsDirty(true);
+                        }}
+                      />
+                      <Checkbox
                         label={copy.showProductFilterBar}
                         helpText={copy.showProductFilterBarHelp}
-                        checked={categorySettings.show_product_filter_bar === true}
+                        checked={
+                          (isCategorySelection || isCollectionSelection)
+                            ? categorySettings.show_product_filter_bar !== false
+                            : categorySettings.show_product_filter_bar === true
+                        }
                         onChange={(checked) => {
                           setCategorySettings((prev) => ({ ...prev, show_product_filter_bar: checked }));
                           setIsDirty(true);
@@ -5174,6 +5222,9 @@ export default function LandingPageEditor() {
 
                           {isCategorySelection && (
                             <Banner tone="success">{copy.categoryBanner}</Banner>
+                          )}
+                          {isCollectionSelection && (
+                            <Banner tone="success">{copy.collectionBanner}</Banner>
                           )}
 
                           {containers.length === 0 && (

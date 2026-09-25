@@ -1810,6 +1810,16 @@ async function start() {
         await client.query(`ALTER TABLE admin_hub_landing_categories ADD COLUMN IF NOT EXISTS draft_containers JSONB`).catch(() => {})
         await client.query(`ALTER TABLE admin_hub_landing_categories ADD COLUMN IF NOT EXISTS draft_settings JSONB`).catch(() => {})
         await client.query(`
+  CREATE TABLE IF NOT EXISTS admin_hub_landing_collections (
+    collection_id varchar(255) PRIMARY KEY,
+    containers JSONB NOT NULL DEFAULT '[]',
+    settings JSONB NOT NULL DEFAULT '{}',
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+  );
+`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_collections ADD COLUMN IF NOT EXISTS draft_containers JSONB`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_landing_collections ADD COLUMN IF NOT EXISTS draft_settings JSONB`).catch(() => {})
+        await client.query(`
   CREATE TABLE IF NOT EXISTS admin_hub_styles (
     key varchar(50) PRIMARY KEY,
     value JSONB

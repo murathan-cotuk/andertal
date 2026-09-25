@@ -12,6 +12,12 @@ const getDbClient = () => {
   return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
 }
 
+function normalizeFlowAudience(raw) {
+  const audience = String(raw || 'customer').toLowerCase()
+  if (audience === 'seller' || audience === 'admin') return audience
+  return 'customer'
+}
+
 module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport }) {
     // ── Automation flows (Content → Flows; superuser) ───────────────────────────
     /** Dokumentation + Testdaten für Flow-E-Mails; Platzhalter {KEY} (Groß/Klein egal) */
@@ -1008,8 +1014,7 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
       const status = ['draft', 'active', 'paused'].includes(String(body.status || '').toLowerCase())
         ? String(body.status).toLowerCase()
         : 'draft'
-      const audienceRaw = String(body.audience || 'customer').toLowerCase()
-      const audience = audienceRaw === 'seller' ? 'seller' : 'customer'
+      const audience = normalizeFlowAudience(body.audience)
       if (!name) return res.status(400).json({ message: 'name is required' })
       if (!FLOW_TRIGGER_KEYS.has(triggerKey)) return res.status(400).json({ message: 'invalid trigger' })
       try {
@@ -1118,10 +1123,8 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
           ? String(body.trigger || body.trigger_key || '').trim()
           : String(ex.rows[0].trigger_key || '').trim()
         const nextAudience = body.audience !== undefined
-          ? (String(body.audience || 'customer').toLowerCase() === 'seller'
-            ? 'seller'
-            : String(body.audience).toLowerCase() === 'admin' ? 'admin' : 'customer')
-          : String(ex.rows[0].audience || 'customer')
+          ? normalizeFlowAudience(body.audience)
+          : normalizeFlowAudience(ex.rows[0].audience)
         const clash = await client.query(
           `SELECT id FROM admin_hub_flows WHERE trigger_key = $1 AND audience = $2 AND id <> $3::uuid LIMIT 1`,
           [nextTrigger, nextAudience, id],
@@ -1176,9 +1179,8 @@ module.exports = function createFlowsRouter({ requireSuperuser, getSmtpTransport
           vals.push(st)
         }
         if (body.audience !== undefined) {
-          const au = String(body.audience || 'customer').toLowerCase() === 'seller' ? 'seller' : 'customer'
           sets.push(`audience = $${vi++}`)
-          vals.push(au)
+          vals.push(normalizeFlowAudience(body.audience))
         }
 
         if (sets.length) {

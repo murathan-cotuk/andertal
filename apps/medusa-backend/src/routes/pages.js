@@ -766,6 +766,12 @@ function landingDiscardQuery(kind, id) {
       values: [id],
     }
   }
+  if (kind === 'collection') {
+    return {
+      text: `UPDATE admin_hub_landing_collections SET draft_containers = NULL, draft_settings = NULL, updated_at = NOW() WHERE collection_id = $1`,
+      values: [id],
+    }
+  }
   return {
     text: `UPDATE admin_hub_landing_pages SET draft_containers = NULL, draft_settings = NULL, updated_at = NOW() WHERE page_id = $1`,
     values: [id],
@@ -802,6 +808,22 @@ function landingWriteQuery(kind, { id, containersJson, settingsJson, publish }) 
       text: `INSERT INTO admin_hub_landing_categories (category_id, containers, settings, draft_containers, draft_settings, updated_at)
              VALUES ($1, '[]'::jsonb, '{}'::jsonb, $2, $3, NOW())
              ON CONFLICT (category_id) DO UPDATE SET draft_containers = $2, draft_settings = $3, updated_at = NOW()`,
+      values: [id, containersJson, settingsJson],
+    }
+  }
+  if (kind === 'collection') {
+    if (publish) {
+      return {
+        text: `INSERT INTO admin_hub_landing_collections (collection_id, containers, settings, draft_containers, draft_settings, updated_at)
+               VALUES ($1, $2, $3, NULL, NULL, NOW())
+               ON CONFLICT (collection_id) DO UPDATE SET containers = $2, settings = $3, draft_containers = NULL, draft_settings = NULL, updated_at = NOW()`,
+        values: [id, containersJson, settingsJson],
+      }
+    }
+    return {
+      text: `INSERT INTO admin_hub_landing_collections (collection_id, containers, settings, draft_containers, draft_settings, updated_at)
+             VALUES ($1, '[]'::jsonb, '{}'::jsonb, $2, $3, NOW())
+             ON CONFLICT (collection_id) DO UPDATE SET draft_containers = $2, draft_settings = $3, updated_at = NOW()`,
       values: [id, containersJson, settingsJson],
     }
   }
@@ -934,6 +956,64 @@ const landingCategoryPUT = async (req, res) => {
   } catch (err) {
     if (err.statusCode === 400) return res.status(400).json({ message: err.message })
     console.error('Landing category PUT error:', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
+
+const landingCollectionGET = async (req, res) => {
+  const client = getDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  const collectionId = (req.params.collectionId || '').trim()
+  if (!collectionId) return res.json({ containers: [], settings: {}, updated_at: null })
+  try {
+    await client.connect()
+    const r = await client.query(
+      `SELECT ${LANDING_SELECT} FROM admin_hub_landing_collections WHERE collection_id = $1`,
+      [collectionId]
+    )
+    if (!r.rows[0]) {
+      return res.json({ containers: [], settings: {}, updated_at: null, has_unpublished_draft: false })
+    }
+    res.json(await landingGetJson(r.rows[0], client, isAdminHubLandingReq(req)))
+  } catch (err) {
+    console.error('Landing collection GET error:', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  } finally {
+    await client.end().catch(() => {})
+  }
+}
+const landingCollectionPUT = async (req, res) => {
+  const client = getDbClient()
+  if (!client) return res.status(503).json({ message: 'Database not configured' })
+  const collectionId = (req.params.collectionId || '').trim()
+  if (!collectionId) return res.status(400).json({ message: 'collectionId required' })
+  try {
+    await client.connect()
+    if (req.body?.discard_draft === true) {
+      const q = landingDiscardQuery('collection', collectionId)
+      await client.query(q.text, q.values)
+      const r = await client.query(
+        `SELECT ${LANDING_SELECT} FROM admin_hub_landing_collections WHERE collection_id = $1`,
+        [collectionId]
+      )
+      const payload = await landingGetJson(r.rows[0] || null, client, true)
+      return res.json({ ok: true, discarded: true, published: false, ...payload })
+    }
+    const { containers, settings } = sanitizeLandingPayload(req.body)
+    const publish = req.body?.publish === true
+    const q = landingWriteQuery('collection', {
+      id: collectionId,
+      containersJson: JSON.stringify(containers),
+      settingsJson: JSON.stringify(settings),
+      publish,
+    })
+    await client.query(q.text, q.values)
+    res.json({ ok: true, containers, settings, published: publish, has_unpublished_draft: !publish })
+  } catch (err) {
+    if (err.statusCode === 400) return res.status(400).json({ message: err.message })
+    console.error('Landing collection PUT error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })
   } finally {
     await client.end().catch(() => {})
@@ -1078,6 +1158,10 @@ module.exports = function createPagesRouter() {
   router.get('/admin-hub/landing-page/category/:categoryId', landingCategoryGET)
   router.put('/admin-hub/landing-page/category/:categoryId', landingCategoryPUT)
   router.get('/store/landing-page/category/:categoryId', landingCategoryGET)
+
+  router.get('/admin-hub/landing-page/collection/:collectionId', landingCollectionGET)
+  router.put('/admin-hub/landing-page/collection/:collectionId', landingCollectionPUT)
+  router.get('/store/landing-page/collection/:collectionId', landingCollectionGET)
 
   router.get('/admin-hub/landing-page/:pageId', landingPageByIdGET)
   router.put('/admin-hub/landing-page/:pageId', landingPageByIdPUT)

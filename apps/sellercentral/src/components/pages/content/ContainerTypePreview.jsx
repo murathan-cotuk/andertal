@@ -53,6 +53,37 @@ export function ContainerTypePreview({ type, label }) {
           <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translate(-50%,-50%)", width: 28, height: 8, borderRadius: 3, background: "#202223" }} />
         </PreviewShell>
       );
+    case "page_banner":
+      return (
+        <PreviewShell title={label}>
+          <div style={{ ...block({ position: "absolute", inset: 0 }), background: "linear-gradient(90deg,#c5ccd4,#9aa7b3)" }} />
+          <div style={{ position: "absolute", left: 8, bottom: 8, width: 56, ...bar({ height: 6, background: "#fff" }) }} />
+        </PreviewShell>
+      );
+    case "product_container":
+      return (
+        <PreviewShell title={label}>
+          <div style={{ display: "flex", height: "100%", gap: 4, padding: 5 }}>
+            <div style={{ width: 18, ...block({ height: "100%" }) }} />
+            <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 3 }}>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div key={i} style={block({ height: "100%" })} />
+              ))}
+            </div>
+          </div>
+        </PreviewShell>
+      );
+    case "page_richtext":
+      return (
+        <PreviewShell title={label}>
+          <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={bar({ width: "40%", height: 5 })} />
+            <div style={ink({ width: "100%", height: 2 })} />
+            <div style={ink({ width: "95%", height: 2 })} />
+            <div style={ink({ width: "70%", height: 2 })} />
+          </div>
+        </PreviewShell>
+      );
     case "text_block":
       return (
         <PreviewShell title={label}>

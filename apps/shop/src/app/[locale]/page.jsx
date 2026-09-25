@@ -21,7 +21,7 @@ export default async function Home() {
       <ShopHeader />
       <main className="flex-grow bg-white">
         <SectionErrorBoundary>
-          <LandingContainers initialContainers={initialContainers} initialSettings={initialSettings} />
+          <LandingContainers initialContainers={initialContainers} initialSettings={initialSettings} initialPreload={data?.preload || null} />
         </SectionErrorBoundary>
         <div className="container mx-auto px-4 py-8">
           <Breadcrumbs />

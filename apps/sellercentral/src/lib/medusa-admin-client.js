@@ -387,6 +387,23 @@ class MedusaAdminClient {
     });
   }
 
+  /** GET /admin-hub/landing-page/collection/:collectionId */
+  async getLandingPageCollectionContainers(collectionId) {
+    return this.request(`/admin-hub/landing-page/collection/${encodeURIComponent(collectionId)}`);
+  }
+
+  /** PUT /admin-hub/landing-page/collection/:collectionId — body: { containers, settings } */
+  async saveLandingPageCollectionContainers(collectionId, payload) {
+    return this.request(`/admin-hub/landing-page/collection/${encodeURIComponent(collectionId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...payload,
+        publish: payload?.publish === true,
+        discard_draft: payload?.discard_draft === true,
+      }),
+    });
+  }
+
   /** GET /admin-hub/styles */
   async getStyles() {
     return this.request('/admin-hub/styles');

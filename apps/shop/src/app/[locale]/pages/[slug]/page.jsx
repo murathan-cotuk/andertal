@@ -136,6 +136,30 @@ export default function CmsPageBySlug() {
   const hero = page.featured_image ? resolveImageUrl(page.featured_image) : "";
   const containers = Array.isArray(landing?.containers) ? landing.containers : [];
   const hasContainers = containers.length > 0;
+  const hasRichtextSlot = containers.some((c) => c && c.visible !== false && c.type === "page_richtext");
+  const bodyBlock = safeBody ? (
+        <div style={{ width: "100%", background: "#f5f5f5", boxSizing: "border-box" }}>
+          <div
+            className="cms-richtext container mx-auto px-4 max-w-3xl w-full"
+            style={{ paddingTop: 40, paddingBottom: pagePad.paddingBottom }}
+            dangerouslySetInnerHTML={{ __html: safeBody }}
+          />
+        </div>
+  ) : null;
+  const bannerBlock = (
+    <>
+          {hero ? (
+            <div className="mb-8 rounded-xl overflow-hidden border border-gray-100">
+              <img
+                src={hero}
+                alt={localizedTitle}
+                className="w-full max-h-[min(42vh,400px)] object-cover block"
+              />
+            </div>
+          ) : null}
+          <h1>{localizedTitle}</h1>
+    </>
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -147,6 +171,10 @@ export default function CmsPageBySlug() {
               pageId={page.id}
               initialContainers={containers}
               initialSettings={landing?.settings || {}}
+              catalogSlots={{
+                page_banner: bannerBlock,
+                page_richtext: bodyBlock,
+              }}
             />
           </SectionErrorBoundary>
         ) : null}
@@ -173,15 +201,7 @@ export default function CmsPageBySlug() {
         </div>
         {/* Full-bleed backdrop behind the richtext block — spans the page's full width,
             independent of the constrained title/hero box above it. */}
-        {safeBody ? (
-          <div style={{ width: "100%", background: "#f5f5f5", boxSizing: "border-box" }}>
-            <div
-              className="cms-richtext container mx-auto px-4 max-w-3xl w-full"
-              style={{ paddingTop: 40, paddingBottom: pagePad.paddingBottom }}
-              dangerouslySetInnerHTML={{ __html: safeBody }}
-            />
-          </div>
-        ) : null}
+        {safeBody && !hasRichtextSlot ? bodyBlock : null}
       </main>
       <Footer />
       {/* @tailwindcss/typography isn't installed, so "prose" utility classes are no-ops here —

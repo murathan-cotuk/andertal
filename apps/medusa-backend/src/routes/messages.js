@@ -254,6 +254,7 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
               runAutomationFlowsForMessageEvent({
                 triggerKey,
                 toEmail: sellerEmail,
+                sellerEmail,
                 locale: sellerLocale,
                 vars,
                 dedupeKey: r.rows[0]?.id || '',
@@ -310,6 +311,8 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
           runAutomationFlowsForMessageEvent({
             triggerKey: 'customer_message_replied',
             toEmail: recipientEmail,
+            customerEmail: recipientEmail,
+            sellerEmail: req.sellerUser?.email || '',
             locale: customerLocale,
             vars: {
               CUSTOMER_NAME: customerName,
@@ -736,6 +739,8 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
         runAutomationFlowsForMessageEvent({
           triggerKey: 'customer_message_sent',
           toEmail: payload.email,
+          customerEmail: payload.email,
+          sellerEmail,
           locale: customerLocale,
           vars: sharedVars,
           orderId: order_id || '',
@@ -748,6 +753,8 @@ function createMessagesRouter({ verifyCustomerToken, requireSuperuser }) {
           runAutomationFlowsForMessageEvent({
             triggerKey: 'seller_new_customer_message',
             toEmail: sellerEmail,
+            customerEmail: payload.email,
+            sellerEmail,
             locale: sellerLocale,
             vars: sharedVars,
             orderId: order_id || '',

@@ -160,11 +160,32 @@ export default function CatalogCmsLanding({
   const containers = Array.isArray(landing?.containers) ? landing.containers : []
   const useContainers = shouldUseLandingContainers(landing, { preferNativeCatalog })
   const brandsDirInCms = slug === 'brands' && hasBrandsDirectoryContainer(landing)
-  const showNativeBody = hasChildren && (!useContainers || (slug === 'brands' && !brandsDirInCms))
+  const hasProductSlot = containers.some((c) => c && c.visible !== false && c.type === 'product_container')
+  const hasRichtextSlot = containers.some((c) => c && c.visible !== false && c.type === 'page_richtext')
+  const showNativeBody = hasChildren && !hasProductSlot && (!useContainers || (slug === 'brands' && !brandsDirInCms))
   const showTitle = showTitleWhenNoContainers && !useContainers
   const safeBody = sanitizeHtml(page ? localizedCmsField(page, 'body', locale) : '')
+  const trailingBody = safeBody && !hasRichtextSlot
   const richtextAlign = tmpl.richtext_align || 'left'
   const richtextMaxW = tmpl.richtext_max_width || '700px'
+
+  const bodyBlock = safeBody ? (
+          <div
+            className="container mx-auto px-4 w-full"
+            style={{
+              maxWidth: richtextMaxW === 'full' ? 1200 : 800,
+              paddingTop: Math.max(24, pagePad.paddingTop || 0),
+              paddingBottom: pagePad.paddingBottom,
+              boxSizing: 'border-box',
+              textAlign: richtextAlign,
+            }}
+          >
+            <div
+              className="prose prose-gray max-w-none"
+              dangerouslySetInnerHTML={{ __html: safeBody }}
+            />
+          </div>
+  ) : null
 
   if (loading) {
     return (
@@ -186,6 +207,10 @@ export default function CatalogCmsLanding({
               pageId={page.id}
               initialContainers={containers}
               initialSettings={landing?.settings || {}}
+              catalogSlots={{
+                product_container: hasChildren ? children : null,
+                page_richtext: bodyBlock,
+              }}
             />
           </SectionErrorBoundary>
         ) : null}
@@ -196,23 +221,7 @@ export default function CatalogCmsLanding({
         ) : null}
         {showNativeBody ? children : null}
 
-        {safeBody ? (
-          <div
-            className="container mx-auto px-4 w-full"
-            style={{
-              maxWidth: richtextMaxW === 'full' ? 1200 : 800,
-              paddingTop: Math.max(24, pagePad.paddingTop || 0),
-              paddingBottom: pagePad.paddingBottom,
-              boxSizing: 'border-box',
-              textAlign: richtextAlign,
-            }}
-          >
-            <div
-              className="prose prose-gray max-w-none"
-              dangerouslySetInnerHTML={{ __html: safeBody }}
-            />
-          </div>
-        ) : null}
+        {trailingBody ? bodyBlock : null}
       </main>
       <Footer />
     </div>

@@ -14,6 +14,8 @@ import { formatPriceCents, getLocalizedCategory } from "@/lib/format";
 import { shallowCategoriesQuery, storeCategoriesQuery } from "@/lib/store-categories-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
+import { bestsellerPreloadKey } from "@/lib/landing-page-fetch";
+import { resolveCatalogLandingContainers } from "@/lib/catalog-landing-layout";
 import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
@@ -1400,9 +1402,9 @@ function productRecencyMs(product) {
   return Number.isFinite(t) ? t : 0;
 }
 
-function BestsellerCarousel({ container, locale = "de" }) {
+function BestsellerCarousel({ container, locale = "de", preloadedProducts }) {
   const tLanding = useTranslations("landing");
-  const [products, setProducts] = useState(undefined);
+  const [products, setProducts] = useState(Array.isArray(preloadedProducts) ? preloadedProducts : undefined);
   const isNarrow = useIsNarrow(1023);
   const baseGap = container.gap != null ? Number(container.gap) : 10;
   const gap = Number.isNaN(baseGap) ? 10 : baseGap;
@@ -1410,6 +1412,10 @@ function BestsellerCarousel({ container, locale = "de" }) {
   const slug = String(container.category_slug || "").trim();
 
   useEffect(() => {
+    if (Array.isArray(preloadedProducts)) {
+      setProducts(preloadedProducts);
+      return;
+    }
     const qs = new URLSearchParams({ limit: "50" });
     if (slug) qs.set("category", slug);
     cachedJsonFetch(`/api/store-products?${qs.toString()}`, { ttlMs: 15000 })
@@ -1430,7 +1436,7 @@ function BestsellerCarousel({ container, locale = "de" }) {
         setProducts(next);
       })
       .catch(() => setProducts([]));
-  }, [slug, mode, container.limit]);
+  }, [slug, mode, container.limit, preloadedProducts]);
 
   if (products === undefined) {
     return (
@@ -3308,6 +3314,9 @@ const FETCH_GATED_CONTAINER_TYPES = new Set([
   "seller_carousel",
   "blog_carousel",
   "personalized_product_row",
+  "page_banner",
+  "product_container",
+  "page_richtext",
 ]);
 
 // `opts.isChild` — layout_section slots (docs/SUPPORT-LANDING-STEP1-ARCHITECTURE.md §2.3): a
@@ -3361,7 +3370,7 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
     case "image_carousel":       inner = <ImageCarousel container={c} locale={locale} isFirstContainer={ctx.firstVisibleId === c.id} />; break;
     case "banner_cta":           inner = <BannerCta container={c} locale={locale} />; break;
     case "collection_carousel":  inner = <CollectionCarousel container={c} locale={locale} preloadedProducts={preload.collectionProducts?.[collectionKey]} />; break;
-    case "bestseller_carousel":  inner = <BestsellerCarousel container={c} locale={locale} />; break;
+    case "bestseller_carousel":  inner = <BestsellerCarousel container={c} locale={locale} preloadedProducts={preload.bestsellers?.[bestsellerPreloadKey(c)]} />; break;
     case "brands_directory":     inner = <BrandsDirectoryContainer container={c} locale={locale} />; break;
     // Legacy brands hub seed used seller_carousel for the Marken grid (API never existed).
     case "seller_carousel":      inner = <BrandsDirectoryContainer container={c} locale={locale} />; break;
@@ -3376,6 +3385,18 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
     case "testimonials":              inner = <Testimonials container={c} locale={locale} />; break;
     case "personalized_product_row":  inner = <PersonalizedProductRow container={c} locale={locale} />; break;
     case "layout_section":       inner = <LayoutSection container={c} locale={locale} preload={preload} ctx={ctx} />; break;
+    case "page_banner":
+      inner = ctx.catalogSlots?.page_banner ?? null;
+      if (!inner) return null;
+      break;
+    case "product_container":
+      inner = ctx.catalogSlots?.product_container ?? null;
+      if (!inner) return null;
+      break;
+    case "page_richtext":
+      inner = ctx.catalogSlots?.page_richtext ?? null;
+      if (!inner) return null;
+      break;
     case "support_hero":
     case "support_case_wizard":
     case "support_topic_grid":
@@ -3406,12 +3427,38 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
  * (apps/shop/src/app/[locale]/page.jsx) — every other call site (CMS pages, category templates)
  * doesn't pass them and behaves exactly as before, unaffected.
  */
-export default function LandingContainers({ pageId, categoryId, initialContainers = null, initialSettings = null }) {
+const EMPTY_PRELOAD = { collectionProducts: {}, singleProducts: {}, bestsellers: {} };
+
+export default function LandingContainers({
+  pageId,
+  categoryId,
+  collectionId,
+  initialContainers = null,
+  initialSettings = null,
+  initialPreload = null,
+  applyCatalogDefaults = false,
+  catalogSlots = null,
+  onSettingsChange = null,
+}) {
   const hasProvided = Array.isArray(initialContainers);
   const hasSsrData = hasProvided;
-  const [containers, setContainers] = useState(hasProvided ? initialContainers : null);
-  const [landingSettings, setLandingSettings] = useState(hasProvided && initialSettings ? initialSettings : {});
-  const [preload, setPreload] = useState({ collectionProducts: {}, singleProducts: {} });
+  const applyList = (list, settings) => (
+    applyCatalogDefaults
+      ? resolveCatalogLandingContainers(Array.isArray(list) ? list : [], settings)
+      : (Array.isArray(list) ? list : [])
+  );
+  const [containers, setContainers] = useState(
+    applyCatalogDefaults
+      ? resolveCatalogLandingContainers(hasProvided ? initialContainers : [], initialSettings || {})
+      : (hasProvided ? initialContainers : null)
+  );
+  const [landingSettings, setLandingSettings] = useState(
+    hasProvided && initialSettings
+      ? initialSettings
+      : (applyCatalogDefaults ? { show_product_filter_bar: true } : {})
+  );
+  const [preload, setPreload] = useState(initialPreload || EMPTY_PRELOAD);
+  const preloadCovers = useRef(initialPreload ? initialContainers : null);
   const [sidebarCategoryLinks, setSidebarCategoryLinks] = useState([]);
   const { setLandingHeaderFilterBar, setSecondNavDesktopClassic } = useLandingChrome();
   const isNarrow = useIsNarrow(1023);
@@ -3426,19 +3473,27 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
       const showBar = initialSettings?.show_filter_bar !== false;
       setLandingHeaderFilterBar(showBar);
       setSecondNavDesktopClassic(initialSettings?.second_nav_desktop_classic === true);
-      setContainers(initialContainers);
-      setLandingSettings(initialSettings && typeof initialSettings === "object" ? initialSettings : {});
+      const settings = initialSettings && typeof initialSettings === "object" ? initialSettings : {};
+      setContainers(applyList(initialContainers, settings));
+      setLandingSettings(settings);
+      if (typeof onSettingsChange === "function") onSettingsChange(settings);
       return;
     }
     let endpoint = "/api/store-landing-page";
-    if (categoryId) {
+    if (collectionId) {
+      endpoint = `/api/store-landing-page/collection/${encodeURIComponent(collectionId)}`;
+    } else if (categoryId) {
       endpoint = `/api/store-landing-page/category/${encodeURIComponent(categoryId)}`;
     } else if (pageId) {
       endpoint = `/api/store-landing-page/${encodeURIComponent(pageId)}`;
+    } else if (applyCatalogDefaults) {
+      return;
     }
-    setContainers(null);
-    setLandingSettings({});
-    fetch(endpoint)
+    if (!applyCatalogDefaults) {
+      setContainers(null);
+      setLandingSettings({});
+    }
+    fetch(endpoint, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         if (data?.__error) {
@@ -3452,27 +3507,39 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
           }
           setLandingHeaderFilterBar(true);
           setSecondNavDesktopClassic(false);
-          setContainers([]);
+          const fallbackSettings = applyCatalogDefaults ? { show_product_filter_bar: true } : {};
+          setLandingSettings(fallbackSettings);
+          if (typeof onSettingsChange === "function") onSettingsChange(fallbackSettings);
+          setContainers(applyList([], fallbackSettings));
           return;
         }
         const showBar = data?.settings?.show_filter_bar !== false;
         setLandingHeaderFilterBar(showBar);
         setSecondNavDesktopClassic(data?.settings?.second_nav_desktop_classic === true);
-        setLandingSettings(data?.settings && typeof data.settings === "object" ? data.settings : {});
-        if (Array.isArray(data?.containers)) setContainers(data.containers);
-        else setContainers([]);
+        const settings = data?.settings && typeof data.settings === "object" ? data.settings : {};
+        setLandingSettings(settings);
+        if (typeof onSettingsChange === "function") onSettingsChange(settings);
+        if (data?.preload) {
+          preloadCovers.current = data.containers;
+          setPreload(data.preload);
+        }
+        setContainers(applyList(Array.isArray(data?.containers) ? data.containers : [], settings));
       })
       .catch(() => {
         setLandingHeaderFilterBar(true);
         setSecondNavDesktopClassic(false);
-        setContainers([]);
+        const fallbackSettings = applyCatalogDefaults ? { show_product_filter_bar: true } : {};
+        setLandingSettings(fallbackSettings);
+        if (typeof onSettingsChange === "function") onSettingsChange(fallbackSettings);
+        setContainers(applyList([], fallbackSettings));
       });
-  }, [pageId, categoryId, hasSsrData, initialContainers, initialSettings, setLandingHeaderFilterBar, setSecondNavDesktopClassic]);
+  }, [pageId, categoryId, collectionId, hasSsrData, initialContainers, initialSettings, applyCatalogDefaults, setLandingHeaderFilterBar, setSecondNavDesktopClassic]);
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       if (!Array.isArray(containers) || containers.length === 0) return;
+      if (preloadCovers.current === containers) return;
 
       const collectionTargets = new Map();
       const singleTargets = new Set();
@@ -3611,7 +3678,7 @@ export default function LandingContainers({ pageId, categoryId, initialContainer
   const mainContainers = containers.filter((c) => c.type !== "category_sidebar");
   const stack = (
     <div>
-      {mainContainers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, hasTabletContainer, locale, firstVisibleId }))}
+      {mainContainers.map((c) => renderContainer(c, preload, { isNarrow, isTablet, hasTabletContainer, locale, firstVisibleId, catalogSlots }))}
     </div>
   );
 

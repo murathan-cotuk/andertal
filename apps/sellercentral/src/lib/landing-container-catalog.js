@@ -9,6 +9,7 @@ export const CONTAINER_GROUPS = [
 
 export const CONTAINER_TYPE_GROUP = {
   hero_banner: "hero_media",
+  page_banner: "hero_media",
   layout_section: "hero_media",
   layout_section_2x2: "hero_media",
   image_text: "hero_media",
@@ -23,8 +24,10 @@ export const CONTAINER_TYPE_GROUP = {
   brands_directory: "commerce",
   collections_carousel: "commerce",
   single_product: "commerce",
+  product_container: "commerce",
   personalized_product_row: "commerce",
   text_block: "content",
+  page_richtext: "content",
   banner_cta: "content",
   accordion: "content",
   tabs: "content",

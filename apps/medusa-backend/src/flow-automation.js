@@ -1623,9 +1623,14 @@ async function runAutomationFlowsForCustomerEvent(opts) {
     for (const fr of flowRows) {
       const audRaw = String(fr.audience || 'customer').toLowerCase()
       const audience = audRaw === 'seller' ? 'seller' : audRaw === 'admin' ? 'admin' : 'customer'
-      const recipientEmail = audience === 'admin'
-        ? (adminEmail || (adminEmail = await resolveAdminNotificationEmail(client)))
-        : toEmail
+      let recipientEmail = ''
+      if (audience === 'admin') {
+        recipientEmail = adminEmail || (adminEmail = await resolveAdminNotificationEmail(client))
+      } else if (audience === 'seller') {
+        recipientEmail = String(opts.sellerEmail || '').trim()
+      } else {
+        recipientEmail = toEmail
+      }
       if (!recipientEmail) {
         logger.warn(`[flow-automation] skip flow ${fr.id} (${audience}): no recipient`)
         continue
@@ -1720,12 +1725,26 @@ async function runAutomationFlowsForMessageEvent(opts) {
       return 0
     }
 
-    // Message/support-case callers resolve the exact recipient. Admin audience is therefore
-    // safe here as well: it is sent only to the explicit toEmail supplied by the caller.
+    // Each flow goes to the audience saved on that flow, not to a single hardcoded recipient.
+    let adminEmail = ''
+    const customerEmail = String(opts.customerEmail || '').trim()
+    const sellerEmail = String(opts.sellerEmail || '').trim()
     let total = 0
     for (const fr of flowRows) {
       const audRaw = String(fr.audience || 'customer').toLowerCase()
       const audience = audRaw === 'seller' ? 'seller' : audRaw === 'admin' ? 'admin' : 'customer'
+      let flowTo = ''
+      if (audience === 'admin') {
+        flowTo = adminEmail || (adminEmail = await resolveAdminNotificationEmail(client))
+      } else if (audience === 'seller') {
+        flowTo = sellerEmail || (!customerEmail ? toEmail : '')
+      } else {
+        flowTo = customerEmail || (!sellerEmail ? toEmail : '')
+      }
+      if (!flowTo) {
+        logger.warn(`[flow-automation] skip flow ${fr.id} (${audience}): no recipient`)
+        continue
+      }
       const sr = await client.query(
         `SELECT step_order, step_type, wait_hours, email_subject, email_body, email_i18n, email_attachments, smtp_sender_id
          FROM admin_hub_flow_steps WHERE flow_id = $1::uuid ORDER BY step_order ASC`,
@@ -1739,8 +1758,8 @@ async function runAutomationFlowsForMessageEvent(opts) {
         audience,
         triggerKey,
         steps: sr.rows || [],
-        toEmail,
-        templateLocale: locale,
+        toEmail: flowTo,
+        templateLocale: audience === 'admin' ? 'de' : locale,
         placeholderVars: opts.vars || {},
         orderId: opts.orderId || '',
         customerId: opts.customerId || '',

@@ -1144,7 +1144,8 @@ function CollectionPage() {
   const bannerStyle   = tmpl.banner_style || "strip";
   const bannerPreset  = BANNER_PRESETS[bannerStyle] || BANNER_PRESETS.strip;
   const showBanner    = bannerStyle !== "none" && (!!bannerUrl || !!bannerVideoUrl);
-  const showSidebar   = tmpl.show_sidebar !== false;
+  const [landingSettings, setLandingSettings] = useState({ show_product_filter_bar: true });
+  const showSidebar   = tmpl.show_sidebar !== false && landingSettings.show_product_filter_bar !== false;
   const sidebarWidth  = tmpl.sidebar_width || "220px";
   const colsPerRow    = Number(tmpl.products_per_row) || 4;
   const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;
@@ -1288,9 +1289,12 @@ function CollectionPage() {
     <PageWrap>
       <ShopHeader />
       <Main>
-
-        {/* ── Banner / header ── */}
-        {showBanner ? (
+        <LandingContainers
+          collectionId={collection?.id ? String(collection.id) : undefined}
+          applyCatalogDefaults
+          onSettingsChange={setLandingSettings}
+          catalogSlots={{
+            page_banner: showBanner ? (
           <HeroBanner $aspect={bannerPreset.aspectRatio} $minH={bannerPreset.minHeight} $maxH={bannerPreset.maxHeight}>
             {bannerVideoUrl ? (
               <video autoPlay muted loop playsInline src={bannerVideoUrl} />
@@ -1305,11 +1309,9 @@ function CollectionPage() {
           <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
             <h1 className="shop-typo-catalog-title">{title}</h1>
           </ColHeader>
-        )}
-
-        {linkedCategoryId ? <LandingContainers categoryId={linkedCategoryId} /> : null}
-
-        {/* ── Sort bar (sticky) ── */}
+        ),
+            product_container: (
+              <>
         <SortBar>
           <SortBarInner>
             <SortBarLeft>
@@ -1538,13 +1540,16 @@ function CollectionPage() {
 
           </Body>
         </ContentWrap>
-
-        {collection.description && (
-          <RichtextStrip style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
-            <Desc $divider={false} $align={richtextAlign} $maxWidth={richtextMaxW}
-              dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
-          </RichtextStrip>
-        )}
+              </>
+            ),
+            page_richtext: collection.description ? (
+        <RichtextStrip style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+          <Desc $divider={false} $align={richtextAlign} $maxWidth={richtextMaxW}
+            dangerouslySetInnerHTML={{ __html: sanitize(rewriteImageUrlsInHtml(collection.description)) }} />
+        </RichtextStrip>
+      ) : null,
+          }}
+        />
       </Main>
       <Footer />
     </PageWrap>
