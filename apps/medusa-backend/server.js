@@ -649,6 +649,7 @@ async function start() {
         await client.query(`UPDATE admin_hub_brands SET brand_type = 'own_registered' WHERE brand_type = 'registered';`).catch(() => {})
         // verification_level: own brands = unverified (no trademark proof), approved registered = verified
         await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS verification_level varchar(20) DEFAULT NULL;`).catch(() => {})
+        await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT NULL;`).catch(() => {})
         await client.query(`UPDATE admin_hub_brands SET verification_level = 'unverified' WHERE brand_type = 'own' AND verification_level IS NULL;`).catch(() => {})
         await client.query(`
           CREATE TABLE IF NOT EXISTS admin_hub_brand_authorization_documents (
@@ -1465,6 +1466,31 @@ async function start() {
 
         // Normalize store_name: convert empty string to NULL so sub-users don't conflict
         await client.query(`UPDATE seller_users SET store_name = NULL WHERE store_name = ''`).catch(() => {})
+        // Platform rebrand: Settings → Security "Shop / Display name" reads seller_users.store_name.
+        // Legacy Belucha / Beluchaa (that account, plus the platform settings row) should be Andertal.
+        await client.query(`
+          UPDATE admin_hub_seller_settings
+          SET store_name = 'Andertal', updated_at = now()
+          WHERE lower(trim(COALESCE(store_name, ''))) IN ('belucha', 'beluchaa')
+            AND (
+              seller_id = 'default'
+              OR seller_id IN (
+                SELECT seller_id FROM seller_users
+                WHERE lower(trim(COALESCE(store_name, ''))) IN ('belucha', 'beluchaa')
+              )
+            )
+        `).catch(() => {})
+        await client.query(`
+          UPDATE admin_hub_seller_settings
+          SET platform_name = 'Andertal', updated_at = now()
+          WHERE seller_id = 'default'
+            AND lower(trim(COALESCE(platform_name, ''))) IN ('belucha', 'beluchaa', 'belucha marketplace', 'beluchaa marketplace')
+        `).catch(() => {})
+        await client.query(`
+          UPDATE seller_users
+          SET store_name = 'Andertal', updated_at = now()
+          WHERE lower(trim(store_name)) IN ('belucha', 'beluchaa')
+        `).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS first_name varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS last_name varchar(255) DEFAULT NULL;`).catch(() => {})
         await client.query(`ALTER TABLE seller_invitations ADD COLUMN IF NOT EXISTS permissions jsonb DEFAULT NULL;`).catch(() => {})

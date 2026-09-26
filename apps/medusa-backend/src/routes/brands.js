@@ -114,6 +114,7 @@ const adminBrandsGET = async (req, res) => {
   if (!client) return res.status(500).json({ message: 'Database unavailable' })
   try {
     await client.connect()
+    await client.query(`ALTER TABLE admin_hub_brands ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT NULL`)
     const r = await client.query(`SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands ORDER BY name`)
     await client.end()
     res.json({ brands: (r.rows || []).map(mapBrandRow) })

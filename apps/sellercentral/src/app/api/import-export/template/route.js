@@ -138,6 +138,14 @@ async function loadReferenceData(backendUrl, sellerToken, locale) {
   } catch {
     brands = [];
   }
+  if (!brands.length) {
+    try {
+      const data = await fetchJson(`${backendUrl}/store/brands`);
+      brands = Array.isArray(data.brands) ? data.brands : [];
+    } catch {
+      brands = [];
+    }
+  }
 
   let shippingGroups = [];
   try {
@@ -162,12 +170,80 @@ async function loadReferenceData(backendUrl, sellerToken, locale) {
   return { catsFlat, brands, shippingGroups, metafieldDefs };
 }
 
-/** Column definitions — no collection_handles, no handle_*; shipping + extra options + metafields */
-function buildColumns(locale) {
+/** Excel columns that mirror a compliance-profile field. Included only when a selected category requires that field. */
+const COMPLIANCE_COLUMN_ALIASES = {
+  manufacturer: ["hersteller", "manufacturer"],
+  manufacturer_information: ["hersteller_information", "manufacturer_information"],
+  responsible_person_information: ["verantwortliche_person_information", "responsible_person_information"],
+  weee_number: ["weee_number"],
+  eprel_number: ["eprel_number"],
+};
+
+const COMPLIANCE_KEYS_ALREADY_COLUMNS = new Set(
+  Object.values(COMPLIANCE_COLUMN_ALIASES).flat(),
+);
+
+function complianceKeyRequired(requiredKeys, aliases) {
+  if (!requiredKeys) return false;
+  return aliases.some((k) => requiredKeys.has(k));
+}
+
+async function loadCategoryCompliance(backendUrl, sellerToken, categories) {
+  const ids = [...new Set((categories || []).map((c) => String(c?.id || "").trim()).filter(Boolean))];
+  if (!ids.length) return null;
+  const headers = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
+  const schemas = await Promise.all(ids.map(async (id) => {
+    try {
+      return await fetchJson(
+        `${backendUrl}/admin-hub/v1/categories/${encodeURIComponent(id)}/compliance-schema?marketplace=DE`,
+        { headers },
+      );
+    } catch {
+      return null;
+    }
+  }));
+  const loaded = schemas.filter(Boolean);
+  if (!loaded.length) return null;
+  const required = new Set();
+  const defs = {};
+  for (const schema of loaded) {
+    for (const key of schema.required_fields || []) {
+      const k = String(key || "").trim();
+      if (k) required.add(k);
+    }
+    const fd = schema.field_definitions && typeof schema.field_definitions === "object" ? schema.field_definitions : {};
+    for (const [key, def] of Object.entries(fd)) {
+      if (required.has(key) && def && typeof def === "object") defs[key] = def;
+    }
+  }
+  return { required, defs };
+}
+
+function complianceFieldNote(def, locale, fallback) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const label = def?.label_i18n?.[loc] || def?.label_i18n?.de || def?.label_i18n?.en || "";
+  const help = def?.help_text_i18n?.[loc] || def?.help_text_i18n?.de || def?.help_text_i18n?.en || "";
+  const text = [label, help].map((s) => String(s || "").trim()).filter(Boolean).join(" — ");
+  return text || fallback;
+}
+
+/** Column definitions — no collection_handles, no handle_*; shipping + extra options + metafields.
+ *  Compliance columns (GPSR, WEEE, EPREL, …) follow the selected categories' required-field mapping. */
+function buildColumns(locale, compliance) {
   const loc = String(locale || "de").slice(0, 2).toLowerCase();
   const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
   const LANG_LABELS = langLabelsFor(loc);
   const cols = [];
+  const known = !!compliance?.required;
+  const required = compliance?.required || null;
+  const defs = compliance?.defs || {};
+  const wants = (columnKey) => {
+    if (!known) {
+      // Schema unavailable: keep the GPSR base, omit category-specific registers.
+      return columnKey === "manufacturer" || columnKey === "manufacturer_information" || columnKey === "responsible_person_information";
+    }
+    return complianceKeyRequired(required, COMPLIANCE_COLUMN_ALIASES[columnKey] || [columnKey]);
+  };
 
   const core = [
     { key: "product_type", label: "product_type", note: x("Dropdown: parent | child", "Açılır liste: parent | child", "Liste: parent | child", "Lista: parent | child", "Elenco: parent | child", "Dropdown: parent | child"), width: 14, group: "core" },
@@ -176,7 +252,7 @@ function buildColumns(locale) {
     { key: "status", label: "status", note: x("Dropdown: draft | published", "Açılır liste: draft | published", "Liste: draft | published", "Lista: draft | published", "Elenco: draft | published", "Dropdown: draft | published"), width: 13, group: "core" },
     { key: "ean", label: "ean", note: x("EAN / GTIN", "EAN / GTIN", "EAN / GTIN", "EAN / GTIN", "EAN / GTIN", "EAN / GTIN"), width: 18, group: "core" },
     { key: "inventory", label: "inventory", note: x("Inventory quantity", "Stok adedi", "Quantité en stock", "Cantidad en inventario", "Quantità a magazzino", "Lagerbestand"), width: 12, group: "core" },
-    { key: "brand", label: "brand", note: x("Dropdown: brand name from list", "Açılır liste: listedeki marka adı", "Liste: nom de marque", "Lista: nombre de marca", "Elenco: nome marca", "Dropdown: Markenname aus Liste"), width: 18, group: "core" },
+    { key: "brand", label: "brand", note: x("Dropdown: every brand in the system. Missing name: register it under Content → Brands, then re-download.", "Açılır liste: sistemdeki tüm markalar. Yoksa Content → Brands üzerinden kaydedip şablonu yeniden indirin.", "Liste: toutes les marques du système. Absente: Content → Brands, puis retéléchargez.", "Lista: todas las marcas del sistema. Si falta: Content → Brands y vuelva a descargar.", "Elenco: tutti i brand del sistema. Se manca: Content → Brands, poi riscarica.", "Dropdown: alle Marken im System. Fehlt sie: unter Content → Brands anlegen, Vorlage neu laden."), width: 22, group: "core" },
     { key: "type", label: "type", note: x("Product type", "Ürün tipi", "Type de produit", "Tipo de producto", "Tipo prodotto", "Produkttyp"), width: 16, group: "core" },
     { key: "category_slug", label: "category_slug", note: x("Dropdown: exact category slug from list", "Açılır liste: listedeki kategori slug", "Liste: slug catégorie exact", "Lista: slug de categoría exacto", "Elenco: slug categoria esatto", "Dropdown: exakter Kategorie-Slug aus Liste"), width: 22, group: "core" },
     { key: "shipping_group", label: "shipping_group", note: x("Dropdown: shipping group name", "Açılır liste: kargo grubu adı", "Liste: nom groupe livraison", "Lista: nombre grupo envío", "Elenco: nome gruppo spedizione", "Dropdown: Versandgruppenname"), width: 22, group: "core" },
@@ -194,27 +270,45 @@ function buildColumns(locale) {
     { key: "image_url_5", label: "image_url_5", note: x("Image URL 5", "Görsel URL 5", "URL image 5", "URL imagen 5", "URL immagine 5", "Bild-URL 5"), width: 40, group: "core" },
     { key: "swatch_image_url", label: "swatch_image_url", note: x("Swatch image URL", "Swatch görsel URL", "URL image swatch", "URL imagen muestra", "URL immagine campione", "Swatch-Bild-URL"), width: 28, group: "core" },
     { key: "option1_name", label: "variation1_name", note: x("Parent: variation 1 name (e.g. color)", "Parent: varyasyon 1 adı (örn. renk)", "Parent: nom variation 1 (ex. couleur)", "Parent: nombre variación 1 (ej. color)", "Parent: nome variante 1 (es. colore)", "Parent: Variante 1 Name (z. B. Farbe)"), width: 18, group: "variations" },
-    { key: "option1_value", label: "variation1_value", note: x("Child: variation 1 value (e.g. red)", "Child: varyasyon 1 değeri (örn. kırmızı)", "Enfant: valeur variation 1 (ex. rouge)", "Child: valor variación 1 (ej. rojo)", "Child: valore variante 1 (es. rosso)", "Child: Variante 1 Wert (z. B. rot)"), width: 18, group: "variations" },
+    { key: "option1_value", label: "variation1_value", note: x("Child: type any variation 1 value (e.g. red)", "Child: varyasyon 1 değeri serbest metin (örn. kırmızı)", "Enfant : saisie libre de la valeur variation 1 (ex. rouge)", "Child: escriba cualquier valor de variación 1 (ej. rojo)", "Child: testo libero per il valore variante 1 (es. rosso)", "Child: Variante 1 Wert frei eingeben (z. B. rot)"), width: 18, group: "variations" },
     { key: "option2_name", label: "variation2_name", note: x("Parent: variation 2 name (e.g. size)", "Parent: varyasyon 2 adı (örn. beden)", "Parent: nom variation 2 (ex. taille)", "Parent: nombre variación 2 (ej. talla)", "Parent: nome variante 2 (es. taglia)", "Parent: Variante 2 Name (z. B. Größe)"), width: 18, group: "variations" },
-    { key: "option2_value", label: "variation2_value", note: x("Child: variation 2 value (e.g. M)", "Child: varyasyon 2 değeri (örn. M)", "Enfant: valeur variation 2 (ex. M)", "Child: valor variación 2 (ej. M)", "Child: valore variante 2 (es. M)", "Child: Variante 2 Wert (z. B. M)"), width: 18, group: "variations" },
+    { key: "option2_value", label: "variation2_value", note: x("Child: type any variation 2 value (e.g. M)", "Child: varyasyon 2 değeri serbest metin (örn. M)", "Enfant : saisie libre de la valeur variation 2 (ex. M)", "Child: escriba cualquier valor de variación 2 (ej. M)", "Child: testo libero per il valore variante 2 (es. M)", "Child: Variante 2 Wert frei eingeben (z. B. M)"), width: 18, group: "variations" },
     { key: "option3_name", label: "variation3_name", note: x("Parent: variation 3 name (optional)", "Parent: varyasyon 3 adı (isteğe bağlı)", "Parent: nom variation 3 (optionnel)", "Parent: nombre variación 3 (opcional)", "Parent: nome variante 3 (opzionale)", "Parent: Variante 3 Name (optional)"), width: 18, group: "variations" },
-    { key: "option3_value", label: "variation3_value", note: x("Child: variation 3 value", "Child: varyasyon 3 değeri", "Enfant: valeur variation 3", "Child: valor variación 3", "Child: valore variante 3", "Child: Variante 3 Wert"), width: 18, group: "variations" },
+    { key: "option3_value", label: "variation3_value", note: x("Child: type any variation 3 value", "Child: varyasyon 3 değeri serbest metin", "Enfant : saisie libre de la valeur variation 3", "Child: escriba cualquier valor de variación 3", "Child: testo libero per il valore variante 3", "Child: Variante 3 Wert frei eingeben"), width: 18, group: "variations" },
     { key: "option4_name", label: "variation4_name", note: x("Parent: variation 4 name (optional)", "Parent: varyasyon 4 adı (isteğe bağlı)", "Parent: nom variation 4 (optionnel)", "Parent: nombre variación 4 (opcional)", "Parent: nome variante 4 (opzionale)", "Parent: Variante 4 Name (optional)"), width: 18, group: "variations" },
-    { key: "option4_value", label: "variation4_value", note: x("Child: variation 4 value", "Child: varyasyon 4 değeri", "Enfant: valeur variation 4", "Child: valor variación 4", "Child: valore variante 4", "Child: Variante 4 Wert"), width: 18, group: "variations" },
+    { key: "option4_value", label: "variation4_value", note: x("Child: type any variation 4 value", "Child: varyasyon 4 değeri serbest metin", "Enfant : saisie libre de la valeur variation 4", "Child: escriba cualquier valor de variación 4", "Child: testo libero per il valore variante 4", "Child: Variante 4 Wert frei eingeben"), width: 18, group: "variations" },
     { key: "option5_name", label: "variation5_name", note: x("Parent: variation 5 name (optional)", "Parent: varyasyon 5 adı (isteğe bağlı)", "Parent: nom variation 5 (optionnel)", "Parent: nombre variación 5 (opcional)", "Parent: nome variante 5 (opzionale)", "Parent: Variante 5 Name (optional)"), width: 18, group: "variations" },
-    { key: "option5_value", label: "variation5_value", note: x("Child: variation 5 value", "Child: varyasyon 5 değeri", "Enfant: valeur variation 5", "Child: valor variación 5", "Child: valore variante 5", "Child: Variante 5 Wert"), width: 18, group: "variations" },
+    { key: "option5_value", label: "variation5_value", note: x("Child: type any variation 5 value", "Child: varyasyon 5 değeri serbest metin", "Enfant : saisie libre de la valeur variation 5", "Child: escriba cualquier valor de variación 5", "Child: testo libero per il valore variante 5", "Child: Variante 5 Wert frei eingeben"), width: 18, group: "variations" },
     { key: "option6_name", label: "variation6_name", note: x("Parent: variation 6 name (optional)", "Parent: varyasyon 6 adı (isteğe bağlı)", "Parent: nom variation 6 (optionnel)", "Parent: nombre variación 6 (opcional)", "Parent: nome variante 6 (opzionale)", "Parent: Variante 6 Name (optional)"), width: 18, group: "variations" },
-    { key: "option6_value", label: "variation6_value", note: x("Child: variation 6 value", "Child: varyasyon 6 değeri", "Enfant: valeur variation 6", "Child: valor variación 6", "Child: valore variante 6", "Child: Variante 6 Wert"), width: 18, group: "variations" },
+    { key: "option6_value", label: "variation6_value", note: x("Child: type any variation 6 value", "Child: varyasyon 6 değeri serbest metin", "Enfant : saisie libre de la valeur variation 6", "Child: escriba cualquier valor de variación 6", "Child: testo libero per il valore variante 6", "Child: Variante 6 Wert frei eingeben"), width: 18, group: "variations" },
     { key: "unit_type", label: "unit_type", note: x("Dropdown: kg | g | L | ml | piece", "Açılır liste: kg | g | L | ml | piece", "Liste: kg | g | L | ml | piece", "Lista: kg | g | L | ml | piece", "Elenco: kg | g | L | ml | piece", "Dropdown: kg | g | L | ml | piece"), width: 12, group: "core" },
     { key: "unit_value", label: "unit_value", note: x("e.g. 200", "örn. 200", "ex. 200", "ej. 200", "es. 200", "z. B. 200"), width: 12, group: "core" },
     { key: "per_unit", label: "per_unit", note: x("Reference quantity for price per unit (g/ml => 1000, kg/l/piece => 1)", "Birim fiyat referans miktarı (g/ml => 1000, kg/l/piece => 1)", "Quantité de référence prix unitaire", "Cantidad referencia precio unitario", "Quantità riferimento prezzo unitario", "Referenzmenge für Grundpreis (g/ml => 1000, kg/l/piece => 1)"), width: 12, group: "core" },
     { key: "price", label: "price", note: x("Gross selling price in EUR (one price for all markets)", "Tüm pazarlar için EUR brüt satış fiyatı", "Prix de vente TTC en EUR (un prix pour tous les marchés)", "Precio de venta bruto en EUR (un precio para todos los mercados)", "Prezzo di vendita lordo in EUR (un prezzo per tutti i mercati)", "Verkaufspreis brutto in EUR (ein Preis für alle Märkte)"), width: 14, group: "price_eur" },
     { key: "price_uvp", label: "price_uvp", note: x("RRP / list price in EUR (optional)", "EUR tavsiye edilen perakende fiyat (isteğe bağlı)", "Prix conseillé en EUR (optionnel)", "PVP / precio tachado en EUR (opcional)", "Prezzo di listino in EUR (opzionale)", "UVP / Streichpreis in EUR (optional)"), width: 14, group: "price_eur" },
     { key: "price_sale", label: "price_sale", note: x("Sale price in EUR (optional)", "EUR indirimli fiyat (isteğe bağlı)", "Prix promo en EUR (optionnel)", "Precio de oferta en EUR (opcional)", "Prezzo promozionale in EUR (opzionale)", "Aktionspreis in EUR (optional)"), width: 14, group: "price_eur" },
-    { key: "weee_number", label: "weee_number", note: x("WEEE reg. no. (e-waste registration)", "WEEE kayıt no. (elektronik atık)", "N° enregistrement DEEE", "N.º registro RAEE", "N. registro RAEE", "WEEE-Reg.-Nr. (Elektroaltgeräte-Registrierung)"), width: 22, group: "core" },
-    { key: "eprel_number", label: "eprel_number", note: x("EPREL reg. no. (EU energy label)", "EPREL kayıt no. (AB enerji etiketi)", "N° enregistrement EPREL", "N.º registro EPREL", "N. registro EPREL", "EPREL-Reg.-Nr. (EU-Energielabel)"), width: 22, group: "core" },
+    { key: "weee_number", label: "weee_number", note: x("Required for this category: WEEE reg. no.", "Bu kategori için zorunlu: WEEE kayıt no.", "Obligatoire pour cette catégorie : n° DEEE", "Obligatorio para esta categoría: n.º RAEE", "Obbligatorio per questa categoria: n. RAEE", "Für diese Kategorie Pflicht: WEEE-Reg.-Nr."), width: 22, group: "compliance" },
+    { key: "eprel_number", label: "eprel_number", note: x("Required for this category: EPREL reg. no.", "Bu kategori için zorunlu: EPREL kayıt no.", "Obligatoire pour cette catégorie : n° EPREL", "Obligatorio para esta categoría: n.º EPREL", "Obbligatorio per questa categoria: n. EPREL", "Für diese Kategorie Pflicht: EPREL-Reg.-Nr."), width: 22, group: "compliance" },
   ];
-  cols.push(...core);
+  cols.push(...core.filter((col) => !COMPLIANCE_COLUMN_ALIASES[col.key] || wants(col.key)));
+
+  if (known) {
+    const extraKeys = [...required].filter((k) => !COMPLIANCE_KEYS_ALREADY_COLUMNS.has(k)).sort((a, b) => a.localeCompare(b));
+    for (const key of extraKeys) {
+      const def = defs[key] || {};
+      const options = Array.isArray(def.options)
+        ? def.options.map((o) => String(o || "").trim()).filter((o) => o && !o.includes(","))
+        : [];
+      cols.push({
+        key,
+        label: key,
+        note: complianceFieldNote(def, loc, x("Required for the selected categories", "Seçilen kategoriler için zorunlu", "Obligatoire pour les catégories sélectionnées", "Obligatorio para las categorías seleccionadas", "Obbligatorio per le categorie selezionate", "Pflicht für die gewählten Kategorien")),
+        width: 28,
+        group: "compliance",
+        selectOptions: options.length ? options : undefined,
+      });
+    }
+  }
 
   const FILE_SLOTS = 5;
   for (let i = 1; i <= FILE_SLOTS; i++) {
@@ -237,7 +331,7 @@ function buildColumns(locale) {
       {
         key: `metafield_${i}_value`,
         label: `metafield_${i}_value`,
-        note: x(`Eigenschaft ${i} value — dropdown of catalog values; you may type a custom value (approval required)`, `Eigenschaft ${i} değer — katalog değerleri; özel değer yazılabilir (onay gerekir)`, `Eigenschaft ${i} valeur — valeurs catalogue ; saisie libre possible (approbation requise)`, `Eigenschaft ${i} valor — valores del catálogo; puede escribir uno propio (requiere aprobación)`, `Eigenschaft ${i} valore — valori catalogo; testo libero possibile (approvazione richiesta)`, `Eigenschaft ${i} Wert — Katalogwerte im Dropdown; eigener Wert möglich (Freigabe nötig)`),
+        note: x(`Eigenschaft ${i} value — dropdown lists only the values of the title chosen in metafield_${i}_key. You may type a custom value (approval required)`, `Eigenschaft ${i} değer — yalnızca metafield_${i}_key içinde seçilen başlığın değerleri. Özel değer yazılabilir (onay gerekir)`, `Eigenschaft ${i} valeur — uniquement les valeurs du titre choisi dans metafield_${i}_key. Saisie libre possible (approbation requise)`, `Eigenschaft ${i} valor — solo los valores del título elegido en metafield_${i}_key. Puede escribir uno propio (requiere aprobación)`, `Eigenschaft ${i} valore — solo i valori del titolo scelto in metafield_${i}_key. Testo libero possibile (approvazione richiesta)`, `Eigenschaft ${i} Wert — Dropdown zeigt nur die Werte des in metafield_${i}_key gewählten Titels. Eigener Wert möglich (Freigabe nötig)`),
         width: 34,
         group: "metafields",
         outline: 1,
@@ -271,12 +365,14 @@ const COLORS = {
   seo: { argb: "FF4A235A" },
   meta: { argb: "FF5F4B0B" },
   files: { argb: "FF1A5276" },
+  compliance: { argb: "FF6B2D5B" },
   coreBg: { argb: "FFCCE5FF" },
   langBg: { argb: "FFD5F5E3" },
   priceBg: { argb: "FFFDEBD0" },
   price_eurBg: { argb: "FFFDEBD0" },
   seoBg: { argb: "FFF3E5F5" },
   metaBg: { argb: "FFF9E79F" },
+  complianceBg: { argb: "FFF5E6F0" },
   filesBg: { argb: "FFD6EAF8" },
   groupRow: { argb: "FFE8F4F8" },
 };
@@ -313,6 +409,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       skuUpdate:
         "Bestehende Produkte: Stimmt die Parent-SKU mit einer SKU im System überein, wird das Produkt aktualisiert — es wird nur überschrieben, was in der Excel-Zelle gefüllt ist; leere Zellen lassen die bisherigen Werte unverändert.",
       brandsCount: (n) => `(${n} Marken im Dropdown verfügbar)`,
+      brandsRegister: "Fehlt eine Marke, legen Sie sie zuerst unter Content → Brands in Seller Central an und laden Sie die Vorlage danach neu herunter.",
     },
     en: {
       title: "ANDERTAL — Import products via Excel",
@@ -333,6 +430,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       skuUpdate:
         "Existing products: If the parent row SKU matches a product SKU in the system, that product is updated — only cells you fill in Excel overwrite data; empty cells keep the previous values.",
       brandsCount: (n) => `(${n} brands available in the dropdown)`,
+      brandsRegister: "If a brand is missing, register it under Content → Brands in Seller Central, then download the template again.",
     },
     tr: {
       title: "ANDERTAL — Excel ile ürün içe aktarma",
@@ -353,6 +451,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       skuUpdate:
         "Mevcut ürünler: Parent SKU sistemdeki bir SKU ile eşleşirse ürün güncellenir — yalnızca doldurduğunuz hücreler üzerine yazılır; boş hücreler önceki değeri korur.",
       brandsCount: (n) => `(${n} marka açılır listede mevcut)`,
+      brandsRegister: "Listede olmayan markayı önce Seller Central'da Content → Brands üzerinden kaydedin, sonra şablonu yeniden indirin.",
     },
     fr: {
       title: "ANDERTAL — Importer des produits via Excel",
@@ -372,6 +471,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       comments: "Les lignes vides sont ignorées. Les lignes dont le SKU commence par # sont des commentaires.",
       skuUpdate: "Produits existants : si la SKU parent correspond, seules les cellules remplies écrasent les données ; les cellules vides conservent les valeurs précédentes.",
       brandsCount: (n) => `(${n} marques disponibles dans la liste)`,
+      brandsRegister: "Si une marque manque, enregistrez-la sous Content → Brands dans Seller Central, puis téléchargez à nouveau le modèle.",
     },
     es: {
       title: "ANDERTAL — Importar productos vía Excel",
@@ -391,6 +491,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       comments: "Se omiten filas vacías. Las filas con SKU que empieza por # son comentarios.",
       skuUpdate: "Productos existentes: si la SKU parent coincide, solo las celdas rellenas sobrescriben datos; las vacías conservan valores anteriores.",
       brandsCount: (n) => `(${n} marcas disponibles en el desplegable)`,
+      brandsRegister: "Si falta una marca, regístrela en Content → Brands en Seller Central y vuelva a descargar la plantilla.",
     },
     it: {
       title: "ANDERTAL — Importare prodotti via Excel",
@@ -410,6 +511,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
       comments: "Le righe vuote vengono saltate. Le righe con SKU che inizia per # sono commenti.",
       skuUpdate: "Prodotti esistenti: se la SKU parent corrisponde, solo le celle compilate sovrascrivono i dati; le vuote mantengono i valori precedenti.",
       brandsCount: (n) => `(${n} marchi disponibili nel menu)`,
+      brandsRegister: "Se manca un brand, registralo in Content → Brands su Seller Central e scarica di nuovo il modello.",
     },
   };
   const pack = L[loc] || L.en;
@@ -431,6 +533,7 @@ function buildLocalizedInstructions(locale, { categoryRows, brandNames, shipName
   lines.push(["", ""]);
   lines.push(["", pack.brandsTitle]);
   lines.push(["", brandNames.length ? pack.brandsCount(brandNames.length) : "(—)"]);
+  lines.push(["", pack.brandsRegister]);
   lines.push(["", ""]);
   lines.push(["", pack.shipTitle]);
   if (shipNames.length === 0) {
@@ -461,7 +564,7 @@ function defDisplayLabel(key, def, locale) {
 }
 
 function fillListsSheet(ws, lists) {
-  const { productTypes, statuses, unitTypes, categorySlugs, brandNames, shipNames, titleAliases, allValues } = lists;
+  const { productTypes, statuses, unitTypes, categorySlugs, brandNames, shipNames, titleAliases } = lists;
 
   productTypes.forEach((v, i) => { ws.getCell(i + 1, 1).value = v; });
   statuses.forEach((v, i) => { ws.getCell(i + 1, 2).value = v; });
@@ -470,13 +573,12 @@ function fillListsSheet(ws, lists) {
   brandNames.forEach((v, i) => { ws.getCell(i + 1, 5).value = v; });
   shipNames.forEach((v, i) => { ws.getCell(i + 1, 6).value = v; });
   (titleAliases || []).forEach((v, i) => { ws.getCell(i + 1, 7).value = v; });
-  (allValues || []).forEach((v, i) => { ws.getCell(i + 1, 8).value = v; });
 
   ws.state = "veryHidden";
   ws.columns = [
     { width: 14 }, { width: 12 }, { width: 10 },
     { width: 28 }, { width: 22 }, { width: 26 },
-    { width: 28 }, { width: 28 },
+    { width: 28 },
   ];
 
   return {
@@ -487,8 +589,75 @@ function fillListsSheet(ws, lists) {
     rE: { col: 5, start: 1, end: Math.max(1, brandNames.length) },
     rF: { col: 6, start: 1, end: Math.max(1, shipNames.length) },
     rTitles: { col: 7, start: 1, end: Math.max(1, (titleAliases || []).length) },
-    rValues: { col: 8, start: 1, end: Math.max(1, (allValues || []).length) },
   };
+}
+
+function valuesForMetafieldDef(def, locale) {
+  const out = [];
+  const seen = new Set();
+  const push = (raw) => {
+    const s = String(raw || "").trim();
+    if (!s) return;
+    const lk = s.toLowerCase();
+    if (seen.has(lk)) return;
+    seen.add(lk);
+    out.push(s);
+  };
+  for (const v of (Array.isArray(def?.values) ? def.values : [])) push(v);
+  const vi18n = def?.values_i18n && typeof def.values_i18n === "object" ? def.values_i18n : {};
+  const locMap = vi18n[locale];
+  if (locMap && typeof locMap === "object") {
+    for (const translated of Object.values(locMap)) push(translated);
+  }
+  out.sort((a, b) => a.localeCompare(b, locale));
+  return out;
+}
+
+/**
+ * metafield_N_value dropdown follows the title in metafield_N_key on the same row.
+ * Each definition's aliases map to one named range that contains only that definition's values.
+ */
+function writeMetafieldValueSheet(wb, groups) {
+  const ws = wb.addWorksheet("MetaVals");
+  // hidden, not veryHidden: Excel INDIRECT() cannot read veryHidden sheets, and the
+  // value dropdown resolves the selected key through INDIRECT.
+  ws.state = "hidden";
+  ws.getCell(1, 3).value = "";
+  wb.definedNames.add("MetaVals!$C$1:$C$1", "mf_empty");
+
+  let mapRow = 1;
+  let valueCol = 4;
+  for (const group of groups) {
+    const values = group.values || [];
+    let rangeName = "mf_empty";
+    if (values.length) {
+      rangeName = `mf_${valueCol}`;
+      values.forEach((v, r) => { ws.getCell(r + 1, valueCol).value = v; });
+      const letter = colLetter(valueCol);
+      wb.definedNames.add(`MetaVals!$${letter}$1:$${letter}$${values.length}`, rangeName);
+      valueCol += 1;
+    }
+    for (const alias of group.aliases) {
+      ws.getCell(mapRow, 1).value = alias;
+      ws.getCell(mapRow, 2).value = rangeName;
+      mapRow += 1;
+    }
+  }
+  return Math.max(1, mapRow - 1);
+}
+
+function applyDependentMetafieldValues(ws, keyColIndex, valueColIndex, mapRows) {
+  const keyLetter = colLetter(keyColIndex);
+  const valueLetter = colLetter(valueColIndex);
+  const last = Math.max(1, mapRows);
+  // Formula is relative to row 4; Excel shifts it for each row in the range.
+  const formula = `=INDIRECT(IFERROR(VLOOKUP(${keyLetter}4,MetaVals!$A$1:$B$${last},2,FALSE),"mf_empty"))`;
+  ws.dataValidations.add(`${valueLetter}4:${valueLetter}5000`, {
+    type: "list",
+    allowBlank: true,
+    formulae: [formula],
+    showErrorMessage: false,
+  });
 }
 
 function applyListValidation(ws, colIndex, listRef, maxRow = 5000, { allowCustom = false } = {}) {
@@ -511,6 +680,7 @@ async function buildWorkbook({
   brands,
   shippingGroups,
   metafieldDefs,
+  compliance,
 }) {
   const loc = String(locale || "de").slice(0, 2).toLowerCase();
   const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
@@ -527,7 +697,7 @@ async function buildWorkbook({
     views: [{ state: "frozen", ySplit: 3, xSplit: 0 }],
   });
 
-  const cols = buildColumns(loc);
+  const cols = buildColumns(loc, compliance);
   cols.forEach((col, i) => {
     const exCol = ws.getColumn(i + 1);
     exCol.width = col.width;
@@ -554,6 +724,7 @@ async function buildWorkbook({
     metafields: { label: x("Eigenschaften", "Eigenschaften", "Eigenschaften", "Eigenschaften", "Eigenschaften", "Eigenschaften"), bg: COLORS.metaBg, fg: COLORS.meta },
     price_eur: { label: x("💰 Prices (EUR)", "💰 Fiyatlar (EUR)", "💰 Prix (EUR)", "💰 Precios (EUR)", "💰 Prezzi (EUR)", "💰 Preise (EUR)"), bg: COLORS.price_eurBg, fg: COLORS.price_eur },
     files: { label: x("📁 Files (optional)", "📁 Dosyalar (isteğe bağlı)", "📁 Fichiers (optionnel)", "📁 Archivos (opcional)", "📁 File (opzionale)", "📁 Dateien (optional)"), bg: COLORS.filesBg, fg: COLORS.files },
+    compliance: { label: x("Compliance (required for selected categories)", "Uyumluluk (seçilen kategoriler için zorunlu)", "Conformité (obligatoire pour les catégories sélectionnées)", "Cumplimiento (obligatorio para las categorías seleccionadas)", "Conformità (obbligatorio per le categorie selezionate)", "Compliance (Pflicht für gewählte Kategorien)"), bg: COLORS.complianceBg, fg: COLORS.compliance },
   };
   const uiLangLabels = langLabelsFor(loc);
   LANGS.forEach((l) => {
@@ -583,12 +754,13 @@ async function buildWorkbook({
     const isPri = col.group === "price_eur" || col.group.startsWith("price_");
     const isMeta = col.group === "metafields";
     const isFiles = col.group === "files";
+    const isCompliance = col.group === "compliance";
     cell.fill = headerFill(
-      isLang ? COLORS.langBg : isPri ? COLORS.price_eurBg : col.group === "seo" ? COLORS.seoBg : isMeta ? COLORS.metaBg : isFiles ? COLORS.filesBg : COLORS.coreBg
+      isLang ? COLORS.langBg : isPri ? COLORS.price_eurBg : col.group === "seo" ? COLORS.seoBg : isMeta ? COLORS.metaBg : isFiles ? COLORS.filesBg : isCompliance ? COLORS.complianceBg : COLORS.coreBg
     );
     cell.font = {
       bold: true,
-      color: isLang ? COLORS.lang : isPri ? COLORS.price_eur : col.group === "seo" ? COLORS.seo : isMeta ? COLORS.meta : isFiles ? COLORS.files : COLORS.core,
+      color: isLang ? COLORS.lang : isPri ? COLORS.price_eur : col.group === "seo" ? COLORS.seo : isMeta ? COLORS.meta : isFiles ? COLORS.files : isCompliance ? COLORS.compliance : COLORS.core,
       size: 9,
     };
     cell.alignment = { horizontal: "left", vertical: "middle" };
@@ -738,41 +910,23 @@ async function buildWorkbook({
   const defs = metafieldDefs && typeof metafieldDefs === "object" ? metafieldDefs : {};
   const titleAliases = [];
   const seenAlias = new Set();
-  const allValues = [];
-  const seenVal = new Set();
+  const metafieldGroups = [];
   for (const [key, def] of Object.entries(defs)) {
     const k = String(key || "").trim();
     if (!k) continue;
     const label = defDisplayLabel(k, def, loc);
+    const aliases = [];
     for (const alias of [label, k, def?.label].map((x) => String(x || "").trim()).filter(Boolean)) {
       const lk = alias.toLowerCase();
       if (seenAlias.has(lk)) continue;
       seenAlias.add(lk);
+      aliases.push(alias);
       titleAliases.push(alias);
     }
-    for (const v of (Array.isArray(def?.values) ? def.values : [])) {
-      const s = String(v || "").trim();
-      if (!s) continue;
-      const lk = s.toLowerCase();
-      if (seenVal.has(lk)) continue;
-      seenVal.add(lk);
-      allValues.push(s);
-    }
-    const vi18n = def?.values_i18n && typeof def.values_i18n === "object" ? def.values_i18n : {};
-    const locMap = vi18n[loc];
-    if (locMap && typeof locMap === "object") {
-      for (const translated of Object.values(locMap)) {
-        const s = String(translated || "").trim();
-        if (!s) continue;
-        const lk = s.toLowerCase();
-        if (seenVal.has(lk)) continue;
-        seenVal.add(lk);
-        allValues.push(s);
-      }
-    }
+    if (!aliases.length) continue;
+    metafieldGroups.push({ aliases, values: valuesForMetafieldDef(def, loc) });
   }
   titleAliases.sort((a, b) => a.localeCompare(b, loc));
-  allValues.sort((a, b) => a.localeCompare(b, loc));
 
   const listRefs = fillListsSheet(listsWs, {
     productTypes: ["parent", "child"],
@@ -782,8 +936,8 @@ async function buildWorkbook({
     brandNames: brandNames.length ? brandNames : ["—"],
     shipNames: shipNames.length ? shipNames : ["—"],
     titleAliases: titleAliases.length ? titleAliases : ["—"],
-    allValues: allValues.length ? allValues : ["—"],
   });
+  const metaMapRows = writeMetafieldValueSheet(wb, metafieldGroups);
 
   const ix = (k) => keyIndex[k] + 1;
   applyListValidation(ws, ix("product_type"), listRefs.rA);
@@ -795,12 +949,27 @@ async function buildWorkbook({
   if (titleAliases.length) {
     for (let i = 1; i <= 6; i++) {
       applyListValidation(ws, ix(`option${i}_name`), listRefs.rTitles, 5000, { allowCustom: true });
-      applyListValidation(ws, ix(`option${i}_value`), listRefs.rValues, 5000, { allowCustom: true });
+      // variationN_value is free text. Do not attach the Eigenschaften value list
+      // (1 Liter, 100 Watt, …) — that catalog belongs only on metafield_N_value.
     }
     for (let i = 1; i <= METAFIELD_PAIRS; i++) {
       applyListValidation(ws, ix(`metafield_${i}_key`), listRefs.rTitles, 5000, { allowCustom: true });
-      applyListValidation(ws, ix(`metafield_${i}_value`), listRefs.rValues, 5000, { allowCustom: true });
+      applyDependentMetafieldValues(ws, ix(`metafield_${i}_key`), ix(`metafield_${i}_value`), metaMapRows);
     }
+  }
+
+  for (const col of cols) {
+    const options = Array.isArray(col.selectOptions) ? col.selectOptions : [];
+    if (!options.length || keyIndex[col.key] == null) continue;
+    const inline = `"${options.join(",")}"`;
+    if (inline.length > 240) continue;
+    const letter = colLetter(keyIndex[col.key] + 1);
+    ws.dataValidations.add(`${letter}4:${letter}5000`, {
+      type: "list",
+      allowBlank: true,
+      formulae: [inline],
+      showErrorMessage: false,
+    });
   }
 
   return wb.xlsx.writeBuffer();
@@ -875,12 +1044,15 @@ export async function POST(request) {
       );
     }
 
+    const compliance = await loadCategoryCompliance(backendUrl, sellerToken, categoriesForList);
+
     const buf = await buildWorkbook({
       locale,
       categoriesForList,
       brands,
       shippingGroups,
       metafieldDefs,
+      compliance,
     });
 
     return new Response(buf, {

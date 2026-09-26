@@ -672,7 +672,7 @@ class MedusaAdminClient {
   }
 
   async getBrands() {
-    const data = await this.request('/admin-hub/brands').catch(() => ({ brands: [] }))
+    const data = await this.request('/admin-hub/brands')
     return { brands: data.brands || [] }
   }
 

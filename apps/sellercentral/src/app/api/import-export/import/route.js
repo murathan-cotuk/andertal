@@ -251,11 +251,27 @@ async function loadImportLookups(backendUrl, sellerToken) {
   } catch {
     brands = [];
   }
+  if (!brands.length) {
+    try {
+      const data = await fetchJson(`${backendUrl}/store/brands`);
+      brands = Array.isArray(data.brands) ? data.brands : [];
+    } catch {
+      brands = [];
+    }
+  }
 
+  const brandRank = (b) => {
+    const s = String(b?.status || "active");
+    if (s === "active") return 2;
+    if (s === "pending") return 1;
+    return 0;
+  };
   const brandByLowerName = new Map();
   for (const b of brands) {
     const k = String(b.name || "").trim().toLowerCase();
-    if (k) brandByLowerName.set(k, b);
+    if (!k) continue;
+    const prev = brandByLowerName.get(k);
+    if (!prev || brandRank(b) > brandRank(prev)) brandByLowerName.set(k, b);
   }
 
   let shipGroups = [];
@@ -429,6 +445,37 @@ function collectRowMetafields(row, headers, idx) {
     if (k) out.push({ key: k, value: v });
   }
   return out.length ? out : undefined;
+}
+
+const RESERVED_IMPORT_HEADERS = new Set([
+  "product_type", "sku", "parent_sku", "status", "ean", "inventory", "brand", "type",
+  "category_slug", "shipping_group", "manufacturer", "hersteller",
+  "manufacturer_information", "hersteller_information",
+  "responsible_person_information", "verantwortliche_person_information",
+  "weight_grams", "dim_length_cm", "dim_width_cm", "dim_height_cm",
+  "unit_type", "unit_value", "per_unit", "unit_reference",
+  "price", "price_uvp", "price_sale", "weee_number", "eprel_number", "swatch_image_url",
+  "title", "description", "bullet1", "bullet2", "bullet3", "bullet4", "bullet5",
+  "seo_title", "seo_description", "seo_keywords", "verkäufer", "_product_id",
+]);
+
+function isReservedImportHeader(key) {
+  const k = String(key || "");
+  if (!k || RESERVED_IMPORT_HEADERS.has(k.toLowerCase())) return true;
+  if (/^(image_url_\d+|file_\d+_(url|name)|option\d+_(name|value)|variation\d+_(name|value)|metafield_\d+_(key|value)|variant_metafield_\d+_(key|value)|title_.+|description_.+|bullet\d+_.+|seo_(title|description|keywords)_.+)$/i.test(k)) return true;
+  return false;
+}
+
+/** Category compliance columns that are not part of the fixed template (e.g. energy_label_image). */
+function collectComplianceExtras(row, idx) {
+  const out = {};
+  for (const key of Object.keys(idx)) {
+    if (isReservedImportHeader(key)) continue;
+    if (!/^[a-z][a-z0-9_]{0,80}$/.test(key)) continue;
+    const v = str(row[idx[key]] ?? "");
+    if (v) out[key] = v;
+  }
+  return out;
 }
 
 function rowHasMetafieldColumnsTouched(row, idx) {
@@ -913,6 +960,23 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
   }
   if (parentPresent.weee_number && pm.weee_number) m.weee_number = pm.weee_number;
   if (parentPresent.eprel_number && pm.eprel_number) m.eprel_number = pm.eprel_number;
+  if (pm && typeof pm === "object") {
+    const structural = new Set([
+      "translations", "prices", "media", "ean", "weight_grams",
+      "dimensions_length", "dimensions_width", "dimensions_height",
+      "unit_type", "unit_value", "unit_reference", "variation_groups",
+      "seo_meta_title", "seo_meta_description", "seo_keywords",
+      "hersteller", "hersteller_information", "verantwortliche_person_information",
+      "weee_number", "eprel_number", "product_files", "metafields",
+      "brand_id", "category_id", "category_slug", "shipping_group_id", "type",
+    ]);
+    for (const [k, v] of Object.entries(pm)) {
+      if (structural.has(k) || v == null || v === "") continue;
+      if (typeof v !== "string") continue;
+      if (!/^[a-z][a-z0-9_]{0,80}$/.test(k)) continue;
+      m[k] = v;
+    }
+  }
   if (parentPresent.productFilesTouched && Array.isArray(pm.product_files)) m.product_files = pm.product_files;
   if (parentPresent.type && pm.type) m.type = pm.type;
 
@@ -1113,6 +1177,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
     verantwortliche_person_information: G("verantwortliche_person_information") || undefined,
     weee_number: G("weee_number") || undefined,
     eprel_number: G("eprel_number") || undefined,
+    ...collectComplianceExtras(parentRow, idx),
     ...((() => { const pf = collectProductFiles(parentRow, idx); return pf ? { product_files: pf } : {}; })()),
     ...(metafields ? { metafields } : {}),
   };

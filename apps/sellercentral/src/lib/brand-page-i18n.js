@@ -14,6 +14,7 @@ export function getBrandPageCopy(locale, isSuperuser) {
     deleteError: t(locale, "Failed to delete.", "Silme başarısız.", "Échec de la suppression.", "Error al eliminar.", "Eliminazione non riuscita.", "Löschen fehlgeschlagen."),
     nameRequired: t(locale, "Brand name is required.", "Marka adı zorunludur.", "Le nom de la marque est obligatoire.", "El nombre de marca es obligatorio.", "Il nome del brand è obbligatorio.", "Markenname ist erforderlich."),
     loading: t(locale, "Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Laden…"),
+    loadError: t(locale, "Brands could not be loaded. Refresh the page.", "Markalar yüklenemedi. Sayfayı yenileyin.", "Impossible de charger les marques. Actualisez la page.", "No se pudieron cargar las marcas. Actualice la página.", "Impossibile caricare i brand. Aggiorna la pagina.", "Marken konnten nicht geladen werden. Seite neu laden."),
     myBrands: t(locale, "My Brands", "Markalarım", "Mes marques", "Mis marcas", "I miei brand", "Meine Marken"),
     allBrands: isSuperuser
       ? t(locale, "All Brands", "Tüm Markalar", "Toutes les marques", "Todas las marcas", "Tutti i brand", "Alle Marken")

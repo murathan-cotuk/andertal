@@ -91,8 +91,12 @@ function resolveComplianceProfile(profileId, marketplace = DEFAULT_MARKETPLACE) 
   for (const entry of overlay.national_register_fields || []) {
     const nf = typeof entry === 'string' ? { field: entry, requires_if_base_field: null } : entry
     if (!nf || !nf.field) continue
-    if (nf.requires_if_base_field && baseRequiredSet.has(nf.requires_if_base_field)) {
-      nationalRequired.push(nf.field)
+    const trigger = nf.requires_if_base_field ? String(nf.requires_if_base_field).trim() : ''
+    // Trigger set but this product type does not require it → omit the field.
+    // Otherwise a furniture category would still list WEEE as "optional" just because
+    // the DE overlay mentions weee_number. null trigger → suggested, never blocking.
+    if (trigger) {
+      if (baseRequiredSet.has(trigger)) nationalRequired.push(nf.field)
     } else {
       nationalSuggested.push(nf.field)
     }

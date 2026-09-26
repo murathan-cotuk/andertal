@@ -220,6 +220,7 @@ export default function BrandPage() {
 
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBrand, setEditingBrand] = useState(null); // full brand object (null = create)
   const [saving, setSaving] = useState(false);
@@ -455,9 +456,13 @@ export default function BrandPage() {
 
   const loadBrands = () => {
     setLoading(true);
+    setLoadError("");
     client.getBrands()
       .then((r) => setBrands(r.brands || []))
-      .catch(() => setBrands([]))
+      .catch((e) => {
+        setBrands([]);
+        setLoadError(userError(e, locale, copy.loadError));
+      })
       .finally(() => setLoading(false));
   };
 
@@ -633,6 +638,11 @@ export default function BrandPage() {
             onDismiss={() => setMessage({ type: "", text: "" })}
           >
             {message.text}
+          </Banner>
+        )}
+        {loadError && (
+          <Banner tone="critical" onDismiss={() => setLoadError("")}>
+            {loadError}
           </Banner>
         )}
 

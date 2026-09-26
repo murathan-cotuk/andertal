@@ -13,8 +13,9 @@ const LABELS = {
     emailPlaceholder: "E-Mail-Adresse",
     passwordPlaceholder: "Passwort",
     loginBtn: "Weiter zur Unterzeichnung",
-    signHeading: "Unterschreiben Sie hier",
-    signSub: "Bitte unterschreiben Sie in dem gelben Feld mit Ihrem Finger oder der Maus.",
+    signHeading: "Vereinbarung lesen und unterschreiben",
+    signSub: "Bitte lesen Sie die vollständige Vereinbarung unten. Unterschreiben Sie anschließend im gelben Feld.",
+    contractHeading: "Vertragsinhalt",
     clearBtn: "Loeschen",
     submitBtn: "Vereinbarung unterzeichnen",
     successHeading: "Vielen Dank!",
@@ -31,8 +32,9 @@ const LABELS = {
     emailPlaceholder: "E-Posta Adresi",
     passwordPlaceholder: "Sifre",
     loginBtn: "Imzalamaya Devam Et",
-    signHeading: "Buraya Imzalayin",
-    signSub: "Lutfen sari kutucugun icine parmaginiz veya fare ile imzanizi atin.",
+    signHeading: "Sozlesmeyi okuyun ve imzalayin",
+    signSub: "Lutfen asagidaki sozlesmenin tamamini okuyun. Ardindan sari alana imzanizi atin.",
+    contractHeading: "Sozlesme metni",
     clearBtn: "Temizle",
     submitBtn: "Sozlesmeyi Imzala",
     successHeading: "Tesekkurler!",
@@ -49,8 +51,9 @@ const LABELS = {
     emailPlaceholder: "Email Address",
     passwordPlaceholder: "Password",
     loginBtn: "Continue to Sign",
-    signHeading: "Sign Here",
-    signSub: "Please sign inside the yellow box using your finger or mouse.",
+    signHeading: "Read and sign the agreement",
+    signSub: "Please read the full agreement below. Then sign inside the yellow box.",
+    contractHeading: "Agreement text",
     clearBtn: "Clear",
     submitBtn: "Sign Agreement",
     successHeading: "Thank You!",
@@ -67,8 +70,9 @@ const LABELS = {
     emailPlaceholder: "Adresse e-mail",
     passwordPlaceholder: "Mot de passe",
     loginBtn: "Continuer vers la signature",
-    signHeading: "Signez ici",
-    signSub: "Veuillez signer dans le cadre jaune avec votre doigt ou la souris.",
+    signHeading: "Lire et signer l'accord",
+    signSub: "Veuillez lire l'accord complet ci-dessous, puis signer dans le cadre jaune.",
+    contractHeading: "Texte de l'accord",
     clearBtn: "Effacer",
     submitBtn: "Signer l'accord",
     successHeading: "Merci !",
@@ -85,8 +89,9 @@ const LABELS = {
     emailPlaceholder: "Correo electronico",
     passwordPlaceholder: "Contrasena",
     loginBtn: "Continuar para firmar",
-    signHeading: "Firme aqui",
-    signSub: "Por favor firme dentro del cuadro amarillo con su dedo o el raton.",
+    signHeading: "Lea y firme el acuerdo",
+    signSub: "Lea el acuerdo completo a continuacion y firme en el cuadro amarillo.",
+    contractHeading: "Texto del acuerdo",
     clearBtn: "Borrar",
     submitBtn: "Firmar el acuerdo",
     successHeading: "Gracias!",
@@ -103,8 +108,9 @@ const LABELS = {
     emailPlaceholder: "Indirizzo e-mail",
     passwordPlaceholder: "Password",
     loginBtn: "Continua per firmare",
-    signHeading: "Firma qui",
-    signSub: "Si prega di firmare nel riquadro giallo con il dito o il mouse.",
+    signHeading: "Leggere e firmare l'accordo",
+    signSub: "Leggere l'accordo completo qui sotto, poi firmare nel riquadro giallo.",
+    contractHeading: "Testo dell'accordo",
     clearBtn: "Cancella",
     submitBtn: "Firma l'accordo",
     successHeading: "Grazie!",
@@ -130,6 +136,8 @@ export default function SignPage() {
   const [signSession, setSignSession] = useState(null);
   const [signError, setSignError] = useState("");
   const [signLoading, setSignLoading] = useState(false);
+  const [agreement, setAgreement] = useState(null);
+  const [agreementLoading, setAgreementLoading] = useState(false);
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
   const lastPosRef = useRef({ x: 0, y: 0 });
@@ -145,6 +153,24 @@ export default function SignPage() {
       })
       .catch(() => setStep("expired"));
   }, [token]); // intentionally omits BACKEND_URL (constant)
+
+  useEffect(() => {
+    if (step !== "sign") return;
+    let cancelled = false;
+    setAgreementLoading(true);
+    fetch(`/api/seller-agreement?locale=${encodeURIComponent(locale || "de")}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setAgreement(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAgreement(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAgreementLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [step, locale]);
 
   useEffect(() => {
     if (step !== "sign") return;
@@ -228,10 +254,18 @@ export default function SignPage() {
 
   const s = {
     page: { fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", margin: 0, background: "#f5f5f5", minHeight: "100vh", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px 64px", boxSizing: "border-box" },
-    card: { background: "#fff", borderRadius: 14, boxShadow: "0 2px 20px rgba(0,0,0,.10)", padding: "36px 28px", width: "100%", maxWidth: 440, marginTop: 16 },
+    card: { background: "#fff", borderRadius: 14, boxShadow: "0 2px 20px rgba(0,0,0,.10)", padding: "36px 28px", width: "100%", maxWidth: 720, marginTop: 16 },
     logo: { textAlign: "center", marginBottom: 24, fontSize: 22, fontWeight: 800, color: "#136761", letterSpacing: -0.5 },
     h2: { margin: "0 0 6px", fontSize: 19, fontWeight: 700, color: "#111" },
+    h3: { margin: "0 0 10px", fontSize: 15, fontWeight: 700, color: "#222" },
     sub: { color: "#666", fontSize: 14, marginBottom: 20, lineHeight: 1.5, margin: "0 0 20px" },
+    contractBox: {
+      maxHeight: 320, overflowY: "auto", border: "1px solid #e5e5e5", borderRadius: 8,
+      padding: "14px 16px", marginBottom: 18, background: "#fafafa", fontSize: 13, lineHeight: 1.55, color: "#333",
+    },
+    sectionH: { fontWeight: 700, margin: "14px 0 6px", fontSize: 13.5, color: "#111" },
+    sectionB: { whiteSpace: "pre-line", margin: "0 0 8px", color: "#444" },
+    meta: { fontSize: 12, color: "#666", marginBottom: 10 },
     input: { width: "100%", padding: "12px 14px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box", WebkitAppearance: "none", marginBottom: 14, display: "block" },
     btn: { width: "100%", padding: 13, background: "#136761", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: "pointer", display: "block" },
     btnDisabled: { background: "#999", cursor: "not-allowed" },
@@ -281,6 +315,27 @@ export default function SignPage() {
           <>
             <h2 style={s.h2}>{t.signHeading}</h2>
             <p style={s.sub}>{t.signSub}</p>
+            <h3 style={s.h3}>{t.contractHeading}</h3>
+            <div style={s.contractBox}>
+              {agreementLoading && <div style={s.center}>...</div>}
+              {!agreementLoading && agreement?.governing_note && (
+                <div style={{ ...s.meta, fontWeight: 600 }}>{agreement.governing_note}</div>
+              )}
+              {!agreementLoading && agreement?.version && (
+                <div style={s.meta}>
+                  Version {agreement.version}{agreement.updated ? ` · ${agreement.updated}` : ""}
+                </div>
+              )}
+              {!agreementLoading && Array.isArray(agreement?.sections) && agreement.sections.map((sec) => (
+                <div key={sec.heading}>
+                  <div style={s.sectionH}>{sec.heading}</div>
+                  <p style={s.sectionB}>{sec.body}</p>
+                </div>
+              ))}
+              {!agreementLoading && !agreement?.sections?.length && (
+                <div style={s.center}>{t.errorGeneral}</div>
+              )}
+            </div>
             <canvas ref={canvasRef} width={800} height={300} style={s.canvas} />
             <div style={s.btnRow}>
               <button style={s.btnClear}

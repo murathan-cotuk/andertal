@@ -364,7 +364,7 @@ const sellerAuthRegisterPOST = async (req, res) => {
     const effective_store_name = sub_of_seller_id ? null : (store_name || null)
     const agreement_accepted = !!body.agreement_accepted
     const agreement_accepted_at = agreement_accepted ? new Date().toISOString() : null
-    const agreement_version = body.agreement_version || '1.0'
+    const agreement_version = body.agreement_version || require('../seller-agreement-contract').AGREEMENT_VERSION
     const agreement_ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || null
     // docs/affiliate.md PR 6 — Model 1. Only stamps WHO referred this account; the actual
     // commission-generating seller_referrals row (with its UNIQUE seller_id lock-in) is created
