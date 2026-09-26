@@ -116,13 +116,16 @@ async function fetchJson(url, init = {}) {
 
 async function registerImportedMediaUrls(backendUrl, authHeaders, urls, targetSellerId = null) {
   const cleaned = [...new Set((urls || []).map((u) => String(u || "").trim()).filter((u) => /^https?:\/\//i.test(u)))];
-  if (!cleaned.length) return null;
+  if (!cleaned.length) return { registered: 0, skipped: 0, folder: null, errors: [], url_map: {} };
 
-  const CHUNK_SIZE = 150;
+  // Backend ingests (download→WebP→R2) with max 40/request and concurrency 3 — keep chunks small
+  // so Vercel/serverless import route does not time out on large catalogs.
+  const CHUNK_SIZE = 30;
   let registered = 0;
   let skipped = 0;
   let folder = null;
   const errors = [];
+  const urlMap = {};
 
   for (let i = 0; i < cleaned.length; i += CHUNK_SIZE) {
     const chunk = cleaned.slice(i, i + CHUNK_SIZE);
@@ -131,13 +134,23 @@ async function registerImportedMediaUrls(backendUrl, authHeaders, urls, targetSe
       const mr = await fetch(`${backendUrl}/admin-hub/v1/media/import-urls`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ urls: chunk, ...(targetSellerId ? { target_seller_id: targetSellerId } : {}) }),
+        body: JSON.stringify({
+          urls: chunk,
+          purpose: "product",
+          ...(targetSellerId ? { target_seller_id: targetSellerId } : {}),
+        }),
       });
       if (mr.ok) {
         const data = await mr.json().catch(() => ({}));
         registered += Number(data?.registered || 0);
         skipped += Number(data?.skipped || 0);
         if (!folder && data?.folder) folder = data.folder;
+        if (data?.url_map && typeof data.url_map === "object") {
+          Object.assign(urlMap, data.url_map);
+        }
+        if (Array.isArray(data?.errors)) {
+          for (const e of data.errors) errors.push(typeof e === "string" ? e : e?.message || JSON.stringify(e));
+        }
         chunkDone = true;
       } else {
         const t = await mr.text().catch(() => "");
@@ -147,25 +160,52 @@ async function registerImportedMediaUrls(backendUrl, authHeaders, urls, targetSe
       errors.push(`import-urls error: ${e?.message || "request failed"}`);
     }
 
-    // Fallback for older/backward deployments: try one-by-one URL registration endpoint.
+    // Fallback for older backends: register URL only (no ingest) via add-url.
     if (!chunkDone) {
       for (const url of chunk) {
         try {
           const ar = await fetch(`${backendUrl}/admin-hub/v1/media/add-url`, {
             method: "POST",
             headers: { "Content-Type": "application/json", ...authHeaders },
-            body: JSON.stringify({ url }),
+            body: JSON.stringify({ url, purpose: "product" }),
           });
-          if (ar.ok) registered++;
-          else skipped++;
+          if (ar.ok) {
+            const data = await ar.json().catch(() => ({}));
+            const hosted = data?.media?.url || url;
+            urlMap[url] = hosted;
+            registered++;
+          } else {
+            urlMap[url] = url;
+            skipped++;
+          }
         } catch (_) {
+          urlMap[url] = url;
           skipped++;
         }
       }
     }
   }
 
-  return { registered, skipped, folder, errors };
+  // Ensure every input URL has a map entry (identity if ingest soft-failed).
+  for (const u of cleaned) {
+    if (!urlMap[u]) urlMap[u] = u;
+  }
+
+  return { registered, skipped, folder, errors, url_map: urlMap };
+}
+
+function wrapGetWithImageUrlMap(getFn, urlMap) {
+  if (!urlMap || !Object.keys(urlMap).length) return getFn;
+  return (row, key) => {
+    const v = getFn(row, key);
+    if (!v) return v;
+    const k = String(key || "").toLowerCase();
+    if (k.startsWith("image_url_") || k === "swatch_image_url") {
+      const mapped = urlMap[String(v).trim()];
+      if (mapped) return mapped;
+    }
+    return v;
+  };
 }
 
 function buildMetafieldLookup(definitions) {
@@ -615,12 +655,17 @@ function collectProductFiles(row, idx) {
   return files.length ? files : undefined;
 }
 
-function collectImageSlotsFromRow(row, idx) {
+function collectImageSlotsFromRow(row, idx, getFn = null) {
   const out = {};
   for (let n = 1; n <= 5; n++) {
-    const col = idx[`image_url_${n}`];
-    if (col === undefined) continue;
-    const v = str(row[col]);
+    let v = "";
+    if (typeof getFn === "function") {
+      v = str(getFn(row, `image_url_${n}`));
+    } else {
+      const col = idx[`image_url_${n}`];
+      if (col === undefined) continue;
+      v = str(row[col]);
+    }
     if (v) out[n] = v;
   }
   return out;
@@ -1087,7 +1132,7 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
       if (deTrans.seo_description) variantMeta.seo_meta_description = deTrans.seo_description;
       if (deTrans.seo_keywords) variantMeta.seo_keywords = deTrans.seo_keywords;
     }
-    const cImageSlots = collectImageSlotsFromRow(cRow, idx);
+    const cImageSlots = collectImageSlotsFromRow(cRow, idx, get);
     const cImage = cImageSlots[1] || "";
     const cBrand = str(cGet("brand"));
     const cBrandRef = cBrand ? brandByLowerName.get(cBrand.toLowerCase()) : null;
@@ -1315,12 +1360,37 @@ export async function POST(request) {
 
     const results = { created: 0, updated: 0, failed: 0, errors: [] };
     const authHeaders = sellerToken ? { Authorization: `Bearer ${sellerToken}` } : {};
-    const collectedImageUrls = new Set(); // all image URLs from this import batch
-    let detectedSellerIdFromResponse = null; // captured from first successful product creation
+    const collectedImageUrls = new Set();
+
+    // Collect every image URL first — ingest to R2/disk BEFORE writing products so catalog
+    // stores hosted URLs, not hotlinks.
+    for (const [sku, parentRow] of parents) {
+      void sku;
+      for (let n = 1; n <= 5; n++) {
+        const u = get(parentRow, `image_url_${n}`);
+        if (u && /^https?:\/\//i.test(u)) collectedImageUrls.add(String(u).trim());
+      }
+      for (const cRow of children.get(sku) || []) {
+        for (let n = 1; n <= 5; n++) {
+          const u = get(cRow, `image_url_${n}`);
+          if (u && /^https?:\/\//i.test(u)) collectedImageUrls.add(String(u).trim());
+        }
+        const sw = get(cRow, "swatch_image_url");
+        if (sw && /^https?:\/\//i.test(sw)) collectedImageUrls.add(String(sw).trim());
+      }
+    }
+
+    let mediaResult = null;
+    let imageUrlMap = {};
+    if (collectedImageUrls.size > 0 && sellerToken) {
+      mediaResult = await registerImportedMediaUrls(backendUrl, authHeaders, [...collectedImageUrls], null);
+      imageUrlMap = mediaResult?.url_map || {};
+    }
+    const getMapped = wrapGetWithImageUrlMap(get, imageUrlMap);
 
     for (const [sku, parentRow] of parents) {
       const childRows = children.get(sku) || [];
-      const built = buildProductPayload(parentRow, childRows, headers, idx, get, lookups, msg);
+      const built = buildProductPayload(parentRow, childRows, headers, idx, getMapped, lookups, msg);
       if (built.error) {
         results.failed++;
         results.errors.push({ sku, error: built.error });
@@ -1328,20 +1398,6 @@ export async function POST(request) {
       }
       const { payload } = built;
       const parentPresent = computeParentPresent(parentRow, idx);
-      // Collect image URLs from parent and child rows for media registration
-      for (let n = 1; n <= 5; n++) {
-        const u = get(parentRow, `image_url_${n}`);
-        if (u && u.startsWith("http")) collectedImageUrls.add(u);
-      }
-      for (const cRow of children.get(sku) || []) {
-        for (let n = 1; n <= 5; n++) {
-          const u = get(cRow, `image_url_${n}`);
-          if (u && u.startsWith("http")) collectedImageUrls.add(u);
-        }
-        const sw = get(cRow, "swatch_image_url");
-        if (sw && sw.startsWith("http")) collectedImageUrls.add(sw);
-      }
-
       let existingProduct = null;
       try {
         const listUrl = `${backendUrl}/admin-hub/products?sku=${encodeURIComponent(sku)}&limit=10`;
@@ -1355,7 +1411,7 @@ export async function POST(request) {
 
       if (existingProduct?.id) {
         try {
-          const body = mergeImportIntoExisting(existingProduct, payload, parentPresent, parentRow, childRows, idx, get);
+          const body = mergeImportIntoExisting(existingProduct, payload, parentPresent, parentRow, childRows, idx, getMapped);
           const res = await fetch(`${backendUrl}/admin-hub/products/${existingProduct.id}`, {
             method: "PUT",
             headers: {
@@ -1417,27 +1473,11 @@ export async function POST(request) {
           results.errors.push({ sku, error: err?.message || `HTTP ${res.status}` });
         } else {
           results.created++;
-          if (!detectedSellerIdFromResponse) {
-            const created = await res.clone().json().catch(() => null);
-            const sid =
-              created?.listing?.seller_id ||
-              created?.product?.seller_id ||
-              created?.seller_id ||
-              null;
-            if (sid) detectedSellerIdFromResponse = String(sid).trim();
-          }
         }
       } catch (e) {
         results.failed++;
         results.errors.push({ sku, error: e.message });
       }
-    }
-
-    // Register collected image URLs in the seller's media library.
-    // Robust mode: chunked batch endpoint + fallback to add-url (older backend deployments).
-    let mediaResult = null;
-    if (collectedImageUrls.size > 0 && sellerToken) {
-      mediaResult = await registerImportedMediaUrls(backendUrl, authHeaders, [...collectedImageUrls], detectedSellerIdFromResponse);
     }
 
     return Response.json({
@@ -1453,6 +1493,7 @@ export async function POST(request) {
             skipped: mediaResult.skipped,
             folder: mediaResult.folder || null,
             errors: Array.isArray(mediaResult.errors) ? mediaResult.errors : [],
+            ingested: Object.keys(imageUrlMap).filter((k) => imageUrlMap[k] && imageUrlMap[k] !== k).length,
           }
         : null,
     });

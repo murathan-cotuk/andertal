@@ -8,6 +8,11 @@ const {
   storageFilenameWithPrefix,
 } = require('../media-filename')
 const { isS3Configured, uploadBufferToS3 } = require('../s3-upload')
+const {
+  ingestRemoteImageUrl,
+  isAlreadyHostedUrl,
+  mapPool,
+} = require('../remote-image-ingest')
 
 // Uploads: use UPLOAD_DIR for a persistent volume path, or S3 when S3_UPLOAD_* env is set.
 // Otherwise <medusa-backend>/uploads (ephemeral on many hosts). See docs/CloudflareKurulum.md.
@@ -15,6 +20,9 @@ const uploadDir = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
   : path.join(__dirname, '..', '..', 'uploads')
 const useS3 = isS3Configured()
+/** Cap concurrent remote downloads during CSV import so we don't melt Render/outbound. */
+const IMPORT_URL_CONCURRENCY = 3
+const IMPORT_URL_MAX_PER_REQUEST = 40
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -481,22 +489,86 @@ const mediaPATCH = async (req, res) => {
     res.json({ media: r.rows[0] })
   } catch (e) { res.status(500).json({ message: e?.message }) } finally { await client.end().catch(() => {}) }
 }
-// Add media by URL
+const resolveMediaSegForSellerId = async (client, sellerId, isSuperuser) => {
+  if (isSuperuser && !sellerId) return '_platform'
+  let sn = ''
+  if (sellerId) {
+    try {
+      const s1 = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1', [sellerId])
+      sn = (s1.rows[0]?.store_name || '').trim()
+      if (!sn) {
+        const s2 = await client.query('SELECT store_name FROM seller_users WHERE seller_id = $1 LIMIT 1', [sellerId])
+        sn = (s2.rows[0]?.store_name || '').trim()
+      }
+    } catch (_) {}
+  }
+  return sanitizeSellerMediaFolderSegment(sn, sellerId || 'seller')
+}
+
+// Add media by URL — download, normalize, store on R2/disk (not hotlink).
 const mediaAddByUrlPOST = async (req, res) => {
-  const { url, alt, folder_id, filename } = req.body || {}
+  const { url, alt, folder_id, filename, purpose } = req.body || {}
   if (!url) return res.status(400).json({ message: 'url required' })
   const client = getDbClient()
   if (!client) return res.status(503).json({ message: 'DB not configured' })
   try {
     await client.connect()
-    const name = decodeMultipartFilename(filename || url.split('/').pop()?.split('?')[0] || 'image')
     const urlSellerId = req.sellerUser?.seller_id || null
-    const r = await client.query(
-      `INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, alt, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [name, url, url, null, 0, alt || null, folder_id || null, urlSellerId]
+    const sourceUrl = String(url).trim()
+
+    // Reuse prior ingest of the same source for this seller.
+    if (urlSellerId && !isAlreadyHostedUrl(sourceUrl)) {
+      const prev = await client.query(
+        `SELECT * FROM admin_hub_media WHERE source_url = $1 AND seller_id = $2 ORDER BY created_at DESC LIMIT 1`,
+        [sourceUrl, urlSellerId],
+      )
+      if (prev.rows[0] && prev.rows[0].url && prev.rows[0].url !== sourceUrl) {
+        return res.status(201).json({ media: mapMediaRowForApi(prev.rows[0]), reused: true })
+      }
+    }
+
+    const mediaSeg = await resolveMediaSegForSellerId(client, urlSellerId, !!req.sellerUser?.is_superuser)
+    let ingested
+    try {
+      ingested = await ingestRemoteImageUrl({
+        sourceUrl,
+        mediaSeg,
+        purpose: purpose || 'product',
+        uploadDir,
+        processProductImageToSquareWebp,
+        processGenericImageToWebp,
+      })
+    } catch (ie) {
+      console.warn('mediaAddByUrl ingest failed:', ie?.code || ie?.message)
+      return res.status(422).json({
+        message: 'Could not download or process image URL',
+        code: ie?.code || 'INGEST_FAILED',
+      })
+    }
+
+    const name = decodeMultipartFilename(
+      filename || ingested.filename || sourceUrl.split('/').pop()?.split('?')[0] || 'image',
     )
-    res.status(201).json({ media: r.rows[0] })
-  } catch (e) { res.status(500).json({ message: e?.message }) } finally { await client.end().catch(() => {}) }
+    const r = await client.query(
+      `INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, alt, folder_id, seller_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        name,
+        ingested.url,
+        sourceUrl,
+        ingested.mime || null,
+        ingested.size || 0,
+        alt || null,
+        folder_id || null,
+        urlSellerId,
+      ],
+    )
+    res.status(201).json({ media: mapMediaRowForApi(r.rows[0]), ingested: !ingested.skipped })
+  } catch (e) {
+    res.status(500).json({ message: e?.message })
+  } finally {
+    await client.end().catch(() => {})
+  }
 }
 
 // Update mediaListGET to support folder_id filter
@@ -554,25 +626,21 @@ const mediaListWithFolderGET = async (req, res) => {
   }
 }
 
-// Batch-register image URLs from Excel import into seller's media folder
+// Batch: download CSV image URLs → WebP → R2/disk; return url_map for product rewrite.
 const mediaImportUrlsPOST = async (req, res) => {
-  const { urls, folder_name, target_seller_id } = req.body || {}
+  const { urls, folder_name, target_seller_id, purpose } = req.body || {}
   if (!Array.isArray(urls) || urls.length === 0) return res.status(400).json({ message: 'urls array required' })
   const client = getDbClient()
   if (!client) return res.status(503).json({ message: 'DB not configured' })
   try {
     await client.connect()
     const u = req.sellerUser
-    // Superuser can pass target_seller_id to register images under a specific seller; with no
-    // target specified it's their own import, so it should still be tagged with their own real
-    // seller_id rather than left ownerless.
     const sellerId = u?.is_superuser
       ? (target_seller_id ? String(target_seller_id).trim() : (u?.seller_id || null))
       : (u?.seller_id || null)
-    // Resolve folder: get or create "Excel Import" folder for this seller
+
     let folderName = (folder_name || '').trim()
     if (!folderName) {
-      // Use seller's store name if available
       let storeName = null
       if (sellerId) {
         const sRow = await client.query('SELECT store_name FROM admin_hub_seller_settings WHERE seller_id = $1 LIMIT 1', [sellerId])
@@ -580,7 +648,6 @@ const mediaImportUrlsPOST = async (req, res) => {
       }
       folderName = storeName ? `${storeName} — Excel Import` : 'Excel Import'
     }
-    // Get or create the folder
     let folder = null
     const fCheck = sellerId
       ? await client.query('SELECT * FROM admin_hub_media_folders WHERE name = $1 AND seller_id = $2 LIMIT 1', [folderName, sellerId])
@@ -590,32 +657,118 @@ const mediaImportUrlsPOST = async (req, res) => {
     } else {
       const fIns = await client.query(
         'INSERT INTO admin_hub_media_folders (name, seller_id) VALUES ($1, $2) RETURNING *',
-        [folderName, sellerId]
+        [folderName, sellerId],
       )
       folder = fIns.rows[0]
     }
-    // Register each URL (skip duplicates for this seller)
-    let registered = 0, skipped = 0
-    for (const rawUrl of urls) {
-      const url = (rawUrl || '').trim()
-      if (!url || !url.startsWith('http')) { skipped++; continue }
-      // Check duplicate
-      const dupCheck = sellerId
-        ? await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id = $2 LIMIT 1', [url, sellerId])
-        : await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id IS NULL LIMIT 1', [url])
-      if (dupCheck.rows[0]) { skipped++; continue }
-      const filename = decodeMultipartFilename(url.split('/').pop()?.split('?')[0] || 'image')
-      // Detect image mime type from extension
-      const ext = (filename.split('.').pop() || '').toLowerCase()
-      const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', avif: 'image/avif' }
-      const mimeType = mimeMap[ext] || 'image/jpeg'
-      await client.query(
-        'INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [filename, url, url, mimeType, 0, folder.id, sellerId]
-      )
-      registered++
+
+    const mediaSeg = await resolveMediaSegForSellerId(client, sellerId, !!u?.is_superuser)
+    const ingestPurpose = String(purpose || 'product').toLowerCase() === 'content' ? 'content' : 'product'
+
+    const cleaned = [...new Set(
+      urls.map((x) => String(x || '').trim()).filter((x) => /^https?:\/\//i.test(x)),
+    )].slice(0, IMPORT_URL_MAX_PER_REQUEST)
+
+    const urlMap = {}
+    let registered = 0
+    let skipped = 0
+    const errors = []
+
+    // Phase 1: resolve reuse / already-hosted (sequential — single pg Client).
+    const toIngest = []
+    for (const sourceUrl of cleaned) {
+      if (isAlreadyHostedUrl(sourceUrl)) {
+        urlMap[sourceUrl] = sourceUrl
+        const dup = sellerId
+          ? await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id = $2 LIMIT 1', [sourceUrl, sellerId])
+          : await client.query('SELECT id FROM admin_hub_media WHERE url = $1 AND seller_id IS NULL LIMIT 1', [sourceUrl])
+        if (!dup.rows[0]) {
+          const filename = decodeMultipartFilename(sourceUrl.split('/').pop()?.split('?')[0] || 'image')
+          await client.query(
+            'INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [filename, sourceUrl, sourceUrl, null, 0, folder.id, sellerId],
+          )
+          registered++
+        } else {
+          skipped++
+        }
+        continue
+      }
+      const prior = sellerId
+        ? await client.query(
+          `SELECT url FROM admin_hub_media
+           WHERE seller_id = $1 AND source_url = $2 AND url IS NOT NULL AND url <> source_url
+           ORDER BY created_at DESC LIMIT 1`,
+          [sellerId, sourceUrl],
+        )
+        : await client.query(
+          `SELECT url FROM admin_hub_media
+           WHERE seller_id IS NULL AND source_url = $1 AND url IS NOT NULL AND url <> source_url
+           ORDER BY created_at DESC LIMIT 1`,
+          [sourceUrl],
+        )
+      if (prior.rows[0]?.url) {
+        urlMap[sourceUrl] = prior.rows[0].url
+        skipped++
+        continue
+      }
+      toIngest.push(sourceUrl)
     }
-    res.json({ ok: true, registered, skipped, folder: { id: folder.id, name: folder.name } })
+
+    // Phase 2: download + process + store in parallel (no DB). Cap concurrency.
+    const ingestResults = await mapPool(toIngest, IMPORT_URL_CONCURRENCY, async (sourceUrl) => {
+      try {
+        const ingested = await ingestRemoteImageUrl({
+          sourceUrl,
+          mediaSeg,
+          purpose: ingestPurpose,
+          uploadDir,
+          processProductImageToSquareWebp,
+          processGenericImageToWebp,
+        })
+        return { sourceUrl, ok: true, ingested }
+      } catch (e) {
+        return {
+          sourceUrl,
+          ok: false,
+          code: e?.code || 'INGEST_FAILED',
+          message: e?.message || 'failed',
+        }
+      }
+    })
+
+    // Phase 3: write media rows sequentially.
+    for (const row of ingestResults) {
+      if (!row.ok || !row.ingested) {
+        urlMap[row.sourceUrl] = row.sourceUrl
+        skipped++
+        errors.push({ url: row.sourceUrl, code: row.code || 'INGEST_FAILED', message: row.message || 'failed' })
+        continue
+      }
+      const ingested = row.ingested
+      urlMap[row.sourceUrl] = ingested.url
+      const filename = decodeMultipartFilename(ingested.filename || row.sourceUrl.split('/').pop()?.split('?')[0] || 'image')
+      try {
+        await client.query(
+          'INSERT INTO admin_hub_media (filename, url, source_url, mime_type, size, folder_id, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [filename, ingested.url, row.sourceUrl, ingested.mime || null, ingested.size || 0, folder.id, sellerId],
+        )
+        registered++
+      } catch (e) {
+        urlMap[row.sourceUrl] = ingested.url
+        errors.push({ url: row.sourceUrl, code: 'DB_INSERT', message: e?.message || 'insert failed' })
+      }
+    }
+
+    res.json({
+      ok: true,
+      registered,
+      skipped,
+      folder: { id: folder.id, name: folder.name },
+      url_map: urlMap,
+      errors,
+      truncated: urls.length > IMPORT_URL_MAX_PER_REQUEST,
+    })
   } catch (e) {
     console.error('mediaImportUrlsPOST error:', e)
     res.status(500).json({ message: e?.message || 'Internal server error' })
@@ -649,3 +802,4 @@ module.exports.uploadDir = uploadDir
 module.exports.useS3 = useS3
 module.exports.GENERIC_IMAGE_MAX_EDGE = GENERIC_IMAGE_MAX_EDGE
 module.exports.GENERIC_IMAGE_SKIP_MIMETYPES = GENERIC_IMAGE_SKIP_MIMETYPES
+module.exports.processProductImageToSquareWebp = processProductImageToSquareWebp
