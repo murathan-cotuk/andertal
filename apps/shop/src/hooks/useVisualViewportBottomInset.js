@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react";
 
-const MOBILE_MAX = 1023;
+import { BOTTOM_NAV_MQ } from "@/lib/bottom-nav-mq";
 
 /**
- * Distance from the bottom of the layout viewport to the bottom of the visual viewport.
- * Mobile browsers (Chrome bottom toolbar, Safari chrome) often exclude this from
- * env(safe-area-inset-bottom). Pushing `position: fixed; bottom: 0` up by this value
- * keeps the bar on the actually visible screen edge when the browser UI shows/hides.
+ * `position: fixed; bottom` offset so the bar sits on the visible screen edge.
+ * Positive: browser toolbar covers the layout bottom — lift the bar above it.
+ * Negative: Chrome hid that toolbar and the visual viewport grew past `innerHeight`.
+ * Clamping at 0 leaves the bar floating with the footer showing in the gap.
  */
 export function useVisualViewportBottomInset() {
   const [inset, setInset] = useState(0);
@@ -30,11 +30,12 @@ export function useVisualViewportBottomInset() {
     const update = () => {
       if (rafId) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        if (!window.matchMedia(`(max-width: ${MOBILE_MAX}px)`).matches) {
+        if (!window.matchMedia(BOTTOM_NAV_MQ).matches) {
           setInset(0);
           return;
         }
-        setInset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+        const raw = window.innerHeight - vv.offsetTop - vv.height;
+        setInset(Math.abs(raw) < 0.5 ? 0 : Math.round(raw));
       });
     };
 
@@ -42,7 +43,7 @@ export function useVisualViewportBottomInset() {
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
     window.addEventListener("resize", update);
-    const mq = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
+    const mq = window.matchMedia(BOTTOM_NAV_MQ);
     mq.addEventListener("change", update);
 
     return () => {

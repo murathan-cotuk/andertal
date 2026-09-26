@@ -86,9 +86,7 @@ export default function ModernMobileBottomNav({
         display: "grid",
         gridTemplateColumns: `repeat(${finalItems.length}, minmax(0, 1fr))`,
         position: isFixed ? "fixed" : "relative",
-        /* visualInset tracks the browser's own bottom toolbar height (Samsung Internet, Chrome,
-           Safari). Setting bottom to this value keeps the bar above the browser chrome on every
-           mobile device without any hardcoded pixel values. */
+        /* Visible screen edge, including after Chrome's bottom bar hides (inset may be negative). */
         bottom: isFixed ? visualInset : undefined,
         left: isFixed ? 0 : undefined,
         right: isFixed ? 0 : undefined,

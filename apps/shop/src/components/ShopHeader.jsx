@@ -280,8 +280,8 @@ const CategoriesDropdown = styled.div`
   flex-shrink: 0;
   margin-right: 4px;
 
-  /* On mobile the bottom nav handles menu; hide header hamburger */
-  @media (max-width: 767px) {
+  /* Telefon: alt menü var. Yatayda genişlik 767’yi aşsa da (kısa yükseklik) gizle. */
+  @media (max-width: 767px), (orientation: landscape) and (max-height: 500px) {
     display: none !important;
   }
 `;

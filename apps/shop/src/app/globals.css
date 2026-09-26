@@ -219,7 +219,7 @@ a {
 
 /* ══════════════════════════════════════════════════════
    SHOP HEADER — mobile-only overrides
-   Bottom nav (MobileNav) handles cart/account/locale on ≤1023px;
+   Bottom nav (MobileNav) handles cart/account/locale on phone and tablet (≤1199px, and touch tablets up to 1366px);
    header’daki ikonlar yalnızca çok dar mobilde (≤767px) gizlenir.
    ══════════════════════════════════════════════════════ */
 
@@ -235,15 +235,27 @@ a {
   }
 }
 
+/* Mobil arama: tarayıcı sekmesinde safe-area boş şerit bırakmaz.
+   Ana ekrana eklenmiş uygulamada çentik payı durur. */
+.mobile-search-sheet {
+  padding-top: 0;
+}
+@media (display-mode: standalone) {
+  .mobile-search-sheet {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
 /* ══════════════════════════════════════════════════════
    MOBILE NAV — show/hide rules
    ══════════════════════════════════════════════════════ */
 
-/* Mobile nav root: narrow storefront only (mobil + tablet, ShopHeader narrow breakpoint ile uyumlu) */
+/* Alt menü: telefon + tablet, dikey ve yatay. Masaüstü (≥1200, fare) gizli.
+   Sorgu apps/shop/src/lib/bottom-nav-mq.js ile aynı kalmalı. */
 .andertal-mobile-nav-root {
   display: none;
 }
-@media (max-width: 1023px) {
+@media (max-width: 1199px), (hover: none) and (pointer: coarse) and (max-width: 1366px) {
   .andertal-mobile-nav-root {
     display: block;
   }
@@ -425,7 +437,7 @@ a {
 /* ══════════════════════════════════════════════════════
    FOOTER — mobile
    ══════════════════════════════════════════════════════ */
-@media (max-width: 1023px) {
+@media (max-width: 1199px), (hover: none) and (pointer: coarse) and (max-width: 1366px) {
   /* İç boşluk + alt nav (~60px) + home indicator — footer rengi çentiğe kadar uzar */
   html:not([data-mobile-bottom-nav-inline]) footer.site-footer {
     padding-bottom: calc(24px + 60px + env(safe-area-inset-bottom, 0px)) !important;

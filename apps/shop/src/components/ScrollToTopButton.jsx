@@ -3,8 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 
-/** align with `HEADER_NARROW_MQ` in ShopHeader — no floating chrome on phone/tablet */
-const HIDE_BELOW_PX = 1023;
+/** Alt menünün olduğu telefon/tablet aralığında yüzen buton yok. */
+const HIDE_BELOW_PX = 1199;
 
 const Button = styled.button`
   position: fixed;
@@ -28,7 +28,7 @@ const Button = styled.button`
     outline-offset: 3px;
   }
 
-  @media (max-width: ${HIDE_BELOW_PX}px) {
+  @media (max-width: ${HIDE_BELOW_PX}px), (hover: none) and (pointer: coarse) and (max-width: 1366px) {
     display: none;
   }
 `;

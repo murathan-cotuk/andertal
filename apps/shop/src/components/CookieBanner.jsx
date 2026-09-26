@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
 import CustomCheckbox from "./ui/CustomCheckbox";
+import { BOTTOM_NAV_MQ } from "@/lib/bottom-nav-mq";
 
 const STORAGE_KEY = "andertal_cookie_consent";
 
@@ -130,7 +131,7 @@ export default function CookieBanner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 1023px)");
+    const mq = window.matchMedia(BOTTOM_NAV_MQ);
     const update = () => setIsMobile(mq.matches);
     update();
     if (typeof mq.addEventListener === "function") mq.addEventListener("change", update);

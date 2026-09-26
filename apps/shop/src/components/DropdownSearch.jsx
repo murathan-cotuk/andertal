@@ -1,7 +1,8 @@
 ﻿"use client";
 
-import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { flushSync } from "react-dom";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
@@ -237,6 +238,93 @@ function useMatchMediaOnce(query) {
   return matches;
 }
 
+/** iOS yalnızca kullanıcı dokunuşunun içinde yapılan focus() ile klavyeyi açar. */
+function focusSearchInput(input) {
+  if (!input) return;
+  try {
+    input.focus({ preventScroll: true });
+  } catch {
+    input.focus();
+  }
+}
+
+function lockDocumentForSearch() {
+  const body = document.body;
+  if (body.dataset.searchScrollLock === "1") return;
+  const y = window.scrollY || document.documentElement.scrollTop || 0;
+  body.dataset.searchScrollLock = "1";
+  body.dataset.searchScrollY = String(y);
+  body.style.position = "fixed";
+  body.style.top = `-${y}px`;
+  body.style.left = "0";
+  body.style.right = "0";
+  body.style.width = "100%";
+}
+
+function unlockDocumentForSearch() {
+  const body = document.body;
+  if (body.dataset.searchScrollLock !== "1") return;
+  const y = Number(body.dataset.searchScrollY || 0);
+  body.style.position = "";
+  body.style.top = "";
+  body.style.left = "";
+  body.style.right = "";
+  body.style.width = "";
+  delete body.dataset.searchScrollLock;
+  delete body.dataset.searchScrollY;
+  window.scrollTo(0, y);
+}
+
+function openMobileSearchSheet(setMobileOpen, inputRef) {
+  lockDocumentForSearch();
+  flushSync(() => setMobileOpen(true));
+  const input = inputRef.current;
+  if (input && document.activeElement !== input) focusSearchInput(input);
+}
+
+/** Görünen alanın üstüne yapışır; klavye veya tarayıcı çubuğu boş şerit bırakmaz. */
+function useSearchSheetBox(active) {
+  const [box, setBox] = useState(null);
+  useEffect(() => {
+    if (!active || typeof window === "undefined") {
+      setBox(null);
+      return undefined;
+    }
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    let raf = 0;
+    const apply = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        setBox({ height: vv.height });
+      });
+    };
+    apply();
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", apply);
+      vv.removeEventListener("scroll", apply);
+    };
+  }, [active]);
+  return box;
+}
+
+function searchSheetStyle(box) {
+  return {
+    position: "fixed",
+    left: 0,
+    right: 0,
+    top: 0,
+    height: box ? box.height : "100dvh",
+    zIndex: 2147483660,
+    background: "#fff",
+    display: "flex",
+    flexDirection: "column",
+  };
+}
+
 function loadRecentSearches() {
   if (typeof window === "undefined") return [];
   try {
@@ -299,6 +387,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   const wrapRef = useRef(null);
   const mobileInputRef = useRef(null);
   const debounceRef = useRef(null);
+  const searchSheetBox = useSearchSheetBox(isMobile && mobileOpen);
 
   const fetchProducts = useCallback(async (query) => {
     if (!(query && query.trim().length >= 1)) {
@@ -338,12 +427,6 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
     setMounted(true);
   }, []);
 
-  useLayoutEffect(() => {
-    if (!isMobile || !mobileOpen) return;
-    const t = requestAnimationFrame(() => mobileInputRef.current?.focus());
-    return () => cancelAnimationFrame(t);
-  }, [isMobile, mobileOpen]);
-
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const query = (q || "").trim();
@@ -380,10 +463,9 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   }, [isMobile, mobileOpen]);
 
   useEffect(() => {
-    if (!isMobile || !mobileOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    if (!isMobile || !mobileOpen) return undefined;
+    lockDocumentForSearch();
+    return () => unlockDocumentForSearch();
   }, [isMobile, mobileOpen]);
 
   useEffect(() => {
@@ -438,11 +520,8 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   if (isMobile) {
     const mobilePanel = mobileOpen && mounted ? createPortal(
       <div
-        style={{
-          position: "fixed", inset: 0, zIndex: 2147483660, background: "#fff",
-          display: "flex", flexDirection: "column",
-          paddingTop: "env(safe-area-inset-top, 0px)",
-        }}
+        className="mobile-search-sheet"
+        style={searchSheetStyle(searchSheetBox)}
         role="dialog"
         aria-modal="true"
         aria-label={ts("label")}
@@ -451,8 +530,12 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
           <button type="button" onClick={() => setMobileOpen(false)} aria-label={ts("back")} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 40, height: 40, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>←</button>
           <input
             ref={mobileInputRef}
-            type="search"
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
             autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
             placeholder={placeholder}
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -531,8 +614,14 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
       <>
         <div
           style={{ minHeight: pill ? 36 : undefined, width: "100%", display: "flex", alignItems: "center", cursor: "text", padding: pill ? "0" : undefined, color: q ? "#111" : "#9ca3af", fontSize: 15 }}
-          onClick={() => { setRecentSearches(loadRecentSearches()); setMobileOpen(true); }}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setMobileOpen(true); } }}
+          onPointerDown={(e) => {
+            if (e.button != null && e.button !== 0) return;
+            e.preventDefault();
+            setRecentSearches(loadRecentSearches());
+            openMobileSearchSheet(setMobileOpen, mobileInputRef);
+          }}
+          onClick={() => { setRecentSearches(loadRecentSearches()); openMobileSearchSheet(setMobileOpen, mobileInputRef); }}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openMobileSearchSheet(setMobileOpen, mobileInputRef); } }}
           role="button"
           tabIndex={0}
           aria-label={ts("open")}
@@ -617,6 +706,7 @@ function SearchInputWithDropdown({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const wrapRef = useRef(null);
   const mobileInputRef = useRef(null);
+  const searchSheetBox = useSearchSheetBox(isMobile && mobileOpen);
 
   const showDropdown = query.length > 0;
   const loading = status === "loading" || status === "stalled";
@@ -634,12 +724,6 @@ function SearchInputWithDropdown({
     setFocusedIndex(-1);
   }, [query, hits.length]);
 
-  useLayoutEffect(() => {
-    if (!isMobile || !mobileOpen) return;
-    const t = requestAnimationFrame(() => mobileInputRef.current?.focus());
-    return () => cancelAnimationFrame(t);
-  }, [isMobile, mobileOpen]);
-
   useEffect(() => {
     if (!isMobile || !mobileOpen) return;
     const onKey = (e) => {
@@ -654,11 +738,8 @@ function SearchInputWithDropdown({
 
   useEffect(() => {
     if (!isMobile || !mobileOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    lockDocumentForSearch();
+    return () => unlockDocumentForSearch();
   }, [isMobile, mobileOpen]);
 
   useEffect(() => {
@@ -685,7 +766,7 @@ function SearchInputWithDropdown({
 
   const openMobileSearch = () => {
     setRecentSearches(loadRecentSearches());
-    setMobileOpen(true);
+    openMobileSearchSheet(setMobileOpen, mobileInputRef);
   };
 
   const handleKeyDown = (e) => {
@@ -713,15 +794,8 @@ function SearchInputWithDropdown({
   if (isMobile) {
     const mobilePanel = mobileOpen && mounted ? createPortal(
       <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 2147483660,
-          background: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          paddingTop: "env(safe-area-inset-top, 0px)",
-        }}
+        className="mobile-search-sheet"
+        style={searchSheetStyle(searchSheetBox)}
         role="dialog"
         aria-modal="true"
         aria-label={ts("label")}
@@ -755,8 +829,12 @@ function SearchInputWithDropdown({
           </button>
           <input
             ref={mobileInputRef}
-            type="search"
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
             autoComplete="off"
+            autoCapitalize="off"
+            autoCorrect="off"
             placeholder={placeholder}
             value={query}
             onChange={(e) => refine(e.target.value)}
@@ -949,6 +1027,11 @@ function SearchInputWithDropdown({
             padding: pill ? "0" : undefined,
             color: query ? "#111" : "#9ca3af",
             fontSize: 15,
+          }}
+          onPointerDown={(e) => {
+            if (e.button != null && e.button !== 0) return;
+            e.preventDefault();
+            openMobileSearch();
           }}
           onClick={openMobileSearch}
           onKeyDown={(e) => {

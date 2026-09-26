@@ -1,7 +1,7 @@
 ﻿"use client";
 
 /**
- * MobileNav — Bottom navigation bar + slide-in drawer for narrow viewports (≤1023px, mobil + tablet).
+ * MobileNav — Bottom navigation bar + slide-in drawer for phone and tablet (portrait and landscape).
  * Bar: Home, Menü, Warenkorb, Merkzettel, Profil (search lives in ShopHeader).
  * Drawer: Kategorien (+ category image thumbs) then Mein Konto; no CMS “Menü” / Service links.
  * Rendered as a sibling of page content via Providers.jsx (display:none on desktop).
@@ -19,6 +19,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { mapCategoryNodesToMenuRows, shouldCategoryMenuDrill } from "@/lib/category-menu-rows";
 import ModernMobileBottomNav from "@/components/ModernMobileBottomNav";
+import { BOTTOM_NAV_MQ } from "@/lib/bottom-nav-mq";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import {
   MOBILE_CHROME_SCROLL_THRESHOLD_PX,
@@ -339,7 +340,7 @@ export default function MobileNav({ layout = "fixed" }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 1023px)");
+    const mq = window.matchMedia(BOTTOM_NAV_MQ);
     const go = () => setIsMobileNavViewport(mq.matches);
     go();
     mq.addEventListener("change", go);
@@ -465,7 +466,7 @@ export default function MobileNav({ layout = "fixed" }) {
   if (hideOnAuthPages) return null;
 
   return (
-    /* Dar görünümde görünür (≤1023px) — globals.css ile geniş ekranda gizli */
+    /* Telefon ve tablette görünür — globals.css ile masaüstünde gizli */
     <div className="andertal-mobile-nav-root">
       {/* ── Drawer Overlay ── */}
       <div
