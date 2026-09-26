@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { getToken } from "@andertal/lib";
 import { Link } from "@/i18n/navigation";
 import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
+import { resolveImageUrl } from "@/lib/image-url";
 import styles from "./CaseInbox.module.css";
 
 const FILTERS = ["open", "awaiting_customer", "awaiting_seller", "done", "unread"];
@@ -39,15 +40,11 @@ function normalizeAttachment(entry) {
 function attachmentUrl(entry) {
   const value = String(entry?.public_url || entry?.url || entry?.file_url || entry?.path || "").trim();
   if (!value) return "";
-  if (/^https?:\/\//i.test(value)) return value;
-  if (value.startsWith("/")) return `${resolveMedusaBaseUrl()}${value}`;
-  return `${resolveMedusaBaseUrl()}/uploads/${value.replace(/^\/+/, "")}`;
+  return resolveImageUrl(value.startsWith("/") || /^https?:\/\//i.test(value) ? value : `/uploads/${value.replace(/^\/+/, "")}`);
 }
 
 function imageUrl(value) {
-  const source = String(value || "").trim();
-  if (!source || /^https?:\/\//i.test(source) || source.startsWith("/")) return source;
-  return `${resolveMedusaBaseUrl()}/uploads/${source}`;
+  return resolveImageUrl(value);
 }
 
 function normalizeItems(data) {

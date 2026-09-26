@@ -2,7 +2,34 @@
 const { Router } = require('express')
 
 module.exports = function createSellerAgreementRouter({ verifySellerPassword, getProductsDbClient }) {
-      const { getSellerAgreement, AGREEMENT_VERSION, DEFAULT_PLATFORM_NAME } = require('../seller-agreement-contract')
+      const {
+        getSellerAgreement,
+        getDefaultSellerAgreement,
+        resolveSellerAgreement,
+        saveSellerAgreementTemplate,
+        listAgreementLocales,
+        AGREEMENT_VERSION,
+        DEFAULT_PLATFORM_NAME,
+      } = require('../seller-agreement-contract')
+
+      const getAgreementDbClient = () => {
+        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+        if (!dbUrl || !dbUrl.startsWith('postgres')) return null
+        const { Client } = require('pg')
+        const isRender = dbUrl.includes('render.com')
+        return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+      }
+
+      const withAgreementDb = async (fn) => {
+        const client = getAgreementDbClient()
+        if (!client) return fn(null)
+        await client.connect()
+        try {
+          return await fn((sql, params) => client.query(sql, params))
+        } finally {
+          try { await client.end() } catch (_) {}
+        }
+      }
 
       const signPdfDeLatin = (s) => {
         if (s == null) return ''
@@ -19,9 +46,9 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
           .replace(/ñ/g, 'n').replace(/ã/g, 'a').replace(/õ/g, 'o')
       }
 
-      const buildAgreementPdf = async (seller, locale, signatureDataUrl, signedAt, signedIp, platformInfo) => {
+      const buildAgreementPdf = async (seller, locale, signatureDataUrl, signedAt, signedIp, platformInfo, agreementOverride) => {
         const PDFDocument = require('pdfkit')
-        const agreement = getSellerAgreement(locale)
+        const agreement = agreementOverride || getDefaultSellerAgreement(locale)
         const sections = agreement.sections
         const signedDate = signedAt ? new Date(signedAt).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' }) : new Date().toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'medium' })
         const pi = platformInfo || {}
@@ -279,20 +306,26 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
               platformInfo = pr.rows[0] || {}
             }
           } catch (_) {}
+          const agreementDoc = await withAgreementDb(async (query) => {
+            if (!query) return getDefaultSellerAgreement(row.locale)
+            return resolveSellerAgreement(row.locale, query)
+          })
           const pdfBuf = await buildAgreementPdf(
             { company_name: row.company_name, authorized_person_name: row.authorized_person_name, seller_name: row.store_name, email: row.email },
             row.locale,
             signature_data,
             signedAt,
             signedIp,
-            platformInfo
+            platformInfo,
+            agreementDoc,
           )
           const pdfBase64 = 'data:application/pdf;base64,' + pdfBuf.toString('base64')
+          const signedVersion = agreementDoc?.version || AGREEMENT_VERSION
           await client.query(
             `UPDATE seller_users SET signature_data = $1, signature_at = $2, signature_ip = $3, agreement_pdf_url = $4,
               agreement_accepted = true, agreement_accepted_at = $2, agreement_version = $6, agreement_ip = $3
               WHERE id::text = $5`,
-            [signature_data, signedAt, signedIp, pdfBase64, row.seller_id, AGREEMENT_VERSION]
+            [signature_data, signedAt, signedIp, pdfBase64, row.seller_id, signedVersion]
           )
           await client.query(`UPDATE seller_sign_tokens SET used_at = $1, ip = $2 WHERE token = $3`, [signedAt, signedIp, token])
           await client.end()
@@ -350,12 +383,105 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
       })
 
 
-  router.get('/public/seller-agreement', (req, res) => {
+  router.get('/public/seller-agreement', async (req, res) => {
     try {
       const locale = req.query.locale || req.headers['accept-language'] || 'de'
-      const payload = getSellerAgreement(locale)
-      res.set('Cache-Control', 'public, max-age=300')
+      const payload = await withAgreementDb(async (query) => {
+        if (!query) return getDefaultSellerAgreement(locale)
+        return resolveSellerAgreement(locale, query)
+      })
+      res.set('Cache-Control', 'public, max-age=60')
       res.json(payload)
+    } catch (e) {
+      res.status(500).json({ message: e?.message || 'Error' })
+    }
+  })
+
+  // Superuser: current template (DB or defaults) for one locale
+  router.get('/admin-hub/v1/seller-agreement', async (req, res) => {
+    if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+    try {
+      const locale = req.query.locale || 'de'
+      const payload = await withAgreementDb(async (query) => {
+        if (!query) return getDefaultSellerAgreement(locale)
+        return resolveSellerAgreement(locale, query)
+      })
+      res.json({ ...payload, locales: listAgreementLocales() })
+    } catch (e) {
+      res.status(500).json({ message: e?.message || 'Error' })
+    }
+  })
+
+  // Superuser: save template for one locale
+  router.put('/admin-hub/v1/seller-agreement', async (req, res) => {
+    if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+    try {
+      const locale = req.body?.locale || req.query.locale || 'de'
+      const updatedBy = req.sellerUser?.email || String(req.sellerUser?.id || '')
+      const saved = await withAgreementDb(async (query) => {
+        if (!query) {
+          const err = new Error('Database not configured')
+          err.status = 503
+          throw err
+        }
+        return saveSellerAgreementTemplate(locale, req.body || {}, query, updatedBy)
+      })
+      res.json(saved)
+    } catch (e) {
+      res.status(e?.status || 500).json({ message: e?.message || 'Error' })
+    }
+  })
+
+  // Superuser: reset one locale to built-in defaults (deletes DB override)
+  router.delete('/admin-hub/v1/seller-agreement', async (req, res) => {
+    if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+    try {
+      const locale = String(req.query.locale || req.body?.locale || 'de').slice(0, 2).toLowerCase()
+      await withAgreementDb(async (query) => {
+        if (!query) return
+        await query(`DELETE FROM seller_agreement_templates WHERE locale = $1`, [locale])
+      })
+      res.json(getDefaultSellerAgreement(locale))
+    } catch (e) {
+      res.status(500).json({ message: e?.message || 'Error' })
+    }
+  })
+
+  // Superuser: sellers who signed (with PDF availability)
+  router.get('/admin-hub/v1/seller-agreement/signed', async (req, res) => {
+    if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
+    try {
+      const rows = await withAgreementDb(async (query) => {
+        if (!query) return []
+        const r = await query(
+          `SELECT id, email, store_name, company_name, authorized_person_name, seller_id,
+                  agreement_version, agreement_accepted_at, agreement_ip,
+                  signature_at, signature_ip,
+                  (agreement_pdf_url IS NOT NULL AND length(agreement_pdf_url) > 0) AS has_pdf
+           FROM seller_users
+           WHERE sub_of_seller_id IS NULL
+             AND signature_at IS NOT NULL
+           ORDER BY signature_at DESC`,
+        )
+        return r.rows || []
+      })
+      res.json({
+        contracts: (rows || []).map((row) => ({
+          id: row.id,
+          email: row.email,
+          store_name: row.store_name,
+          company_name: row.company_name,
+          authorized_person_name: row.authorized_person_name,
+          seller_id: row.seller_id,
+          agreement_version: row.agreement_version,
+          agreement_accepted_at: row.agreement_accepted_at,
+          agreement_ip: row.agreement_ip,
+          signature_at: row.signature_at,
+          signature_ip: row.signature_ip,
+          has_pdf: !!row.has_pdf,
+        })),
+        count: (rows || []).length,
+      })
     } catch (e) {
       res.status(500).json({ message: e?.message || 'Error' })
     }

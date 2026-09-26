@@ -263,8 +263,12 @@ const listAdminHubProductsDb = async (query = {}) => {
       : []
     const hasScope = !!(categoryQ || collScope || categoryIdAllowlist.length)
     const rawLimit = parseInt(query.limit, 10) || (hasScope ? 3000 : 100)
-    // Storefront category pages must not dump thousands of full product rows.
-    const maxCap = categoryIdAllowlist.length > 0 ? 120 : (hasScope || rawLimit > 200 ? 5000 : 200)
+    // Storefront must never dump thousands of full product rows into memory/response.
+    const maxCap = categoryIdAllowlist.length > 0
+      ? 120
+      : (query.ean || query.brand_id)
+        ? 200
+        : (hasScope || rawLimit > 200 ? 500 : 200)
     const limit = Math.min(Math.max(rawLimit, 1), maxCap)
     const offset = parseInt(query.offset, 10) || 0
     const sellerId = (query.seller_id || query.seller || '').trim()
@@ -309,6 +313,25 @@ const listAdminHubProductsDb = async (query = {}) => {
       params.push(collectionId)
     }
     if (skuFilter) { where.push('LOWER(TRIM(COALESCE(sku,\'\'))) = LOWER($' + (params.length + 1) + ')'); params.push(skuFilter) }
+    const brandId = (query.brand_id || '').toString().trim()
+    if (brandId) {
+      where.push(`LOWER(TRIM(COALESCE(metadata->>'brand_id',''))) = LOWER($${params.length + 1})`)
+      params.push(brandId)
+    }
+    const eanFilter = (query.ean || '').toString().replace(/\D/g, '')
+    if (eanFilter) {
+      params.push(eanFilter)
+      const pEan = params.length
+      where.push(
+        '(' +
+          `regexp_replace(COALESCE(metadata->>'ean',''), '[^0-9]', '', 'g') = $${pEan}` +
+          ` OR EXISTS (` +
+            `SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(variants) = 'array' THEN variants ELSE '[]'::jsonb END) AS v(elem)` +
+            ` WHERE regexp_replace(COALESCE(v.elem->>'ean',''), '[^0-9]', '', 'g') = $${pEan}` +
+          `)` +
+        ')'
+      )
+    }
     if (categoryIdAllowlist.length > 0) {
       params.push(categoryIdAllowlist)
       const pIds = params.length

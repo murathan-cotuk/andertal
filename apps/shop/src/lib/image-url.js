@@ -1,12 +1,21 @@
 /**
  * Resolve image URL for display.
  *
- * Own-backend /uploads/ paths (relative or absolute) are returned as relative
- * paths so the shop rewrite proxies them. Foreign absolute upload hosts stay
- * as-is so legacy CDN files still load.
+ * When NEXT_PUBLIC_UPLOADS_BASE_URL is set (Cloudflare R2 public URL), relative
+ * /uploads/... paths and own-backend absolute /uploads URLs are rewritten to the
+ * CDN so browsers never pull image bytes through Render.
+ *
+ * Disk paths are /uploads/media/...; R2 object keys are media/... (no "uploads"
+ * segment) — matching medusa-backend/src/s3-upload.js.
  */
-const BACKEND_URL = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL) || "http://localhost:9000";
+const BACKEND_URL =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL) ||
+  "http://localhost:9000";
 const BASE = (BACKEND_URL || "").replace(/\/$/, "");
+const UPLOADS_BASE = (
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_UPLOADS_BASE_URL) ||
+  ""
+).replace(/\/$/, "");
 
 /** Extract pathname from a full URL (http(s) or //). Returns null if not a valid URL. */
 function getPathname(fullUrl) {
@@ -31,10 +40,19 @@ function isOwnUploadHost(fullUrl) {
     } catch (_) {}
     if (backendHost && host === backendHost) return true;
     if (host === "andertal.com" || host.endsWith(".andertal.com")) return true;
+    if (host.endsWith(".onrender.com")) return true;
     return false;
   } catch (_) {
     return false;
   }
+}
+
+/** /uploads/media/x → https://cdn/media/x (R2 keys omit the "uploads" prefix). */
+function toCdnUploadsUrl(uploadsPathname) {
+  if (!UPLOADS_BASE || !uploadsPathname) return "";
+  let p = String(uploadsPathname).replace(/^\/+/, "");
+  if (p.startsWith("uploads/")) p = p.slice("uploads/".length);
+  return `${UPLOADS_BASE}/${p}`;
 }
 
 export function resolveImageUrl(url) {
@@ -43,25 +61,26 @@ export function resolveImageUrl(url) {
   if (!u) return "";
 
   if (!u.startsWith("http") && !u.startsWith("//")) {
-    // Relative path: /uploads/... stays relative so shop rewrite proxy serves it
-    if (u.startsWith("/uploads/")) return u;
+    if (u.startsWith("/uploads/")) {
+      if (UPLOADS_BASE) return toCdnUploadsUrl(u);
+      return u;
+    }
     return `${BASE}${u.startsWith("/") ? "" : "/"}${u}`;
   }
 
-  // Absolute URL: rewrite /uploads/ to a same-origin path only when the file
-  // lives on this shop's own backend. Foreign hosts (legacy CDNs) must stay
-  // absolute — stripping them made category thumbnails 404.
   const pathname = getPathname(u);
   if (pathname && pathname.startsWith("/uploads/")) {
+    if (UPLOADS_BASE) return toCdnUploadsUrl(pathname);
     if (isOwnUploadHost(u)) return pathname;
     return u;
   }
+  // Already absolute CDN / foreign URL — keep as-is
   return u;
 }
 
 /**
  * Rewrite image URLs inside HTML (e.g. collection description richtext).
- * Ensures img src="/uploads/..." or wrong-host URLs use the configured backend.
+ * Ensures img src="/uploads/..." or wrong-host URLs use the configured CDN/backend.
  */
 export function rewriteImageUrlsInHtml(html) {
   if (!html || typeof html !== "string") return html;

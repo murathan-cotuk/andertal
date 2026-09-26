@@ -66,9 +66,20 @@ async function fetchJSON(path) {
 }
 
 async function fetchAllProducts() {
-  // Backend loads the catalog in-memory and applies limit; use a high ceiling.
-  const data = await fetchJSON("/store/products?limit=5000&status=published");
-  return Array.isArray(data?.products) ? data.products : [];
+  const pageSize = 200
+  const maxPages = 750 // hard ceiling ~150k rows for sitemap generation
+  const products = []
+  for (let page = 0; page < maxPages; page++) {
+    const offset = page * pageSize
+    const data = await fetchJSON(
+      `/store/products?limit=${pageSize}&offset=${offset}&status=published`
+    )
+    const batch = Array.isArray(data?.products) ? data.products : []
+    if (!batch.length) break
+    products.push(...batch)
+    if (batch.length < pageSize) break
+  }
+  return products
 }
 
 export async function GET() {

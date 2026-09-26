@@ -5,10 +5,12 @@ const fs = require('fs')
 
 // Same storage convention as media.js: UPLOAD_DIR for a persistent volume, or S3 when
 // S3_UPLOAD_* env vars are set, otherwise <medusa-backend>/uploads (ephemeral on many hosts).
+const { isS3Configured, uploadBufferToS3 } = require('../s3-upload')
+
 const uploadDir = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
   : path.join(__dirname, '..', '..', 'uploads')
-const useS3 = !!(process.env.S3_UPLOAD_BUCKET && process.env.S3_UPLOAD_REGION)
+const useS3 = isS3Configured()
 
 const ALLOWED_DOCUMENT_TYPES = ['invoice', 'lieferschein', 'retourelabel']
 
@@ -25,24 +27,9 @@ const sanitizeSellerFolder = (sellerId) =>
 async function saveDocumentBuffer(buffer, sellerId, orderId, documentType) {
   const seg = sanitizeSellerFolder(sellerId)
   const filename = `${orderId}-${documentType}-${Date.now()}.pdf`
-  if (useS3 && process.env.S3_UPLOAD_BUCKET) {
-    const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
-    const bucket = process.env.S3_UPLOAD_BUCKET
-    const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
+  if (useS3) {
     const key = `order-documents/${seg}/${filename}`
-    const s3 = new S3Client({
-      region,
-      ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
-      ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
-        ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
-        : {}),
-    })
-    await s3.send(new PutObjectCommand({
-      Bucket: bucket, Key: key, Body: buffer, ContentType: 'application/pdf',
-      ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL }),
-    }))
-    const baseUrl = process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`
-    return `${baseUrl.replace(/\/$/, '')}/${key}`
+    return uploadBufferToS3(buffer, key, 'application/pdf')
   }
   const destDir = path.join(uploadDir, 'order-documents', seg)
   fs.mkdirSync(destDir, { recursive: true })

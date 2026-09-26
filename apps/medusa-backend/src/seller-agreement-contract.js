@@ -457,6 +457,10 @@ function normalizeAgreementLocale(locale) {
  * @returns {{ version: string, updated: string, locale: string, title: string, governing_note: string, sections: Array<{heading:string,body:string}> }}
  */
 function getSellerAgreement(locale) {
+  return getDefaultSellerAgreement(locale)
+}
+
+function getDefaultSellerAgreement(locale) {
   const loc = normalizeAgreementLocale(locale)
   return {
     version: AGREEMENT_VERSION,
@@ -468,10 +472,115 @@ function getSellerAgreement(locale) {
   }
 }
 
+const ENSURE_AGREEMENT_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS seller_agreement_templates (
+    locale varchar(5) PRIMARY KEY,
+    title text NOT NULL,
+    governing_note text,
+    version varchar(32) NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    sections jsonb NOT NULL DEFAULT '[]'::jsonb,
+    updated_by text
+  )
+`
+
+async function ensureSellerAgreementTable(queryFn) {
+  await queryFn(ENSURE_AGREEMENT_TABLE_SQL)
+}
+
+/**
+ * Load agreement for a locale: DB override if present, else built-in defaults.
+ * @param {string} locale
+ * @param {(sql: string, params?: any[]) => Promise<{rows:any[]}>} queryFn
+ */
+async function resolveSellerAgreement(locale, queryFn) {
+  const loc = normalizeAgreementLocale(locale)
+  const fallback = getDefaultSellerAgreement(loc)
+  if (typeof queryFn !== 'function') return fallback
+  try {
+    await ensureSellerAgreementTable(queryFn)
+    const r = await queryFn(
+      `SELECT locale, title, governing_note, version, updated_at, sections
+       FROM seller_agreement_templates WHERE locale = $1 LIMIT 1`,
+      [loc],
+    )
+    const row = r?.rows?.[0]
+    if (!row) return fallback
+    const sections = Array.isArray(row.sections) ? row.sections : []
+    if (!sections.length) return fallback
+    const updated = row.updated_at
+      ? new Date(row.updated_at).toISOString().slice(0, 10)
+      : fallback.updated
+    return {
+      version: String(row.version || fallback.version),
+      updated,
+      locale: loc,
+      title: String(row.title || fallback.title),
+      governing_note: row.governing_note != null ? String(row.governing_note) : fallback.governing_note,
+      sections: sections.map((s) => ({
+        heading: String(s?.heading || '').trim() || '—',
+        body: String(s?.body || ''),
+      })),
+      source: 'db',
+    }
+  } catch (_) {
+    return fallback
+  }
+}
+
+/**
+ * Persist one locale template. Returns saved payload.
+ */
+async function saveSellerAgreementTemplate(locale, payload, queryFn, updatedBy) {
+  const loc = normalizeAgreementLocale(locale)
+  await ensureSellerAgreementTable(queryFn)
+  const title = String(payload?.title || '').trim() || (TITLES[loc] || TITLES.en)
+  const governing_note = payload?.governing_note != null
+    ? String(payload.governing_note)
+    : (GOVERNING_NOTES[loc] || '')
+  const version = String(payload?.version || '').trim() || new Date().toISOString().slice(0, 10).replace(/-/g, '.')
+  const sectionsIn = Array.isArray(payload?.sections) ? payload.sections : []
+  const sections = sectionsIn
+    .map((s) => ({
+      heading: String(s?.heading || '').trim(),
+      body: String(s?.body || ''),
+    }))
+    .filter((s) => s.heading || s.body)
+  if (!sections.length) {
+    const err = new Error('At least one section is required')
+    err.status = 400
+    throw err
+  }
+  await queryFn(
+    `INSERT INTO seller_agreement_templates (locale, title, governing_note, version, updated_at, sections, updated_by)
+     VALUES ($1, $2, $3, $4, now(), $5::jsonb, $6)
+     ON CONFLICT (locale) DO UPDATE SET
+       title = EXCLUDED.title,
+       governing_note = EXCLUDED.governing_note,
+       version = EXCLUDED.version,
+       updated_at = now(),
+       sections = EXCLUDED.sections,
+       updated_by = EXCLUDED.updated_by`,
+    [loc, title, governing_note, version, JSON.stringify(sections), updatedBy || null],
+  )
+  return resolveSellerAgreement(loc, queryFn)
+}
+
+/** All built-in locales (for editor language tabs). */
+function listAgreementLocales() {
+  return Object.keys(TITLES)
+}
+
 module.exports = {
   AGREEMENT_VERSION,
   AGREEMENT_UPDATED,
   DEFAULT_PLATFORM_NAME,
   getSellerAgreement,
+  getDefaultSellerAgreement,
   normalizeAgreementLocale,
+  ensureSellerAgreementTable,
+  resolveSellerAgreement,
+  saveSellerAgreementTemplate,
+  listAgreementLocales,
+  ENSURE_AGREEMENT_TABLE_SQL,
 }

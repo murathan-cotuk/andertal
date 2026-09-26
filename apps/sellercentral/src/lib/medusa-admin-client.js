@@ -1897,6 +1897,29 @@ class MedusaAdminClient {
     return resp.blob()
   }
 
+  /** Superuser: editable seller-agreement template for one locale */
+  async getSellerAgreementTemplate(locale = 'de') {
+    const qs = `?locale=${encodeURIComponent(String(locale || 'de').slice(0, 2))}`
+    return this.request(`/admin-hub/v1/seller-agreement${qs}`, { cache: 'no-store' })
+  }
+
+  async saveSellerAgreementTemplate(payload) {
+    return this.request('/admin-hub/v1/seller-agreement', {
+      method: 'PUT',
+      body: JSON.stringify(payload || {}),
+    })
+  }
+
+  async resetSellerAgreementTemplate(locale = 'de') {
+    const qs = `?locale=${encodeURIComponent(String(locale || 'de').slice(0, 2))}`
+    return this.request(`/admin-hub/v1/seller-agreement${qs}`, { method: 'DELETE' })
+  }
+
+  /** Superuser: list sellers who signed the agreement */
+  async getSignedSellerAgreements() {
+    return this.request('/admin-hub/v1/seller-agreement/signed', { cache: 'no-store' })
+  }
+
   /**
    * Fetch an order PDF (invoice / lieferschein / …) as a Blob with Bearer auth.
    * opts: { carrier?, tracking? } — optional Lieferschein overrides.

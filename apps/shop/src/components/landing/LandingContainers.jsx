@@ -21,6 +21,7 @@ import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
 import CatalogHubFilterShell from "@/components/catalog/CatalogHubFilterShell";
 import { tokens } from "@/design-system/tokens";
+import { resolveImageUrl } from "@/lib/image-url";
 import styled from "styled-components";
 
 // "See all/more" link under a product carousel — matches the brand accent used across the shop
@@ -46,8 +47,6 @@ const SupportLanding = dynamic(() => import("@/components/support/SupportLanding
 const BecomeSellerLanding = dynamic(() => import("@/components/landing/BecomeSellerLanding"), { ssr: false });
 const BrandsDirectoryBlock = dynamic(() => import("@/components/landing/BrandsDirectoryBlock"), { ssr: false });
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
-
 /** Read a translatable text field — falls back to root field (DE default) */
 function lt(obj, field, locale) {
   if (!locale || locale === "de") return obj?.[field] ?? "";
@@ -60,21 +59,7 @@ function localizedAsset(obj, field, locale) {
 }
 
 function resolveUrl(url) {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    // Strip the host on absolute /uploads/... URLs (including stale/old backend domains from
-    // before any rename/migration) so the shop's own /uploads rewrite proxy serves them through
-    // the CURRENT backend + our domain's caching, instead of a cross-origin hotlink that can 404
-    // if the old host is ever retired. Anything else (external/seller-hotlinked images) passes
-    // through unchanged — mirrors apps/shop/src/lib/image-url.js's resolveImageUrl().
-    try {
-      const pathname = new URL(url).pathname;
-      if (pathname.startsWith("/uploads/")) return pathname;
-    } catch (_) {}
-    return url;
-  }
-  if (url.startsWith("/")) return url;
-  return `${BACKEND_URL}/uploads/${url}`;
+  return resolveImageUrl(url);
 }
 
 /** Sellercentral hero slides store overlay as 0–100; older rows may use 0–1. */

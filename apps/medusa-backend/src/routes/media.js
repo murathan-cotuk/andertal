@@ -7,13 +7,14 @@ const {
   resolveUploadDisplayFilename,
   storageFilenameWithPrefix,
 } = require('../media-filename')
+const { isS3Configured, uploadBufferToS3 } = require('../s3-upload')
 
 // Uploads: use UPLOAD_DIR for a persistent volume path, or S3 when S3_UPLOAD_* env is set.
-// Otherwise <medusa-backend>/uploads (ephemeral on many hosts). See docs/UPLOADS.md.
+// Otherwise <medusa-backend>/uploads (ephemeral on many hosts). See docs/CloudflareKurulum.md.
 const uploadDir = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
   : path.join(__dirname, '..', '..', 'uploads')
-const useS3 = !!(process.env.S3_UPLOAD_BUCKET && process.env.S3_UPLOAD_REGION)
+const useS3 = isS3Configured()
 
 const getDbClient = () => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
@@ -97,30 +98,6 @@ const mediaRowVisibleToUser = (row, u) => {
 const mapMediaRowForApi = (row) => {
   if (!row) return row
   return { ...row, filename: decodeMultipartFilename(row.filename) }
-}
-
-/** Shared S3 PutObject helper — used by the product-image path, the generic content-image path,
- * and the raw (unprocessed) fallback path below, so all three stay behaviorally identical. */
-const uploadBufferToS3 = async (buffer, key, contentType) => {
-  const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
-  const bucket = process.env.S3_UPLOAD_BUCKET
-  const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
-  const s3 = new S3Client({
-    region,
-    ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
-    ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
-      ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
-      : {})
-  })
-  await s3.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: key,
-    Body: buffer,
-    ContentType: contentType,
-    ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL })
-  }))
-  const baseUrl = process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`
-  return `${baseUrl.replace(/\/$/, '')}/${key}`
 }
 
 /** Product gallery / variant images: min 1000px edge, center square crop, store as WebP (JPEG/PNG in). */
@@ -270,28 +247,10 @@ const mediaUploadPOST = async (req, res) => {
     if (req.file.path && fs.existsSync(req.file.path)) {
       try { fs.unlinkSync(req.file.path) } catch (_) {}
     }
-    if (useS3 && process.env.S3_UPLOAD_BUCKET) {
+    if (useS3) {
       try {
-        const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
-        const bucket = process.env.S3_UPLOAD_BUCKET
-        const region = process.env.S3_UPLOAD_REGION || 'eu-central-1'
         const key = `media/${mediaSeg}/${outFilename}`
-        const s3 = new S3Client({
-          region,
-          ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
-          ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
-            ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
-            : {})
-        })
-        await s3.send(new PutObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          Body: outBuffer,
-          ContentType: 'image/webp',
-          ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL })
-        }))
-        const baseUrl = process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`
-        fileUrl = `${baseUrl.replace(/\/$/, '')}/${key}`
+        fileUrl = await uploadBufferToS3(outBuffer, key, 'image/webp')
       } catch (s3Err) {
         console.error('S3 upload error (product webp):', s3Err)
         return res.status(500).json({ message: 'Upload to storage failed' })
@@ -338,7 +297,7 @@ const mediaUploadPOST = async (req, res) => {
       if (req.file.path && fs.existsSync(req.file.path)) {
         try { fs.unlinkSync(req.file.path) } catch (_) {}
       }
-      if (useS3 && process.env.S3_UPLOAD_BUCKET) {
+      if (useS3) {
         try {
           const key = `media/${mediaSeg}/${outFilename}`
           fileUrl = await uploadBufferToS3(outBuffer, key, 'image/webp')
@@ -357,7 +316,7 @@ const mediaUploadPOST = async (req, res) => {
         fs.writeFileSync(diskPathWritten, outBuffer)
         fileUrl = `/uploads/media/${mediaSeg}/${outFilename}`
       }
-    } else if (useS3 && req.file.buffer && process.env.S3_UPLOAD_BUCKET) {
+    } else if (useS3 && req.file.buffer) {
       try {
         const key = `media/${mediaSeg}/${storageFilenameWithPrefix(req.file.originalname || 'file')}`
         fileUrl = await uploadBufferToS3(req.file.buffer, key, req.file.mimetype || 'application/octet-stream')

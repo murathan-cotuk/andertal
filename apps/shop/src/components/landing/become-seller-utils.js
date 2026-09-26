@@ -1,4 +1,4 @@
-const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+import { resolveImageUrl } from "@/lib/image-url";
 
 export function ltField(obj, field, locale) {
   if (!obj) return "";
@@ -15,9 +15,7 @@ export function itemBody(item, locale) {
 }
 
 export function resolveUrl(url) {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) return url;
-  return `${BACKEND_URL}/uploads/${url}`;
+  return resolveImageUrl(url);
 }
 
 export function slideOverlayOpacity(slide) {

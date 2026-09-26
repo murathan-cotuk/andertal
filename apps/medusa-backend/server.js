@@ -418,17 +418,35 @@ async function start() {
         notification_queue: notificationQueue,
       })
     })
-    // Uploads: use UPLOAD_DIR for a persistent volume path, or S3 when S3_UPLOAD_* env is set.
-    // Otherwise __dirname/uploads (ephemeral on many hosts). See docs/UPLOADS.md.
+    // Uploads: use UPLOAD_DIR for a persistent volume path, or S3/R2 when S3_UPLOAD_* env is set.
+    // Otherwise __dirname/uploads (ephemeral on many hosts). See docs/CloudflareKurulum.md.
     const uploadDir = process.env.UPLOAD_DIR
       ? path.resolve(process.env.UPLOAD_DIR)
       : path.join(__dirname, 'uploads')
-    const useS3 = !!(process.env.S3_UPLOAD_BUCKET && process.env.S3_UPLOAD_REGION)
-    if (!useS3) {
+    const { isS3Configured, publicUrlForUploadsPath } = require('./src/s3-upload')
+    const useS3 = isS3Configured()
+    if (useS3) {
+      // Legacy relative /uploads/... URLs → public R2/S3 object (browser never hits Render for bytes).
+      app.get(/^\/uploads\/.+/, (req, res) => {
+        const target = publicUrlForUploadsPath(req.path)
+        if (!target) return res.status(404).end()
+        res.set('Cache-Control', 'public, max-age=300')
+        return res.redirect(302, target)
+      })
+    } else {
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true })
       }
-      app.use('/uploads', express.static(uploadDir))
+      app.use(
+        '/uploads',
+        express.static(uploadDir, {
+          maxAge: '365d',
+          immutable: true,
+          setHeaders(res) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+          },
+        })
+      )
     }
     const appLoader = new MedusaAppLoader({ cwd: path.resolve(__dirname) })
 
@@ -1377,6 +1395,18 @@ async function start() {
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS signature_at timestamptz DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS signature_ip varchar(60) DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS agreement_pdf_url text DEFAULT NULL`).catch(() => {})
+        await client.query(`ALTER TABLE seller_users ALTER COLUMN agreement_version TYPE varchar(32)`).catch(() => {})
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS seller_agreement_templates (
+            locale varchar(5) PRIMARY KEY,
+            title text NOT NULL,
+            governing_note text,
+            version varchar(32) NOT NULL,
+            updated_at timestamptz NOT NULL DEFAULT now(),
+            sections jsonb NOT NULL DEFAULT '[]'::jsonb,
+            updated_by text
+          )
+        `).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_customer_id text DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_payment_method_id text DEFAULT NULL`).catch(() => {})
         await client.query(`ALTER TABLE seller_users ADD COLUMN IF NOT EXISTS stripe_card_last4 varchar(4) DEFAULT NULL`).catch(() => {})

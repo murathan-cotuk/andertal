@@ -327,7 +327,7 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedLi
   if (!ean) return []
   let list = preloadedList
   if (!list) {
-    list = await listAdminHubProductsDb({ limit: 5000 })
+    list = await listAdminHubProductsDb({ ean, limit: 200 })
     list = list.filter((row) => isStorePublishedStatus(row.status) && isStoreVisibleSellerProduct(row, approvedSellerIds))
   }
   // Match any product that carries this EAN on parent OR a variant — not only the
@@ -1042,9 +1042,17 @@ const storeProductByIdFromAdminHubGET = async (req, res) => {
     const canonicalEan = extractEanFromHubProductRow(landed) || productEans[0] || ''
     let winnerRow = landed, multiOffer = null
     if (canonicalEan || productEans.length) {
-      let publishedList = await listAdminHubProductsDb({ limit: 5000 })
-      publishedList = publishedList.filter((row) => isStorePublishedStatus(row.status) && isStoreVisibleSellerProduct(row, approvedSellerIds))
       const eansToBuild = productEans.length ? productEans : (canonicalEan ? [canonicalEan] : [])
+      // Load only rows that carry these EANs — never the whole catalog.
+      const byId = new Map()
+      for (const ean of eansToBuild) {
+        const rows = await listAdminHubProductsDb({ ean, limit: 200 })
+        for (const row of rows) {
+          if (!isStorePublishedStatus(row.status) || !isStoreVisibleSellerProduct(row, approvedSellerIds)) continue
+          byId.set(String(row.id), row)
+        }
+      }
+      const publishedList = [...byId.values()]
       const byEan = {}
       let primaryScored = null
       const allSellerIds = new Set()
@@ -1183,8 +1191,14 @@ module.exports = function createStoreProductsRouter() {
       if (!brand) { await client.end(); return res.status(404).json({ message: 'Brand not found' }) }
       await client.end()
       const approvedSellerIds = await getApprovedSellerIdsSet()
-      let list = await listAdminHubProductsDb({ limit: 3000 })
-      list = list.filter((p) => isStorePublishedStatus(p.status) && isStoreVisibleSellerProduct(p, approvedSellerIds) && (p.metadata && p.metadata.brand_id) === brand.id)
+      const brandLimit = Math.min(Math.max(parseInt(req.query.limit, 10) || 96, 1), 96)
+      const brandOffset = Math.max(parseInt(req.query.offset, 10) || 0, 0)
+      let list = await listAdminHubProductsDb({
+        brand_id: String(brand.id),
+        limit: brandLimit,
+        offset: brandOffset,
+      })
+      list = list.filter((p) => isStorePublishedStatus(p.status) && isStoreVisibleSellerProduct(p, approvedSellerIds))
       const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim() || 'default').filter(Boolean))]
       const storeNamesBySeller = {}
       await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))

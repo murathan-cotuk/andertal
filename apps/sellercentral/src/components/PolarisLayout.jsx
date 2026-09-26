@@ -299,6 +299,7 @@ function getMenuItemsMain(t, isSuperuser = false) {
       icon: StoreIcon,
       subNavigationItems: [
         { url: "/sellers", label: tx("view", "View"), superuserOnly: true },
+        { url: "/sellers/contract", label: tx("contract", "Contract"), superuserOnly: true },
         { url: "/sellers/errors", label: tx("issueLog", "Issue log"), superuserOnly: true },
       ],
     });
@@ -718,6 +719,7 @@ export default function PolarisLayout({ children }) {
   // Routes blocked for non-superuser sellers
   const SELLER_BLOCKED_ROUTES = new Set([
     "/sellers",
+    "/sellers/contract",
     "/sellers/errors",
     "/products/collections",
     "/products/collections/new",
@@ -1022,6 +1024,7 @@ export default function PolarisLayout({ children }) {
                     !notifData?.recent_seller_errors?.length &&
                     !notifData?.recent_support_cases?.length &&
                     !notifData?.recent_seller_listings_pending?.length &&
+                    !notifData?.recent_brand_authorizations_pending?.length &&
                     !notifData?.recent_eu_origin_pending?.length) ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>{notifCopy.empty}</div>
                   ) : (
@@ -1086,6 +1089,27 @@ export default function PolarisLayout({ children }) {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.title || notifCopy.newCampaign}</div>
                             <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2 }}>{c.body || ""}</div>
+                          </div>
+                        </Link>
+                      ))}
+                      {(notifData?.recent_brand_authorizations_pending || []).length > 0 && (
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                          {notifCopy.brandAuthorizations}
+                        </div>
+                      )}
+                      {(notifData?.recent_brand_authorizations_pending || []).map((n) => (
+                        <Link
+                          key={n.id}
+                          href={n.reference_id ? `/content/brands?review=${encodeURIComponent(n.reference_id)}` : "/content/brands"}
+                          onClick={() => setNotifOpen(false)}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                        >
+                          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>🏷️</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{n.title || notifCopy.brandPending}</div>
+                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2 }}>
+                              {String(n.body || "")}
+                            </div>
                           </div>
                         </Link>
                       ))}
@@ -1307,6 +1331,7 @@ export default function PolarisLayout({ children }) {
     "/marketing/automations",
     "/marketing/seo",
     "/sellers",
+    "/sellers/contract",
     "/sellers/errors",
   ]);
 

@@ -191,7 +191,7 @@ const adminBrandsPOST = async (req, res) => {
           callerSellerId,
           row.id,
         ]
-      ).catch(() => {})
+      ).catch((e) => console.error('Brand authorization notification:', e))
     }
     await client.end()
     res.status(201).json({ brand: row ? mapBrandRow(row) : null })
@@ -408,7 +408,7 @@ const brandVerifyPOST = async (req, res) => {
         `INSERT INTO admin_hub_notifications (type, title, body, seller_id, reference_id)
          VALUES ('brand_authorization_pending', $1, $2, $3, $4)`,
         ['Marka doğrulama bekliyor', notifBody, callerSellerId, brandId]
-      ).catch(() => {})
+      ).catch((e) => console.error('Brand authorization notification:', e))
     }
 
     const r = await client.query(`SELECT ${BRAND_SELECT_COLS} FROM admin_hub_brands WHERE id = $1`, [brandId])

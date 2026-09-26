@@ -238,12 +238,25 @@ module.exports = function createNotificationsRouter() {
           : `SELECT 0::int AS c`
         const brandAuthUnreadQ = sup
           ? `
-          SELECT COUNT(*)::int AS c FROM admin_hub_notifications n
-          LEFT JOIN seller_hub_notification_state s
-            ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = n.id
-          WHERE n.type = 'brand_authorization_pending'
-            AND (s.id IS NULL OR s.deleted_at IS NULL)
-            AND (s.id IS NULL OR s.read_at IS NULL)`
+          SELECT (
+            (SELECT COUNT(*)::int FROM admin_hub_notifications n
+              LEFT JOIN seller_hub_notification_state s
+                ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = n.id
+              WHERE n.type = 'brand_authorization_pending'
+                AND (s.id IS NULL OR s.deleted_at IS NULL)
+                AND (s.id IS NULL OR s.read_at IS NULL))
+            +
+            (SELECT COUNT(*)::int FROM admin_hub_brands b
+              LEFT JOIN seller_hub_notification_state s
+                ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = b.id
+              WHERE (b.status = 'pending' OR b.verification_level = 'pending_review')
+                AND NOT EXISTS (
+                  SELECT 1 FROM admin_hub_notifications n
+                  WHERE n.type = 'brand_authorization_pending' AND n.reference_id = b.id::text
+                )
+                AND (s.id IS NULL OR s.deleted_at IS NULL)
+                AND (s.id IS NULL OR s.read_at IS NULL))
+          )::int AS c`
           : `SELECT 0::int AS c`
         const crUnreadQ = `
           SELECT COUNT(*)::int AS c FROM admin_hub_product_change_requests cr
@@ -408,14 +421,31 @@ module.exports = function createNotificationsRouter() {
         let recentBrandAuthPending = { rows: [] }
         if (sup) {
           recentBrandAuthPending = await client.query(
-            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
-                    (s.read_at IS NOT NULL) AS read
-             FROM admin_hub_notifications n
-             LEFT JOIN seller_hub_notification_state s
-               ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = n.id
-             WHERE n.type = 'brand_authorization_pending'
-               AND (s.id IS NULL OR s.deleted_at IS NULL)
-             ORDER BY n.created_at DESC LIMIT 8`,
+            `SELECT * FROM (
+               SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                      (s.read_at IS NOT NULL) AS read
+               FROM admin_hub_notifications n
+               LEFT JOIN seller_hub_notification_state s
+                 ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = n.id
+               WHERE n.type = 'brand_authorization_pending'
+                 AND (s.id IS NULL OR s.deleted_at IS NULL)
+               UNION ALL
+               SELECT b.id,
+                      'Marka yetkilendirme bekliyor'::text,
+                      ('Bir satıcı "' || b.name || '" markası için onay bekliyor.')::text,
+                      b.seller_id, b.id::text, b.created_at,
+                      (s.read_at IS NOT NULL) AS read
+               FROM admin_hub_brands b
+               LEFT JOIN seller_hub_notification_state s
+                 ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = b.id
+               WHERE (b.status = 'pending' OR b.verification_level = 'pending_review')
+                 AND NOT EXISTS (
+                   SELECT 1 FROM admin_hub_notifications n
+                   WHERE n.type = 'brand_authorization_pending' AND n.reference_id = b.id::text
+                 )
+                 AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ) q
+             ORDER BY created_at DESC LIMIT 8`,
             [rk],
           ).catch(() => ({ rows: [] }))
         }
@@ -690,14 +720,31 @@ module.exports = function createNotificationsRouter() {
         let brandAuthQ = { rows: [] }
         if (sup) {
           brandAuthQ = await client.query(
-            `SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
-                    (s.read_at IS NOT NULL) AS read
-             FROM admin_hub_notifications n
-             LEFT JOIN seller_hub_notification_state s
-               ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = n.id
-             WHERE n.type = 'brand_authorization_pending'
-               AND (s.id IS NULL OR s.deleted_at IS NULL)
-             ORDER BY n.created_at DESC LIMIT 500`,
+            `SELECT * FROM (
+               SELECT n.id, n.title, n.body, n.seller_id, n.reference_id, n.created_at,
+                      (s.read_at IS NOT NULL) AS read
+               FROM admin_hub_notifications n
+               LEFT JOIN seller_hub_notification_state s
+                 ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = n.id
+               WHERE n.type = 'brand_authorization_pending'
+                 AND (s.id IS NULL OR s.deleted_at IS NULL)
+               UNION ALL
+               SELECT b.id,
+                      'Marka yetkilendirme bekliyor'::text,
+                      ('Bir satıcı "' || b.name || '" markası için onay bekliyor.')::text,
+                      b.seller_id, b.id::text, b.created_at,
+                      (s.read_at IS NOT NULL) AS read
+               FROM admin_hub_brands b
+               LEFT JOIN seller_hub_notification_state s
+                 ON s.recipient_key = $1 AND s.source_type = 'brand_authorization_pending' AND s.source_id = b.id
+               WHERE (b.status = 'pending' OR b.verification_level = 'pending_review')
+                 AND NOT EXISTS (
+                   SELECT 1 FROM admin_hub_notifications n
+                   WHERE n.type = 'brand_authorization_pending' AND n.reference_id = b.id::text
+                 )
+                 AND (s.id IS NULL OR s.deleted_at IS NULL)
+             ) q
+             ORDER BY created_at DESC LIMIT 500`,
             [rk],
           ).catch(() => ({ rows: [] }))
         }
@@ -930,7 +977,7 @@ module.exports = function createNotificationsRouter() {
             created_at: r.created_at,
             title: r.title || 'Marka yetkilendirme bekliyor',
             subtitle: r.body || '',
-            href: '/content/brands/authorizations',
+            href: r.reference_id ? `/content/brands?review=${encodeURIComponent(String(r.reference_id))}` : '/content/brands',
             brand_id: r.reference_id ? String(r.reference_id) : undefined,
             seller_id: r.seller_id || undefined,
           })

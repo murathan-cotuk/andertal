@@ -421,26 +421,10 @@ async function saveAttachment(file) {
   const detected = detectFileType(file.buffer)
   if (!detected) throw Object.assign(new Error('Only valid JPEG, PNG, WebP, or PDF files are allowed'), { status: 415 })
   const key = makeAttachmentKey(detected.ext)
-  if (process.env.S3_UPLOAD_BUCKET && process.env.S3_UPLOAD_REGION) {
-    const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
-    const bucket = process.env.S3_UPLOAD_BUCKET
-    const region = process.env.S3_UPLOAD_REGION
-    const s3 = new S3Client({
-      region,
-      ...(process.env.S3_UPLOAD_ENDPOINT && { endpoint: process.env.S3_UPLOAD_ENDPOINT }),
-      ...(process.env.S3_UPLOAD_ACCESS_KEY_ID && process.env.S3_UPLOAD_SECRET_ACCESS_KEY
-        ? { credentials: { accessKeyId: process.env.S3_UPLOAD_ACCESS_KEY_ID, secretAccessKey: process.env.S3_UPLOAD_SECRET_ACCESS_KEY } }
-        : {}),
-    })
-    await s3.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: file.buffer,
-      ContentType: detected.mime,
-      ...(process.env.S3_UPLOAD_ACL && { ACL: process.env.S3_UPLOAD_ACL }),
-    }))
-    const base = String(process.env.S3_UPLOAD_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`).replace(/\/$/, '')
-    return { key, url: `${base}/${key}`, mime: detected.mime, ext: detected.ext }
+  const { isS3Configured, uploadBufferToS3 } = require('../s3-upload')
+  if (isS3Configured()) {
+    const url = await uploadBufferToS3(file.buffer, key, detected.mime)
+    return { key, url, mime: detected.mime, ext: detected.ext }
   }
   const uploadRoot = process.env.UPLOAD_DIR ? path.resolve(process.env.UPLOAD_DIR) : path.join(__dirname, '..', '..', 'uploads')
   const destination = path.join(uploadRoot, ...key.split('/'))

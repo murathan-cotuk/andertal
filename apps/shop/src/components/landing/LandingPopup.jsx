@@ -3,13 +3,10 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { getMedusaClient, resolveMedusaBaseUrl } from "@/lib/medusa-client";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
+import { resolveImageUrl } from "@/lib/image-url";
 
 function resolveUrl(url) {
-  if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) return url;
-  return `${BACKEND_URL}/uploads/${url}`;
+  return resolveImageUrl(url);
 }
 
 // ── Device detection ──────────────────────────────────────────────────────────

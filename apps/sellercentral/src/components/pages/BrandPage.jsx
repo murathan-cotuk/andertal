@@ -21,6 +21,7 @@ import { titleToHandle } from "@/lib/slugify";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { getBrandPageCopy, getBrandAuthorizationsPageCopy } from "@/lib/brand-page-i18n";
 import { userError } from "@/lib/api-error-messages";
 import { appendMediaFileToFormData } from "@/lib/media-upload";
@@ -80,7 +81,11 @@ function authDocLabel(type, authCopy) {
 }
 
 // ── Brand card (grid tile) ─────────────────────────────────────────────────
-function BrandCard({ brand, baseUrl, onEdit, canEdit, canVerify, onVerify, isSuperuser, isMine, copy }) {
+function isPendingReview(brand) {
+  return brand?.status === "pending" || brand?.verification_level === "pending_review";
+}
+
+function BrandCard({ brand, baseUrl, onEdit, canEdit, canVerify, onVerify, canReview, onReview, isSuperuser, isMine, copy }) {
   const resolveUrl = (url) => {
     if (!url) return "";
     if (url.startsWith("http") || url.startsWith("data:")) return url;
@@ -90,6 +95,29 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, canVerify, onVerify, isSup
   const bannerSrc = brand.banner_image ? resolveUrl(brand.banner_image) : null;
 
   return (
+    <div style={{ position: "relative" }}>
+      {isPendingReview(brand) && (
+        <span
+          title={copy.statusPending}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            zIndex: 2,
+            minWidth: 18,
+            height: 18,
+            padding: "0 5px",
+            borderRadius: 999,
+            background: "#dc2626",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 800,
+            lineHeight: "18px",
+            textAlign: "center",
+            boxShadow: "0 0 0 2px #fff",
+          }}
+        >!</span>
+      )}
     <Card padding="300">
       <BlockStack gap="200">
         {bannerSrc && (
@@ -126,74 +154,24 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, canVerify, onVerify, isSup
             {isSuperuser ? copy.edit : copy.logoBanner}
           </Button>
         )}
+        {canReview && (
+          <Button size="slim" tone="critical" fullWidth onClick={() => onReview(brand)}>
+            {copy.review}
+          </Button>
+        )}
       </BlockStack>
     </Card>
+    </div>
   );
 }
 
-// ── Pending authorization card (full-width review row) ─────────────────────
-function PendingBrandCard({ brand, authCopy, baseUrl, onApprove, onReject, busy }) {
-  const resolveUrl = (url) => {
-    if (!url) return "";
-    if (url.startsWith("http") || url.startsWith("data:")) return url;
-    return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
-  };
-  const isReseller = brand.brand_type === "authorized_reseller";
-
+function ReviewField({ label, children }) {
+  if (children == null || children === "" || children === false) return null;
   return (
-    <Card padding="400">
-      <BlockStack gap="300">
-        <InlineStack align="space-between" blockAlign="center">
-          <BlockStack gap="050">
-            <InlineStack gap="150" blockAlign="center">
-              <Text as="p" variant="bodyMd" fontWeight="semibold">{brand.name}</Text>
-              <Badge tone="attention">{isReseller ? authCopy.typeReseller : authCopy.typeRegistered}</Badge>
-            </InlineStack>
-            <Text as="p" variant="bodySm" tone="subdued">{authCopy.seller}: {brand.seller_name || brand.seller_id}</Text>
-            {brand.created_at && (
-              <Text as="p" variant="bodySm" tone="subdued">{authCopy.submittedOn}: {new Date(brand.created_at).toLocaleString()}</Text>
-            )}
-          </BlockStack>
-          <InlineStack gap="200">
-            <Button size="slim" tone="critical" onClick={() => onReject(brand)} disabled={busy}>{authCopy.reject}</Button>
-            <Button size="slim" variant="primary" onClick={() => onApprove(brand)} loading={busy}>{authCopy.approve}</Button>
-          </InlineStack>
-        </InlineStack>
-
-        {!isReseller && (brand.trademark_number || brand.trademark_jurisdiction) && (
-          <Text as="p" variant="bodySm">
-            {authCopy.trademark}: {brand.trademark_number || "—"} ({brand.trademark_jurisdiction || "—"})
-            {brand.verification?.trademark_status ? ` · ${brand.verification.trademark_status}` : ""}
-          </Text>
-        )}
-        {brand.verification?.trademark_owner_name && (
-          <Text as="p" variant="bodySm">{authCopy.owner}: {brand.verification.trademark_owner_name}</Text>
-        )}
-        {brand.verification?.website && (
-          <Text as="p" variant="bodySm">{authCopy.website}: {brand.verification.website}</Text>
-        )}
-
-        <Divider />
-
-        <BlockStack gap="150">
-          <Text as="p" variant="bodySm" fontWeight="medium">{authCopy.documents}</Text>
-          {(!brand.documents || brand.documents.length === 0) ? (
-            <Text as="p" variant="bodySm" tone="subdued">{authCopy.noDocuments}</Text>
-          ) : (
-            <BlockStack gap="100">
-              {brand.documents.map((doc) => (
-                <InlineStack key={doc.id} gap="200" blockAlign="center">
-                  <Text as="span" variant="bodySm">{authDocLabel(doc.document_type, authCopy)}{doc.file_name ? ` — ${doc.file_name}` : ""}</Text>
-                  <Button size="slim" variant="plain" url={resolveUrl(doc.file_url)} target="_blank">
-                    {authCopy.viewDocument}
-                  </Button>
-                </InlineStack>
-              ))}
-            </BlockStack>
-          )}
-        </BlockStack>
-      </BlockStack>
-    </Card>
+    <div style={{ padding: "10px 0", borderBottom: "1px solid #e5e7eb" }}>
+      <Text as="p" variant="bodySm" tone="subdued">{label}</Text>
+      <div style={{ marginTop: 4 }}>{typeof children === "string" ? <Text as="p" variant="bodyMd">{children}</Text> : children}</div>
+    </div>
   );
 }
 
@@ -201,6 +179,8 @@ function PendingBrandCard({ brand, authCopy, baseUrl, onApprove, onReject, busy 
 export default function BrandPage() {
   const client = getMedusaAdminClient();
   const locale = useLocale();
+  const searchParams = useSearchParams();
+  const reviewId = searchParams.get("review");
   const baseUrl = (client.baseURL || getDefaultBaseUrl()).replace(/\/$/, "");
 
   // Read caller identity from localStorage
@@ -241,6 +221,7 @@ export default function BrandPage() {
   const [pendingBrands, setPendingBrands] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(true);
   const [authBusyId, setAuthBusyId] = useState(null);
+  const [reviewTarget, setReviewTarget] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null); // brand or null
   const [rejectReason, setRejectReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
@@ -264,12 +245,19 @@ export default function BrandPage() {
 
   useEffect(() => { loadPending(); }, [isSuperuser]);
 
+  useEffect(() => {
+    if (!isSuperuser || pendingLoading || !reviewId) return;
+    const brand = pendingBrands.find((b) => b.id === reviewId);
+    if (brand) setReviewTarget(brand);
+  }, [isSuperuser, pendingLoading, pendingBrands, reviewId]);
+
   const handleApprove = async (brand) => {
     setAuthBusyId(brand.id);
     setMessage({ type: "", text: "" });
     try {
       await client.approveBrandAuthorization(brand.id);
       setMessage({ type: "success", text: authCopy.approved });
+      setReviewTarget(null);
       loadPending();
       loadBrands();
     } catch (e) {
@@ -292,6 +280,7 @@ export default function BrandPage() {
       await client.rejectBrandAuthorization(rejectTarget.id, rejectReason.trim());
       setMessage({ type: "success", text: authCopy.rejected });
       setRejectTarget(null);
+      setReviewTarget(null);
       loadPending();
       loadBrands();
     } catch (e) {
@@ -475,6 +464,10 @@ export default function BrandPage() {
   const pageSafe = Math.min(Math.max(1, page), totalPages);
   const pagedOtherBrands = otherBrands.slice((pageSafe - 1) * BRANDS_PAGE_SIZE, pageSafe * BRANDS_PAGE_SIZE);
 
+  const openReview = (brand) => {
+    setReviewTarget(pendingBrands.find((b) => b.id === brand.id) || brand);
+  };
+
   const renderBrandGrid = (list, { isMineSection }) => (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
       {list.map((brand) => (
@@ -486,6 +479,8 @@ export default function BrandPage() {
           canEdit={canEditBrand(brand)}
           canVerify={canVerifyBrand(brand, { isSuperuser, callerId })}
           onVerify={openVerify}
+          canReview={isSuperuser && isPendingReview(brand)}
+          onReview={openReview}
           isSuperuser={isSuperuser}
           isMine={isMineSection || (!!brand.seller_id && brand.seller_id === callerId)}
           copy={copy}
@@ -644,40 +639,6 @@ export default function BrandPage() {
           <Banner tone="critical" onDismiss={() => setLoadError("")}>
             {loadError}
           </Banner>
-        )}
-
-        {/* ── PENDING AUTHORIZATIONS (superuser only, always on top) ───────── */}
-        {isSuperuser && (
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="050">
-                <Text as="h2" variant="headingMd">{authCopy.title}</Text>
-                <Text as="p" variant="bodySm" tone="subdued">{authCopy.subtitle}</Text>
-              </BlockStack>
-
-              {pendingLoading ? (
-                <Text as="p" tone="subdued">{authCopy.loading}</Text>
-              ) : pendingBrands.length === 0 ? (
-                <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                  <Text as="p" tone="subdued">{authCopy.empty}</Text>
-                </Box>
-              ) : (
-                <BlockStack gap="300">
-                  {pendingBrands.map((brand) => (
-                    <PendingBrandCard
-                      key={brand.id}
-                      brand={brand}
-                      authCopy={authCopy}
-                      baseUrl={baseUrl}
-                      onApprove={handleApprove}
-                      onReject={openReject}
-                      busy={authBusyId === brand.id}
-                    />
-                  ))}
-                </BlockStack>
-              )}
-            </BlockStack>
-          </Card>
         )}
 
         {/* ── MY BRANDS (seller-created, always on top, own block) ─────────── */}
@@ -1080,6 +1041,58 @@ export default function BrandPage() {
               </>
             )}
           </BlockStack>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={!!reviewTarget}
+        onClose={() => setReviewTarget(null)}
+        title={reviewTarget ? `${authCopy.reviewTitle}: ${reviewTarget.name}` : authCopy.reviewTitle}
+        primaryAction={{
+          content: authCopy.approve,
+          onAction: () => reviewTarget && handleApprove(reviewTarget),
+          loading: !!(reviewTarget && authBusyId === reviewTarget.id),
+        }}
+        secondaryActions={[
+          { content: authCopy.reject, destructive: true, onAction: () => { if (!reviewTarget) return; const brand = reviewTarget; setReviewTarget(null); openReject(brand); } },
+          { content: authCopy.cancel, onAction: () => setReviewTarget(null) },
+        ]}
+      >
+        <Modal.Section>
+          {reviewTarget && (
+            <BlockStack gap="0">
+              <ReviewField label={copy.name}>{reviewTarget.name}</ReviewField>
+              <ReviewField label={copy.handle}>{reviewTarget.handle}</ReviewField>
+              <ReviewField label={authCopy.seller}>{reviewTarget.seller_name || reviewTarget.seller_id}</ReviewField>
+              <ReviewField label={copy.brandType}>
+                {reviewTarget.brand_type === "authorized_reseller"
+                  ? authCopy.typeReseller
+                  : reviewTarget.brand_type === "own_registered"
+                    ? authCopy.typeRegistered
+                    : copy.brandTypeOwn}
+              </ReviewField>
+              <ReviewField label={copy.address}>{reviewTarget.address}</ReviewField>
+              <ReviewField label={copy.trademarkNumber}>{reviewTarget.trademark_number}</ReviewField>
+              <ReviewField label={copy.trademarkJurisdiction}>{reviewTarget.trademark_jurisdiction}</ReviewField>
+              <ReviewField label={authCopy.trademark}>{reviewTarget.verification?.trademark_status}</ReviewField>
+              <ReviewField label={authCopy.owner}>{reviewTarget.verification?.trademark_owner_name}</ReviewField>
+              <ReviewField label={copy.ownershipRole}>{reviewTarget.verification?.ownership_role}</ReviewField>
+              <ReviewField label={authCopy.website}>{reviewTarget.verification?.website}</ReviewField>
+              <ReviewField label={authCopy.submittedOn}>
+                {reviewTarget.created_at ? new Date(reviewTarget.created_at).toLocaleString() : ""}
+              </ReviewField>
+              {(reviewTarget.documents || []).map((doc) => (
+                <ReviewField key={doc.id} label={authDocLabel(doc.document_type, authCopy)}>
+                  <Button size="slim" variant="plain" url={resolveUrl(doc.file_url)} target="_blank">
+                    {doc.file_name || authCopy.viewDocument}
+                  </Button>
+                </ReviewField>
+              ))}
+              {(!reviewTarget.documents || reviewTarget.documents.length === 0) && (
+                <ReviewField label={authCopy.documents}>{authCopy.noDocuments}</ReviewField>
+              )}
+            </BlockStack>
+          )}
         </Modal.Section>
       </Modal>
 
