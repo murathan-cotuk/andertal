@@ -418,36 +418,25 @@ async function start() {
         notification_queue: notificationQueue,
       })
     })
-    // Uploads: use UPLOAD_DIR for a persistent volume path, or S3/R2 when S3_UPLOAD_* env is set.
-    // Otherwise __dirname/uploads (ephemeral on many hosts). See docs/CloudflareKurulum.md.
+    // Uploads: always serve local disk for legacy /uploads/... paths.
+    // New files go to R2 when S3_UPLOAD_* is set (absolute URLs stored in DB).
+    // Do NOT redirect all /uploads to R2 — most catalog images were never migrated.
     const uploadDir = process.env.UPLOAD_DIR
       ? path.resolve(process.env.UPLOAD_DIR)
       : path.join(__dirname, 'uploads')
-    const { isS3Configured, publicUrlForUploadsPath } = require('./src/s3-upload')
-    const useS3 = isS3Configured()
-    if (useS3) {
-      // Legacy relative /uploads/... URLs → public R2/S3 object (browser never hits Render for bytes).
-      app.get(/^\/uploads\/.+/, (req, res) => {
-        const target = publicUrlForUploadsPath(req.path)
-        if (!target) return res.status(404).end()
-        res.set('Cache-Control', 'public, max-age=300')
-        return res.redirect(302, target)
-      })
-    } else {
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true })
-      }
-      app.use(
-        '/uploads',
-        express.static(uploadDir, {
-          maxAge: '365d',
-          immutable: true,
-          setHeaders(res) {
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
-          },
-        })
-      )
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
     }
+    app.use(
+      '/uploads',
+      express.static(uploadDir, {
+        maxAge: '365d',
+        immutable: true,
+        setHeaders(res) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+        },
+      })
+    )
     const appLoader = new MedusaAppLoader({ cwd: path.resolve(__dirname) })
 
     let medusaApp

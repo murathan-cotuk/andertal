@@ -11,6 +11,16 @@ Hedef trafik (~30k gün / ~1000 anlık, 10k kategori, 140k ürün) için **görs
 
 ---
 
+**Önemli — eski görseller:** Katalogdaki çoğu URL hâlâ `/uploads/...` (Render diski).
+Bunları R2’ye **otomatik taşımayız**. `NEXT_PUBLIC_UPLOADS_BASE_URL` shop’ta olsa bile
+relative `/uploads` yolları backend’den servis edilir. Sadece **yeni** upload’lar
+(R2 env’li backend) DB’ye `https://pub-….r2.dev/media/...` yazar.
+
+Eski dosyaları R2’ye taşıyana kadar shop env’den `NEXT_PUBLIC_UPLOADS_BASE_URL`
+**zorunlu değil** (zararsız da bırakılabilir).
+
+---
+
 ## 0) Domain proxy — kontrol listesi (muhtemelen yaptın)
 
 1. [dash.cloudflare.com](https://dash.cloudflare.com) → domain → **DNS**

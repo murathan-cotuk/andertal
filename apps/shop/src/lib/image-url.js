@@ -1,12 +1,15 @@
 /**
  * Resolve image URL for display.
  *
- * When NEXT_PUBLIC_UPLOADS_BASE_URL is set (Cloudflare R2 public URL), relative
- * /uploads/... paths and own-backend absolute /uploads URLs are rewritten to the
- * CDN so browsers never pull image bytes through Render.
+ * Own-backend /uploads/ paths (relative or absolute) stay as relative /uploads/...
+ * so the shop rewrite proxies them from the backend disk — most catalog images still
+ * live there until migrated to R2.
  *
- * Disk paths are /uploads/media/...; R2 object keys are media/... (no "uploads"
- * segment) — matching medusa-backend/src/s3-upload.js.
+ * Absolute R2/CDN URLs (or any foreign host) are left as-is. New uploads already
+ * store full https://pub-….r2.dev/media/... URLs in the DB when S3_UPLOAD_* is set.
+ *
+ * Do NOT rewrite every /uploads path to NEXT_PUBLIC_UPLOADS_BASE_URL: that breaks
+ * legacy files that were never copied to R2.
  */
 const BACKEND_URL =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL) ||
@@ -28,6 +31,18 @@ function getPathname(fullUrl) {
   return null;
 }
 
+function isUploadsCdnHost(fullUrl) {
+  if (!UPLOADS_BASE) return false;
+  try {
+    const abs = fullUrl.startsWith("//") ? `https:${fullUrl}` : fullUrl;
+    const host = new URL(abs).hostname.toLowerCase();
+    const cdnHost = new URL(UPLOADS_BASE.startsWith("http") ? UPLOADS_BASE : `https://${UPLOADS_BASE}`).hostname.toLowerCase();
+    return host === cdnHost;
+  } catch (_) {
+    return false;
+  }
+}
+
 function isOwnUploadHost(fullUrl) {
   try {
     const abs = fullUrl.startsWith("//") ? `https:${fullUrl}` : fullUrl;
@@ -47,40 +62,31 @@ function isOwnUploadHost(fullUrl) {
   }
 }
 
-/** /uploads/media/x → https://cdn/media/x (R2 keys omit the "uploads" prefix). */
-function toCdnUploadsUrl(uploadsPathname) {
-  if (!UPLOADS_BASE || !uploadsPathname) return "";
-  let p = String(uploadsPathname).replace(/^\/+/, "");
-  if (p.startsWith("uploads/")) p = p.slice("uploads/".length);
-  return `${UPLOADS_BASE}/${p}`;
-}
-
 export function resolveImageUrl(url) {
   if (!url || typeof url !== "string") return "";
   const u = url.trim();
   if (!u) return "";
 
   if (!u.startsWith("http") && !u.startsWith("//")) {
-    if (u.startsWith("/uploads/")) {
-      if (UPLOADS_BASE) return toCdnUploadsUrl(u);
-      return u;
-    }
+    // Relative /uploads/... → shop rewrite → backend disk (legacy + safe).
+    if (u.startsWith("/uploads/")) return u;
     return `${BASE}${u.startsWith("/") ? "" : "/"}${u}`;
   }
 
+  // Already on R2/CDN — keep absolute.
+  if (isUploadsCdnHost(u)) return u;
+
   const pathname = getPathname(u);
   if (pathname && pathname.startsWith("/uploads/")) {
-    if (UPLOADS_BASE) return toCdnUploadsUrl(pathname);
+    // Own backend absolute /uploads → same-origin relative (shop proxy).
     if (isOwnUploadHost(u)) return pathname;
     return u;
   }
-  // Already absolute CDN / foreign URL — keep as-is
   return u;
 }
 
 /**
  * Rewrite image URLs inside HTML (e.g. collection description richtext).
- * Ensures img src="/uploads/..." or wrong-host URLs use the configured CDN/backend.
  */
 export function rewriteImageUrlsInHtml(html) {
   if (!html || typeof html !== "string") return html;
