@@ -567,7 +567,7 @@ const CategoryMegaBackdrop = styled.div`
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.38);
+    background: rgba(29, 27, 24, 0.45);
     z-index: 2147483590;
     opacity: ${(p) => (p.$open ? 1 : 0)};
     visibility: ${(p) => (p.$open ? "visible" : "hidden")};
@@ -587,7 +587,8 @@ const CategoryMegaPanel = styled.div`
     right: 0;
     background: #fff;
     border-top: 3px solid var(--shop-primary, #1b8880);
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.13);
+    border-radius: 0 0 20px 20px;
+    box-shadow: 0 20px 50px rgba(29, 27, 24, 0.16);
     overflow: hidden;
     max-height: ${(p) => (p.$open ? "600px" : "0")};
     transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
@@ -607,8 +608,8 @@ const CategoryMegaPanel = styled.div`
     right: auto;
     background: #fff;
     border: none;
-    border-right: 1px solid #e5e7eb;
-    box-shadow: 8px 0 44px rgba(0, 0, 0, 0.14);
+    border-radius: 0 24px 24px 0;
+    box-shadow: 24px 0 48px rgba(29, 27, 24, 0.18);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -626,13 +627,14 @@ const CategoryMegaSidebarHead = styled.div`
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    padding: 14px 16px;
-    background: var(--shop-primary, #1b8880);
-    font-size: 15px;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: 0.01em;
-    font-family: ${tokens.fontFamily.sans};
+    padding: 18px 16px 14px 24px;
+    background: #fff;
+    border-bottom: 1px solid #efe8dd;
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--body-color, #1d1b18);
+    letter-spacing: -0.01em;
+    font-family: var(--h2-ff, inherit);
   }
 `;
 
@@ -642,20 +644,20 @@ const CategoryMegaSidebarClose = styled.button`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
-    margin: -6px -8px -6px 0;
+    width: 44px;
+    height: 44px;
+    margin: -6px 0;
     padding: 0;
     border: none;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    border-radius: 50%;
+    background: #f6f2ec;
+    color: var(--body-color, #1d1b18);
     cursor: pointer;
     font-size: 20px;
     line-height: 1;
     transition: background 0.13s ease;
     &:hover {
-      background: rgba(255, 255, 255, 0.26);
+      background: #ece5da;
     }
   }
 `;
@@ -695,43 +697,44 @@ const CategoryMegaLink = styled(Link)`
   align-items: center;
   gap: 12px;
   padding: 7px 12px;
-  font-size: 13.5px;
-  font-family: ${tokens.fontFamily.sans};
-  color: ${tokens.dark[700]};
+  font-size: 14.5px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--body-color, #1d1b18);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: 12px;
   white-space: nowrap;
   transition: background 0.13s ease, color 0.13s ease;
 
   &:hover {
-    background: ${tokens.background.soft};
-    color: var(--shop-primary, ${tokens.primary.DEFAULT});
+    background: #f6f2ec;
+    color: var(--body-color, #1d1b18);
   }
 
   @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
     white-space: normal;
     padding: 8px 12px;
-    border-radius: 8px;
-    min-height: 48px;
+    border-radius: 14px;
+    min-height: 56px;
   }
 `;
 
 const CategoryMegaThumb = styled.img`
   width: 44px;
   height: 44px;
-  border-radius: 8px;
+  border-radius: 12px;
   object-fit: cover;
-  background: #e5e7eb;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #f6f2ec;
+  border: none;
   flex-shrink: 0;
 `;
 
 const CategoryMegaThumbPlaceholder = styled.div`
   width: 44px;
   height: 44px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  background: #efe8dd;
+  border: none;
   flex-shrink: 0;
 `;
 
@@ -747,28 +750,29 @@ const CategoryMegaBtnLink = styled.button`
   gap: 10px;
   width: 100%;
   text-align: left;
+  min-height: 44px;
   padding: 10px 14px;
-  font-size: 13.5px;
-  font-family: ${tokens.fontFamily.sans};
-  font-weight: 600;
-  color: ${tokens.dark[700]};
+  font-size: 14.5px;
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: 12px;
   background: none;
   border: none;
   cursor: pointer;
   transition: background 0.13s ease, color 0.13s ease;
 
   &:hover {
-    background: ${tokens.background.soft};
-    color: var(--shop-primary, ${tokens.primary.DEFAULT});
+    background: #f6f2ec;
+    color: var(--body-color, #1d1b18);
   }
 `;
 
 const CategoryMegaSidebarCol = styled.div`
   flex-shrink: 0;
   width: 200px;
-  border-right: 1px solid #e8e8e6;
+  border-right: 1px solid #efe8dd;
   padding-right: 12px;
   margin-right: 12px;
   display: flex;
@@ -779,23 +783,23 @@ const CategoryMegaRootLink = styled(Link)`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px 8px 10px;
-  border-left: 2px solid transparent;
+  padding: 9px 12px 9px 10px;
+  border-left: 3px solid transparent;
   border-left-color: ${(p) => (p.$active ? "var(--shop-primary, " + tokens.primary.DEFAULT + ")" : "transparent")};
-  font-size: 13.5px;
-  font-family: ${tokens.fontFamily.sans};
-  color: ${(p) => (p.$active ? "var(--shop-primary, " + tokens.primary.DEFAULT + ")" : tokens.dark[700])};
-  font-weight: ${(p) => (p.$active ? 600 : 400)};
-  background: ${(p) => (p.$active ? tokens.background.soft : "transparent")};
+  font-size: 14.5px;
+  font-family: inherit;
+  color: var(--body-color, #1d1b18);
+  font-weight: ${(p) => (p.$active ? 700 : 500)};
+  background: ${(p) => (p.$active ? "#fcebd5" : "transparent")};
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: 10px;
   white-space: nowrap;
   transition: background 0.13s ease, color 0.13s ease, border-color 0.13s ease;
   cursor: pointer;
 
   &:hover {
-    background: ${tokens.background.soft};
-    color: var(--shop-primary, ${tokens.primary.DEFAULT});
+    background: #f6f2ec;
+    color: var(--body-color, #1d1b18);
   }
 `;
 

@@ -26,7 +26,8 @@ import {
   useMobileBottomNavScroll,
 } from "@/context/MobileBottomNavScrollContext";
 
-const TEAL = "#1b8880";
+/* Accent follows the shop theme (Styles → colors.accent); teal only as a last-resort fallback. */
+const TEAL = "var(--shop-accent, #1b8880)";
 const USE_MODERN_MOBILE_BOTTOM_NAV = true;
 
 /* ─── inline styles (no styled-components dependency) ─────── */
@@ -104,7 +105,8 @@ const css = {
     zIndex: 2147483701,
     transform: open ? "translateX(0)" : "translateX(-100%)",
     transition: reducedMotion ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-    boxShadow: "4px 0 32px rgba(0,0,0,0.16)",
+    boxShadow: "24px 0 48px rgba(29,27,24,0.18)",
+    borderRadius: "0 24px 24px 0",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
@@ -114,8 +116,9 @@ const css = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "14px 16px",
-    background: TEAL,
+    padding: "16px 12px 14px 20px",
+    background: "#fff",
+    borderBottom: "1px solid #efe8dd",
     flexShrink: 0,
   },
 
@@ -128,11 +131,11 @@ const css = {
 
   sectionLabel: {
     padding: "12px 16px 4px",
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 700,
-    color: "#9ca3af",
+    color: "#5e574e",
     textTransform: "uppercase",
-    letterSpacing: "0.1em",
+    letterSpacing: "0.08em",
   },
 
   drawerLink: {
@@ -142,10 +145,10 @@ const css = {
     padding: "11px 16px",
     fontSize: 15,
     fontWeight: 500,
-    color: "#111827",
+    color: "var(--body-color, #1d1b18)",
     textDecoration: "none",
     transition: "background 0.1s",
-    borderBottom: "1px solid #f9fafb",
+    borderBottom: "1px solid #f6f2ec",
   },
 
   /** Category row: thumb (square) + label — comfortable tap height */
@@ -157,10 +160,10 @@ const css = {
     padding: "10px 16px",
     fontSize: 15,
     fontWeight: 500,
-    color: "#111827",
+    color: "var(--body-color, #1d1b18)",
     textDecoration: "none",
     transition: "background 0.1s",
-    borderBottom: "1px solid #f3f4f6",
+    borderBottom: "1px solid #f6f2ec",
   },
   categoryRowBtn: {
     width: "100%",
@@ -194,19 +197,19 @@ const css = {
   categoryThumb: {
     width: 44,
     height: 44,
-    borderRadius: 8,
+    borderRadius: 12,
     objectFit: "cover",
-    background: "#e5e7eb",
-    border: "1px solid rgba(0,0,0,0.06)",
+    background: "#f6f2ec",
+    border: "none",
     flexShrink: 0,
   },
 
   categoryThumbPlaceholder: {
     width: 44,
     height: 44,
-    borderRadius: 8,
-    background: "linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%)",
-    border: "1px solid rgba(0,0,0,0.06)",
+    borderRadius: 12,
+    background: "#efe8dd",
+    border: "none",
     flexShrink: 0,
   },
 
@@ -290,7 +293,7 @@ function HoverLink({ style, ...props }) {
   return (
     <Link
       {...props}
-      style={{ ...style, background: hov ? "#f3f4f6" : "transparent" }}
+      style={{ ...style, background: hov ? "#f6f2ec" : "transparent" }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
     />
@@ -485,12 +488,12 @@ export default function MobileNav({ layout = "fixed" }) {
       >
         {/* Drawer head */}
         <div style={css.drawerHead}>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: "0.01em" }}>{t("menu")}</span>
+          <span style={{ fontFamily: "var(--h2-ff, inherit)", fontSize: 22, fontWeight: 800, color: "var(--body-color, #1d1b18)", letterSpacing: "-0.01em" }}>{t("menu")}</span>
           <button
             type="button"
             onClick={closeDrawer}
             aria-label={t("closeMenu")}
-            style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#fff", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}
+            style={{ background: "#f6f2ec", border: "none", color: "var(--body-color, #1d1b18)", cursor: "pointer", width: 44, height: 44, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}
           >
             <IcoClose />
           </button>
