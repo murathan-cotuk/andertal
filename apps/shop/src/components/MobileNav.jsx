@@ -307,7 +307,7 @@ function appPathFromPathname(pathname) {
 export default function MobileNav({ layout = "fixed" }) {
   const shopStyles = useShopStyles();
   const mc = shopStyles?.mobileChrome || {};
-  const { mobileBottomNavScroll } = useMobileBottomNavScroll();
+  const { mobileBottomNavScroll, productPageActive } = useMobileBottomNavScroll();
   const pathname = usePathname();
   const locale = useLocale();
   const t = useTranslations("common");
@@ -446,10 +446,10 @@ export default function MobileNav({ layout = "fixed" }) {
       ["/orders", "/addresses", "/payment-methods", "/nachrichten", "/reviews", "/bonus", "/invoices"].some(
         (h) => appPath === h || appPath.startsWith(`${h}/`),
       ));
-  /** Kaydırma ile kademeli gizleme — tema: bottom_nav_recess_on_scroll */
+  /** Kaydırma ile kademeli gizleme — tema: bottom_nav_recess_on_scroll; ürün sayfasında her zaman */
   const bottomNavRecessProgress =
     layout === "fixed" &&
-    !!mc.bottom_nav_recess_on_scroll &&
+    (!!mc.bottom_nav_recess_on_scroll || productPageActive) &&
     isMobileNavViewport &&
     !drawerOpen &&
     mobileBottomNavScroll.scrollY > MOBILE_CHROME_SCROLL_THRESHOLD_PX

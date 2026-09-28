@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 /** ShopHeader ile aynı eşik (dar görünümde ikinci şerit + mobil alt bar) */
 export const MOBILE_CHROME_SCROLL_THRESHOLD_PX = 60;
@@ -11,6 +11,9 @@ export const CHROME_HIDE_SCROLL_PX = 100;
 const MobileBottomNavScrollContext = createContext({
   publishMobileBottomNavScroll: () => {},
   mobileBottomNavScroll: { scrollY: 0, scrollingDown: false, chromeHideProgress: 0 },
+  /** true while a product page is mounted — the bottom nav then recedes on scroll there only */
+  productPageActive: false,
+  setProductPageActive: () => {},
 });
 
 /** ShopHeader scroll ile senkron — mobil alt bar aşağı kaydırınca saklanır */
@@ -35,9 +38,11 @@ export function MobileBottomNavScrollProvider({ children }) {
     });
   }, []);
 
+  const [productPageActive, setProductPageActive] = useState(false);
+
   const value = useMemo(
-    () => ({ publishMobileBottomNavScroll, mobileBottomNavScroll }),
-    [publishMobileBottomNavScroll, mobileBottomNavScroll],
+    () => ({ publishMobileBottomNavScroll, mobileBottomNavScroll, productPageActive, setProductPageActive }),
+    [publishMobileBottomNavScroll, mobileBottomNavScroll, productPageActive],
   );
 
   return (
@@ -49,4 +54,13 @@ export function MobileBottomNavScrollProvider({ children }) {
 
 export function useMobileBottomNavScroll() {
   return useContext(MobileBottomNavScrollContext);
+}
+
+/** Call from a product page template: marks the page so the mobile bottom nav hides on scroll down. */
+export function useMarkProductPage() {
+  const { setProductPageActive } = useContext(MobileBottomNavScrollContext);
+  useEffect(() => {
+    setProductPageActive(true);
+    return () => setProductPageActive(false);
+  }, [setProductPageActive]);
 }
