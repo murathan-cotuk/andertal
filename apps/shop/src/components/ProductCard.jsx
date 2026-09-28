@@ -66,10 +66,13 @@ const Card = styled.article`
   box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
   overflow: hidden;
   height: 100%;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
   color: var(--body-color, #1d1b18);
+  /* inline-size containment: the card never sizes from its content, so it always needs a width
+     from its parent (grid cell / carousel slide) — width: 100% guarantees that. */
   container-type: inline-size;
   transition: box-shadow 0.18s ease;
 
