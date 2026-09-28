@@ -30,6 +30,9 @@ import {
   effectiveGradientEnabled,
   resolveEffectiveLayoutSurfaces,
   applyUnifiedNavbarPreset,
+  applyWarmMarketplacePreset,
+  WARM_MARKETPLACE_PRESET_ID,
+  WARM_PALETTE,
 } from "@andertal/shop-theme";
 
 /** Button color field labels (keys as in DEFAULT_BUTTON_COLORS). */
@@ -1726,6 +1729,40 @@ export default function StylesPage() {
             <p>{c.stylesLoadHint}</p>
           </Banner>
         </Layout.Section>
+        <AccordionCard
+          title={locale === "tr" ? "Tasarım şablonu: Warmer Marktplatz" : locale === "de" ? "Design-Vorlage: Warmer Marktplatz" : "Design preset: Warmer Marktplatz"}
+          subtitle={
+            styles?.design_preset === WARM_MARKETPLACE_PRESET_ID
+              ? (locale === "tr" ? "Aktif" : locale === "de" ? "Aktiv" : "Active")
+              : (locale === "tr" ? "Renkler, yazı tipleri, header, footer ve butonlar tek tıkla" : locale === "de" ? "Farben, Schriften, Header, Footer und Buttons mit einem Klick" : "Colors, fonts, header, footer and buttons in one click")
+          }
+        >
+          <BlockStack gap="300">
+            <InlineStack gap="200" blockAlign="center">
+              {[WARM_PALETTE.ground, WARM_PALETTE.surface, WARM_PALETTE.ink, WARM_PALETTE.brand, WARM_PALETTE.brandSoft, WARM_PALETTE.sale].map((hex) => (
+                <span key={hex} title={hex} style={{ width: 28, height: 28, borderRadius: 14, background: hex, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.12)", display: "inline-block" }} />
+              ))}
+              <Text as="span" tone="subdued">Bricolage Grotesque · Instrument Sans</Text>
+            </InlineStack>
+            <Text as="p" tone="subdued">
+              {locale === "tr"
+                ? "Mevcut ayarların üzerine şablonun renk, yazı tipi, header, second nav, footer ve buton değerlerini yazar. Mevcut buton varyantların silinmez, sadece pasif olur. Logo, topbar metinleri, SEO ve rozetler değişmez. Kaydet'e basana kadar mağazada hiçbir şey değişmez."
+                : locale === "de"
+                  ? "Übernimmt Farben, Schriften, Header, Second Nav, Footer und Buttons der Vorlage. Bestehende Button-Varianten bleiben erhalten (nur inaktiv). Logo, Topbar-Texte, SEO und Badges bleiben unverändert. Im Shop ändert sich erst etwas, wenn du speicherst."
+                  : "Applies the preset's colors, fonts, header, second nav, footer and buttons. Existing button variants are kept (set inactive). Logo, topbar texts, SEO and badges stay unchanged. Nothing changes in the shop until you save."}
+            </Text>
+            <InlineStack gap="200">
+              <Button variant="primary" onClick={() => setStyles((prev) => applyWarmMarketplacePreset(prev))}>
+                {locale === "tr" ? "Şablonu uygula" : locale === "de" ? "Vorlage übernehmen" : "Apply preset"}
+              </Button>
+              {isDirty ? (
+                <Button onClick={handleDiscard}>
+                  {locale === "tr" ? "Değişiklikleri geri al" : locale === "de" ? "Änderungen verwerfen" : "Discard changes"}
+                </Button>
+              ) : null}
+            </InlineStack>
+          </BlockStack>
+        </AccordionCard>
         {isSuperuser && (
           <AccordionCard title="Homepage SEO (Meta)" subtitle={locale === "de" ? "Browser-Titel und Meta-Beschreibung der Startseite" : locale === "tr" ? "Ana sayfanın tarayıcı başlığı ve meta açıklaması" : locale === "fr" ? "Titre du navigateur et méta-description de la page d'accueil" : locale === "es" ? "Título del navegador y meta-descripción de la página de inicio" : locale === "it" ? "Titolo del browser e meta-descrizione della home page" : "Browser title and meta description of the home page"}>
             <BlockStack gap="300">

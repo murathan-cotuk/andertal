@@ -284,6 +284,36 @@ const CategoriesDropdown = styled.div`
   @media (max-width: 767px), (orientation: landscape) and (max-height: 500px) {
     display: none !important;
   }
+
+  /* Desktop: while the second nav is visible its "Alle Kategorien" pill opens the panel;
+     the icon only comes back once the second nav has scrolled away. */
+  ${(p) => (p.$desktopHidden ? "@media (min-width: 1024px) { display: none; }" : "")}
+`;
+
+/* "Alle Kategorien" pill at the start of the second nav (desktop only). */
+const SecondNavCategoriesBtn = styled.button`
+  display: none;
+  @media (min-width: 1024px) {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    height: 34px;
+    padding: 0 14px;
+    margin-left: -8px;
+    border: 0;
+    border-radius: 999px;
+    background: ${(p) => (p.$open ? "var(--second-nav-text, #1d1b18)" : "rgba(0, 0, 0, 0.05)")};
+    color: ${(p) => (p.$open ? "var(--second-nav-bg, #ffffff)" : "var(--second-nav-text, #1d1b18)")};
+    font: inherit;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    &:hover {
+      background: ${(p) => (p.$open ? "var(--second-nav-text, #1d1b18)" : "rgba(0, 0, 0, 0.09)")};
+    }
+  }
 `;
 
 /* ── Mega menu nav (desktop only) ─────────────────────────── */
@@ -396,7 +426,7 @@ const CategoriesButton = styled.button`
   padding: 0;
   border: none;
   background: transparent;
-  color: #fff !important;
+  color: var(--header-icon-color, #fff) !important;
   cursor: pointer;
 
   &:hover {
@@ -909,7 +939,7 @@ const SecondMenuRowInner = styled.div`
 const SecondLink = styled(Link)`
   color: var(--second-nav-text, ${tokens.dark[600]});
   font-weight: inherit;
-  font-family: ${tokens.fontFamily.sans};
+  font-family: inherit;
   text-decoration: none;
   transition: color ${tokens.transition.base}, opacity ${tokens.transition.base};
   display: inline-flex;
@@ -1726,7 +1756,7 @@ export default function ShopHeader() {
                 $compactProgress={narrowCompactProgress}
                 style={{ gap: 0, minWidth: 0 }}
               >
-                <CategoriesDropdown data-categories-dropdown>
+                <CategoriesDropdown data-categories-dropdown $desktopHidden={subNavHideProgress < 0.5}>
                   <CategoriesButton
                     type="button"
                     onClick={() => {
@@ -1895,6 +1925,23 @@ export default function ShopHeader() {
             }}
           >
             <SecondMenuRowInner>
+              <SecondNavCategoriesBtn
+                type="button"
+                data-categories-dropdown
+                $open={mainMenuOpen}
+                aria-expanded={mainMenuOpen}
+                onClick={() => {
+                  setLocaleDropdownOpen(false);
+                  setHoveredMenuItemId(null);
+                  setCategoryDrillStack([]);
+                  setMainMenuOpen((v) => !v);
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+                {tCommon("allCategories")}
+              </SecondNavCategoriesBtn>
               {secondMenuItems.map((item) => {
                 const href = menuItemHref(item);
                 const isActive =

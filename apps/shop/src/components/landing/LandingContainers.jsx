@@ -105,12 +105,13 @@ function normalizeContentMaxWidth(val, fallbackPx) {
 /** Dünne Überschrift direkt unter einem Bild / einer Karten-Fläche (Landing) */
 function LandingItemHeadingStyle() {
   return {
-    fontSize: 12,
-    fontWeight: 400,
-    color: "#64748b",
-    lineHeight: 1.35,
-    marginTop: 4,
-    letterSpacing: "0.02em",
+    fontFamily: "var(--h3-ff, inherit)",
+    fontSize: 17,
+    fontWeight: 700,
+    color: "var(--body-color, #1d1b18)",
+    lineHeight: 1.3,
+    marginTop: 10,
+    letterSpacing: "-0.005em",
   };
 }
 
@@ -714,7 +715,7 @@ function VideoBlock({ container, locale = "de" }) {
     <div style={{ background: bg, ...getContainerPadding(container, "32px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 1000) }}>
         {lt(container, "title", locale) && (
-          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: tc, margin: "0 0 8px" }}>
+          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: tc, margin: "0 0 8px" }}>
             {lt(container, "title", locale)}
           </h2>
         )}
@@ -1103,7 +1104,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
       <div style={getContentInnerStyle(container, 1440)}>
         {lt(container, "title", locale) && (
-          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
+          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
         )}
         {isFreeGrid ? (
           <div
@@ -1636,14 +1637,14 @@ function PersonalizedProductRow({ container, locale = "de" }) {
       <div style={getContentInnerStyle(container, 1440)}>
         {displayMode === "image_tiles" ? (
           <>
-            {title && <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            {title && <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${freeGridCols}, minmax(0, 1fr))`, gridAutoRows: `${freeGridRowHeight}px`, gridAutoFlow: "dense", gap, width: "100%" }}>
               {products.map((product, i) => renderTile(product, i))}
             </div>
           </>
         ) : orientation === "vertical" ? (
           <>
-            {title && <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            {title && <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
               {products.map((product, i) => (
                 <div key={product.id || i} style={{ minWidth: 0 }}>
@@ -2697,7 +2698,7 @@ function FeatureGrid({ container, locale = "de" }) {
       background: isStrip ? "transparent" : card_bg,
       color: text_color,
       padding: isStrip ? "8px 4px" : "20px 8px",
-      borderRadius: isStrip ? 0 : 12,
+      borderRadius: isStrip ? 0 : 20,
       display: "flex",
       flexDirection: "column",
       gap: isStrip ? 6 : 10,
@@ -2990,7 +2991,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
       width: "100%",
       aspectRatio: ratio,
       overflow: "hidden",
-      borderRadius: 12,
+      borderRadius: 20,
       background: "#f3f4f6",
       ...(minH ? { minHeight: String(container.min_height_mobile).trim() } : {}),
       ...(maxH ? { maxHeight: maxH } : {}),
@@ -3047,7 +3048,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
       <div style={{ ...carouselPadding, background: bg }}>
         <div style={getContentInnerStyle(container, 1440)}>
           {lt(container, "title", locale) && (
-            <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.375rem)", fontWeight: 600, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
+            <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
           )}
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
             {shown.map((img, i) => (
@@ -3091,7 +3092,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
       <div style={{ background: bg }}>
         {title && (
           <div style={{ padding: `0 ${padLeft}`, marginBottom: 12 }}>
-            <h2 style={{ fontSize: "clamp(1rem, 2vw, 1.375rem)", fontWeight: 600, margin: 0 }}>{title}</h2>
+            <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: 0 }}>{title}</h2>
           </div>
         )}
         <div
@@ -3138,7 +3139,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     <div style={{ ...carouselPadding, background: bg }}>
       <div style={getContentInnerStyle(container, 1440)}>
         {lt(container, "title", locale) && (
-          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.375rem)", fontWeight: 600, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
+          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
         )}
         <div style={{ position: "relative" }}>
           <div
@@ -3180,14 +3181,14 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
                 type="button"
                 aria-label={tCommon("previous")}
                 onClick={() => scrollByOneItem(desktopScrollRef, -1)}
-                style={{ position: "absolute", left: -8, top: "50%", transform: "translate(-50%, -50%)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "50%", width: 40, height: 40, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 2px 8px rgba(0,0,0,0.14)" }}
-              >‹</button>
+                style={{ position: "absolute", left: -8, top: "50%", transform: "translate(-50%, -50%)", background: "var(--body-color, #1d1b18)", color: "#fff", border: "none", borderRadius: "50%", width: 48, height: 48, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 6px 18px rgba(0,0,0,0.18)" }}
+              ><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
               <button
                 type="button"
                 aria-label={tCommon("next")}
                 onClick={() => scrollByOneItem(desktopScrollRef, 1)}
-                style={{ position: "absolute", right: -8, top: "50%", transform: "translate(50%, -50%)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "50%", width: 40, height: 40, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 2px 8px rgba(0,0,0,0.14)" }}
-              >›</button>
+                style={{ position: "absolute", right: -8, top: "50%", transform: "translate(50%, -50%)", background: "var(--body-color, #1d1b18)", color: "#fff", border: "none", borderRadius: "50%", width: 48, height: 48, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, boxShadow: "0 6px 18px rgba(0,0,0,0.18)" }}
+              ><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg></button>
             </>
           )}
         </div>
@@ -3239,7 +3240,7 @@ function LayoutSection({ container, locale = "de", preload = {}, ctx = {} }) {
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
       <div style={getContentInnerStyle(container, 1440)}>
         {title && (
-          <h2 style={{ fontSize: "clamp(1.125rem, 2vw, 1.5rem)", fontWeight: 700, color: container.text_color || "#111827", margin: "0 0 20px", textAlign: titleAlign }}>
+          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: container.text_color || "#111827", margin: "0 0 20px", textAlign: titleAlign }}>
             {title}
           </h2>
         )}

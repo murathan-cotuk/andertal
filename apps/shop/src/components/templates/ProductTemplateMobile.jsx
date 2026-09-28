@@ -45,6 +45,7 @@ import ProductPurchaseActions from "@/components/ui/ProductPurchaseActions";
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import ProductImageBadges from "@/components/ProductImageBadges";
 import { isBestsellerMetadata } from "@/lib/bestseller";
+import { useMarkProductPage } from "@/context/MobileBottomNavScrollContext";
 
 const Container = styled.div`
   max-width: 100%;
@@ -606,14 +607,25 @@ const InfoValue = styled.span`
 `;
 
 const SectionTitle = styled.h2`
-  font-size: 1.35rem;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: #1f2937;
+  font-family: var(--h2-ff, inherit);
+  font-size: clamp(1.3rem, 2vw, 1.65rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin: 0 0 16px;
+  color: var(--h2-color, #1d1b18);
 `;
 
 const DescriptionSection = styled.section`
-  margin-bottom: 48px;
+  margin-bottom: 20px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 32px 40px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
+  @media (max-width: 767px) {
+    border-radius: 18px;
+    padding: 20px 18px;
+  }
   max-width: 780px;
   color: var(--body-color, #4b5563);
   line-height: var(--body-lh, 1.7);
@@ -706,6 +718,14 @@ const DescriptionSection = styled.section`
 
 const ReviewsSection = styled.section`
   margin-bottom: 48px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 32px 40px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
+  @media (max-width: 767px) {
+    border-radius: 18px;
+    padding: 20px 18px;
+  }
 `;
 
 /* ── Mobile-only flat layout ── */
@@ -1082,6 +1102,7 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 export default function ProductTemplateMobile() {
+  useMarkProductPage();
   const params = useParams();
   const router = useRouter();
   const locale = useLocale();
@@ -2156,19 +2177,21 @@ export default function ProductTemplateMobile() {
       </ThreeCol>
 
       {(effectiveDescription || product.subtitle) && (
-        <DescriptionSection
-          id="description"
-          dangerouslySetInnerHTML={{
-            __html: sanitizeHtml(effectiveDescription || product.subtitle || "") || "",
-          }}
-        />
+        <DescriptionSection id="description">
+          <SectionTitle>{{ de: "Produktbeschreibung", en: "Product description", tr: "Ürün açıklaması", fr: "Description du produit", it: "Descrizione del prodotto", es: "Descripción del producto" }[locale] ?? "Produktbeschreibung"}</SectionTitle>
+          <div
+            dangerouslySetInnerHTML={{
+              __html: sanitizeHtml(effectiveDescription || product.subtitle || "") || "",
+            }}
+          />
+        </DescriptionSection>
       )}
 
       {(() => {
         const extraCompliance = EXTRA_COMPLIANCE_KEYS.filter((k) => meta[k] != null && String(meta[k]).trim() !== "");
         if (!meta.hersteller && !meta.hersteller_information && !meta.verantwortliche_person_information && extraCompliance.length === 0) return null;
         return (
-          <DescriptionSection id="produktsicherheit" as="section" style={{ marginTop: 24 }}>
+          <DescriptionSection id="produktsicherheit" as="section">
             <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
               {{ de: "Produktsicherheitsinformationen", en: "Product safety information", tr: "Ürün güvenlik bilgileri", fr: "Informations de sécurité produit", it: "Informazioni di sicurezza prodotto", es: "Información de seguridad del producto" }[locale] ?? "Produktsicherheitsinformationen"}
             </h3>
@@ -2195,7 +2218,7 @@ export default function ProductTemplateMobile() {
       })()}
 
       {Array.isArray(meta.product_files) && meta.product_files.length > 0 && (
-        <DescriptionSection as="section" style={{ marginTop: 24 }}>
+        <DescriptionSection as="section">
           <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
             {{ de: "Dateien", en: "Files", tr: "Dosyalar", fr: "Fichiers", it: "File", es: "Archivos" }[locale] ?? "Dateien"}
           </h3>

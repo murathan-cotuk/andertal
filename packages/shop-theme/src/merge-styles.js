@@ -142,6 +142,7 @@ export function mergeLoadedShopStyles(loaded = {}) {
       loaded.made_in_europe_badge || DEFAULT_SHOP_STYLES.made_in_europe_badge,
     ),
     bestseller_badge: { ...DEFAULT_SHOP_STYLES.bestseller_badge, ...(loaded.bestseller_badge || {}) },
+    design_preset: typeof loaded.design_preset === "string" ? loaded.design_preset : "",
     seo_home_title: loaded.seo_home_title ?? '',
     seo_home_description: loaded.seo_home_description ?? '',
   };

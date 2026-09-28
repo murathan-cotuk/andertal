@@ -38,7 +38,7 @@ import {
   ContainerTypePreview,
 } from "@/components/pages/content/ContainerTypePreview";
 import { groupContainerTypes } from "@/lib/landing-container-catalog";
-import { templatesForLibrary } from "@/lib/landing-template-registry";
+import { templatesForLibrary, LANDING_PAGE_PRESETS, pagePresetCopy } from "@/lib/landing-template-registry";
 import { resolveCatalogLandingContainers } from "@/lib/catalog-landing-layout";
 import {
   MAX_LANDING_CONTAINER_DEPTH,
@@ -5671,6 +5671,37 @@ export default function LandingPageEditor() {
               {filteredContainerTypeGroups.length === 0 && (
                 <Text as="p" tone="subdued" alignment="center">{copy.noContainersFound}</Text>
               )}
+              {!containerSearch.trim() && !isSupportPageSelection && !isProductPageSelection && LANDING_PAGE_PRESETS.map((preset) => {
+                const pc = pagePresetCopy(preset.id, uiLocale);
+                return (
+                  <div
+                    key={preset.id}
+                    style={{
+                      border: "1px solid var(--p-color-border, #e1e3e5)",
+                      borderRadius: 10,
+                      background: "#FCEBD5",
+                      padding: 14,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 16,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 220 }}>
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">{pc.title}</Text>
+                        <Text as="p" variant="bodySm" tone="subdued">{pc.blurb}</Text>
+                      </BlockStack>
+                    </div>
+                    <Button
+                      variant="primary"
+                      onClick={() => preset.containers.forEach((spec) => addContainer(spec.type, spec.defaults))}
+                    >
+                      {pc.button}
+                    </Button>
+                  </div>
+                );
+              })}
               {(() => {
                 const recommended = templatesForLibrary(uiLocale).filter((tpl) => {
                   if (tpl.group === "support" && !isSupportPageSelection) return false;

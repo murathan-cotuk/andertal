@@ -2,6 +2,7 @@
   "common": {
     "search": "Buscar productos...",
     "categories": "Categorías",
+    "allCategories": "Todas las categorías",
     "login": "Iniciar sesión",
     "register": "Registrarse",
     "account": "Cuenta",
