@@ -18,7 +18,7 @@ import { findShippingGroup, resolveShippingQuoteStrict } from "@/lib/shipping-pr
 import ProductWishlistHeart from "@/components/ProductWishlistHeart";
 import { CustomProductBadges } from "@/components/CustomProductBadge";
 import { getBruttoCentsFromPricesMap, resolveProductSaleCents } from "@/lib/product-price";
-import styled, { css } from "styled-components";
+import styled from "styled-components";
 
 /* ─────────────────────────────────────────────────────────── *
  *  Helpers
@@ -48,29 +48,39 @@ function resolveSwatchImg(src) {
 
 /* ─────────────────────────────────────────────────────────── *
  *  Styled components
+ *
+ *  Every block below the image has a FIXED height, so all cards in a row are exactly the same
+ *  height whatever the product has (0/1/2 variation groups, one-line title, no sale price…).
+ *  Nothing in the card expands in place: extra options / groups are a "+N" link to the product
+ *  page instead. Colors and fonts come from the shop theme (Sellercentral → Styles).
  * ─────────────────────────────────────────────────────────── */
 
 const Card = styled.article`
   position: relative;
   display: flex;
   flex-direction: column;
+  gap: 10px;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  border-radius: 20px;
+  padding: 10px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
   overflow: hidden;
   height: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.15s ease;
+  color: var(--body-color, #1d1b18);
+  container-type: inline-size;
+  transition: box-shadow 0.18s ease;
 
   &:hover {
-    border-color: #d1d5db;
+    box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.12), 0 8px 24px rgba(29, 27, 24, 0.08);
   }
 
   @media (max-width: 767px) {
-    border-radius: 8px;
+    border-radius: 16px;
+    padding: 8px;
+    gap: 7px;
   }
 `;
 
@@ -79,11 +89,13 @@ const ImgBlock = styled.div`
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
+  flex-shrink: 0;
   overflow: hidden;
+  border-radius: 14px;
   background: #fff;
   isolation: isolate;
   @media (max-width: 767px) {
-    aspect-ratio: 1 / 1;
+    border-radius: 12px;
   }
 
   /* Only product photos — never style Sellercentral badge images */
@@ -129,82 +141,10 @@ const ImgPlaceholder = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ccc;
+  color: #b8afa2;
   font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-`;
-
-const AddToCartBtn = styled.button`
-  width: calc(100% - 12px);
-  margin: 5px 6px 0;
-  padding: 7px 10px;
-  @media (max-width: 767px) {
-    margin-top: 3px;
-  }
-  background: #111;
-  color: #fff;
-  border: none;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
-  &:hover:not(:disabled) { background: #333; }
-  &:disabled { opacity: 0.5; cursor: not-allowed; background: #999; }
-`;
-
-const QtyRow = styled.div`
-  width: calc(100% - 12px);
-  margin: 4px 6px 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #f3f4f6;
-  overflow: hidden;
-`;
-
-const QtyBtn = styled.button`
-  width: 30px;
-  height: 28px;
-  border: 0;
-  background: transparent;
-  color: #6b7280;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  &:hover:not(:disabled) {
-    background: #e5e7eb;
-    color: #111827;
-  }
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const QtyInput = styled.input`
-  flex: 1;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: #374151;
-  letter-spacing: 0.02em;
-  border: 0;
-  background: transparent;
-  outline: none;
-  min-width: 0;
-  padding: 0 4px;
-  &::-webkit-outer-spin-button,
-  &::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-  &[type="number"] {
-    -moz-appearance: textfield;
-  }
 `;
 
 const CartNotice = styled.div`
@@ -223,14 +163,15 @@ const CartNotice = styled.div`
   pointer-events: none;
 `;
 
-const ReviewRow = styled.div`
-  margin-top: 0;
-  height: 18px;
-  font-size: 13px;
-  @media (max-width: 767px) {
-    height: 14px;
-    font-size: 10px;
-  }
+/* Overlay variant of the notice for the grid card — never pushes the layout. */
+const CardNotice = styled(CartNotice)`
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 62px;
+  margin: 0;
+  z-index: 20;
+  background: #ecfdf5;
 `;
 
 /* Badges */
@@ -248,13 +189,12 @@ const Badges = styled.div`
 
 const RankBadge = styled.span`
   display: inline-block;
-  padding: 2px 5px;
-  font-size: 10px;
+  padding: 3px 8px;
+  font-size: 11px;
   font-weight: 700;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.65);
+  border-radius: 999px;
+  background: #1d1b18;
   color: #fff;
-  letter-spacing: 0.02em;
   line-height: 1.4;
 `;
 
@@ -268,216 +208,332 @@ const WishlistHeartWrap = styled.div`
 
 const Badge = styled.span`
   display: inline-block;
-  padding: 5px 9px;
-  font-size: 9px;
+  padding: 4px 10px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  border-radius: 6px;
+  border-radius: 999px;
   color: #fff;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
   background: ${(p) =>
-    p.$sale ? "#e11d48" : p.$sold ? "#9ca3af" : p.$comingSoon ? "#c2410c" : "#18181b"};
+    p.$sale ? "#b42318" : p.$sold ? "#6b645b" : p.$comingSoon ? "#a65300" : "#1d1b18"};
 `;
 
-/* Info block below image — flex: 1 so all cards in a row share the same height */
-const Info = styled.div`
-  padding: 8px 9px 6px;
-  flex: 1;
+/* Two fixed rows for variation groups — always reserved, even when empty. */
+const VariantBlock = styled.div`
+  flex-shrink: 0;
+  height: 50px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 2px;
   min-width: 0;
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
   @media (max-width: 767px) {
-    padding: 7px 7px 5px;
+    height: 46px;
+    gap: 4px;
+  }
+`;
+
+const VariantRow = styled.div`
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+`;
+
+const Swatch = styled.button`
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  background: transparent;
+  box-shadow: ${(p) =>
+    p.$on ? "0 0 0 2px #fff, 0 0 0 3.5px var(--body-color, #1d1b18)" : "inset 0 0 0 1px rgba(0, 0, 0, 0.14)"};
+  opacity: ${(p) => (p.$outOfStock && !p.$on ? 0.45 : 1)};
+  margin: 0 1px;
+  @media (max-width: 767px) {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
+const Chip = styled.button`
+  flex-shrink: 0;
+  max-width: 100px;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: ${(p) => (p.$on ? "inset 0 0 0 1.5px var(--body-color, #1d1b18)" : "inset 0 0 0 1px #cfc6b8")};
+  color: ${(p) => (p.$outOfStock && !p.$on ? "#9a9186" : "var(--body-color, #1d1b18)")};
+  text-decoration: ${(p) => (p.$outOfStock && !p.$on ? "line-through" : "none")};
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  @media (max-width: 767px) {
+    height: 20px;
+    line-height: 20px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
+`;
+
+const MoreLink = styled(Link)`
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #5e574e;
+  text-decoration: none;
+  white-space: nowrap;
+  &:hover { color: var(--body-color, #1d1b18); }
+`;
+
+const MoreGroupsLink = styled(Link)`
+  margin-left: auto;
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fcebd5;
+  color: #8a4600;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  white-space: nowrap;
+  text-decoration: none;
+  @media (max-width: 767px) {
+    height: 20px;
+    line-height: 20px;
+    font-size: 10px;
+    padding: 0 6px;
+  }
+`;
+
+const TextBlock = styled.div`
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 2px;
+  min-width: 0;
+`;
+
+const BrandLine = styled.span`
+  height: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5e574e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  @media (max-width: 767px) {
+    display: none;
   }
 `;
 
 const Name = styled.h3`
-  font-family: var(--h3-ff, inherit);
-  font-size: 13px;
+  font-family: inherit;
+  font-size: 15px;
   font-weight: 500;
-  color: #111;
-  line-height: 1.4;
+  color: var(--body-color, #1d1b18);
+  line-height: 20px;
+  height: 40px;
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: normal;
-  min-height: calc(1.4em * 2);
+  @media (max-width: 767px) {
+    font-size: 13px;
+    line-height: 17px;
+    height: 34px;
+  }
 `;
 
-const Prices = styled.div`
+const ReviewRow = styled.div`
+  flex-shrink: 0;
+  height: 18px;
+  padding: 0 2px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  @media (max-width: 767px) {
+    height: 16px;
+    font-size: 11px;
+  }
+`;
+
+const PriceBlock = styled.div`
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 2px;
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  margin-top: 2px;
-  margin-bottom: 1px;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  @media (max-width: 767px) {
+    height: 26px;
+  }
 `;
 
 const CurrentPrice = styled.span`
-  font-size: 15px;
-  font-weight: 700;
-  color: ${(p) => (p.$sale ? "#e53e3e" : "#111")};
-  @media (min-width: 768px) {
+  font-family: var(--h2-ff, inherit);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: ${(p) => (p.$sale ? "#b42318" : "var(--body-color, #1d1b18)")};
+  @media (max-width: 767px) {
     font-size: 18px;
   }
 `;
 
 const OriginalPrice = styled.span`
   font-size: 12.5px;
-  color: #aaa;
+  color: #5e574e;
   text-decoration: line-through;
-`;
-
-/* Variant groups area */
-/*
- * Reserves the SAME vertical space on every card — whether it has 0, 1 or 2 variation
- * groups, a flat pill list, or no variants at all — so the qty stepper at the bottom of
- * the card always sits at the same height and the gap above it never grows/shrinks card
- * to card. Content taller than this (e.g. "+N weitere" expanded) still grows the card
- * normally; this is a floor, never a cap/scroll — never reintroduce a fixed+scrollable
- * variant box here, that was explicitly rejected before.
- */
-const VariantSlot = styled.div`
-  min-height: 103px;
-`;
-
-const VariantGroups = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin-top: 4px;
-  min-width: 0;
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
-`;
-
-const VGroupRow = styled.div`
-  min-width: 0;
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
-`;
-
-const VGroupLabel = styled.div`
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #888;
-  margin-bottom: 3px;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 `;
 
-/* Variant pills */
-const Pills = styled.div`
+const ActionRow = styled.div`
+  margin-top: auto;
+  flex-shrink: 0;
+  height: 44px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
+  gap: 6px;
   min-width: 0;
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
   @media (max-width: 767px) {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-    &::-webkit-scrollbar { display: none; }
+    height: 40px;
   }
 `;
 
-const Pill = styled.button`
-  padding: ${(p) => (p.$swatch ? "0" : "7px 10px")};
-  width: ${(p) => (p.$swatch ? "26px" : "auto")};
-  height: ${(p) => (p.$swatch ? "26px" : "auto")};
-  min-width: ${(p) => (p.$swatch ? "26px" : "0")};
-  max-width: ${(p) => (p.$swatch ? "26px" : "100%")};
-  min-height: ${(p) => (p.$swatch ? "26px" : "32px")};
-  font-size: 11.5px;
-  font-weight: 500;
-  line-height: 1.1;
-  border-radius: ${(p) => (p.$swatch ? "50%" : "8px")};
-  border: ${(p) => p.$swatch
-    ? `3px solid ${p.$on ? "#111" : "#e0e0e0"}`
-    : `1.5px solid ${p.$on ? "#111" : "#e0e0e0"}`};
-  background: ${(p) => (p.$swatch ? "none" : p.$on ? "#111" : "transparent")};
-  color: ${(p) => (p.$on ? "#fff" : p.$outOfStock ? "#bbb" : "#555")};
+const QtyRow = styled.div`
+  flex-shrink: 0;
+  width: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px #cfc6b8;
+  overflow: hidden;
+
+  @container (max-width: 190px) {
+    width: 72px;
+  }
+`;
+
+const QtyBtn = styled.button`
+  width: 28px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--body-color, #1d1b18);
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s, color 0.12s, transform 0.12s;
-  transform: ${(p) => (p.$swatch && p.$on ? "scale(1.05)" : "scale(1)")};
-  text-decoration: ${(p) => (p.$outOfStock && !p.$on ? "line-through" : "none")};
+  &:hover:not(:disabled) {
+    background: #f6f2ec;
+  }
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  @container (max-width: 190px) {
+    width: 22px;
+  }
+`;
+
+const QtyInput = styled.input`
+  flex: 1;
+  width: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
+  border: 0;
+  background: transparent;
+  outline: none;
+  min-width: 0;
+  padding: 0;
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  &[type="number"] {
+    -moz-appearance: textfield;
+  }
+`;
+
+const AddToCartBtn = styled.button`
+  flex: 1;
+  min-width: 44px;
+  height: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--btn-atc-bg, var(--shop-primary, #ee8a12));
+  color: var(--btn-atc-text, #1d1b18);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
   overflow: hidden;
-  ${(p) => (p.$swatch
-    ? css`flex-shrink: 0;`
-    : css`
-        flex: 0 1 auto;
-        min-width: 0;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      `)}
-  opacity: ${(p) => (p.$outOfStock && !p.$on ? 0.5 : 1)};
-
-  &:hover {
-    border-color: #111;
-    color: ${(p) => (p.$on ? "#fff" : "#111")};
-  }
-`;
-
-/* "+N weitere" — right-aligned toggle to reveal variation groups beyond the first 2 */
-const MoreGroupsBtn = styled.button`
-  align-self: flex-end;
-  margin-top: -1px;
-  padding: 0;
-  border: none;
-  background: none;
-  font-size: 11px;
-  font-weight: 600;
-  color: #555;
-  text-decoration: underline;
   cursor: pointer;
-
-  &:hover {
-    color: #111;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  &:hover:not(:disabled) {
+    background: var(--btn-atc-hover-bg, var(--shop-accent, #d97a06));
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: #cfc6b8;
+    color: #1d1b18;
+  }
+  svg {
+    flex-shrink: 0;
+  }
+  .pc-atc-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  @container (max-width: 250px) {
+    .pc-atc-label {
+      display: none;
+    }
   }
 `;
 
-const MorePill = styled.button`
-  padding: 0 9px;
-  height: 26px;
-  font-size: 11px;
-  font-weight: 500;
-  color: #555;
-  background: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  flex-shrink: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+const CartIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 4h2l2.4 11h10.2L20 8H6.2" />
+    <circle cx="9" cy="19" r="1.5" />
+    <circle cx="17" cy="19" r="1.5" />
+  </svg>
+);
 
-  &:hover {
-    background: #ebebeb;
-    border-color: #bbb;
-    color: #111;
-  }
-`;
+/** Max options shown per variation row before the "+N" link (swatches are narrower than chips). */
+const MAX_SWATCHES = 6;
+const MAX_CHIPS = 3;
 
 /* ─────────────────────────────────────────────────────────── *
  *  Component
@@ -536,9 +592,6 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [cartNotice, setCartNotice] = useState({ text: "", visible: false });
-  const [expandedGroups, setExpandedGroups] = useState({});
-  const [expandedFlat, setExpandedFlat] = useState(false);
-  const [expandedAllGroups, setExpandedAllGroups] = useState(false);
   const cartNoticeTimersRef = useRef({ hide: null, clear: null });
 
   // For grouped display: track selected option per group index
@@ -654,33 +707,129 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
     return Math.max(1, Math.floor(num));
   };
 
+  const brandName = (() => {
+    const b = meta.brand_name || (typeof meta.brand === "string" ? meta.brand : "");
+    return String(b || "").trim();
+  })();
+  const productHref = productUrl || "#";
+  const disabledAtc = cartLoading || adding || outOfStock || isComingSoon || shippingUnavailable;
+  const atcLabel = adding ? "…" : isComingSoon ? tp("comingSoon") : shippingUnavailable ? tp("notAvailable") : outOfStock ? tp("outOfStock") : tp("addToCart");
+
+  /* Build the (max 2) variant rows. Each row: options that fit + "+N" link to the product page. */
+  const variantRows = (() => {
+    if (!showPills) return [];
+    if (variationGroups) {
+      const pMeta = product.metadata || {};
+      return variationGroups.slice(0, 2).map((group, gIdx) => {
+        const allOpts = group.options || [];
+        const isSwatchGroup = allOpts.some((o) => typeof o === "object" && o.swatch_image);
+        const max = isSwatchGroup ? MAX_SWATCHES : MAX_CHIPS;
+        const groupName = variationGroupDisplayName(group, gIdx, pMeta, locale) || group.name;
+        const items = allOpts.slice(0, max).map((opt, oIdx) => {
+          const val = optionCanonicalValue(opt);
+          const displayStr = optionDisplayLabel(opt, locale) || val;
+          const swatchUrl = typeof opt === "object" && opt.swatch_image ? resolveSwatchImg(opt.swatch_image) : null;
+          const isOn = (selectedOpts[gIdx] || "").toLowerCase() === val.toLowerCase();
+          const hasStock = normalizedVariants.some((v) => {
+            const ov = Array.isArray(v.option_values) ? v.option_values : [];
+            if (String(ov[gIdx] || "").toLowerCase() !== val.toLowerCase()) return false;
+            const qty = v.inventory_quantity ?? v.inventory ?? 0;
+            return Number(qty) > 0;
+          });
+          const onPick = (e) => {
+            e.preventDefault();
+            setSelectedOpts((prev) => ({ ...prev, [gIdx]: val }));
+          };
+          return isSwatchGroup ? (
+            <Swatch
+              key={oIdx}
+              type="button"
+              $on={isOn}
+              $outOfStock={!hasStock}
+              title={`${groupName}: ${displayStr}`}
+              aria-label={`${groupName}: ${displayStr}`}
+              aria-pressed={isOn}
+              onClick={onPick}
+            >
+              {swatchUrl ? (
+                <Image
+                  src={swatchUrl}
+                  alt=""
+                  width={18}
+                  height={18}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                    const fallback = e.currentTarget.nextSibling;
+                    if (fallback) fallback.style.display = "block";
+                  }}
+                />
+              ) : null}
+              <span
+                style={{
+                  display: swatchUrl ? "none" : "block",
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "50%",
+                  background: colorSwatchFallback(val),
+                }}
+              />
+            </Swatch>
+          ) : (
+            <Chip
+              key={oIdx}
+              type="button"
+              $on={isOn}
+              $outOfStock={!hasStock}
+              title={`${groupName}: ${displayStr}`}
+              aria-pressed={isOn}
+              onClick={onPick}
+            >
+              {displayStr}
+            </Chip>
+          );
+        });
+        return { key: `g${gIdx}`, items, extra: Math.max(0, allOpts.length - max) };
+      });
+    }
+    /* Legacy: flat variant list in one row */
+    const items = normalizedVariants.slice(0, MAX_CHIPS + 2).map((v, i) => {
+      const swatchUrl = v.swatch_image_url ? resolveSwatchImg(v.swatch_image_url) : null;
+      const qty = v.inventory_quantity ?? v.inventory ?? 0;
+      const label = v.title || v.value || `${i + 1}`;
+      const onPick = (e) => { e.preventDefault(); setSelIdx(i); };
+      return swatchUrl ? (
+        <Swatch key={i} type="button" $on={i === selIdx} $outOfStock={Number(qty) <= 0} title={label} aria-label={label} aria-pressed={i === selIdx} onClick={onPick}>
+          <Image src={swatchUrl} alt="" width={18} height={18} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
+        </Swatch>
+      ) : (
+        <Chip key={i} type="button" $on={i === selIdx} $outOfStock={Number(qty) <= 0} title={label} aria-pressed={i === selIdx} onClick={onPick}>
+          {label}
+        </Chip>
+      );
+    });
+    return [{ key: "flat", items, extra: Math.max(0, normalizedVariants.length - (MAX_CHIPS + 2)) }];
+  })();
+  const hiddenGroupCount = variationGroups ? Math.max(0, variationGroups.length - 2) : 0;
+
+  const imageInner = imgSrc ? (
+    <>
+      <Image className="img-primary" src={imgSrc} alt={displayTitle} fill sizes="(max-width: 767px) 50vw, 300px" referrerPolicy="no-referrer" />
+      {imgSrc2 && !plainImage ? <Image className="img-secondary" src={imgSrc2} alt="" aria-hidden fill sizes="(max-width: 767px) 50vw, 300px" /> : null}
+    </>
+  ) : (
+    <ImgPlaceholder>No image</ImgPlaceholder>
+  );
+
   return (
     <Card>
       {/* ── Image ── */}
       <ImgBlock $plain={plainImage}>
         {productUrl ? (
           <Link href={productUrl} aria-label={displayTitle} style={{ position: "absolute", inset: 0, zIndex: 0 }}>
-            {imgSrc ? (
-              <>
-                <Image className="img-primary" src={imgSrc} alt={displayTitle} fill sizes="(max-width: 767px) 50vw, 300px" referrerPolicy="no-referrer" />
-                {imgSrc2 && !plainImage ? <Image className="img-secondary" src={imgSrc2} alt="" aria-hidden fill sizes="(max-width: 767px) 50vw, 300px" /> : null}
-              </>
-            ) : (
-              <ImgPlaceholder>No image</ImgPlaceholder>
-            )}
+            {imageInner}
           </Link>
-        ) : (
-          <>
-            {imgSrc ? (
-              <>
-                <Image className="img-primary" src={imgSrc} alt={displayTitle} fill sizes="(max-width: 767px) 50vw, 300px" referrerPolicy="no-referrer" />
-                {imgSrc2 && !plainImage ? <Image className="img-secondary" src={imgSrc2} alt="" aria-hidden fill sizes="(max-width: 767px) 50vw, 300px" /> : null}
-              </>
-            ) : (
-              <ImgPlaceholder>No image</ImgPlaceholder>
-            )}
-          </>
-        )}
+        ) : imageInner}
 
         {/* Status + Sellercentral custom badges only (no built-in Sale/Bestseller/New) */}
         <Badges>
@@ -701,199 +850,84 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
         )}
       </ImgBlock>
 
-      <AddToCartBtn
-        type="button"
-        onClick={handleQuickAdd}
-        disabled={cartLoading || adding || outOfStock || isComingSoon || shippingUnavailable}
-      >
-        {adding ? "…" : isComingSoon ? tp("comingSoon") : shippingUnavailable ? tp("notAvailable") : outOfStock ? tp("outOfStock") : tp("addToCart")}
-      </AddToCartBtn>
+      {/* ── Variants: two fixed rows ── */}
+      <VariantBlock>
+        {[0, 1].map((rowIdx) => {
+          const row = variantRows[rowIdx];
+          return (
+            <VariantRow key={rowIdx}>
+              {row ? row.items : null}
+              {row && row.extra > 0 ? (
+                <MoreLink href={productHref} aria-label={tp("moreVariants", { n: row.extra })}>+{row.extra}</MoreLink>
+              ) : null}
+              {rowIdx === 1 && hiddenGroupCount > 0 ? (
+                <MoreGroupsLink href={productHref}>{tp("moreVariants", { n: hiddenGroupCount })}</MoreGroupsLink>
+              ) : null}
+            </VariantRow>
+          );
+        })}
+      </VariantBlock>
 
-      {cartNotice.text ? <CartNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CartNotice> : null}
-
-      {/* ── Info ── */}
-      <Info>
-        <Link href={productUrl} style={{ textDecoration: "none" }}>
+      {/* ── Brand + title ── */}
+      <TextBlock>
+        <BrandLine>{brandName}</BrandLine>
+        <Link href={productHref} style={{ textDecoration: "none" }}>
           <Name>{displayTitle}</Name>
         </Link>
+      </TextBlock>
 
-        <ReviewRow>
-          {reviewCount > 0 ? (
-            <Link href={productUrl ? `${productUrl}#reviews` : "#"} style={{ textDecoration: "none", display: "inline-flex" }}>
-              <StarRating average={reviewAvg} count={reviewCount} />
-            </Link>
-          ) : (
-            <StarRating average={0} count={0} />
-          )}
-        </ReviewRow>
-
-        <Prices>
-          {hasSale && (
-            <OriginalPrice>{formatPriceCents(priceCents)} €</OriginalPrice>
-          )}
-          <CurrentPrice $sale={hasSale}>
-            {formatPriceCents(hasSale ? saleCents : priceCents)} €
-          </CurrentPrice>
-        </Prices>
-
-        <VariantSlot>
-        {showPills && (
-          variationGroups ? (
-            /* Grouped display: one row per variation group. More than 2 groups stay
-               collapsed to the first 2 behind a "+N weitere" toggle so cards don't grow
-               unpredictably tall — same idea as the per-group option truncation below. */
-            <VariantGroups>
-              {(expandedAllGroups ? variationGroups : variationGroups.slice(0, 2)).map((group, gIdx) => {
-                const isExpanded = !!expandedGroups[gIdx];
-                const allOpts = group.options || [];
-                const MAX_OPTS = 5;
-                const opts = isExpanded ? allOpts : allOpts.slice(0, MAX_OPTS);
-                const extra = isExpanded ? 0 : Math.max(0, allOpts.length - MAX_OPTS);
-                const pMeta = product.metadata || {};
-                const isSwatchGroup = allOpts.some((o) => typeof o === "object" && o.swatch_image);
-                return (
-                  <VGroupRow key={gIdx}>
-                    <VGroupLabel>{variationGroupDisplayName(group, gIdx, pMeta, locale) || group.name}</VGroupLabel>
-                    <Pills>
-                      {opts.map((opt, oIdx) => {
-                        const val = optionCanonicalValue(opt);
-                        const displayStr = optionDisplayLabel(opt, locale) || val;
-                        const swatchUrl = typeof opt === "object" && opt.swatch_image ? resolveSwatchImg(opt.swatch_image) : null;
-                        const isOn = (selectedOpts[gIdx] || "").toLowerCase() === val.toLowerCase();
-                        const hasStock = normalizedVariants.some((v) => {
-                          const ov = Array.isArray(v.option_values) ? v.option_values : [];
-                          if (String(ov[gIdx] || "").toLowerCase() !== val.toLowerCase()) return false;
-                          const qty = v.inventory_quantity ?? v.inventory ?? 0;
-                          return Number(qty) > 0;
-                        });
-                        return (
-                          <Pill
-                            key={oIdx}
-                            $on={isOn}
-                            $outOfStock={!hasStock}
-                            $swatch={isSwatchGroup}
-                            type="button"
-                            title={displayStr}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setSelectedOpts((prev) => ({ ...prev, [gIdx]: val }));
-                            }}
-                          >
-                            {isSwatchGroup ? (
-                              <>
-                                {swatchUrl && (
-                                  <Image
-                                    src={swatchUrl}
-                                    alt={displayStr}
-                                    width={26}
-                                    height={26}
-                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }}
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = "none";
-                                      const fallback = e.currentTarget.nextSibling;
-                                      if (fallback) fallback.style.display = "block";
-                                    }}
-                                  />
-                                )}
-                                <span
-                                  style={{
-                                    display: swatchUrl ? "none" : "block",
-                                    width: "100%",
-                                    height: "100%",
-                                    borderRadius: "50%",
-                                    background: colorSwatchFallback(val),
-                                  }}
-                                />
-                              </>
-                            ) : displayStr}
-                          </Pill>
-                        );
-                      })}
-                      {extra > 0 && (
-                        <MorePill
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); setExpandedGroups((prev) => ({ ...prev, [gIdx]: true })); }}
-                        >
-                          +{extra}
-                        </MorePill>
-                      )}
-                    </Pills>
-                  </VGroupRow>
-                );
-              })}
-              {!expandedAllGroups && variationGroups.length > 2 && (
-                <MoreGroupsBtn
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); setExpandedAllGroups(true); }}
-                >
-                  {tp("moreVariants", { n: variationGroups.length - 2 })}
-                </MoreGroupsBtn>
-              )}
-            </VariantGroups>
-          ) : (
-            /* Legacy: flat pill list */
-            <Pills style={{ marginTop: 4 }}>
-              {normalizedVariants.slice(0, expandedFlat ? undefined : 5).map((v, i) => {
-                const qty = v.inventory_quantity ?? v.inventory ?? 0;
-                const outOfStock = Number(qty) <= 0;
-                const swatchUrl = v.swatch_image_url ? resolveSwatchImg(v.swatch_image_url) : null;
-                return (
-                  <Pill
-                    key={i}
-                    $on={i === selIdx}
-                    $outOfStock={outOfStock}
-                    $swatch={!!swatchUrl}
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); setSelIdx(i); }}
-                    title={v.title || v.value || `${i + 1}`}
-                  >
-                    {swatchUrl ? (
-                      <Image src={swatchUrl} alt={v.value || v.title || ""} width={26} height={26} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
-                    ) : (v.title || v.value || `${i + 1}`)}
-                  </Pill>
-                );
-              })}
-              {!expandedFlat && normalizedVariants.length > 5 && (
-                <MorePill
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); setExpandedFlat(true); }}
-                >
-                  +{normalizedVariants.length - 5}
-                </MorePill>
-              )}
-            </Pills>
-          )
+      <ReviewRow>
+        {reviewCount > 0 ? (
+          <Link href={productUrl ? `${productUrl}#reviews` : "#"} style={{ textDecoration: "none", display: "inline-flex" }}>
+            <StarRating average={reviewAvg} count={reviewCount} />
+          </Link>
+        ) : (
+          <StarRating average={0} count={0} />
         )}
-        </VariantSlot>
-      </Info>
+      </ReviewRow>
 
-      <QtyRow>
-        <QtyBtn
-          type="button"
-          onClick={() => setQuantity((q) => clampQty(q - 1))}
-          disabled={quantity <= 1 || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label={tp("decreaseQty")}
-        >
-          −
-        </QtyBtn>
-        <QtyInput
-          type="number"
-          min={1}
-          value={quantity}
-          onChange={(e) => setQuantity(clampQty(e.target.value))}
-          onBlur={(e) => setQuantity(clampQty(e.target.value))}
-          disabled={outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label={tp("qty")}
-        />
-        <QtyBtn
-          type="button"
-          onClick={() => setQuantity((q) => clampQty(q + 1))}
-          disabled={quantity >= maxQty || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-          aria-label={tp("increaseQty")}
-        >
-          +
-        </QtyBtn>
-      </QtyRow>
+      <PriceBlock>
+        <CurrentPrice $sale={hasSale}>
+          {formatPriceCents(hasSale ? saleCents : priceCents)} €
+        </CurrentPrice>
+        {hasSale && <OriginalPrice>{formatPriceCents(priceCents)} €</OriginalPrice>}
+      </PriceBlock>
+
+      {cartNotice.text ? <CardNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CardNotice> : null}
+
+      <ActionRow>
+        <QtyRow>
+          <QtyBtn
+            type="button"
+            onClick={() => setQuantity((q) => clampQty(q - 1))}
+            disabled={quantity <= 1 || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
+            aria-label={tp("decreaseQty")}
+          >
+            −
+          </QtyBtn>
+          <QtyInput
+            type="number"
+            min={1}
+            value={quantity}
+            onChange={(e) => setQuantity(clampQty(e.target.value))}
+            onBlur={(e) => setQuantity(clampQty(e.target.value))}
+            disabled={outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
+            aria-label={tp("qty")}
+          />
+          <QtyBtn
+            type="button"
+            onClick={() => setQuantity((q) => clampQty(q + 1))}
+            disabled={quantity >= maxQty || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
+            aria-label={tp("increaseQty")}
+          >
+            +
+          </QtyBtn>
+        </QtyRow>
+        <AddToCartBtn type="button" onClick={handleQuickAdd} disabled={disabledAtc} aria-label={atcLabel} title={atcLabel}>
+          <CartIcon />
+          <span className="pc-atc-label">{atcLabel}</span>
+        </AddToCartBtn>
+      </ActionRow>
     </Card>
   );
 }
@@ -905,11 +939,11 @@ export function StarRating({ average = 0, count = 0 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 3, lineHeight: 1 }}>
       <span aria-hidden style={{ display: "flex", fontSize: "1em" }}>
-        {[...Array(full)].map((_, i) => <span key={`f${i}`} style={{ color: "#f59e0b" }}>★</span>)}
-        {half ? <span style={{ color: "#f59e0b" }}>★</span> : null}
-        {[...Array(empty)].map((_, i) => <span key={`e${i}`} style={{ color: "#d1d5db" }}>★</span>)}
+        {[...Array(full)].map((_, i) => <span key={`f${i}`} style={{ color: "var(--shop-primary, #ee8a12)" }}>★</span>)}
+        {half ? <span style={{ color: "var(--shop-primary, #ee8a12)" }}>★</span> : null}
+        {[...Array(empty)].map((_, i) => <span key={`e${i}`} style={{ color: "#ddd4c7" }}>★</span>)}
       </span>
-      <span style={{ fontSize: "0.85em", color: "#9ca3af" }}>({count})</span>
+      <span style={{ fontSize: "0.85em", color: "#5e574e" }}>({count})</span>
     </div>
   );
 }

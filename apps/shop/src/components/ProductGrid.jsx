@@ -5,8 +5,8 @@ import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import styled from "styled-components";
 
-const STRIP_GAP = 8;
-const MOBILE_GRID_GAP = 4;
+const STRIP_GAP = 12;
+const MOBILE_GRID_GAP = 10;
 
 const CatalogWrap = styled.div`
   width: 100%;
