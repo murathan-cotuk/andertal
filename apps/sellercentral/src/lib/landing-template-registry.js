@@ -51,3 +51,42 @@ export function templatesForLibrary(locale) {
     blurb: templateBlurb(tpl.id, locale),
   }));
 }
+
+/**
+ * Whole-page presets: a list of container templates inserted in one click (Sellercentral →
+ * landing-page → "Add container"). They are appended to the current device tab of the page being
+ * edited and, like every other edit there, only go live after Save. Existing containers are
+ * never touched.
+ */
+export const LANDING_PAGE_PRESETS = [
+  {
+    id: "warm_marketplace_home",
+    containers: [
+      { type: "hero_banner" },
+      { type: "feature_grid", defaults: { card_style: "flat", card_bg: "#FFFFFF", cols: 4, title_align: "left", padding: "32px 24px" } },
+      { type: "image_carousel", defaults: { aspect_ratio: "4/5", items_per_row: 4, gap: 20 } },
+      { type: "collections_carousel", defaults: { source: "categories", items_per_row: 6, card_aspect_ratio: "1/1", gap: 20 } },
+      { type: "bestseller_carousel", defaults: { mode: "bestseller", items_per_row: 5, gap: 20 } },
+    ],
+  },
+];
+
+export function pagePresetCopy(id, locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
+  const map = {
+    warm_marketplace_home: {
+      title: x("Page preset: Warmer Marktplatz home", "Sayfa şablonu: Warmer Marktplatz ana sayfa", "Modèle de page : accueil Warmer Marktplatz", "Plantilla de página: inicio Warmer Marktplatz", "Modello di pagina: home Warmer Marktplatz", "Seiten-Vorlage: Warmer Marktplatz Startseite"),
+      blurb: x(
+        "Adds hero, trust bar, image carousel, categories and bestsellers to the current device tab. Existing containers stay; nothing is live until you save.",
+        "Mevcut cihaz sekmesine hero, trust bar, Bilder-Karussell, kategoriler ve bestseller ekler. Mevcut container'lar kalır; kaydedene kadar canlıya çıkmaz.",
+        "Ajoute hero, barre de confiance, carrousel d’images, catégories et meilleures ventes à l’onglet actuel. Rien n’est publié avant l’enregistrement.",
+        "Añade hero, barra de confianza, carrusel de imágenes, categorías y más vendidos a la pestaña actual. Nada se publica hasta guardar.",
+        "Aggiunge hero, barra di fiducia, carosello immagini, categorie e bestseller alla scheda attuale. Nulla è pubblicato prima del salvataggio.",
+        "Fügt Hero, Trust-Leiste, Bilder-Karussell, Kategorien und Bestseller zum aktuellen Geräte-Tab hinzu. Bestehende Container bleiben; live erst nach dem Speichern.",
+      ),
+      button: x("Insert all", "Hepsini ekle", "Tout insérer", "Insertar todo", "Inserisci tutto", "Alle einfügen"),
+    },
+  };
+  return map[id] || { title: id, blurb: "", button: "+" };
+}
