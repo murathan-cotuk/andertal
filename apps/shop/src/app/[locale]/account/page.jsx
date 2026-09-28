@@ -12,10 +12,10 @@ import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account
 import { getMedusaClient } from "@/lib/medusa-client";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 
-const ORANGE = "#ff971c";
-const DARK = "#1A1A1A";
-const GRAY = "#6b7280";
-const BORDER = "#e5e7eb";
+const ORANGE = "var(--shop-accent, #ff971c)";
+const DARK = "var(--body-color, #1d1b18)";
+const GRAY = "#5e574e";
+const BORDER = "#efe8dd";
 
 const inp = {
   width: "100%",
@@ -44,8 +44,8 @@ const lbl = {
 
 const CarouselSection = styled.div`
   background: #fff;
-  border-radius: 12px;
-  border: 1px solid ${BORDER};
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
   overflow: hidden;
   margin-bottom: 16px;
 `;
@@ -59,8 +59,9 @@ const CarouselHeader = styled.div`
 
 const CarouselTitle = styled.h2`
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
+  font-family: var(--h2-ff, inherit);
+  font-size: 20px;
+  font-weight: 800;
   color: ${DARK};
 `;
 
@@ -89,12 +90,12 @@ const MiniCard = styled(Link)`
   display: flex;
   flex-direction: column;
   text-decoration: none;
-  border-radius: 10px;
+  border-radius: 14px;
   overflow: hidden;
   border: 1px solid ${BORDER};
-  background: #fafafa;
+  background: #fff;
   transition: box-shadow 0.15s;
-  &:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  &:hover { box-shadow: 0 6px 18px rgba(29,27,24,0.08); }
   @media (max-width: 767px) { flex: 0 0 104px; }
 `;
 
@@ -145,12 +146,12 @@ const OrderCard = styled(Link)`
   display: flex;
   flex-direction: column;
   text-decoration: none;
-  border-radius: 10px;
+  border-radius: 14px;
   overflow: hidden;
   border: 1px solid ${BORDER};
-  background: #fafafa;
+  background: #fff;
   transition: box-shadow 0.15s;
-  &:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  &:hover { box-shadow: 0 6px 18px rgba(29,27,24,0.08); }
   @media (max-width: 767px) { flex: 0 0 128px; }
 `;
 
@@ -203,13 +204,13 @@ const StatusDot = styled.span`
 
 const SectionCard = styled.div`
   background: #fff;
-  border-radius: 12px;
-  border: 1px solid ${BORDER};
+  border-radius: 22px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
   padding: 24px 28px;
   margin-bottom: 16px;
   @media (max-width: 767px) {
-    padding: 16px 14px;
-    border-radius: 10px;
+    padding: 18px 16px;
+    border-radius: 18px;
   }
 `;
 
@@ -256,7 +257,7 @@ function Section({ title, children, action }) {
   return (
     <SectionCard>
       <SectionHead>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: DARK }}>{title}</h2>
+        <h2 style={{ margin: 0, fontFamily: "var(--h2-ff, inherit)", fontSize: 20, fontWeight: 800, color: DARK }}>{title}</h2>
         {action}
       </SectionHead>
       {children}
@@ -272,12 +273,13 @@ function EditButton({ onClick, label }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        padding: "7px 16px",
-        background: hover ? ORANGE : "#fff",
-        color: hover ? "#fff" : ORANGE,
-        border: `1.5px solid ${ORANGE}`,
-        borderRadius: 8,
-        fontSize: 13,
+        minHeight: 40,
+        padding: "0 18px",
+        background: hover ? DARK : "#fff",
+        color: hover ? "#fff" : DARK,
+        border: `2px solid ${DARK}`,
+        borderRadius: 999,
+        fontSize: 14,
         fontWeight: 600,
         cursor: "pointer",
         transition: "all 0.15s",
@@ -297,17 +299,17 @@ function SaveButton({ onClick, loading, saveLabel, savingLabel }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        padding: "10px 24px",
-        background: hover && !loading ? "#e6880e" : ORANGE,
-        color: "#fff",
+        minHeight: 48,
+        padding: "0 26px",
+        background: "var(--btn-atc-bg, var(--shop-primary, #ff971c))",
+        color: "var(--btn-atc-text, #fff)",
         border: "none",
-        borderRadius: 8,
-        fontSize: 14,
+        borderRadius: 999,
+        fontSize: 15,
         fontWeight: 700,
         cursor: loading ? "not-allowed" : "pointer",
-        opacity: loading ? 0.7 : 1,
-        transition: "background 0.15s",
-        boxShadow: "0 2px 0 2px #000",
+        opacity: loading ? 0.7 : hover ? 0.9 : 1,
+        transition: "opacity 0.15s",
       }}
     >
       {loading ? savingLabel : saveLabel}

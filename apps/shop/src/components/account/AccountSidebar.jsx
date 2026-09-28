@@ -7,9 +7,8 @@ import { LogoutButton } from "@andertal/ui";
 import { restPathFromPathname } from "@/lib/shop-market";
 import { useState, useEffect } from "react";
 
-const ORANGE = "#ff971c";
-const DARK = "#1A1A1A";
-const BORDER = "#e5e7eb";
+const DARK = "var(--body-color, #1d1b18)";
+const BORDER = "#efe8dd";
 
 const NAV_KEYS = [
   { key: "overview", href: "/account" },
@@ -46,10 +45,15 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
   }, [user?.email, appPath]);
 
   return (
-    <nav style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, overflow: "hidden", minWidth: 200 }}>
+    <nav style={{ background: "#fff", borderRadius: 20, boxShadow: "0 0 0 1px rgba(29,27,24,0.06)", overflow: "hidden", minWidth: 200, padding: 10, display: "flex", flexDirection: "column", gap: 2 }}>
       {user && (
-        <div style={{ padding: "14px 18px", fontSize: 13, fontWeight: 600, color: DARK, borderBottom: `1px solid ${BORDER}` }}>
-          {user.firstName} {user.lastName}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 8px 14px", marginBottom: 6, borderBottom: `1px solid ${BORDER}` }}>
+          <span aria-hidden style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--shop-primary, #ee8a12)", color: "#1d1b18", fontWeight: 800, fontSize: 16, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {String(user.firstName || user.email || "?").trim().charAt(0).toUpperCase()}
+          </span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: DARK, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {user.firstName} {user.lastName}
+          </span>
         </div>
       )}
       {NAV_KEYS.map((item) => {
@@ -66,18 +70,19 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
             onClick={() => onNavigate?.()}
             style={{
               display: "flex", alignItems: "center", gap: 10,
-              padding: "14px 18px", fontSize: 14, fontWeight: 500,
-              color: active ? ORANGE : DARK,
-              background: active ? "#fff7ed" : "transparent",
-              borderLeft: active ? `3px solid ${ORANGE}` : "3px solid transparent",
-              textDecoration: "none", borderBottom: `1px solid ${BORDER}`,
-              transition: "all 0.1s",
+              minHeight: 44, padding: "0 14px", fontSize: 15,
+              fontWeight: active ? 700 : 500,
+              color: active ? "#fff" : DARK,
+              background: active ? "var(--body-color, #1d1b18)" : "transparent",
+              borderRadius: 12,
+              textDecoration: "none",
+              transition: "background 0.1s, color 0.1s",
             }}
           >
             <span style={{ flex: 1 }}>{tNav(item.key)}</span>
             {item.badge && unreadCount > 0 && (
               <span style={{
-                background: "#ef4444", color: "#fff", borderRadius: "50%",
+                background: "var(--shop-primary, #ee8a12)", color: "#1d1b18", borderRadius: "50%",
                 fontSize: 10, fontWeight: 800, width: 18, height: 18,
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
               }}>
@@ -87,7 +92,7 @@ export default function AccountSidebar({ onLogout, onNavigate }) {
           </Link>
         );
       })}
-      <div style={{ padding: "14px 18px", borderTop: `1px solid ${BORDER}` }}>
+      <div style={{ padding: "12px 8px 6px", marginTop: 6, borderTop: `1px solid ${BORDER}` }}>
         <LogoutButton
           label={t("logout")}
           onClick={() => {

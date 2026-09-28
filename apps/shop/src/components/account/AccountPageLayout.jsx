@@ -13,8 +13,8 @@ export const ACCOUNT_PAGE_MAIN_INNER = {
   padding: "24px 16px 56px",
 };
 
-const DARK = "#1A1A1A";
-const GRAY = "#6b7280";
+const DARK = "var(--body-color, #1d1b18)";
+const GRAY = "#5e574e";
 
 /** title / description: Übersicht sayfasında kullanılmaz; diğer konto sayfalarında greeting’den sonra içerik sütununda */
 export default function AccountPageLayout({ children, onLogout, title, description }) {
@@ -39,8 +39,8 @@ export default function AccountPageLayout({ children, onLogout, title, descripti
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: showSidebar ? "220px 1fr" : "1fr",
-          gap: 24,
+          gridTemplateColumns: showSidebar ? "260px 1fr" : "1fr",
+          gap: 28,
           alignItems: "start",
         }}
       >
@@ -53,10 +53,12 @@ export default function AccountPageLayout({ children, onLogout, title, descripti
               <h1
                 style={{
                   margin: 0,
-                  fontSize: 16,
-                  fontWeight: 700,
+                  fontFamily: "var(--h1-ff, inherit)",
+                  fontSize: "clamp(1.5rem, 3vw, 2.1rem)",
+                  fontWeight: 800,
+                  letterSpacing: "-0.015em",
                   color: DARK,
-                  lineHeight: 1.35,
+                  lineHeight: 1.15,
                 }}
               >
                 {title}
