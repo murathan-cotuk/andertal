@@ -167,12 +167,11 @@ const Breadcrumb = styled.nav`
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #999;
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  color: #5e574e;
 
-  a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
-  b { color: #444; font-weight: 500; }
+  a { color: #5e574e; text-decoration: none; transition: color 0.12s; &:hover { color: var(--body-color, #1d1b18); } }
+  b { color: var(--body-color, #1d1b18); font-weight: 600; }
 
   @media (max-width: 767px) {
     display: none;
@@ -235,22 +234,21 @@ const SortBarLeft = styled.div`
 const FilterBtn = styled.button`
   display: none;
   align-items: center;
-  gap: 7px;
-  padding: 12px 0;
-  background: none;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  margin: 6px 0;
+  background: var(--body-color, #1d1b18);
   border: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: ${(p) => (p.$active ? "#111" : "#666")};
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
   cursor: pointer;
-  transition: color 0.12s;
-  border-bottom: 2px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  margin-bottom: -1px;
+  transition: opacity 0.12s;
 
-  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
-  &:hover { color: #111; }
+  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  &:hover { opacity: 0.88; }
 
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: inline-flex;
@@ -261,15 +259,13 @@ const SortWrap = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: #666;
+  font-size: 14px;
+  color: #5e574e;
 `;
 
 const SortLabel = styled.span`
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #999;
+  font-size: 14px;
+  color: #5e574e;
   white-space: nowrap;
 
   @media (max-width: 480px) { display: none; }
@@ -277,18 +273,20 @@ const SortLabel = styled.span`
 
 const SortSelect = styled.select`
   appearance: none;
-  background: transparent;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #111;
+  background-color: #fff;
+  border: 1px solid #cfc6b8;
+  border-radius: 999px;
+  margin: 6px 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
   cursor: pointer;
   outline: none;
-  padding: 12px 20px 12px 0;
+  padding: 10px 34px 10px 16px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 4px center;
+  background-position: right 14px center;
 `;
 
 /* ─── Sidebar + content layout ───────────────────────────── */
@@ -321,6 +319,14 @@ const Sidebar = styled.aside`
   top: ${HEADER_H + 100}px;
   max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
+
+  @media (min-width: ${CATALOG_DRAWER_MAX_PX + 1}px) {
+    background: #fff;
+    border-radius: 20px;
+    padding: 18px 18px 6px;
+    box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
+    box-sizing: border-box;
+  }
 
   /* Mobile/tablet: overlay drawer */
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
@@ -369,31 +375,39 @@ const CmsPageSidebar = styled.aside`
   display: none;
   @media (min-width: 1024px) {
     display: block;
-    width: 220px;
+    width: 260px;
     flex-shrink: 0;
     position: sticky;
     top: ${HEADER_H + 24}px;
+    background: #fff;
+    border-radius: 20px;
+    padding: 16px 14px;
+    box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
+    box-sizing: border-box;
   }
 `;
 
 const CmsPageSidebarTitle = styled.h2`
-  margin: 0 0 12px;
-  font-size: 11px;
+  margin: 0 0 8px;
+  padding: 0 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #111;
+  color: #5e574e;
 `;
 
 const CmsPageSidebarLink = styled(Link)`
-  display: block;
-  padding: 7px 0;
-  font-size: 13.5px;
-  color: #555;
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 10px;
+  font-size: 15px;
+  color: var(--body-color, #1d1b18);
   text-decoration: none;
-  border-bottom: 1px solid #f0f0ee;
-  transition: color 0.12s;
-  &:hover { color: #111; }
+  border-radius: 12px;
+  transition: background 0.12s;
+  &:hover { background: #f6f2ec; }
 `;
 
 const CmsPageContent = styled.div`
@@ -419,16 +433,16 @@ const CmsPageMobilePills = styled.div`
 const CmsPageMobilePill = styled(Link)`
   display: inline-block;
   flex-shrink: 0;
-  padding: 5px 12px;
+  padding: 8px 14px;
   border-radius: 999px;
   background: #fff;
-  border: 1px solid #d1d5db;
-  font-size: 12px;
+  border: 1px solid #e6dfd4;
+  font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: var(--body-color, #1d1b18);
   text-decoration: none;
   white-space: nowrap;
-  &:hover { background: #f3f4f6; }
+  &:hover { background: #f6f2ec; }
 `;
 
 const SidebarOverlay = styled.div`
@@ -460,7 +474,10 @@ const SidebarHead = styled.div`
 `;
 
 const FilterGroup = styled.div`
-  border-bottom: 1px solid #eceae7;
+  border-bottom: 1px solid #efe8dd;
+  &:last-child {
+    border-bottom: none;
+  }
 `;
 
 const FilterGroupTitle = styled.button`
@@ -524,17 +541,16 @@ const CheckRow = styled.label.attrs({ className: "shop-typo-sidebar-submenu" })`
 
 const ClearAllBtn = styled.button`
   background: none;
-  border: 1px solid #ccc;
-  padding: 5px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #555;
+  border: none;
+  padding: 6px 4px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--shop-accent, #a65300);
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
+  transition: opacity 0.12s;
 
-  &:hover { border-color: #111; color: #111; }
+  &:hover { opacity: 0.75; text-decoration: underline; text-underline-offset: 3px; }
 `;
 
 const DesktopFilterContent = styled.div`
@@ -560,8 +576,8 @@ const MobileFilterLeft = styled.div`
   width: 92px;
   flex-shrink: 0;
   overflow-y: auto;
-  background: #f7f7f6;
-  border-right: 1px solid #e8e8e6;
+  background: #f6f2ec;
+  border-right: 1px solid #e6dfd4;
 `;
 
 const MobileFilterLeftBtn = styled.button`
@@ -573,8 +589,8 @@ const MobileFilterLeftBtn = styled.button`
   text-align: left;
   background: ${(p) => (p.$active ? "#fff" : "transparent")};
   border: none;
-  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  color: ${(p) => (p.$active ? "#111" : "#555")};
+  border-left: 3px solid ${(p) => (p.$active ? "var(--shop-primary, #ee8a12)" : "transparent")};
+  color: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#5e574e")};
   cursor: pointer;
   line-height: 1.3;
   letter-spacing: 0.02em;
@@ -598,16 +614,16 @@ const MobileFilterPill = styled.button`
   padding: 9px 6px;
   font-size: 11.5px;
   font-weight: ${(p) => (p.$on ? 700 : 400)};
-  background: ${(p) => (p.$on ? "#111" : "#fff")};
-  color: ${(p) => (p.$on ? "#fff" : "#444")};
-  border: 1.5px solid ${(p) => (p.$on ? "#111" : "#d1d5db")};
-  border-radius: 8px;
+  background: ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#fff")};
+  color: ${(p) => (p.$on ? "#fff" : "var(--body-color, #1d1b18)")};
+  border: 1.5px solid ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#cfc6b8")};
+  border-radius: 999px;
   cursor: pointer;
   text-align: center;
   line-height: 1.3;
   font-family: inherit;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
-  &:hover { border-color: #111; }
+  &:hover { border-color: var(--shop-primary, #ee8a12); }
   word-break: break-word;
 `;
 
@@ -629,27 +645,28 @@ const ChipBar = styled.div`
 const Chip = styled.button`
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  background: #111;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  background: var(--body-color, #1d1b18);
   color: #fff;
   border: none;
-  font-size: 10.5px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: opacity 0.12s;
 
-  &:hover { background: #333; }
+  &:hover { opacity: 0.85; }
 `;
 
 /* ─── Result bar above grid ──────────────────────────────── */
 const ResultBar = styled.div`
   padding: 16px 0 12px;
-  font-size: 11.5px;
-  color: #999;
-  letter-spacing: 0.04em;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5e574e;
 `;
 
 /* ─── Pagination ─────────────────────────────────────────── */
@@ -657,29 +674,30 @@ const Pager = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 8px;
   padding-top: 48px;
 `;
 
 const PBtn = styled.button`
-  min-width: 36px;
-  height: 36px;
-  padding: 0 6px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid ${(p) => (p.$on ? "#111" : "#ddd")};
-  background: ${(p) => (p.$on ? "#111" : "#fff")};
-  color: ${(p) => (p.$on ? "#fff" : "#555")};
-  font-size: 12.5px;
+  border-radius: 999px;
+  border: 1px solid ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#e6dfd4")};
+  background: ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#fff")};
+  color: ${(p) => (p.$on ? "#fff" : "var(--body-color, #1d1b18)")};
+  font-family: inherit;
+  font-size: 14px;
   font-weight: ${(p) => (p.$on ? "700" : "400")};
   cursor: ${(p) => (p.disabled ? "not-allowed" : "pointer")};
   opacity: ${(p) => (p.disabled ? "0.3" : "1")};
   transition: border-color 0.12s, color 0.12s, background 0.12s;
 
   &:not(:disabled):hover {
-    border-color: #111;
-    color: ${(p) => (p.$on ? "#fff" : "#111")};
+    border-color: var(--body-color, #1d1b18);
   }
 `;
 
