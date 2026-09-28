@@ -82,8 +82,8 @@ const Dropdown = styled.div`
   right: 0;
   background: ${tokens.background.card};
   border: 1px solid ${tokens.border.light};
-  border-radius: ${tokens.radius.button};
-  box-shadow: ${tokens.shadow.card};
+  border-radius: 20px;
+  box-shadow: 0 24px 48px rgba(29, 27, 24, 0.18);
   max-height: ${(p) => p.$maxHeight || tokens.search.dropdownMaxHeight};
   overflow-y: auto;
   z-index: 1000;
@@ -370,6 +370,102 @@ function formatPriceCents(cents) {
   return v.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
+/* ─── Desktop: panel shown when the empty search field gets focus ──────────
+ * Same data as the mobile search sheet: recent searches (localStorage) and
+ * "Weiter einkaufen" products from /api/store-products. */
+const FocusGrid = styled.div`
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) 2fr;
+  gap: 8px;
+  padding: 8px 8px 16px;
+`;
+
+const FocusChips = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 16px;
+`;
+
+const FocusProducts = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 16px;
+`;
+
+const FocusProduct = styled(Link)`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-decoration: none;
+  color: #1d1b18;
+  &:hover { color: ${tokens.primary.DEFAULT}; }
+`;
+
+function useDesktopFocusSuggestions(enabled) {
+  const [focused, setFocused] = useState(false);
+  const [recent, setRecent] = useState([]);
+  const [products, setProducts] = useState([]);
+  const loadedRef = useRef(false);
+  const onFocus = useCallback(() => {
+    if (!enabled) return;
+    setFocused(true);
+    setRecent(loadRecentSearches());
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    fetch("/api/store-products?limit=8")
+      .then((r) => r.json())
+      .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
+      .catch(() => setProducts([]));
+  }, [enabled]);
+  return { focused, setFocused, recent, products, onFocus };
+}
+
+function DesktopFocusPanel({ recent, products, onPickTerm, onClose }) {
+  const locale = useLocale();
+  const ts = useTranslations("search");
+  if (!recent.length && !products.length) return null;
+  return (
+    <Dropdown $maxHeight="min(70vh, 560px)" role="dialog" aria-label={ts("label")}>
+      <FocusGrid>
+        <div>
+          <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
+          {recent.length === 0 ? (
+            <div style={{ padding: "0 16px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
+          ) : (
+            <FocusChips>
+              {recent.map((term) => (
+                <SuggestionChip key={term} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onPickTerm(term)}>
+                  {term}
+                </SuggestionChip>
+              ))}
+            </FocusChips>
+          )}
+        </div>
+        {products.length > 0 ? (
+          <div>
+            <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
+            <FocusProducts>
+              {products.slice(0, 8).map((p) => {
+                const { title: pt } = getLocalizedProduct(p, locale);
+                const h = storefrontProductHandle(p, locale);
+                const th = p.thumbnail ? resolveImageUrl(p.thumbnail) : "";
+                return (
+                  <FocusProduct key={p.id} href={h ? `/${h}` : "#"} onClick={onClose}>
+                    <WeiterImg style={{ marginBottom: 0 }}>{th ? <img src={th} alt="" /> : null}</WeiterImg>
+                    <WeiterTitle>{pt || p.title || p.handle || ""}</WeiterTitle>
+                  </FocusProduct>
+                );
+              })}
+            </FocusProducts>
+          </div>
+        ) : null}
+      </FocusGrid>
+    </Dropdown>
+  );
+}
+
 function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hideSearchIcon = false, pill = false }) {
   const router = useRouter();
   const locale = useLocale();
@@ -388,6 +484,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   const mobileInputRef = useRef(null);
   const debounceRef = useRef(null);
   const searchSheetBox = useSearchSheetBox(isMobile && mobileOpen);
+  const focusPanel = useDesktopFocusSuggestions(!isMobile);
 
   const fetchProducts = useCallback(async (query) => {
     if (!(query && query.trim().length >= 1)) {
@@ -444,11 +541,14 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+        focusPanel.setFocused(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [focusPanel.setFocused]);
 
   useEffect(() => {
     if (!isMobile || !mobileOpen) return;
@@ -642,11 +742,25 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
           placeholder={placeholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onFocus={focusPanel.onFocus}
+          onKeyDown={(e) => { if (e.key === "Escape") focusPanel.setFocused(false); }}
           aria-label={ts("label")}
           aria-expanded={showDropdown}
           $pill={pill}
         />
       </InputWrap>
+      {!showDropdown && focusPanel.focused && !q.trim() ? (
+        <DesktopFocusPanel
+          recent={focusPanel.recent}
+          products={focusPanel.products}
+          onPickTerm={(term) => {
+            focusPanel.setFocused(false);
+            saveRecentSearch(term);
+            router.push(`/search?q=${encodeURIComponent(term)}`);
+          }}
+          onClose={() => focusPanel.setFocused(false)}
+        />
+      ) : null}
       {showDropdown && (
         <Dropdown $maxHeight={maxHeight} role="listbox">
           {loading && hits.length === 0 && <Empty>{ts("searching")}</Empty>}
@@ -707,6 +821,8 @@ function SearchInputWithDropdown({
   const wrapRef = useRef(null);
   const mobileInputRef = useRef(null);
   const searchSheetBox = useSearchSheetBox(isMobile && mobileOpen);
+  const focusPanel = useDesktopFocusSuggestions(!isMobile);
+  const setFocusPanelOpen = focusPanel.setFocused;
 
   const showDropdown = query.length > 0;
   const loading = status === "loading" || status === "stalled";
@@ -723,6 +839,15 @@ function SearchInputWithDropdown({
   useEffect(() => {
     setFocusedIndex(-1);
   }, [query, hits.length]);
+
+  useEffect(() => {
+    if (isMobile) return undefined;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setFocusPanelOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [isMobile, setFocusPanelOpen]);
 
   useEffect(() => {
     if (!isMobile || !mobileOpen) return;
@@ -1062,12 +1187,28 @@ function SearchInputWithDropdown({
           placeholder={placeholder}
           value={query}
           onChange={(e) => refine(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onFocus={focusPanel.onFocus}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setFocusPanelOpen(false);
+            handleKeyDown(e);
+          }}
           aria-expanded={showDropdown}
           aria-controls="search-hits"
           $pill={pill}
         />
       </InputWrap>
+      {!showDropdown && focusPanel.focused ? (
+        <DesktopFocusPanel
+          recent={focusPanel.recent}
+          products={focusPanel.products}
+          onPickTerm={(term) => {
+            setFocusPanelOpen(false);
+            refine(term);
+            goSearchResults(term);
+          }}
+          onClose={() => setFocusPanelOpen(false)}
+        />
+      ) : null}
       {showDropdown && (
         <Dropdown id="search-hits" $maxHeight={maxHeight} role="listbox">
           {loading && hits.length === 0 && <Empty>{ts("searching")}</Empty>}

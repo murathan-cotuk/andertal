@@ -34,11 +34,16 @@ const Drawer = styled.aside`
   position: fixed;
   top: 0;
   right: 0;
-  width: 420px;
+  width: 460px;
   max-width: 100vw;
   height: 100vh;
   background: #fff;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+  border-radius: 24px 0 0 24px;
+  overflow: hidden;
+  box-shadow: -24px 0 48px rgba(29, 27, 24, 0.18);
+  @media (max-width: 767px) {
+    border-radius: 0;
+  }
   z-index: ${CART_Z_DRAWER};
   display: flex;
   flex-direction: column;
@@ -58,51 +63,53 @@ const Header = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 18px 24px;
+  border-bottom: 1px solid #efe8dd;
   flex-shrink: 0;
 `;
 
 const Title = styled.h2`
   margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1f2937;
+  font-family: var(--h2-ff, inherit);
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--body-color, #1d1b18);
 `;
 
 const CloseBtn = styled.button`
-  background: #111827;
+  background: #f6f2ec;
   border: none;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   min-width: 44px;
   min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #fff;
+  color: var(--body-color, #1d1b18);
   border-radius: 50%;
   -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
   &:hover {
-    background: #000;
+    background: #ece5da;
   }
 `;
 
 const Scroll = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 16px 20px;
+  padding: 8px 24px 16px;
   overscroll-behavior: contain;
 `;
 
 const Item = styled.div`
   display: flex;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f3f4f6;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid #efe8dd;
   &:last-child {
     border-bottom: none;
   }
@@ -110,10 +117,10 @@ const Item = styled.div`
 
 const ItemImage = styled.div`
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: 88px;
+  height: 88px;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 14px;
   overflow: hidden;
   background: #f3f4f6;
   img {
@@ -157,9 +164,9 @@ const RemoveBtn = styled.button`
 `;
 
 const ItemTitle = styled.div`
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #1f2937;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--body-color, #1d1b18);
   margin-bottom: 4px;
   line-height: 1.3;
   display: flex;
@@ -170,22 +177,22 @@ const ItemTitle = styled.div`
 
 const ItemPrice = styled.div`
   font-size: 0.875rem;
-  color: #6b7280;
-  margin-bottom: 8px;
+  color: #5e574e;
+  margin-bottom: 10px;
 `;
 
 const QtyRow = styled.div`
   display: inline-flex;
   align-items: center;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #f3f4f6;
+  border: 1px solid #cfc6b8;
+  border-radius: 999px;
+  background: #fff;
   overflow: hidden;
 `;
 
 const QtyBtn = styled.button`
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border: 0;
   background: transparent;
   color: #6b7280;
@@ -204,8 +211,8 @@ const QtyBtn = styled.button`
 `;
 
 const QtyInput = styled.input`
-  width: 36px;
-  height: 28px;
+  width: 32px;
+  height: 36px;
   text-align: center;
   font-size: 12px;
   font-weight: 600;
@@ -243,8 +250,8 @@ function QtyInputCell({ itemId, quantity, disabled, onUpdate }) {
 }
 
 const Footer = styled.div`
-  padding: 16px 20px;
-  border-top: 1px solid #e5e7eb;
+  padding: 18px 24px 22px;
+  border-top: 1px solid #efe8dd;
   flex-shrink: 0;
   background: #fff;
 
@@ -263,9 +270,11 @@ const Row = styled.div`
   color: #4b5563;
 `;
 const RowTotal = styled(Row)`
-  font-weight: 600;
-  font-size: 1rem;
-  color: #1f2937;
+  align-items: baseline;
+  font-family: var(--h2-ff, inherit);
+  font-weight: 800;
+  font-size: 1.35rem;
+  color: var(--body-color, #1d1b18);
   margin-top: 12px;
   margin-bottom: 16px;
 `;
@@ -273,17 +282,17 @@ const RowTotal = styled(Row)`
 const PrimaryBtn = styled.a`
   display: block;
   text-align: center;
-  padding: 12px 20px;
-  background: #ff971c;
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  border-radius: 8px;
+  padding: 16px 20px;
+  background: var(--btn-atc-bg, var(--shop-primary, #ff971c));
+  color: var(--btn-atc-text, #fff);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  border-radius: 999px;
   text-decoration: none;
   margin-bottom: 12px;
   &:hover {
-    background: #e65f00;
-    color: #fff;
+    background: var(--btn-atc-hover-bg, var(--shop-accent, #e65f00));
+    color: var(--btn-atc-text, #fff);
   }
 `;
 
