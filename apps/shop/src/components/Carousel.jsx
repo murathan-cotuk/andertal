@@ -46,10 +46,10 @@ const Title = styled.h2`
 const NavBtn = styled.button`
   width: 44px;
   height: 44px;
-  border-radius: 6px;
-  border: 1px solid ${tokens.border.light};
-  background: #fff;
-  color: ${tokens.dark[700]};
+  border-radius: 50%;
+  border: none;
+  background: var(--body-color, #1d1b18);
+  color: #fff;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -59,13 +59,10 @@ const NavBtn = styled.button`
     color ${tokens.transition.base};
 
   &:hover:not(:disabled) {
-    background: ${tokens.background.soft};
-    border-color: #d1d5db;
-    color: ${tokens.dark[900]};
+    opacity: 0.88;
   }
   &:active:not(:disabled) {
-    background: #f3f4f6;
-    transform: scale(0.98);
+    transform: scale(0.96);
   }
   @media (prefers-reduced-motion: no-preference) {
     transition:
