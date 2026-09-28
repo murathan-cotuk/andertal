@@ -182,7 +182,7 @@ export function buildShopThemeCSS(rawStyles, opts = { merge: true }) {
   --header-bg:       ${header.bg_color};
   --header-chrome-bg: ${headerChromeByVp.desktop};
   --header-text:     ${header.text_color};
-  --header-icon-color: #ffffff;
+  --header-icon-color: ${header.icon_color || "#ffffff"};
   --header-h:        ${headerHVp.desktop};
   --header-h-compact: ${headerCompactVp.desktop};
   --header-shadow:   ${header.shadow};
