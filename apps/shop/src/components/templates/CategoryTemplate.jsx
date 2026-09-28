@@ -119,12 +119,11 @@ const Breadcrumb = styled.nav`
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #999;
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  color: #5e574e;
 
-  a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
-  b { color: #444; font-weight: 500; }
+  a { color: #5e574e; text-decoration: none; transition: color 0.12s; &:hover { color: var(--body-color, #1d1b18); } }
+  b { color: var(--body-color, #1d1b18); font-weight: 600; }
 
   @media (max-width: 767px) {
     display: none;
@@ -191,23 +190,22 @@ const SortBarLeft = styled.div`
 const FilterBtn = styled.button`
   display: none;
   align-items: center;
-  gap: 5px;
-  padding: 5px 0;
-  background: none;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  margin: 6px 0;
+  background: var(--body-color, #1d1b18);
   border: none;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: ${(p) => (p.$active ? "#111" : "#666")};
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
   cursor: pointer;
-  transition: color 0.12s;
-  border-bottom: 1.5px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  margin-bottom: -1px;
-  line-height: 1.2;
+  transition: opacity 0.12s;
+  line-height: 1;
 
-  svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.8; }
-  &:hover { color: #111; }
+  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  &:hover { opacity: 0.88; }
 
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: inline-flex;
@@ -218,15 +216,13 @@ const SortWrap = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: #666;
+  font-size: 14px;
+  color: #5e574e;
 `;
 
 const SortLabel = styled.span`
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #999;
+  font-size: 14px;
+  color: #5e574e;
   white-space: nowrap;
 
   @media (max-width: 480px) { display: none; }
@@ -234,18 +230,20 @@ const SortLabel = styled.span`
 
 const SortSelect = styled.select`
   appearance: none;
-  background: transparent;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #111;
+  background-color: #fff;
+  border: 1px solid #cfc6b8;
+  border-radius: 999px;
+  margin: 6px 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
   cursor: pointer;
   outline: none;
-  padding: 12px 20px 12px 0;
+  padding: 10px 34px 10px 16px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 4px center;
+  background-position: right 14px center;
 `;
 
 const ContentWrap = styled.div`
@@ -277,6 +275,14 @@ const Sidebar = styled.aside`
   top: ${HEADER_H + 100}px;
   max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
+
+  @media (min-width: ${CATALOG_DRAWER_MAX_PX + 1}px) {
+    background: #fff;
+    border-radius: 20px;
+    padding: 18px 18px 6px;
+    box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
+    box-sizing: border-box;
+  }
 
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     position: fixed;
@@ -331,24 +337,23 @@ const MobileDrawerSegments = styled.div`
   display: flex;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid #e7e5e4;
-  background: linear-gradient(to bottom, #fafaf9, #f4f4f2);
+  border-bottom: 1px solid #efe8dd;
+  background: #fff;
 `;
 
 const MobileDrawerSegmentBtn = styled.button`
   flex: 1;
+  min-height: 44px;
   padding: 10px 8px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border: 1px solid ${(p) => (p.$active ? "#0d9488" : "#d6d3d1")};
-  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#cfc6b8")};
+  border-radius: 999px;
   cursor: pointer;
   font-family: inherit;
-  background: ${(p) => (p.$active ? "#0f766e" : "#ffffff")};
-  color: ${(p) => (p.$active ? "#ffffff" : "#57534e")};
-  box-shadow: ${(p) => (p.$active ? "0 2px 8px rgba(15,118,110,0.25)" : "0 1px 2px rgba(0,0,0,0.04)")};
+  background: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#ffffff")};
+  color: ${(p) => (p.$active ? "#ffffff" : "var(--body-color, #1d1b18)")};
+  box-shadow: none;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 `;
 
@@ -365,10 +370,10 @@ const MobileCategoryBlockTitle = styled.div`
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: #78716c;
+  color: #5e574e;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e7e5e4;
+  border-bottom: 1px solid #efe8dd;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -377,7 +382,7 @@ const MobileCategoryBlockTitle = styled.div`
     content: "";
     width: 4px;
     height: 14px;
-    background: #0f766e;
+    background: var(--shop-primary, #ee8a12);
     border-radius: 2px;
     flex-shrink: 0;
   }
@@ -395,20 +400,20 @@ const MobileCatRow = styled(Link)`
   font-weight: ${(p) => (p.$active ? 600 : p.$variant === "muted" ? 500 : 500)};
   line-height: 1.35;
   color: ${(p) => {
-    if (p.$variant === "muted") return "#78716c";
-    return p.$active ? "#115e59" : "#292524";
+    if (p.$variant === "muted") return "#5e574e";
+    return p.$active ? "#8a4600" : "var(--body-color, #1d1b18)";
   }};
   text-decoration: none;
   background: ${(p) =>
-    p.$variant === "muted" ? "#f5f5f4" : p.$active ? "#ccfbf1" : "#ffffff"};
+    p.$variant === "muted" ? "#f6f2ec" : p.$active ? "#fcebd5" : "#ffffff"};
   border: 1px solid ${(p) =>
-    p.$variant === "muted" ? "#e7e5e4" : p.$active ? "#5eead4" : "#e7e5e4"};
+    p.$variant === "muted" ? "#efe8dd" : p.$active ? "#f1cfa6" : "#efe8dd"};
   border-radius: ${(p) => (p.$variant === "muted" ? 8 : 12)}px;
   box-sizing: border-box;
   transition: background 0.12s, border-color 0.12s;
 
   &:active {
-    background: ${(p) => (p.$variant === "muted" ? "#e7e5e4" : "#f0fdfa")};
+    background: ${(p) => (p.$variant === "muted" ? "#efe8dd" : "#fcebd5")};
   }
 
   ${(p) =>
@@ -443,9 +448,9 @@ const MobileFilterRailHeader = styled.div`
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #1c1917;
-  background: #e7e5e4;
-  border-bottom: 1px solid #d6d3d1;
+  color: var(--body-color, #1d1b18);
+  background: #efe8dd;
+  border-bottom: 1px solid #e6dfd4;
   line-height: 1.3;
   word-break: break-word;
 `;
@@ -456,8 +461,8 @@ const MobileFilterLeft = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #f5f5f4;
-  border-right: 1px solid #d6d3d1;
+  background: #f6f2ec;
+  border-right: 1px solid #e6dfd4;
 `;
 
 const MobileFilterLeftScroll = styled.div`
@@ -476,13 +481,13 @@ const MobileFilterLeftBtn = styled.button`
   text-align: left;
   background: ${(p) => (p.$active ? "#ffffff" : "transparent")};
   border: none;
-  border-left: 4px solid ${(p) => (p.$active ? "#0f766e" : "transparent")};
-  color: ${(p) => (p.$active ? "#134e4a" : "#44403c")};
+  border-left: 4px solid ${(p) => (p.$active ? "var(--shop-primary, #ee8a12)" : "transparent")};
+  color: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#5e574e")};
   cursor: pointer;
   line-height: 1.35;
   letter-spacing: 0.02em;
   font-family: inherit;
-  border-bottom: 1px solid #e7e5e4;
+  border-bottom: 1px solid #efe8dd;
   &:last-child {
     border-bottom: none;
   }
@@ -494,7 +499,7 @@ const MobileFilterRight = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #fafaf9;
+  background: #fff;
 `;
 
 const MobileFilterRightScroll = styled.div`
@@ -510,7 +515,7 @@ const MobileFilterRightHead = styled.h3`
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #0c0a09;
+  color: var(--body-color, #1d1b18);
   line-height: 1.25;
 `;
 
@@ -518,7 +523,7 @@ const MobileFilterRightHint = styled.p`
   margin: 0 0 14px;
   font-size: 12px;
   line-height: 1.45;
-  color: #78716c;
+  color: #5e574e;
 `;
 
 const MobileFilterPillGrid = styled.div`
@@ -531,17 +536,17 @@ const MobileFilterPill = styled.button`
   padding: 10px 8px;
   font-size: 12px;
   font-weight: ${(p) => (p.$on ? 700 : 500)};
-  background: ${(p) => (p.$on ? "#134e4a" : "#ffffff")};
-  color: ${(p) => (p.$on ? "#ecfdf5" : "#44403c")};
-  border: 1.5px solid ${(p) => (p.$on ? "#134e4a" : "#d6d3d1")};
-  border-radius: 10px;
+  background: ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#ffffff")};
+  color: ${(p) => (p.$on ? "#ffffff" : "var(--body-color, #1d1b18)")};
+  border: 1.5px solid ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#cfc6b8")};
+  border-radius: 999px;
   cursor: pointer;
   text-align: center;
   line-height: 1.35;
   font-family: inherit;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
   &:hover {
-    border-color: #0f766e;
+    border-color: var(--shop-primary, #ee8a12);
   }
   &:active {
     transform: scale(0.98);
@@ -554,7 +559,7 @@ const SidebarPane = styled.section`
 
   & + & {
     padding-top: 16px;
-    border-top: 1px solid #eceae7;
+    border-top: 1px solid #efe8dd;
   }
 `;
 
@@ -591,7 +596,10 @@ const SidebarHead = styled.div`
 `;
 
 const FilterGroup = styled.div`
-  border-bottom: 1px solid #eceae7;
+  border-bottom: 1px solid #efe8dd;
+  &:last-child {
+    border-bottom: none;
+  }
 `;
 
 const FilterGroupTitle = styled.button`
@@ -600,6 +608,7 @@ const FilterGroupTitle = styled.button`
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-height: 44px;
   padding: 10px 0;
   background: none;
   border: none;
@@ -627,7 +636,7 @@ const FilterChevron = styled.span`
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: #9ca3af;
+  color: #5e574e;
   transform: rotate(${(p) => (p.$open ? "180deg" : "0deg")});
   transition: transform 0.18s ease;
 
@@ -641,7 +650,8 @@ const FilterChevron = styled.span`
 const CheckRow = styled.label.attrs({ className: "shop-typo-sidebar-submenu" })`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 30px;
   padding: 3px 0;
   cursor: pointer;
   color: ${(p) => (p.$on ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
@@ -674,34 +684,34 @@ const SubcategoryLink = styled(Link).attrs((p) => ({
   className: p.$active ? "shop-typo-sidebar-submenu is-active" : "shop-typo-sidebar-submenu",
 }))`
   display: block;
-  padding: 5px 8px;
+  padding: 6px 10px;
   text-decoration: none;
-  border-radius: 6px;
-  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
+  border-radius: 10px;
+  background: ${(p) => (p.$active ? "#fcebd5" : "transparent")};
+  box-shadow: ${(p) => (p.$active ? "inset 3px 0 0 var(--shop-primary, #ee8a12)" : "none")};
   margin-bottom: 1px;
   transition: background 0.12s, color 0.12s;
   color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
   font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-submenu-fw, 400)")};
 
   &:hover {
-    background: #e5e7eb;
+    background: #f6f2ec;
     color: var(--sidebar-nav-color, #111827);
   }
 `;
 
 const ClearAllBtn = styled.button`
   background: none;
-  border: 1px solid #ccc;
-  padding: 5px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #555;
+  border: none;
+  padding: 6px 4px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--shop-accent, #a65300);
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
+  transition: opacity 0.12s;
 
-  &:hover { border-color: #111; color: #111; }
+  &:hover { opacity: 0.75; text-decoration: underline; text-underline-offset: 3px; }
 `;
 
 const Body = styled.div`
@@ -720,55 +730,57 @@ const ChipBar = styled.div`
 const Chip = styled.button`
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  background: #111;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  background: var(--body-color, #1d1b18);
   color: #fff;
   border: none;
-  font-size: 10.5px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: opacity 0.12s;
 
-  &:hover { background: #333; }
+  &:hover { opacity: 0.85; }
 `;
 
 const ResultBar = styled.div`
   padding: 16px 0 12px;
-  font-size: 11.5px;
-  color: #999;
-  letter-spacing: 0.04em;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5e574e;
 `;
 
 const Pager = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 8px;
   padding-top: 48px;
 `;
 
 const PBtn = styled.button`
-  min-width: 36px;
-  height: 36px;
-  padding: 0 6px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid ${(p) => (p.$on ? "#111" : "#ddd")};
-  background: ${(p) => (p.$on ? "#111" : "#fff")};
-  color: ${(p) => (p.$on ? "#fff" : "#555")};
-  font-size: 12.5px;
+  border-radius: 999px;
+  border: 1px solid ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#e6dfd4")};
+  background: ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#fff")};
+  color: ${(p) => (p.$on ? "#fff" : "var(--body-color, #1d1b18)")};
+  font-family: inherit;
+  font-size: 14px;
   font-weight: ${(p) => (p.$on ? "700" : "400")};
   cursor: ${(p) => (p.disabled ? "not-allowed" : "pointer")};
   opacity: ${(p) => (p.disabled ? "0.3" : "1")};
   transition: border-color 0.12s, color 0.12s, background 0.12s;
 
   &:not(:disabled):hover {
-    border-color: #111;
-    color: ${(p) => (p.$on ? "#fff" : "#111")};
+    border-color: var(--body-color, #1d1b18);
   }
 `;
 
