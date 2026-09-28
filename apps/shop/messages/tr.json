@@ -2,6 +2,7 @@
   "common": {
     "search": "Ürün ara...",
     "categories": "Kategoriler",
+    "allCategories": "Tüm kategoriler",
     "login": "Giriş yap",
     "register": "Kayıt ol",
     "account": "Hesabım",

@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import styled from "styled-components";
-import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { formatPriceCents } from "@/lib/format";
@@ -13,12 +12,13 @@ import { menuItemHref } from "@/lib/shop-menu-href";
 const FooterContainer = styled.footer`
   background-color: var(--footer-bg, #136761);
   color: var(--footer-text, #ffffff);
-  padding: 48px 0 calc(24px + env(safe-area-inset-bottom, 0px));
+  border-top: var(--footer-border, none);
+  padding: 56px 0 calc(28px + env(safe-area-inset-bottom, 0px));
   margin-top: auto;
 
   @media (max-width: 767px) {
     margin-top: 0;
-    padding: 0 0 calc(2px + env(safe-area-inset-bottom, 0px));
+    padding: 28px 0 calc(24px + env(safe-area-inset-bottom, 0px));
   }
 `;
 
@@ -26,155 +26,109 @@ const Container = styled.div`
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
+  @media (max-width: 767px) {
+    padding: 0 20px;
+  }
 `;
 
-const Grid = styled.div`
+const Top = styled.div`
   display: grid;
-  grid-template-columns: repeat(${(p) => p.$columns || 4}, 1fr);
-  gap: 32px;
-  margin-bottom: 32px;
+  grid-template-columns: minmax(180px, 1fr) repeat(${(p) => p.$columns || 4}, minmax(0, 1fr));
+  gap: 40px;
+  padding-bottom: 36px;
+
+  @media (max-width: 1023px) {
+    grid-template-columns: repeat(${(p) => Math.min(p.$columns || 4, 4)}, minmax(0, 1fr));
+    gap: 32px;
+  }
   @media (max-width: 767px) {
-    display: block;
-    margin-bottom: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 16px;
+    padding-bottom: 24px;
   }
 `;
 
-const Column = styled.div`
+const Brand = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  @media (max-width: 767px) {
-    border-bottom: ${(p) => (p.$isLast ? "none" : "1px solid rgba(255, 255, 255, 0.15)")};
+  gap: 14px;
+  @media (max-width: 1023px) {
+    grid-column: 1 / -1;
   }
 `;
 
-const Title = styled.h3`
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 4px;
+const Wordmark = styled(Link)`
+  font-family: var(--h2-ff, inherit);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
   color: var(--footer-text, #ffffff);
-`;
-
-const AccordionLinks = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  @media (max-width: 767px) {
-    display: none;
-  }
-`;
-
-const DesktopTitle = styled(Title)`
-  @media (max-width: 767px) {
-    display: none;
-  }
-`;
-
-const MobileAccordion = styled(AccordionPrimitive.Root)`
-  display: none;
-  @media (max-width: 767px) {
-    display: block;
-  }
-`;
-
-const MobileAccordionItem = styled(AccordionPrimitive.Item)`
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const MobileAccordionTrigger = styled(AccordionPrimitive.Trigger)`
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: none;
-  border: none;
-  padding: 14px 0;
-  color: var(--footer-text, #ffffff);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-  font-family: inherit;
-  -webkit-tap-highlight-color: transparent;
-
-  &[data-state="open"] .footer-chevron {
-    transform: rotate(180deg);
-  }
-`;
-
-const MobileAccordionContent = styled(AccordionPrimitive.Content)`
-  overflow: hidden;
-  &[data-state="open"] {
-    animation: footerAccordionDown 0.24s ease-out;
-  }
-  &[data-state="closed"] {
-    animation: footerAccordionUp 0.2s ease-out;
-  }
-
-  @keyframes footerAccordionDown {
-    from { height: 0; opacity: 0; }
-    to { height: var(--radix-accordion-content-height); opacity: 1; }
-  }
-  @keyframes footerAccordionUp {
-    from { height: var(--radix-accordion-content-height); opacity: 1; }
-    to { height: 0; opacity: 0; }
-  }
-`;
-
-const MobileAccordionContentInner = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 10px 12px 14px;
-`;
-
-const FooterLink = styled(Link)`
-  color: var(--footer-text, #ffffff);
-  font-size: 14px;
-  transition: color 0.2s ease;
-
+  text-decoration: none;
   &:hover {
     color: var(--footer-text, #ffffff);
     opacity: 0.9;
   }
 `;
 
+const Column = styled.nav`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  @media (max-width: 767px) {
+    gap: 10px;
+  }
+`;
+
+const Title = styled.h3`
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0 0 4px;
+  color: var(--footer-text, #ffffff);
+
+  @media (max-width: 767px) {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--shop-primary, #ffffff);
+    margin: 0;
+  }
+`;
+
+const FooterLink = styled(Link)`
+  color: var(--footer-text, #ffffff);
+  font-size: 14px;
+  line-height: 1.4;
+  opacity: 0.85;
+  text-decoration: none;
+  transition: opacity 0.2s ease, color 0.2s ease;
+  overflow-wrap: anywhere;
+
+  &:hover {
+    color: var(--footer-text, #ffffff);
+    opacity: 1;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+`;
+
 const Placeholder = styled.div`
   color: var(--footer-text, #ffffff);
+  opacity: 0.7;
   font-size: 14px;
 `;
 
-const LogoPlaceholder = styled(Link)`
-  color: var(--footer-text, #ffffff);
-  opacity: 0.95;
-  font-weight: 700;
-  font-size: 18px;
-  text-decoration: none;
-
-  &:hover {
-    opacity: 1;
-    color: var(--footer-text, #ffffff);
-  }
-`;
-
 const Bottom = styled.div`
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  margin-top: 24px;
-  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  padding-top: 20px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-
-  @media (max-width: 767px) {
-    margin-top: 8px;
-    padding-top: 10px;
-    justify-content: center;
-  }
+  gap: 12px;
 `;
 
 const BottomLeft = styled.div`
@@ -194,12 +148,9 @@ const ShippingPromo = styled.span`
 
 const Copyright = styled.p`
   color: var(--footer-text, #ffffff);
-  font-size: 14px;
-
-  @media (max-width: 767px) {
-    text-align: center;
-    width: 100%;
-  }
+  opacity: 0.8;
+  font-size: 13px;
+  margin: 0;
 `;
 
 const FOOTER_LOCATIONS = ["footer1", "footer2", "footer3", "footer4"];
@@ -251,64 +202,29 @@ export default function Footer() {
   return (
     <FooterContainer className="site-footer">
       <Container>
-        {footerColumns.length > 0 && (
-          <Grid $columns={4}>
-            {footerColumns.map(({ location, menu, items }) => {
-              const name = menu?.name || " ";
-              return (
-                <Column key={location} $isLast={location === footerColumns[footerColumns.length - 1]?.location}>
-                  {/* Desktop: plain title */}
-                  <DesktopTitle>{name}</DesktopTitle>
-                  <AccordionLinks>
-                    {items.length > 0 ? (
-                      items.map((item) => (
-                        <FooterLink key={item.id} href={menuItemHref(item)}>{item.label}</FooterLink>
-                      ))
-                    ) : (
-                      menu ? <Placeholder>Keine Einträge</Placeholder> : null
-                    )}
-                  </AccordionLinks>
-                </Column>
-              );
-            })}
-          </Grid>
-        )}
-        {footerColumns.length > 0 && (
-          <MobileAccordion type="multiple">
-            {footerColumns.map(({ location, menu, items }) => {
-              const name = menu?.name || " ";
-              return (
-                <MobileAccordionItem key={`mobile-${location}`} value={location}>
-                  <AccordionPrimitive.Header>
-                    <MobileAccordionTrigger>
-                      <span>{name}</span>
-                      <svg className="footer-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transition: "transform 0.2s ease", opacity: 0.8 }}>
-                        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </MobileAccordionTrigger>
-                  </AccordionPrimitive.Header>
-                  <MobileAccordionContent>
-                    <MobileAccordionContentInner>
-                      {items.length > 0 ? (
-                        items.map((item) => (
-                          <FooterLink key={`mobile-${item.id}`} href={menuItemHref(item)}>{item.label}</FooterLink>
-                        ))
-                      ) : (
-                        menu ? <Placeholder>Keine Einträge</Placeholder> : null
-                      )}
-                    </MobileAccordionContentInner>
-                  </MobileAccordionContent>
-                </MobileAccordionItem>
-              );
-            })}
-          </MobileAccordion>
-        )}
+        <Top $columns={footerColumns.length || 4}>
+          <Brand>
+            <Wordmark href="/">Andertal</Wordmark>
+          </Brand>
+          {footerColumns.map(({ location, menu, items }) => (
+            <Column key={location} aria-label={menu?.name || undefined}>
+              <Title>{menu?.name || " "}</Title>
+              {items.length > 0 ? (
+                items.map((item) => (
+                  <FooterLink key={item.id} href={menuItemHref(item)}>{item.label}</FooterLink>
+                ))
+              ) : (
+                menu ? <Placeholder>Keine Einträge</Placeholder> : null
+              )}
+            </Column>
+          ))}
+        </Top>
         <Bottom>
           <BottomLeft>
             {shippingPromoText && (
               <ShippingPromo>{shippingPromoText}</ShippingPromo>
             )}
-            <Copyright style={{ margin: 0 }}>© {new Date().getFullYear()} Andertal. All rights reserved.</Copyright>
+            <Copyright>© {new Date().getFullYear()} Andertal</Copyright>
           </BottomLeft>
         </Bottom>
       </Container>
