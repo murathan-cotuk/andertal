@@ -620,7 +620,8 @@
     "noResults": "No results for \"{query}\"",
     "noDirectResults": "No direct matches — showing products anyway.",
     "suggestions": "Suggestions",
-    "continueShopping": "Continue shopping"
+    "continueShopping": "Continue shopping",
+    "clearRecent": "Clear"
   },
   "landing": {
     "noPreview": "No preview",

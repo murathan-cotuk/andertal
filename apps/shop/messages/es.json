@@ -603,7 +603,8 @@
     "noResults": "Sin resultados para \"{query}\"",
     "noDirectResults": "Sin coincidencias directas — mostrando productos de todas formas.",
     "suggestions": "Sugerencias",
-    "continueShopping": "Seguir comprando"
+    "continueShopping": "Seguir comprando",
+    "clearRecent": "Borrar"
   },
   "landing": {
     "noPreview": "Sin vista previa",

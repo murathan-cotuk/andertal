@@ -268,12 +268,10 @@ const MobileVariantsWrap = styled.div`
 const VarGroup = styled.div``;
 
 const VarLabel = styled.div`
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
+  margin-bottom: 8px;
 `;
 
 const VarLabelSelected = styled.span`
@@ -1922,7 +1920,6 @@ export default function ProductTemplateMobile() {
             style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "inherit", whiteSpace: "nowrap" }}
           >
             <StarRating average={reviewAvg} count={reviewCount} />
-            <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{reviewCount > 0 ? reviewCount : 0}</span>
           </a>
         </MobileBrandReviewRow>
 

@@ -124,7 +124,8 @@ const WeiterScroll = styled.div`
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory;
-  padding: 0 12px 16px;
+  scroll-padding-inline: 16px;
+  padding: 0 16px 16px;
 `;
 
 const WeiterCard = styled(Link)`
@@ -419,10 +420,14 @@ function useDesktopFocusSuggestions(enabled) {
       .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
       .catch(() => setProducts([]));
   }, [enabled]);
-  return { focused, setFocused, recent, products, onFocus };
+  const clearRecent = useCallback(() => {
+    try { window.localStorage.removeItem(RECENT_SEARCHES_KEY); } catch { /* ignore */ }
+    setRecent([]);
+  }, []);
+  return { focused, setFocused, recent, products, onFocus, clearRecent };
 }
 
-function DesktopFocusPanel({ recent, products, onPickTerm, onClose }) {
+function DesktopFocusPanel({ recent, products, onPickTerm, onClose, onClearRecent }) {
   const locale = useLocale();
   const ts = useTranslations("search");
   if (!recent.length && !products.length) return null;
@@ -430,13 +435,29 @@ function DesktopFocusPanel({ recent, products, onPickTerm, onClose }) {
     <Dropdown $maxHeight="min(70vh, 560px)" role="dialog" aria-label={ts("label")}>
       <FocusGrid>
         <div>
-          <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 8 }}>
+            <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
+            {recent.length > 0 && onClearRecent ? (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={onClearRecent}
+                style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "#a65300", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}
+              >
+                {ts("clearRecent")}
+              </button>
+            ) : null}
+          </div>
           {recent.length === 0 ? (
             <div style={{ padding: "0 16px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
           ) : (
             <FocusChips>
               {recent.map((term) => (
                 <SuggestionChip key={term} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onPickTerm(term)}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" style={{ marginRight: 6, opacity: 0.7, verticalAlign: "-2px" }}>
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 7v5l3 2" />
+                  </svg>
                   {term}
                 </SuggestionChip>
               ))}
@@ -640,12 +661,22 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); goSearchResults(q); } }}
-            style={{ flex: 1, minWidth: 0, fontSize: 16, padding: "10px 14px", border: "1px solid #e5e7eb", borderRadius: 12, outline: "none" }}
+            style={{ flex: 1, minWidth: 0, fontSize: 16, padding: "10px 14px", border: "2px solid #1d1b18", borderRadius: 999, background: "#f6f2ec", outline: "none" }}
           />
         </div>
         <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           {!q.trim() ? (
             <>
+              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
+              {recentSearches.length === 0 ? (
+                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
+              ) : (
+                <div style={{ padding: "0 16px 16px" }}>
+                  {recentSearches.map((term) => (
+                    <button type="button" key={term} onClick={() => { setQ(term); goSearchResults(term); }} style={{ display: "inline-flex", alignItems: "center", margin: "0 8px 8px 0", padding: "8px 14px", border: "none", borderRadius: 999, background: "#f6f2ec", fontSize: 14, color: "#1d1b18", cursor: "pointer", fontFamily: "inherit" }}>{term}</button>
+                  ))}
+                </div>
+              )}
               {recProducts.length > 0 && (
                 <>
                   <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
@@ -663,16 +694,6 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
                     })}
                   </WeiterScroll>
                 </>
-              )}
-              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
-              {recentSearches.length === 0 ? (
-                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
-              ) : (
-                <div style={{ padding: "0 16px 16px" }}>
-                  {recentSearches.map((term) => (
-                    <button type="button" key={term} onClick={() => { setQ(term); goSearchResults(term); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 0", border: "none", borderBottom: "1px solid #f3f4f6", background: "none", fontSize: 15, color: "#111", cursor: "pointer", fontFamily: "inherit" }}>{term}</button>
-                  ))}
-                </div>
               )}
             </>
           ) : (
@@ -753,6 +774,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
         <DesktopFocusPanel
           recent={focusPanel.recent}
           products={focusPanel.products}
+          onClearRecent={focusPanel.clearRecent}
           onPickTerm={(term) => {
             focusPanel.setFocused(false);
             saveRecentSearch(term);
@@ -974,8 +996,9 @@ function SearchInputWithDropdown({
               minWidth: 0,
               fontSize: 16,
               padding: "10px 14px",
-              border: "1px solid #e5e7eb",
-              borderRadius: 12,
+              border: "2px solid #1d1b18",
+              borderRadius: 999,
+              background: "#f6f2ec",
               outline: "none",
             }}
           />
@@ -983,6 +1006,38 @@ function SearchInputWithDropdown({
         <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           {!query.trim() ? (
             <>
+              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
+              {recentSearches.length === 0 ? (
+                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
+              ) : (
+                <div style={{ padding: "0 16px 16px" }}>
+                  {recentSearches.map((term) => (
+                    <button
+                      type="button"
+                      key={term}
+                      onClick={() => {
+                        refine(term);
+                        goSearchResults(term);
+                      }}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        margin: "0 8px 8px 0",
+                        padding: "8px 14px",
+                        border: "none",
+                        borderRadius: 999,
+                        background: "#f6f2ec",
+                        fontSize: 14,
+                        color: "#1d1b18",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              )}
               {recProducts.length > 0 && (
                 <>
                   <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
@@ -1007,38 +1062,6 @@ function SearchInputWithDropdown({
                     })}
                   </WeiterScroll>
                 </>
-              )}
-              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
-              {recentSearches.length === 0 ? (
-                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
-              ) : (
-                <div style={{ padding: "0 16px 16px" }}>
-                  {recentSearches.map((term) => (
-                    <button
-                      type="button"
-                      key={term}
-                      onClick={() => {
-                        refine(term);
-                        goSearchResults(term);
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "12px 0",
-                        border: "none",
-                        borderBottom: "1px solid #f3f4f6",
-                        background: "none",
-                        fontSize: 15,
-                        color: "#111",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      {term}
-                    </button>
-                  ))}
-                </div>
               )}
             </>
           ) : (
@@ -1201,6 +1224,7 @@ function SearchInputWithDropdown({
         <DesktopFocusPanel
           recent={focusPanel.recent}
           products={focusPanel.products}
+          onClearRecent={focusPanel.clearRecent}
           onPickTerm={(term) => {
             setFocusPanelOpen(false);
             refine(term);

@@ -603,7 +603,8 @@
     "noResults": "Nessun risultato per \"{query}\"",
     "noDirectResults": "Nessuna corrispondenza diretta — mostriamo comunque i prodotti.",
     "suggestions": "Suggerimenti",
-    "continueShopping": "Continua gli acquisti"
+    "continueShopping": "Continua gli acquisti",
+    "clearRecent": "Cancella"
   },
   "landing": {
     "noPreview": "Nessuna anteprima",

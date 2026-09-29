@@ -365,6 +365,18 @@ const Sidebar = styled.aside`
       transition: none;
     }
   }
+
+  /* Phones (design): bottom sheet with rounded top corners instead of a side drawer. */
+  @media (max-width: 767px) {
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    height: 88dvh;
+    max-height: 88dvh;
+    border-radius: 24px 24px 0 0;
+    box-shadow: ${(p) => (p.$open ? "0 -8px 32px rgba(0,0,0,0.2)" : "none")};
+    transform: translateY(${(p) => (p.$open ? "0" : "100%")});
+  }
 `;
 
 const SidebarSplit = styled.div`
@@ -1241,8 +1253,9 @@ export default function CategoryTemplate() {
 
   useEffect(() => {
     if (!panelOpen) return;
-    setMobileDrawerTab(showMobileCatNav ? "categories" : "filters");
-  }, [panelOpen, showMobileCatNav]);
+    // Sub-categories are already shown as pills above the grid, so the sheet opens on the filters.
+    setMobileDrawerTab(hasFacets || !showMobileCatNav ? "filters" : "categories");
+  }, [panelOpen, showMobileCatNav, hasFacets]);
 
   /* Mobile: sidebar stays closed on load — user opens manually via filter button */
 
@@ -1684,6 +1697,15 @@ export default function CategoryTemplate() {
                         <>
                           <MobileFilterRightHead>{getFacetGroupTitle(activeMobileFilterGroup, locale, metafieldDefinitions)}</MobileFilterRightHead>
                           <MobileFilterRightHint>{tCommon("filterHint")}</MobileFilterRightHint>
+                          {facetDisplayKind(activeMobileFilterGroup, getFacetGroupTitle(activeMobileFilterGroup, locale, metafieldDefinitions)) === "color" ? (
+                            <FacetOptions
+                              kind="color"
+                              values={facets[activeMobileFilterGroup]}
+                              selected={filters[activeMobileFilterGroup] || []}
+                              label={(v) => formatFacetOptionLabel(activeMobileFilterGroup, v, null, locale, metafieldDefinitions)}
+                              onToggle={(v) => toggle(activeMobileFilterGroup, v)}
+                            />
+                          ) : (
                           <MobileFilterPillGrid>
                             {facets[activeMobileFilterGroup].map((val) => {
                               const on = (filters[activeMobileFilterGroup] || []).includes(val);
@@ -1694,6 +1716,7 @@ export default function CategoryTemplate() {
                               );
                             })}
                           </MobileFilterPillGrid>
+                          )}
                         </>
                       ) : (
                         <div style={{ color: "#a8a29e", fontSize: 13, lineHeight: 1.45, paddingTop: 8 }}>

@@ -12,6 +12,7 @@ import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
+import { bonusPointsForCents } from "@/components/product/PdpExtras";
 import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
 
 /** Cart lines saved without a thumbnail (product had only a gallery) get their image from the product. */
@@ -359,12 +360,67 @@ const FooterPrimaryBtn = styled(PrimaryBtn)``;
 const TextLink = styled(Link)`
   display: block;
   text-align: center;
-  font-size: 0.875rem;
-  color: #1a1a1a;
+  padding: 12px 16px;
+  border: 2px solid var(--body-color, #1d1b18);
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
   text-decoration: none;
   &:hover {
-    text-decoration: underline;
+    background: #f6f2ec;
   }
+`;
+
+/* "Passt dazu" (design): compact two-up tiles — thumb, name, price, round add button. */
+const MatchGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+`;
+
+const MatchTile = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #faf6ef;
+  min-width: 0;
+  .mt-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+    color: inherit;
+    text-decoration: none;
+  }
+  .mt-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: #efe8dd;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .mt-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mt-text { display: flex; flex-direction: column; min-width: 0; font-size: 13px; line-height: 1.3; }
+  .mt-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mt-add {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--btn-atc-bg, var(--shop-primary, #ee8a12));
+    color: var(--btn-atc-text, #1d1b18);
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mt-add:disabled { opacity: 0.5; cursor: not-allowed; }
 `;
 
 const Empty = styled.p`
@@ -567,6 +623,7 @@ export default function CartSidebar() {
   const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, addToCart, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
   const lineImage = useCartLineImages(items);
+  const tProduct = useTranslations("product");
   const allThresholds = useShippingThresholds();
   const prefix = useMarketPrefix();
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
@@ -663,7 +720,12 @@ export default function CartSidebar() {
       <Overlay $open={sidebarOpen} onClick={closeCartSidebar} aria-hidden="true" />
       <Drawer $open={sidebarOpen} role="dialog" aria-label={tCart("title")}>
         <Header>
-          <Title>{tCart("title")}</Title>
+          <Title>
+            {tCart("title")}
+            {items.length > 0 ? (
+              <span style={{ color: "#8a8175", fontWeight: 500 }}> ({items.reduce((n, i) => n + (i.quantity || 0), 0)})</span>
+            ) : null}
+          </Title>
           <CloseBtn type="button" onClick={closeCartSidebar} aria-label={tPanel("close")}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
               <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
@@ -770,6 +832,11 @@ export default function CartSidebar() {
                 )}
               </ItemImage>
               <ItemBody>
+                {item.product_metadata?.brand_name || item.product_metadata?.brand ? (
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#5e574e", marginBottom: 2 }}>
+                    {item.product_metadata.brand_name || item.product_metadata.brand}
+                  </div>
+                ) : null}
                 <ItemTitle>
                   <Link
                     href={(() => {
@@ -785,6 +852,9 @@ export default function CartSidebar() {
                     {getLocalizedCartLineTitle(item, locale) || tCart("item")}
                   </Link>
                 </ItemTitle>
+                {item.variant_title && !/^(standard|default)/i.test(String(item.variant_title)) ? (
+                  <div style={{ fontSize: 12, color: "#5e574e", marginBottom: 2 }}>{item.variant_title}</div>
+                ) : null}
                 <ItemPrice>{formatPriceCents(item.unit_price_cents || 0)}</ItemPrice>
                 <QtyRow>
                   <QtyBtn
@@ -825,22 +895,21 @@ export default function CartSidebar() {
           {items.length > 0 && matches.length > 0 && (
             <RecommendedWrap>
               <RecommendedTitle>{tCart("matchesTitle")}</RecommendedTitle>
-              <RecommendedStrip role="region" aria-label={tCart("matchesTitle")}>
+              <MatchGrid role="region" aria-label={tCart("matchesTitle")}>
                 {matches.map((p) => (
-                  <RecommendedCard key={p.id}>
-                    <RecommendedItemLink href={`/${p.handle}`} onClick={closeCartSidebar}>
-                      <RecommendedThumb>
-                        {p.thumbnail ? (
-                          <img src={resolveImageUrl(p.thumbnail)} alt={p.title} />
-                        ) : (
-                          <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
-                        )}
-                      </RecommendedThumb>
-                      <RecommendedName>{p.title}</RecommendedName>
-                      <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
-                    </RecommendedItemLink>
-                    <QuickAddBtn
+                  <MatchTile key={p.id}>
+                    <Link href={`/${p.handle}`} onClick={closeCartSidebar} className="mt-link">
+                      <span className="mt-thumb">
+                        {p.thumbnail ? <img src={resolveImageUrl(p.thumbnail)} alt="" /> : null}
+                      </span>
+                      <span className="mt-text">
+                        <span className="mt-name">{p.title}</span>
+                        <b>{formatPriceCents(p.price)} €</b>
+                      </span>
+                    </Link>
+                    <button
                       type="button"
+                      className="mt-add"
                       title={tCart("quickAdd")}
                       aria-label={tCart("quickAdd")}
                       disabled={loading}
@@ -852,10 +921,10 @@ export default function CartSidebar() {
                       }}
                     >
                       +
-                    </QuickAddBtn>
-                  </RecommendedCard>
+                    </button>
+                  </MatchTile>
                 ))}
-              </RecommendedStrip>
+              </MatchGrid>
             </RecommendedWrap>
           )}
         </Scroll>
@@ -871,6 +940,12 @@ export default function CartSidebar() {
                 <span>−{formatPriceCents(bonusDiscountCents)} €</span>
               </Row>
             )}
+            {bonusPointsForCents(effectiveTotal) > 0 ? (
+              <Row style={{ color: "#a65300", fontWeight: 700, fontSize: 13 }}>
+                <span />
+                <span>{tProduct("bonusPoints", { points: bonusPointsForCents(effectiveTotal) })}</span>
+              </Row>
+            ) : null}
             <Row>
               <span>{tCart("shippingLabel")}</span>
               <span style={{ color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined }}>{shippingLabel}</span>

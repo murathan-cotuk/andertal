@@ -38,11 +38,23 @@ const COLOR_HEX = {
   burgundy: "#7c2d3e",
   bronze: "#a97142",
   copper: "#b87333",
+  anthracite: "#3f3f46",
+  sand: "#d8c3a0",
+  sage: "#a3b18a",
+  terracotta: "#c46a45",
+  honey: "#d99a2b",
+  midnight: "#1f2a44",
   multicolor: "linear-gradient(135deg,#ef4444,#f59e0b,#10b981,#3b82f6,#8b5cf6)",
 };
 
 /** Normalized (diacritics/umlaut-stripped) color word -> COLOR_HEX key */
 const ALIASES = {
+  anthrazit: "anthracite", anthracite: "anthracite", antrasit: "anthracite", antracite: "anthracite", antracita: "anthracite",
+  sand: "sand", sable: "sand", sabbia: "sand", arena: "sand", kum: "sand",
+  salbei: "sage", sage: "sage", sauge: "sage", salvia: "sage", adacayi: "sage",
+  terrakotta: "terracotta", terracotta: "terracotta", terracota: "terracotta", terrakota: "terracotta", "terre cuite": "terracotta",
+  honig: "honey", honey: "honey", miel: "honey", miele: "honey", bal: "honey",
+  nacht: "midnight", nachtblau: "midnight", midnight: "midnight", minuit: "midnight", mezzanotte: "midnight", medianoche: "midnight", gece: "midnight",
   // German
   schwarz: "black", weiss: "white", rot: "red", blau: "blue", grun: "green", gelb: "yellow",
   lila: "purple", violett: "purple", braun: "brown", rosa: "pink", grau: "gray", beige: "beige",

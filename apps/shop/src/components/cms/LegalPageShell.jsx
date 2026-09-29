@@ -51,7 +51,7 @@ const Row = styled.div`
 `;
 
 const SideNav = styled.nav`
-  width: 280px;
+  width: 308px;
   flex-shrink: 0;
   background: #fff;
   border-radius: 20px;
@@ -90,8 +90,17 @@ const SideNav = styled.nav`
     width: 100%;
     flex-direction: row;
     overflow-x: auto;
-    padding: 8px;
-    border-radius: 16px;
+    padding: 0;
+    gap: 8px;
+    background: transparent;
+    border-radius: 0;
+    a {
+      flex-shrink: 0;
+      min-height: 36px;
+      border-radius: 999px;
+      background: #fff;
+      white-space: nowrap;
+    }
     scrollbar-width: none;
     &::-webkit-scrollbar {
       display: none;
@@ -110,7 +119,7 @@ const SideNav = styled.nav`
 const Article = styled.article`
   flex: 1;
   min-width: 0;
-  max-width: 820px;
+  max-width: 932px;
   background: #fff;
   border-radius: 24px;
   padding: 48px 56px;

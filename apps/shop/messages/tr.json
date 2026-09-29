@@ -620,7 +620,8 @@
     "noResults": "\"{query}\" için sonuç yok",
     "noDirectResults": "Doğrudan sonuç yok — yine de ürünler gösteriliyor.",
     "suggestions": "Öneriler",
-    "continueShopping": "Alışverişe devam et"
+    "continueShopping": "Alışverişe devam et",
+    "clearRecent": "Temizle"
   },
   "landing": {
     "noPreview": "Önizleme yok",
