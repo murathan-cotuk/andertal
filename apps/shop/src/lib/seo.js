@@ -214,7 +214,6 @@ export function buildPageMetadata({
   noIndex = false,
 }) {
   const loc = normalizeLocale(locale);
-  void market;
   const canonicalPath =
     typeof pathForLocale === "function" ? pathForLocale(loc) : path || "";
   const canonical = absolutePublicUrl(defaultMarketForLocale(loc), loc, canonicalPath);
@@ -240,7 +239,7 @@ export function buildPageMetadata({
     keywords: kw.length ? kw : undefined,
     alternates: {
       canonical,
-      languages: languageAlternates(mkt, pathForLocale || path || ""),
+      languages: languageAlternates(market, pathForLocale || path || ""),
     },
     openGraph: {
       type,
