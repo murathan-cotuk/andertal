@@ -2,9 +2,8 @@
 
 import { useEffect, useLayoutEffect, useContext, useRef } from "react";
 import {
-  DEFAULT_SHOP_STYLES,
   buildShopThemeCSS,
-  mergeLoadedShopStyles,
+  resolveStorefrontStyles,
   collectTypographyGoogleFamilies,
   buildGoogleFontsLinkHrefForFamilies,
 } from "@andertal/shop-theme";
@@ -23,7 +22,8 @@ function loadAndApplyStyles(setStyles, injectCss, ensureGoogleFontLink, lastRawR
       // Skip expensive processing + React re-render if content hasn't changed
       if (lastRawRef && lastRawRef.current === rawStr) return;
       if (lastRawRef) lastRawRef.current = rawStr;
-      const merged = mergeLoadedShopStyles(raw);
+      // Default design ("Warmer Marktplatz") unless the merchant saved a design choice.
+      const merged = resolveStorefrontStyles(raw);
       injectCss(buildShopThemeCSS(merged, { merge: false }));
       const href = buildGoogleFontsLinkHrefForFamilies(collectTypographyGoogleFamilies(merged.typography));
       ensureGoogleFontLink(href);
@@ -69,8 +69,9 @@ export default function ShopStylesInjector() {
 
   // İlk boyamadan önce :root değişkenleri (H1–H5, body) hazır olsun; yoksa rich text h1 body fontuna düşer
   useLayoutEffect(() => {
-    injectCss(buildShopThemeCSS(DEFAULT_SHOP_STYLES));
-    const g0 = buildGoogleFontsLinkHrefForFamilies(collectTypographyGoogleFamilies(DEFAULT_SHOP_STYLES.typography));
+    const initial = resolveStorefrontStyles({});
+    injectCss(buildShopThemeCSS(initial, { merge: false }));
+    const g0 = buildGoogleFontsLinkHrefForFamilies(collectTypographyGoogleFamilies(initial.typography));
     ensureGoogleFontLink(g0);
   }, []);
 

@@ -4,6 +4,8 @@ export {
   WARM_MARKETPLACE_STYLES,
   WARM_PALETTE,
   applyWarmMarketplacePreset,
+  resolveStorefrontStyles,
+  CLASSIC_DESIGN_PRESET_ID,
 } from "./warm-marketplace-preset.js";
 export {
   DEFAULT_ATC_CODE,

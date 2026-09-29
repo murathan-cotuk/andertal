@@ -7,6 +7,8 @@
  * ones (never replacing them), so switching back is one click in the button editor.
  */
 
+import { mergeLoadedShopStyles } from "./merge-styles.js";
+
 export const WARM_MARKETPLACE_PRESET_ID = "warm_marketplace";
 
 export const WARM_PALETTE = {
@@ -339,4 +341,20 @@ export function applyWarmMarketplacePreset(styles = {}) {
     buttons: mergeButtons(styles.buttons),
     design_preset: WARM_MARKETPLACE_PRESET_ID,
   };
+}
+
+export const CLASSIC_DESIGN_PRESET_ID = "classic";
+
+/**
+ * Styles the storefront renders with. "Warmer Marktplatz" is the default design: when the merchant
+ * has never chosen a design (no `design_preset` saved), the preset is applied on top of the saved
+ * styles at render time — nothing is written to the database. Once a design is saved in
+ * Sellercentral (the preset itself, or "classic"), the saved styles are used exactly as stored.
+ * @param {Record<string, any>} raw — styles as loaded from the API
+ */
+export function resolveStorefrontStyles(raw = {}) {
+  const merged = mergeLoadedShopStyles(raw || {});
+  const chosen = typeof raw?.design_preset === "string" ? raw.design_preset.trim() : "";
+  if (chosen) return merged;
+  return applyWarmMarketplacePreset(merged);
 }

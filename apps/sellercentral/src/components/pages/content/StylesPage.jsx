@@ -31,7 +31,9 @@ import {
   resolveEffectiveLayoutSurfaces,
   applyUnifiedNavbarPreset,
   applyWarmMarketplacePreset,
+  resolveStorefrontStyles,
   WARM_MARKETPLACE_PRESET_ID,
+  CLASSIC_DESIGN_PRESET_ID,
   WARM_PALETTE,
 } from "@andertal/shop-theme";
 
@@ -1357,6 +1359,8 @@ export default function StylesPage() {
   const [savedMsg, setSavedMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
   const [loadError, setLoadError] = useState(false);
+  /** Saved styles without the default design applied — used by "Klassisches Design". */
+  const classicBaseRef = useRef(null);
 
   const mkDeviceLogo = (h = 34) => ({ url: "", size: h, height: h, pt: 0, pr: 0, pb: 0, pl: 0 });
   const defaultLogoConfig = () => ({
@@ -1447,7 +1451,10 @@ export default function StylesPage() {
     try {
       const data = await client.getStyles();
       const loaded = data?.styles || {};
-      const merged = mergeLoadedShopStyles(loaded);
+      // The form shows exactly what the storefront renders: with no saved design choice that is
+      // the default "Warmer Marktplatz" design (see resolveStorefrontStyles in @andertal/shop-theme).
+      classicBaseRef.current = mergeLoadedShopStyles(loaded);
+      const merged = resolveStorefrontStyles(loaded);
       // Ensure link_style_* always have explicit values in state so they are always
       // included in the save payload — mergeLoadedShopStyles deletes them when absent
       // from DB (intentional for layout presets in the shop), but StylesPage needs
@@ -1755,6 +1762,20 @@ export default function StylesPage() {
               <Button variant="primary" onClick={() => setStyles((prev) => applyWarmMarketplacePreset(prev))}>
                 {locale === "tr" ? "Şablonu uygula" : locale === "de" ? "Vorlage übernehmen" : "Apply preset"}
               </Button>
+              {styles?.design_preset !== CLASSIC_DESIGN_PRESET_ID && classicBaseRef.current ? (
+                <Button
+                  onClick={() => {
+                    const base = classicBaseRef.current;
+                    const previousChoice = base?.design_preset;
+                    setStyles({
+                      ...(previousChoice === WARM_MARKETPLACE_PRESET_ID ? mergeLoadedShopStyles({}) : base),
+                      design_preset: CLASSIC_DESIGN_PRESET_ID,
+                    });
+                  }}
+                >
+                  {locale === "tr" ? "Klasik tasarıma dön" : locale === "de" ? "Klassisches Design verwenden" : "Use classic design"}
+                </Button>
+              ) : null}
               {isDirty ? (
                 <Button onClick={handleDiscard}>
                   {locale === "tr" ? "Değişiklikleri geri al" : locale === "de" ? "Änderungen verwerfen" : "Discard changes"}

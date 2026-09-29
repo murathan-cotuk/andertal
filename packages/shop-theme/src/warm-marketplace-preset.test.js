@@ -39,3 +39,17 @@ test("preset survives a save/load round trip and reaches the CSS", () => {
 test("header icons stay white when no preset is applied", () => {
   assert.match(buildShopThemeCSS({}), /--header-icon-color: #ffffff/);
 });
+
+test("storefront uses the warm design when no design was chosen", async () => {
+  const { resolveStorefrontStyles } = await import("./warm-marketplace-preset.js");
+  const out = resolveStorefrontStyles({ colors: { primary: "#123456" }, topbar: { items: [{ text: "x" }] } });
+  assert.equal(out.colors.primary, "#EE8A12");
+  assert.equal(out.header.icon_color, "#1D1B18");
+  assert.deepEqual(out.topbar.items, [{ text: "x" }]);
+});
+
+test("storefront keeps saved styles once a design was chosen", async () => {
+  const { resolveStorefrontStyles } = await import("./warm-marketplace-preset.js");
+  assert.equal(resolveStorefrontStyles({ design_preset: "classic", colors: { primary: "#123456" } }).colors.primary, "#123456");
+  assert.equal(resolveStorefrontStyles({ design_preset: "warm_marketplace", colors: { primary: "#abcdef" } }).colors.primary, "#abcdef");
+});
