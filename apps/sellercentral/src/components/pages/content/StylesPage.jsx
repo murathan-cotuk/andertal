@@ -567,6 +567,60 @@ function TypographyLevelRow({ heading, levelKey, typo, families, familiesLoading
 }
 
 // ── Color swatch input ────────────────────────────────────────────────────────
+/**
+ * Second nav: colour + hover colour per root menu item. Stored in styles.secondNav.item_styles
+ * ({ [menuItemId]: { color, hover_color } }) — saved with the other styles, menus stay untouched.
+ */
+function SecondNavItemColors({ client, value, onChange, locale }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const norm = (x) => String(x || "").toLowerCase().trim();
+        const [{ locations }, { menus }] = await Promise.all([client.getMenuLocations().catch(() => ({ locations: [] })), client.getMenus()]);
+        const subnavLoc = (locations || []).find((l) => norm(l?.html_id) === "subnav");
+        const subnavSlug = norm(subnavLoc?.slug || "second");
+        const second = (menus || []).find((m) => norm(m?.location) === subnavSlug) || (menus || []).find((m) => norm(m?.slug) === "second-menu");
+        if (!second) { if (!cancelled) setItems([]); return; }
+        const list = Array.isArray(second.items) && second.items.length ? second.items : (await client.getMenuItems(second.id)).items;
+        if (!cancelled) setItems((list || []).filter((i) => !i?.parent_id).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)));
+      } catch {
+        if (!cancelled) setItems([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [client]);
+  const map = value && typeof value === "object" ? value : {};
+  const setField = (id, key, v) => {
+    const next = { ...map, [id]: { ...(map[id] || {}), [key]: v } };
+    if (!next[id].color && !next[id].hover_color) delete next[id];
+    onChange(next);
+  };
+  const L = (tr, de, en) => (locale === "tr" ? tr : locale === "de" ? de : en);
+  return (
+    <BlockStack gap="200">
+      <Text as="span" variant="bodySm" fontWeight="medium">{L("Menü öğesi renkleri", "Farben der Menüpunkte", "Menu item colours")}</Text>
+      <Text as="p" variant="bodySm" tone="subdued">
+        {L("Boş bırakılırsa yukarıdaki metin ve aktif/hover rengi kullanılır.", "Leer = Textfarbe bzw. Aktiv-/Hover-Farbe von oben.", "Empty = text colour / active-hover colour above.")}
+      </Text>
+      {items == null ? (
+        <Text as="p" variant="bodySm" tone="subdued">…</Text>
+      ) : items.length === 0 ? (
+        <Text as="p" variant="bodySm" tone="subdued">{L("Second nav menüsü bulunamadı.", "Kein Second-Nav-Menü gefunden.", "No second nav menu found.")}</Text>
+      ) : (
+        items.map((it) => (
+          <div key={it.id} style={{ display: "grid", gridTemplateColumns: "minmax(120px, 180px) 1fr 1fr", gap: 12, alignItems: "end" }}>
+            <Text as="span" fontWeight="medium">{it.label}</Text>
+            <ColorField label={L("Renk", "Farbe", "Colour")} value={map[it.id]?.color || ""} onChange={(v) => setField(it.id, "color", v)} />
+            <ColorField label={L("Hover rengi", "Hover-Farbe", "Hover colour")} value={map[it.id]?.hover_color || ""} onChange={(v) => setField(it.id, "hover_color", v)} />
+          </div>
+        ))
+      )}
+    </BlockStack>
+  );
+}
+
 function ColorField({ label, value, onChange, preserveAlphaFromRgba = false, helpText }) {
   const raw = String(value ?? "").trim();
   const solidOk = canParseAsSolidCssColor(raw);
@@ -2856,6 +2910,14 @@ export default function StylesPage() {
                   value={styles.secondNav.active_color}
                   onChange={(v) => updateSection("secondNav", "active_color", v)}
                 />
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <SecondNavItemColors
+                    client={client}
+                    locale={locale}
+                    value={styles.secondNav.item_styles}
+                    onChange={(v) => updateSection("secondNav", "item_styles", v)}
+                  />
+                </div>
                 <div style={{ gridColumn: "1 / -1" }}>
                   <BlockStack gap="200">
                     <Text as="span" variant="bodySm" fontWeight="medium">{c.height}</Text>

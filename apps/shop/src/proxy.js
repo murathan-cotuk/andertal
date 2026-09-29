@@ -230,6 +230,8 @@ export default function proxy(request) {
     const destPath =
       rest === "" || rest === "/" ? `${mp}/` : `${mp}${rest}`;
     const dest = new URL(destPath, request.url);
+    // Keep the query string (?q=…, utm_*, …) — a bare path would drop it.
+    dest.search = request.nextUrl.search;
     const redirectRes = NextResponse.redirect(dest);
     try {
       rememberMarket(redirectRes, mp);

@@ -1087,6 +1087,18 @@ const UserBtn = styled.button`
 
 
 /* Outer clipper — collapses max-height AND clips SubNavWrap border via overflow:hidden */
+/** Per-item colours from Sellercentral (Styles → Second Nav → menu item colours), keyed by menu item id. */
+function secondNavItemStyle(shopStyles, item) {
+  const map = shopStyles?.secondNav?.item_styles;
+  const cfg = map && item?.id ? map[item.id] : null;
+  if (!cfg || typeof cfg !== "object") return undefined;
+  const out = {};
+  if (cfg.color) out["--sn-item-color"] = cfg.color;
+  if (cfg.hover_color) out["--sn-item-hover"] = cfg.hover_color;
+  if (cfg.bold) out.fontWeight = 700;
+  return Object.keys(out).length ? out : undefined;
+}
+
 const SubNavClipper = styled.div`
   width: 100%;
   overflow: hidden;
@@ -1166,37 +1178,6 @@ const SecondLink = styled(Link)`
     color: var(--shop-accent, #a65300);
   }
 
-  &.is-sale {
-    color: var(--shop-accent, #a65300);
-    font-weight: 700;
-    @media (min-width: 1024px) {
-      margin-left: auto;
-    }
-  }
-`;
-
-const DeliverToBtn = styled.button`
-  display: none;
-  @media (min-width: 1200px) {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    margin-left: 24px;
-    padding: 4px 6px;
-    border: 0;
-    border-radius: 10px;
-    background: transparent;
-    color: var(--header-icon-color, #1d1b18);
-    font: inherit;
-    font-size: 12px;
-    line-height: 1.25;
-    text-align: left;
-    cursor: pointer;
-    &:hover { background: rgba(127, 127, 127, 0.1); }
-    small { display: block; font-size: 12px; opacity: 0.72; }
-    b { display: block; font-size: 14px; }
-  }
 `;
 
 const HeaderSpacer = styled.div`
@@ -1358,15 +1339,6 @@ export default function ShopHeader() {
     return t.country.toUpperCase();
   })();
 
-  const deliverCountryLabel = (() => {
-    const hit = shopCountries.find((c) => c.code === selectedCountry);
-    if (hit?.label) return hit.label;
-    try {
-      return new Intl.DisplayNames([locale], { type: "region" }).of(selectedCountry) || selectedCountry;
-    } catch {
-      return selectedCountry;
-    }
-  })();
   const localeButtonLabel = `${selectedCountry} · ${(SHOP_LOCALES.find((l) => l.code === locale) || {}).label || String(locale).toUpperCase()}`;
 
   const navigateTriple = (countryLower, langLower, curLower) => {
@@ -2064,23 +2036,6 @@ export default function ShopHeader() {
                     );
                   })()}
                 </MiddleBarLogo>
-                {!isNarrowViewport ? (
-                  <DeliverToBtn
-                    type="button"
-                    data-locale-dropdown
-                    onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }}
-                    aria-label={`${tCommon("deliverTo")} ${deliverCountryLabel}`}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
-                      <circle cx="12" cy="9.5" r="2.5" />
-                    </svg>
-                    <span>
-                      <small>{tCommon("deliverTo")}</small>
-                      <b>{deliverCountryLabel}</b>
-                    </span>
-                  </DeliverToBtn>
-                ) : null}
               </MiddleBarLeft>
             </NarrowHeaderChrome>
 
@@ -2297,11 +2252,14 @@ export default function ShopHeader() {
                 const isActive =
                   href !== "#" &&
                   (headerRestPath === href || headerRestPath.startsWith(`${href}/`));
+                const itemStyle = secondNavItemStyle(shopStyles, item);
                 return (
                   <SecondLink
                     key={item.id}
                     href={href}
-                    className={[isActive ? "active" : "", /^(sale|angebote|deals|offerte|ofertas|soldes|indirim|i̇ndirim)$/i.test(String(item.label || "").trim()) ? "is-sale" : ""].filter(Boolean).join(" ") || undefined}
+                    className={isActive ? "active" : undefined}
+                    data-sn-item={itemStyle ? "" : undefined}
+                    style={itemStyle}
                   >
                     {item.label}
                   </SecondLink>

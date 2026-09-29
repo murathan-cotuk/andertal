@@ -79,8 +79,8 @@ const NavBtn = styled.button`
     outline-offset: 2px;
   }
   &:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
+    opacity: 0;
+    pointer-events: none;
   }
   svg {
     width: 20px;

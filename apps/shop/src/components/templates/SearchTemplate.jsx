@@ -125,6 +125,11 @@ const SortBarInner = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
+
   @media (max-width: 600px) { padding: 0 16px; }
 `;
 
@@ -139,22 +144,22 @@ const SortBarLeft = styled.div`
 const FilterBtn = styled.button`
   display: none;
   align-items: center;
-  gap: 7px;
-  padding: 12px 0;
-  background: none;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  margin: 6px 0;
+  background: var(--body-color, #1d1b18);
   border: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: ${(p) => (p.$active ? "#111" : "#666")};
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
   cursor: pointer;
-  transition: color 0.12s;
-  border-bottom: 2px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  margin-bottom: -1px;
+  transition: opacity 0.12s;
+  line-height: 1;
 
-  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
-  &:hover { color: #111; }
+  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  &:hover { opacity: 0.88; }
 
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: inline-flex;
@@ -165,33 +170,34 @@ const SortWrap = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: #666;
+  font-size: 14px;
+  color: #5e574e;
 `;
 
 const SortLabel = styled.span`
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #999;
+  font-size: 14px;
+  color: #5e574e;
   white-space: nowrap;
+
   @media (max-width: 480px) { display: none; }
 `;
 
 const SortSelect = styled.select`
   appearance: none;
-  background: transparent;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #111;
+  background-color: #fff;
+  border: 1px solid #cfc6b8;
+  border-radius: 999px;
+  margin: 6px 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
   cursor: pointer;
   outline: none;
-  padding: 12px 20px 12px 0;
+  padding: 10px 34px 10px 16px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 4px center;
+  background-position: right 14px center;
 `;
 
 const ContentWrap = styled.div`
@@ -203,6 +209,9 @@ const ContentWrap = styled.div`
   display: flex;
   gap: 32px;
   align-items: flex-start;
+  @media (min-width: 1024px) {
+    max-width: 1700px;
+  }
   @media ${NARROW} {
     padding: 6px 6px 80px;
     padding-left: 4px !important;
@@ -694,6 +703,7 @@ export default function SearchTemplate() {
   const tCommon = useTranslations("common");
   const tSort = useTranslations("catalogSort");
   const tHome = useTranslations("home");
+  const tSearch = useTranslations("search");
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -995,7 +1005,7 @@ export default function SearchTemplate() {
     return buildSearchUrl(pathname, q, sl);
   };
 
-  const title = q ? `${tCommon("search")}: "${q}"` : tCommon("search");
+  const title = q ? `„${q}“` : tSearch("label");
 
   // ── Nav content helpers ──────────────────────────────────────────────────────
 
@@ -1152,7 +1162,6 @@ export default function SearchTemplate() {
       <main className="flex-grow" aria-label="Search results">
         <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <CategoryTitle>{title}</CategoryTitle>
-          {q ? <TitleSub>{tSort("results", { count: textHits.length })}</TitleSub> : null}
         </ColHeader>
 
         <SortBar>
@@ -1179,7 +1188,7 @@ export default function SearchTemplate() {
               <Breadcrumb aria-label="Breadcrumb">
                 <Link href="/">{tCommon("home")}</Link>
                 <span style={{ color: "#b8afa2" }}>›</span>
-                <b>{tCommon("search")}</b>
+                <b>{tSearch("label")}</b>
                 {q ? (
                   <>
                     <span style={{ color: "#b8afa2" }}>›</span>

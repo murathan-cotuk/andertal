@@ -354,6 +354,41 @@ function secondNavViewportColors() {
   return out;
 }
 
+/** Relative luminance (0–1) of a #rgb/#rrggbb/rgb() colour, or null when it cannot be parsed. */
+function colorLuminance(value) {
+  const str = String(value || "").trim().toLowerCase();
+  let r;
+  let g;
+  let b;
+  const hex = str.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].split("").map((c) => c + c).join("") : hex[1];
+    r = parseInt(h.slice(0, 2), 16);
+    g = parseInt(h.slice(2, 4), 16);
+    b = parseInt(h.slice(4, 6), 16);
+  } else {
+    const rgb = str.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
+    if (!rgb) return null;
+    [r, g, b] = [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  }
+  const lin = (c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+function headerForegroundColors(header = {}, colors = {}) {
+  const h = header || {};
+  let bg = String(h.bg_color || "").trim();
+  if (bg.includes("__PRIMARY__")) bg = String((colors && colors.primary) || "");
+  const lum = colorLuminance(bg);
+  if (lum != null && lum > 0.6) {
+    return { icon_color: h.icon_color || h.text_color || "#1d1b18" };
+  }
+  return { text_color: "#ffffff", icon_color: "#ffffff" };
+}
+
 export function applyWarmMarketplacePreset(styles = {}) {
   const s = WARM_MARKETPLACE_STYLES;
   const prevTopbar = styles.topbar || {};
@@ -368,8 +403,8 @@ export function applyWarmMarketplacePreset(styles = {}) {
     header: {
       ...mergeSection(styles.header, s.header),
       ...keepSmallerViewports(styles.header, "72px"),
-      // Icons follow the header text colour unless the merchant picked an icon colour.
-      icon_color: (styles.header && (styles.header.icon_color || styles.header.text_color)) || "#ffffff",
+      // On the merchant's coloured (dark) header, text and icons are white; a light header keeps its own colours.
+      ...headerForegroundColors(styles.header, styles.colors),
     },
     secondNav: { ...mergeSection(styles.secondNav, s.secondNav), ...secondNavViewportColors(), ...keepSmallerViewports(styles.secondNav, "44px") },
     footer: mergeSection(styles.footer, s.footer),

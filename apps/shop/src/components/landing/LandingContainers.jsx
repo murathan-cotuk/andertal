@@ -93,6 +93,21 @@ function getContainerPadding(container, defaultPad) {
 }
 
 /** Innere Zeile: volle Breite innerhalb des Container-Paddings oder zentriert mit max-width (pro Block typischer Fallback in px). */
+/* "Warmer Marktplatz" button defaults. The old defaults (orange #ff971c, 2px black border, 8px radius,
+   black offset shadow) were also saved into many containers by the editor, so they count as "unset". */
+function designBtnBg(v, fallback = "var(--shop-primary, #ee8a12)") {
+  const t = String(v || "").trim();
+  return t && t.toLowerCase() !== "#ff971c" ? t : fallback;
+}
+function designBtnBorder(v) {
+  const t = String(v || "").trim();
+  return t && !/solid\s+#000(000)?\b/i.test(t) ? t : "none";
+}
+function designBtnRadius(v) {
+  const t = String(v ?? "").trim();
+  return t && t !== "8" && t !== "8px" ? v : 999;
+}
+
 function normalizeContentMaxWidth(val, fallbackPx) {
   const n = Number(fallbackPx);
   const fb = `${Number.isFinite(n) && n > 0 ? n : 1440}px`;
@@ -415,8 +430,9 @@ function HeroBanner({ container, locale = "de", headingLevel = 2 }) {
   }
   const height = container.height || container.min_height || "500px";
   const mobileHeight = container.mobile_height || (container.min_height && String(container.min_height).includes("vh") ? "70vh" : "200px");
-  const mobilePadding = container.mobile_padding || "0px";
-  const mobileRadius = container.mobile_radius ? `${container.mobile_radius}px` : "0px";
+  // Design: the hero is a rounded card with the page gutter on phones too (unless set otherwise).
+  const mobilePadding = container.mobile_padding || (container.content_layout === "full" ? "0px" : "12px 16px 0");
+  const mobileRadius = container.mobile_radius ? `${container.mobile_radius}px` : (container.content_layout === "full" ? "0px" : "20px");
 
   // ── Auto-advance ──────────────────────────────────────────────────────────
   const scheduleNext = useCallback(() => {
@@ -481,14 +497,14 @@ function HeroBanner({ container, locale = "de", headingLevel = 2 }) {
               pointerEvents: "auto",
               display: "inline-block",
               padding: mobile ? "7px 16px" : (s.btn_padding || "12px 28px"),
-              background: s.btn_bg || "#ff971c",
+              background: designBtnBg(s.btn_bg),
               color: s.btn_color || "#fff",
-              border: s.btn_border || "2px solid #000",
-              borderRadius: s.btn_radius || 8,
+              border: designBtnBorder(s.btn_border),
+              borderRadius: designBtnRadius(s.btn_radius),
               fontWeight: 800,
               fontSize: mobile ? 12 : 15,
               textDecoration: "none",
-              boxShadow: s.btn_variant === "flat" ? "none" : "0 3px 0 2px #000",
+              boxShadow: "none",
               alignSelf: btnAlignSelf(ps.justifyContent),
             }}
             onMouseEnter={(e) => {
@@ -496,7 +512,7 @@ function HeroBanner({ container, locale = "de", headingLevel = 2 }) {
               if (s.btn_hover_color) e.currentTarget.style.color = s.btn_hover_color;
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = s.btn_bg || "#ff971c";
+              e.currentTarget.style.background = designBtnBg(s.btn_bg);
               e.currentTarget.style.color = s.btn_color || "#fff";
             }}
           >
@@ -567,9 +583,9 @@ function HeroBanner({ container, locale = "de", headingLevel = 2 }) {
   const slide = slides[current];
   const posStyle = getPositionStyle(slide.text_position || "center");
   return (
-    <div style={getContainerPadding(container, "0px 0px 0px 0px")}>
-      <div style={getContentInnerStyle(container, 1600)}>
-        <div style={{ position: "relative", width: "100%", height, overflow: "hidden" }}>
+    <div style={container.content_layout === "full" ? getContainerPadding(container, "0px 0px 0px 0px") : { padding: "24px 24px 0" }}>
+      <div style={container.content_layout === "full" ? getContentInnerStyle(container, 1600) : { maxWidth: 1312, margin: "0 auto" }}>
+        <div style={{ position: "relative", width: "100%", height, overflow: "hidden", borderRadius: container.content_layout === "full" ? 0 : 24 }}>
           {slides.map((s, i) => {
             const mediaEl = (
               <>
@@ -619,11 +635,11 @@ function TextBlock({ container, locale = "de" }) {
             className="landing-cta-btn"
             style={{
               display: "inline-block", padding: container.btn_padding || "12px 28px",
-              background: container.btn_bg || "#ff971c",
+              background: designBtnBg(container.btn_bg),
               color: container.btn_color || "#fff",
-              border: container.btn_border || "2px solid #000",
-              borderRadius: container.btn_radius || 8,
-              fontWeight: 800, fontSize: 14, textDecoration: "none", boxShadow: "0 3px 0 2px #000",
+              border: designBtnBorder(container.btn_border),
+              borderRadius: designBtnRadius(container.btn_radius),
+              fontWeight: 800, fontSize: 14, textDecoration: "none", boxShadow: "none",
             }}
           >
             {btnText}
@@ -782,9 +798,9 @@ function ImageText({ container, locale = "de" }) {
     <div style={{ background: container.bg_color || "transparent", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 1100), display: "flex", flexDirection: imageLeft ? "row" : "row-reverse", gap: 40, alignItems: "center", flexWrap: "wrap" }}>
         {(videoSrc || imgSrc) && (
-          <div style={{ flex: "0 0 auto", width: "min(45%, 480px)" }}>
+          <div className="landing-image-text-media" style={{ flex: "0 0 auto", width: "min(45%, 480px)" }}>
             {videoSrc ? (
-              <video src={videoSrc} style={{ width: "100%", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }} autoPlay muted loop playsInline />
+              <video src={videoSrc} style={{ width: "100%", borderRadius: 20, display: "block" }} autoPlay muted loop playsInline />
             ) : (
               // No fixed aspect-ratio config exists for this container type — width/height below
               // are only a size HINT for next/image's optimizer + initial reserved space; the
@@ -799,11 +815,12 @@ function ImageText({ container, locale = "de" }) {
                 height={600}
                 sizes="(max-width: 768px) 45vw, 480px"
                 loading="lazy"
-                style={{ width: "100%", height: "auto", borderRadius: 12, display: "block", border: "2px solid #000", boxShadow: "0 4px 0 2px #000" }}
+                style={{ width: "100%", height: "auto", borderRadius: 20, display: "block" }}
               />
             )}
           </div>
         )}
+        <style>{`@media (max-width: 767px){.landing-image-text-media{width:100% !important;}}`}</style>
         <div style={{ flex: 1, minWidth: 240, textAlign }}>
           {title && (
             <h2 style={{ fontSize: "clamp(20px,2.5vw,32px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 12px" }}>
@@ -818,11 +835,11 @@ function ImageText({ container, locale = "de" }) {
               href={container.btn_url}
               style={{
                 display: "inline-block", padding: container.btn_padding || "10px 24px",
-                background: container.btn_bg || "#ff971c",
+                background: designBtnBg(container.btn_bg),
                 color: container.btn_color || "#fff",
-                border: container.btn_border || "2px solid #000",
-                borderRadius: container.btn_radius || 8,
-                fontWeight: 800, fontSize: 14, textDecoration: "none", boxShadow: "0 3px 0 2px #000",
+                border: designBtnBorder(container.btn_border),
+                borderRadius: designBtnRadius(container.btn_radius),
+                fontWeight: 800, fontSize: 14, textDecoration: "none", boxShadow: "none",
               }}
             >
               {btnText}
@@ -992,8 +1009,8 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
             full-width row (e.g. a 1-column pattern) reads as a bounded card, not a bare oversized
             image dropped edge-to-edge on the page — and a maxHeight clamp keeps tall aspect ratios
             (or a very wide row) from growing without limit. */}
-        <div style={{ background: "#f8f9fb", border: "1px solid #e5e7eb", borderRadius: 16, padding: 10, boxSizing: "border-box" }}>
-          <div style={{ position: "relative", width: "100%", aspectRatio: r, borderRadius: 10, overflow: "hidden", maxHeight: isNarrow ? 360 : 560 }}>
+        <div style={{ boxSizing: "border-box", marginBottom: 10 }}>
+          <div style={{ position: "relative", width: "100%", aspectRatio: r, borderRadius: 20, overflow: "hidden", maxHeight: isNarrow ? 320 : 420 }}>
             <Image src={src} alt={imgTitle || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: "cover" }} />
           </div>
         </div>
@@ -1024,10 +1041,9 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
           position: "relative",
           width: "100%",
           aspectRatio: ratio,
-          borderRadius: 18,
+          borderRadius: 20,
           overflow: "hidden",
-          background: "#f3f4f6",
-          border: "1px solid #ececec",
+          background: "#efe8dd",
         }}
       >
         {image ? (
@@ -1169,7 +1185,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 // optional with the old behavior as the default, so existing pages render unchanged.
 function ImageGrid({ container, locale = "de" }) {
   const isNarrow = useIsNarrow(1023);
-  const colsDesktop = Math.max(1, Math.min(6, Number(container.cols) || 2));
+  const colsDesktop = Math.max(1, Math.min(6, Number(container.cols) || 4));
   const colsMobile = Math.max(1, Math.min(4, container.cols_mobile != null ? Number(container.cols_mobile) || 1 : Math.min(colsDesktop, 2)));
   const cols = isNarrow ? colsMobile : colsDesktop;
   const gapDesktop = Number(container.gap) || 16;
@@ -1180,14 +1196,14 @@ function ImageGrid({ container, locale = "de" }) {
   if (!images.length) return null;
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
-      <div style={{ ...getContentInnerStyle(container, 1100), display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap }}>
+      <div style={{ ...getContentInnerStyle(container, 1312), display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap }}>
         {images.map((img, i) => {
           const ratio = img.aspect_ratio || "1/1";
           const imgTitle = lt(img, "title", locale);
           const imgText = lt(img, "text", locale);
           const imgEl = (
-            <div style={{ background: "#f8f9fb", border: "1px solid #e5e7eb", borderRadius: 16, padding: 10, boxSizing: "border-box" }}>
-              <div style={{ position: "relative", width: "100%", aspectRatio: ratio, borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ boxSizing: "border-box", marginBottom: 10 }}>
+              <div style={{ position: "relative", width: "100%", aspectRatio: ratio, borderRadius: 20, overflow: "hidden" }}>
                 <Image src={resolveUrl(lt(img, "url", locale))} alt={imgTitle || ""} fill sizes={`(max-width: 768px) 100vw, ${Math.round(100 / cols)}vw`} style={{ objectFit: "cover" }} />
               </div>
             </div>
@@ -1221,11 +1237,15 @@ function BannerCta({ container, locale = "de" }) {
       ? { ...padRaw, paddingTop: "32px", paddingBottom: "40px" }
       : padRaw;
   return (
+    <div style={{ padding: "24px var(--landing-gutter, 24px)", boxSizing: "border-box" }}>
     <div
       style={{
-        background: container.bg_color || "#ff971c",
+        background: designBtnBg(container.bg_color, "var(--body-color, #1d1b18)"),
         boxSizing: "border-box",
         width: "100%",
+        maxWidth: 1312,
+        margin: "0 auto",
+        borderRadius: 24,
         minWidth: 0,
         ...pad,
         display: "flex",
@@ -1253,14 +1273,14 @@ function BannerCta({ container, locale = "de" }) {
               maxWidth: "100%",
               boxSizing: "border-box",
               padding: container.btn_padding || "12px 28px",
-              background: container.btn_bg || "#fff",
-              color: container.btn_color || "#111827",
-              border: container.btn_border || "2px solid #000",
-              borderRadius: container.btn_radius || 8,
+              background: designBtnBg(container.btn_bg, "var(--shop-primary, #ee8a12)"),
+              color: container.btn_color || "#1d1b18",
+              border: designBtnBorder(container.btn_border),
+              borderRadius: designBtnRadius(container.btn_radius),
               fontWeight: 800,
               fontSize: 14,
               textDecoration: "none",
-              boxShadow: "0 2px 0 1px rgba(0,0,0,0.35)",
+              boxShadow: "none",
               marginBottom: 4,
               alignSelf: btnAlignSelf(posStyle.justifyContent),
             }}
@@ -1269,6 +1289,7 @@ function BannerCta({ container, locale = "de" }) {
           </a>
         )}
       </div>
+    </div>
       <style>{`.landing-cta-btn{transition:transform .15s ease,box-shadow .15s ease,filter .15s ease;}.landing-cta-btn:hover{transform:translateY(-1px);filter:brightness(0.96);}.landing-cta-btn:active{transform:translateY(0);filter:brightness(0.92);}`}</style>
     </div>
   );
@@ -1800,7 +1821,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
   // A background square smaller than the image lets the image visually overflow it (the
   // "floating product" look) — 100% = no overflow, i.e. the old flush-background card.
   const bgEnabled = container.card_bg_enabled !== false;
-  const bgColor = container.card_bg_color || "#f3f4f6";
+  const bgColor = container.card_bg_color || "#efe8dd";
   const bgHoverColor = container.card_bg_hover_color || bgColor;
   const bgSizePct = Math.min(100, Math.max(40, Number(container.card_bg_size) || 80));
   const bgInset = (100 - bgSizePct) / 2;
@@ -1937,11 +1958,11 @@ function CollectionsCarousel({ container, locale = "de" }) {
               style={{ position: "absolute", inset: `${bgInset}%`, borderRadius: 14, background: bgColor, "--cc-bg-hover": bgHoverColor }}
             />
           )}
-          <div style={{ position: "absolute", inset: 0, borderRadius: 18, overflow: "hidden", border: "1px solid #ececec" }}>
+          <div style={{ position: "absolute", inset: 0, borderRadius: 20, overflow: "hidden" }}>
             {image ? (
               <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
             ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#f3f4f6" }}>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#efe8dd" }}>
                 {tLanding("noPreview")}
               </div>
             )}
@@ -2019,11 +2040,11 @@ function CollectionsCarousel({ container, locale = "de" }) {
                     style={{ position: "absolute", inset: `${bgInset}%`, borderRadius: 14, background: bgColor, "--cc-bg-hover": bgHoverColor }}
                   />
                 )}
-                <div style={{ position: "absolute", inset: 0, borderRadius: 18, overflow: "hidden", border: "1px solid #ececec" }}>
+                <div style={{ position: "absolute", inset: 0, borderRadius: 20, overflow: "hidden" }}>
                   {image ? (
                     <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
                   ) : (
-                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#f3f4f6" }}>
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#efe8dd" }}>
                       {tLanding("noPreview")}
                     </div>
                   )}
@@ -2261,9 +2282,9 @@ function NewsletterSignup({ container, locale = "de" }) {
   const lastNameFieldName = (container.last_name_field_name || "LNAME").trim() || "LNAME";
   const emailName = (container.email_field_name || "EMAIL").trim() || "EMAIL";
   const hiddenFields = Array.isArray(container.hidden_fields) ? container.hidden_fields : [];
-  const bg = container.bg_color || "#f3f4f6";
+  const bg = container.bg_color || "#efe8dd";
   const textColor = container.text_color || "#111827";
-  const btnBg = container.btn_bg || "#111827";
+  const btnBg = container.btn_bg || "var(--body-color, #1d1b18)";
   const btnColor = container.btn_color || "#fff";
   const [internalFirstName, setInternalFirstName] = React.useState("");
   const [internalLastName, setInternalLastName] = React.useState("");
@@ -2327,7 +2348,8 @@ function NewsletterSignup({ container, locale = "de" }) {
   };
 
   return (
-    <div style={{ ...getContainerPadding(container, "48px 24px"), background: bg }}>
+    <div style={{ padding: "24px 24px", boxSizing: "border-box" }}>
+    <div style={{ ...getContainerPadding(container, "48px 24px"), background: bg, maxWidth: 1312, margin: "0 auto", borderRadius: 24, boxSizing: "border-box" }}>
       <div style={{ ...getContentInnerStyle(container, 560), textAlign: "center" }}>
         {lt(container, "title", locale) ? (
           <h2 style={{ fontSize: "clamp(20px,3vw,28px)", fontWeight: 800, color: textColor, margin: "0 0 8px" }}>
@@ -2401,6 +2423,7 @@ function NewsletterSignup({ container, locale = "de" }) {
         ) : null}
       </div>
     </div>
+    </div>
   );
 }
 
@@ -2428,13 +2451,15 @@ function AccordionChevron({ color, open }) {
 function Accordion({ container, locale = "de" }) {
   const [openIdx, setOpenIdx] = useState(null);
   const items = container.items || [];
+  // Section sits on the page background (design); the question cards stay white.
+  const sectionBg = container.bg_color || "transparent";
   const bg = container.bg_color || "#ffffff";
   const textColor = container.text_color || "#111827";
-  const borderColor = container.border_color || "#e5e7eb";
+  const borderColor = container.border_color || "#efe8dd";
   const iconColor = container.icon_color || "#64748b";
 
   return (
-    <div style={{ background: bg, ...getContainerPadding(container, "48px 24px") }}>
+    <div style={{ background: sectionBg, ...getContainerPadding(container, "48px 24px") }}>
       <div style={getContentInnerStyle(container, 720)}>
         {lt(container, "title", locale) && (
           <h2
@@ -2789,7 +2814,7 @@ function Testimonials({ container, locale = "de" }) {
   const {
     title_align = "center",
     cols = 3, show_stars = true,
-    bg_color = "#f9fafb", card_bg = "#ffffff",
+    bg_color = "transparent", card_bg = "#ffffff",
     card_border_color = "#e5e7eb", text_color = "#111827",
     accent_color = "#ff971c",
     items = [],
@@ -3002,9 +3027,12 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // "images per row" count, evenly dividing the ~1280px content box (same math the old fixed-
   // column Carousel used), so containers configured before this became a peek-scroll still get a
   // sensible width instead of silently ignoring their existing setting.
-  const desktopN = Math.max(1, container.items_per_row != null ? Number(container.items_per_row) || 4 : 4);
+  // Design: the carousel never gets wider than the product carousels (1312px box, ≥5 tiles per row like the product cards),
+  // so a "full width" layout or a large item width no longer stretches it across the screen.
+  const desktopN = Math.max(5, container.items_per_row != null ? Number(container.items_per_row) || 5 : 5);
   const desktopItemWidthPx = Math.max(160, Math.floor((1312 - gap * (desktopN - 1)) / desktopN));
-  const desktopItemW = String(container.desktop_item_width || "").trim() || `${desktopItemWidthPx}px`;
+  const desktopItemWRaw = String(container.desktop_item_width || "").trim();
+  const desktopItemW = desktopItemWRaw ? `min(${desktopItemWRaw}, ${desktopItemWidthPx}px)` : `${desktopItemWidthPx}px`;
   const scrollByOneItem = (ref, dir) => {
     const el = ref.current;
     if (!el) return;
@@ -3180,8 +3208,15 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // added since a mouse doesn't swipe as naturally as a touch gesture; the underlying scroll-snap
   // still works with drag/wheel either way.
   return (
-    <div style={{ ...carouselPadding, background: bg }}>
-      <div style={getContentInnerStyle(container, 1312)}>
+    <div
+      style={{
+        ...carouselPadding,
+        paddingLeft: carouselPadding.paddingLeft && carouselPadding.paddingLeft !== "0px" ? carouselPadding.paddingLeft : "24px",
+        paddingRight: carouselPadding.paddingRight && carouselPadding.paddingRight !== "0px" ? carouselPadding.paddingRight : "24px",
+        background: bg,
+      }}
+    >
+      <div style={getContentInnerStyle({ ...container, content_layout: "boxed", content_max_width: "" }, 1312)}>
         {lt(container, "title", locale) && (
           <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.1, margin: "0 0 24px" }}>{lt(container, "title", locale)}</h2>
         )}
