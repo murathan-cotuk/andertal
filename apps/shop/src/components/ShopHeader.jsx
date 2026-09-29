@@ -599,68 +599,31 @@ const CategoryMegaPanel = styled.div`
     border-top: none;
   }
 
+  /* Desktop: large card dropping down from under the header (two panes: roots | children) */
   @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
     position: fixed;
-    left: 0;
-    top: ${(p) => `${Math.max(52, Number(p.$topPx) || 0)}px`};
-    bottom: 0;
-    width: min(400px, 38vw);
+    left: 50%;
     right: auto;
+    top: ${(p) => `${Math.max(52, Number(p.$topPx) || 0) + 8}px`};
+    width: min(1312px, calc(100vw - 48px));
+    height: ${(p) => `min(640px, calc(100vh - ${Math.max(52, Number(p.$topPx) || 0) + 32}px))`};
     background: #fff;
     border: none;
-    border-radius: 0 24px 24px 0;
-    box-shadow: 24px 0 48px rgba(29, 27, 24, 0.18);
+    border-radius: 24px;
+    box-shadow: 0 24px 64px rgba(29, 27, 24, 0.22);
     overflow: hidden;
     display: flex;
     flex-direction: column;
     max-height: none;
-    transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
-    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: ${(p) => (p.$open ? 1 : 0)};
+    visibility: ${(p) => (p.$open ? "visible" : "hidden")};
+    transform: translate(-50%, ${(p) => (p.$open ? "0" : "-12px")});
+    transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.22s;
     pointer-events: ${(p) => (p.$open ? "auto" : "none")};
   }
 `;
 
-const CategoryMegaSidebarHead = styled.div`
-  display: none;
-  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    padding: 18px 16px 14px 24px;
-    background: #fff;
-    border-bottom: 1px solid #efe8dd;
-    font-size: 24px;
-    font-weight: 800;
-    color: var(--body-color, #1d1b18);
-    letter-spacing: -0.01em;
-    font-family: var(--h2-ff, inherit);
-  }
-`;
 
-const CategoryMegaSidebarClose = styled.button`
-  display: none;
-  @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    margin: -6px 0;
-    padding: 0;
-    border: none;
-    border-radius: 50%;
-    background: #f6f2ec;
-    color: var(--body-color, #1d1b18);
-    cursor: pointer;
-    font-size: 20px;
-    line-height: 1;
-    transition: background 0.13s ease;
-    &:hover {
-      background: #ece5da;
-    }
-  }
-`;
 
 const CategoryMegaInner = styled.div`
   max-width: 1280px;
@@ -675,13 +638,11 @@ const CategoryMegaInner = styled.div`
     min-height: 0;
     max-width: none;
     margin: 0;
-    padding: 10px 12px 28px;
+    padding: 0;
     flex-direction: column;
     align-items: stretch;
-    gap: 4px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    gap: 0;
+    overflow: hidden;
   }
 `;
 
@@ -801,6 +762,122 @@ const CategoryMegaRootLink = styled(Link)`
     background: #f6f2ec;
     color: var(--body-color, #1d1b18);
   }
+`;
+
+/* ── Desktop category dropdown (two panes) ───────────────────── */
+const CategoryMegaDesktopShell = styled.div`
+  display: flex;
+  flex: 1;
+  min-height: 0;
+`;
+
+const CategoryMegaRootList = styled.nav`
+  width: 300px;
+  flex-shrink: 0;
+  background: #fbf8f3;
+  border-right: 1px solid #efe8dd;
+  padding: 14px 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+
+const CategoryMegaRootItem = styled(Link)`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: ${(p) => (p.$active ? 700 : 500)};
+  color: ${(p) => (p.$active ? "#fff" : "var(--body-color, #1d1b18)")};
+  background: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "transparent")};
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+  &:hover {
+    background: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#efe8dd")};
+    color: ${(p) => (p.$active ? "#fff" : "var(--body-color, #1d1b18)")};
+  }
+  span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+`;
+
+const CategoryMegaDetail = styled.div`
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 26px 32px 32px;
+`;
+
+const CategoryMegaDetailHead = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  h2 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-family: var(--h2-ff, inherit);
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    color: var(--body-color, #1d1b18);
+  }
+`;
+
+const CategoryMegaAllLink = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--body-color, #1d1b18);
+  color: #fff !important;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  &:hover { opacity: 0.88; }
+`;
+
+const CategoryMegaCloseBtn = styled.button`
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: #f6f2ec;
+  color: var(--body-color, #1d1b18);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  &:hover { background: #ece5da; }
+`;
+
+const CategoryMegaChildGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 12px;
+`;
+
+const CategoryMegaFlatGrid = styled.div`
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 26px 32px 32px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-content: start;
+  gap: 6px 12px;
 `;
 
 const CategoryMegaSubCols = styled.div`
@@ -1089,6 +1166,8 @@ export default function ShopHeader() {
   const [categoryChildrenById, setCategoryChildrenById] = useState(() => new Map());
   const categoryChildrenLoadedRef = useRef(new Set());
   const [categoryDrillStack, setCategoryDrillStack] = useState([]); // [] = root level
+  /** Desktop dropdown: root category whose children are shown in the right pane */
+  const [megaRoot, setMegaRoot] = useState(null);
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
   const tLocale = useTranslations("locale");
@@ -1304,6 +1383,36 @@ export default function ShopHeader() {
       });
     return () => { cancelled = true; };
   }, [locale]);
+
+  /* Lazy-load children for the desktop dropdown's hovered root (same endpoint as drilling). */
+  useEffect(() => {
+    const parentId = megaRoot?.id != null ? String(megaRoot.id) : "";
+    if (!parentId || categoryChildrenLoadedRef.current.has(parentId)) return undefined;
+    categoryChildrenLoadedRef.current.add(parentId);
+    cachedJsonFetch(`/api/store-categories${childrenCategoriesQuery(locale, parentId)}`, { ttlMs: 60000 })
+      .catch(() => ({ tree: [] }))
+      .then((res) => {
+        const kids = Array.isArray(res?.tree) ? res.tree : [];
+        setCategoryChildrenById((prev) => {
+          const next = new Map(prev);
+          next.set(parentId, kids);
+          return next;
+        });
+        setCategorySlugToId((prev) => {
+          const next = new Map(prev);
+          walkCategorySlugMap(kids, next);
+          return next;
+        });
+      })
+      .catch(() => {
+        categoryChildrenLoadedRef.current.delete(parentId);
+      });
+    return undefined;
+  }, [megaRoot, locale]);
+
+  useEffect(() => {
+    if (!mainMenuOpen) setMegaRoot(null);
+  }, [mainMenuOpen]);
 
   /* Lazy-load children when the mega-menu drills into a category. */
   useEffect(() => {
@@ -2014,25 +2123,6 @@ export default function ShopHeader() {
                   }
                 }}
               >
-                {!isNarrowViewport ? (
-                  <CategoryMegaSidebarHead>
-                    <span>
-                      {useCategoryTreeForPanel && categoryDrillStack.length
-                        ? categoryDrillStack[categoryDrillStack.length - 1].label
-                        : tCommon("categories")}
-                    </span>
-                    <CategoryMegaSidebarClose
-                      type="button"
-                      aria-label={tAccountPanel("close")}
-                      onClick={() => {
-                        setMainMenuOpen(false);
-                        setCategoryDrillStack([]);
-                      }}
-                    >
-                      ×
-                    </CategoryMegaSidebarClose>
-                  </CategoryMegaSidebarHead>
-                ) : null}
                 <CategoryMegaInner>
                   {(() => {
                     const imageForMenuItem = (item) => {
@@ -2135,11 +2225,90 @@ export default function ShopHeader() {
                     }
 
                     if (!isNarrowViewport) {
+                      const closeMenu = () => {
+                        setMainMenuOpen(false);
+                        setCategoryDrillStack([]);
+                      };
+                      if (!canDrill) {
+                        return <CategoryMegaFlatGrid>{rows.map((row) => renderRow(row))}</CategoryMegaFlatGrid>;
+                      }
+                      const rootRows = categoryPanelRows
+                        .map((row) => ({ ...row, href: row.href || `/${row.slug}` }))
+                        .filter((r) => r.href && r.href !== "#");
+                      const activeRoot =
+                        (megaRoot && rootRows.find((r) => String(r.id) === String(megaRoot.id))) ||
+                        rootRows.find((r) => r.hasChildren) ||
+                        rootRows[0];
+                      const childRows = activeRoot
+                        ? mapCategoryNodesToMenuRows(categoryChildrenById.get(String(activeRoot.id)) || [], locale)
+                            .map((r) => ({ ...r, href: `/${r.slug}` }))
+                            .filter((r) => r.slug)
+                        : [];
+                      const childrenLoading =
+                        !!activeRoot?.hasChildren && !categoryChildrenById.has(String(activeRoot.id));
                       return (
-                        <>
-                          {drillChrome}
-                          {rows.map((row) => renderRow(row))}
-                        </>
+                        <CategoryMegaDesktopShell>
+                          <CategoryMegaRootList aria-label={tCommon("categories")}>
+                            {rootRows.map((row) => {
+                              const isActive = activeRoot && String(activeRoot.id) === String(row.id);
+                              return (
+                                <CategoryMegaRootItem
+                                  key={row.key}
+                                  href={row.href}
+                                  $active={isActive}
+                                  aria-current={isActive ? "true" : undefined}
+                                  onMouseEnter={() => setMegaRoot({ id: row.id, label: row.label, slug: row.slug })}
+                                  onFocus={() => setMegaRoot({ id: row.id, label: row.label, slug: row.slug })}
+                                  onClick={closeMenu}
+                                >
+                                  <span>{row.label}</span>
+                                  {row.hasChildren ? (
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" style={{ flexShrink: 0, opacity: 0.7 }}>
+                                      <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                  ) : null}
+                                </CategoryMegaRootItem>
+                              );
+                            })}
+                          </CategoryMegaRootList>
+                          <CategoryMegaDetail>
+                            <CategoryMegaDetailHead>
+                              <h2>{activeRoot ? activeRoot.label : tCommon("categories")}</h2>
+                              {activeRoot ? (
+                                <CategoryMegaAllLink href={activeRoot.href} onClick={closeMenu}>
+                                  {tCommon("allCategories")} ›
+                                </CategoryMegaAllLink>
+                              ) : null}
+                              <CategoryMegaCloseBtn type="button" aria-label={tAccountPanel("close")} onClick={closeMenu}>
+                                ×
+                              </CategoryMegaCloseBtn>
+                            </CategoryMegaDetailHead>
+                            {childrenLoading ? (
+                              <CategoryMegaChildGrid aria-busy="true">
+                                {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                                  <div key={i} style={{ height: 56, borderRadius: 14, background: "#f6f2ec" }} />
+                                ))}
+                              </CategoryMegaChildGrid>
+                            ) : childRows.length > 0 ? (
+                              <CategoryMegaChildGrid>
+                                {childRows.map((row) => (
+                                  <CategoryMegaLink key={row.key} href={row.href} onClick={closeMenu}>
+                                    {row.imageUrl ? (
+                                      <CategoryMegaThumb src={row.imageUrl} alt="" />
+                                    ) : (
+                                      <CategoryMegaThumbPlaceholder aria-hidden />
+                                    )}
+                                    <CategoryMegaLinkLabel>{row.label}</CategoryMegaLinkLabel>
+                                  </CategoryMegaLink>
+                                ))}
+                              </CategoryMegaChildGrid>
+                            ) : activeRoot ? (
+                              <CategoryMegaAllLink href={activeRoot.href} onClick={closeMenu} style={{ alignSelf: "flex-start" }}>
+                                {activeRoot.label} ›
+                              </CategoryMegaAllLink>
+                            ) : null}
+                          </CategoryMegaDetail>
+                        </CategoryMegaDesktopShell>
                       );
                     }
 
