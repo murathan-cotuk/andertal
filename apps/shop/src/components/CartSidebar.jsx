@@ -499,6 +499,28 @@ const BestsellerSectionTitle = styled.h3`
   color: #1f2937;
 `;
 
+const FreeShipBar = styled.div`
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #faf6ef;
+  font-size: 13px;
+  line-height: 1.4;
+  .track {
+    margin-top: 8px;
+    height: 6px;
+    border-radius: 3px;
+    background: #efe8dd;
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--shop-primary, #ee8a12);
+    transition: width 0.3s ease;
+  }
+`;
+
 const ENV_THRESHOLD_CENTS = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
   ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
   : null;
@@ -587,8 +609,9 @@ export default function CartSidebar() {
     return () => { cancelled = true; };
   }, [sidebarOpen]);
 
+  const hasItems = items.length > 0;
   useEffect(() => {
-    if (!sidebarOpen || items.length > 0) return;
+    if (!sidebarOpen) return;
     let cancelled = false;
     setRecommendedLoading(true);
     fetch("/api/store-products?limit=8")
@@ -631,7 +654,9 @@ export default function CartSidebar() {
     return () => {
       cancelled = true;
     };
-  }, [sidebarOpen, items.length]);
+  }, [sidebarOpen, hasItems]);
+  const cartProductIds = new Set(items.map((it) => it.product_id).filter(Boolean));
+  const matches = recommended.filter((p) => !cartProductIds.has(p.id)).slice(0, 4);
 
   return (
     <>
@@ -725,6 +750,16 @@ export default function CartSidebar() {
               )}
             </>
           )}
+          {items.length > 0 && freeShippingThreshold != null && freeShippingThreshold > 0 && (
+            <FreeShipBar role="status">
+              {isFree
+                ? <b style={{ color: "#1E6B3C" }}>{tCart("freeShippingReached")}</b>
+                : tCart("freeShippingRemaining", { amount: `${formatPriceCents(Math.max(0, freeShippingThreshold - effectiveTotal))} €` })}
+              <div className="track" aria-hidden="true">
+                <div className="fill" style={{ width: `${Math.min(100, Math.max(0, Math.round((effectiveTotal / freeShippingThreshold) * 100)))}%` }} />
+              </div>
+            </FreeShipBar>
+          )}
           {items.map((item) => (
             <Item key={item.id}>
               <ItemImage>
@@ -787,6 +822,42 @@ export default function CartSidebar() {
               </RemoveBtn>
             </Item>
           ))}
+          {items.length > 0 && matches.length > 0 && (
+            <RecommendedWrap>
+              <RecommendedTitle>{tCart("matchesTitle")}</RecommendedTitle>
+              <RecommendedStrip role="region" aria-label={tCart("matchesTitle")}>
+                {matches.map((p) => (
+                  <RecommendedCard key={p.id}>
+                    <RecommendedItemLink href={`/${p.handle}`} onClick={closeCartSidebar}>
+                      <RecommendedThumb>
+                        {p.thumbnail ? (
+                          <img src={resolveImageUrl(p.thumbnail)} alt={p.title} />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                        )}
+                      </RecommendedThumb>
+                      <RecommendedName>{p.title}</RecommendedName>
+                      <RecommendedPrice>{formatPriceCents(p.price)}</RecommendedPrice>
+                    </RecommendedItemLink>
+                    <QuickAddBtn
+                      type="button"
+                      title={tCart("quickAdd")}
+                      aria-label={tCart("quickAdd")}
+                      disabled={loading}
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        let out = await addToCart(p.variantId, 1, p.sellerId || null);
+                        if (!out && p.sellerId) out = await addToCart(p.variantId, 1, null);
+                      }}
+                    >
+                      +
+                    </QuickAddBtn>
+                  </RecommendedCard>
+                ))}
+              </RecommendedStrip>
+            </RecommendedWrap>
+          )}
         </Scroll>
         {items.length > 0 && (
           <Footer>

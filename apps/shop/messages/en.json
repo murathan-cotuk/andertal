@@ -105,7 +105,10 @@
     "recommendedTitle": "Recommended products",
     "loading": "Loading...",
     "noRecommendations": "No recommendations available.",
-    "quickAdd": "Quick add"
+    "quickAdd": "Quick add",
+    "freeShippingRemaining": "{amount} more for free shipping",
+    "freeShippingReached": "Your order ships for free!",
+    "matchesTitle": "Goes well with"
   },
   "checkout": {
     "title": "Checkout",
@@ -573,7 +576,16 @@
     "featuredCollections": "Featured Collections",
     "premiumMarketplace": "Premium Marketplace",
     "heroSubline": "Discover selected products from trusted sellers.",
-    "discoverNow": "Discover now"
+    "discoverNow": "Discover now",
+    "inStockShort": "In stock",
+    "bonusPoints": "+{points} bonus points with this purchase",
+    "soldBy": "Sold by",
+    "outOfFive": "out of 5 · {count} reviews",
+    "shippingReturnsTitle": "Shipping & returns",
+    "delivery": "Delivery",
+    "deliveryBy": "Shipped by {seller} · {shipping}",
+    "buyerProtection": "Buyer protection",
+    "buyerProtectionText": "Money back if your order doesn't arrive or doesn't match the description."
   },
   "slimbar": {
     "sale": "Sale",

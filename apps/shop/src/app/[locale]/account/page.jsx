@@ -9,6 +9,7 @@ import { useLocale, useTranslations } from "next-intl";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
+import AccountOverviewTiles from "@/components/account/AccountOverviewTiles";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 
@@ -568,6 +569,13 @@ export default function AccountPage() {
 
           <AccountPageLayout onLogout={handleLogout}>
             <div>
+              <AccountOverviewTiles
+                customer={customer}
+                email={user?.email || customer?.email || ""}
+                latestOrder={orders[0] || null}
+                latestOrderStatus={orders[0] ? orderStatusLabel(getOrderStatus(orders[0])) : ""}
+                latestOrderDate={orders[0] ? fmtDate(orders[0].created_at, locale) : ""}
+              />
 
               {/* Personal data */}
               <Section

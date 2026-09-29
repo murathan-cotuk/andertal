@@ -105,7 +105,10 @@
     "recommendedTitle": "Önerilen ürünler",
     "loading": "Yükleniyor...",
     "noRecommendations": "Öneri bulunmuyor.",
-    "quickAdd": "Hızlı ekle"
+    "quickAdd": "Hızlı ekle",
+    "freeShippingRemaining": "Ücretsiz kargoya {amount} kaldı",
+    "freeShippingReached": "Kargo ücretsiz!",
+    "matchesTitle": "Bununla iyi gider"
   },
   "checkout": {
     "title": "Ödeme",
@@ -573,7 +576,16 @@
     "featuredCollections": "Öne Çıkan Koleksiyonlar",
     "premiumMarketplace": "Premium Pazar Yeri",
     "heroSubline": "Güvenilir satıcılardan seçilmiş ürünleri keşfedin.",
-    "discoverNow": "Şimdi keşfet"
+    "discoverNow": "Şimdi keşfet",
+    "inStockShort": "Stokta",
+    "bonusPoints": "Bu alışverişle +{points} bonus puan",
+    "soldBy": "Satıcı",
+    "outOfFive": "5 üzerinden · {count} değerlendirme",
+    "shippingReturnsTitle": "Kargo ve iade",
+    "delivery": "Teslimat",
+    "deliveryBy": "{seller} tarafından gönderilir · {shipping}",
+    "buyerProtection": "Alıcı koruması",
+    "buyerProtectionText": "Siparişin ulaşmazsa veya açıklamaya uymazsa paran iade edilir."
   },
   "slimbar": {
     "sale": "İndirimler",

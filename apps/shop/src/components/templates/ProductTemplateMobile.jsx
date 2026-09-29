@@ -28,6 +28,7 @@ import { getBruttoCentsFromPricesMap, getUvpCentsFromPricesMap, resolveProductSa
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
+import { PdpInfoCard, PdpReviewSummary, PdpShippingReturns, bonusPointsForCents } from "@/components/product/PdpExtras";
 import { ProductCard } from "@/components/ProductCard";
 import dynamic from "next/dynamic";
 // Lightbox only mounts when the user clicks an image — lazy-load to keep initial bundle lean.
@@ -1948,6 +1949,10 @@ export default function ProductTemplateMobile() {
           />
         </MobileSection>
 
+        <MobileSection>
+          <PdpInfoCard inStock={inStock} points={bonusPointsForCents(effectiveDisplayCents)} sellerName={effectiveStoreName} />
+        </MobileSection>
+
         {/* 7. Qty + CTA */}
         <MobileSection>
           <ProductPurchaseActions
@@ -2386,7 +2391,7 @@ export default function ProductTemplateMobile() {
         <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>
           {tp("reviewsDisclaimer")}
         </p>
-        <StarRating average={reviewAvg} count={reviewCount} />
+        <PdpReviewSummary average={reviewAvg} count={reviewCount} reviews={productReviews} />
         {productReviews.length > 0 ? (
           <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
             {productReviews.map((rv) => (
@@ -2427,6 +2432,8 @@ export default function ProductTemplateMobile() {
           style={{ marginTop: 28 }}
         />
       </ReviewsSection>
+
+      <PdpShippingReturns shipping={shippingDisplay} returnDays={returnDays} returnCost={returnCost} sellerName={effectiveStoreName} />
 
       {/* Full width below */}
       {alsoBought.length > 0 && (

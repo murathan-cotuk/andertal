@@ -101,7 +101,10 @@
     "recommendedTitle": "Prodotti consigliati",
     "loading": "Caricamento...",
     "noRecommendations": "Nessun consiglio disponibile.",
-    "quickAdd": "Aggiunta rapida"
+    "quickAdd": "Aggiunta rapida",
+    "freeShippingRemaining": "Ancora {amount} per la spedizione gratuita",
+    "freeShippingReached": "La spedizione è gratuita!",
+    "matchesTitle": "Si abbina con"
   },
   "checkout": {
     "title": "Pagamento",
@@ -556,7 +559,16 @@
     "featuredCollections": "Collezioni in evidenza",
     "premiumMarketplace": "Marketplace premium",
     "heroSubline": "Scopri prodotti selezionati da venditori affidabili.",
-    "discoverNow": "Scopri ora"
+    "discoverNow": "Scopri ora",
+    "inStockShort": "Disponibile",
+    "bonusPoints": "+{points} punti bonus con questo acquisto",
+    "soldBy": "Venduto da",
+    "outOfFive": "su 5 · {count} recensioni",
+    "shippingReturnsTitle": "Spedizione e resi",
+    "delivery": "Consegna",
+    "deliveryBy": "Spedito da {seller} · {shipping}",
+    "buyerProtection": "Protezione acquirente",
+    "buyerProtectionText": "Rimborso se l'ordine non arriva o non corrisponde alla descrizione."
   },
   "slimbar": {
     "sale": "Saldi",
