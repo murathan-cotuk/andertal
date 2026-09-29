@@ -502,6 +502,8 @@
     "emailPlaceholder": "votre@email.fr"
   },
   "product": {
+    "inclVat": "TVA incluse",
+    "back": "Retour",
     "buyNow": "Acheter maintenant",
     "addToCart": "Ajouter au panier",
     "addedToCart": "Ajouté au panier",

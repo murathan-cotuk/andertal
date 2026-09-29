@@ -1247,7 +1247,8 @@ function CollectionPage() {
 
   if (isProduct) return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
-      <ShopHeader />
+      {/* Phones: the product image starts at the top edge (back button inside); no shop header. */}
+      {!isMobile ? <ShopHeader /> : null}
       <main className="flex-grow">
         {isMobile ? <ProductTemplateMobile /> : <ProductTemplate />}
       </main>

@@ -479,15 +479,8 @@ export default function MobileNav({ layout = "fixed" }) {
       ["/orders", "/addresses", "/payment-methods", "/nachrichten", "/reviews", "/bonus", "/invoices"].some(
         (h) => appPath === h || appPath.startsWith(`${h}/`),
       ));
-  /** Kaydırma ile kademeli gizleme — tema: bottom_nav_recess_on_scroll; ürün sayfasında her zaman */
-  const bottomNavRecessProgress =
-    layout === "fixed" &&
-    (!!mc.bottom_nav_recess_on_scroll || productPageActive) &&
-    isMobileNavViewport &&
-    !drawerOpen &&
-    mobileBottomNavScroll.scrollY > MOBILE_CHROME_SCROLL_THRESHOLD_PX
-      ? Math.min(1, Math.max(0, mobileBottomNavScroll.chromeHideProgress ?? 0))
-      : 0;
+  /** Bottom bar always stays on screen (never slides away on scroll). */
+  const bottomNavRecessProgress = 0;
 
   const hideOnAuthPages =
     appPath === "/login" ||

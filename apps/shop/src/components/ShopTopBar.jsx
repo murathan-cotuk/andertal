@@ -9,6 +9,10 @@ import { useTranslations } from "next-intl";
 const Outer = styled.div`
   width: 100%;
   flex-shrink: 0;
+  /* Phones: header space goes to the content (design MobileHome has no top bar). */
+  @media (max-width: 767px) {
+    display: none !important;
+  }
 `;
 
 const InlineInner = styled.div`

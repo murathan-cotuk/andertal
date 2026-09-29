@@ -224,52 +224,60 @@ const Badge = styled.span`
 /* Two fixed rows for variation groups — always reserved, even when empty. */
 const VariantBlock = styled.div`
   flex-shrink: 0;
-  height: 50px;
+  height: 62px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   padding: 0 2px;
   min-width: 0;
   @media (max-width: 767px) {
-    height: 46px;
-    gap: 4px;
+    height: 58px;
+    gap: 2px;
   }
 `;
 
+/* 28px rows: swatches/chips get a finger-sized hit area without growing visually. */
 const VariantRow = styled.div`
-  height: 22px;
+  height: 28px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
+  padding-left: 3px;
 `;
 
 const Swatch = styled.button`
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  position: relative;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   overflow: hidden;
   cursor: pointer;
-  background: transparent;
+  touch-action: manipulation;
+  background: #fff;
   box-shadow: ${(p) =>
     p.$on ? "0 0 0 2px #fff, 0 0 0 3.5px var(--body-color, #1d1b18)" : "inset 0 0 0 1px rgba(0, 0, 0, 0.14)"};
   opacity: ${(p) => (p.$outOfStock && !p.$on ? 0.45 : 1)};
   margin: 0 1px;
+  img {
+    object-fit: cover;
+  }
   @media (max-width: 767px) {
-    width: 16px;
-    height: 16px;
+    width: 22px;
+    height: 22px;
   }
 `;
 
 const Chip = styled.button`
   flex-shrink: 0;
   max-width: 100px;
-  height: 22px;
+  touch-action: manipulation;
+  height: 24px;
   padding: 0 8px;
   border: 0;
   border-radius: 999px;
@@ -280,16 +288,16 @@ const Chip = styled.button`
   font: inherit;
   font-size: 11px;
   font-weight: 600;
-  line-height: 22px;
+  line-height: 24px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
   @media (max-width: 767px) {
-    height: 20px;
-    line-height: 20px;
-    padding: 0 6px;
-    font-size: 10px;
+    height: 24px;
+    line-height: 24px;
+    padding: 0 7px;
+    font-size: 10.5px;
   }
 `;
 
@@ -742,7 +750,21 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
           });
           const onPick = (e) => {
             e.preventDefault();
-            setSelectedOpts((prev) => ({ ...prev, [gIdx]: val }));
+            e.stopPropagation();
+            setSelectedOpts((prev) => {
+              const next = { ...prev, [gIdx]: val };
+              const matches = (v, want) => {
+                const ov = Array.isArray(v.option_values) ? v.option_values : [];
+                return Object.entries(want).every(([i, o]) => !o || String(ov[i] || "").toLowerCase() === String(o).toLowerCase());
+              };
+              if (normalizedVariants.some((v) => matches(v, next))) return next;
+              // No variant has this exact combination: jump to one that has the picked option,
+              // so its image and price show instead of silently falling back to the first variant.
+              const alt = normalizedVariants.find((v) => matches(v, { [gIdx]: val }));
+              if (!alt) return next;
+              const ov = Array.isArray(alt.option_values) ? alt.option_values : [];
+              return Object.fromEntries(ov.map((o, i) => [i, o]));
+            });
           };
           return isSwatchGroup ? (
             <Swatch
@@ -759,8 +781,8 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                 <Image
                   src={swatchUrl}
                   alt=""
-                  width={18}
-                  height={18}
+                  width={44}
+                  height={44}
                   style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }}
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
@@ -801,10 +823,10 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
       const swatchUrl = v.swatch_image_url ? resolveSwatchImg(v.swatch_image_url) : null;
       const qty = v.inventory_quantity ?? v.inventory ?? 0;
       const label = v.title || v.value || `${i + 1}`;
-      const onPick = (e) => { e.preventDefault(); setSelIdx(i); };
+      const onPick = (e) => { e.preventDefault(); e.stopPropagation(); setSelIdx(i); };
       return swatchUrl ? (
         <Swatch key={i} type="button" $on={i === selIdx} $outOfStock={Number(qty) <= 0} title={label} aria-label={label} aria-pressed={i === selIdx} onClick={onPick}>
-          <Image src={swatchUrl} alt="" width={18} height={18} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
+          <Image src={swatchUrl} alt="" width={44} height={44} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
         </Swatch>
       ) : (
         <Chip key={i} type="button" $on={i === selIdx} $outOfStock={Number(qty) <= 0} title={label} aria-pressed={i === selIdx} onClick={onPick}>

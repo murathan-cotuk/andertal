@@ -519,6 +519,8 @@
     "emailPlaceholder": "eposta@adresiniz.com"
   },
   "product": {
+    "inclVat": "KDV dahil",
+    "back": "Geri",
     "buyNow": "Hemen satin al",
     "addToCart": "Sepete Ekle",
     "addedToCart": "Sepete eklendi",

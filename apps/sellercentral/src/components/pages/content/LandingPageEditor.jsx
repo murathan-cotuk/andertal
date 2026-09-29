@@ -1586,6 +1586,16 @@ function ImageCarouselEditor({ container, onChange, deviceTab = 0, editLang = "d
                 value={container.display_mode === "grid" ? "grid" : "carousel"}
                 onChange={(v) => onChange({ ...container, display_mode: v })}
               />
+              <Select
+                label={c.headerGradientModeLabel}
+                helpText={c.headerGradientModeHelp}
+                options={[
+                  { label: c.headerGradientModeHeader, value: "header" },
+                  { label: c.headerGradientModeExtended, value: "extended" },
+                ]}
+                value={container.header_gradient_mode === "extended" ? "extended" : "header"}
+                onChange={(v) => onChange({ ...container, header_gradient_mode: v })}
+              />
               {container.display_mode === "grid" && (
                 <>
                   <TextField

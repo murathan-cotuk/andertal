@@ -51,7 +51,11 @@ const Container = styled.div`
   max-width: 100%;
   padding: 32px 24px 64px;
   @media (max-width: 767px) {
-    padding: 16px 12px 80px;
+    /* room for the sticky price bar + bottom navigation */
+    padding: 0 12px calc(150px + env(safe-area-inset-bottom, 0px));
+    > nav[aria-label="Breadcrumb"] {
+      display: none;
+    }
   }
   @media (min-width: 1200px) {
     padding-left: 150px;
@@ -132,8 +136,8 @@ const MainImageWrap = styled.div`
 
 const GalleryActionRow = styled.div`
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: 12px;
+  top: 12px;
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -742,14 +746,100 @@ const MobileStack = styled.div`
 `;
 
 const MobileSection = styled.div`
-  border-top: 1px solid #f3f4f6;
-  padding: 14px 0;
+  padding: 10px 0;
 `;
 
+/* Full-bleed image area at the very top (no shop header on the mobile product page). */
 const MobileGalleryOuter = styled.div`
-  margin: 10px -12px 0;
+  margin: 0 -12px;
   background: #fff;
   position: relative;
+  padding-bottom: 24px;
+`;
+
+/* Rounded sheet overlapping the image (design "MobileProduct"). */
+const MobileSheet = styled.div`
+  margin: -22px -12px 0;
+  padding: 20px 16px 0;
+  background: var(--shop-bg, #f6f2ec);
+  border-radius: 24px 24px 0 0;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  h1 {
+    font-family: var(--h1-ff, inherit);
+    font-size: 24px !important;
+    line-height: 1.12 !important;
+    font-weight: 800;
+    margin: 2px 0 4px !important;
+  }
+`;
+
+const MobileBackBtn = styled.button`
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(29, 27, 24, 0.14);
+  color: #1d1b18;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+/* Price + add to cart, pinned just above the bottom navigation. */
+const MobileCtaBar = styled.div`
+  display: none;
+  @media (max-width: 767px) {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
+    z-index: 2147483630;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    background: #fff;
+    border-top: 1px solid #e6dfd4;
+    box-shadow: 0 -4px 16px rgba(29, 27, 24, 0.06);
+  }
+  .cta-price {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+  }
+  .cta-price b {
+    font-family: var(--h2-ff, inherit);
+    font-size: 22px;
+    font-weight: 800;
+  }
+  .cta-price small {
+    margin-top: 3px;
+    font-size: 11px;
+    color: #5e574e;
+  }
+  button {
+    flex: 1;
+    height: 50px;
+    border: 0;
+    border-radius: 25px;
+    background: var(--btn-atc-bg, var(--shop-primary, #ee8a12));
+    color: var(--btn-atc-text, #1d1b18);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  button:disabled {
+    background: #cfc6b8;
+  }
 `;
 
 const MobileGalleryTrack = styled.div`
@@ -768,6 +858,7 @@ const MobileGallerySlide = styled.div`
   flex: 0 0 100%;
   scroll-snap-align: start;
   aspect-ratio: 1 / 1;
+  max-height: 62vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1746,31 +1837,19 @@ export default function ProductTemplateMobile() {
 
       {/* ── Mobile-only flat layout ── */}
       <MobileStack>
-        {/* 1. Brand + Reviews */}
-        <MobileBrandReviewRow style={{ paddingBottom: 8 }}>
-          {(meta.brand_name || meta.brand) ? (
-            <BrandRow
-              brandName={meta.brand_name || meta.brand || ""}
-              brandHandle={meta.brand_handle || null}
-              brandLogo={meta.brand_logo ? resolveImageUrl(meta.brand_logo) : null}
-              reviewCount={0}
-            />
-          ) : <span />}
-          <a
-            href="#reviews"
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "inherit", whiteSpace: "nowrap" }}
-          >
-            <StarRating average={reviewAvg} count={reviewCount} />
-            <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{reviewCount > 0 ? reviewCount : 0}</span>
-          </a>
-        </MobileBrandReviewRow>
-
-        {/* 2. Title */}
-        <Title style={{ fontSize: "1.05rem", lineHeight: 1.35, margin: "2px 0 6px" }}>{titleDisplay}</Title>
-
         {/* 3. Full-bleed swipeable gallery */}
         <MobileGalleryOuter>
           <div style={{ position: "relative", width: "100%" }}>
+            <MobileBackBtn
+              type="button"
+              aria-label={tp("back")}
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) router.back();
+                else router.push("/");
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+            </MobileBackBtn>
             <MobileGalleryTrack ref={galleryTrackRef} onScroll={handleMobileGalleryScroll}>
               {(displayImages.length > 0 ? displayImages : [{ url: mainImage, alt: displayTitle }]).map((img, i) => (
                 <MobileGallerySlide key={i} onClick={() => { setSelectedImage(i); setLightboxOpen(true); }}>
@@ -1825,6 +1904,29 @@ export default function ProductTemplateMobile() {
             </div>
           )}
         </MobileGalleryOuter>
+
+        <MobileSheet>
+        {/* 1. Brand + Reviews */}
+        <MobileBrandReviewRow style={{ paddingBottom: 8 }}>
+          {(meta.brand_name || meta.brand) ? (
+            <BrandRow
+              brandName={meta.brand_name || meta.brand || ""}
+              brandHandle={meta.brand_handle || null}
+              brandLogo={meta.brand_logo ? resolveImageUrl(meta.brand_logo) : null}
+              reviewCount={0}
+            />
+          ) : <span />}
+          <a
+            href="#reviews"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", color: "inherit", whiteSpace: "nowrap" }}
+          >
+            <StarRating average={reviewAvg} count={reviewCount} />
+            <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{reviewCount > 0 ? reviewCount : 0}</span>
+          </a>
+        </MobileBrandReviewRow>
+
+        {/* 2. Title */}
+        <Title>{titleDisplay}</Title>
 
         {/* 5. Variants — single scrollable row */}
         {mobileVariantSelector && (
@@ -1909,7 +2011,18 @@ export default function ProductTemplateMobile() {
             </MetaTable>
           </MobileSection>
         )}
+        </MobileSheet>
       </MobileStack>
+
+      <MobileCtaBar>
+        <span className="cta-price">
+          <b style={{ color: hasSale ? "#b42318" : undefined }}>{formatPriceCents(effectiveDisplayCents)} €</b>
+          <small>{tp("inclVat")}</small>
+        </span>
+        <button type="button" onClick={handleAddToCart} disabled={!inStock || isComingSoon || shippingUnavailable}>
+          {isComingSoon ? tp("comingSoon") : shippingUnavailable ? tp("notAvailable") : !inStock ? tp("outOfStock") : tp("addToCart")}
+        </button>
+      </MobileCtaBar>
 
       {/* ── Desktop ThreeCol (hidden on mobile) ── */}
       <ThreeCol>

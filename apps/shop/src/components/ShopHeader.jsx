@@ -829,9 +829,9 @@ const CategoryMegaRootItem = styled(Link)`
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 36px;
-  padding: 0 12px;
-  border-radius: 10px;
+  min-height: 44px;
+  padding: 0 10px 0 6px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: ${(p) => (p.$active ? 700 : 500)};
   color: ${(p) => (p.$active ? "#fff" : "var(--body-color, #1d1b18)")} !important;
@@ -842,7 +842,15 @@ const CategoryMegaRootItem = styled(Link)`
   &:hover {
     background: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#efe8dd")};
   }
-  span {
+  .mega-root-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: #fff;
+  }
+  .mega-root-label {
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -1082,7 +1090,9 @@ const UserBtn = styled.button`
 const SubNavClipper = styled.div`
   width: 100%;
   overflow: hidden;
-  border-bottom: 1px solid rgba(29, 27, 24, 0.1);
+  @media (min-width: 1024px) {
+    border-bottom: 1px solid rgba(29, 27, 24, 0.1);
+  }
   max-height: ${(p) => {
     if (p.$chromeCover) return `var(--second-nav-h, 50px)`;
     const t = Math.min(1, Math.max(0, p.$hideProgress ?? 0));
@@ -2141,8 +2151,13 @@ export default function ShopHeader() {
                     type="button"
                     aria-label={tSearch("label")}
                     onClick={(e) => {
-                      const input = e.currentTarget.parentElement?.querySelector("input");
-                      if (!input) return;
+                      const box = e.currentTarget.parentElement;
+                      const input = box?.querySelector("input");
+                      if (!input) {
+                        // Phones: the field is a button that opens the full-screen search.
+                        box?.querySelector('[role="button"]')?.click();
+                        return;
+                      }
                       if (String(input.value || "").trim() && input.form) input.form.requestSubmit();
                       else input.focus();
                     }}
@@ -2476,7 +2491,7 @@ export default function ShopHeader() {
                       return (
                         <CategoryMegaDesktopShell>
                           <CategoryMegaRootList aria-label={tCommon("categories")}>
-                            {rootRows.map((row) => {
+                            {rootRows.map((row, ri) => {
                               const isActive = activeRoot && String(activeRoot.id) === String(row.id);
                               return (
                                 <CategoryMegaRootItem
@@ -2488,7 +2503,12 @@ export default function ShopHeader() {
                                   onFocus={() => setMegaRoot({ id: row.id, label: row.label, slug: row.slug })}
                                   onClick={closeMenu}
                                 >
-                                  <span>{row.label}</span>
+                                  {row.imageUrl ? (
+                                    <img src={row.imageUrl} alt="" className="mega-root-thumb" />
+                                  ) : (
+                                    <span className="mega-root-thumb" style={{ background: MEGA_TILE_TONES[ri % MEGA_TILE_TONES.length] }} aria-hidden="true" />
+                                  )}
+                                  <span className="mega-root-label">{row.label}</span>
                                   {row.hasChildren ? (
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" style={{ flexShrink: 0 }}>
                                       <path d="M9 6l6 6-6 6" />

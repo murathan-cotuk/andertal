@@ -1457,7 +1457,7 @@ function BestsellerCarousel({ container, locale = "de", preloadedProducts }) {
 
   if (isNarrow && isGrid) {
     return (
-      <div style={{ ...getContainerPadding(container, "32px 16px"), background: container.bg_color || "transparent" }}>
+      <div style={{ ...getContainerPadding(container, "20px 16px 8px"), background: container.bg_color || "transparent" }}>
         <div style={getContentInnerStyle(container, 1312)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
@@ -1479,7 +1479,7 @@ function BestsellerCarousel({ container, locale = "de", preloadedProducts }) {
     // Horizontal padding matches tokens.containerPadding (24px) — Carousel's navOnSides bleed/
     // arrow-inset math is hardcoded to that value, so a narrower side padding here (the old 16px)
     // made the desktop nav arrows sit misaligned with this row's own edge.
-    <div style={{ ...getContainerPadding(container, "48px 24px"), background: container.bg_color || "transparent" }}>
+    <div style={{ ...getContainerPadding(container, isNarrow ? "24px 16px 8px" : "48px 24px"), background: container.bg_color || "transparent" }}>
       <div style={getContentInnerStyle(container, 1312)}>
         <Carousel
           contained={false}
@@ -2967,11 +2967,16 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     if (img?.color) {
       const dir = img.gradient_direction || "to bottom";
       const stop = img.gradient_stop || "80%";
-      setLandingHeaderBg(`linear-gradient(${dir}, ${img.color} 0%, transparent ${stop})`, img.color);
+      if (container.header_gradient_mode === "extended" && isNarrow) {
+        // Solid colour in the header; the carousel section continues it down behind the images.
+        setLandingHeaderBg(`linear-gradient(${img.color}, ${img.color})`, img.color);
+      } else {
+        setLandingHeaderBg(`linear-gradient(${dir}, ${img.color} 0%, transparent ${stop})`, img.color);
+      }
     } else {
       setLandingHeaderBg(null);
     }
-  }, [activeIdx, isFirstContainer, images, setLandingHeaderBg]);
+  }, [activeIdx, isFirstContainer, images, setLandingHeaderBg, container.header_gradient_mode, isNarrow]);
 
   // Clear gradient on unmount
   useEffect(() => {
@@ -3112,11 +3117,20 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // First image left-anchored, middle images center-snapped, last image right-anchored.
   // Edge padding (from container padding settings) applies only to first and last items.
   if (isNarrow) {
-    const padLeft = rawPad.paddingLeft || "0px";
-    const padRight = rawPad.paddingRight || "0px";
+    const padLeft = rawPad.paddingLeft && rawPad.paddingLeft !== "0px" ? rawPad.paddingLeft : "16px";
+    const padRight = rawPad.paddingRight && rawPad.paddingRight !== "0px" ? rawPad.paddingRight : "16px";
     const title = lt(container, "title", locale);
+    const extendedColor = isFirstContainer && container.header_gradient_mode === "extended" ? images[activeIdx]?.color : "";
     return (
-      <div style={{ background: bg }}>
+      <div
+        style={{
+          background: extendedColor
+            ? `linear-gradient(to bottom, ${extendedColor} 0%, ${extendedColor} 22%, var(--shop-bg, #f6f2ec) 88%)`
+            : bg,
+          paddingTop: extendedColor ? 12 : undefined,
+          transition: "background-color 0.3s ease",
+        }}
+      >
         {title && (
           <div style={{ padding: `0 ${padLeft}`, marginBottom: 12 }}>
             <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: 0 }}>{title}</h2>
@@ -3128,6 +3142,10 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
             display: "flex",
             gap: `${gap}px`,
             overflowX: "auto",
+            paddingLeft: padLeft,
+            paddingRight: padRight,
+            scrollPaddingLeft: padLeft,
+            scrollPaddingRight: padRight,
             scrollSnapType: "x mandatory",
             WebkitOverflowScrolling: "touch",
             scrollbarWidth: "none",
@@ -3145,8 +3163,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
                   width: mobileItemW,
                   minWidth: mobileItemW,
                   scrollSnapAlign: isFirst ? "start" : isLast ? "end" : "center",
-                  ...(isFirst ? { marginLeft: padLeft } : {}),
-                  ...(isLast ? { marginRight: padRight, scrollMarginRight: padRight } : {}),
+
                 }}
               >
                 {renderImageCell(img, isFirstContainer && isFirst, `(max-width: 768px) ${mobileItemW}, 400px`)}

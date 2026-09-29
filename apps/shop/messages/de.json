@@ -519,6 +519,8 @@
     "emailPlaceholder": "deine@email.de"
   },
   "product": {
+    "inclVat": "inkl. MwSt.",
+    "back": "Zurück",
     "buyNow": "Jetzt kaufen",
     "addToCart": "In den Warenkorb",
     "addedToCart": "Zum Warenkorb hinzugefügt",

@@ -519,6 +519,8 @@
     "emailPlaceholder": "your@email.com"
   },
   "product": {
+    "inclVat": "incl. VAT",
+    "back": "Back",
     "buyNow": "Buy now",
     "addToCart": "Add to cart",
     "addedToCart": "Added to cart",

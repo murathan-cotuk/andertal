@@ -11,6 +11,47 @@ import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes
 import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
 import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
+import { resolveImageUrl } from "@/lib/image-url";
+import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
+
+/** Cart lines saved without a thumbnail (product had only a gallery) get their image from the product. */
+function useCartLineImages(items) {
+  const [byProduct, setByProduct] = useState({});
+  const missing = items
+    .filter((it) => !String(it?.thumbnail || "").trim() && it?.product_id)
+    .map((it) => String(it.product_id));
+  const key = [...new Set(missing)].sort().join(",");
+  useEffect(() => {
+    if (!key) return undefined;
+    let cancelled = false;
+    Promise.all(
+      key.split(",").map((id) =>
+        cachedJsonFetch(`/api/store-products/${encodeURIComponent(id)}`, { ttlMs: 300000 })
+          .then((d) => [id, d?.product || null])
+          .catch(() => [id, null]),
+      ),
+    ).then((pairs) => {
+      if (cancelled) return;
+      setByProduct((prev) => {
+        const next = { ...prev };
+        for (const [id, p] of pairs) if (p) next[id] = p;
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  return (item) => {
+    const own = String(item?.thumbnail || "").trim();
+    if (own) return resolveImageUrl(own);
+    const p = byProduct[String(item?.product_id || "")];
+    if (!p) return "";
+    const v = (p.variants || []).find((x) => String(x.id) === String(item.variant_id));
+    const raw = v?.metadata?.image_url || v?.metadata?.images?.[0] || v?.images?.[0]?.url || v?.thumbnail || p.thumbnail || p.images?.[0]?.url || "";
+    return raw ? resolveImageUrl(typeof raw === "string" ? raw : raw?.url || "") : "";
+  };
+}
 
 /* Above MobileNav bar (2147483640) — nav bar hides behind cart when open */
 const CART_Z_OVERLAY = 2147483641;
@@ -503,6 +544,7 @@ export default function CartSidebar() {
   const tPanel = useTranslations("accountPanel");
   const { cart, sidebarOpen, closeCartSidebar, updateLineItem, removeLineItem, addToCart, loading, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
+  const lineImage = useCartLineImages(items);
   const allThresholds = useShippingThresholds();
   const prefix = useMarketPrefix();
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
@@ -686,8 +728,8 @@ export default function CartSidebar() {
           {items.map((item) => (
             <Item key={item.id}>
               <ItemImage>
-                {item.thumbnail ? (
-                  <img src={item.thumbnail} alt={getLocalizedCartLineTitle(item, locale)} />
+                {lineImage(item) ? (
+                  <img src={lineImage(item)} alt={getLocalizedCartLineTitle(item, locale)} />
                 ) : (
                   <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
                 )}

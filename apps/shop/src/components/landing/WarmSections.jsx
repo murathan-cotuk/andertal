@@ -47,7 +47,7 @@ export const WarmSection = styled.section`
   padding: ${(p) => p.$pad || "56px 24px 0"};
   box-sizing: border-box;
   @media (max-width: 767px) {
-    padding: ${(p) => p.$padMobile || "32px 16px 0"};
+    padding: ${(p) => p.$padMobile || "24px 16px 0"};
   }
 `;
 

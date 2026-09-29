@@ -281,6 +281,9 @@ export const WARM_MARKETPLACE_STYLES = {
     border: "none",
   },
   mobileChrome: {
+    /* Bottom bar pinned to the screen edge at all times (never inline, never hidden on scroll). */
+    bottom_nav_sticky: true,
+    bottom_nav_recess_on_scroll: false,
     header_on_scroll: "frosted_white",
     bottom_nav_bg: "rgba(255,255,255,0.97)",
     bottom_nav_border_top: `1px solid ${P.line}`,

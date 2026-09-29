@@ -502,6 +502,8 @@
     "emailPlaceholder": "tu@email.es"
   },
   "product": {
+    "inclVat": "IVA incluido",
+    "back": "Atrás",
     "buyNow": "Comprar ahora",
     "addToCart": "Añadir al carrito",
     "addedToCart": "Añadido al carrito",
