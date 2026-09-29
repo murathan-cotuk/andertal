@@ -14,7 +14,7 @@ const Btn = styled.button`
   gap: 10px;
   border: none;
   border-radius: 12px;
-  background: var(--shop-primary, #ff971c);
+  background: var(--shop-primary, #ee8a12);
   color: #fff;
   font-size: 0.95rem;
   font-weight: 700;

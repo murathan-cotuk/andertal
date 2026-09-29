@@ -13,7 +13,7 @@ import AccountOverviewTiles from "@/components/account/AccountOverviewTiles";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 
-const ORANGE = "var(--shop-accent, #ff971c)";
+const ORANGE = "var(--shop-accent, #ee8a12)";
 const DARK = "var(--body-color, #1d1b18)";
 const GRAY = "#5e574e";
 const BORDER = "#efe8dd";
@@ -302,7 +302,7 @@ function SaveButton({ onClick, loading, saveLabel, savingLabel }) {
       style={{
         minHeight: 48,
         padding: "0 26px",
-        background: "var(--btn-atc-bg, var(--shop-primary, #ff971c))",
+        background: "var(--btn-atc-bg, var(--shop-primary, #ee8a12))",
         color: "var(--btn-atc-text, #fff)",
         border: "none",
         borderRadius: 999,
@@ -829,7 +829,7 @@ export default function AccountPage() {
                     border: "none",
                     borderRadius: 8,
                     cursor: deleteBusy ? "not-allowed" : "pointer",
-                    boxShadow: "0 2px 0 2px #000",
+                    boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
                   }}
                 >
                   {deleteBusy ? ta("deleting") : ta("deleteButton")}

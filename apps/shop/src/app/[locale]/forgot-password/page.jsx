@@ -44,7 +44,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--shop-bg, #f6f2ec)", fontFamily: tokens.fontFamily.sans }}>
       <div style={{ padding: "16px 24px" }}>
         <Link href="/" style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", textDecoration: "none", letterSpacing: "-0.03em" }}>
           Andertal
@@ -57,9 +57,9 @@ export default function ForgotPasswordPage() {
             width: "100%",
             maxWidth: 420,
             background: "#fff",
-            border: "2px solid #1A1A1A",
-            borderRadius: 16,
-            boxShadow: "4px 4px 0 0 #1A1A1A",
+            border: "1px solid #e6dfd4",
+            borderRadius: 24,
+            boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
             padding: "36px 30px 30px",
           }}
         >
@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
               style={{
                 width: "100%",
                 padding: "11px 14px",
-                border: "2px solid #1A1A1A",
+                border: "1px solid #e6dfd4",
                 borderRadius: 8,
                 fontSize: 15,
                 color: "#1A1A1A",
@@ -109,12 +109,12 @@ export default function ForgotPasswordPage() {
                 padding: "12px 0",
                 background: loading ? "#ccc" : tokens.primary.DEFAULT,
                 color: "#fff",
-                border: `2px solid ${loading ? "#bbb" : "#1A1A1A"}`,
-                borderRadius: 8,
+                border: `1px solid transparent`,
+                borderRadius: 999,
                 fontSize: 15,
                 fontWeight: 800,
                 cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: loading ? "none" : "0 3px 0 2px #1A1A1A",
+                boxShadow: loading ? "none" : "0 0 0 1px rgba(29,27,24,0.08)",
               }}
             >
               {loading ? t("sending") : t("sendResetLink")}

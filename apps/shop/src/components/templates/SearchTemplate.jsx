@@ -127,7 +127,7 @@ const SortBarInner = styled.div`
   gap: 20px;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   @media (max-width: 600px) { padding: 0 16px; }
@@ -210,7 +210,7 @@ const ContentWrap = styled.div`
   gap: 32px;
   align-items: flex-start;
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
   @media ${NARROW} {
     padding: 6px 6px 80px;
@@ -1398,7 +1398,7 @@ export default function SearchTemplate() {
                           >
                             {getFacetGroupTitle(key, locale, metafieldDefinitions)}
                             {cnt > 0 && (
-                              <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>
+                              <span style={{ display: "block", fontSize: 9, color: "#ee8a12", fontWeight: 800, marginTop: 2 }}>
                                 {cnt} ausgewählt
                               </span>
                             )}

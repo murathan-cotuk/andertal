@@ -148,7 +148,7 @@ const PageWrap = styled.div`
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: ${tokens.background.main};
+  background: var(--shop-bg, #f6f2ec);
   width: 100%;
   max-width: 100%;
   overflow-x: clip;

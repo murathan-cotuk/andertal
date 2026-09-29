@@ -26,7 +26,7 @@ export default function LocaleError({ error, reset }) {
         color: "#1f2937",
       }}
     >
-      <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: "0.12em", color: "#ff971c", marginBottom: 8 }}>
+      <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: "0.12em", color: "#ee8a12", marginBottom: 8 }}>
         ANDERTAL
       </div>
 
@@ -43,14 +43,14 @@ export default function LocaleError({ error, reset }) {
           onClick={reset}
           style={{
             padding: "11px 28px",
-            background: "#ff971c",
+            background: "#ee8a12",
             color: "#fff",
-            border: "2px solid #000",
+            border: "1px solid #e6dfd4",
             borderRadius: 10,
             fontSize: 14,
             fontWeight: 700,
             cursor: "pointer",
-            boxShadow: "0 2px 0 2px #000",
+            boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
           }}
         >
           Erneut versuchen
@@ -61,12 +61,12 @@ export default function LocaleError({ error, reset }) {
             padding: "11px 28px",
             background: "#fff",
             color: "#1f2937",
-            border: "2px solid #000",
+            border: "1px solid #e6dfd4",
             borderRadius: 10,
             fontSize: 14,
             fontWeight: 700,
             textDecoration: "none",
-            boxShadow: "0 2px 0 2px #000",
+            boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
           }}
         >
           Zur Startseite

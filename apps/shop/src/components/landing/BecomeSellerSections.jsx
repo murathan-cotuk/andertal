@@ -59,11 +59,11 @@ function BsButton({ btn, locale }) {
   const custom =
     variant === "custom" || variant === "andertal_orange"
       ? {
-          background: btn.bg || (variant === "andertal_orange" ? "#ff971c" : undefined),
+          background: btn.bg || (variant === "andertal_orange" ? "#ee8a12" : undefined),
           color: btn.color || (variant === "andertal_orange" ? "#fff" : undefined),
-          border: btn.border || (variant === "andertal_orange" ? "2px solid #000" : undefined),
+          border: btn.border || (variant === "andertal_orange" ? "1px solid #e6dfd4" : undefined),
           borderRadius: btn.radius != null ? `${btn.radius}px` : variant === "andertal_orange" ? 8 : undefined,
-          boxShadow: variant === "andertal_orange" ? "0 3px 0 2px #000" : undefined,
+          boxShadow: variant === "andertal_orange" ? "0 0 0 1px rgba(29,27,24,0.08)" : undefined,
         }
       : {};
 

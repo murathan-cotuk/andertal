@@ -6,7 +6,7 @@ import { tokens } from "@/design-system/tokens";
 
 const Btn = styled.button`
   padding: 1.05em 1.9em;
-  border: 2px solid #000;
+  border: 1px solid #e6dfd4;
   font-size: 15px;
   color: #131313;
   cursor: pointer;
@@ -17,7 +17,7 @@ const Btn = styled.button`
   background-color: ${tokens.primary.light};
   font-weight: 800;
   font-family: ${tokens.fontFamily.sans};
-  box-shadow: 0 2px 0 2px #000;
+  box-shadow: 0 0 0 1px rgba(29,27,24,0.08);
   line-height: 1;
   user-select: none;
 

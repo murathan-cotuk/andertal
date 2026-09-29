@@ -152,7 +152,7 @@ const SeeAll = styled(Link)`
   align-items: center;
   gap: 3px;
   text-decoration: none;
-  color: var(--shop-primary, #ff971c);
+  color: var(--shop-primary, #ee8a12);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;

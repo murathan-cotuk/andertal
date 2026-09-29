@@ -31,7 +31,7 @@ export default async function NotFound() {
         ) : (
           <img src={customImageUrl} alt="404" style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }} />
         )}
-        <Link href="/" style={{ marginTop: 24, background: "#ff971c", color: "#fff", padding: "10px 28px", borderRadius: 10, fontWeight: 700, textDecoration: "none", border: "2px solid #000", boxShadow: "0 2px 0 2px #000", fontSize: 14 }}>
+        <Link href="/" style={{ marginTop: 24, background: "#ee8a12", color: "#fff", padding: "10px 28px", borderRadius: 10, fontWeight: 700, textDecoration: "none", border: "1px solid #e6dfd4", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)", fontSize: 14 }}>
           Zur Startseite
         </Link>
       </div>
@@ -99,7 +99,7 @@ export default async function NotFound() {
             <div className="text_4043">4</div>
           </div>
         </div>
-        <Link href="/" style={{ marginTop: 24, background: "#ff971c", color: "#fff", padding: "10px 28px", borderRadius: 10, fontWeight: 700, textDecoration: "none", border: "2px solid #000", boxShadow: "0 2px 0 2px #000", fontSize: 14 }}>
+        <Link href="/" style={{ marginTop: 24, background: "#ee8a12", color: "#fff", padding: "10px 28px", borderRadius: 10, fontWeight: 700, textDecoration: "none", border: "1px solid #e6dfd4", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)", fontSize: 14 }}>
           Zur Startseite
         </Link>
         <style>{`
@@ -356,7 +356,7 @@ export default async function NotFound() {
             justify-content: center;
             flex-direction: column;
             row-gap: 0.75em;
-            box-shadow: 3px 3px 0px #e69635;
+            box-shadow: none;
           }
           .b1 {
             width: 1.65em;

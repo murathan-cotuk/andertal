@@ -995,7 +995,7 @@ export default function BrandPage() {
                       onClick={() => setActiveMobileFilterGroup(MOBILE_CATEGORIES_KEY)}
                     >
                       {tCommon("categories")}
-                      {activeCategoryId && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>1</span>}
+                      {activeCategoryId && <span style={{ display: "block", fontSize: 9, color: "#ee8a12", fontWeight: 800, marginTop: 2 }}>1</span>}
                     </MobileFilterLeftBtn>
                   )}
                   {Object.entries(facets).map(([key]) => {
@@ -1003,7 +1003,7 @@ export default function BrandPage() {
                     return (
                       <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
                         {getFacetGroupTitle(key, locale, metafieldDefinitions)}
-                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
+                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ee8a12", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
                       </MobileFilterLeftBtn>
                     );
                   })}

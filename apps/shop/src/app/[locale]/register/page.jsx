@@ -19,11 +19,11 @@ function MonkeyAvatar({ isBlind }) {
     <div style={{
       width: 96, height: 96,
       borderRadius: "50%",
-      border: "2.5px solid #1A1A1A",
+      border: "1px solid #e6dfd4",
       background: "#fff8f0",
       display: "flex", alignItems: "center", justifyContent: "center",
       overflow: "hidden", flexShrink: 0, position: "relative",
-      boxShadow: "0 3px 0 2px #1A1A1A",
+      boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
     }}>
       <svg xmlns="http://www.w3.org/2000/svg" width="70" height="70" viewBox="0 0 64 64" style={{ position: "absolute" }}>
         <ellipse cx="53.7" cy="33" rx="8.3" ry="8.2" fill="#89664c" />
@@ -58,7 +58,7 @@ function MonkeyAvatar({ isBlind }) {
 /* ── Shared input style ─────────────────────────────────────────────────── */
 const inp = {
   width: "100%", padding: "11px 14px",
-  border: "2px solid #1A1A1A", borderRadius: 8,
+  border: "1px solid #e6dfd4", borderRadius: 8,
   fontSize: 15, color: "#1A1A1A", background: "#fff",
   boxSizing: "border-box", outline: "none",
   fontFamily: tokens.fontFamily.sans,
@@ -344,7 +344,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "#fafafa", fontFamily: tokens.fontFamily.sans, overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", background: "var(--shop-bg, #f6f2ec)", fontFamily: tokens.fontFamily.sans, overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch" }}>
       {/* Top bar */}
       <div style={{ padding: "16px max(16px, env(safe-area-inset-left)) 16px max(16px, env(safe-area-inset-right))", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <Link href="/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
@@ -355,17 +355,17 @@ export default function RegisterPage() {
               style={{ height: Math.min(Math.max(branding.logoHeight || 34, 20), 56), width: "auto", maxWidth: 220, objectFit: "contain", display: "block" }}
             />
           ) : (
-            <span style={{ fontSize: 20, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em" }}>Andertal</span>
+            <span style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", letterSpacing: "-0.03em", fontFamily: "var(--h1-ff, inherit)" }}>Andertal</span>
           )}
         </Link>
         <details style={{ position: "relative" }}>
-          <summary style={{ listStyle: "none", cursor: "pointer", border: "2px solid #1A1A1A", borderRadius: 10, padding: "7px 10px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#fff", lineHeight: 0, boxShadow: isDesktop ? "0 3px 0 0 #1A1A1A" : "none", minWidth: isDesktop ? 42 : "auto" }}>
+          <summary style={{ listStyle: "none", cursor: "pointer", border: "1px solid #e6dfd4", borderRadius: 10, padding: "7px 10px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#fff", lineHeight: 0, boxShadow: isDesktop ? "0 0 0 1px rgba(29,27,24,0.08)" : "none", minWidth: isDesktop ? 42 : "auto" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="9" stroke="#1A1A1A" strokeWidth="2" />
               <path d="M3 12h18M12 3c2.5 2.5 2.5 15.5 0 18M12 3c-2.5 2.5-2.5 15.5 0 18" stroke="#1A1A1A" strokeWidth="1.6" />
             </svg>
           </summary>
-          <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: "#fff", border: "2px solid #1A1A1A", borderRadius: isDesktop ? 14 : 10, minWidth: isDesktop ? 180 : 150, boxShadow: isDesktop ? "0 12px 30px rgba(0,0,0,0.18)" : "0 6px 20px rgba(0,0,0,0.14)", overflow: "hidden", zIndex: 20, padding: isDesktop ? 6 : 0 }}>
+          <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", background: "#fff", border: "1px solid #e6dfd4", borderRadius: isDesktop ? 14 : 10, minWidth: isDesktop ? 180 : 150, boxShadow: isDesktop ? "0 12px 30px rgba(0,0,0,0.18)" : "0 6px 20px rgba(0,0,0,0.14)", overflow: "hidden", zIndex: 20, padding: isDesktop ? 6 : 0 }}>
             {localeItems.map((l) => (
               <a
                 key={l.code}
@@ -384,9 +384,9 @@ export default function RegisterPage() {
         <div style={{
           width: "100%", maxWidth: 980,
           background: "#fff",
-          border: "2px solid #1A1A1A",
-          borderRadius: 16,
-          boxShadow: "4px 4px 0 0 #1A1A1A",
+          border: "1px solid #e6dfd4",
+          borderRadius: 24,
+          boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
           padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px) clamp(16px, 4vw, 36px)",
           display: "flex", flexDirection: "column", alignItems: "center", gap: 24,
           marginBottom: 40,
@@ -416,7 +416,7 @@ export default function RegisterPage() {
             {/* Account type toggle */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
               <label style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("accountType")}</label>
-              <div style={{ display: "flex", border: "2px solid #1A1A1A", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ display: "flex", border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden" }}>
                 {[{ val: "privat", label: t("private") }, { val: "gewerbe", label: t("business") }].map(({ val, label }) => (
                   <button
                     key={val}
@@ -567,7 +567,7 @@ export default function RegisterPage() {
                       left: 0,
                       right: 0,
                       background: "#fff",
-                      border: "2px solid #1A1A1A",
+                      border: "1px solid #e6dfd4",
                       borderRadius: 8,
                       maxHeight: 220,
                       overflowY: "auto",
@@ -681,7 +681,7 @@ export default function RegisterPage() {
                           left: 0,
                           right: 0,
                           background: "#fff",
-                          border: "2px solid #1A1A1A",
+                          border: "1px solid #e6dfd4",
                           borderRadius: 8,
                           maxHeight: 220,
                           overflowY: "auto",
@@ -824,19 +824,19 @@ export default function RegisterPage() {
                 width: "100%", padding: "13px 0",
                 background: loading ? "#ccc" : tokens.primary.DEFAULT,
                 color: "#fff",
-                border: `2px solid ${loading ? "#bbb" : "#1A1A1A"}`,
-                borderRadius: 8,
+                border: `1px solid transparent`,
+                borderRadius: 999,
                 fontSize: 15, fontWeight: 800,
                 cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: loading ? "none" : "0 3px 0 2px #1A1A1A",
+                boxShadow: loading ? "none" : "0 0 0 1px rgba(29,27,24,0.08)",
                 transition: "transform 0.1s, box-shadow 0.1s",
                 letterSpacing: 0.2,
                 fontFamily: tokens.fontFamily.sans,
                 maxWidth: 420,
                 alignSelf: "center",
               }}
-              onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = "translateY(1px)"; e.currentTarget.style.boxShadow = "0 2px 0 2px #1A1A1A"; } }}
-              onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = loading ? "none" : "0 3px 0 2px #1A1A1A"; }}
+              onMouseEnter={e => { if (!loading) { e.currentTarget.style.transform = "translateY(1px)"; e.currentTarget.style.boxShadow = "0 0 0 1px rgba(29,27,24,0.08)"; } }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = loading ? "none" : "0 0 0 1px rgba(29,27,24,0.08)"; }}
             >
               {loading ? t("registering") : t("createAccount")}
             </button>

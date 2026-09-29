@@ -13,7 +13,7 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 import styled from "styled-components";
 
-const ORANGE = "#ff971c";
+const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
 const BORDER = "#e5e7eb";
@@ -80,8 +80,8 @@ export default function WishlistMerkzettelPage() {
                       borderRadius: 10,
                       fontWeight: 700,
                       textDecoration: "none",
-                      border: "2px solid #000",
-                      boxShadow: "0 2px 0 2px #000",
+                      border: "1px solid #e6dfd4",
+                      boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
                     }}
                   >
                     Zum Shop

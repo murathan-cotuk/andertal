@@ -103,7 +103,7 @@ const ColHeader = styled.div`
   box-sizing: border-box;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   @media (max-width: 767px) {
@@ -176,7 +176,7 @@ const SortBarInner = styled.div`
   gap: 20px;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   @media (max-width: 600px) { padding: 0 16px; }
@@ -260,7 +260,7 @@ const ContentWrap = styled.div`
   align-items: flex-start;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   @media (max-width: 767px) {

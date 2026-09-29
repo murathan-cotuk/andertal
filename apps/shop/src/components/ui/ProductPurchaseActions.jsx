@@ -40,7 +40,7 @@ const AddBtn = styled.button`
   gap: 8px;
   border: none;
   border-radius: 26px;
-  background: var(--btn-atc-bg, var(--shop-primary, #ff971c));
+  background: var(--btn-atc-bg, var(--shop-primary, #ee8a12));
   color: var(--btn-atc-text, #1d1b18);
   font-family: inherit;
   font-size: 16px;
@@ -54,7 +54,7 @@ const AddBtn = styled.button`
     flex-shrink: 0;
   }
   &:hover:not(:disabled) {
-    background: var(--btn-atc-hover-bg, var(--shop-primary, #ff971c));
+    background: var(--btn-atc-hover-bg, var(--shop-primary, #ee8a12));
     opacity: 0.92;
   }
   &:disabled {

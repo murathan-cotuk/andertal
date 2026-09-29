@@ -24,7 +24,7 @@ const Button = styled.button`
     transform 0.2s ease;
 
   &:focus-visible {
-    outline: 2px solid var(--shop-primary, #ff971c);
+    outline: 2px solid var(--shop-primary, #ee8a12);
     outline-offset: 3px;
   }
 

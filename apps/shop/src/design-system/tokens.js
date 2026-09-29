@@ -8,10 +8,10 @@
 export const tokens = {
   // —— Primary (Brand Orange) — aksiyon rengi, CTA
   primary: {
-    DEFAULT: "#ff971c",
-    hover: "#E65F00",
-    active: "#CC5400",
-    light: "#FFF2E6",
+    DEFAULT: "#ee8a12",
+    hover: "#D97A06",
+    active: "#C06C05",
+    light: "#FCEBD5",
   },
 
   // —— Secondary (Dark Neutral) — metin, siyah yerine antrasit

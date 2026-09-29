@@ -7,6 +7,7 @@ import CategoryTemplate from "@/components/templates/CategoryTemplate";
 import ProductTemplate from "@/components/templates/ProductTemplate";
 import ProductTemplateMobile from "@/components/templates/ProductTemplateMobile";
 import { ProductGrid } from "@/components/ProductGrid";
+import { getLocalizedCategory } from "@/lib/format";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Suspense, useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -152,7 +153,7 @@ const ColHeader = styled.div`
   box-sizing: border-box;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   h1 {
@@ -217,7 +218,7 @@ const SortBarInner = styled.div`
   gap: 20px;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   @media (max-width: 600px) { padding: 0 16px; }
@@ -302,7 +303,7 @@ const ContentWrap = styled.div`
   align-items: flex-start;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   @media (max-width: 767px) {
@@ -364,7 +365,7 @@ const CmsPageWithSidebar = styled.div`
   align-items: flex-start;
 
   @media (min-width: 1024px) {
-    max-width: 1700px;
+    max-width: 1376px;
   }
 
   @media (max-width: 767px) {
@@ -848,6 +849,7 @@ function CollectionPage() {
   const [cmsPage,     setCmsPage]     = useState(null);
   const [cmsPageCategoryLinks, setCmsPageCategoryLinks] = useState([]);
   const [products,    setProducts]    = useState([]);
+  const [collCategoryId, setCollCategoryId] = useState("");
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
   const [notFoundSt,  setNotFoundSt]  = useState(false);
@@ -1089,7 +1091,21 @@ function CollectionPage() {
   const facets = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions);
 
   const hasFacets = Object.keys(facets).length > 0;
-  const showCatalogSidebar = hasFacets;
+  // Categories of the products in this collection (design: category list above the filters).
+  const collCategories = (() => {
+    const map = new Map();
+    for (const p of products) {
+      for (const c of Array.isArray(p?.categories) ? p.categories : []) {
+        if (!c?.id) continue;
+        const cur = map.get(c.id) || { id: c.id, name: getLocalizedCategory(c, locale).name || c.name, count: 0 };
+        cur.count += 1;
+        map.set(c.id, cur);
+      }
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 12);
+  })();
+  const showCollCategories = collCategories.length > 1;
+  const showCatalogSidebar = hasFacets || showCollCategories;
 
   useEffect(() => {
     const facetKeys = Object.keys(facets);
@@ -1146,6 +1162,9 @@ function CollectionPage() {
   }
   if (bestsellerOnly) {
     filtered = filtered.filter((p) => productSalesScore(p) >= bestsellerMinSold);
+  }
+  if (collCategoryId) {
+    filtered = filtered.filter((p) => (Array.isArray(p?.categories) ? p.categories : []).some((c) => c?.id === collCategoryId));
   }
   filtered = filterProductsByFacets(filtered, filters);
 
@@ -1423,6 +1442,33 @@ function CollectionPage() {
 
               {/* Desktop: accordion */}
               <DesktopFilterContent>
+                {showCollCategories ? (
+                  <nav aria-label={tCommon("categories")} style={{ marginBottom: 14, paddingBottom: 10, borderBottom: "1px solid #efe8dd" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1d1b18", marginBottom: 6 }}>{tCommon("categories")}</div>
+                    {[{ id: "", name: tCommon("allIn", { name: title }) }, ...collCategories].map((c) => {
+                      const active = collCategoryId === c.id;
+                      return (
+                        <button
+                          key={c.id || "all"}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => { setCollCategoryId(c.id); setPage(1); }}
+                          style={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%",
+                            padding: "6px 10px", margin: "1px 0", border: "none", borderRadius: 10, cursor: "pointer",
+                            textAlign: "left", fontSize: 13, fontFamily: "inherit",
+                            background: active ? "#fcebd5" : "transparent",
+                            color: active ? "#1d1b18" : "#5e574e", fontWeight: active ? 700 : 500,
+                            boxShadow: active ? "inset 3px 0 0 var(--shop-primary, #ee8a12)" : "none",
+                          }}
+                        >
+                          <span>{c.name}</span>
+                          {c.count ? <span style={{ fontSize: 12, color: "#8a8175" }}>{c.count}</span> : null}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                ) : null}
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
                   Filter
                   {activeCount > 0 && (
@@ -1461,7 +1507,7 @@ function CollectionPage() {
                     return (
                       <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
                         {label}
-                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ff971c", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
+                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ee8a12", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
                       </MobileFilterLeftBtn>
                     );
                   })}

@@ -22,7 +22,7 @@ const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: ${tokens.background.main};
+  background: var(--shop-bg, #f6f2ec);
 `;
 
 const Main = styled.main`
@@ -64,8 +64,8 @@ const Layout = styled.div`
 
 const ItemsSection = styled.div`
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  border: 1px solid #efe8dd;
+  border-radius: 20px;
   overflow: hidden;
 `;
 
@@ -363,6 +363,7 @@ const EmptyState = styled.div`
 
 export default function CartPage() {
   const t = useTranslations("cart");
+  const tAccount = useTranslations("pages.account");
   const locale = useLocale();
   const { cart, loading, updateLineItem, removeLineItem, clearCart, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
@@ -422,12 +423,12 @@ export default function CartPage() {
                 padding: "12px 24px",
                 background: tokens.primary.DEFAULT,
                 color: "#fff",
-                borderRadius: 8,
+                borderRadius: 999,
                 textDecoration: "none",
                 fontWeight: 600,
               }}
             >
-              {t("viewCart")}
+              {tAccount("continueShopping")}
             </Link>
           </EmptyState>
         ) : (

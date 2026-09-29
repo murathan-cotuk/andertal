@@ -18,7 +18,7 @@ import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, 
 
 /* ─────────────── Design tokens ─────────────── */
 const T = {
-  orange: "#ff971c",
+  orange: "#ee8a12",
   dark: "#1A1A1A",
   dark2: "#2A2A2A",
   gray1: "#555555",
@@ -992,7 +992,7 @@ export default function OrdersPage() {
                     background: T.orange, color: "#fff", padding: "10px 22px",
                     borderRadius: 10, fontWeight: 700, textDecoration: "none",
                     fontSize: 13.5, fontFamily: T.font,
-                    border: "2px solid #000", boxShadow: "0 2px 0 2px #000",
+                    border: "1px solid #e6dfd4", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
                   }}>
                     Zum Shop
                   </Link>

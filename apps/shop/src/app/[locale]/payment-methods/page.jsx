@@ -94,7 +94,7 @@ function AddCardForm({ onSuccess, onCancel }) {
         <button
           type="submit"
           disabled={saving || !stripe}
-          style={{ flex: 1, padding: "9px 0", background: "#ff971c", color: "#fff", border: "2px solid #000", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 0 2px #000" }}
+          style={{ flex: 1, padding: "9px 0", background: "#ee8a12", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)" }}
         >
           {saving ? "Wird gespeichert…" : "Speichern"}
         </button>
@@ -213,7 +213,7 @@ export default function PaymentMethodsPage() {
                   <button
                     onClick={handleShowAdd}
                     disabled={setupLoading}
-                    style={{ alignSelf: "flex-start", padding: "9px 18px", background: "#ff971c", color: "#fff", border: "2px solid #000", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 0 2px #000", marginTop: 4 }}
+                    style={{ alignSelf: "flex-start", padding: "9px 18px", background: "#ee8a12", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)", marginTop: 4 }}
                   >
                     {setupLoading ? "…" : "+ Zahlungsmethode hinzufügen"}
                   </button>

@@ -164,7 +164,7 @@ export default function CookieBanner() {
 
   const btnBase = {
     padding: "10px 20px", borderRadius: 8, fontWeight: 700, fontSize: 14,
-    cursor: "pointer", border: "2px solid #000", transition: "opacity .15s",
+    cursor: "pointer", border: "1px solid #e6dfd4", transition: "opacity .15s",
   };
 
   return (
@@ -174,7 +174,7 @@ export default function CookieBanner() {
         bottom: isMobile ? "calc(60px + env(safe-area-inset-bottom, 0px))" : 0,
         left: 0, right: 0,
         zIndex: 2147483647,
-        background: "#fff", borderTop: "2px solid #000",
+        background: "#fff", borderTop: "1px solid #e6dfd4",
         boxShadow: "0 -4px 24px rgba(0,0,0,0.18)",
         fontFamily: "inherit",
         maxHeight: isMobile ? "calc(100vh - 80px)" : "none",
@@ -211,7 +211,7 @@ export default function CookieBanner() {
             </button>
             <button
               onClick={acceptAll}
-              style={{ ...btnBase, background: "#ff971c", color: "#fff", border: "2px solid #000", flex: isMobile ? "1 1 calc(50% - 4px)" : "0 0 auto" }}
+              style={{ ...btnBase, background: "#ee8a12", color: "#fff", border: "1px solid #e6dfd4", flex: isMobile ? "1 1 calc(50% - 4px)" : "0 0 auto" }}
             >
               {t.acceptAll}
             </button>
@@ -263,7 +263,7 @@ export default function CookieBanner() {
             </button>
             <button
               onClick={acceptAll}
-              style={{ ...btnBase, background: "#ff971c", color: "#fff", fontSize: 13 }}
+              style={{ ...btnBase, background: "#ee8a12", color: "#fff", fontSize: 13 }}
             >
               {t.acceptAll}
             </button>

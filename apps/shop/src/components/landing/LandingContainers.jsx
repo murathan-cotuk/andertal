@@ -93,11 +93,11 @@ function getContainerPadding(container, defaultPad) {
 }
 
 /** Innere Zeile: volle Breite innerhalb des Container-Paddings oder zentriert mit max-width (pro Block typischer Fallback in px). */
-/* "Warmer Marktplatz" button defaults. The old defaults (orange #ff971c, 2px black border, 8px radius,
+/* "Warmer Marktplatz" button defaults. The old defaults (orange #ee8a12, 2px black border, 8px radius,
    black offset shadow) were also saved into many containers by the editor, so they count as "unset". */
 function designBtnBg(v, fallback = "var(--shop-primary, #ee8a12)") {
   const t = String(v || "").trim();
-  return t && t.toLowerCase() !== "#ff971c" ? t : fallback;
+  return t && t.toLowerCase() !== "#ee8a12" ? t : fallback;
 }
 function designBtnBorder(v) {
   const t = String(v || "").trim();
@@ -530,7 +530,7 @@ function HeroBanner({ container, locale = "de", headingLevel = 2 }) {
       <div style={{ position: "absolute", bottom: mobile ? 8 : 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: mobile ? 5 : 8, zIndex: 5, pointerEvents: "auto" }}>
         {slides.map((_, i) => (
           <button key={i} type="button" onClick={() => goTo(i)} aria-label={tLanding("slide", { n: i + 1 })} aria-current={i === current ? "true" : undefined}
-            style={{ width: i === current ? (mobile ? 18 : 24) : (mobile ? 6 : 10), height: mobile ? 6 : 10, borderRadius: mobile ? 3 : 5, border: "none", cursor: "pointer", background: i === current ? "#ff971c" : "rgba(255,255,255,0.65)", transition: "all .28s", padding: 0 }} />
+            style={{ width: i === current ? (mobile ? 18 : 24) : (mobile ? 6 : 10), height: mobile ? 6 : 10, borderRadius: mobile ? 3 : 5, border: "none", cursor: "pointer", background: i === current ? "#ee8a12" : "rgba(255,255,255,0.65)", transition: "all .28s", padding: 0 }} />
         ))}
       </div>
     );
@@ -2562,8 +2562,8 @@ function Tabs({ container, locale = "de" }) {
   if (!tabs.length) return null;
   const bg = container.bg_color || "transparent";
   const textColor = container.text_color || "#111827";
-  const activeColor = container.active_color || "#ff971c";
-  const tabBg = container.tab_bg || "#f1f5f9";
+  const activeColor = container.active_color || "#ee8a12";
+  const tabBg = container.tab_bg || "#efe8dd";
   const style = container.tab_style || "underline";
 
   const tabStyle = (idx) => {
@@ -2629,7 +2629,7 @@ function Tabs({ container, locale = "de" }) {
         display: "flex",
         flexWrap: "wrap",
         gap: 4,
-        borderBottom: "2px solid rgba(148, 163, 184, 0.35)",
+        borderBottom: "2px solid #e6dfd4",
         marginBottom: 0,
         paddingBottom: 0,
       };
@@ -2696,9 +2696,9 @@ function Tabs({ container, locale = "de" }) {
               lineHeight: 1.78,
               padding: "28px 32px",
               borderRadius: 20,
-              background: `linear-gradient(165deg, ${tabBg} 0%, ${bg} 72%)`,
-              border: "1px solid rgba(148, 163, 184, 0.28)",
-              boxShadow: "0 4px 28px -8px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.05)",
+              background: container.tab_bg ? `linear-gradient(165deg, ${tabBg} 0%, ${bg} 72%)` : "#fff",
+              border: "1px solid #efe8dd",
+              boxShadow: "none",
               minHeight: 48,
             }}
             dangerouslySetInnerHTML={{ __html: lt(activeTab, "content", locale) || "" }}
@@ -2816,7 +2816,7 @@ function Testimonials({ container, locale = "de" }) {
     cols = 3, show_stars = true,
     bg_color = "transparent", card_bg = "#ffffff",
     card_border_color = "#e5e7eb", text_color = "#111827",
-    accent_color = "#ff971c",
+    accent_color = "#ee8a12",
     items = [],
   } = container;
   const title = lt(container, "title", locale);

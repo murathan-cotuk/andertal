@@ -8,7 +8,7 @@ import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
 
-const ORANGE = "#ff971c";
+const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
 const BORDER = "#e5e7eb";

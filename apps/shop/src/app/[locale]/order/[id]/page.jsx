@@ -16,7 +16,7 @@ import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
 import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, splitInclusiveVat, orderBonusDiscountCents, orderCouponDiscountCents } from "@/lib/goods-vat";
 
-const ORANGE = "#ff971c";
+const ORANGE = "#ee8a12";
 const BACKEND = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 /* ── helpers ── */

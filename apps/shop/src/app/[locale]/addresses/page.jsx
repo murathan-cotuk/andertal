@@ -13,7 +13,7 @@ import { useCart } from "@/context/CartContext";
 import { COUNTRY_MAP, getShippableCountries } from "@/lib/countries";
 import { useLocale, useTranslations } from "next-intl";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
-const ORANGE = "#ff971c";
+const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
 const BORDER = "#e5e7eb";

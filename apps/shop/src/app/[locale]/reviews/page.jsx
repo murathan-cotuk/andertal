@@ -11,7 +11,7 @@ import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 
-const ORANGE = "#ff971c";
+const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
 const BORDER = "#e5e7eb";
@@ -112,7 +112,7 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
         type="button"
         onClick={handleSubmit}
         disabled={saving}
-        style={{ marginTop: 10, padding: "8px 18px", background: ORANGE, color: "#fff", border: "2px solid #000", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 2px 0 2px #000" }}
+        style={{ marginTop: 10, padding: "8px 18px", background: ORANGE, color: "#fff", border: "1px solid #e6dfd4", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)" }}
       >
         {saving ? "…" : existing ? "Aktualisieren" : "Bewertung abgeben"}
       </button>

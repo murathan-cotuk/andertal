@@ -324,7 +324,7 @@ const PrimaryBtn = styled.a`
   display: block;
   text-align: center;
   padding: 16px 20px;
-  background: var(--btn-atc-bg, var(--shop-primary, #ff971c));
+  background: var(--btn-atc-bg, var(--shop-primary, #ee8a12));
   color: var(--btn-atc-text, #fff);
   font-weight: 700;
   font-size: 1.0625rem;
@@ -469,7 +469,7 @@ const QuickAddBtn = styled.button`
   height: 32px;
   border-radius: 8px;
   border: none;
-  background: #ff971c;
+  background: #ee8a12;
   color: #fff;
   font-size: 18px;
   line-height: 1;

@@ -8,7 +8,7 @@ import { useCustomerAuth as useAuth } from "@andertal/lib";
 import { LogoutButton } from "@andertal/ui";
 import { restPathFromPathname } from "@/lib/shop-market";
 
-const ORANGE = "#ff971c";
+const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
 const BORDER = "#e5e7eb";
 
