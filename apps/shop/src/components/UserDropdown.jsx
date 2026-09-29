@@ -611,7 +611,7 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
           height: 46,
           border: "none",
           background: "transparent",
-          color: "#fff",
+          color: "var(--header-icon-color, #fff)",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
@@ -622,7 +622,7 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
           flexShrink: 0,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+          e.currentTarget.style.background = "rgba(127,127,127,0.14)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "transparent";
@@ -641,7 +641,7 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
               height: 15,
               borderRadius: "50%",
               background: "linear-gradient(160deg,#4ade80 0%,#22c55e 100%)",
-              border: "2px solid #1b7a72",
+              border: "2px solid var(--header-bg, #1b7a72)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

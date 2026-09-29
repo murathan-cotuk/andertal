@@ -552,7 +552,7 @@ const MiddleBarLocaleBtn = styled(MiddleBarIconBtn)``;
 /* User dropdown — hidden on mobile (bottom nav handles account) */
 const MiddleBarUserWrap = styled.div`
   button {
-    color: #fff !important;
+    color: var(--header-icon-color, #fff) !important;
   }
 
   @media (max-width: 767px) {
@@ -1637,6 +1637,13 @@ export default function ShopHeader() {
   const categoryDrillParentId = categoryDrillStack.length
     ? String(categoryDrillStack[categoryDrillStack.length - 1].id)
     : null;
+
+  /* Desktop dropdown: preselect the first root with children so its subcategories load right away. */
+  useEffect(() => {
+    if (!mainMenuOpen || megaRoot || isNarrowViewport) return;
+    const first = categoryPanelRows.find((r) => r.hasChildren) || categoryPanelRows[0];
+    if (first) setMegaRoot({ id: first.id, label: first.label, slug: first.slug });
+  }, [mainMenuOpen, megaRoot, isNarrowViewport, categoryPanelRows]);
   const categoryDrillRows = useMemo(
     () => mapCategoryNodesToMenuRows(
       categoryDrillParentId ? (categoryChildrenById.get(categoryDrillParentId) || []) : [],

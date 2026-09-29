@@ -242,7 +242,7 @@ export const WARM_MARKETPLACE_STYLES = {
   secondNav: {
     variant: "default",
     bg_color: P.surface,
-    border: `1px solid ${P.line}`,
+    border: "none",
     text_color: P.ink,
     active_color: P.brandText,
     font_size: "15px",

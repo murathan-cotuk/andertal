@@ -40,7 +40,7 @@ const Drawer = styled.aside`
   background: #fff;
   border-radius: 24px 0 0 24px;
   overflow: hidden;
-  box-shadow: -24px 0 48px rgba(29, 27, 24, 0.18);
+  box-shadow: ${(p) => (p.$open ? "-24px 0 48px rgba(29, 27, 24, 0.18)" : "none")};
   @media (max-width: 767px) {
     border-radius: 0;
   }

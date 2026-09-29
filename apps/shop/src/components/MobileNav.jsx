@@ -105,7 +105,7 @@ const css = {
     zIndex: 2147483701,
     transform: open ? "translateX(0)" : "translateX(-100%)",
     transition: reducedMotion ? "none" : "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-    boxShadow: "24px 0 48px rgba(29,27,24,0.18)",
+    boxShadow: open ? "24px 0 48px rgba(29,27,24,0.18)" : "none",
     borderRadius: "0 24px 24px 0",
     display: "flex",
     flexDirection: "column",
