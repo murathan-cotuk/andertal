@@ -1,4 +1,5 @@
-﻿@tailwind base;
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap");
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -16,7 +17,7 @@
   --background-end-rgb: 255, 255, 255;
   /* Top bar yüksekliği (Polaris varsayılanı 3.5rem) – istersen 48px, 56px vb. yapabilirsin */
   --pg-top-bar-height: 3.5rem;
-  --sellercentral-polaris-topbar-bg: #1a1a1a;
+  --sellercentral-polaris-topbar-bg: #1d1b18;
 }
 #AppFrameTopBar {
   --p-color-bg-inverse: var(--sellercentral-polaris-topbar-bg);
@@ -527,3 +528,114 @@ body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page-Header__Ti
   }
 }
 
+
+/* ═══ "Warmer Marktplatz" design (visual only — colours, fonts, radii; no layout/function changes) ═══ */
+:root {
+  --andertal-ground: #f6f2ec;
+  --andertal-ink: #1d1b18;
+  --andertal-line: #e6dfd4;
+  --andertal-brand: #ee8a12;
+  --andertal-brand-text: #a65300;
+  --andertal-brand-soft: #fcebd5;
+}
+body,
+.Polaris-Frame {
+  --p-font-family-sans: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --p-color-bg: var(--andertal-ground);
+  --p-color-bg-surface-secondary: #faf7f2;
+  --p-color-bg-surface-hover: #faf6ef;
+  --p-color-border: var(--andertal-line);
+  --p-color-border-secondary: #efe8dd;
+  --p-color-text-link: var(--andertal-brand-text);
+  --p-color-text-link-hover: #7f3f00;
+  --p-color-border-focus: var(--andertal-brand);
+  --p-color-bg-fill-brand: var(--andertal-ink);
+  --p-color-bg-fill-brand-hover: #34302b;
+  --p-color-bg-fill-brand-active: #000;
+  --p-border-radius-300: 16px;
+  --p-border-radius-400: 20px;
+  font-family: var(--p-font-family-sans);
+}
+html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }
+
+/* Page area on the warm ground */
+.andertal-page-content { background: var(--andertal-ground); }
+
+/* Headings in the display face */
+.Polaris-Text--headingXl, .Polaris-Text--heading2xl, .Polaris-Text--heading3xl,
+.Polaris-Text--headingLg, .Polaris-Header-Title,
+.andertal-page-content h1, .andertal-page-content h2 {
+  font-family: "Bricolage Grotesque", Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+/* Sidebar: dark, light text, orange active item (design: Sellercentral · Übersicht) */
+#AppFrameNav,
+#AppFrameNav .Polaris-Navigation {
+  background-color: var(--andertal-ink) !important;
+  --p-color-border: rgba(255, 255, 255, 0.1);
+  --p-color-border-secondary: rgba(255, 255, 255, 0.1);
+}
+#AppFrameNav .Polaris-Navigation__Section--withSeparator,
+#AppFrameNav hr { border-color: rgba(255, 255, 255, 0.1) !important; }
+#AppFrameNav .Polaris-Navigation__Item,
+#AppFrameNav .Polaris-Navigation__Text,
+#AppFrameNav .Polaris-Navigation__SectionHeading,
+#AppFrameNav .Polaris-Navigation__SectionHeading .Polaris-Text--root {
+  color: #e9e2d6 !important;
+}
+#AppFrameNav .Polaris-Navigation__Icon svg,
+#AppFrameNav .Polaris-Icon svg { fill: #cfc6b8 !important; }
+#AppFrameNav .Polaris-Navigation__ItemInnerWrapper { border-radius: 12px; background: transparent !important; }
+#AppFrameNav .Polaris-Navigation__ItemInnerWrapper:hover { background: rgba(255, 255, 255, 0.08) !important; }
+#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--selected,
+#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--selected:hover { background: var(--andertal-brand) !important; }
+#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Item,
+#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Text {
+  color: var(--andertal-ink) !important;
+  font-weight: 700;
+}
+#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Icon svg { fill: var(--andertal-ink) !important; }
+/* Sub-items (expanded section): subtle orange tint instead of the full orange pill */
+#AppFrameNav .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__ItemInnerWrapper--selected {
+  background: rgba(238, 138, 18, 0.18) !important;
+}
+#AppFrameNav .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Item,
+#AppFrameNav .Polaris-Navigation__SecondaryNavigation .Polaris-Navigation__ItemInnerWrapper--selected .Polaris-Navigation__Text {
+  color: #fcebd5 !important;
+}
+#AppFrameNav .Polaris-Navigation__Text .Polaris-Text--root { color: inherit !important; }
+#AppFrameNav .Polaris-Navigation__Text .Polaris-Text--subdued { color: #b9b0a3 !important; }
+#AppFrameNav .Polaris-Navigation__Item:focus-visible { outline: 2px solid var(--andertal-brand); }
+#AppFrameNav .Polaris-Badge { background: rgba(255, 255, 255, 0.12); color: #e9e2d6; }
+
+/* Cards: white, rounder, warm hairline */
+.andertal-page-content .Polaris-ShadowBevel {
+  --pc-shadow-bevel-border-radius: 20px !important;
+  --pc-shadow-bevel-box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06) !important;
+}
+.andertal-page-content .Polaris-LegacyCard { border-radius: 20px; box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06); }
+
+/* Buttons: primary = dark pill, secondary = white pill with warm border */
+.Polaris-Button { border-radius: 999px !important; }
+.Polaris-Button--variantPrimary {
+  --pc-button-bg: var(--andertal-ink) !important;
+  --pc-button-bg-hover: #34302b !important;
+  --pc-button-bg-active: #000 !important;
+  --pc-button-box-shadow: none !important;
+  --pc-button-box-shadow-active: none !important;
+  background: var(--andertal-ink) !important;
+}
+.Polaris-Button--variantPrimary::before, .Polaris-Button--variantPrimary::after { box-shadow: none !important; }
+.Polaris-Button--variantSecondary { --pc-button-box-shadow: 0 0 0 1px var(--andertal-line) inset !important; }
+
+/* Form fields: warm border, orange focus ring */
+.Polaris-TextField__Backdrop { border-color: var(--andertal-line) !important; border-radius: 12px !important; }
+.Polaris-TextField--focus > .Polaris-TextField__Backdrop::after,
+.Polaris-Select__Input:focus ~ .Polaris-Select__Backdrop::after { box-shadow: 0 0 0 2px var(--andertal-brand) !important; }
+
+/* Tabs / selection accents */
+.Polaris-Tabs__Tab--active, .Polaris-Tabs__Tab[aria-selected="true"] { --pc-tab-bg: var(--andertal-brand-soft); }
+.Polaris-Checkbox__Backdrop.Polaris-Checkbox--checked, .Polaris-RadioButton__Input:checked + .Polaris-RadioButton__Backdrop {
+  --p-color-bg-fill-brand: var(--andertal-ink);
+}

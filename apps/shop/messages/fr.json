@@ -568,7 +568,8 @@
     "delivery": "Livraison",
     "deliveryBy": "Expédié par {seller} · {shipping}",
     "buyerProtection": "Protection acheteur",
-    "buyerProtectionText": "Remboursement si ta commande n'arrive pas ou ne correspond pas à la description."
+    "buyerProtectionText": "Remboursement si ta commande n'arrive pas ou ne correspond pas à la description.",
+    "buyerProtectionIncluded": "Protection acheteur Andertal incluse"
   },
   "slimbar": {
     "sale": "Soldes",

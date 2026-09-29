@@ -26,7 +26,7 @@ import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes
 import { findShippingGroup, resolveShippingQuoteCents, resolveShippingQuoteStrict } from "@/lib/shipping-price";
 import Carousel from "@/components/Carousel";
 import { StarRating } from "@/components/ProductCard";
-import { PdpReviewSummary, PdpShippingReturns } from "@/components/product/PdpExtras";
+import { PdpReviewSummary, PdpShippingReturns, PdpBuyboxPerks, PdpProtectionNote, bonusPointsForCents } from "@/components/product/PdpExtras";
 import { ProductCard } from "@/components/ProductCard";
 import dynamic from "next/dynamic";
 // Lightbox only mounts when the user clicks an image — lazy-load to keep initial bundle lean.
@@ -67,8 +67,10 @@ const PageLayout = styled.div`
   grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
   gap: 32px;
   align-items: start;
+  /* Tablet: keep gallery | details side by side (a single column made the image fill the screen). */
   @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+    gap: 24px;
   }
   @media (max-width: 768px) {
     display: flex;
@@ -93,6 +95,10 @@ const InnerGrid = styled.div`
   gap: 32px;
   margin-bottom: 48px;
   align-items: start;
+  @media (max-width: 1180px) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
   @media (max-width: 768px) {
     display: flex;
     flex-direction: column;
@@ -108,12 +114,10 @@ const GalleryCol = styled.div`
   position: sticky;
   top: 116px;
   align-self: start;
-  @media (max-width: 1024px) {
+  @media (max-width: 768px) {
     position: static;
     top: auto;
     margin-left: 0;
-  }
-  @media (max-width: 768px) {
     order: 1;
   }
 `;
@@ -1877,6 +1881,8 @@ export default function ProductTemplate() {
                 showCampaignBadge={pdpVisible("campaign_badge")}
               />
 
+              <PdpBuyboxPerks inStock={inStock} points={bonusPointsForCents(effectiveDisplayCents)} />
+
               <ProductPurchaseActions
                 quantity={quantity}
                 onQuantityChange={setQuantity}
@@ -1932,6 +1938,7 @@ export default function ProductTemplate() {
               </InfoList>
             </BuyboxInner>
           </BuyboxCard>
+          <PdpProtectionNote />
 
           {otherSellersForVariant.length > 0 && pdpVisible("other_sellers") ? (
             <OtherSellersCard>

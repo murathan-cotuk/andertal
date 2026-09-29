@@ -5,7 +5,6 @@ import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import styled from "styled-components";
 
-const STRIP_GAP = 12;
 const MOBILE_GRID_GAP = 10;
 
 const CatalogWrap = styled.div`
@@ -29,22 +28,12 @@ const CatalogWrap = styled.div`
     `}
   }
 
-  /* ── Tablet (768–1023px): horizontal scroll strip ────────────────────── */
+  /* ── Tablet (768–1023px): 3-column grid (a sideways strip only showed two products) ── */
   @media (min-width: 768px) and (max-width: 1023px) {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    gap: ${STRIP_GAP}px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
-    padding: 0 0 4px;
-    scrollbar-width: thin;
-    @media (prefers-reduced-motion: reduce) {
-      scroll-behavior: auto;
-    }
+    display: grid;
+    grid-template-columns: repeat(${(p) => (p.$cols ? Math.min(3, p.$cols) : 3)}, minmax(0, 1fr));
+    gap: 14px;
+    align-content: start;
   }
 
   /* ── Desktop (≥1024px): grid ─────────────────────────────────────────── */
@@ -63,13 +52,8 @@ const CardSlot = styled.div`
     min-width: 0;
   }
 
-  /* Tablet strip: fixed-width cards */
   @media (min-width: 768px) and (max-width: 1023px) {
-    flex: 0 0 ${(p) => `calc((100% - ${(p.$m - 1) * STRIP_GAP}px) / ${p.$m})`};
-    min-width: ${(p) => `calc((100% - ${(p.$m - 1) * STRIP_GAP}px) / ${p.$m})`};
-    max-width: ${(p) => `calc((100% - ${(p.$m - 1) * STRIP_GAP}px) / ${p.$m})`};
-    scroll-snap-align: start;
-    box-sizing: border-box;
+    min-width: 0;
   }
 
   /* Desktop: grid handles layout */

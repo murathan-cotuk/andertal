@@ -96,7 +96,7 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0f766e 100%)",
+        background: "linear-gradient(135deg, #1d1b18 0%, #2a2520 55%, #7a4a14 100%)",
         borderRadius: 14,
         padding: "20px 22px",
         color: "#f8fafc",

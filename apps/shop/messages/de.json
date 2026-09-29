@@ -585,7 +585,8 @@
     "delivery": "Lieferung",
     "deliveryBy": "Versand durch {seller} · {shipping}",
     "buyerProtection": "Käuferschutz",
-    "buyerProtectionText": "Geld zurück, wenn deine Bestellung nicht ankommt oder nicht der Beschreibung entspricht."
+    "buyerProtectionText": "Geld zurück, wenn deine Bestellung nicht ankommt oder nicht der Beschreibung entspricht.",
+    "buyerProtectionIncluded": "Andertal-Käuferschutz inklusive"
   },
   "slimbar": {
     "sale": "Angebote",

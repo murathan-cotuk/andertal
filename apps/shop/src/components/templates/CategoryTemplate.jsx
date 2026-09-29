@@ -115,6 +115,11 @@ const ColHeader = styled.div`
   }
 
   @media (max-width: 600px) { padding: 20px 16px 0; }
+
+  @media (max-width: 767px) {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
 `;
 
 const Breadcrumb = styled.nav`
@@ -152,6 +157,30 @@ const BreadcrumbRow = styled.div`
   }
 `;
 
+/* Mobile (design): horizontal pill row with the sub-categories under the title. */
+const MobileSubPills = styled.nav`
+  display: none;
+  @media (max-width: 1023px) {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 16px 10px;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+    a {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: #efe8dd;
+      color: var(--body-color, #1d1b18);
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+  }
+`;
+
 const SortBar = styled.div`
   position: sticky;
   top: ${HEADER_H}px;
@@ -180,6 +209,11 @@ const SortBarInner = styled.div`
   }
 
   @media (max-width: 600px) { padding: 0 16px; }
+
+  @media (max-width: 767px) {
+    padding: 10px 16px;
+    gap: 10px;
+  }
 `;
 
 const SortBarLeft = styled.div`
@@ -188,6 +222,11 @@ const SortBarLeft = styled.div`
   gap: 16px;
   min-width: 0;
   flex: 1;
+
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+    gap: 8px;
+  }
 `;
 
 const FilterBtn = styled.button`
@@ -213,6 +252,13 @@ const FilterBtn = styled.button`
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: inline-flex;
   }
+
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+    justify-content: center;
+    height: 44px;
+    margin: 0;
+  }
 `;
 
 const SortWrap = styled.div`
@@ -221,6 +267,10 @@ const SortWrap = styled.div`
   gap: 8px;
   font-size: 14px;
   color: #5e574e;
+
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+  }
 `;
 
 const SortLabel = styled.span`
@@ -247,6 +297,12 @@ const SortSelect = styled.select`
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
+
+  @media (max-width: 767px) {
+    width: 100%;
+    margin: 0;
+    height: 44px;
+  }
 `;
 
 const ContentWrap = styled.div`
@@ -265,8 +321,8 @@ const ContentWrap = styled.div`
 
   @media (max-width: 767px) {
     padding: 6px 6px 80px;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
     gap: 0;
   }
 `;
@@ -296,7 +352,7 @@ const Sidebar = styled.aside`
     max-height: 100dvh;
     z-index: ${CATALOG_FILTER_SIDEBAR_Z};
     background: #fff;
-    box-shadow: 4px 0 32px rgba(0,0,0,0.2);
+    box-shadow: ${(p) => (p.$open ? "4px 0 32px rgba(0,0,0,0.2)" : "none")};
     transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
     transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
     padding: 0;
@@ -1302,6 +1358,16 @@ export default function CategoryTemplate() {
       ),
         product_container: (
           <>
+      {hasSubcategories ? (
+        <MobileSubPills aria-label={tCommon("categories")}>
+          {subcategories.map((sub) => {
+            const subSlug = String(sub.slug || "").replace(/^\//, "");
+            return subSlug ? (
+              <Link key={sub.id || subSlug} href={`/${subSlug}`}>{sub.name || subSlug}</Link>
+            ) : null;
+          })}
+        </MobileSubPills>
+      ) : null}
       <SortBar>
         <SortBarInner>
           <SortBarLeft>
@@ -1320,7 +1386,7 @@ export default function CategoryTemplate() {
                   <circle cx="11" cy="6" r="1.5" fill="#111" stroke="none" />
                   <circle cx="5" cy="10" r="1.5" fill="#111" stroke="none" />
                 </svg>
-                {tCommon("categories")}{activeCount > 0 ? ` (${activeCount})` : ""}
+                {tCommon("filter")}{activeCount > 0 ? ` (${activeCount})` : ""}
               </FilterBtn>
             )}
             {/* Breadcrumb — desktop only */}

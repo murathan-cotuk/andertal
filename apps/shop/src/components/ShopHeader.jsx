@@ -1099,6 +1099,26 @@ function secondNavItemStyle(shopStyles, item) {
   return Object.keys(out).length ? out : undefined;
 }
 
+/** True for clearly light #rgb/#rrggbb/rgb() colours (relative luminance > 0.6). */
+function isLightCssColor(value) {
+  const str = String(value || "").trim().toLowerCase();
+  let rgb = null;
+  const hex = str.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
+  if (hex) {
+    const h = hex[1].length === 3 ? hex[1].split("").map((c) => c + c).join("") : hex[1];
+    rgb = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  } else {
+    const m = str.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
+    if (m) rgb = [Number(m[1]), Number(m[2]), Number(m[3])];
+  }
+  if (!rgb) return false;
+  const lin = (c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]) > 0.6;
+}
+
 const SubNavClipper = styled.div`
   width: 100%;
   overflow: hidden;
@@ -1959,6 +1979,18 @@ export default function ShopHeader() {
                     : !isNarrowViewport
                       ? { background: "var(--header-chrome-bg)" }
                       : {}),
+                  // A light hero tint behind the header (image-carousel colour) needs dark text/icons.
+                  ...(landingHeaderBg &&
+                  isLightCssColor(
+                    landingHeaderStatusColor || extractSolidTintFromChromeCss(landingHeaderBg, computedHeaderSolidColor),
+                  )
+                    ? {
+                        "--header-text": "#1d1b18",
+                        "--header-icon-color": "#1d1b18",
+                        "--topbar-text": "#1d1b18",
+                        color: "#1d1b18",
+                      }
+                    : {}),
                   "--narrow-header-safe-fill":
                     landingHeaderStatusColor ||
                     (landingHeaderBg

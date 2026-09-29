@@ -161,6 +161,11 @@ const ColHeader = styled.div`
   }
 
   @media (max-width: 600px) { padding: 20px 16px 0; }
+
+  @media (max-width: 767px) {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
 `;
 
 /* ─── Breadcrumb ─────────────────────────────────────────── */
@@ -222,6 +227,11 @@ const SortBarInner = styled.div`
   }
 
   @media (max-width: 600px) { padding: 0 16px; }
+
+  @media (max-width: 767px) {
+    padding: 10px 16px;
+    gap: 10px;
+  }
 `;
 
 const SortBarLeft = styled.div`
@@ -230,6 +240,11 @@ const SortBarLeft = styled.div`
   gap: 16px;
   min-width: 0;
   flex: 1;
+
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+    gap: 8px;
+  }
 `;
 
 /* Mobile-only filter toggle */
@@ -255,6 +270,13 @@ const FilterBtn = styled.button`
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: inline-flex;
   }
+
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+    justify-content: center;
+    height: 44px;
+    margin: 0;
+  }
 `;
 
 const SortWrap = styled.div`
@@ -263,6 +285,10 @@ const SortWrap = styled.div`
   gap: 8px;
   font-size: 14px;
   color: #5e574e;
+
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+  }
 `;
 
 const SortLabel = styled.span`
@@ -289,6 +315,12 @@ const SortSelect = styled.select`
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
+
+  @media (max-width: 767px) {
+    width: 100%;
+    margin: 0;
+    height: 44px;
+  }
 `;
 
 /* ─── Sidebar + content layout ───────────────────────────── */
@@ -308,8 +340,8 @@ const ContentWrap = styled.div`
 
   @media (max-width: 767px) {
     padding: 8px 6px 60px;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
   }
 `;
 
@@ -340,7 +372,7 @@ const Sidebar = styled.aside`
     max-height: 100dvh;
     z-index: ${CATALOG_FILTER_SIDEBAR_Z};
     background: #fff;
-    box-shadow: 4px 0 16px rgba(0,0,0,0.12);
+    box-shadow: ${(p) => (p.$open ? "4px 0 16px rgba(0,0,0,0.12)" : "none")};
     transition: left 0.3s ease;
     padding: ${(p) => (p.$mobileFilterMode ? "0" : "16px")};
     box-sizing: border-box;

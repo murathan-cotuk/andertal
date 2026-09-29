@@ -585,7 +585,8 @@
     "delivery": "Delivery",
     "deliveryBy": "Shipped by {seller} · {shipping}",
     "buyerProtection": "Buyer protection",
-    "buyerProtectionText": "Money back if your order doesn't arrive or doesn't match the description."
+    "buyerProtectionText": "Money back if your order doesn't arrive or doesn't match the description.",
+    "buyerProtectionIncluded": "Andertal buyer protection included"
   },
   "slimbar": {
     "sale": "Sale",

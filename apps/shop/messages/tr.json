@@ -585,7 +585,8 @@
     "delivery": "Teslimat",
     "deliveryBy": "{seller} tarafından gönderilir · {shipping}",
     "buyerProtection": "Alıcı koruması",
-    "buyerProtectionText": "Siparişin ulaşmazsa veya açıklamaya uymazsa paran iade edilir."
+    "buyerProtectionText": "Siparişin ulaşmazsa veya açıklamaya uymazsa paran iade edilir.",
+    "buyerProtectionIncluded": "Andertal alıcı koruması dahil"
   },
   "slimbar": {
     "sale": "İndirimler",

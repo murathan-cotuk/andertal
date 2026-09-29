@@ -568,7 +568,8 @@
     "delivery": "Entrega",
     "deliveryBy": "Enviado por {seller} · {shipping}",
     "buyerProtection": "Protección al comprador",
-    "buyerProtectionText": "Te devolvemos el dinero si tu pedido no llega o no coincide con la descripción."
+    "buyerProtectionText": "Te devolvemos el dinero si tu pedido no llega o no coincide con la descripción.",
+    "buyerProtectionIncluded": "Protección al comprador de Andertal incluida"
   },
   "slimbar": {
     "sale": "Ofertas",

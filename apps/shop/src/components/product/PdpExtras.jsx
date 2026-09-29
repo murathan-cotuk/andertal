@@ -223,3 +223,38 @@ export function PdpShippingReturns({ shipping = "", returnDays = 14, returnCost 
     </Shipping>
   );
 }
+
+/** Desktop buybox (design): bonus-points pill + stock line under the price. */
+export function PdpBuyboxPerks({ inStock, points = 0 }) {
+  const t = useTranslations("product");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "10px 0 12px" }}>
+      {points > 0 ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 12, background: "#fcebd5", fontSize: 13, fontWeight: 700, color: "#1d1b18" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A65300" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" />
+          </svg>
+          {t("bonusPoints", { points })}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+        <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: inStock ? "#1E7A46" : "#B42318" }} />
+        <b style={{ color: inStock ? "#1E6B3C" : "#B42318" }}>{inStock ? t("inStockShort") : t("outOfStock")}</b>
+      </div>
+    </div>
+  );
+}
+
+/** Line under the buybox: "Andertal-Käuferschutz inklusive". */
+export function PdpProtectionNote() {
+  const t = useTranslations("product");
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 6px 0", fontSize: 13, color: "#5e574e" }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+      {t("buyerProtectionIncluded")}
+    </div>
+  );
+}

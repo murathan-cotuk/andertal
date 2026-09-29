@@ -155,16 +155,16 @@ const Scroll = styled.div`
 
   @media (max-width: 1279px) {
     padding: 12px ${tokens.containerPadding} 20px;
-    scroll-padding-inline: 0;
+    scroll-padding-inline: ${tokens.containerPadding};
   }
   @media (pointer: coarse) {
     padding: 12px ${tokens.containerPadding} 20px;
-    scroll-padding-inline: 0;
+    scroll-padding-inline: ${tokens.containerPadding};
   }
 
   @media (max-width: 767px) {
     padding: 12px max(18px, env(safe-area-inset-left, 0px)) 20px max(18px, env(safe-area-inset-right, 0px));
-    scroll-padding-inline: max(14px, env(safe-area-inset-left, 0px));
+    scroll-padding-inline: max(18px, env(safe-area-inset-left, 0px));
   }
 
   @media (prefers-reduced-motion: reduce) {

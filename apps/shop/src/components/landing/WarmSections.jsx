@@ -415,7 +415,17 @@ const Circles = styled.div`
     transition: transform 0.2s ease;
   }
   @media (max-width: 1023px) {
-    grid-template-columns: repeat(${(p) => Math.min(4, p.$cols)}, minmax(0, 1fr));
+    display: flex;
+    overflow-x: auto;
+    gap: 18px;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    a {
+      flex: 0 0 120px;
+      font-size: 14px;
+    }
   }
   @media (max-width: 767px) {
     display: flex;
@@ -426,8 +436,9 @@ const Circles = styled.div`
       display: none;
     }
     a {
-      flex: 0 0 96px;
-      font-size: 13px;
+      flex: 0 0 76px;
+      font-size: 12px;
+      line-height: 1.25;
       gap: 8px;
     }
   }
@@ -482,7 +493,7 @@ export function CategoryCircles({ container, locale = "de" }) {
           return (
             <SmartLink key={`${it.link}-${i}`} href={it.link}>
               <span className="circle" style={{ background: TONES[i % TONES.length] }}>
-                {src ? <Image src={src} alt="" fill sizes="(max-width: 767px) 96px, 200px" style={{ objectFit: "cover" }} /> : null}
+                {src ? <Image src={src} alt="" fill sizes="(max-width: 767px) 76px, 200px" style={{ objectFit: "cover" }} /> : null}
               </span>
               <span>{it.label}</span>
             </SmartLink>

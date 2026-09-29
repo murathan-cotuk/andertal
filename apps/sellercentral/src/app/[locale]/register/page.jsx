@@ -149,7 +149,7 @@ function RegisterForm() {
   const inputStyle = { width: "100%", padding: "10px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" };
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f3f4f6", overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch", padding: "16px", boxSizing: "border-box" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f6f2ec", overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch", padding: "16px", boxSizing: "border-box" }}>
       <div style={{ position: "fixed", top: 16, right: 16, zIndex: 100 }}><LocaleSwitcher /></div>
       <div style={{ width: "100%", maxWidth: 440, boxSizing: "border-box" }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
@@ -160,10 +160,10 @@ function RegisterForm() {
               style={{ height: Math.min(Math.max(branding.logoHeight || 30, 18), 52), width: "auto", maxWidth: 260, objectFit: "contain", display: "inline-block" }}
             />
           ) : (
-            <span style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.18em", color: "#111827" }}>ANDERTAL</span>
+            <span style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-0.02em", color: "#1d1b18", fontFamily: "'Bricolage Grotesque', Georgia, serif" }}>andertal</span>
           )}
         </div>
-        <div style={{ background: "#fff", borderRadius: 12, padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px)", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+        <div style={{ background: "#fff", borderRadius: 24, padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px)", boxShadow: "0 0 0 1px rgba(29,27,24,0.06)" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{isInvited ? t("titleInvited") : t("title")}</h1>
             <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>{isInvited ? t("subtitleInvited") : t("subtitle")}</p>
@@ -263,7 +263,7 @@ function RegisterForm() {
               <div style={{ background: "#d1fae5", border: "1px solid #10b981", borderRadius: 8, padding: "12px 14px", color: "#065f46", fontSize: 14 }}>{success}</div>
             )}
             <button type="submit" disabled={loading}
-              style={{ padding: "12px", background: loading ? "#9ca3af" : "#1f2937", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
+              style={{ padding: "12px", background: loading ? "#9ca3af" : "#1d1b18", color: "#fff", border: "none", borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
               {loading ? t("submitting") : (isInvited ? t("submitInvited") : t("submit"))}
             </button>
           </form>

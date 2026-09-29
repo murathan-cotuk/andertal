@@ -22,7 +22,7 @@ const QtySelect = styled.select`
   color: #111827;
   cursor: pointer;
   flex-shrink: 0;
-  min-width: 84px;
+  min-width: 76px;
   appearance: auto;
   &:disabled {
     opacity: 0.55;
@@ -32,8 +32,9 @@ const QtySelect = styled.select`
 
 const AddBtn = styled.button`
   flex: 1;
+  min-width: 0;
   height: 52px;
-  padding: 0 16px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
