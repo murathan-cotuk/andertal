@@ -36,7 +36,13 @@
     "allIn": "Tutto in {name}",
     "showAll": "Mostra tutto",
     "noCategoryMatch": "Nessuna categoria trovata",
-    "footerTagline": "Il marketplace di brand indipendenti e venditori verificati d’Europa."
+    "footerTagline": "Il marketplace di brand indipendenti e venditori verificati d’Europa.",
+    "lastUpdated": "Ultimo aggiornamento: {date}",
+    "legalHelp": "Domande su un ordine?",
+    "legalHelpLink": "Servizio clienti",
+    "collectionLabel": "Collezione",
+    "productsCount": "{count, plural, one {# prodotto} other {# prodotti}}",
+    "brandsCount": "{count, plural, one {# brand} other {# brand}}"
   },
   "nav": {
     "collection": "Collezione",

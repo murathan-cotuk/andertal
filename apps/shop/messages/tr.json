@@ -36,7 +36,13 @@
     "allIn": "Tümü: {name}",
     "showAll": "Tümünü göster",
     "noCategoryMatch": "Eşleşen kategori yok",
-    "footerTagline": "Avrupa’dan bağımsız markalar ve doğrulanmış satıcılar için pazar yeri."
+    "footerTagline": "Avrupa’dan bağımsız markalar ve doğrulanmış satıcılar için pazar yeri.",
+    "lastUpdated": "Son güncelleme: {date}",
+    "legalHelp": "Bir siparişle ilgili sorunuz mu var?",
+    "legalHelpLink": "Müşteri hizmetlerine git",
+    "collectionLabel": "Koleksiyon",
+    "productsCount": "{count} ürün",
+    "brandsCount": "{count} marka"
   },
   "nav": {
     "collection": "Koleksiyon",

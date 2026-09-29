@@ -53,6 +53,35 @@ export function ContainerTypePreview({ type, label }) {
           <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translate(-50%,-50%)", width: 28, height: 8, borderRadius: 3, background: "#202223" }} />
         </PreviewShell>
       );
+    case "promo_bento":
+      return (
+        <PreviewShell title={label}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 3, padding: 5, height: "100%", boxSizing: "border-box" }}>
+            <div style={{ borderRadius: 4, background: "#FCEBD5", padding: 5, display: "flex", flexDirection: "column", gap: 3, justifyContent: "center" }}>
+              <div style={bar({ width: "70%", height: 5, background: "#1D1B18" })} />
+              <div style={bar({ width: "50%", height: 3 })} />
+              <div style={{ width: 18, height: 6, borderRadius: 3, background: "#1D1B18" }} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <div style={{ flex: 1, borderRadius: 4, background: "#1D1B18" }} />
+              <div style={{ flex: 1, borderRadius: 4, background: "#DCE3D6" }} />
+            </div>
+          </div>
+        </PreviewShell>
+      );
+    case "category_circles":
+      return (
+        <PreviewShell title={label}>
+          <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "center", height: "100%", padding: 4, boxSizing: "border-box" }}>
+            {["#F1D9C4", "#DCE3D6", "#E4DCE8", "#F3E3C6", "#D8E0E8"].map((c) => (
+              <div key={c} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                <div style={{ width: 16, height: 16, borderRadius: "50%", background: c }} />
+                <div style={ink({ width: 12, height: 2 })} />
+              </div>
+            ))}
+          </div>
+        </PreviewShell>
+      );
     case "page_banner":
       return (
         <PreviewShell title={label}>

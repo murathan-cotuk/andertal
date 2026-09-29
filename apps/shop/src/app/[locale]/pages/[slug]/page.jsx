@@ -14,6 +14,7 @@ import { SectionErrorBoundary } from "@/components/ErrorBoundary";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { localizedCmsField } from "@/lib/seo";
 import { catalogShopPathForSlug } from "@/lib/catalog-cms-page";
+import LegalPageShell from "@/components/cms/LegalPageShell";
 
 /** DE lives on the plain field; other locales live under `${field}_i18n[locale][field]`, falling back to DE. */
 function lt(page, field, locale) {
@@ -160,6 +161,19 @@ export default function CmsPageBySlug() {
           <h1>{localizedTitle}</h1>
     </>
   );
+
+  // Plain text pages (Impressum, AGB, Datenschutz …): side menu + text card (design "Legal").
+  if (!hasContainers) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <ShopHeader />
+        <main className="flex-1">
+          <LegalPageShell slug={slug} title={localizedTitle} html={safeBody} hero={hero} updatedAt={page.updated_at || null} />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -5,7 +5,19 @@ import { lt } from "@/lib/locale-text";
  * Named reusable templates. Each maps 1:1 onto an existing container `type`
  * so live JSONB stays backward compatible — no templates DB table.
  */
+const TRUST_BAR_ITEMS = [
+  { icon: "shield", title: "Käuferschutz", body: "Geld zurück bei Problemen" },
+  { icon: "truck", title: "Schneller Versand", body: "Lieferdatum vor dem Kauf" },
+  { icon: "points", title: "Bonuspunkte", body: "Bei jedem Einkauf sammeln" },
+  { icon: "badge", title: "Verifizierte Marken", body: "Geprüfte Händler & Belege" },
+];
+
 export const LANDING_TEMPLATES = [
+  { id: "warm_bento", type: "promo_bento" },
+  { id: "warm_trust_bar", type: "feature_grid", defaults: { variant: "trust_bar", cols: 4, title: "", padding: "32px 24px 40px", items: TRUST_BAR_ITEMS } },
+  { id: "warm_inspiration", type: "image_carousel", defaults: { title: "Inspiration der Woche", aspect_ratio: "4/5", items_per_row: 4, gap: 20 } },
+  { id: "warm_category_circles", type: "category_circles", defaults: { source: "catalog", max_items: 6 } },
+  { id: "warm_bestsellers", type: "bestseller_carousel", defaults: { title: "Bestseller dieser Woche", mode: "bestseller", items_per_row: 5, gap: 20 } },
   { id: "hero_full", type: "hero_banner" },
   { id: "editorial_split", type: "image_text" },
   { id: "promo_banner", type: "banner_cta" },
@@ -26,6 +38,11 @@ export function templateBlurb(id, locale) {
   const loc = String(locale || "de").slice(0, 2).toLowerCase();
   const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
   const map = {
+    warm_bento: x("Campaign tile with two side tiles (Sale / New) — the design’s homepage hero.", "Kampanya kutusu ve iki yan kutu (İndirim / Yeni) — tasarımın ana sayfa hero’su.", "Tuile campagne + deux tuiles latérales.", "Ficha de campaña + dos fichas laterales.", "Riquadro campagna + due riquadri laterali.", "Kampagnen-Kachel mit zwei Seitenkacheln (Sale / Neuheiten) — der Startseiten-Hero des Designs."),
+    warm_trust_bar: x("White strip with four round icons: buyer protection, shipping, points, verified brands.", "Dört yuvarlak ikonlu beyaz şerit: alıcı koruması, kargo, puan, doğrulanmış markalar.", "Bande blanche avec quatre icônes rondes.", "Franja blanca con cuatro iconos redondos.", "Striscia bianca con quattro icone rotonde.", "Weiße Leiste mit vier runden Icons: Käuferschutz, Versand, Bonuspunkte, verifizierte Marken."),
+    warm_inspiration: x("Bilder-Karussell in 4:5 with title and text under each image.", "Her görselin altında başlık ve metinle 4:5 Bilder-Karussell.", "Carrousel d’images 4:5.", "Carrusel de imágenes 4:5.", "Carosello immagini 4:5.", "Bilder-Karussell im Format 4:5 mit Titel und Text unter jedem Bild."),
+    warm_category_circles: x("Round category tiles from the live catalog.", "Canlı katalogdan yuvarlak kategori kutuları.", "Catégories en cercles.", "Categorías en círculos.", "Categorie in cerchi.", "Runde Kategorie-Kacheln aus dem Live-Katalog."),
+    warm_bestsellers: x("Five product cards per row with “See all” on the right.", "Sağda “Tümünü gör” ile satırda beş ürün kartı.", "Cinq fiches produit par ligne.", "Cinco fichas por fila.", "Cinque schede per riga.", "Fünf Produktkarten pro Reihe, rechts „Alle ansehen“."),
     hero_full: x("Full-width campaign slider. Swap images and CTAs without code.", "Tam genişlik kampanya slider’ı.", "Slider campagne pleine largeur.", "Slider de campaña a ancho completo.", "Slider campagna a tutta larghezza.", "Vollbreite Kampagnen-Slider."),
     editorial_split: x("Image + copy for seasonal or brand stories.", "Mevsimsel / marka hikâyesi için görsel + metin.", "Image + texte éditorial.", "Imagen + texto editorial.", "Immagine + testo editoriale.", "Bild + Text für Editorial."),
     promo_banner: x("Single CTA strip — deals, free shipping, campaign.", "Tek CTA şeridi — fırsat, kargo, kampanya.", "Bandeau CTA unique.", "Franja CTA única.", "Fascia CTA unica.", "Einzelner CTA-Streifen."),
@@ -44,9 +61,23 @@ export function templateBlurb(id, locale) {
   return map[id] || "";
 }
 
+export function templateTitle(id, locale) {
+  const loc = String(locale || "de").slice(0, 2).toLowerCase();
+  const x = (en, tr, fr, es, it, de) => lt(loc, en, tr, fr, es, it, de);
+  const map = {
+    warm_bento: x("Warm · Promo bento", "Warm · Promo bento", "Warm · Bento promo", "Warm · Bento promo", "Warm · Bento promo", "Warm · Promo-Bento"),
+    warm_trust_bar: x("Warm · Trust bar", "Warm · Güven şeridi", "Warm · Barre de confiance", "Warm · Barra de confianza", "Warm · Barra fiducia", "Warm · Trust-Leiste"),
+    warm_inspiration: x("Warm · Inspiration of the week", "Warm · Haftanın ilhamı", "Warm · Inspiration", "Warm · Inspiración", "Warm · Ispirazione", "Warm · Inspiration der Woche"),
+    warm_category_circles: x("Warm · Popular categories", "Warm · Popüler kategoriler", "Warm · Catégories populaires", "Warm · Categorías populares", "Warm · Categorie popolari", "Warm · Beliebte Kategorien"),
+    warm_bestsellers: x("Warm · Bestsellers this week", "Warm · Haftanın çok satanları", "Warm · Meilleures ventes", "Warm · Más vendidos", "Warm · Più venduti", "Warm · Bestseller dieser Woche"),
+  };
+  return map[id] || "";
+}
+
 export function templatesForLibrary(locale) {
   return LANDING_TEMPLATES.map((tpl) => ({
     ...tpl,
+    title: templateTitle(tpl.id, locale),
     group: CONTAINER_TYPE_GROUP[tpl.type] || "content",
     blurb: templateBlurb(tpl.id, locale),
   }));

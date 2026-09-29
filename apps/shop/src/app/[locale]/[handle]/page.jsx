@@ -11,7 +11,7 @@ import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Suspense, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import { resolveImageUrl, rewriteImageUrlsInHtml } from "@/lib/image-url";
 import { baseHandleFromUrl, parseProductUrlHandle } from "@/lib/product-url-handle";
@@ -40,6 +40,7 @@ import {
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
+import FacetOptions, { facetDisplayKind } from "@/components/catalog/FacetOptions";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
   CATALOG_FILTER_OVERLAY_Z,
@@ -812,7 +813,12 @@ const Desc = styled.div`
 /* ─────────────────────────────────────────────────────────── *
  *  Page
  * ─────────────────────────────────────────────────────────── */
+const COLL_SORT_KEYS = new Set(["default", "bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"]);
+
 function CollectionPage() {
+  const tCommon = useTranslations("common");
+  const tSort = useTranslations("catalogSort");
+  const collSortLabel = (o) => (COLL_SORT_KEYS.has(o.value) ? tSort(o.value) : o.label);
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1371,20 +1377,20 @@ function CollectionPage() {
               </FilterBtn>
               {/* Breadcrumb — desktop only */}
               <Breadcrumb aria-label="Breadcrumb" style={{ margin: 0 }}>
-                <Link href={`/${locale}`}>Home</Link>
-                <span style={{ color: "#ccc", margin: "0 2px" }}>&gt;</span>
+                <Link href="/">{tCommon("home")}</Link>
+                <span style={{ color: "#b8afa2", margin: "0 2px" }}>›</span>
                 <b>{title}</b>
               </Breadcrumb>
             </SortBarLeft>
             <SortWrap>
-              <SortLabel>Sort:</SortLabel>
+              <SortLabel>{tSort("sortBy")}</SortLabel>
               <SortSelect
                 value={sort}
                 onChange={e => { setSort(e.target.value); setPage(1); }}
                 aria-label="Sort products"
               >
                 {SORT_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>{collSortLabel(o)}</option>
                 ))}
               </SortSelect>
             </SortWrap>
@@ -1424,20 +1430,19 @@ function CollectionPage() {
                 </div>
                 {Object.entries(facets).map(([key, vals]) => (
                   <FilterGroup key={key}>
-                    <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                    <FilterGroupTitle type="button" aria-expanded={!!openFilterGroups[key]} onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
                       <FilterGroupHeading>{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
                       <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                     </FilterGroupTitle>
                     <FilterGroupBody $open={!!openFilterGroups[key]}>
-                      {vals.map(val => {
-                        const on = (filters[key] || []).includes(val);
-                        return (
-                          <CheckRow key={val} $on={on}>
-                            <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={12} />
-                            {formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions)}
-                          </CheckRow>
-                        );
-                      })}
+                      <FacetOptions
+                        kind={facetDisplayKind(key, getFacetGroupTitle(key, locale, metafieldDefinitions))}
+                        values={vals}
+                        selected={filters[key] || []}
+                        label={(v) => formatFacetOptionLabel(key, v, null, locale, metafieldDefinitions)}
+                        onToggle={(v) => toggle(key, v)}
+                        checkboxSize={12}
+                      />
                     </FilterGroupBody>
                   </FilterGroup>
                 ))}
@@ -1499,13 +1504,13 @@ function CollectionPage() {
 
             {/* Result count */}
             <ResultBar>
-              {total} {total === 1 ? "product" : "products"}
+              {tSort("results", { count: total })}
             </ResultBar>
 
             {/* Grid */}
             {paginated.length === 0 ? (
               <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                No products match your filters.
+                {tSort("noMatch")}
               </div>
             ) : (
               <ProductGrid

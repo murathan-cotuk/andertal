@@ -7,6 +7,7 @@
  */
 import { isDiscountedProduct, isWithinNewWindow } from "@/lib/catalog-listing";
 import { toSalesScore } from "@/lib/bestseller";
+import { resolveHomeComposition } from "@andertal/shop-theme";
 
 const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
@@ -137,6 +138,19 @@ export async function hydrateLandingPreload(containers) {
   };
 }
 
+/** The design the merchant saved in Sellercentral ("" when none was chosen yet). */
+async function storedDesignPreset(base) {
+  try {
+    const res = await fetch(`${base}/store/styles`, { next: { revalidate: 30 } });
+    if (!res.ok) return "";
+    const data = await res.json().catch(() => ({}));
+    const raw = data?.styles && typeof data.styles === "object" ? data.styles : data;
+    return typeof raw?.design_preset === "string" ? raw.design_preset : "";
+  } catch {
+    return "";
+  }
+}
+
 export async function fetchLandingPage(suffix = "", { revalidate = 0 } = {}) {
   try {
     const base = getBackendUrl();
@@ -150,6 +164,11 @@ export async function fetchLandingPage(suffix = "", { revalidate = 0 } = {}) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       return { __error: true, status: res.status, message: data?.message || res.statusText };
+    }
+    if (!pageSpecific) {
+      const home = resolveHomeComposition(data?.containers, data?.settings, await storedDesignPreset(base));
+      data.containers = home.containers;
+      data.settings = home.settings;
     }
     if (Array.isArray(data?.containers) && data.containers.length) {
       data.preload = await hydrateLandingPreload(data.containers);

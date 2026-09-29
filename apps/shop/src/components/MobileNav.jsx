@@ -244,9 +244,39 @@ const css = {
 
 /* ─── Icons ──────────────────────────────────────────────── */
 const IcoHome = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
+    <path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" />
+  </svg>
+);
+
+/** Grid — Kategorien (opens the category drawer) */
+const IcoGrid = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+    <rect x="4" y="4" width="7" height="7" rx="1.5" />
+    <rect x="13" y="4" width="7" height="7" rx="1.5" />
+    <rect x="4" y="13" width="7" height="7" rx="1.5" />
+    <rect x="13" y="13" width="7" height="7" rx="1.5" />
+  </svg>
+);
+
+const IcoBag = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 4h2l2.4 11h10.2L20 8H6.2" />
+    <circle cx="9" cy="19" r="1.5" />
+    <circle cx="17" cy="19" r="1.5" />
+  </svg>
+);
+
+const IcoPerson = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
+  </svg>
+);
+
+const IcoHeartLine = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round">
+    <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" />
   </svg>
 );
 
@@ -608,8 +638,8 @@ export default function MobileNav({ layout = "fixed" }) {
             { key: "home", label: t("home"), icon: <IcoHome />, href: "/", active: isHome },
             {
               key: "menu",
-              label: t("menu"),
-              icon: <IcoMenu />,
+              label: t("categories"),
+              icon: <IcoGrid />,
               active: drawerOpen && drawerTarget === "menu",
               onClick: () => {
                 setDrawerTarget("menu");
@@ -617,36 +647,28 @@ export default function MobileNav({ layout = "fixed" }) {
               },
             },
             {
+              key: "wishlist",
+              label: tWishlist("title"),
+              icon: <IcoHeartLine />,
+              href: "/merkzettel",
+              active: isMerkzettel,
+              badge: wishlistCount || 0,
+            },
+            {
               key: "cart",
               label: t("cart"),
-              icon: <IcoCart />,
+              icon: <IcoBag />,
               active: isCart,
               badge: itemCount || 0,
               onClick: openCartSidebar,
             },
             {
-              key: "wishlist",
-              label: tWishlist("title"),
-              icon: <IcoHeart />,
-              href: "/merkzettel",
-              active: isMerkzettel,
-              badge: wishlistCount || 0,
+              key: "profile",
+              label: t("account"),
+              icon: <IcoPerson />,
+              href: isAuthenticated ? "/account" : "/login",
+              active: isProfile,
             },
-            isAuthenticated
-              ? {
-                  key: "profile",
-                  label: t("profile"),
-                  icon: <IcoUser />,
-                  href: "/account",
-                  active: isProfile,
-                }
-              : {
-                  key: "profile",
-                  label: t("profile"),
-                  icon: <IcoUser />,
-                  href: "/login",
-                  active: isProfile,
-                },
           ]}
         />
       ) : (

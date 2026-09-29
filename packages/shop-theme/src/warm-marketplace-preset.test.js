@@ -32,7 +32,7 @@ test("preset survives a save/load round trip and reaches the CSS", () => {
   const reloaded = mergeLoadedShopStyles(saved);
   assert.equal(reloaded.design_preset, WARM_MARKETPLACE_PRESET_ID);
   const css = buildShopThemeCSS(saved);
-  assert.match(css, /--header-icon-color: #1D1B18/);
+  assert.match(css, /--second-nav-text:\s+#1D1B18/);
   assert.match(css, /Bricolage Grotesque/);
 });
 
@@ -44,7 +44,7 @@ test("storefront uses the warm design when no design was chosen", async () => {
   const { resolveStorefrontStyles } = await import("./warm-marketplace-preset.js");
   const out = resolveStorefrontStyles({ colors: { primary: "#123456" }, topbar: { items: [{ text: "x" }] } });
   assert.equal(out.colors.primary, "#EE8A12");
-  assert.equal(out.header.icon_color, "#1D1B18");
+  assert.equal(out.secondNav.text_color_desktop, "#1D1B18");
   assert.deepEqual(out.topbar.items, [{ text: "x" }]);
 });
 
@@ -52,4 +52,12 @@ test("storefront keeps saved styles once a design was chosen", async () => {
   const { resolveStorefrontStyles } = await import("./warm-marketplace-preset.js");
   assert.equal(resolveStorefrontStyles({ design_preset: "classic", colors: { primary: "#123456" } }).colors.primary, "#123456");
   assert.equal(resolveStorefrontStyles({ design_preset: "warm_marketplace", colors: { primary: "#abcdef" } }).colors.primary, "#abcdef");
+});
+
+test("preset keeps the merchant's header colours and overrides old second-nav text colours", async () => {
+  const { resolveStorefrontStyles } = await import("./warm-marketplace-preset.js");
+  const out = resolveStorefrontStyles({ header: { bg_color: "#1b7a72", text_color: "#ffffff" }, secondNav: { text_color_desktop: "#ffffff" } });
+  assert.equal(out.header.bg_color, "#1b7a72");
+  assert.equal(out.header.text_color, "#ffffff");
+  assert.equal(out.secondNav.text_color_desktop, "#1D1B18");
 });

@@ -73,3 +73,10 @@ export {
 } from "./pdp-elements.js";
 export { ensureActiveVariant, mergeButtonCatalog, normalizeButtonType } from "./button-merge.js";
 export { DEFAULT_BUTTON_COLORS, buildButtonColorVarLines, BUTTON_COLOR_VAR_PREFIX } from "./button-type-colors.js";
+export {
+  WARM_HOME_LAYOUT,
+  CUSTOM_HOME_LAYOUT,
+  buildWarmHomeContainers,
+  isWarmHomeSaved,
+  resolveHomeComposition,
+} from "./warm-home-composition.js";

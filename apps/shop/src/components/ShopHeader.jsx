@@ -300,7 +300,7 @@ const SecondNavCategoriesBtn = styled.button`
     flex-shrink: 0;
     height: 38px;
     padding: 0 14px;
-    margin-left: -12px;
+    margin-left: 0;
     border: 0;
     border-radius: 999px;
     background: ${(p) => (p.$open ? "var(--second-nav-text, #1d1b18)" : "var(--shop-bg, rgba(0, 0, 0, 0.05))")};
@@ -447,7 +447,8 @@ const SearchBarForm = styled.div`
   border: 2px solid var(--header-icon-color, #1d1b18);
   border-radius: 9999px;
   box-sizing: border-box;
-  overflow: hidden;
+  /* no overflow:hidden — the search history / suggestion panel hangs below this box */
+  position: relative;
   transition: box-shadow 0.2s ease, height 0.2s ease;
 
   &:focus-within {
@@ -473,6 +474,7 @@ const SearchBarButton = styled.button`
   width: 64px;
   padding: 0;
   margin: 0;
+  border-radius: 0 9999px 9999px 0;
   color: #1d1b18;
   flex-shrink: 0;
   transition: filter 0.15s ease;
@@ -486,6 +488,7 @@ const SearchBarButton = styled.button`
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     order: 0;
     width: 44px;
+    border-radius: 9999px 0 0 9999px;
     background: transparent;
     color: #1d1b18;
   }
@@ -1117,6 +1120,14 @@ const SecondMenuRowInner = styled.div`
   justify-content: flex-start;
   font-size: 15px;
   min-height: var(--second-nav-h, 42px);
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+  @media (min-width: 1024px) {
+    /* The "Alle Kategorien" pill sits 12px left of the content edge (design). */
+    padding-left: 12px;
+  }
 
   @media (max-width: 1023px) {
     overflow-x: auto;

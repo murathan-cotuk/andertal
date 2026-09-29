@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import FacetOptions, { facetDisplayKind } from "@/components/catalog/FacetOptions";
 import styled, { keyframes } from "styled-components";
 import { useTranslations } from "next-intl";
 import { useRouter, usePathname } from "@/i18n/navigation";
@@ -52,6 +53,8 @@ const Bone = styled.div`
   animation: ${shimmer} 1.5s infinite linear;
 `;
 
+const SEARCH_SORT_KEYS = new Set(["default", "bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"]);
+
 const ColHeader = styled.div`
   padding: 28px 32px 0;
   max-width: 1440px;
@@ -78,11 +81,10 @@ const Breadcrumb = styled.nav`
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #999;
-  letter-spacing: 0.02em;
-  a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
-  b { color: #444; font-weight: 500; }
+  font-size: 13px;
+  color: #5e574e;
+  a { color: #5e574e; text-decoration: none; transition: color 0.12s; &:hover { color: var(--body-color, #1d1b18); } }
+  b { color: var(--body-color, #1d1b18); font-weight: 600; }
 
   @media (max-width: 767px) {
     display: none;
@@ -216,6 +218,15 @@ const Sidebar = styled.aside`
   top: ${HEADER_H + 100}px;
   max-height: calc(100vh - ${HEADER_H + 100}px);
   overflow-y: auto;
+
+  /* Desktop: same white card as the category page sidebar */
+  @media (min-width: ${CATALOG_DRAWER_MAX_PX + 1}px) {
+    background: #fff;
+    border-radius: 20px;
+    padding: 18px 18px 6px;
+    box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
+    box-sizing: border-box;
+  }
 
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     position: fixed;
@@ -681,6 +692,7 @@ function buildSearchUrl(pathname, q, cat) {
 
 export default function SearchTemplate() {
   const tCommon = useTranslations("common");
+  const tSort = useTranslations("catalogSort");
   const tHome = useTranslations("home");
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -971,7 +983,7 @@ export default function SearchTemplate() {
     Boolean(q)
     && (textHits.length > 0)
     && (hasNavPane || hasFacets)
-    && !!currentNode
+    && (!!currentNode || hasFacets)
     && !treeLoading
     && showSidebarTmpl;
 
@@ -1140,7 +1152,7 @@ export default function SearchTemplate() {
       <main className="flex-grow" aria-label="Search results">
         <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <CategoryTitle>{title}</CategoryTitle>
-          {q ? <TitleSub>{textHits.length} {textHits.length === 1 ? "Ergebnis" : "Ergebnisse"}</TitleSub> : null}
+          {q ? <TitleSub>{tSort("results", { count: textHits.length })}</TitleSub> : null}
         </ColHeader>
 
         <SortBar>
@@ -1164,37 +1176,33 @@ export default function SearchTemplate() {
                   Navigation{activeCount > 0 ? ` (${activeCount})` : ""}
                 </FilterBtn>
               )}
+              <Breadcrumb aria-label="Breadcrumb">
+                <Link href="/">{tCommon("home")}</Link>
+                <span style={{ color: "#b8afa2" }}>›</span>
+                <b>{tCommon("search")}</b>
+                {q ? (
+                  <>
+                    <span style={{ color: "#b8afa2" }}>›</span>
+                    <b style={{ maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>„{q}“</b>
+                  </>
+                ) : null}
+              </Breadcrumb>
             </SortBarLeft>
             <SortWrap>
-              <SortLabel>Sort:</SortLabel>
+              <SortLabel>{tSort("sortBy")}</SortLabel>
               <SortSelect
                 value={sort}
                 onChange={(e) => { setSort(e.target.value); setPage(1); }}
                 aria-label="Sort products"
               >
                 {SORT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>{SEARCH_SORT_KEYS.has(o.value) ? tSort(o.value) : o.label}</option>
                 ))}
               </SortSelect>
             </SortWrap>
           </SortBarInner>
         </SortBar>
 
-        <BreadcrumbRow style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
-          <Breadcrumb aria-label="Breadcrumb">
-            <Link href={`/${locale}`}>Home</Link>
-            <span style={{ color: "#ccc" }}>/</span>
-            <b>{tCommon("search")}</b>
-            {q ? (
-              <>
-                <span style={{ color: "#ccc" }}>/</span>
-                <b style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {q}
-                </b>
-              </>
-            ) : null}
-          </Breadcrumb>
-        </BreadcrumbRow>
 
         <ContentWrap ref={bodyRef} style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           {showCatalogSidebar && (
@@ -1244,15 +1252,14 @@ export default function SearchTemplate() {
                             <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
                           </FilterGroupTitle>
                           <FilterGroupBody $open={!!openFilterGroups[key]}>
-                            {vals.map((val) => {
-                              const on = (filters[key] || []).includes(val);
-                              return (
-                                <CheckRow key={val} $on={on}>
-                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={12} />
-                                  {formatFacetOptionLabel(key, val, categorySlugToName, locale, metafieldDefinitions)}
-                                </CheckRow>
-                              );
-                            })}
+                            <FacetOptions
+                              kind={facetDisplayKind(key, getFacetGroupTitle(key, locale, metafieldDefinitions))}
+                              values={vals}
+                              selected={filters[key] || []}
+                              label={(v) => formatFacetOptionLabel(key, v, categorySlugToName, locale, metafieldDefinitions)}
+                              onToggle={(v) => toggle(key, v)}
+                              checkboxSize={12}
+                            />
                           </FilterGroupBody>
                         </FilterGroup>
                       ))
@@ -1436,7 +1443,7 @@ export default function SearchTemplate() {
 
             {q ? (
               <ResultBar>
-                {total} {total === 1 ? "product" : "products"}
+                {tSort("results", { count: total })}
               </ResultBar>
             ) : null}
 

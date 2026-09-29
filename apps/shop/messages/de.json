@@ -36,7 +36,13 @@
     "allIn": "Alles in {name}",
     "showAll": "Alle anzeigen",
     "noCategoryMatch": "Keine passende Kategorie",
-    "footerTagline": "Der Marktplatz für unabhängige Marken und geprüfte Händler aus Europa."
+    "footerTagline": "Der Marktplatz für unabhängige Marken und geprüfte Händler aus Europa.",
+    "lastUpdated": "Zuletzt aktualisiert: {date}",
+    "legalHelp": "Fragen zu einer Bestellung?",
+    "legalHelpLink": "Zum Kundenservice",
+    "collectionLabel": "Kollektion",
+    "productsCount": "{count, plural, one {# Produkt} other {# Produkte}}",
+    "brandsCount": "{count, plural, one {# Marke} other {# Marken}}"
   },
   "nav": {
     "collection": "Kollektion",

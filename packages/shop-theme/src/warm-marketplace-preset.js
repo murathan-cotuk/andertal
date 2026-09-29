@@ -229,15 +229,8 @@ export const WARM_MARKETPLACE_STYLES = {
     shadow: "none",
     border_bottom: "none",
   },
+  /* Header keeps the merchant's own colours (background, gradient, text, icons); only the height changes. */
   header: {
-    variant: "default",
-    bg_color: P.surface,
-    bg_image_url: "",
-    bg_gradient_enabled: false,
-    text_color: P.ink,
-    icon_color: P.ink,
-    shadow: "none",
-    border_bottom: `1px solid ${P.line}`,
     height_desktop: "88px",
   },
   secondNav: {
@@ -344,6 +337,20 @@ function keepSmallerViewports(prev = {}, fallback) {
   };
 }
 
+/** Second nav: white bar with dark text on every viewport — per-viewport overrides the merchant saved
+ *  earlier (e.g. white text for the old coloured header) would otherwise win over the base values. */
+function secondNavViewportColors() {
+  const out = {};
+  for (const vp of ["desktop", "tablet", "mobile"]) {
+    out[`bg_${vp}`] = P.surface;
+    out[`border_${vp}`] = "none";
+    out[`text_color_${vp}`] = P.ink;
+    out[`text_color_scroll_${vp}`] = P.ink;
+    out[`active_color_${vp}`] = P.brandText;
+  }
+  return out;
+}
+
 export function applyWarmMarketplacePreset(styles = {}) {
   const s = WARM_MARKETPLACE_STYLES;
   const prevTopbar = styles.topbar || {};
@@ -355,8 +362,13 @@ export function applyWarmMarketplacePreset(styles = {}) {
       ...mergeSection(prevTopbar, s.topbar),
       ...(hasTopbarItems ? {} : { items: WARM_TOPBAR_ITEMS, enabled: true, display_mode: "inline" }),
     },
-    header: { ...mergeSection(styles.header, s.header), ...keepSmallerViewports(styles.header, "72px") },
-    secondNav: { ...mergeSection(styles.secondNav, s.secondNav), ...keepSmallerViewports(styles.secondNav, "44px") },
+    header: {
+      ...mergeSection(styles.header, s.header),
+      ...keepSmallerViewports(styles.header, "72px"),
+      // Icons follow the header text colour unless the merchant picked an icon colour.
+      icon_color: (styles.header && (styles.header.icon_color || styles.header.text_color)) || "#ffffff",
+    },
+    secondNav: { ...mergeSection(styles.secondNav, s.secondNav), ...secondNavViewportColors(), ...keepSmallerViewports(styles.secondNav, "44px") },
     footer: mergeSection(styles.footer, s.footer),
     typography: mergeTypography(styles.typography, s.typography),
     scrollUpButton: mergeSection(styles.scrollUpButton, s.scrollUpButton),

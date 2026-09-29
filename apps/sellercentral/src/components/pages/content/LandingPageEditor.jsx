@@ -24,7 +24,7 @@ import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import { PromoBentoEditor, CategoryCirclesEditor } from "@/components/pages/content/WarmContainerEditors";
 import RichTextEditor from "@/components/RichTextEditor";
-import { mergeLoadedShopStyles } from "@andertal/shop-theme";
+import { mergeLoadedShopStyles, buildWarmHomeContainers, isWarmHomeSaved, WARM_HOME_LAYOUT, CUSTOM_HOME_LAYOUT } from "@andertal/shop-theme";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import SearchableGroupedSelect from "@/components/inputs/SearchableGroupedSelect";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
@@ -4636,6 +4636,12 @@ export default function LandingPageEditor() {
         publish: true,
       };
       if (selectedPageId === DEFAULT_PAGE_ID) {
+        // Saving the homepage is an explicit choice: the shop then shows exactly this page
+        // (instead of the design homepage it renders while nothing was saved).
+        payload.settings = {
+          ...payload.settings,
+          homepage_layout: isWarmHomeSaved(containers, {}) ? WARM_HOME_LAYOUT : CUSTOM_HOME_LAYOUT,
+        };
         await client.request("/admin-hub/landing-page", {
           method: "PUT",
           body: JSON.stringify(payload),
@@ -4662,23 +4668,18 @@ export default function LandingPageEditor() {
 
   const handleSave = useCallback(() => persistLanding(), [persistLanding]);
 
-  const handleApplyHomepageComposition = useCallback(async () => {
-    setSaving(true);
-    setErr("");
-    try {
-      const data = await client.request("/admin-hub/landing-page/homepage-composition");
-      if (!Array.isArray(data?.containers) || !data.containers.length) {
-        throw new Error(copy.loadContainersError);
-      }
-      setContainers(data.containers);
-      setCategorySettings((prev) => ({ ...prev, ...(data.settings || {}) }));
-      setIsDirty(true);
-      setExpandedId(null);
-    } catch (e) {
-      setErr(e?.message || copy.saveError);
-    }
-    setSaving(false);
-  }, [client, copy.loadContainersError, copy.saveError]);
+  /* Loads the design homepage (same composition the shop shows until one is saved) into the editor.
+     Existing images from hero / Bilder-Karussell are reused; nothing is live until Save. */
+  const handleApplyHomepageComposition = useCallback(() => {
+    const next = buildWarmHomeContainers(containers).map((c) => ({
+      ...c,
+      id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    }));
+    setContainers(next);
+    setCategorySettings((prev) => ({ ...prev, homepage_layout: WARM_HOME_LAYOUT }));
+    setIsDirty(true);
+    setExpandedId(null);
+  }, [containers]);
 
   const handleDiscard = useCallback(async () => {
     setIsDirty(false);
@@ -5085,7 +5086,7 @@ export default function LandingPageEditor() {
               </InlineStack>
               {selectedPageId === DEFAULT_PAGE_ID && (
                 <BlockStack gap="150">
-                  <Button onClick={handleApplyHomepageComposition} loading={saving}>
+                  <Button variant="primary" onClick={handleApplyHomepageComposition}>
                     {copy.applyHomepageComposition}
                   </Button>
                   <Text as="p" variant="bodySm" tone="subdued">{copy.applyHomepageCompositionHelp}</Text>
@@ -5760,7 +5761,7 @@ export default function LandingPageEditor() {
                               <ContainerTypePreview type={tpl.type} label={info.label} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <BlockStack gap="100">
-                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{info.label}{tpl.defaults?.mode === "sale" ? " · deals" : tpl.defaults?.mode === "newest" ? " · new" : tpl.defaults?.source === "categories" ? " · categories" : ""}</Text>
+                                  <Text as="p" variant="bodyMd" fontWeight="semibold">{tpl.title ? tpl.title : info.label}{tpl.title ? "" : tpl.defaults?.mode === "sale" ? " · deals" : tpl.defaults?.mode === "newest" ? " · new" : tpl.defaults?.source === "categories" ? " · categories" : ""}</Text>
                                   <Text as="p" variant="bodySm" tone="subdued">{tpl.blurb || info.description}</Text>
                                 </BlockStack>
                               </div>
