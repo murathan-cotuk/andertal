@@ -48,7 +48,7 @@ import { extractSolidTintFromChromeCss } from "@/lib/header-status-tint";
 import { applyDocumentFavicon } from "@/lib/apply-document-favicon";
 import { resolveImageUrl } from "@/lib/image-url";
 import { pickCategoryListImageRaw } from "@/lib/category-list-image";
-import { mapCategoryNodesToMenuRows, shouldCategoryMenuDrill } from "@/lib/category-menu-rows";
+import { mapCategoryGroups, mapCategoryNodesToMenuRows, shouldCategoryMenuDrill } from "@/lib/category-menu-rows";
 
 /** Yukarı kaydırırken titreşimi süzmek için (alt menüyü tekrar göster) */
 const SCROLL_UP_DELTA = 6;
@@ -213,7 +213,7 @@ const MiddleBarWrap = styled.div`
 `;
 
 const MiddleBarInner = styled.div`
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
   padding: 0 24px;
   min-height: var(--header-h, 72px);
@@ -241,8 +241,8 @@ const MiddleBarLeft = styled.div`
 const MiddleBarLogo = styled(Link)`
   color: var(--header-text, #fff);
   font-size: 1.35rem;
-  font-weight: 700;
-  font-family: ${tokens.fontFamily.sans};
+  font-weight: 800;
+  font-family: var(--h1-ff, ${tokens.fontFamily.sans});
   text-decoration: none;
   padding: 0 4px 0 0;
   letter-spacing: -0.02em;
@@ -298,12 +298,12 @@ const SecondNavCategoriesBtn = styled.button`
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
-    height: 34px;
+    height: 38px;
     padding: 0 14px;
-    margin-left: -8px;
+    margin-left: -12px;
     border: 0;
     border-radius: 999px;
-    background: ${(p) => (p.$open ? "var(--second-nav-text, #1d1b18)" : "rgba(0, 0, 0, 0.05)")};
+    background: ${(p) => (p.$open ? "var(--second-nav-text, #1d1b18)" : "var(--shop-bg, rgba(0, 0, 0, 0.05))")};
     color: ${(p) => (p.$open ? "var(--second-nav-bg, #ffffff)" : "var(--second-nav-text, #1d1b18)")};
     font: inherit;
     font-weight: 700;
@@ -440,35 +440,54 @@ const SearchBarForm = styled.div`
   min-width: 0;
   width: 100%;
   display: flex;
-  align-items: center;
-  height: 37px;
-  padding: 0 4px 0 12px;
+  align-items: stretch;
+  height: 52px;
+  padding: 0 0 0 8px;
   background: #fff;
+  border: 2px solid var(--header-icon-color, #1d1b18);
   border-radius: 9999px;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
-  transition: box-shadow 0.2s ease, transform 0.2s ease, height 0.2s ease;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, height 0.2s ease;
 
   &:focus-within {
-    box-shadow: 0 2px 14px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--shop-primary, #ee8a12) 35%, transparent);
+  }
+
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    height: 46px;
+    border: 0;
+    padding: 0 12px 0 0;
+    box-shadow: 0 1px 2px rgba(29, 27, 24, 0.08), 0 0 0 1px rgba(29, 27, 24, 0.06);
   }
 `;
 
 const SearchBarButton = styled.button`
+  order: 2;
   border: none;
-  background: transparent;
+  background: var(--shop-primary, #ee8a12);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 64px;
   padding: 0;
-  margin-right: 12px;
-  color: #6b7280;
+  margin: 0;
+  color: #1d1b18;
   flex-shrink: 0;
-  &:focus {
-    outline: none;
+  transition: filter 0.15s ease;
+  &:focus-visible {
+    outline: 2px solid #1d1b18;
+    outline-offset: -4px;
   }
   &:hover {
-    color: #374151;
+    filter: brightness(0.95);
+  }
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    order: 0;
+    width: 44px;
+    background: transparent;
+    color: #1d1b18;
   }
 `;
 
@@ -494,22 +513,38 @@ const MiddleBarRight = styled.div`
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
+  margin-left: 20px;
   position: relative;
   z-index: 10;
   color: #fff;
+
+  .shop-header-icon-label {
+    display: none;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+  @media (min-width: 1024px) {
+    .shop-header-icon-label { display: block; }
+  }
 `;
 
 const MiddleBarIconBtn = styled.button`
-  width: 46px;
+  min-width: 46px;
   height: 46px;
+  padding: 0 10px;
   border: none;
   background: transparent;
   color: #fff !important;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
+  gap: 2px;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 12px;
   transition: background 0.2s ease, color 0.2s ease;
 
   &:hover {
@@ -531,11 +566,12 @@ const MiddleBarCartBtn = styled(MiddleBarIconBtn)`
 
 const MiddleBarCartBadge = styled.span`
   position: absolute;
-  top: 6px;
-  right: 6px;
-  background: #fff;
-  color: ${MIDDLE_BAR_BG};
-  border-radius: 50%;
+  top: 0;
+  right: 12px;
+  padding: 0 4px;
+  background: var(--shop-primary, #ee8a12);
+  color: #1d1b18;
+  border-radius: 9px;
   min-width: 18px;
   height: 18px;
   font-size: 11px;
@@ -566,7 +602,7 @@ const CategoryMegaBackdrop = styled.div`
   @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
     display: block;
     position: fixed;
-    inset: 0;
+    inset: ${(p) => `${Math.max(0, Number(p.$topPx) || 0)}px 0 0 0`};
     background: rgba(29, 27, 24, 0.45);
     z-index: 2147483590;
     opacity: ${(p) => (p.$open ? 1 : 0)};
@@ -599,26 +635,26 @@ const CategoryMegaPanel = styled.div`
     border-top: none;
   }
 
-  /* Desktop: large card dropping down from under the header (two panes: roots | children) */
+  /* Desktop: wide card hanging directly under the header (roots | groups) */
   @media (min-width: ${HEADER_NARROW_MQ + 1}px) {
     position: fixed;
     left: 50%;
     right: auto;
-    top: ${(p) => `${Math.max(52, Number(p.$topPx) || 0) + 8}px`};
-    width: min(1312px, calc(100vw - 48px));
-    height: ${(p) => `min(640px, calc(100vh - ${Math.max(52, Number(p.$topPx) || 0) + 32}px))`};
+    top: ${(p) => `${Math.max(52, Number(p.$topPx) || 0)}px`};
+    width: min(1324px, calc(100vw - 32px));
+    height: ${(p) => `min(680px, calc(100vh - ${Math.max(52, Number(p.$topPx) || 0) + 24}px))`};
     background: #fff;
     border: none;
-    border-radius: 24px;
-    box-shadow: 0 24px 64px rgba(29, 27, 24, 0.22);
+    border-radius: 0 0 24px 24px;
+    box-shadow: 0 24px 48px rgba(29, 27, 24, 0.18);
     overflow: hidden;
     display: flex;
     flex-direction: column;
     max-height: none;
     opacity: ${(p) => (p.$open ? 1 : 0)};
     visibility: ${(p) => (p.$open ? "visible" : "hidden")};
-    transform: translate(-50%, ${(p) => (p.$open ? "0" : "-12px")});
-    transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.22s;
+    transform: translate(-50%, ${(p) => (p.$open ? "0" : "-8px")});
+    transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0.2s;
     pointer-events: ${(p) => (p.$open ? "auto" : "none")};
   }
 `;
@@ -765,6 +801,8 @@ const CategoryMegaRootLink = styled(Link)`
 `;
 
 /* ── Desktop category dropdown (two panes) ───────────────────── */
+const MEGA_TILE_TONES = ["#F1D9C4", "#E4DCE8", "#F3E3C6", "#D8E0E8", "#DCE3D6", "#EADFCF", "#E8D2BC", "#C9D6C0"];
+
 const CategoryMegaDesktopShell = styled.div`
   display: flex;
   flex: 1;
@@ -772,11 +810,11 @@ const CategoryMegaDesktopShell = styled.div`
 `;
 
 const CategoryMegaRootList = styled.nav`
-  width: 300px;
+  width: 290px;
   flex-shrink: 0;
   background: #fbf8f3;
   border-right: 1px solid #efe8dd;
-  padding: 14px 10px;
+  padding: 16px 12px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -786,20 +824,20 @@ const CategoryMegaRootList = styled.nav`
 const CategoryMegaRootItem = styled(Link)`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  min-height: 42px;
+  min-height: 36px;
   padding: 0 12px;
-  border-radius: 12px;
-  font-size: 15px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: ${(p) => (p.$active ? 700 : 500)};
-  color: ${(p) => (p.$active ? "#fff" : "var(--body-color, #1d1b18)")};
+  color: ${(p) => (p.$active ? "#fff" : "var(--body-color, #1d1b18)")} !important;
   background: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "transparent")};
   text-decoration: none;
   flex-shrink: 0;
   transition: background 0.12s ease, color 0.12s ease;
   &:hover {
     background: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#efe8dd")};
-    color: ${(p) => (p.$active ? "#fff" : "var(--body-color, #1d1b18)")};
   }
   span {
     flex: 1;
@@ -814,59 +852,132 @@ const CategoryMegaDetail = styled.div`
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: 26px 32px 32px;
+  padding: 28px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 `;
 
 const CategoryMegaDetailHead = styled.div`
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-  h2 {
+  gap: 20px;
+  .mega-title {
     flex: 1;
     min-width: 0;
-    margin: 0;
+    span {
+      font-size: 13px;
+      color: #5e574e;
+    }
+  }
+  h2 {
+    margin: 2px 0 0;
     font-family: var(--h2-ff, inherit);
     font-size: 30px;
     font-weight: 800;
     letter-spacing: -0.015em;
+    line-height: 1.1;
     color: var(--body-color, #1d1b18);
+  }
+`;
+
+const CategoryMegaSearch = styled.div`
+  width: min(380px, 32vw);
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 23px;
+  background: #f6f2ec;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  color: #1d1b18;
+  &:focus-within {
+    box-shadow: 0 0 0 2px #1d1b18;
+  }
+  input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 14px;
+    outline: none;
+    color: inherit;
   }
 `;
 
 const CategoryMegaAllLink = styled(Link)`
   display: inline-flex;
   align-items: center;
-  height: 44px;
+  height: 46px;
   padding: 0 20px;
-  border-radius: 999px;
+  border-radius: 23px;
   background: var(--body-color, #1d1b18);
   color: #fff !important;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  flex-shrink: 0;
   &:hover { opacity: 0.88; }
 `;
 
-const CategoryMegaCloseBtn = styled.button`
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  border: none;
-  border-radius: 50%;
-  background: #f6f2ec;
-  color: var(--body-color, #1d1b18);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-  &:hover { background: #ece5da; }
+const CategoryMegaGroupGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px 32px;
+  align-content: start;
+  .mega-skeleton {
+    height: 160px;
+    border-radius: 14px;
+    background: #f6f2ec;
+  }
+  @media (max-width: 1180px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 `;
 
-const CategoryMegaChildGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 6px 12px;
+const CategoryMegaGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  min-width: 0;
+  a {
+    text-decoration: none;
+  }
+  .mega-group-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--body-color, #1d1b18);
+  }
+  .mega-group-tile {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+  .mega-group-link {
+    padding-left: 46px;
+    color: #3a352f;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mega-group-more {
+    padding-left: 46px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--shop-accent, #a65300);
+  }
+  a:hover {
+    color: var(--shop-accent, #a65300);
+  }
 `;
 
 const CategoryMegaFlatGrid = styled.div`
@@ -968,6 +1079,7 @@ const UserBtn = styled.button`
 const SubNavClipper = styled.div`
   width: 100%;
   overflow: hidden;
+  border-bottom: 1px solid rgba(29, 27, 24, 0.1);
   max-height: ${(p) => {
     if (p.$chromeCover) return `var(--second-nav-h, 50px)`;
     const t = Math.min(1, Math.max(0, p.$hideProgress ?? 0));
@@ -996,15 +1108,15 @@ const SubNavWrap = styled.div`
 
 const SecondMenuRowInner = styled.div`
   width: 100%;
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
-  padding: 0 ${tokens.containerPadding};
+  padding: 0 24px;
   display: flex;
-  gap: ${tokens.spacing.lg};
+  gap: 28px;
   align-items: center;
   justify-content: flex-start;
   font-size: 15px;
-  min-height: 42px;
+  min-height: var(--second-nav-h, 42px);
 
   @media (max-width: 1023px) {
     overflow-x: auto;
@@ -1028,6 +1140,42 @@ const SecondLink = styled(Link)`
   line-height: 1.25;
   white-space: nowrap;
   flex-shrink: 0;
+
+  &:hover {
+    color: var(--shop-accent, #a65300);
+  }
+
+  &.is-sale {
+    color: var(--shop-accent, #a65300);
+    font-weight: 700;
+    @media (min-width: 1024px) {
+      margin-left: auto;
+    }
+  }
+`;
+
+const DeliverToBtn = styled.button`
+  display: none;
+  @media (min-width: 1200px) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 24px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--header-icon-color, #1d1b18);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.25;
+    text-align: left;
+    cursor: pointer;
+    &:hover { background: rgba(127, 127, 127, 0.1); }
+    small { display: block; font-size: 12px; opacity: 0.72; }
+    b { display: block; font-size: 14px; }
+  }
 `;
 
 const HeaderSpacer = styled.div`
@@ -1168,12 +1316,15 @@ export default function ShopHeader() {
   const [categoryDrillStack, setCategoryDrillStack] = useState([]); // [] = root level
   /** Desktop dropdown: root category whose children are shown in the right pane */
   const [megaRoot, setMegaRoot] = useState(null);
+  /* Desktop category card: children + grandchildren per root, loaded on hover (depth 2). */
+  const [megaGroupsById, setMegaGroupsById] = useState(() => new Map());
+  const megaGroupsLoadedRef = useRef(new Set());
+  const [megaQuery, setMegaQuery] = useState("");
   const { isAuthenticated, user, logout } = useAuth();
   const { openCartSidebar, itemCount, shippingGroups } = useCart();
   const tLocale = useTranslations("locale");
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
-  const tAccountPanel = useTranslations("accountPanel");
   const tSearch = useTranslations("search");
   const locale = useLocale();
 
@@ -1185,6 +1336,17 @@ export default function ShopHeader() {
     if (!t?.country) return String(DEFAULT_MARKET).toUpperCase();
     return t.country.toUpperCase();
   })();
+
+  const deliverCountryLabel = (() => {
+    const hit = shopCountries.find((c) => c.code === selectedCountry);
+    if (hit?.label) return hit.label;
+    try {
+      return new Intl.DisplayNames([locale], { type: "region" }).of(selectedCountry) || selectedCountry;
+    } catch {
+      return selectedCountry;
+    }
+  })();
+  const localeButtonLabel = `${selectedCountry} · ${(SHOP_LOCALES.find((l) => l.code === locale) || {}).label || String(locale).toUpperCase()}`;
 
   const navigateTriple = (countryLower, langLower, curLower) => {
     const tail = restPathFromPathname(pathname);
@@ -1384,16 +1546,16 @@ export default function ShopHeader() {
     return () => { cancelled = true; };
   }, [locale]);
 
-  /* Lazy-load children for the desktop dropdown's hovered root (same endpoint as drilling). */
+  /* Lazy-load children + grandchildren for the desktop card's hovered root. */
   useEffect(() => {
     const parentId = megaRoot?.id != null ? String(megaRoot.id) : "";
-    if (!parentId || categoryChildrenLoadedRef.current.has(parentId)) return undefined;
-    categoryChildrenLoadedRef.current.add(parentId);
-    cachedJsonFetch(`/api/store-categories${childrenCategoriesQuery(locale, parentId)}`, { ttlMs: 60000 })
+    if (!parentId || megaGroupsLoadedRef.current.has(parentId)) return undefined;
+    megaGroupsLoadedRef.current.add(parentId);
+    cachedJsonFetch(`/api/store-categories${childrenCategoriesQuery(locale, parentId, 2)}`, { ttlMs: 60000 })
       .catch(() => ({ tree: [] }))
       .then((res) => {
         const kids = Array.isArray(res?.tree) ? res.tree : [];
-        setCategoryChildrenById((prev) => {
+        setMegaGroupsById((prev) => {
           const next = new Map(prev);
           next.set(parentId, kids);
           return next;
@@ -1405,14 +1567,27 @@ export default function ShopHeader() {
         });
       })
       .catch(() => {
-        categoryChildrenLoadedRef.current.delete(parentId);
+        megaGroupsLoadedRef.current.delete(parentId);
       });
     return undefined;
   }, [megaRoot, locale]);
 
   useEffect(() => {
-    if (!mainMenuOpen) setMegaRoot(null);
+    if (!mainMenuOpen) {
+      setMegaRoot(null);
+      setMegaQuery("");
+    }
   }, [mainMenuOpen]);
+
+  /* Footer's "Land · Sprache" button opens the header's country/language picker. */
+  useEffect(() => {
+    const open = () => {
+      setMainMenuOpen(false);
+      setLocaleDropdownOpen(true);
+    };
+    window.addEventListener("andertal:open-locale", open);
+    return () => window.removeEventListener("andertal:open-locale", open);
+  }, []);
 
   /* Lazy-load children when the mega-menu drills into a category. */
   useEffect(() => {
@@ -1862,12 +2037,29 @@ export default function ShopHeader() {
                         }}
                       />
                     ) : (
-                      <span style={{ fontSize: isNarrowViewport && narrowCompactProgress > 0.02 ? "1rem" : "1.35rem" }}>
+                      <span style={{ fontSize: isNarrowViewport ? (narrowCompactProgress > 0.02 ? "1rem" : "1.35rem") : "1.75rem", letterSpacing: "-0.03em" }}>
                         Andertal
                       </span>
                     );
                   })()}
                 </MiddleBarLogo>
+                {!isNarrowViewport ? (
+                  <DeliverToBtn
+                    type="button"
+                    data-locale-dropdown
+                    onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }}
+                    aria-label={`${tCommon("deliverTo")} ${deliverCountryLabel}`}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" />
+                      <circle cx="12" cy="9.5" r="2.5" />
+                    </svg>
+                    <span>
+                      <small>{tCommon("deliverTo")}</small>
+                      <b>{deliverCountryLabel}</b>
+                    </span>
+                  </DeliverToBtn>
+                ) : null}
               </MiddleBarLeft>
             </NarrowHeaderChrome>
 
@@ -1937,10 +2129,16 @@ export default function ShopHeader() {
                   <SearchBarButton
                     type="button"
                     aria-label={tSearch("label")}
-                    onClick={() => {}}
+                    onClick={(e) => {
+                      const input = e.currentTarget.parentElement?.querySelector("input");
+                      if (!input) return;
+                      if (String(input.value || "").trim() && input.form) input.form.requestSubmit();
+                      else input.focus();
+                    }}
                   >
-                    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" style={{ minWidth: 20, height: 20 }}>
-                      <path d="M17.545 15.467l-3.779-3.779c0.57-0.935 0.898-2.035 0.898-3.21 0-3.417-2.961-6.377-6.378-6.377s-6.186 2.769-6.186 6.186c0 3.416 2.961 6.377 6.377 6.377 1.137 0 2.2-0.309 3.115-0.844l3.799 3.801c0.372 0.371 0.975 0.371 1.346 0l0.943-0.943c0.371-0.371 0.236-0.84-0.135-1.211zM4.004 8.287c0-2.366 1.917-4.283 4.282-4.283s4.474 2.107 4.474 4.474c0 2.365-1.918 4.283-4.283 4.283s-4.473-2.109-4.473-4.474z" />
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M20 20l-3.5-3.5" />
                     </svg>
                   </SearchBarButton>
                   <SearchBarInputWrap>
@@ -1961,9 +2159,11 @@ export default function ShopHeader() {
             <MiddleBarRight>
               <LocaleCurrencyWrap data-locale-dropdown>
                 <MiddleBarLocaleBtn type="button" className="shop-header-action-icon" onClick={() => { setMainMenuOpen(false); setLocaleDropdownOpen((v) => !v); }} title={tLocale("label")} aria-label={tLocale("label")} aria-haspopup="listbox" aria-expanded={localeDropdownOpen}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
                   </svg>
+                  <span className="shop-header-icon-label">{localeButtonLabel}</span>
                 </MiddleBarLocaleBtn>
                 <LocaleDropdown $open={localeDropdownOpen}>
                   <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0", minWidth: 0 }}>
@@ -2005,6 +2205,7 @@ export default function ShopHeader() {
               </LocaleCurrencyWrap>
               <MiddleBarUserWrap>
                 <UserDropdownPanel
+                  label={tCommon("account")}
                   layoutAnchorRef={middleBarRef}
                   isAuthenticated={isAuthenticated}
                   user={user}
@@ -2016,9 +2217,12 @@ export default function ShopHeader() {
                 />
               </MiddleBarUserWrap>
               <MiddleBarCartBtn type="button" className="shop-header-action-icon" onClick={openCartSidebar} title={tCommon("cart")} aria-label={tCommon("cart")}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" clipRule="evenodd" d="M1 2.75C1 2.33579 1.33579 2 1.75 2H2.27029C3.34283 2 4.26626 2.75703 4.4766 3.80874L4.71485 5H20.2676C21.3791 5 22.209 6.02281 21.98 7.11052L20.5682 13.8165C20.3003 15.0891 19.1777 16 17.8772 16H7.63961C6.32874 16 5.20009 15.0747 4.94301 13.7893L3.00573 4.10291C2.93562 3.75234 2.6278 3.5 2.27029 3.5H1.75C1.33579 3.5 1 3.16421 1 2.75ZM6 19C6 17.8954 6.89543 17 8 17C9.10457 17 10 17.8954 10 19C10 20.1046 9.10457 21 8 21C6.89543 21 6 20.1046 6 19ZM15 19C15 17.8954 15.8954 17 17 17C18.1046 17 19 17.8954 19 19C19 20.1046 18.1046 21 17 21C15.8954 21 15 20.1046 15 19Z" />
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h2l2.4 11h10.2L20 8H6.2" />
+                  <circle cx="9" cy="19" r="1.5" />
+                  <circle cx="17" cy="19" r="1.5" />
                 </svg>
+                <span className="shop-header-icon-label">{tCommon("cart")}</span>
                 {itemCount > 0 && <MiddleBarCartBadge>{itemCount}</MiddleBarCartBadge>}
               </MiddleBarCartBtn>
             </MiddleBarRight>
@@ -2071,7 +2275,7 @@ export default function ShopHeader() {
                   <SecondLink
                     key={item.id}
                     href={href}
-                    className={isActive ? "active" : undefined}
+                    className={[isActive ? "active" : "", /^(sale|angebote|deals|offerte|ofertas|soldes|indirim|i̇ndirim)$/i.test(String(item.label || "").trim()) ? "is-sale" : ""].filter(Boolean).join(" ") || undefined}
                   >
                     {item.label}
                   </SecondLink>
@@ -2111,6 +2315,7 @@ export default function ShopHeader() {
               {!isNarrowViewport ? (
                 <CategoryMegaBackdrop
                   $open={mainMenuOpen}
+                  $topPx={headerHeight}
                   aria-hidden={!mainMenuOpen}
                   onClick={() => {
                     setMainMenuOpen(false);
@@ -2246,13 +2451,17 @@ export default function ShopHeader() {
                         (megaRoot && rootRows.find((r) => String(r.id) === String(megaRoot.id))) ||
                         rootRows.find((r) => r.hasChildren) ||
                         rootRows[0];
-                      const childRows = activeRoot
-                        ? mapCategoryNodesToMenuRows(categoryChildrenById.get(String(activeRoot.id)) || [], locale)
-                            .map((r) => ({ ...r, href: `/${r.slug}` }))
-                            .filter((r) => r.slug)
-                        : [];
-                      const childrenLoading =
-                        !!activeRoot?.hasChildren && !categoryChildrenById.has(String(activeRoot.id));
+                      const rawGroups = activeRoot ? megaGroupsById.get(String(activeRoot.id)) : null;
+                      const groupsLoading = !!activeRoot?.hasChildren && !rawGroups;
+                      const q = megaQuery.trim().toLowerCase();
+                      const groups = mapCategoryGroups(rawGroups || [], locale, 4)
+                        .map((g) => {
+                          if (!q) return g;
+                          if (g.label.toLowerCase().includes(q)) return g;
+                          const hits = g.allLinks.filter((l) => l.label.toLowerCase().includes(q));
+                          return hits.length ? { ...g, links: hits.slice(0, 6), moreCount: Math.max(0, hits.length - 6) } : null;
+                        })
+                        .filter(Boolean);
                       return (
                         <CategoryMegaDesktopShell>
                           <CategoryMegaRootList aria-label={tCommon("categories")}>
@@ -2270,8 +2479,8 @@ export default function ShopHeader() {
                                 >
                                   <span>{row.label}</span>
                                   {row.hasChildren ? (
-                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" style={{ flexShrink: 0, opacity: 0.7 }}>
-                                      <path d="M4.5 2.5L8 6L4.5 9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+                                      <path d="M9 6l6 6-6 6" />
                                     </svg>
                                   ) : null}
                                 </CategoryMegaRootItem>
@@ -2280,35 +2489,62 @@ export default function ShopHeader() {
                           </CategoryMegaRootList>
                           <CategoryMegaDetail>
                             <CategoryMegaDetailHead>
-                              <h2>{activeRoot ? activeRoot.label : tCommon("categories")}</h2>
+                              <div className="mega-title">
+                                <span>{tCommon("allCategories")} ›</span>
+                                <h2>{activeRoot ? activeRoot.label : tCommon("categories")}</h2>
+                              </div>
+                              <CategoryMegaSearch role="search">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                                  <circle cx="11" cy="11" r="7" />
+                                  <path d="M20 20l-3.5-3.5" />
+                                </svg>
+                                <input
+                                  type="search"
+                                  value={megaQuery}
+                                  onChange={(e) => setMegaQuery(e.target.value)}
+                                  placeholder={tCommon("searchCategories")}
+                                  aria-label={tCommon("searchCategories")}
+                                />
+                              </CategoryMegaSearch>
                               {activeRoot ? (
                                 <CategoryMegaAllLink href={activeRoot.href} onClick={closeMenu}>
-                                  {tCommon("allCategories")} ›
+                                  {tCommon("allIn", { name: activeRoot.label })}
                                 </CategoryMegaAllLink>
                               ) : null}
-                              <CategoryMegaCloseBtn type="button" aria-label={tAccountPanel("close")} onClick={closeMenu}>
-                                ×
-                              </CategoryMegaCloseBtn>
                             </CategoryMegaDetailHead>
-                            {childrenLoading ? (
-                              <CategoryMegaChildGrid aria-busy="true">
+                            {groupsLoading ? (
+                              <CategoryMegaGroupGrid aria-busy="true">
                                 {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-                                  <div key={i} style={{ height: 56, borderRadius: 14, background: "#f6f2ec" }} />
+                                  <div key={i} className="mega-skeleton" />
                                 ))}
-                              </CategoryMegaChildGrid>
-                            ) : childRows.length > 0 ? (
-                              <CategoryMegaChildGrid>
-                                {childRows.map((row) => (
-                                  <CategoryMegaLink key={row.key} href={row.href} onClick={closeMenu}>
-                                    {row.imageUrl ? (
-                                      <CategoryMegaThumb src={row.imageUrl} alt="" />
-                                    ) : (
-                                      <CategoryMegaThumbPlaceholder aria-hidden />
-                                    )}
-                                    <CategoryMegaLinkLabel>{row.label}</CategoryMegaLinkLabel>
-                                  </CategoryMegaLink>
+                              </CategoryMegaGroupGrid>
+                            ) : groups.length > 0 ? (
+                              <CategoryMegaGroupGrid>
+                                {groups.map((g, gi) => (
+                                  <CategoryMegaGroup key={g.key}>
+                                    <Link href={`/${g.slug}`} className="mega-group-head" onClick={closeMenu}>
+                                      {g.imageUrl ? (
+                                        <img src={g.imageUrl} alt="" className="mega-group-tile" />
+                                      ) : (
+                                        <span className="mega-group-tile" style={{ background: MEGA_TILE_TONES[gi % MEGA_TILE_TONES.length] }} aria-hidden="true" />
+                                      )}
+                                      <span>{g.label}</span>
+                                    </Link>
+                                    {g.links.map((l) => (
+                                      <Link key={l.key} href={`/${l.slug}`} className="mega-group-link" onClick={closeMenu}>
+                                        {l.label}
+                                      </Link>
+                                    ))}
+                                    {g.links.length > 0 ? (
+                                      <Link href={`/${g.slug}`} className="mega-group-more" onClick={closeMenu}>
+                                        {tCommon("showAll")}
+                                      </Link>
+                                    ) : null}
+                                  </CategoryMegaGroup>
                                 ))}
-                              </CategoryMegaChildGrid>
+                              </CategoryMegaGroupGrid>
+                            ) : q ? (
+                              <p style={{ margin: 0, color: "#5E574E", fontSize: 14 }}>{tCommon("noCategoryMatch")}</p>
                             ) : activeRoot ? (
                               <CategoryMegaAllLink href={activeRoot.href} onClick={closeMenu} style={{ alignSelf: "flex-start" }}>
                                 {activeRoot.label} ›

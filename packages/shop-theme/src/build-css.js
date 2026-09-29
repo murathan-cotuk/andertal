@@ -514,6 +514,10 @@ h6.shop-typo-sidebar-nav {
 nav.second-nav a { color: var(--second-nav-text) !important; }
 .second-nav a.active,
 nav.second-nav a.active { color: var(--second-nav-active) !important; }
+.second-nav a.is-sale,
+nav.second-nav a.is-sale,
+.second-nav a:hover,
+nav.second-nav a:hover { color: var(--second-nav-active) !important; }
 ${buildSecondNavLinkAppearanceCss(resolveSecondNavLinkStyles(styles))}
 footer, .site-footer {
   background: var(--footer-bg) !important;

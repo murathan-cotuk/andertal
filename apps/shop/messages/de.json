@@ -30,7 +30,13 @@
     "noFilters": "Keine Filter in dieser Kategorie.",
     "filterSelectHint": "Wählen Sie links eine Produkteigenschaft.",
     "imageGallery": "Bildergalerie",
-    "toBrand": "Zur Marke"
+    "toBrand": "Zur Marke",
+    "deliverTo": "Liefern nach",
+    "searchCategories": "Kategorien durchsuchen",
+    "allIn": "Alles in {name}",
+    "showAll": "Alle anzeigen",
+    "noCategoryMatch": "Keine passende Kategorie",
+    "footerTagline": "Der Marktplatz für unabhängige Marken und geprüfte Händler aus Europa."
   },
   "nav": {
     "collection": "Kollektion",
@@ -721,7 +727,6 @@
         "4": "Prüfen",
         "5": "Fertig"
       },
-
       "categoryPrompt": "Thema auswählen",
       "subtopicPrompt": "Was beschreibt Ihr Anliegen am besten?",
       "orderPrompt": "Relevante Bestellung auswählen",
@@ -923,5 +928,17 @@
       "generic": "Etwas ist schiefgelaufen. Bitte aktualisieren Sie die Seite."
     },
     "legacyReadOnly": "Dies ist eine frühere Nachricht und nur noch lesbar."
+  },
+  "catalogSort": {
+    "sortBy": "Sortieren:",
+    "results": "{count, plural, one {# Ergebnis} other {# Ergebnisse}}",
+    "default": "Beliebtheit",
+    "bestseller": "Bestseller",
+    "newest": "Neueste",
+    "price_asc": "Preis aufsteigend",
+    "price_desc": "Preis absteigend",
+    "title_asc": "Name A–Z",
+    "title_desc": "Name Z–A",
+    "noMatch": "Keine Produkte passen zu deinen Filtern."
   }
 }

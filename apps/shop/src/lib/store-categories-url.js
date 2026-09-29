@@ -20,12 +20,12 @@ export function shallowCategoriesQuery(locale, extra = {}) {
   });
 }
 
-/** Direct children of one parent (one level). */
-export function childrenCategoriesQuery(locale, parentId) {
+/** Children of one parent — one level by default; depth 2 also brings the grandchildren. */
+export function childrenCategoriesQuery(locale, parentId, depth = 1) {
   return storeCategoriesQuery(locale, {
     tree: "true",
     is_visible: "true",
-    depth: "1",
+    depth: String(depth),
     parent_id: parentId,
   });
 }

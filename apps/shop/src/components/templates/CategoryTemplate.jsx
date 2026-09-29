@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { colorSwatchFallback } from "@/lib/color-swatch";
 import styled, { keyframes, css } from "styled-components";
 import { CategoryProductListing } from "@/components/CategoryProductListing";
 import { Link } from "@/i18n/navigation";
@@ -54,6 +55,8 @@ const CAT_BANNER_PRESETS = {
   tall:   { aspectRatio: "16 / 7", minHeight: "320px", maxHeight: "640px" },
 };
 
+const SORT_LABEL_KEYS = new Set(["default", "bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"]);
+
 const HeroBanner = styled.div`
   width: 100%;
   aspect-ratio: ${(p) => p.$aspect || "21 / 6"};
@@ -62,12 +65,14 @@ const HeroBanner = styled.div`
   overflow: hidden;
   position: relative;
   background: #f4f4f2;
+  border-radius: 24px;
 
   /* Mobile: use sensible banner height regardless of desktop preset */
   @media (max-width: 767px) {
     aspect-ratio: 3 / 1 !important;
     min-height: 80px !important;
     max-height: 160px !important;
+    border-radius: 16px;
   }
 
   img, video {
@@ -89,6 +94,61 @@ const HeroText = styled.div`
 
   h1 {
     margin: 0 0 4px;
+  }
+`;
+
+/* Page head: breadcrumb + banner card, aligned with the header's content column. */
+const CatHead = styled.div`
+  max-width: 1360px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 18px 24px 0;
+  @media (max-width: 767px) {
+    padding: 12px 12px 0;
+  }
+`;
+
+const CatBannerCard = styled.section`
+  position: relative;
+  min-height: 170px;
+  border-radius: 24px;
+  background: var(--cat-banner-bg, #fcebd5);
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 24px 40px;
+  overflow: hidden;
+  box-sizing: border-box;
+  h1 {
+    margin: 0;
+    font-size: clamp(1.75rem, 3.4vw, 2.75rem);
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.05;
+  }
+  p {
+    margin: 8px 0 0;
+    max-width: 620px;
+    line-height: 1.55;
+    color: #5e574e;
+  }
+  .cat-banner-deco {
+    flex-shrink: 0;
+    width: 240px;
+    height: 210px;
+    margin: -40px -10px -40px auto;
+    border-radius: 24px;
+    background: var(--cat-banner-deco, #f1cfa6);
+    transform: rotate(-6deg);
+  }
+  @media (max-width: 767px) {
+    min-height: 0;
+    padding: 18px 20px;
+    border-radius: 18px;
+    .cat-banner-deco {
+      display: none;
+    }
   }
 `;
 
@@ -118,9 +178,10 @@ const Breadcrumb = styled.nav`
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
   color: #5e574e;
+  padding-bottom: 18px;
 
   a { color: #5e574e; text-decoration: none; transition: color 0.12s; &:hover { color: var(--body-color, #1d1b18); } }
   b { color: var(--body-color, #1d1b18); font-weight: 600; }
@@ -149,17 +210,59 @@ const BreadcrumbRow = styled.div`
   }
 `;
 
+/* Tablet/mobile only: sticky bar with the filter drawer button + sort. Desktop uses the toolbar above the grid. */
 const SortBar = styled.div`
   position: sticky;
   top: ${HEADER_H}px;
   z-index: 20;
-  background: #fff;
-  border-top: 1px solid #e8e8e6;
-  border-bottom: 1px solid #e8e8e6;
+  background: var(--shop-bg, #fff);
+  border-bottom: 1px solid #e6dfd4;
+  margin-top: 12px;
 
   /* Sticky offset vs fixed header (approx.; TopBar removed site-wide) */
   @media (max-width: 767px) {
     top: 72px;
+  }
+  @media (min-width: ${CATALOG_DRAWER_MAX_PX + 1}px) {
+    display: none;
+  }
+`;
+
+const Toolbar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  .tb-count {
+    font-weight: 700;
+    color: var(--body-color, #1d1b18);
+  }
+  .tb-clear {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--shop-accent, #a65300);
+    cursor: pointer;
+  }
+  .tb-spacer {
+    flex: 1;
+  }
+  .tb-sort {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #5e574e;
+  }
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
+    margin-bottom: 12px;
+    .tb-sort {
+      display: none;
+    }
   }
 `;
 
@@ -247,18 +350,14 @@ const SortSelect = styled.select`
 `;
 
 const ContentWrap = styled.div`
-  max-width: 1440px;
+  max-width: 1360px;
   margin: 0 auto;
-  padding: 14px 32px 80px;
+  padding: 28px 24px 80px;
   width: 100%;
   box-sizing: border-box;
   display: flex;
   gap: 32px;
   align-items: flex-start;
-
-  @media (min-width: 1024px) {
-    max-width: 1700px;
-  }
 
   @media (max-width: 767px) {
     padding: 6px 6px 80px;
@@ -624,6 +723,51 @@ const FilterGroupHeading = styled.h4.attrs({ className: "shop-typo-sidebar-nav" 
   text-align: left;
 `;
 
+/** Colour facets render as swatches, size-like facets as pills, everything else as checkboxes. */
+function facetDisplayKind(key, title) {
+  const k = `${key} ${title}`.toLowerCase();
+  if (/farbe|colou?r|renk|couleur|colore/.test(k)) return "color";
+  if (/gr(ö|oe)(ß|ss)e|size|beden|taille|taglia|talla|ma(ß|ss)e/.test(k)) return "size";
+  return "list";
+}
+
+const FacetSwatchGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  padding: 4px 2px;
+  button {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+`;
+
+const FacetPillWrap = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  button {
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 17px;
+    border: 1px solid #cfc6b8;
+    background: #fff;
+    font: inherit;
+    font-size: 13px;
+    color: var(--body-color, #1d1b18);
+    cursor: pointer;
+  }
+  button[data-on="true"] {
+    border-color: var(--body-color, #1d1b18);
+    background: var(--body-color, #1d1b18);
+    color: #fff;
+    font-weight: 600;
+  }
+`;
+
 const FilterGroupBody = styled.div`
   display: ${(p) => (p.$open ? "block" : "none")};
   padding: 0 0 12px;
@@ -732,7 +876,7 @@ const Chip = styled.button`
   align-items: center;
   gap: 6px;
   min-height: 34px;
-  padding: 0 14px;
+  padding: 0 8px 0 14px;
   background: var(--body-color, #1d1b18);
   color: #fff;
   border: none;
@@ -965,6 +1109,7 @@ function visibleSubcats(children) {
 
 export default function CategoryTemplate() {
   const tCommon = useTranslations("common");
+  const tSort = useTranslations("catalogSort");
   const params = useParams();
   const searchParams = useSearchParams();
   const slug = params?.slug ? String(params.slug) : params?.handle ? String(params.handle) : "";
@@ -1110,12 +1255,14 @@ export default function CategoryTemplate() {
   const catBannerPreset = CAT_BANNER_PRESETS[catBannerStyle] || CAT_BANNER_PRESETS.strip;
   const showCatBanner   = catBannerStyle !== "none" && (!!bannerUrl || !!bannerVideoUrl);
   const showSidebar     = tmpl.show_sidebar !== false && landingSettings.show_product_filter_bar !== false;
-  const sidebarWidth    = tmpl.sidebar_width || "280px";
+  const sidebarWidth    = tmpl.sidebar_width || "248px";
   const colsPerRow      = Number(tmpl.products_per_row) || 4;
   const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;
   const richtextAlign   = tmpl.richtext_align || "left";
   const richtextMaxW    = tmpl.richtext_max_width || "full";
-  const contentPadX     = tmpl.content_padding_x || "32px";
+  const contentPadX     = tmpl.content_padding_x || "24px";
+  const catDescription  = String(localizedCat.description || category?.description || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const sortLabel = (o) => (SORT_LABEL_KEYS.has(o.value) ? tSort(o.value) : o.label);
 
   useEffect(() => {
     if (!category || typeof document === "undefined") return;
@@ -1279,21 +1426,43 @@ export default function CategoryTemplate() {
       applyCatalogDefaults
       onSettingsChange={setLandingSettings}
       catalogSlots={{
-        page_banner: showCatBanner ? (
-        <HeroBanner $aspect={catBannerPreset.aspectRatio} $minH={catBannerPreset.minHeight} $maxH={catBannerPreset.maxHeight}>
-          {bannerVideoUrl ? (
-            <video autoPlay muted loop playsInline src={bannerVideoUrl} />
+        page_banner: (
+        <CatHead>
+          <Breadcrumb aria-label="Breadcrumb">
+            <Link href="/">{tCommon("home")}</Link>
+            {ancestors.map((anc) => {
+              const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
+              return (
+                <React.Fragment key={anc.id || ancSlug}>
+                  <span aria-hidden="true">›</span>
+                  <Link href={`/${ancSlug}`}>{getLocalizedCategory(anc, locale).name || anc.name || ancSlug}</Link>
+                </React.Fragment>
+              );
+            })}
+            <span aria-hidden="true">›</span>
+            <b>{displayTitle}</b>
+          </Breadcrumb>
+          {showCatBanner ? (
+            <HeroBanner $aspect={catBannerPreset.aspectRatio} $minH={catBannerPreset.minHeight} $maxH={catBannerPreset.maxHeight}>
+              {bannerVideoUrl ? (
+                <video autoPlay muted loop playsInline src={bannerVideoUrl} />
+              ) : (
+                <img src={bannerUrl} alt={displayTitle} />
+              )}
+              <HeroText>
+                <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{displayTitle}</h1>
+              </HeroText>
+            </HeroBanner>
           ) : (
-            <img src={bannerUrl} alt={displayTitle} />
+            <CatBannerCard>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h1 className="shop-typo-catalog-title">{displayTitle}</h1>
+                {catDescription ? <p>{catDescription}</p> : null}
+              </div>
+              <span className="cat-banner-deco" aria-hidden="true" />
+            </CatBannerCard>
           )}
-          <HeroText>
-            <h1 className="shop-typo-catalog-title shop-typo-catalog-title--on-dark">{displayTitle}</h1>
-          </HeroText>
-        </HeroBanner>
-      ) : (
-        <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
-          <h1 className="shop-typo-catalog-title">{displayTitle}</h1>
-        </ColHeader>
+        </CatHead>
       ),
         product_container: (
           <>
@@ -1318,27 +1487,12 @@ export default function CategoryTemplate() {
                 {tCommon("categories")}{activeCount > 0 ? ` (${activeCount})` : ""}
               </FilterBtn>
             )}
-            {/* Breadcrumb — desktop only */}
-            <Breadcrumb aria-label="Breadcrumb" style={{ margin: 0 }}>
-              <Link href={`/${locale}`}>Home</Link>
-              {ancestors.map((anc) => {
-                const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
-                return (
-                  <React.Fragment key={anc.id || ancSlug}>
-                    <span style={{ color: "#ccc", margin: "0 2px" }}>&gt;</span>
-                    <Link href={`/${ancSlug}`}>{anc.name || ancSlug}</Link>
-                  </React.Fragment>
-                );
-              })}
-              <span style={{ color: "#ccc", margin: "0 2px" }}>&gt;</span>
-              <b>{displayTitle}</b>
-            </Breadcrumb>
           </SortBarLeft>
           <SortWrap>
-            <SortLabel>Sort:</SortLabel>
+            <SortLabel>{tSort("sortBy")}</SortLabel>
             <SortSelect value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} aria-label="Sort products">
               {SORT_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>{sortLabel(o)}</option>
               ))}
             </SortSelect>
           </SortWrap>
@@ -1435,34 +1589,63 @@ export default function CategoryTemplate() {
                 </SidebarPane>
               )}
               <SidebarPane>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                  {tCommon("filter")}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontFamily: "var(--h2-ff, inherit)", fontSize: 20, fontWeight: 800, color: "var(--body-color, #1d1b18)" }}>{tCommon("filter")}</span>
                   {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>{tCommon("clear")}</ClearAllBtn>
+                    <button type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ border: 0, background: "none", padding: 0, font: "inherit", fontSize: 13, fontWeight: 600, color: "var(--shop-accent, #a65300)", cursor: "pointer" }}>{tCommon("clear")}</button>
                   )}
                 </div>
                 {hasFacets ? (
                   Object.entries(facets).map(([key, vals]) => (
                     <FilterGroup key={key}>
-                      <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
+                      <FilterGroupTitle type="button" aria-expanded={openFilterGroups[key] !== false} onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: prev[key] === false }))}>
                         <FilterGroupHeading>{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
-                        <FilterChevron $open={!!openFilterGroups[key]} aria-hidden>
+                        <FilterChevron $open={openFilterGroups[key] !== false} aria-hidden>
                           <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </FilterChevron>
                       </FilterGroupTitle>
-                      <FilterGroupBody $open={!!openFilterGroups[key]}>
-                        {vals.map((val) => {
-                          const on = (filters[key] || []).includes(val);
-                          const label = formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions);
-                          return (
-                            <CheckRow key={label} $on={on} $cbSize={filterCheckboxSize}>
-                              <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={filterCheckboxSize} />
-                              {label}
-                            </CheckRow>
-                          );
-                        })}
+                      <FilterGroupBody $open={openFilterGroups[key] !== false}>
+                        {(() => {
+                          const kind = facetDisplayKind(key, getFacetGroupTitle(key, locale, metafieldDefinitions));
+                          if (kind === "color") {
+                            return (
+                              <FacetSwatchGrid>
+                                {vals.map((val) => {
+                                  const on = (filters[key] || []).includes(val);
+                                  const label = formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions);
+                                  return (
+                                    <button key={label} type="button" title={label} aria-label={label} aria-pressed={on} onClick={() => toggle(key, val)} style={{ background: colorSwatchFallback(val), boxShadow: on ? "0 0 0 2px #fff, 0 0 0 3.5px #1d1b18" : "inset 0 0 0 1px #cfc6b8" }} />
+                                  );
+                                })}
+                              </FacetSwatchGrid>
+                            );
+                          }
+                          if (kind === "size") {
+                            return (
+                              <FacetPillWrap>
+                                {vals.map((val) => {
+                                  const on = (filters[key] || []).includes(val);
+                                  const label = formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions);
+                                  return (
+                                    <button key={label} type="button" aria-pressed={on} data-on={on ? "true" : "false"} onClick={() => toggle(key, val)}>{label}</button>
+                                  );
+                                })}
+                              </FacetPillWrap>
+                            );
+                          }
+                          return vals.map((val) => {
+                            const on = (filters[key] || []).includes(val);
+                            const label = formatFacetOptionLabel(key, val, null, locale, metafieldDefinitions);
+                            return (
+                              <CheckRow key={label} $on={on} $cbSize={filterCheckboxSize}>
+                                <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={filterCheckboxSize} />
+                                {label}
+                              </CheckRow>
+                            );
+                          });
+                        })()}
                       </FilterGroupBody>
                     </FilterGroup>
                   ))
@@ -1642,25 +1825,35 @@ export default function CategoryTemplate() {
         )}
 
         <Body>
-          {activeCount > 0 && (
-            <ChipBar>
-              {Object.entries(filters).flatMap(([k, vals]) =>
-                (vals || []).map((v) => (
-                  <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                    {formatFacetOptionLabel(k, v, null, locale, metafieldDefinitions)} ×
-                  </Chip>
-                )),
-              )}
-            </ChipBar>
-          )}
-
-          <ResultBar>
-            {total} {total === 1 ? "product" : "products"}
-          </ResultBar>
+          <Toolbar>
+            <span className="tb-count">{tSort("results", { count: total })}</span>
+            {Object.entries(filters).flatMap(([k, vals]) =>
+              (vals || []).map((v) => (
+                <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)} aria-label={`${formatFacetOptionLabel(k, v, null, locale, metafieldDefinitions)} – ${tCommon("clear")}`}>
+                  {formatFacetOptionLabel(k, v, null, locale, metafieldDefinitions)}
+                  <span aria-hidden="true" style={{ width: 22, height: 22, borderRadius: 11, background: "#3a352f", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>×</span>
+                </Chip>
+              )),
+            )}
+            {activeCount > 0 ? (
+              <button type="button" className="tb-clear" onClick={() => { setFilters({}); setPage(1); }}>
+                {tCommon("clearAllFilters")}
+              </button>
+            ) : null}
+            <span className="tb-spacer" />
+            <label className="tb-sort">
+              {tSort("sortBy")}
+              <SortSelect value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} style={{ margin: 0 }}>
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{sortLabel(o)}</option>
+                ))}
+              </SortSelect>
+            </label>
+          </Toolbar>
 
           {paginated.length === 0 ? (
             <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              No products match your filters.
+              {tSort("noMatch")}
             </div>
           ) : (
             <CategoryProductListing

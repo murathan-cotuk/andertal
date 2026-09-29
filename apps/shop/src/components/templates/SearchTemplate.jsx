@@ -1106,9 +1106,9 @@ export default function SearchTemplate() {
 
   if (loading && !textHits.length) {
     return (
-      <div className="min-h-screen flex flex-col bg-white">
+      <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
         <ShopHeader />
-        <main className="flex-grow bg-white" aria-label="Search results">
+        <main className="flex-grow" aria-label="Search results">
           <Bone style={{ height: 220 }} />
           <div style={{ maxWidth: 1440, margin: "0 auto", padding: "14px 32px" }}>
             <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
@@ -1126,7 +1126,7 @@ export default function SearchTemplate() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col bg-white">
+      <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
         <ShopHeader />
         <div style={{ padding: "24px" }} className="text-red-800">{tHome("error")}</div>
         <Footer />
@@ -1135,9 +1135,9 @@ export default function SearchTemplate() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
       <ShopHeader />
-      <main className="flex-grow bg-white" aria-label="Search results">
+      <main className="flex-grow" aria-label="Search results">
         <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <CategoryTitle>{title}</CategoryTitle>
           {q ? <TitleSub>{textHits.length} {textHits.length === 1 ? "Ergebnis" : "Ergebnisse"}</TitleSub> : null}

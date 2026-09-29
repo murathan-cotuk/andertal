@@ -23,6 +23,7 @@ import CatalogHubFilterShell from "@/components/catalog/CatalogHubFilterShell";
 import { tokens } from "@/design-system/tokens";
 import { resolveImageUrl } from "@/lib/image-url";
 import styled from "styled-components";
+import { PromoBento, CategoryCircles, TrustBarIcon, WarmSection, WarmSectionHead } from "@/components/landing/WarmSections";
 
 // "See all/more" link under a product carousel — matches the brand accent used across the shop
 // header/CTAs (var(--shop-primary), so a superuser's custom accent color still applies) instead
@@ -31,7 +32,7 @@ import styled from "styled-components";
 const SeeAllLink = styled(Link)`
   font-size: 13px;
   font-weight: 600;
-  color: var(--shop-primary, ${tokens.primary.DEFAULT});
+  color: var(--shop-accent, ${tokens.primary.DEFAULT});
   text-decoration: none;
   &:hover {
     text-decoration: underline;
@@ -715,7 +716,7 @@ function VideoBlock({ container, locale = "de" }) {
     <div style={{ background: bg, ...getContainerPadding(container, "32px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 1000) }}>
         {lt(container, "title", locale) && (
-          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: tc, margin: "0 0 8px" }}>
+          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: tc, margin: "0 0 8px" }}>
             {lt(container, "title", locale)}
           </h2>
         )}
@@ -955,7 +956,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
   if (source === "collection" && products === undefined) {
     return (
       <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
-        <div style={getContentInnerStyle(container, 1440)}>
+        <div style={getContentInnerStyle(container, 1312)}>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
             {Array.from({ length: gridCols * 2 }).map((_, j) => (
               <div key={j} style={{ minHeight: 200, borderRadius: 10, background: "linear-gradient(90deg,#efefed 25%,#e5e5e3 50%,#efefed 75%)", backgroundSize: "800px 100%", animation: "shimmer 1.5s infinite linear" }} />
@@ -1102,9 +1103,9 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         {lt(container, "title", locale) && (
-          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
+          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
         )}
         {isFreeGrid ? (
           <div
@@ -1332,7 +1333,7 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
   if (isNarrow && isGrid) {
     return (
       <div style={catalogSectionStyle(container, "48px 24px")}>
-        <div style={getContentInnerStyle(container, 1440)}>
+        <div style={getContentInnerStyle(container, 1312)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -1350,7 +1351,7 @@ function CollectionCarousel({ container, preloadedProducts, locale = "de" }) {
 
   return (
     <div style={catalogSectionStyle(container, "48px 24px")}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
@@ -1457,7 +1458,7 @@ function BestsellerCarousel({ container, locale = "de", preloadedProducts }) {
   if (isNarrow && isGrid) {
     return (
       <div style={{ ...getContainerPadding(container, "32px 16px"), background: container.bg_color || "transparent" }}>
-        <div style={getContentInnerStyle(container, 1440)}>
+        <div style={getContentInnerStyle(container, 1312)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -1479,10 +1480,15 @@ function BestsellerCarousel({ container, locale = "de", preloadedProducts }) {
     // arrow-inset math is hardcoded to that value, so a narrower side padding here (the old 16px)
     // made the desktop nav arrows sit misaligned with this row's own edge.
     <div style={{ ...getContainerPadding(container, "48px 24px"), background: container.bg_color || "transparent" }}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         <Carousel
           contained={false}
-          title={lt(container, "title", locale) || undefined}
+          header={
+            <WarmSectionHead style={{ width: "100%", margin: 0 }}>
+              {lt(container, "title", locale) ? <h2>{lt(container, "title", locale)}</h2> : <span />}
+              {!isNarrow ? <SeeAllLink href={seeAllHref} style={{ fontSize: 16 }}>{tLanding("seeAll")}</SeeAllLink> : null}
+            </WarmSectionHead>
+          }
           itemWidth={180}
           visibleCount={isNarrow ? undefined : 5}
           navOnSides
@@ -1496,7 +1502,7 @@ function BestsellerCarousel({ container, locale = "de", preloadedProducts }) {
             </div>
           ))}
         </Carousel>
-        {seeAll}
+        {isNarrow ? seeAll : null}
       </div>
     </div>
   );
@@ -1634,17 +1640,17 @@ function PersonalizedProductRow({ container, locale = "de" }) {
     // See BestsellerCarousel — horizontal padding matches tokens.containerPadding (24px) so the
     // Carousel's navOnSides arrows line up with this row's own edge instead of sitting misaligned.
     <div style={catalogSectionStyle(container, "48px 24px")}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         {displayMode === "image_tiles" ? (
           <>
-            {title && <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${freeGridCols}, minmax(0, 1fr))`, gridAutoRows: `${freeGridRowHeight}px`, gridAutoFlow: "dense", gap, width: "100%" }}>
               {products.map((product, i) => renderTile(product, i))}
             </div>
           </>
         ) : orientation === "vertical" ? (
           <>
-            {title && <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
               {products.map((product, i) => (
                 <div key={product.id || i} style={{ minWidth: 0 }}>
@@ -1738,7 +1744,7 @@ function SellerCarousel({ container, locale = "de" }) {
 
   return (
     <div style={catalogSectionStyle(container, "48px 24px")}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         <Carousel
           contained={false}
           title={title || undefined}
@@ -1975,7 +1981,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
     };
     return (
       <div style={catalogSectionStyle(container, "48px 24px")}>
-        <div style={getContentInnerStyle(container, 1440)}>
+        <div style={getContentInnerStyle(container, 1312)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -1993,7 +1999,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
 
   return (
     <div style={catalogSectionStyle(container, "48px 24px")}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
@@ -2142,7 +2148,7 @@ function BlogCarousel({ container, locale = "de" }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "40px 24px"), background: bg }}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         <Carousel
           contained={false}
           title={lt(container, "title", locale) || undefined}
@@ -2713,9 +2719,30 @@ function FeatureGrid({ container, locale = "de" }) {
 
   if (!Array.isArray(items) || items.length === 0) return null;
 
+  if (variant === "trust_bar") {
+    return (
+      <WarmSection $pad={container.padding && container.padding !== "64px 24px" ? container.padding : "32px 24px 40px"} $padMobile="20px 16px 16px">
+        <div className="landing-trust-bar" style={{ background: card_bg && card_bg !== "transparent" ? card_bg : "#FFFFFF", color: text_color, borderRadius: 20, minHeight: 96, padding: "20px 32px", boxSizing: "border-box", display: "grid", gridTemplateColumns: `repeat(${Math.max(1, Math.min(6, cols))}, minmax(0, 1fr))`, alignItems: "center", gap: 20 }}>
+          {items.map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+              <TrustBarIcon name={item.icon} />
+              <div style={{ minWidth: 0 }}>
+                {lt(item, "title", locale) ? <div style={{ fontWeight: 600 }}>{lt(item, "title", locale)}</div> : null}
+                {(lt(item, "body", locale) || lt(item, "description", locale)) ? (
+                  <div style={{ fontSize: 13, color: "#5E574E" }}>{lt(item, "body", locale) || lt(item, "description", locale)}</div>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+        <style>{`@media(max-width:1023px){.landing-trust-bar{grid-template-columns:repeat(2,minmax(0,1fr))!important;padding:16px!important;}}`}</style>
+      </WarmSection>
+    );
+  }
+
   return (
     <div style={{ background: bg_color || "transparent", ...getContainerPadding(container, "48px 24px") }}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         {(title || subtitle) && (
           <div style={{ textAlign: title_align, marginBottom: 40 }}>
             {title && (
@@ -2971,7 +2998,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // column Carousel used), so containers configured before this became a peek-scroll still get a
   // sensible width instead of silently ignoring their existing setting.
   const desktopN = Math.max(1, container.items_per_row != null ? Number(container.items_per_row) || 4 : 4);
-  const desktopItemWidthPx = Math.max(160, Math.floor((1280 - gap * (desktopN - 1)) / desktopN));
+  const desktopItemWidthPx = Math.max(160, Math.floor((1312 - gap * (desktopN - 1)) / desktopN));
   const desktopItemW = String(container.desktop_item_width || "").trim() || `${desktopItemWidthPx}px`;
   const scrollByOneItem = (ref, dir) => {
     const el = ref.current;
@@ -3046,9 +3073,9 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
     const shown = images.slice(0, gridCols * gridRows);
     return (
       <div style={{ ...carouselPadding, background: bg }}>
-        <div style={getContentInnerStyle(container, 1440)}>
+        <div style={getContentInnerStyle(container, 1312)}>
           {lt(container, "title", locale) && (
-            <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
+            <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.1, margin: "0 0 24px" }}>{lt(container, "title", locale)}</h2>
           )}
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
             {shown.map((img, i) => (
@@ -3065,7 +3092,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   if (isNarrow && isGrid) {
     return (
       <div style={{ ...carouselPadding, background: bg }}>
-        <div style={getContentInnerStyle(container, 1440)}>
+        <div style={getContentInnerStyle(container, 1312)}>
           <MobilePagedGridScroll
             title={lt(container, "title", locale)}
             gap={gap}
@@ -3092,7 +3119,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
       <div style={{ background: bg }}>
         {title && (
           <div style={{ padding: `0 ${padLeft}`, marginBottom: 12 }}>
-            <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: 0 }}>{title}</h2>
+            <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: 0 }}>{title}</h2>
           </div>
         )}
         <div
@@ -3137,9 +3164,9 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
   // still works with drag/wheel either way.
   return (
     <div style={{ ...carouselPadding, background: bg }}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         {lt(container, "title", locale) && (
-          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, margin: "0 0 16px" }}>{lt(container, "title", locale)}</h2>
+          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.1, margin: "0 0 24px" }}>{lt(container, "title", locale)}</h2>
         )}
         <div style={{ position: "relative" }}>
           <div
@@ -3238,9 +3265,9 @@ function LayoutSection({ container, locale = "de", preload = {}, ctx = {} }) {
 
   return (
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
-      <div style={getContentInnerStyle(container, 1440)}>
+      <div style={getContentInnerStyle(container, 1312)}>
         {title && (
-          <h2 style={{ fontSize: "clamp(1.3rem, 2.4vw, 2rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: container.text_color || "#111827", margin: "0 0 20px", textAlign: titleAlign }}>
+          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: container.text_color || "#111827", margin: "0 0 20px", textAlign: titleAlign }}>
             {title}
           </h2>
         )}
@@ -3368,6 +3395,8 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
     case "blog_carousel":        inner = <BlogCarousel container={c} locale={locale} />; break;
     case "newsletter":           inner = <NewsletterSignup container={c} locale={locale} />; break;
     case "feature_grid":         inner = <FeatureGrid container={c} locale={locale} />; break;
+    case "promo_bento":          inner = <PromoBento container={c} locale={locale} headingLevel={ctx.firstVisibleId === c.id ? 1 : 2} />; break;
+    case "category_circles":     inner = <CategoryCircles container={c} locale={locale} />; break;
     case "testimonials":              inner = <Testimonials container={c} locale={locale} />; break;
     case "personalized_product_row":  inner = <PersonalizedProductRow container={c} locale={locale} />; break;
     case "layout_section":       inner = <LayoutSection container={c} locale={locale} preload={preload} ctx={ctx} />; break;

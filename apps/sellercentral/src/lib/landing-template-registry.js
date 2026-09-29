@@ -62,10 +62,24 @@ export const LANDING_PAGE_PRESETS = [
   {
     id: "warm_marketplace_home",
     containers: [
-      { type: "hero_banner" },
-      { type: "feature_grid", defaults: { card_style: "flat", card_bg: "#FFFFFF", cols: 4, title_align: "left", padding: "32px 24px" } },
+      { type: "promo_bento" },
+      {
+        type: "feature_grid",
+        defaults: {
+          variant: "trust_bar",
+          cols: 4,
+          title: "",
+          padding: "32px 24px 40px",
+          items: [
+            { icon: "shield", title: "Käuferschutz", body: "Geld zurück bei Problemen" },
+            { icon: "truck", title: "Schneller Versand", body: "Lieferdatum vor dem Kauf" },
+            { icon: "points", title: "Bonuspunkte", body: "Bei jedem Einkauf sammeln" },
+            { icon: "badge", title: "Verifizierte Marken", body: "Geprüfte Händler & Belege" },
+          ],
+        },
+      },
       { type: "image_carousel", defaults: { aspect_ratio: "4/5", items_per_row: 4, gap: 20 } },
-      { type: "collections_carousel", defaults: { source: "categories", items_per_row: 6, card_aspect_ratio: "1/1", gap: 20 } },
+      { type: "category_circles", defaults: { source: "catalog", max_items: 6 } },
       { type: "bestseller_carousel", defaults: { mode: "bestseller", items_per_row: 5, gap: 20 } },
     ],
   },
@@ -78,12 +92,12 @@ export function pagePresetCopy(id, locale) {
     warm_marketplace_home: {
       title: x("Page preset: Warmer Marktplatz home", "Sayfa şablonu: Warmer Marktplatz ana sayfa", "Modèle de page : accueil Warmer Marktplatz", "Plantilla de página: inicio Warmer Marktplatz", "Modello di pagina: home Warmer Marktplatz", "Seiten-Vorlage: Warmer Marktplatz Startseite"),
       blurb: x(
-        "Adds hero, trust bar, image carousel, categories and bestsellers to the current device tab. Existing containers stay; nothing is live until you save.",
-        "Mevcut cihaz sekmesine hero, trust bar, Bilder-Karussell, kategoriler ve bestseller ekler. Mevcut container'lar kalır; kaydedene kadar canlıya çıkmaz.",
+        "Adds promo bento, trust bar, image carousel, category circles and bestsellers to the current device tab. Existing containers stay; nothing is live until you save.",
+        "Mevcut cihaz sekmesine promo bento, trust bar, Bilder-Karussell, kategori daireleri ve bestseller ekler. Mevcut container'lar kalır; kaydedene kadar canlıya çıkmaz.",
         "Ajoute hero, barre de confiance, carrousel d’images, catégories et meilleures ventes à l’onglet actuel. Rien n’est publié avant l’enregistrement.",
         "Añade hero, barra de confianza, carrusel de imágenes, categorías y más vendidos a la pestaña actual. Nada se publica hasta guardar.",
         "Aggiunge hero, barra di fiducia, carosello immagini, categorie e bestseller alla scheda attuale. Nulla è pubblicato prima del salvataggio.",
-        "Fügt Hero, Trust-Leiste, Bilder-Karussell, Kategorien und Bestseller zum aktuellen Geräte-Tab hinzu. Bestehende Container bleiben; live erst nach dem Speichern.",
+        "Fügt Promo-Bento, Trust-Leiste, Bilder-Karussell, Kategorie-Kreise und Bestseller zum aktuellen Geräte-Tab hinzu. Bestehende Container bleiben; live erst nach dem Speichern.",
       ),
       button: x("Insert all", "Hepsini ekle", "Tout insérer", "Insertar todo", "Inserisci tutto", "Alle einfügen"),
     },

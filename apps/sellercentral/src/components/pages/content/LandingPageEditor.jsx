@@ -22,6 +22,7 @@ import {
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
+import { PromoBentoEditor, CategoryCirclesEditor } from "@/components/pages/content/WarmContainerEditors";
 import RichTextEditor from "@/components/RichTextEditor";
 import { mergeLoadedShopStyles } from "@andertal/shop-theme";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
@@ -414,6 +415,27 @@ function newContainer(type) {
         padding: "48px 24px",
         content_layout: "full",
       };
+    case "promo_bento":
+      return {
+        ...base,
+        badge: "",
+        title: "",
+        text: "",
+        btn_text: "",
+        btn_url: "/neuheiten",
+        btn2_text: "",
+        btn2_url: "/verkaufen",
+        bg_color: "#FCEBD5",
+        text_color: "#1D1B18",
+        bg_image: "",
+        images: [],
+        tiles: [
+          { eyebrow: "Sale", title: "Bis zu −50 %", subtitle: "auf ausgewählte Marken", link: "/sale", bg_color: "#1D1B18", text_color: "#FFFFFF", eyebrow_color: "#EE8A12" },
+          { eyebrow: "Neuheiten", title: "Frisch eingetroffen", subtitle: "Alle ansehen", link: "/neuheiten", bg_color: "#DCE3D6", text_color: "#1D1B18", eyebrow_color: "#2F5A36", arrow: true },
+        ],
+      };
+    case "category_circles":
+      return { ...base, title: "", link_text: "", link_url: "", source: "catalog", max_items: 6, items: [] };
     case "feature_grid":
       return {
         ...base,
@@ -4117,6 +4139,8 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
     case "blog_carousel":        editor = <BlogCarouselEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "newsletter":           editor = <NewsletterEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "feature_grid":         editor = <FeatureGridEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "promo_bento":          editor = <PromoBentoEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "category_circles":     editor = <CategoryCirclesEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "testimonials":              editor = <TestimonialsEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "video_block":               editor = <VideoBlockEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
     case "personalized_product_row":  editor = <PersonalizedProductRowEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
@@ -4176,12 +4200,12 @@ const TEMPLATE_DEFAULTS = {
   category_template: {
     banner_style: "strip",
     show_sidebar: true,
-    sidebar_width: "280px",
+    sidebar_width: "248px",
     products_per_row: 4,
     products_per_row_mobile: 2,
     richtext_align: "left",
     richtext_max_width: "full",
-    content_padding_x: "32px",
+    content_padding_x: "24px",
     filter_checkbox_size: 10,
   },
 };

@@ -30,9 +30,9 @@ export default async function Home() {
   const initialSettings = data?.settings && typeof data.settings === "object" ? data.settings : {};
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
       <ShopHeader />
-      <main className="flex-grow bg-white">
+      <main className="flex-grow">
         <SectionErrorBoundary>
           <LandingContainers initialContainers={initialContainers} initialSettings={initialSettings} initialPreload={data?.preload || null} />
         </SectionErrorBoundary>

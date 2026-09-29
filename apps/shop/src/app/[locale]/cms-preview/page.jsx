@@ -59,9 +59,9 @@ export default function CmsPreviewPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
       <ShopHeader />
-      <main className="flex-grow bg-white">
+      <main className="flex-grow">
         <SectionErrorBoundary>
           {/* Remount on every revision — LandingContainers only ever reads initialContainers/
               initialSettings once (into useState), so a fresh key is what makes new draft data

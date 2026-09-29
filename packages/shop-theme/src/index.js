@@ -3,6 +3,7 @@ export {
   WARM_MARKETPLACE_PRESET_ID,
   WARM_MARKETPLACE_STYLES,
   WARM_PALETTE,
+  WARM_TOPBAR_ITEMS,
   applyWarmMarketplacePreset,
   resolveStorefrontStyles,
   CLASSIC_DESIGN_PRESET_ID,

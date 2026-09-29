@@ -7,22 +7,22 @@ import styled from "styled-components";
 const PurchaseRow = styled.div`
   display: flex;
   align-items: stretch;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 10px;
 `;
 
 const QtySelect = styled.select`
-  height: 40px;
-  padding: 0 6px 0 10px;
-  font-size: 0.9rem;
+  height: 52px;
+  padding: 0 12px 0 16px;
+  font-size: 15px;
   font-weight: 600;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 10px;
+  border: 1px solid #cfc6b8;
+  border-radius: 26px;
   background: #fff;
   color: #111827;
   cursor: pointer;
   flex-shrink: 0;
-  min-width: 66px;
+  min-width: 84px;
   appearance: auto;
   &:disabled {
     opacity: 0.55;
@@ -32,27 +32,30 @@ const QtySelect = styled.select`
 
 const AddBtn = styled.button`
   flex: 1;
-  height: 40px;
-  padding: 0 14px;
+  height: 52px;
+  padding: 0 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   border: none;
-  border-radius: 10px;
-  background: var(--shop-primary, #ff971c);
-  color: #fff;
-  font-size: 0.875rem;
+  border-radius: 26px;
+  background: var(--btn-atc-bg, var(--shop-primary, #ff971c));
+  color: var(--btn-atc-text, #1d1b18);
+  font-family: inherit;
+  font-size: 16px;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   transition: opacity 0.15s;
   svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
   }
   &:hover:not(:disabled) {
-    opacity: 0.88;
+    background: var(--btn-atc-hover-bg, var(--shop-primary, #ff971c));
+    opacity: 0.92;
   }
   &:disabled {
     opacity: 0.55;
@@ -63,15 +66,16 @@ const AddBtn = styled.button`
 
 const BuyNowBtn = styled.button`
   width: 100%;
-  height: 40px;
+  height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid var(--shop-primary, #ff971c);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--shop-primary, #ff971c);
-  font-size: 0.875rem;
+  border: 2px solid var(--body-color, #1d1b18);
+  border-radius: 26px;
+  background: #fff;
+  color: var(--body-color, #1d1b18);
+  font-family: inherit;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -112,8 +116,8 @@ function CartIcon() {
 
 const NotifyBox = styled.form`
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 10px;
 `;
 
 const NotifyInput = styled.input`

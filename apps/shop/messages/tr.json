@@ -30,7 +30,13 @@
     "noFilters": "Bu kategoride filtre bulunmuyor.",
     "filterSelectHint": "Soldan bir ürün özelliği seçin.",
     "imageGallery": "Resim galerisi",
-    "toBrand": "Markaya git"
+    "toBrand": "Markaya git",
+    "deliverTo": "Teslimat",
+    "searchCategories": "Kategorilerde ara",
+    "allIn": "Tümü: {name}",
+    "showAll": "Tümünü göster",
+    "noCategoryMatch": "Eşleşen kategori yok",
+    "footerTagline": "Avrupa’dan bağımsız markalar ve doğrulanmış satıcılar için pazar yeri."
   },
   "nav": {
     "collection": "Koleksiyon",
@@ -721,7 +727,6 @@
         "4": "Kontrol",
         "5": "Bitti"
       },
-
       "categoryPrompt": "Choose a topic",
       "subtopicPrompt": "What best describes your request?",
       "orderPrompt": "Select the relevant order",
@@ -923,5 +928,17 @@
       "generic": "Something went wrong. Please refresh and try again."
     },
     "legacyReadOnly": "Bu önceki mesaj yalnızca okunabilir."
+  },
+  "catalogSort": {
+    "sortBy": "Sırala:",
+    "results": "{count} sonuç",
+    "default": "Popülerlik",
+    "bestseller": "Çok satanlar",
+    "newest": "En yeni",
+    "price_asc": "Fiyat artan",
+    "price_desc": "Fiyat azalan",
+    "title_asc": "İsim A–Z",
+    "title_desc": "İsim Z–A",
+    "noMatch": "Filtrelerinize uyan ürün yok."
   }
 }

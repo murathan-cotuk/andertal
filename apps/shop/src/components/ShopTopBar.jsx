@@ -20,9 +20,25 @@ const InlineInner = styled.div`
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 14px 28px;
+  gap: 8px 40px;
   min-height: inherit;
   box-sizing: border-box;
+
+  /* Phones: one line — the first message only. */
+  @media (max-width: 767px) {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    > a:not(:first-of-type) {
+      display: none;
+    }
+  }
+`;
+
+const ItemDot = styled.span`
+  color: var(--shop-primary, #ee8a12);
+  @media (max-width: 767px) {
+    display: none;
+  }
 `;
 
 const ItemLink = styled(Link)`
@@ -183,9 +199,12 @@ export default function ShopTopBar() {
       <Outer className="topbar shop-topbar" role="region" aria-label="Hinweise">
         <InlineInner>
           {items.map((item, i) => (
-            <ItemLink key={`${item.href}-${i}`} href={item.href === "#" ? "/" : item.href}>
-              {item.text}
-            </ItemLink>
+            <React.Fragment key={`${item.href}-${i}`}>
+              {i > 0 ? <ItemDot aria-hidden="true">•</ItemDot> : null}
+              <ItemLink href={item.href === "#" ? "/" : item.href}>
+                {item.text}
+              </ItemLink>
+            </React.Fragment>
           ))}
         </InlineInner>
       </Outer>

@@ -62,7 +62,7 @@ const Card = styled.article`
   gap: 10px;
   background: #fff;
   border-radius: 20px;
-  padding: 10px;
+  padding: 12px;
   box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
   overflow: hidden;
   height: 100%;
@@ -203,7 +203,7 @@ const RankBadge = styled.span`
 
 const WishlistHeartWrap = styled.div`
   position: absolute;
-  bottom: 8px;
+  top: 8px;
   right: 8px;
   z-index: 50;
   pointer-events: auto;
@@ -519,7 +519,7 @@ const AddToCartBtn = styled.button`
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  @container (max-width: 250px) {
+  @container (max-width: 170px) {
     .pc-atc-label {
       display: none;
     }
@@ -725,7 +725,8 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
       const pMeta = product.metadata || {};
       return variationGroups.slice(0, 2).map((group, gIdx) => {
         const allOpts = group.options || [];
-        const isSwatchGroup = allOpts.some((o) => typeof o === "object" && o.swatch_image);
+        const isColorGroup = /farbe|colou?r|renk|couleur|colore|kleur/i.test(String(group.name || ""));
+        const isSwatchGroup = allOpts.some((o) => typeof o === "object" && (o.swatch_image || o.hex)) || isColorGroup;
         const max = isSwatchGroup ? MAX_SWATCHES : MAX_CHIPS;
         const groupName = variationGroupDisplayName(group, gIdx, pMeta, locale) || group.name;
         const items = allOpts.slice(0, max).map((opt, oIdx) => {
@@ -774,7 +775,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
                   width: "100%",
                   height: "100%",
                   borderRadius: "50%",
-                  background: colorSwatchFallback(val),
+                  background: (typeof opt === "object" && /^#[0-9a-f]{3,8}$/i.test(String(opt.hex || "").trim())) ? String(opt.hex).trim() : colorSwatchFallback(val),
                 }}
               />
             </Swatch>
@@ -882,7 +883,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
       <ReviewRow>
         {reviewCount > 0 ? (
           <Link href={productUrl ? `${productUrl}#reviews` : "#"} style={{ textDecoration: "none", display: "inline-flex" }}>
-            <StarRating average={reviewAvg} count={reviewCount} />
+            <StarRating average={reviewAvg} count={reviewCount} showAverage />
           </Link>
         ) : (
           <StarRating average={0} count={0} />
@@ -899,33 +900,6 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
       {cartNotice.text ? <CardNotice $visible={!!cartNotice.visible}>{cartNotice.text}</CardNotice> : null}
 
       <ActionRow>
-        <QtyRow>
-          <QtyBtn
-            type="button"
-            onClick={() => setQuantity((q) => clampQty(q - 1))}
-            disabled={quantity <= 1 || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-            aria-label={tp("decreaseQty")}
-          >
-            −
-          </QtyBtn>
-          <QtyInput
-            type="number"
-            min={1}
-            value={quantity}
-            onChange={(e) => setQuantity(clampQty(e.target.value))}
-            onBlur={(e) => setQuantity(clampQty(e.target.value))}
-            disabled={outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-            aria-label={tp("qty")}
-          />
-          <QtyBtn
-            type="button"
-            onClick={() => setQuantity((q) => clampQty(q + 1))}
-            disabled={quantity >= maxQty || outOfStock || isComingSoon || shippingUnavailable || adding || cartLoading}
-            aria-label={tp("increaseQty")}
-          >
-            +
-          </QtyBtn>
-        </QtyRow>
         <AddToCartBtn type="button" onClick={handleQuickAdd} disabled={disabledAtc} aria-label={atcLabel} title={atcLabel}>
           <CartIcon />
           <span className="pc-atc-label">{atcLabel}</span>
@@ -935,7 +909,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   );
 }
 
-export function StarRating({ average = 0, count = 0 }) {
+export function StarRating({ average = 0, count = 0, showAverage = false }) {
   const full = Math.floor(average);
   const half = average - full >= 0.5 ? 1 : 0;
   const empty = 5 - full - half;
@@ -946,7 +920,14 @@ export function StarRating({ average = 0, count = 0 }) {
         {half ? <span style={{ color: "var(--shop-primary, #ee8a12)" }}>★</span> : null}
         {[...Array(empty)].map((_, i) => <span key={`e${i}`} style={{ color: "#ddd4c7" }}>★</span>)}
       </span>
-      <span style={{ fontSize: "0.85em", color: "#5e574e" }}>({count})</span>
+      <span style={{ fontSize: "0.85em", color: "#5e574e", marginLeft: showAverage ? 3 : 0 }}>
+        {showAverage && count > 0 ? (
+          <b style={{ color: "var(--body-color, #1d1b18)" }}>
+            {Number(average).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+          </b>
+        ) : null}
+        {showAverage && count > 0 ? " " : ""}({count})
+      </span>
     </div>
   );
 }

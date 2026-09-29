@@ -198,7 +198,7 @@ export default function CatalogCmsLanding({
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#fafafa' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--shop-bg, #fafafa)' }}>
       <ShopHeader />
       <main className="flex-1">
         {useContainers && page?.id ? (

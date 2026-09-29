@@ -175,7 +175,7 @@ const Thumbnail = styled.img`
   background: #fff;
   border-radius: 8px;
   cursor: pointer;
-  border: 2px solid ${(p) => (p.$active ? "#0ea5e9" : "transparent")};
+  border: 2px solid ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "transparent")};
   flex-shrink: 0;
 `;
 
@@ -306,38 +306,39 @@ const VarToggleBtn = styled.button`
 
 /* Compact text chip — sizes, materials, etc */
 const VarChip = styled.button`
-  padding: 8px 14px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: ${(p) => (p.$selected ? 600 : 400)};
   line-height: 1.2;
-  border: 1px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
-  background: ${(p) => (p.$selected ? "#374151" : "#fff")};
-  color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#9ca3af" : "#374151")};
-  border-radius: 10px;
+  border: ${(p) => (p.$selected ? "2px solid var(--body-color, #1d1b18)" : "1px solid #cfc6b8")};
+  background: ${(p) => (p.$selected ? "var(--body-color, #1d1b18)" : "#fff")};
+  color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#9ca3af" : "var(--body-color, #1d1b18)")};
+  border-radius: 20px;
   cursor: ${(p) => (p.$oos ? "default" : "pointer")};
   text-decoration: ${(p) => (p.$oos && !p.$selected ? "line-through" : "none")};
   opacity: ${(p) => (p.$oos && !p.$selected ? 0.6 : 1)};
   pointer-events: ${(p) => (p.$oos && !p.$selected ? "none" : "auto")};
   transition: border-color 0.12s, background 0.12s, color 0.12s;
   &:hover:not(:disabled) {
-    border-color: ${(p) => (p.$selected ? "#374151" : "#9ca3af")};
-    color: ${(p) => (p.$selected ? "#fff" : "#111")};
+    border-color: var(--body-color, #1d1b18);
+    color: ${(p) => (p.$selected ? "#fff" : "var(--body-color, #1d1b18)")};
   }
 `;
 
 /* Compact swatch circle — color / image options */
 const VarSwatch = styled.button`
-  width: 30px;
-  height: 30px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  border: 2px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
+  border: 3px solid var(--shop-bg, #f6f2ec);
+  box-shadow: ${(p) => (p.$selected ? "0 0 0 2px var(--body-color, #1d1b18)" : "0 0 0 1px #cfc6b8")};
   padding: 0;
   background: none;
   cursor: pointer;
   overflow: hidden;
   flex-shrink: 0;
-  transition: border-color 0.12s, transform 0.12s;
-  transform: ${(p) => (p.$selected ? "scale(1.08)" : "scale(1)")};
+  transition: box-shadow 0.12s;
   opacity: ${(p) => (p.$oos && !p.$selected ? 0.5 : 1)};
   pointer-events: ${(p) => (p.$oos && !p.$selected ? "none" : "auto")};
   position: relative;
@@ -536,9 +537,10 @@ const PriceMainRow = styled.div`
 `;
 
 const PriceMain = styled.span`
-  font-size: 1.7rem;
-  font-weight: 650;
-  color: ${(p) => (p.$sale ? "#e53e3e" : "#374151")};
+  font-family: var(--h2-ff, inherit);
+  font-size: 30px;
+  font-weight: 800;
+  color: ${(p) => (p.$sale ? "#b42318" : "var(--body-color, #1d1b18)")};
   letter-spacing: -0.03em;
   line-height: 1.05;
 `;
@@ -704,7 +706,7 @@ const DescriptionSection = styled.section`
   & p { margin: 0 0 1em; }
   & ul, & ol { margin: 0.5em 0 1em 1.5em; padding-left: 1.5em; }
   & strong { font-weight: 600; }
-  & a { color: #0ea5e9; text-decoration: underline; }
+  & a { color: var(--shop-accent, #a65300); text-decoration: underline; }
   & blockquote { margin: 1em 0; padding-left: 1em; border-left: 4px solid #e5e7eb; color: #6b7280; }
   & p:last-child { margin-bottom: 0; }
   & ul { list-style-type: disc; }
@@ -968,7 +970,7 @@ function BrandRow({ brandName, brandHandle, brandLogo, reviewCount }) {
           {(brandName || "?").charAt(0).toUpperCase()}
         </span>
       )}
-      <span style={{ color: "#0ea5e9", textDecoration: "underline", textUnderlineOffset: 2, fontWeight: 500 }}>
+      <span style={{ color: "var(--body-color, #1d1b18)", textDecoration: "underline", textUnderlineOffset: 2, fontWeight: 600 }}>
         {brandName}
       </span>
       {reviewCount > 0 && (
@@ -1630,8 +1632,8 @@ export default function ProductTemplateMobile() {
               ? (selectedOpt ? optionDisplayLabel(selectedOpt, locale) : selected)
               : "";
             const isSwatch = (group.options || []).some(
-              (o) => (typeof o === "object" && o.swatch_image)
-            );
+              (o) => (typeof o === "object" && (o.swatch_image || o.hex))
+            ) || /farbe|colou?r|renk|couleur|colore/i.test(`${groupName} ${groupTitle || ""}`);
             return (
               <VarGroup key={groupName}>
                 <VarLabel>
@@ -1680,7 +1682,7 @@ export default function ProductTemplateMobile() {
                             />
                           ) : null}
                           <span
-                            style={{ display: swatchUrl ? "none" : "block", width: "100%", height: "100%", borderRadius: "50%", background: colorSwatchFallback(valueStr) }}
+                            style={{ display: swatchUrl ? "none" : "block", width: "100%", height: "100%", borderRadius: "50%", background: (typeof opt === "object" && /^#[0-9a-f]{3,8}$/i.test(String(opt.hex || "").trim())) ? String(opt.hex).trim() : colorSwatchFallback(valueStr) }}
                           />
                         </VarSwatch>
                       );
@@ -1815,7 +1817,7 @@ export default function ProductTemplateMobile() {
                     width: mobileGalleryIdx === i ? 16 : 6,
                     height: 6,
                     borderRadius: 3,
-                    background: mobileGalleryIdx === i ? "#374151" : "#d1d5db",
+                    background: mobileGalleryIdx === i ? "var(--body-color, #1d1b18)" : "#cfc6b8",
                     transition: "width 0.2s, background 0.2s",
                   }}
                 />

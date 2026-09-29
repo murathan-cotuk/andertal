@@ -51,22 +51,20 @@ import { useProductPageSettings } from "@/lib/product-page-settings";
 import { pdpOrderedKeys } from "@andertal/shop-theme";
 
 const Container = styled.div`
-  max-width: 100%;
-  padding: 32px 24px 64px;
+  max-width: 1360px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 18px 24px 64px;
   @media (max-width: 767px) {
     padding: 16px 12px 80px;
-  }
-  @media (min-width: 1200px) {
-    padding-left: 150px;
-    padding-right: 150px;
   }
 `;
 
 /* Two-column outer layout: [gallery sticky] [all content] */
 const PageLayout = styled.div`
   display: grid;
-  grid-template-columns: 0.55fr 1fr;
-  gap: 24px;
+  grid-template-columns: minmax(0, 440px) minmax(0, 1fr);
+  gap: 32px;
   align-items: start;
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
@@ -90,8 +88,8 @@ const PageRight = styled.div`
 /* Inner two-column: [center info] [buybox] */
 const InnerGrid = styled.div`
   display: grid;
-  grid-template-columns: 1fr minmax(300px, 360px);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+  gap: 32px;
   margin-bottom: 48px;
   align-items: start;
   @media (max-width: 768px) {
@@ -108,7 +106,6 @@ const GalleryCol = styled.div`
   gap: 12px;
   position: sticky;
   top: 116px;
-  margin-left: -40px;
   align-self: start;
   @media (max-width: 1024px) {
     position: static;
@@ -124,10 +121,10 @@ const MainImageWrap = styled.div`
   position: relative;
   isolation: isolate;
   width: 100%;
-  aspect-ratio: 1;
-  border-radius: 12px;
+  aspect-ratio: 4 / 5;
+  border-radius: 24px;
   overflow: hidden;
-  background: #f3f4f6;
+  background: #fff;
   cursor: pointer;
 
   > img:not(.product-custom-badge-img) {
@@ -161,8 +158,8 @@ const MainImageWrap = styled.div`
 
 const GalleryActionRow = styled.div`
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: 16px;
+  top: 16px;
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -170,12 +167,13 @@ const GalleryActionRow = styled.div`
 `;
 
 const GalleryActionBtn = styled.button`
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: rgba(255, 255, 255, 0.94);
-  color: #374151;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(29, 27, 24, 0.12);
+  color: #1d1b18;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -192,26 +190,26 @@ const MainImage = styled.img`
 
 const Thumbnails = styled.div`
   display: flex;
-  gap: 8px;
+  gap: 10px;
   overflow-x: auto;
   padding-bottom: 4px;
 `;
 
 const Thumbnail = styled.img`
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   object-fit: contain;
   background: #fff;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
-  border: 2px solid ${(p) => (p.$active ? "#0ea5e9" : "transparent")};
+  border: 2px solid ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "transparent")};
   flex-shrink: 0;
 `;
 
 const CenterCol = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   min-height: 200px;
   @media (max-width: 768px) {
     order: 3;
@@ -306,26 +304,21 @@ const MobileVariantsWrap = styled.div`
 const VarGroup = styled.div``;
 
 const VarLabel = styled.div`
-  font-size: 0.6875rem;
+  font-size: 14px;
   font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 4px;
+  color: var(--body-color, #1d1b18);
+  margin-bottom: 10px;
 `;
 
 const VarLabelSelected = styled.span`
   font-weight: 400;
-  color: #374151;
-  text-transform: none;
-  letter-spacing: 0;
-  margin-left: 4px;
+  color: var(--body-color, #1d1b18);
 `;
 
 const VarRow = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 `;
 
 const VarToggleBtn = styled.button`
@@ -342,38 +335,39 @@ const VarToggleBtn = styled.button`
 
 /* Compact text chip — sizes, materials, etc */
 const VarChip = styled.button`
-  padding: 8px 14px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 15px;
+  font-weight: ${(p) => (p.$selected ? 600 : 400)};
   line-height: 1.2;
-  border: 1px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
-  background: ${(p) => (p.$selected ? "#374151" : "#fff")};
-  color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#9ca3af" : "#374151")};
-  border-radius: 10px;
+  border: ${(p) => (p.$selected ? "2px solid var(--body-color, #1d1b18)" : "1px solid #cfc6b8")};
+  background: ${(p) => (p.$selected ? "var(--body-color, #1d1b18)" : "#fff")};
+  color: ${(p) => (p.$selected ? "#fff" : p.$oos ? "#9ca3af" : "var(--body-color, #1d1b18)")};
+  border-radius: 22px;
   cursor: ${(p) => (p.$oos ? "default" : "pointer")};
   text-decoration: ${(p) => (p.$oos && !p.$selected ? "line-through" : "none")};
   opacity: ${(p) => (p.$oos && !p.$selected ? 0.6 : 1)};
   pointer-events: ${(p) => (p.$oos && !p.$selected ? "none" : "auto")};
   transition: border-color 0.12s, background 0.12s, color 0.12s;
   &:hover:not(:disabled) {
-    border-color: ${(p) => (p.$selected ? "#374151" : "#9ca3af")};
-    color: ${(p) => (p.$selected ? "#fff" : "#111")};
+    border-color: var(--body-color, #1d1b18);
+    color: ${(p) => (p.$selected ? "#fff" : "var(--body-color, #1d1b18)")};
   }
 `;
 
 /* Compact swatch circle — color / image options */
 const VarSwatch = styled.button`
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  border: 2px solid ${(p) => (p.$selected ? "#374151" : "#e5e7eb")};
+  border: 3px solid var(--shop-bg, #f6f2ec);
+  box-shadow: ${(p) => (p.$selected ? "0 0 0 2px var(--body-color, #1d1b18)" : "0 0 0 1px #cfc6b8")};
   padding: 0;
   background: none;
   cursor: pointer;
   overflow: hidden;
   flex-shrink: 0;
-  transition: border-color 0.12s, transform 0.12s;
-  transform: ${(p) => (p.$selected ? "scale(1.08)" : "scale(1)")};
+  transition: box-shadow 0.12s;
   opacity: ${(p) => (p.$oos && !p.$selected ? 0.5 : 1)};
   pointer-events: ${(p) => (p.$oos && !p.$selected ? "none" : "auto")};
   position: relative;
@@ -470,19 +464,20 @@ const RightCol = styled.div`
 
 
 const BuyboxCard = styled.aside`
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border-radius: 24px;
+  border: 0;
+  box-shadow: 0 1px 0 #e6dfd4;
   background: #fff;
 `;
 
 const BuyboxInner = styled.div`
   position: relative;
-  padding: 16px;
+  padding: 24px;
 `;
 
 const OtherSellersCard = styled.div`
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  border: 0;
   background: #fff;
   padding: 14px 14px 8px;
 `;
@@ -541,22 +536,21 @@ const PriceMainRow = styled.div`
 `;
 
 const PriceMain = styled.span`
-  font-size: 1.7rem;
-  font-weight: 650;
-  color: ${(p) => (p.$sale ? "#e53e3e" : "#374151")};
-  letter-spacing: -0.03em;
+  font-family: var(--h2-ff, inherit);
+  font-size: 38px;
+  font-weight: 800;
+  color: ${(p) => (p.$sale ? "#b42318" : "var(--body-color, #1d1b18)")};
+  letter-spacing: -0.02em;
   line-height: 1.05;
 `;
 
 const DiscountPill = styled.span`
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  color: #9f1239;
-  background: #ffe4e6;
-  border: 1px solid #fecdd3;
-  padding: 3px 8px;
-  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #b42318;
+  padding: 4px 10px;
+  border-radius: 12px;
 `;
 
 const PriceSubRow = styled.div`
@@ -574,18 +568,18 @@ const Strike = styled.span`
 `;
 
 const MSRP = styled.span`
-  font-size: 0.82rem;
-  color: #9ca3af;
+  font-size: 13px;
+  color: #5e574e;
 `;
 
 const TaxLine = styled.div`
-  font-size: 0.72rem;
-  color: #9ca3af;
+  font-size: 12px;
+  color: #5e574e;
   margin-top: 6px;
 `;
 
 const InfoList = styled.div`
-  border-top: 1px solid rgba(229,231,235,0.9);
+  border-top: 1px solid #efe8dd;
   padding-top: 12px;
   display: grid;
   gap: 9px;
@@ -594,26 +588,26 @@ const InfoList = styled.div`
 const InfoRow = styled.div`
   display: grid;
   grid-template-columns: 90px 1fr;
-  gap: 10px;
+  gap: 12px;
   align-items: baseline;
-  font-size: 0.84rem;
+  font-size: 13px;
 `;
 
 const InfoLabel = styled.span`
-  color: #9ca3af;
-  font-weight: 650;
+  color: #5e574e;
+  font-weight: 400;
 `;
 
 const InfoValue = styled.span`
-  color: #111827;
-  text-align: right;
+  color: var(--body-color, #1d1b18);
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
 
 const SectionTitle = styled.h2`
   font-family: var(--h2-ff, inherit);
-  font-size: clamp(1.3rem, 2vw, 1.65rem);
+  font-size: clamp(1.3rem, 2vw, 1.625rem);
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -708,7 +702,7 @@ const DescriptionSection = styled.section`
   & p { margin: 0 0 1em; }
   & ul, & ol { margin: 0.5em 0 1em 1.5em; padding-left: 1.5em; }
   & strong { font-weight: 600; }
-  & a { color: #0ea5e9; text-decoration: underline; }
+  & a { color: var(--shop-accent, #a65300); text-decoration: underline; }
   & blockquote { margin: 1em 0; padding-left: 1em; border-left: 4px solid #e5e7eb; color: #6b7280; }
   & p:last-child { margin-bottom: 0; }
   & ul { list-style-type: disc; }
@@ -927,7 +921,7 @@ function BrandRow({ brandName, brandHandle, brandLogo, reviewCount }) {
           {(brandName || "?").charAt(0).toUpperCase()}
         </span>
       )}
-      <span style={{ color: "#0ea5e9", textDecoration: "underline", textUnderlineOffset: 2, fontWeight: 500 }}>
+      <span style={{ color: "var(--body-color, #1d1b18)", textDecoration: "underline", textUnderlineOffset: 2, fontWeight: 600 }}>
         {brandName}
       </span>
       {reviewCount > 0 && (
@@ -1581,8 +1575,8 @@ export default function ProductTemplate() {
           ? (selectedOpt ? optionDisplayLabel(selectedOpt, locale) : selected)
           : "";
         const isSwatch = (group.options || []).some(
-          (o) => (typeof o === "object" && o.swatch_image)
-        );
+          (o) => (typeof o === "object" && (o.swatch_image || o.hex))
+        ) || /farbe|colou?r|renk|couleur|colore/i.test(`${groupName} ${groupTitle || ""}`);
         return (
           <VarGroup key={groupName}>
             <VarLabel>
@@ -1631,7 +1625,7 @@ export default function ProductTemplate() {
                         />
                       ) : null}
                       <span
-                        style={{ display: swatchUrl ? "none" : "block", width: "100%", height: "100%", borderRadius: "50%", background: colorSwatchFallback(valueStr) }}
+                        style={{ display: swatchUrl ? "none" : "block", width: "100%", height: "100%", borderRadius: "50%", background: (typeof opt === "object" && /^#[0-9a-f]{3,8}$/i.test(String(opt.hex || "").trim())) ? String(opt.hex).trim() : colorSwatchFallback(valueStr) }}
                       />
                     </VarSwatch>
                   );

@@ -14,17 +14,18 @@ function PersonIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="26"
-      height="26"
+      width="24"
+      height="24"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" />
     </svg>
   );
 }
@@ -263,7 +264,7 @@ function NavPill({ href, icon, children, onClick }) {
   );
 }
 
-export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, layoutAnchorRef }) {
+export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, layoutAnchorRef, label = "" }) {
   const t = useTranslations("accountPanel");
   const tCommon = useTranslations("common");
   const panelId = useId();
@@ -607,13 +608,20 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
         title={isAuthenticated ? t("triggerTitleAuth") : t("triggerTitleGuest")}
         style={{
           position: "relative",
-          width: 46,
+          width: label ? "auto" : 46,
+          minWidth: 46,
           height: 46,
+          padding: label ? "0 10px" : 0,
           border: "none",
           background: "transparent",
           color: "var(--header-icon-color, #fff)",
           cursor: "pointer",
           display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          fontFamily: "inherit",
+          fontSize: 12,
+          fontWeight: 500,
           alignItems: "center",
           justifyContent: "center",
           borderRadius: 8,
@@ -630,6 +638,7 @@ export default function UserDropdown({ isAuthenticated, user, onLogout, onOpen, 
         onClick={() => handleOpen(!open)}
       >
         <PersonIcon />
+        {label ? <span className="shop-header-icon-label">{label}</span> : null}
         {isAuthenticated && (
           <span
             aria-hidden

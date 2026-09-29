@@ -97,7 +97,7 @@ const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #fafafa;
+  background: var(--shop-bg, #fafafa);
 `;
 
 const Main = styled.main`
@@ -1240,9 +1240,9 @@ function CollectionPage() {
   );
 
   if (isProduct) return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
       <ShopHeader />
-      <main className="flex-grow bg-white">
+      <main className="flex-grow">
         {isMobile ? <ProductTemplateMobile /> : <ProductTemplate />}
       </main>
       <Footer />

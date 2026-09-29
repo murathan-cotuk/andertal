@@ -37,6 +37,15 @@ export function mapCategoryNodesToMenuRows(nodes, locale) {
     .sort((a, b) => String(a.label).localeCompare(String(b.label), locale));
 }
 
+/** Rows for the desktop category card: each child with its first `maxLinks` children as links. */
+export function mapCategoryGroups(nodes, locale, maxLinks = 4) {
+  const byId = new Map((nodes || []).filter(Boolean).map((n) => [String(n.id), n]));
+  return mapCategoryNodesToMenuRows(nodes, locale).map((row) => {
+    const links = mapCategoryNodesToMenuRows(byId.get(row.id)?.children || [], locale);
+    return { ...row, links: links.slice(0, maxLinks), moreCount: Math.max(0, links.length - maxLinks), allLinks: links };
+  });
+}
+
 export function shouldCategoryMenuDrill(event, hasChildren) {
   if (!hasChildren) return false;
   if (!event) return true;

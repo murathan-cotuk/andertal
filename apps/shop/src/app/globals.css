@@ -159,6 +159,12 @@ html {
   .topbar.shop-topbar {
     background: var(--header-chrome-bg, var(--topbar-bg)) !important;
   }
+  /* Same surface as the header here, so the text follows the header's text colour. */
+  .topbar.shop-topbar a,
+  .topbar.shop-topbar span,
+  .topbar.shop-topbar p {
+    color: var(--header-text, var(--topbar-text)) !important;
+  }
 }
 
 /*

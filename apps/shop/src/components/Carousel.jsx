@@ -95,7 +95,6 @@ const NavBtn = styled.button`
   }
 `;
 
-const SIDE_NAV_WIDTH = 52;
 
 const CarouselWrap = styled.div`
   position: relative;
@@ -123,11 +122,15 @@ const NavSide = styled(NavBtn)`
     transform: translateY(-50%);
   }
 `;
+/* Side arrows sit centered on the row's outer edges (half over the gutter), cards stay aligned
+   with the section's content edge. */
 const NavLeftSide = styled(NavSide)`
   left: ${tokens.containerPadding};
+  margin-left: -22px;
 `;
 const NavRightSide = styled(NavSide)`
   right: ${tokens.containerPadding};
+  margin-right: -22px;
 `;
 
 /* ─── Scroll track: programatik kaydırma + CSS smooth (a11y: reduce’da anında) ─ */
@@ -136,9 +139,9 @@ const Scroll = styled.div`
   gap: ${(p) => p.$gap ?? 20}px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 12px ${(p) => (p.$navOnSides ? SIDE_NAV_WIDTH : tokens.containerPadding)}px 20px;
+  padding: 12px ${tokens.containerPadding} 20px;
   scroll-snap-type: x mandatory;
-  scroll-padding-inline: ${(p) => (p.$navOnSides ? SIDE_NAV_WIDTH : 0)}px;
+  scroll-padding-inline: ${tokens.containerPadding};
   -webkit-overflow-scrolling: touch;
   /* Nav is via the prev/next buttons (or touch swipe on mobile, where they're hidden) — a visible
      native scroll track underneath is redundant clutter, not an accessibility requirement, since

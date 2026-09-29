@@ -112,6 +112,11 @@ export const DEFAULT_SHOP_STYLES = {
     bg_color: "#111827",
     text_color: "#d1d5db",
     border_top: "none",
+    /** Optional line under the footer logo (empty = shop default text) */
+    tagline: "",
+    instagram_url: "",
+    facebook_url: "",
+    tiktok_url: "",
   },
   typography: {
     google_font_family: "",

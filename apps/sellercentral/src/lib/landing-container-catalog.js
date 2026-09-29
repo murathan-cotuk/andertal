@@ -9,6 +9,7 @@ export const CONTAINER_GROUPS = [
 
 export const CONTAINER_TYPE_GROUP = {
   hero_banner: "hero_media",
+  promo_bento: "hero_media",
   page_banner: "hero_media",
   layout_section: "hero_media",
   layout_section_2x2: "hero_media",
@@ -23,6 +24,7 @@ export const CONTAINER_TYPE_GROUP = {
   seller_carousel: "commerce",
   brands_directory: "commerce",
   collections_carousel: "commerce",
+  category_circles: "commerce",
   single_product: "commerce",
   product_container: "commerce",
   personalized_product_row: "commerce",

@@ -3016,6 +3016,34 @@ export default function StylesPage() {
               onChange={(v) => updateSection("footer", "border_top", v)}
               autoComplete="off"
             />
+            <TextField
+              label={locale === "tr" ? "Logo altı metin" : locale === "de" ? "Text unter dem Logo" : "Text under the logo"}
+              value={styles.footer.tagline || ""}
+              onChange={(v) => updateSection("footer", "tagline", v)}
+              autoComplete="off"
+              multiline={2}
+            />
+            <TextField
+              label="Instagram URL"
+              value={styles.footer.instagram_url || ""}
+              onChange={(v) => updateSection("footer", "instagram_url", v)}
+              autoComplete="off"
+              placeholder="https://instagram.com/…"
+            />
+            <TextField
+              label="Facebook URL"
+              value={styles.footer.facebook_url || ""}
+              onChange={(v) => updateSection("footer", "facebook_url", v)}
+              autoComplete="off"
+              placeholder="https://facebook.com/…"
+            />
+            <TextField
+              label="TikTok URL"
+              value={styles.footer.tiktok_url || ""}
+              onChange={(v) => updateSection("footer", "tiktok_url", v)}
+              autoComplete="off"
+              placeholder="https://tiktok.com/@…"
+            />
           </div>
         </AccordionCard>
 

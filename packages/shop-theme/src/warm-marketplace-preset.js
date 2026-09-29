@@ -238,6 +238,7 @@ export const WARM_MARKETPLACE_STYLES = {
     icon_color: P.ink,
     shadow: "none",
     border_bottom: `1px solid ${P.line}`,
+    height_desktop: "88px",
   },
   secondNav: {
     variant: "default",
@@ -257,6 +258,7 @@ export const WARM_MARKETPLACE_STYLES = {
     pill_padding: "6px 14px",
     pill_shadow: "none",
     own_color_at_top_desktop: true,
+    height_desktop: "52px",
   },
   footer: {
     bg_color: P.ink,
@@ -326,14 +328,35 @@ function mergeButtons(prevButtons = {}) {
  * Merchant-specific content (topbar items, header scopes, logos, SEO, badges, templates) is kept.
  * @param {Record<string, any>} styles
  */
+/** Trust messages shown in the dark top bar when the merchant has not written their own. */
+export const WARM_TOPBAR_ITEMS = [
+  { text: "Käuferschutz bei jeder Bestellung", link: "" },
+  { text: "Bonuspunkte auf jeden Einkauf", link: "" },
+  { text: "Marken aus Europa", link: "" },
+];
+
+/** Only the desktop height comes from the preset; tablet/mobile keep what the merchant had. */
+function keepSmallerViewports(prev = {}, fallback) {
+  const base = prev.height || fallback;
+  return {
+    height_tablet: prev.height_tablet || prev.height_desktop || base,
+    height_mobile: prev.height_mobile || prev.height_tablet || prev.height_desktop || base,
+  };
+}
+
 export function applyWarmMarketplacePreset(styles = {}) {
   const s = WARM_MARKETPLACE_STYLES;
+  const prevTopbar = styles.topbar || {};
+  const hasTopbarItems = Array.isArray(prevTopbar.items) && prevTopbar.items.some((it) => String(it?.text || "").trim());
   return {
     ...styles,
     colors: mergeSection(styles.colors, s.colors),
-    topbar: mergeSection(styles.topbar, s.topbar),
-    header: mergeSection(styles.header, s.header),
-    secondNav: mergeSection(styles.secondNav, s.secondNav),
+    topbar: {
+      ...mergeSection(prevTopbar, s.topbar),
+      ...(hasTopbarItems ? {} : { items: WARM_TOPBAR_ITEMS, enabled: true, display_mode: "inline" }),
+    },
+    header: { ...mergeSection(styles.header, s.header), ...keepSmallerViewports(styles.header, "72px") },
+    secondNav: { ...mergeSection(styles.secondNav, s.secondNav), ...keepSmallerViewports(styles.secondNav, "44px") },
     footer: mergeSection(styles.footer, s.footer),
     typography: mergeTypography(styles.typography, s.typography),
     scrollUpButton: mergeSection(styles.scrollUpButton, s.scrollUpButton),

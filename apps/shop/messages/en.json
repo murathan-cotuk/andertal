@@ -30,7 +30,13 @@
     "noFilters": "No filters in this category.",
     "filterSelectHint": "Select a product property on the left.",
     "imageGallery": "Image gallery",
-    "toBrand": "To the brand"
+    "toBrand": "To the brand",
+    "deliverTo": "Deliver to",
+    "searchCategories": "Search categories",
+    "allIn": "All of {name}",
+    "showAll": "Show all",
+    "noCategoryMatch": "No matching category",
+    "footerTagline": "The marketplace for independent brands and verified sellers from Europe."
   },
   "nav": {
     "collection": "Collection",
@@ -721,7 +727,6 @@
         "4": "Review",
         "5": "Done"
       },
-
       "categoryPrompt": "Choose a topic",
       "subtopicPrompt": "What best describes your request?",
       "orderPrompt": "Select the relevant order",
@@ -923,5 +928,17 @@
       "generic": "Something went wrong. Please refresh and try again."
     },
     "legacyReadOnly": "This is a previous message and is available as read-only."
+  },
+  "catalogSort": {
+    "sortBy": "Sort by:",
+    "results": "{count, plural, one {# result} other {# results}}",
+    "default": "Popularity",
+    "bestseller": "Bestsellers",
+    "newest": "Newest",
+    "price_asc": "Price: low to high",
+    "price_desc": "Price: high to low",
+    "title_asc": "Name A–Z",
+    "title_desc": "Name Z–A",
+    "noMatch": "No products match your filters."
   }
 }

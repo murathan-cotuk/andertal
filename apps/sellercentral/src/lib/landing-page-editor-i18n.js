@@ -96,6 +96,14 @@ export function getContainerTypes(locale) {
       label: t(loc, "Newsletter signup", "Bulten Kaydı", "Inscription newsletter", "Suscripción newsletter", "Iscrizione newsletter", "Newsletter-Anmeldung"),
       description: t(loc, "Form for Mailchimp, Brevo, Klaviyo, etc. via action URL", "Mailchimp, Brevo, Klaviyo vb. için action URL ile form", "Formulaire Mailchimp, Brevo, Klaviyo via URL action", "Formulario Mailchimp, Brevo, Klaviyo vía URL", "Modulo Mailchimp, Brevo, Klaviyo via URL", "Formular (Mailchimp, Brevo, Klaviyo u. a.) per action-URL"),
     },
+    promo_bento: {
+      label: t(loc, "Promo bento (hero + 2 tiles)", "Promo bento (hero + 2 kutu)", "Bento promo (hero + 2 tuiles)", "Bento promo (hero + 2 fichas)", "Bento promo (hero + 2 riquadri)", "Promo-Bento (Hero + 2 Kacheln)"),
+      description: t(loc, "Large campaign tile with badge, headline, text and two buttons, plus two side tiles (e.g. Sale / New)", "Rozet, başlık, metin ve iki butonlu büyük kampanya kutusu + iki yan kutu (ör. İndirim / Yeni)", "Grande tuile campagne avec badge, titre, texte et deux boutons, plus deux tuiles latérales", "Ficha de campaña con insignia, título, texto y dos botones, más dos fichas laterales", "Riquadro campagna con badge, titolo, testo e due pulsanti, più due riquadri laterali", "Große Kampagnen-Kachel mit Badge, Überschrift, Text und zwei Buttons, dazu zwei Seitenkacheln (z. B. Sale / Neuheiten)"),
+    },
+    category_circles: {
+      label: t(loc, "Category circles", "Kategori daireleri", "Cercles de catégories", "Círculos de categorías", "Cerchi categorie", "Kategorie-Kreise"),
+      description: t(loc, "Round category tiles — automatically from the catalog or picked by hand", "Yuvarlak kategori kutuları — katalogdan otomatik veya elle seçilir", "Tuiles rondes — automatiques depuis le catalogue ou choisies", "Fichas redondas — automáticas del catálogo o elegidas a mano", "Riquadri rotondi — automatici dal catalogo o scelti a mano", "Runde Kategorie-Kacheln — automatisch aus dem Katalog oder von Hand gewählt"),
+    },
     feature_grid: {
       label: t(loc, "Feature grid", "Ozellik Izgarasi", "Grille de fonctionnalités", "Cuadrícula de características", "Griglia funzionalità", "Feature-Raster"),
       description: t(loc, "Grid with icon/emoji, title and description — ideal for USPs", "Icon/emoji, başlık ve açıklama metni içeren ızgara", "Grille avec icône, titre et description", "Cuadrícula con icono, título y descripción", "Griglia con icona, titolo e descrizione", "Raster mit Icon/Emoji, Titel und Beschreibungstext"),
@@ -548,6 +556,7 @@ export function getLandingEditorCopy(locale) {
       { label: x("Feature cards", "Özellik kartları", "Cartes fonctionnalités", "Tarjetas de características", "Card funzionalità", "Feature-Karten"), value: "cards" },
       { label: x("Stats strip (Verkäufer werden)", "İstatistik şeridi", "Bandeau stats", "Franja de estadísticas", "Striscia statistiche", "Stats-Leiste (Verkäufer werden)"), value: "stats_strip" },
       { label: x("Price / fee cards", "Ücret kartları", "Cartes tarifs", "Tarjetas de precios", "Card prezzi", "Preis-/Gebühren-Karten"), value: "price_cards" },
+      { label: x("Trust bar (white strip with round icons)", "Güven şeridi (yuvarlak ikonlu beyaz şerit)", "Barre de confiance", "Barra de confianza", "Barra fiducia", "Trust-Leiste (weiße Leiste mit runden Icons)"), value: "trust_bar" },
     ],
     accordionThemeOptions: () => [
       { label: x("Light", "Açık", "Clair", "Claro", "Chiaro", "Hell"), value: "light" },
@@ -858,7 +867,7 @@ export function getLandingEditorCopy(locale) {
     cardBorder: x("Card border", "Kart kenarlığı", "Bordure carte", "Borde tarjeta", "Bordo scheda", "Kartenrahmen"),
     featureN: (n) => x(`Feature ${n}`, `Özellik ${n}`, `Fonctionnalité ${n}`, `Característica ${n}`, `Funzionalità ${n}`, `Merkmal ${n}`),
     iconEmoji: x("Icon / emoji", "İkon / emoji", "Icône / emoji", "Icono / emoji", "Icona / emoji", "Icon / Emoji"),
-    iconEmojiHelp: x("e.g. ⚡ 🔒 ↩️", "örn. ⚡ 🔒 ↩️", "ex. ⚡ 🔒", "p. ej. ⚡ 🔒", "es. ⚡ 🔒", "z. B. ⚡ 🔒 ↩️"),
+    iconEmojiHelp: x("e.g. ⚡ 🔒 ↩️ — or for the trust bar: shield, truck, points, badge, return, lock, leaf, chat", "örn. ⚡ 🔒 ↩️ — güven şeridi için: shield, truck, points, badge, return, lock, leaf, chat", "ex. ⚡ 🔒 — ou : shield, truck, points, badge, return, lock, leaf, chat", "p. ej. ⚡ 🔒 — o: shield, truck, points, badge, return, lock, leaf, chat", "es. ⚡ 🔒 — oppure: shield, truck, points, badge, return, lock, leaf, chat", "z. B. ⚡ 🔒 ↩️ — oder für die Trust-Leiste: shield, truck, points, badge, return, lock, leaf, chat"),
     description: x("Description", "Açıklama", "Description", "Descripción", "Descrizione", "Beschreibung"),
     addFeature: x("+ Add feature", "+ Özellik ekle", "+ Ajouter fonctionnalité", "+ Añadir característica", "+ Aggiungi funzionalità", "+ Merkmal hinzufügen"),
     testimonialsSettings: x("Testimonials settings", "Müşteri yorumları ayarları", "Paramètres témoignages", "Ajustes testimonios", "Impostazioni testimonianze", "Kundenstimmen Einstellungen"),
@@ -1046,6 +1055,19 @@ export function getNewContainerSeed(locale, type) {
         first_name_placeholder: x("First name", "Ad", "Prénom", "Nombre", "Nome", "Vorname"),
         last_name_placeholder: x("Last name", "Soyad", "Nom", "Apellido", "Cognome", "Nachname"),
         email_placeholder: x("Email address", "E-posta adresi", "Adresse e-mail", "Correo electrónico", "Indirizzo email", "E-Mail-Adresse"),
+      };
+    case "promo_bento":
+      return {
+        badge: x("Autumn collection", "Sonbahar koleksiyonu", "Collection d’automne", "Colección de otoño", "Collezione autunno", "Herbst-Kollektion"),
+        title: x("Good things from Europe. Straight from the makers.", "Avrupa’dan iyi ürünler. Doğrudan üreticisinden.", "Le meilleur d’Europe. Directement des créateurs.", "Lo mejor de Europa. Directo de los creadores.", "Il meglio d’Europa. Direttamente dai produttori.", "Gutes aus Europa. Direkt von den Machern."),
+        text: x("Discover independent brands and verified sellers — with buyer protection and bonus points on every purchase.", "Bağımsız markaları ve doğrulanmış satıcıları keşfet — her alışverişte alıcı koruması ve bonus puan.", "Découvrez des marques indépendantes et des vendeurs vérifiés — avec protection acheteur et points bonus.", "Descubre marcas independientes y vendedores verificados — con protección al comprador y puntos.", "Scopri brand indipendenti e venditori verificati — con protezione acquirenti e punti bonus.", "Entdecke unabhängige Marken und geprüfte Händler — mit Käuferschutz und Bonuspunkten bei jedem Kauf."),
+        btn_text: x("Discover now", "Keşfet", "Découvrir", "Descubrir", "Scopri ora", "Jetzt entdecken"),
+        btn2_text: x("Become a seller", "Satıcı ol", "Devenir vendeur", "Hazte vendedor", "Diventa venditore", "Verkäufer werden"),
+      };
+    case "category_circles":
+      return {
+        title: x("Popular categories", "Popüler kategoriler", "Catégories populaires", "Categorías populares", "Categorie popolari", "Beliebte Kategorien"),
+        link_text: x("All categories", "Tüm kategoriler", "Toutes les catégories", "Todas las categorías", "Tutte le categorie", "Alle Kategorien"),
       };
     case "feature_grid":
       return {
