@@ -9,10 +9,10 @@ import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account
 import { getMedusaClient } from "@/lib/medusa-client";
 import { useLocale, useTranslations } from "next-intl";
 
-const ORANGE = "#ee8a12";
-const DARK = "#1A1A1A";
-const GRAY = "#6b7280";
-const BORDER = "#e5e7eb";
+const ORANGE = "var(--shop-accent, #ee8a12)";
+const DARK = "var(--body-color, #1d1b18)";
+const GRAY = "#5e574e";
+const BORDER = "#efe8dd";
 
 function fmtLedgerDate(iso, locale = "de") {
   if (!iso) return { date: "—", time: "" };
@@ -80,8 +80,8 @@ export default function BonusPage() {
               <div
                 style={{
                   background: "#fff",
-                  borderRadius: 12,
-                  border: `1px solid ${BORDER}`,
+                  borderRadius: 18,
+                  boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)",
                   padding: "clamp(16px, 4vw, 28px) clamp(14px, 4vw, 32px)",
                   marginBottom: 24,
                   textAlign: "center",
@@ -99,7 +99,7 @@ export default function BonusPage() {
                 )}
               </div>
 
-              <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "14px 10px 14px", marginBottom: 24 }}>
+              <div style={{ background: "#fff", borderRadius: 18, boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", padding: "14px 10px 14px", marginBottom: 24 }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 12px", paddingLeft: 4 }}>{t("history")}</h2>
                 {loading ? (
                   <GlobalPageLoader />
@@ -147,7 +147,7 @@ export default function BonusPage() {
                 )}
               </div>
 
-              <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "24px 28px" }}>
+              <div style={{ background: "#fff", borderRadius: 18, boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", padding: "24px 28px" }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 16px" }}>{t("howTitle")}</h2>
                 <ul style={{ margin: 0, paddingLeft: 20, color: DARK, fontSize: 15, lineHeight: 1.7 }}>
                   <li>{t.rich("howRegistration", { b })}</li>

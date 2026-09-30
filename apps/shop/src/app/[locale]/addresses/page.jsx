@@ -13,15 +13,15 @@ import { useCart } from "@/context/CartContext";
 import { COUNTRY_MAP, getShippableCountries } from "@/lib/countries";
 import { useLocale, useTranslations } from "next-intl";
 import CustomCheckbox from "@/components/ui/CustomCheckbox";
-const ORANGE = "#ee8a12";
-const DARK = "#1A1A1A";
-const GRAY = "#6b7280";
-const BORDER = "#e5e7eb";
+const ORANGE = "var(--shop-accent, #ee8a12)";
+const DARK = "var(--body-color, #1d1b18)";
+const GRAY = "#5e574e";
+const BORDER = "#efe8dd";
 
 const cardStyle = {
   background: "#fff",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 12,
+  boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)",
+  borderRadius: 18,
   padding: 20,
   minHeight: 180,
   display: "flex",

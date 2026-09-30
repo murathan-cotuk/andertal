@@ -37,19 +37,28 @@ function shouldUseLandingContainers(landing, { preferNativeCatalog }) {
   if (!preferNativeCatalog) return true
 
   const settings = landing?.settings && typeof landing.settings === 'object' ? landing.settings : {}
+  // 'category_carousels_v1' was this flag's original name; catalog-landing-pages-seed.js (the
+  // script that actually seeds these pages) writes 'catalog_hub_v1'/'v3' instead — the two were
+  // never the same string, so this check never once matched what the seeder wrote. Accept either.
   const layout = String(settings.catalog_landing_layout || '')
-  if (layout === 'category_carousels_v1' || settings.catalog_use_containers === true) {
+  if (layout === 'category_carousels_v1' || layout.startsWith('catalog_hub_v') || settings.catalog_use_containers === true) {
     return true
   }
+  // 'bestseller_carousel' and 'personalized_product_row' both render an algorithm-driven
+  // product carousel — a page built entirely from personalized rows (Sellercentral's
+  // landing-page editor lets sellers assemble Sales/Neuheiten/Bestsellers exactly this way)
+  // is just as much a hand-built catalog layout as one using the sidebar+carousel combo below,
+  // and was previously discarded in favor of the generic AutoCatalogHub fallback.
+  const isCarouselContainer = (c) => c && c.visible !== false && (c.type === 'bestseller_carousel' || c.type === 'personalized_product_row')
   if (settings.show_product_filter_bar === true) {
-    const carouselCount = containers.filter((c) => c && c.visible !== false && c.type === 'bestseller_carousel').length
+    const carouselCount = containers.filter(isCarouselContainer).length
     if (carouselCount > 0) return true
   }
 
   const visible = containers.filter((c) => c && c.visible !== false)
   const hasSidebar = visible.some((c) => c.type === 'category_sidebar')
-  const carouselCount = visible.filter((c) => c.type === 'bestseller_carousel').length
-  return hasSidebar && carouselCount > 0
+  const carouselCount = visible.filter(isCarouselContainer).length
+  return hasSidebar ? carouselCount > 0 : carouselCount >= 2
 }
 
 function hasBrandsDirectoryContainer(landing) {

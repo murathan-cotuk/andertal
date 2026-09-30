@@ -18,17 +18,17 @@ import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, 
 
 /* ─────────────── Design tokens ─────────────── */
 const T = {
-  orange: "#ee8a12",
-  dark: "#1A1A1A",
-  dark2: "#2A2A2A",
-  gray1: "#555555",
-  gray2: "#777777",
+  orange: "var(--shop-accent, #ee8a12)",
+  dark: "var(--body-color, #1d1b18)",
+  dark2: "var(--body-color, #1d1b18)",
+  gray1: "#5e574e",
+  gray2: "#6b6459",
   gray3: "#9ca3af",
-  border: "#EEEEEE",
+  border: "#efe8dd",
   cardBg: "#FFFFFF",
   pageBg: "#FAFAFA",
-  radius: "12px",
-  font: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  radius: "18px",
+  font: "inherit",
 };
 
 /* ─────────────── Status config ─────────────── */

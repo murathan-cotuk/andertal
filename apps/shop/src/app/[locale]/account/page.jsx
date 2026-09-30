@@ -574,6 +574,7 @@ export default function AccountPage() {
                 email={user?.email || customer?.email || ""}
                 latestOrder={orders[0] || null}
                 latestOrderStatus={orders[0] ? orderStatusLabel(getOrderStatus(orders[0])) : ""}
+                latestOrderStatusKey={orders[0] ? getOrderStatus(orders[0]) : ""}
                 latestOrderDate={orders[0] ? fmtDate(orders[0].created_at, locale) : ""}
               />
 

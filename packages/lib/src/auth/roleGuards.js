@@ -11,7 +11,7 @@
  * @module roleGuards
  */
 
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getToken, isTokenValid, getTokenClaims } from './tokenService.js';
 
@@ -151,7 +151,10 @@ export function useAuthGuard(options = {}) {
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect): fires before the browser paints the first
+  // frame, so an unauthenticated visit to a guarded page redirects before any
+  // loading skeleton / protected content is ever shown, instead of flashing it.
+  useLayoutEffect(() => {
     // Check if user is authenticated
     const token = getToken(requiredRole);
     const isAuthenticated = token && isTokenValid(token);

@@ -39,7 +39,7 @@ function SavedCard({ pm, onDelete, deleting }) {
   const t = useTranslations("paymentPage");
   const card = pm.card || {};
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", borderRadius: 14, background: "#fff" }}>
       <CardIcon />
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -89,7 +89,7 @@ function AddCardForm({ onSuccess, onCancel }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "20px 18px" }}>
+    <form onSubmit={handleSubmit} style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", borderRadius: 14, padding: "20px 18px" }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 14 }}>{t("addTitle")}</div>
       <PaymentElement />
       {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 10 }}>{err}</p>}
@@ -97,14 +97,14 @@ function AddCardForm({ onSuccess, onCancel }) {
         <button
           type="submit"
           disabled={saving || !stripe}
-          style={{ flex: 1, padding: "9px 0", background: "#ee8a12", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)" }}
+          style={{ flex: 1, padding: "9px 0", background: "var(--shop-accent, #ee8a12)", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)" }}
         >
           {saving ? t("saving") : t("save")}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          style={{ padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff" }}
+          style={{ padding: "9px 16px", border: "1px solid #efe8dd", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff" }}
         >
           {t("cancel")}
         </button>
@@ -208,7 +208,7 @@ export default function PaymentMethodsPage() {
               {!loading && !showAddForm && (
                 <>
                   {paymentMethods.length === 0 && (
-                    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "40px 24px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
+                    <div style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", borderRadius: 18, padding: "40px 24px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
                       {t("empty")}
                     </div>
                   )}
@@ -218,7 +218,7 @@ export default function PaymentMethodsPage() {
                   <button
                     onClick={handleShowAdd}
                     disabled={setupLoading}
-                    style={{ alignSelf: "flex-start", padding: "9px 18px", background: "#ee8a12", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)", marginTop: 4 }}
+                    style={{ alignSelf: "flex-start", padding: "9px 18px", background: "var(--shop-accent, #ee8a12)", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)", marginTop: 4 }}
                   >
                     {setupLoading ? "…" : t("add")}
                   </button>

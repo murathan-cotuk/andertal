@@ -1128,12 +1128,25 @@ const SubNavClipper = styled.div`
     border-bottom: 1px solid rgba(29, 27, 24, 0.1);
   }
   max-height: ${(p) => {
-    if (p.$chromeCover) return `var(--second-nav-h, 50px)`;
     const t = Math.min(1, Math.max(0, p.$hideProgress ?? 0));
+    if (p.$chromeCover) return `var(--second-nav-h, 50px)`;
     return `calc(var(--second-nav-h, 50px) * ${1 - t})`;
   }};
   opacity: ${(p) => 1 - Math.min(1, Math.max(0, p.$hideProgress ?? 0))};
   pointer-events: ${(p) => ((p.$hideProgress ?? 0) >= 0.95 ? "none" : "auto")};
+  visibility: ${(p) => ((p.$hideProgress ?? 0) >= 0.98 ? "hidden" : "visible")};
+
+  /* Mobile/tablet: the "chrome covers" trick is a desktop-only visual merge (main
+     header slides over the second nav). On narrow viewports there's no such
+     slide-over, so honoring $chromeCover here would freeze the bar's box at full
+     height forever — background visible, items faded — instead of fully collapsing.
+     Always collapse by hideProgress on mobile regardless of $chromeCover. */
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    max-height: ${(p) => {
+      const t = Math.min(1, Math.max(0, p.$hideProgress ?? 0));
+      return `calc(var(--second-nav-h, 50px) * ${1 - t})`;
+    }};
+  }
 `;
 
 const SubNavWrap = styled.div`

@@ -12,10 +12,10 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useLocale, useTranslations } from "next-intl";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 
-const ORANGE = "#ee8a12";
-const DARK = "#1A1A1A";
-const GRAY = "#6b7280";
-const BORDER = "#e5e7eb";
+const ORANGE = "var(--shop-accent, #ee8a12)";
+const DARK = "var(--body-color, #1d1b18)";
+const GRAY = "#5e574e";
+const BORDER = "#efe8dd";
 
 function StarPicker({ value, onChange }) {
   const [hovered, setHovered] = useState(0);
@@ -200,7 +200,7 @@ export default function ReviewsPage() {
                   : null;
 
                 return (
-                  <div key={order.id} style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
+                  <div key={order.id} style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", borderRadius: 18, marginBottom: 14, overflow: "hidden" }}>
                     <div
                       style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
                       onClick={() => setExpandedOrder(isOpen ? null : order.id)}

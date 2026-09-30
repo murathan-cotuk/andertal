@@ -7,8 +7,9 @@ import { BOTTOM_NAV_MQ } from "@/lib/bottom-nav-mq";
 /**
  * `position: fixed; bottom` offset so the bar sits on the visible screen edge.
  * Positive: browser toolbar covers the layout bottom — lift the bar above it.
- * Negative: Chrome hid that toolbar and the visual viewport grew past `innerHeight`.
- * Clamping at 0 leaves the bar floating with the footer showing in the gap.
+ * Never negative: a negative `bottom` would push the bar past the true screen
+ * edge (off-screen), which reads as "detached from the bottom" with the page
+ * footer showing in the gap underneath it — always clamp up to 0 instead.
  */
 export function useVisualViewportBottomInset() {
   const [inset, setInset] = useState(0);
@@ -35,7 +36,7 @@ export function useVisualViewportBottomInset() {
           return;
         }
         const raw = window.innerHeight - vv.offsetTop - vv.height;
-        setInset(Math.abs(raw) < 0.5 ? 0 : Math.round(raw));
+        setInset(raw < 0.5 ? 0 : Math.round(raw));
       });
     };
 
