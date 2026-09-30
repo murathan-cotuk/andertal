@@ -40,8 +40,13 @@ import {
   formatFacetOptionLabel,
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
-import CustomCheckbox from "@/components/ui/CustomCheckbox";
-import FacetOptions, { facetDisplayKind } from "@/components/catalog/FacetOptions";
+import StackedFilterPanel, {
+  useCatalogExtraFilters,
+  FilterSheetHeader,
+  FilterSheetScroll,
+  FilterSheetFooter,
+  FilterSheetCategoryGroup,
+} from "@/components/catalog/StackedFilterPanel";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
   CATALOG_FILTER_OVERLAY_Z,
@@ -380,6 +385,20 @@ const Sidebar = styled.aside`
     flex-direction: column;
     overflow: ${(p) => (p.$mobileFilterMode ? "hidden" : "auto")};
   }
+
+  /* Phones (design): bottom sheet with rounded top corners instead of a side drawer. */
+  @media (max-width: 767px) {
+    top: auto;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 88dvh;
+    max-height: 88dvh;
+    border-radius: 24px 24px 0 0;
+    box-shadow: ${(p) => (p.$open ? "0 -8px 32px rgba(0,0,0,0.2)" : "none")};
+    transform: translateY(${(p) => (p.$open ? "0" : "100%")});
+    transition: transform 0.3s ease;
+  }
 `;
 
 /* CMS landing page (e.g. "Bestseller") — desktop-only category jump sidebar,
@@ -499,92 +518,11 @@ const SidebarHead = styled.div`
   justify-content: space-between;
   flex-shrink: 0;
   margin-bottom: ${(p) => (p.$filterMode ? "0" : "20px")};
-  padding: ${(p) => (p.$filterMode ? "12px 14px" : "0 0 12px")};
-  border-bottom: 1px solid #e8e8e6;
+  padding: 0;
 
   @media (min-width: 1024px) {
     display: none;
   }
-`;
-
-const FilterGroup = styled.div`
-  border-bottom: 1px solid #efe8dd;
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const FilterGroupTitle = styled.button`
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-`;
-
-const FilterGroupHeading = styled.h4.attrs({ className: "shop-typo-sidebar-nav" })`
-  margin: 0;
-  padding: 0;
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-`;
-
-const FilterGroupBody = styled.div`
-  display: ${(p) => (p.$open ? "block" : "none")};
-  padding: 0 0 12px;
-`;
-
-const FilterChevron = styled.span`
-  font-size: 14px;
-  line-height: 1;
-  color: #666;
-  transform: rotate(${(p) => (p.$open ? "180deg" : "0deg")});
-  transition: transform 0.18s ease;
-`;
-
-const CheckRow = styled.label.attrs({ className: "shop-typo-sidebar-submenu" })`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-  cursor: pointer;
-  color: ${(p) => (p.$on ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
-  font-weight: ${(p) => (p.$on ? 600 : "var(--sidebar-submenu-fw, 400)")};
-  transition: color 0.12s;
-
-  & > label {
-    flex-shrink: 0;
-    width: 12px;
-    height: 12px;
-  }
-
-  & > label svg {
-    width: 100% !important;
-    height: 100% !important;
-    display: block;
-  }
-
-  &:hover { color: var(--sidebar-nav-color, #111827); }
-`;
-
-const ClearAllBtn = styled.button`
-  background: none;
-  border: none;
-  padding: 6px 4px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--shop-accent, #a65300);
-  cursor: pointer;
-  transition: opacity 0.12s;
-
-  &:hover { opacity: 0.75; text-decoration: underline; text-underline-offset: 3px; }
 `;
 
 const DesktopFilterContent = styled.div`
@@ -599,66 +537,11 @@ const MobileFilterSplit = styled.div`
   display: none;
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     flex: 1;
     min-height: 0;
     overflow: hidden;
   }
-`;
-
-const MobileFilterLeft = styled.div`
-  width: 92px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  background: #f6f2ec;
-  border-right: 1px solid #e6dfd4;
-`;
-
-const MobileFilterLeftBtn = styled.button`
-  display: block;
-  width: 100%;
-  padding: 13px 8px 13px 11px;
-  font-size: 11px;
-  font-weight: ${(p) => (p.$active ? 700 : 400)};
-  text-align: left;
-  background: ${(p) => (p.$active ? "#fff" : "transparent")};
-  border: none;
-  border-left: 3px solid ${(p) => (p.$active ? "var(--shop-primary, #ee8a12)" : "transparent")};
-  color: ${(p) => (p.$active ? "var(--body-color, #1d1b18)" : "#5e574e")};
-  cursor: pointer;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  font-family: inherit;
-`;
-
-const MobileFilterRight = styled.div`
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  padding: 12px 10px;
-`;
-
-const MobileFilterPillGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-`;
-
-const MobileFilterPill = styled.button`
-  padding: 9px 6px;
-  font-size: 11.5px;
-  font-weight: ${(p) => (p.$on ? 700 : 400)};
-  background: ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#fff")};
-  color: ${(p) => (p.$on ? "#fff" : "var(--body-color, #1d1b18)")};
-  border: 1.5px solid ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#cfc6b8")};
-  border-radius: 999px;
-  cursor: pointer;
-  text-align: center;
-  line-height: 1.3;
-  font-family: inherit;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-  &:hover { border-color: var(--shop-primary, #ee8a12); }
-  word-break: break-word;
 `;
 
 /* Main content area (right of sidebar) */
@@ -895,8 +778,6 @@ function CollectionPage() {
   const [page,        setPage]        = useState(1);
   const [filters,     setFilters]     = useState({});
   const [panelOpen,   setPanelOpen]   = useState(false);
-  const [openFilterGroups, setOpenFilterGroups] = useState({});
-  const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
   const [recommendedProducts, setRecommendedProducts] = useState([]);
   const [linkedCategoryId, setLinkedCategoryId] = useState(null);
   const [metafieldDefinitions, setMetafieldDefinitions] = useState({});
@@ -1137,32 +1018,7 @@ function CollectionPage() {
     return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 12);
   })();
   const showCollCategories = collCategories.length > 1;
-  const showCatalogSidebar = hasFacets || showCollCategories;
-
-  useEffect(() => {
-    const facetKeys = Object.keys(facets);
-    setOpenFilterGroups((prev) => {
-      let changed = false;
-      const next = { ...prev };
-
-      facetKeys.forEach((key) => {
-        if (!(key in next)) {
-          next[key] = Boolean(filters[key]?.length);
-          changed = true;
-        }
-      });
-
-      return changed ? next : prev;
-    });
-  }, [facets, filters]);
-
-  useEffect(() => {
-    if (!panelOpen) return;
-    const keys = Object.keys(facets);
-    if (keys.length > 0 && (!activeMobileFilterGroup || !facets[activeMobileFilterGroup])) {
-      setActiveMobileFilterGroup(keys[0]);
-    }
-  }, [panelOpen, facets, activeMobileFilterGroup]);
+  const showCatalogSidebar = hasFacets || showCollCategories || products.length > 0;
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
@@ -1198,7 +1054,19 @@ function CollectionPage() {
   if (collCategoryId) {
     filtered = filtered.filter((p) => (Array.isArray(p?.categories) ? p.categories : []).some((c) => c?.id === collCategoryId));
   }
-  filtered = filterProductsByFacets(filtered, filters);
+  const extra = useCatalogExtraFilters({
+    base: filtered,
+    facets,
+    filters,
+    setFilters,
+    toggle,
+    setPage,
+    facetTitle: (key) => getFacetGroupTitle(key, locale, metafieldDefinitions),
+    optionLabel: (key, v) => formatFacetOptionLabel(key, v, null, locale, metafieldDefinitions),
+    isDeal: saleOnly ? null : (p) => isDiscountedProduct(p, saleMinPct),
+    resetKey: handle || "",
+  });
+  filtered = extra.filtered;
 
   const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly });
 
@@ -1207,7 +1075,7 @@ function CollectionPage() {
   const curPage    = Math.min(page, totalPages);
   const paginated  = sorted.slice((curPage - 1) * PER_PAGE, curPage * PER_PAGE);
 
-  const activeCount = Object.values(filters).reduce((n, v) => n + (v?.length || 0), 0);
+  const activeCount = Object.values(filters).reduce((n, v) => n + (v?.length || 0), 0) + extra.extraActive;
 
   /* ── Derived display values ── */
   const title     = collection?.display_title || collection?.title || handle || "";
@@ -1459,17 +1327,12 @@ function CollectionPage() {
                 <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />
                 <Sidebar $open={panelOpen} $width={sidebarWidth} $mobileFilterMode={true}>
               <SidebarHead $filterMode={true}>
-                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  Filter{activeCount > 0 ? ` (${activeCount})` : ""}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ padding: "2px 8px", fontSize: 10 }}>
-                      Löschen
-                    </ClearAllBtn>
-                  )}
-                  <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }}>×</button>
-                </div>
+                <FilterSheetHeader
+                  showReset={activeCount > 0}
+                  onReset={extra.resetAll}
+                  onClose={() => setPanelOpen(false)}
+                  closeLabel={tCommon("close")}
+                />
               </SidebarHead>
 
               {/* Desktop: accordion */}
@@ -1501,65 +1364,32 @@ function CollectionPage() {
                     })}
                   </nav>
                 ) : null}
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                  Filter
-                  {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); }} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>Clear</ClearAllBtn>
-                  )}
-                </div>
-                {Object.entries(facets).map(([key, vals]) => (
-                  <FilterGroup key={key}>
-                    <FilterGroupTitle type="button" aria-expanded={!!openFilterGroups[key]} onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                      <FilterGroupHeading>{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
-                      <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
-                    </FilterGroupTitle>
-                    <FilterGroupBody $open={!!openFilterGroups[key]}>
-                      <FacetOptions
-                        kind={facetDisplayKind(key, getFacetGroupTitle(key, locale, metafieldDefinitions))}
-                        values={vals}
-                        selected={filters[key] || []}
-                        label={(v) => formatFacetOptionLabel(key, v, null, locale, metafieldDefinitions)}
-                        onToggle={(v) => toggle(key, v)}
-                        checkboxSize={12}
-                      />
-                    </FilterGroupBody>
-                  </FilterGroup>
-                ))}
-                {activeCount > 0 && (
-                  <ClearAllBtn type="button" onClick={() => { setFilters({}); setPage(1); setPanelOpen(false); }}>Clear all filters</ClearAllBtn>
-                )}
+                <StackedFilterPanel {...extra.panelProps} />
               </DesktopFilterContent>
 
-              {/* Mobile: two-panel filter */}
+              {/* Mobile / tablet drawer: stacked groups like the MobileFilter artboard */}
               <MobileFilterSplit>
-                <MobileFilterLeft>
-                  {Object.entries(facets).map(([key]) => {
-                    const cnt = (filters[key] || []).length;
-                    const label = getFacetGroupTitle(key, locale, metafieldDefinitions);
-                    return (
-                      <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
-                        {label}
-                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ee8a12", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
-                      </MobileFilterLeftBtn>
-                    );
-                  })}
-                </MobileFilterLeft>
-                <MobileFilterRight>
-                  {activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
-                    <MobileFilterPillGrid>
-                      {facets[activeMobileFilterGroup].map((val) => {
-                        const on = (filters[activeMobileFilterGroup] || []).includes(val);
-                        return (
-                          <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
-                            {formatFacetOptionLabel(activeMobileFilterGroup, val, null, locale, metafieldDefinitions)}
-                          </MobileFilterPill>
-                        );
-                      })}
-                    </MobileFilterPillGrid>
-                  ) : (
-                    <div style={{ color: "#aaa", fontSize: 12 }}>Wähle einen Filter</div>
-                  )}
-                </MobileFilterRight>
+                <FilterSheetScroll>
+                  <StackedFilterPanel
+                    {...extra.panelProps}
+                    showHeader={false}
+                    before={showCollCategories ? (
+                      <FilterSheetCategoryGroup current={(collCategories.find((c) => c.id === collCategoryId) || {}).name || tCommon("allIn", { name: title })}>
+                        {[{ id: "", name: tCommon("allIn", { name: title }) }, ...collCategories].map((c) => (
+                          <button
+                            key={c.id || "all"}
+                            type="button"
+                            aria-pressed={collCategoryId === c.id}
+                            onClick={() => { setCollCategoryId(c.id); setPage(1); }}
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </FilterSheetCategoryGroup>
+                    ) : null}
+                  />
+                </FilterSheetScroll>
+                <FilterSheetFooter count={total} onClick={() => setPanelOpen(false)} />
               </MobileFilterSplit>
             </Sidebar>
               </>
@@ -1571,6 +1401,9 @@ function CollectionPage() {
             {/* Active filter chips */}
             {activeCount > 0 && (
               <ChipBar>
+                {extra.extraChips.map((c) => (
+                  <Chip key={c.key} type="button" onClick={c.onRemove}>{c.label} ×</Chip>
+                ))}
                 {Object.entries(filters).flatMap(([k, vals]) =>
                   (vals || []).map(v => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>

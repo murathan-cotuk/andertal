@@ -145,24 +145,6 @@ const Socials = styled.div`
   }
 `;
 
-const MarketBtn = styled.button`
-  height: 36px;
-  padding: 0 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: none;
-  color: #fff;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  &:hover {
-    border-color: rgba(255, 255, 255, 0.5);
-  }
-`;
-
 const Placeholder = styled.div`
   color: var(--footer-text, #ffffff);
   opacity: 0.7;
@@ -171,18 +153,11 @@ const Placeholder = styled.div`
 
 const Bottom = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-`;
-
-const BottomLeft = styled.div`
-  display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-width: 200px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
 `;
 
 const ShippingPromo = styled.span`
@@ -219,16 +194,6 @@ const SOCIAL_ICONS = {
     </svg>
   ),
 };
-
-const LANGUAGE_NAMES = { de: "Deutsch", en: "English", fr: "Français", it: "Italiano", es: "Español", tr: "Türkçe" };
-
-function regionName(code, locale) {
-  try {
-    return new Intl.DisplayNames([locale], { type: "region" }).of(code) || code;
-  } catch {
-    return code;
-  }
-}
 
 export default function Footer() {
   const locale = useLocale();
@@ -312,26 +277,10 @@ export default function Footer() {
           ))}
         </Top>
         <Bottom>
-          <BottomLeft>
-            {shippingPromoText && (
-              <ShippingPromo>{shippingPromoText}</ShippingPromo>
-            )}
-            <Copyright>© {new Date().getFullYear()} Andertal</Copyright>
-          </BottomLeft>
-          <MarketBtn
-            type="button"
-            onClick={() => {
-              if (typeof window === "undefined") return;
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              window.dispatchEvent(new CustomEvent("andertal:open-locale"));
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
-            </svg>
-            {regionName(marketCountry, locale)} · {LANGUAGE_NAMES[locale] || String(locale).toUpperCase()}
-          </MarketBtn>
+          {shippingPromoText && (
+            <ShippingPromo>{shippingPromoText}</ShippingPromo>
+          )}
+          <Copyright>© {new Date().getFullYear()} Andertal. {tCommon("allRightsReserved")}</Copyright>
         </Bottom>
       </Container>
     </FooterContainer>

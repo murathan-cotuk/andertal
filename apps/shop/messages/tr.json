@@ -42,7 +42,8 @@
     "legalHelpLink": "Müşteri hizmetlerine git",
     "collectionLabel": "Koleksiyon",
     "productsCount": "{count} ürün",
-    "brandsCount": "{count} marka"
+    "brandsCount": "{count} marka",
+    "allRightsReserved": "Tüm hakları saklıdır."
   },
   "nav": {
     "collection": "Koleksiyon",
@@ -621,7 +622,12 @@
     "noDirectResults": "Doğrudan sonuç yok — yine de ürünler gösteriliyor.",
     "suggestions": "Öneriler",
     "continueShopping": "Alışverişe devam et",
-    "clearRecent": "Temizle"
+    "clearRecent": "Temizle",
+    "recentlySearched": "Son aramalar",
+    "popularSearches": "Popüler aramalar",
+    "recentCategories": "Son görüntülenen kategoriler",
+    "continueIn": "“{name}” içinde keşfetmeye devam et",
+    "forYou": "Senin için önerilenler"
   },
   "landing": {
     "noPreview": "Önizleme yok",
@@ -962,5 +968,20 @@
     "title_asc": "İsim A–Z",
     "title_desc": "İsim Z–A",
     "noMatch": "Filtrelerinize uyan ürün yok."
+  },
+  "filterPanel": {
+    "title": "Filtre",
+    "reset": "Sıfırla",
+    "price": "Fiyat",
+    "priceFrom": "En düşük fiyat",
+    "priceTo": "En yüksek fiyat",
+    "searchIn": "{name} ara",
+    "showAll": "Tümünü göster ({count})",
+    "showLess": "Daha az göster",
+    "inStock": "Yalnızca stoktakiler",
+    "onSale": "Yalnızca indirimdekiler",
+    "category": "Kategori",
+    "showProducts": "{count} ürünü göster",
+    "brand": "Marka"
   }
 }

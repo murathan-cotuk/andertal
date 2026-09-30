@@ -42,7 +42,8 @@
     "legalHelpLink": "Zum Kundenservice",
     "collectionLabel": "Kollektion",
     "productsCount": "{count, plural, one {# Produkt} other {# Produkte}}",
-    "brandsCount": "{count, plural, one {# Marke} other {# Marken}}"
+    "brandsCount": "{count, plural, one {# Marke} other {# Marken}}",
+    "allRightsReserved": "Alle Rechte vorbehalten."
   },
   "nav": {
     "collection": "Kollektion",
@@ -621,7 +622,12 @@
     "noDirectResults": "Keine direkten Treffer — wir zeigen trotzdem Produkte.",
     "suggestions": "Vorschläge",
     "continueShopping": "Weiter einkaufen",
-    "clearRecent": "Löschen"
+    "clearRecent": "Löschen",
+    "recentlySearched": "Zuletzt gesucht",
+    "popularSearches": "Beliebte Suchen",
+    "recentCategories": "Zuletzt angesehene Kategorien",
+    "continueIn": "Weiter stöbern in „{name}“",
+    "forYou": "Für dich empfohlen"
   },
   "landing": {
     "noPreview": "Keine Vorschau",
@@ -962,5 +968,20 @@
     "title_asc": "Name A–Z",
     "title_desc": "Name Z–A",
     "noMatch": "Keine Produkte passen zu deinen Filtern."
+  },
+  "filterPanel": {
+    "title": "Filter",
+    "reset": "Zurücksetzen",
+    "price": "Preis",
+    "priceFrom": "Preis von",
+    "priceTo": "Preis bis",
+    "searchIn": "{name} suchen",
+    "showAll": "Alle {count} anzeigen",
+    "showLess": "Weniger anzeigen",
+    "inStock": "Nur auf Lager",
+    "onSale": "Nur Angebote",
+    "category": "Kategorie",
+    "showProducts": "{count, plural, one {# Produkt anzeigen} other {# Produkte anzeigen}}",
+    "brand": "Marke"
   }
 }

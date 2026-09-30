@@ -42,7 +42,8 @@
     "legalHelpLink": "Service client",
     "collectionLabel": "Collection",
     "productsCount": "{count, plural, one {# produit} other {# produits}}",
-    "brandsCount": "{count, plural, one {# marque} other {# marques}}"
+    "brandsCount": "{count, plural, one {# marque} other {# marques}}",
+    "allRightsReserved": "Tous droits réservés."
   },
   "nav": {
     "collection": "Collection",
@@ -604,7 +605,12 @@
     "noDirectResults": "Aucun résultat direct — nous affichons quand même des produits.",
     "suggestions": "Suggestions",
     "continueShopping": "Continuer vos achats",
-    "clearRecent": "Effacer"
+    "clearRecent": "Effacer",
+    "recentlySearched": "Recherches récentes",
+    "popularSearches": "Recherches populaires",
+    "recentCategories": "Catégories consultées récemment",
+    "continueIn": "Continuer dans « {name} »",
+    "forYou": "Recommandé pour vous"
   },
   "landing": {
     "noPreview": "Pas d’aperçu",
@@ -945,5 +951,20 @@
     "title_asc": "Nom A–Z",
     "title_desc": "Nom Z–A",
     "noMatch": "Aucun produit ne correspond à vos filtres."
+  },
+  "filterPanel": {
+    "title": "Filtres",
+    "reset": "Réinitialiser",
+    "price": "Prix",
+    "priceFrom": "Prix min.",
+    "priceTo": "Prix max.",
+    "searchIn": "Rechercher : {name}",
+    "showAll": "Afficher les {count}",
+    "showLess": "Afficher moins",
+    "inStock": "En stock uniquement",
+    "onSale": "Promotions uniquement",
+    "category": "Catégorie",
+    "showProducts": "{count, plural, one {Afficher # produit} other {Afficher # produits}}",
+    "brand": "Marque"
   }
 }

@@ -78,6 +78,11 @@ export function PromoBentoEditor({ container, onChange, editLang = "de" }) {
     next[idx] = { ...next[idx], url };
     onChange({ ...container, images: next });
   };
+  const setImageLink = (idx, link) => {
+    const next = [0, 1, 2, 3].map((i) => images[i] || { url: "" });
+    next[idx] = { ...next[idx], link };
+    onChange({ ...container, images: next });
+  };
 
   const onPicked = (url) => {
     if (!picker) return;
@@ -114,14 +119,23 @@ export function PromoBentoEditor({ container, onChange, editLang = "de" }) {
           <Text as="p" variant="bodySm" tone="subdued">{L("Collage: bis zu 4 Bilder rechts in der Kachel", "Collage: up to 4 images on the right of the tile", "Kolaj: kutunun sağında en fazla 4 görsel")}</Text>
           <div style={GRID}>
             {[0, 1, 2, 3].map((i) => (
-              <ImagePick
-                key={i}
-                L={L}
-                label={`${L("Bild", "Image", "Görsel")} ${i + 1}`}
-                value={images[i]?.url || ""}
-                onPick={() => setPicker({ kind: "collage", idx: i })}
-                onClear={() => setImage(i, "")}
-              />
+              <BlockStack key={i} gap="150">
+                <ImagePick
+                  L={L}
+                  label={`${L("Bild", "Image", "Görsel")} ${i + 1}`}
+                  value={images[i]?.url || ""}
+                  onPick={() => setPicker({ kind: "collage", idx: i })}
+                  onClear={() => setImage(i, "")}
+                />
+                <TextField
+                  label={`${L("Link", "Link", "Link")} ${i + 1}`}
+                  value={images[i]?.link || ""}
+                  onChange={(v) => setImageLink(i, v)}
+                  autoComplete="off"
+                  placeholder="/kategorie oder https://…"
+                  helpText={L("Optional — Klick auf das Bild öffnet diese URL", "Optional — clicking the image opens this URL", "Opsiyonel — görsele tıklanınca bu URL açılır")}
+                />
+              </BlockStack>
             ))}
           </div>
         </BlockStack>

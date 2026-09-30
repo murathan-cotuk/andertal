@@ -197,6 +197,12 @@ const BentoCollage = styled.div`
   > *:nth-child(2) {
     margin-top: 40px;
   }
+  > a {
+    transition: transform 0.2s ease;
+  }
+  > a:hover {
+    transform: scale(1.03);
+  }
   > *:nth-child(3) {
     margin-bottom: 40px;
   }
@@ -303,12 +309,19 @@ export function PromoBento({ container, locale = "de", headingLevel = 2 }) {
             )}
           </BentoCopy>
           {!mainImage ? (
-            <BentoCollage aria-hidden="true">
+            <BentoCollage>
               {[0, 1, 2, 3].map((i) => {
                 const src = img(lt(images[i] || {}, "url", locale));
                 const tone = images[i]?.color || ["#F1CFA6", "#FFFFFF", "#FFFFFF", "#E8B77A"][i];
-                return (
-                  <div key={i} style={{ background: tone }}>
+                const href = String(images[i]?.link || "").trim();
+                const alt = String(lt(images[i] || {}, "alt", locale) || "").trim();
+                // Each collage image can link somewhere (URL set per image in Sellercentral).
+                return href ? (
+                  <SmartLink key={i} href={href} className="bento-collage-link" style={{ background: tone, display: "block" }} aria-label={alt || href}>
+                    <BentoImage src={src} sizes="220px" priority={i < 2} />
+                  </SmartLink>
+                ) : (
+                  <div key={i} style={{ background: tone }} aria-hidden="true">
                     <BentoImage src={src} sizes="220px" priority={i < 2} />
                   </div>
                 );

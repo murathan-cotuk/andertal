@@ -179,10 +179,12 @@ const SUPERUSER_NAV_HREF_FRAGMENTS = [
 ];
 
 /** Polaris puts label color on inner Text/spans and CSS vars — anchor-only rules only showed on hover. */
-const SUPERUSER_NAV_ACCENT_COLOR = "#601b1b";
+/* Readable on the dark design sidebar; on the orange "selected" pill the darker red is used. */
+const SUPERUSER_NAV_ACCENT_COLOR = "#ff8a80";
+const SUPERUSER_NAV_ACCENT_ON_SELECTED = "#7f1d1d";
 
 const SUPERUSER_NAV_ACCENT_CSS = SUPERUSER_NAV_HREF_FRAGMENTS.map((frag) => {
-  const a = `.Polaris-Navigation a[href*="${frag}"]`;
+  const a = `#AppFrameNav .Polaris-Navigation a[href*="${frag}"]`;
   return [
     `${a}`,
     `${a}:hover`,
@@ -199,10 +201,15 @@ const SUPERUSER_NAV_ACCENT_CSS = SUPERUSER_NAV_HREF_FRAGMENTS.map((frag) => {
 }).join(",") +
   `{color:${SUPERUSER_NAV_ACCENT_COLOR}!important;font-weight:600!important;--p-color-text:${SUPERUSER_NAV_ACCENT_COLOR}!important;--p-color-text-secondary:${SUPERUSER_NAV_ACCENT_COLOR}!important;}` +
   SUPERUSER_NAV_HREF_FRAGMENTS.map((frag) => {
-    const a = `.Polaris-Navigation a[href*="${frag}"]`;
+    const a = `#AppFrameNav .Polaris-Navigation a[href*="${frag}"]`;
     return `${a} svg, ${a}:hover svg, ${a}:focus-visible svg`;
   }).join(",") +
-  `{color:${SUPERUSER_NAV_ACCENT_COLOR}!important;fill:${SUPERUSER_NAV_ACCENT_COLOR}!important;}`;
+  `{color:${SUPERUSER_NAV_ACCENT_COLOR}!important;fill:${SUPERUSER_NAV_ACCENT_COLOR}!important;}` +
+  SUPERUSER_NAV_HREF_FRAGMENTS.map((frag) => {
+    const a = `#AppFrameNav .Polaris-Navigation__ItemInnerWrapper--selected a[href*="${frag}"]`;
+    return `${a}, ${a} span, ${a} [class*="Polaris-Text"], ${a} svg`;
+  }).join(",") +
+  `{color:${SUPERUSER_NAV_ACCENT_ON_SELECTED}!important;fill:${SUPERUSER_NAV_ACCENT_ON_SELECTED}!important;--p-color-text:${SUPERUSER_NAV_ACCENT_ON_SELECTED}!important;}`;
 
 /** Polaris Navigation.Section uses `label` as React key — must never be a React element / object. */
 function coercePolarisNavLabel(label, urlFallback = "") {

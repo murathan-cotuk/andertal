@@ -6,13 +6,13 @@ import { flushSync } from "react-dom";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
-import { resolveImageUrl } from "@/lib/image-url";
 import { liteClient as algoliasearch } from "algoliasearch/lite";
 import { InstantSearch, useSearchBox, useHits, useInstantSearch, Configure } from "react-instantsearch";
 import styled from "styled-components";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { stripHtmlForSearch, getLocalizedProduct } from "@/lib/format";
 import { tokens } from "@/design-system/tokens";
+import { useSearchDiscovery, DiscoveryTerms, DiscoveryProducts, DiscoveryColumns } from "@/components/search/SearchDiscovery";
 
 const Wrap = styled.div`
   position: relative;
@@ -118,50 +118,6 @@ const MobileSectionTitle = styled.div`
   padding: 16px 16px 8px;
 `;
 
-const WeiterScroll = styled.div`
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x mandatory;
-  scroll-padding-inline: 16px;
-  padding: 0 16px 16px;
-`;
-
-const WeiterCard = styled(Link)`
-  flex: 0 0 calc(50% - 4px);
-  min-width: calc(50% - 4px);
-  max-width: calc(50% - 4px);
-  scroll-snap-align: start;
-  text-decoration: none;
-  color: #111827;
-`;
-
-const WeiterImg = styled.div`
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #f3f4f6;
-  margin-bottom: 6px;
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-`;
-
-const WeiterTitle = styled.div`
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-`;
-
 const SuggestionChip = styled.button`
   display: inline-flex;
   align-items: center;
@@ -225,6 +181,8 @@ const MAX_HITS = 8;
 const RECENT_SEARCHES_KEY = "andertal-recent-searches";
 const MAX_RECENT = 10;
 const MOBILE_MQ = "(max-width: 767px)";
+
+const BACK_BTN_STYLE = { border: "none", background: "none", color: "#1d1b18", width: 36, height: 40, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
 
 function useMatchMediaOnce(query) {
   const [matches, setMatches] = useState(false);
@@ -374,116 +332,52 @@ function formatPriceCents(cents) {
 /* ─── Desktop: panel shown when the empty search field gets focus ──────────
  * Same data as the mobile search sheet: recent searches (localStorage) and
  * "Weiter einkaufen" products from /api/store-products. */
-const FocusGrid = styled.div`
-  display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) 2fr;
-  gap: 8px;
-  padding: 8px 8px 16px;
-`;
-
-const FocusChips = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px;
-`;
-
-const FocusProducts = styled.div`
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 0 16px;
-`;
-
-const FocusProduct = styled(Link)`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-decoration: none;
-  color: #1d1b18;
-  &:hover { color: ${tokens.primary.DEFAULT}; }
-`;
-
 function useDesktopFocusSuggestions(enabled) {
   const [focused, setFocused] = useState(false);
   const [recent, setRecent] = useState([]);
-  const [products, setProducts] = useState([]);
-  const loadedRef = useRef(false);
   const onFocus = useCallback(() => {
     if (!enabled) return;
     setFocused(true);
     setRecent(loadRecentSearches());
-    if (loadedRef.current) return;
-    loadedRef.current = true;
-    fetch("/api/store-products?limit=8")
-      .then((r) => r.json())
-      .then((d) => setProducts(Array.isArray(d?.products) ? d.products : []))
-      .catch(() => setProducts([]));
   }, [enabled]);
   const clearRecent = useCallback(() => {
     try { window.localStorage.removeItem(RECENT_SEARCHES_KEY); } catch { /* ignore */ }
     setRecent([]);
   }, []);
-  return { focused, setFocused, recent, products, onFocus, clearRecent };
+  return { focused, setFocused, recent, onFocus, clearRecent };
 }
 
-function DesktopFocusPanel({ recent, products, onPickTerm, onClose, onClearRecent }) {
-  const locale = useLocale();
+const FocusDropdown = styled(Dropdown)`
+  left: 50%;
+  right: auto;
+  width: min(900px, calc(100vw - 48px));
+  transform: translateX(-50%);
+  border-radius: 24px;
+  border: none;
+  box-shadow: 0 30px 80px rgba(29, 27, 24, 0.28);
+  padding: 0;
+`;
+
+function DesktopFocusPanel({ recent, onPickTerm, onClose, onClearRecent }) {
   const ts = useTranslations("search");
-  if (!recent.length && !products.length) return null;
+  const discovery = useSearchDiscovery(true);
+  const hasTerms = recent.length > 0 || discovery.popular.length > 0 || discovery.recentCats.length > 0;
+  const hasProducts = discovery.recommended.length > 0 || discovery.browse.products.length > 0;
+  if (!hasTerms && !hasProducts) return null;
   return (
-    <Dropdown $maxHeight="min(70vh, 560px)" role="dialog" aria-label={ts("label")}>
-      <FocusGrid>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingRight: 8 }}>
-            <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
-            {recent.length > 0 && onClearRecent ? (
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={onClearRecent}
-                style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "#a65300", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}
-              >
-                {ts("clearRecent")}
-              </button>
-            ) : null}
-          </div>
-          {recent.length === 0 ? (
-            <div style={{ padding: "0 16px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
-          ) : (
-            <FocusChips>
-              {recent.map((term) => (
-                <SuggestionChip key={term} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onPickTerm(term)}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" style={{ marginRight: 6, opacity: 0.7, verticalAlign: "-2px" }}>
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 7v5l3 2" />
-                  </svg>
-                  {term}
-                </SuggestionChip>
-              ))}
-            </FocusChips>
-          )}
-        </div>
-        {products.length > 0 ? (
-          <div>
-            <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
-            <FocusProducts>
-              {products.slice(0, 8).map((p) => {
-                const { title: pt } = getLocalizedProduct(p, locale);
-                const h = storefrontProductHandle(p, locale);
-                const th = p.thumbnail ? resolveImageUrl(p.thumbnail) : "";
-                return (
-                  <FocusProduct key={p.id} href={h ? `/${h}` : "#"} onClick={onClose}>
-                    <WeiterImg style={{ marginBottom: 0 }}>{th ? <img src={th} alt="" /> : null}</WeiterImg>
-                    <WeiterTitle>{pt || p.title || p.handle || ""}</WeiterTitle>
-                  </FocusProduct>
-                );
-              })}
-            </FocusProducts>
-          </div>
-        ) : null}
-      </FocusGrid>
-    </Dropdown>
+    <FocusDropdown $maxHeight="min(76vh, 640px)" role="dialog" aria-label={ts("label")}>
+      <DiscoveryColumns>
+        <DiscoveryTerms
+          recent={recent}
+          onClearRecent={onClearRecent}
+          onPickTerm={onPickTerm}
+          popular={discovery.popular}
+          recentCats={discovery.recentCats}
+          onNavigate={onClose}
+        />
+        <DiscoveryProducts browse={discovery.browse} recommended={discovery.recommended} onNavigate={onClose} />
+      </DiscoveryColumns>
+    </FocusDropdown>
   );
 }
 
@@ -498,7 +392,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [recProducts, setRecProducts] = useState([]);
+  const mobileDiscovery = useSearchDiscovery(isMobile && mobileOpen);
   const [recentSearches, setRecentSearches] = useState([]);
   const [mounted, setMounted] = useState(false);
   const wrapRef = useRef(null);
@@ -592,12 +486,6 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
   useEffect(() => {
     if (!isMobile || !mobileOpen) return;
     setRecentSearches(loadRecentSearches());
-    let cancelled = false;
-    fetch("/api/store-products?limit=8")
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setRecProducts(d?.products || []); })
-      .catch(() => { if (!cancelled) setRecProducts([]); });
-    return () => { cancelled = true; };
   }, [isMobile, mobileOpen]);
 
   const handleSubmit = (e) => {
@@ -647,8 +535,8 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
         aria-modal="true"
         aria-label={ts("label")}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
-          <button type="button" onClick={() => setMobileOpen(false)} aria-label={ts("back")} style={{ border: "none", background: "#f3f4f6", borderRadius: 10, width: 40, height: 40, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>←</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #efe8dd", flexShrink: 0 }}>
+          <button type="button" onClick={() => setMobileOpen(false)} aria-label={ts("back")} style={BACK_BTN_STYLE}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
           <input
             ref={mobileInputRef}
             type="text"
@@ -666,36 +554,23 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
         </div>
         <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           {!q.trim() ? (
-            <>
-              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
-              {recentSearches.length === 0 ? (
-                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
-              ) : (
-                <div style={{ padding: "0 16px 16px" }}>
-                  {recentSearches.map((term) => (
-                    <button type="button" key={term} onClick={() => { setQ(term); goSearchResults(term); }} style={{ display: "inline-flex", alignItems: "center", margin: "0 8px 8px 0", padding: "8px 14px", border: "none", borderRadius: 999, background: "#f6f2ec", fontSize: 14, color: "#1d1b18", cursor: "pointer", fontFamily: "inherit" }}>{term}</button>
-                  ))}
-                </div>
-              )}
-              {recProducts.length > 0 && (
-                <>
-                  <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
-                  <WeiterScroll>
-                    {recProducts.map((p) => {
-                      const { title: pt } = getLocalizedProduct(p, locale);
-                      const h = storefrontProductHandle(p, locale);
-                      const th = p.thumbnail ? resolveImageUrl(p.thumbnail) : "";
-                      return (
-                        <WeiterCard key={p.id} href={h ? `/${h}` : "#"} onClick={() => { setMobileOpen(false); setQ(""); }}>
-                          <WeiterImg>{th ? <img src={th} alt="" /> : null}</WeiterImg>
-                          <WeiterTitle>{pt || p.title || ""}</WeiterTitle>
-                        </WeiterCard>
-                      );
-                    })}
-                  </WeiterScroll>
-                </>
-              )}
-            </>
+            <div style={{ padding: "16px 16px 8px" }}>
+              <DiscoveryTerms
+                recent={recentSearches}
+                onClearRecent={null}
+                onPickTerm={(term) => { setQ(term); goSearchResults(term); }}
+                popular={[]}
+                recentCats={mobileDiscovery.recentCats}
+                onNavigate={() => { setMobileOpen(false); setQ(""); }}
+                showPopular={false}
+                showIcons={false}
+              />
+              <DiscoveryProducts
+                browse={mobileDiscovery.browse}
+                recommended={mobileDiscovery.recommended}
+                onNavigate={() => { setMobileOpen(false); setQ(""); }}
+              />
+            </div>
           ) : (
             <>
               {loading && hits.length === 0 && <div style={{ marginTop: 16 }}><Empty>{ts("searching")}</Empty></div>}
@@ -773,7 +648,6 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
       {!showDropdown && focusPanel.focused && !q.trim() ? (
         <DesktopFocusPanel
           recent={focusPanel.recent}
-          products={focusPanel.products}
           onClearRecent={focusPanel.clearRecent}
           onPickTerm={(term) => {
             focusPanel.setFocused(false);
@@ -836,7 +710,7 @@ function SearchInputWithDropdown({
   const { hits } = useHits();
   const { status } = useInstantSearch();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [recProducts, setRecProducts] = useState([]);
+  const mobileDiscovery = useSearchDiscovery(isMobile && mobileOpen);
   const [recentSearches, setRecentSearches] = useState([]);
   const [mounted, setMounted] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -892,14 +766,6 @@ function SearchInputWithDropdown({
   useEffect(() => {
     if (!isMobile || !mobileOpen) return;
     setRecentSearches(loadRecentSearches());
-    let cancelled = false;
-    fetch("/api/store-products?limit=8")
-      .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled) setRecProducts(d?.products || []);
-      })
-      .catch(() => { if (!cancelled) setRecProducts([]); });
-    return () => { cancelled = true; };
   }, [isMobile, mobileOpen]);
 
   const goSearchResults = (q) => {
@@ -953,7 +819,7 @@ function SearchInputWithDropdown({
             alignItems: "center",
             gap: 8,
             padding: "10px 12px",
-            borderBottom: "1px solid #e5e7eb",
+            borderBottom: "1px solid #efe8dd",
             flexShrink: 0,
           }}
         >
@@ -961,18 +827,9 @@ function SearchInputWithDropdown({
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label={ts("back")}
-            style={{
-              border: "none",
-              background: "#f3f4f6",
-              borderRadius: 10,
-              width: 40,
-              height: 40,
-              fontSize: 20,
-              cursor: "pointer",
-              lineHeight: 1,
-            }}
+            style={BACK_BTN_STYLE}
           >
-            ←
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
           <input
             ref={mobileInputRef}
@@ -1005,65 +862,23 @@ function SearchInputWithDropdown({
         </div>
         <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           {!query.trim() ? (
-            <>
-              <MobileSectionTitle>{ts("recent")}</MobileSectionTitle>
-              {recentSearches.length === 0 ? (
-                <div style={{ padding: "0 16px 24px", color: "#9ca3af", fontSize: 14 }}>{ts("noRecent")}</div>
-              ) : (
-                <div style={{ padding: "0 16px 16px" }}>
-                  {recentSearches.map((term) => (
-                    <button
-                      type="button"
-                      key={term}
-                      onClick={() => {
-                        refine(term);
-                        goSearchResults(term);
-                      }}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        margin: "0 8px 8px 0",
-                        padding: "8px 14px",
-                        border: "none",
-                        borderRadius: 999,
-                        background: "#f6f2ec",
-                        fontSize: 14,
-                        color: "#1d1b18",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      {term}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {recProducts.length > 0 && (
-                <>
-                  <MobileSectionTitle>{ts("continueShopping")}</MobileSectionTitle>
-                  <WeiterScroll>
-                    {recProducts.map((p) => {
-                      const { title: pt } = getLocalizedProduct(p, locale);
-                      const h = storefrontProductHandle(p, locale);
-                      const th = p.thumbnail ? resolveImageUrl(p.thumbnail) : "";
-                      return (
-                        <WeiterCard
-                          key={p.id}
-                          href={h ? `/${h}` : "#"}
-                          onClick={() => {
-                            setMobileOpen(false);
-                            refine("");
-                          }}
-                        >
-                          <WeiterImg>{th ? <img src={th} alt="" /> : null}</WeiterImg>
-                          <WeiterTitle>{pt || p.title || p.handle || ""}</WeiterTitle>
-                        </WeiterCard>
-                      );
-                    })}
-                  </WeiterScroll>
-                </>
-              )}
-            </>
+            <div style={{ padding: "16px 16px 8px" }}>
+              <DiscoveryTerms
+                recent={recentSearches}
+                onClearRecent={null}
+                onPickTerm={(term) => { refine(term); goSearchResults(term); }}
+                popular={[]}
+                recentCats={mobileDiscovery.recentCats}
+                onNavigate={() => { setMobileOpen(false); refine(""); }}
+                showPopular={false}
+                showIcons={false}
+              />
+              <DiscoveryProducts
+                browse={mobileDiscovery.browse}
+                recommended={mobileDiscovery.recommended}
+                onNavigate={() => { setMobileOpen(false); refine(""); }}
+              />
+            </div>
           ) : (
             <>
               {loading && hits.length === 0 && (
@@ -1223,7 +1038,6 @@ function SearchInputWithDropdown({
       {!showDropdown && focusPanel.focused ? (
         <DesktopFocusPanel
           recent={focusPanel.recent}
-          products={focusPanel.products}
           onClearRecent={focusPanel.clearRecent}
           onPickTerm={(term) => {
             setFocusPanelOpen(false);
