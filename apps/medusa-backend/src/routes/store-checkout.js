@@ -478,6 +478,116 @@ const computeCartCheckoutMoney = (cart, shippingCentsInput) => {
   }
 }
 
+/**
+ * Per-seller "highest shipping group wins" price for one country, mirroring the shop's own
+ * getShippingPriceCents (apps/shop/src/lib/shipping-price.js): exact country → DE fallback →
+ * lowest configured price. `pricesByCountry` is already { ISO: cents }.
+ */
+function pickShippingPriceCentsForCountry(pricesByCountry, countryCode) {
+  if (!pricesByCountry) return null
+  const want = normalizeHubCountryCode(countryCode)
+  if (want && pricesByCountry[want] != null) return pricesByCountry[want]
+  if (pricesByCountry.DE != null) return pricesByCountry.DE
+  let min = null
+  for (const v of Object.values(pricesByCountry)) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue
+    if (min === null || v < min) min = v
+  }
+  return min
+}
+
+/**
+ * THE authoritative shipping calculation — never trust a client-supplied shipping_cents for the
+ * amount actually charged (docs/TASKS.md: "kargo tutarını backend hesaplamıyor, tarayıcıdan gelen
+ * değeri kabul ediyor — biri istese 0 € kargo gönderebilir"). Mirrors the shop's own display logic
+ * (CartSidebar.jsx calcShipping + resolveFreeShippingThresholdCents) field-for-field, but re-derived
+ * server-side from the cart's own DB-joined shipping_group_id/seller_id — nothing from req.body.
+ *
+ * Sellers are billed independently (docs/TASKS.md seller-based free shipping): each seller's own
+ * subtotal is checked against that seller's own threshold (falling back to the platform 'default'
+ * threshold when the seller hasn't configured one for that country); total shipping = sum of every
+ * seller's own non-zero shipping fee. A single-seller cart collapses to exactly today's behavior.
+ */
+async function computeAuthoritativeShipping(client, cart, countryCodeRaw) {
+  const countryCode = normalizeHubCountryCode(countryCodeRaw) || 'DE'
+  const items = Array.isArray(cart?.items) ? cart.items : []
+
+  const groupIds = [...new Set(items.map((it) => it.shipping_group_id).filter(Boolean))]
+  const pricesByGroup = {}
+  if (groupIds.length) {
+    const r = await client.query(
+      `SELECT group_id, country_code, price_cents FROM store_shipping_prices WHERE group_id = ANY($1::uuid[])`,
+      [groupIds],
+    )
+    for (const row of r.rows || []) {
+      const cc = normalizeHubCountryCode(row.country_code)
+      if (!cc) continue
+      if (!pricesByGroup[row.group_id]) pricesByGroup[row.group_id] = {}
+      pricesByGroup[row.group_id][cc] = Number(row.price_cents)
+    }
+  }
+
+  const sellerIds = [...new Set(items.map((it) => it.seller_id || 'default'))]
+  if (!sellerIds.includes('default')) sellerIds.push('default')
+  const thresholdRes = await client.query(
+    `SELECT seller_id, free_shipping_thresholds FROM admin_hub_seller_settings WHERE seller_id = ANY($1::text[])`,
+    [sellerIds],
+  ).catch(() => ({ rows: [] }))
+  const thresholdsBySeller = {}
+  for (const row of thresholdRes.rows || []) {
+    const raw = row.free_shipping_thresholds
+    if (!raw || typeof raw !== 'object') continue
+    const norm = {}
+    for (const [k, v] of Object.entries(raw)) {
+      const cc = normalizeHubCountryCode(k)
+      if (!cc) continue
+      const n = Number(v)
+      if (Number.isFinite(n) && n >= 0) norm[cc] = n
+    }
+    thresholdsBySeller[row.seller_id] = norm
+  }
+  const resolveThreshold = (sellerId) => {
+    const own = thresholdsBySeller[sellerId]
+    if (own && Object.prototype.hasOwnProperty.call(own, countryCode)) return own[countryCode]
+    const def = thresholdsBySeller.default
+    if (def && Object.prototype.hasOwnProperty.call(def, countryCode)) return def[countryCode]
+    return null
+  }
+
+  const bySeller = new Map()
+  for (const it of items) {
+    const sid = it.seller_id || 'default'
+    if (!bySeller.has(sid)) bySeller.set(sid, { subtotalCents: 0, maxShippingCents: null })
+    const entry = bySeller.get(sid)
+    entry.subtotalCents += Number(it.unit_price_cents || 0) * Number(it.quantity || 1)
+    const groupPrices = it.shipping_group_id ? pricesByGroup[it.shipping_group_id] : null
+    if (groupPrices) {
+      const price = pickShippingPriceCentsForCountry(groupPrices, countryCode)
+      if (price != null && (entry.maxShippingCents === null || price > entry.maxShippingCents)) {
+        entry.maxShippingCents = price
+      }
+    }
+  }
+
+  let totalShippingCents = 0
+  const perSeller = []
+  for (const [sellerId, entry] of bySeller.entries()) {
+    const threshold = resolveThreshold(sellerId)
+    const isFree = threshold != null && entry.subtotalCents >= threshold
+    const shippingCents = isFree ? 0 : Math.max(0, entry.maxShippingCents || 0)
+    totalShippingCents += shippingCents
+    perSeller.push({
+      seller_id: sellerId,
+      subtotal_cents: entry.subtotalCents,
+      shipping_cents: shippingCents,
+      is_free: isFree,
+      threshold_cents: threshold,
+    })
+  }
+
+  return { shippingCents: totalShippingCents, perSeller }
+}
+
 const clearCartBonusReserve = async (client, cartId) => {
   await client.query('UPDATE store_carts SET bonus_points_reserved = 0, updated_at = now() WHERE id = $1', [cartId]).catch(() => {})
 }
@@ -1100,7 +1210,20 @@ const storePaymentIntentPOST = async (req, res) => {
       return res.status(400).json({ message: 'Cart is empty' })
     }
     
-    const shippingCentsRaw = Math.max(0, Number(body.shipping_cents || 0))
+    // Security fix (docs/TASKS.md): shipping used to be whatever the browser sent in
+    // body.shipping_cents — trivially forgeable to 0€ in devtools. The amount actually charged
+    // now always comes from computeAuthoritativeShipping (server-side, per-seller, re-derived
+    // from the cart's own DB-joined shipping_group_id/seller_id). body.shipping_cents is no
+    // longer trusted for the charge; kept only as the pre-computeAuthoritativeShipping fallback
+    // below in case shipping data is somehow unavailable, matching prior behavior degradation.
+    const shippingCountryRaw = (body.shipping_country || body.country || '').toString().trim()
+    let shippingCentsRaw
+    try {
+      const authoritative = await computeAuthoritativeShipping(client, cart, shippingCountryRaw)
+      shippingCentsRaw = authoritative.shippingCents
+    } catch (_) {
+      shippingCentsRaw = Math.max(0, Number(body.shipping_cents || 0))
+    }
     const money = computeCartCheckoutMoney(cart, shippingCentsRaw)
     const {
       subtotalCents,
@@ -2142,6 +2265,31 @@ const storeShippingGroupsGET = async (req, res) => {
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     res.json({ groups: [] })
+  }
+}
+
+// GET /store/carts/:id/shipping-quote?country=XX — public. Lets the shop display the SAME
+// per-seller shipping total that storePaymentIntentPOST will actually charge (computeAuthoritative
+// Shipping is the single source of truth for both), instead of recomputing it separately client-side
+// and risking a display-vs-charge mismatch for multi-seller carts.
+const storeCartShippingQuoteGET = async (req, res) => {
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+  const cartId = (req.params.id || '').trim()
+  const country = (req.query.country || '').toString().trim()
+  if (!cartId) return res.status(400).json({ message: 'cart id required' })
+  let client
+  try {
+    const { Client } = require('pg')
+    client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
+    await client.connect()
+    const cart = await getCartWithItems(client, cartId)
+    if (!cart) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
+    const quote = await computeAuthoritativeShipping(client, cart, country)
+    await client.end()
+    res.json({ shipping_cents: quote.shippingCents, per_seller: quote.perSeller })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
   }
 }
 
@@ -4086,6 +4234,7 @@ module.exports = function createStoreCheckoutRouter() {
   router.patch('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupPATCH)
   router.delete('/admin-hub/v1/shipping-groups/:id', requireSellerAuth, adminHubShippingGroupDELETE)
   router.get('/store/shipping-groups', storeShippingGroupsGET)
+  router.get('/store/carts/:id/shipping-quote', storeCartShippingQuoteGET)
   router.get('/admin-hub/v1/country-overview', requireSellerAuth, adminHubCountryOverviewGET)
   router.patch('/admin-hub/v1/country-overview', requireSellerAuth, adminHubCountryOverviewBulkPATCH)
   router.patch('/admin-hub/v1/country-overview/:country_code', requireSellerAuth, adminHubCountryOverviewPATCH)
