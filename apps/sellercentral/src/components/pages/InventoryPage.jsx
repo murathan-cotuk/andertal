@@ -38,7 +38,7 @@ import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { SettingsIcon } from "@shopify/polaris-icons";
 
 const INVENTORY_ROW_GRID = "2.5rem 3.5rem 6.875rem 4.5rem minmax(20rem, 2fr) minmax(8.75rem, 0.9fr) minmax(9.375rem, 1fr) minmax(12.5rem, 1.2fr) 9.25rem";
-const EXCEL_BORDER = "1px solid #e5e7eb";
+const EXCEL_BORDER = "1px solid #e6dfd4";
 
 const DEFAULT_DUPLICATE_OPTIONS = {
   title: true,
@@ -338,7 +338,7 @@ function ProductStatusToggle({ on, onChange, disabled, title }) {
         height: 26,
         borderRadius: 13,
         padding: 0,
-        background: on ? "#10b981" : "#d1d5db",
+        background: on ? "#10b981" : "#d6ccbd",
         border: "none",
         cursor: disabled ? "not-allowed" : "pointer",
         position: "relative",
@@ -429,20 +429,20 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
     return l === "tr" ? "Taslak" : l === "de" ? "Entwurf" : l === "fr" ? "Brouillon" : l === "es" ? "Borrador" : l === "it" ? "Bozza" : "Draft";
   };
   if (matrixVariants.length === 0) {
-    return <div style={{ padding: "8px 12px", fontSize: 13, color: "#6b7280" }}>{i18n.noVariations}</div>;
+    return <div style={{ padding: "8px 12px", fontSize: 13, color: "#5e574e" }}>{i18n.noVariations}</div>;
   }
 
   return (
     <div style={{ marginTop: 0, borderTop: EXCEL_BORDER, background: "#fff" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 56px 2fr 140px 150px 1.2fr", gap: 0, marginBottom: 0, background: "#f8fafc", borderBottom: EXCEL_BORDER, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 56px 2fr 140px 150px 1.2fr", gap: 0, marginBottom: 0, background: "#faf7f2", borderBottom: EXCEL_BORDER, alignItems: "center" }}>
         <div />
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.select}</div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.status}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.select}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", padding: "8px 6px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.status}</div>
         <div style={{ borderRight: EXCEL_BORDER, padding: "8px 6px" }} />
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 8px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.details}</div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.inventory}</div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.price}</div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", padding: "8px 8px", textAlign: "center" }}>{i18n.variations}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", padding: "8px 8px", borderRight: EXCEL_BORDER, textAlign: "center" }}>{i18n.details}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.inventory}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", textAlign: "center", padding: "8px 8px", borderRight: EXCEL_BORDER }}>{i18n.price}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", padding: "8px 8px", textAlign: "center" }}>{i18n.variations}</div>
       </div>
       {drafts.map((d, idx) => {
         const vRow = matrixVariants[idx] || {};
@@ -455,7 +455,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
         const vThumbUrl = vRawThumb ? resolveImageUrl(vRawThumb) : null;
         return (
         <div key={idx} style={{ display: "grid", gridTemplateColumns: "40px 56px 110px 56px 2fr 140px 150px 1.2fr", gap: 0, alignItems: "center", borderBottom: idx === drafts.length - 1 ? "none" : EXCEL_BORDER, background: idx % 2 === 0 ? "#fff" : "#fcfdff" }}>
-          <div style={{ textAlign: "center", color: "#9ca3af", padding: "8px 4px", borderRight: EXCEL_BORDER }}>?</div>
+          <div style={{ textAlign: "center", color: "#a39a8d", padding: "8px 4px", borderRight: EXCEL_BORDER }}>?</div>
           <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}><CustomCheckbox checked={false} onChange={() => {}} size={18} /></div>
           <div style={{ padding: "8px 6px", borderRight: EXCEL_BORDER }}>
             {(() => {
@@ -471,7 +471,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
             <div
               style={{
                 width: 40, height: 40, flexShrink: 0, borderRadius: 6, overflow: "hidden",
-                background: "#f4f4f5", border: "1px solid #e5e7eb",
+                background: "#f4f4f5", border: "1px solid #e6dfd4",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}
             >
@@ -497,7 +497,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
               href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
               target="_blank"
               rel="noreferrer"
-              style={{ fontSize: 13, fontWeight: 600, color: "#111827", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+              style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18", textDecoration: "none", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
               title={getVariantName(matrixVariants[idx], locale, `Variant ${idx + 1}`)}
             >
               {getVariantName(matrixVariants[idx], locale, `Variant ${idx + 1}`)}
@@ -510,7 +510,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
             >
               {i18n.sku}: {matrixVariants[idx]?.sku || "?"}
             </button>
-            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2 }}>
+            <div style={{ fontSize: 11, color: "#5e574e", lineHeight: 1.2 }}>
               {i18n.ean}: {matrixVariants[idx]?.ean || "?"}
             </div>
           </div>
@@ -520,7 +520,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
             min="0"
             value={d.inventory}
             onChange={(e) => setField(idx, "inventory", e.target.value)}
-            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none", height: 30 }}
+            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d6ccbd", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none", height: 30 }}
           />
           </div>
           <div style={{ padding: "8px 8px", borderRight: EXCEL_BORDER }}>
@@ -531,7 +531,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
             value={d.price}
             onChange={(e) => setField(idx, "price", e.target.value)}
             placeholder="0.00"
-            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none", height: 30 }}
+            style={{ fontSize: 13, padding: "4px 8px", border: "1px solid #d6ccbd", borderRadius: 6, width: "100%", boxSizing: "border-box", outline: "none", height: 30 }}
           />
           </div>
           <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "8px 8px", textAlign: "center" }}>
@@ -540,7 +540,7 @@ function InlineVariantEditor({ product, locale, medusaClient, setProducts }) {
         </div>
         );
       })}
-      <div style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 12, padding: "8px 6px", borderTop: "1px solid #e5e7eb", background: "#fff" }}>
+      <div style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 12, padding: "8px 6px", borderTop: "1px solid #e6dfd4", background: "#fff" }}>
         <Button type="button" onClick={save} loading={saving} variant="primary">
           {saving ? i18n.saving : i18n.save}
         </Button>
@@ -615,15 +615,15 @@ function GroupProductsModal({ locale, ownProducts, manualGroupedIdSet, initialSe
             placeholder={l === "tr" ? "isim veya SKU" : l === "de" ? "Name oder SKU" : "name or SKU"}
           />
           <Text as="p" variant="bodySm" tone="subdued">{checked.size} {l === "tr" ? "seçildi" : l === "de" ? "ausgewählt" : "selected"}</Text>
-          <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8 }}>
+          <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e6dfd4", borderRadius: 8 }}>
             {candidates.length === 0 && (
-              <div style={{ padding: 16, color: "#9ca3af", fontSize: 13 }}>{l === "tr" ? "Ürün yok" : l === "de" ? "Keine Produkte" : "No products"}</div>
+              <div style={{ padding: 16, color: "#a39a8d", fontSize: 13 }}>{l === "tr" ? "Ürün yok" : l === "de" ? "Keine Produkte" : "No products"}</div>
             )}
             {candidates.map((p) => (
-              <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px", borderBottom: "1px solid #f3f4f6", cursor: "pointer", fontSize: 13 }}>
-                <input type="checkbox" checked={checked.has(p.id)} onChange={() => toggle(p.id)} style={{ accentColor: "#2563eb", width: 15, height: 15, cursor: "pointer" }} />
+              <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px", borderBottom: "1px solid #f3eee6", cursor: "pointer", fontSize: 13 }}>
+                <input type="checkbox" checked={checked.has(p.id)} onChange={() => toggle(p.id)} style={{ accentColor: "#a65300", width: 15, height: 15, cursor: "pointer" }} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getLocalizedTitle(p, locale)}</span>
-                <span style={{ color: "#9ca3af", fontSize: 11, marginLeft: "auto", whiteSpace: "nowrap" }}>SKU: {p.sku || "—"}</span>
+                <span style={{ color: "#a39a8d", fontSize: 11, marginLeft: "auto", whiteSpace: "nowrap" }}>SKU: {p.sku || "—"}</span>
               </label>
             ))}
           </div>
@@ -814,7 +814,7 @@ function InventoryProductRow({
   return (
     <div
       style={{ background: "#fff", borderBottom: EXCEL_BORDER, transition: "background-color .1s" }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "#fafafa"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "#faf7f2"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
     >
       <div style={{ display: "grid", gridTemplateColumns: INVENTORY_ROW_GRID, gap: 0, alignItems: "center" }}>
@@ -826,9 +826,9 @@ function InventoryProductRow({
             width: "1.75rem",
             height: "1.75rem",
             borderRadius: "0.375rem",
-            border: "1px solid #d1d5db",
-            background: hasVariants ? "#fff" : "#f3f4f6",
-            color: hasVariants ? "#374151" : "#9ca3af",
+            border: "1px solid #d6ccbd",
+            background: hasVariants ? "#fff" : "#f3eee6",
+            color: hasVariants ? "#3a352f" : "#a39a8d",
             cursor: hasVariants ? "pointer" : "not-allowed",
             fontSize: "0.875rem",
             lineHeight: 1,
@@ -864,7 +864,7 @@ function InventoryProductRow({
           <div
             style={{
               width: "3.5rem", height: "3.5rem", flexShrink: 0, borderRadius: "0.5rem", overflow: "hidden",
-              background: "#f4f4f5", border: "1px solid #e5e7eb",
+              background: "#f4f4f5", border: "1px solid #e6dfd4",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
@@ -898,13 +898,13 @@ function InventoryProductRow({
               href={`${shopBaseUrl}${shopPreviewPrefix(locale)}/produkt/${encodeURIComponent(shopProductHandleForLocale(product, locale))}`}
               target="_blank"
               rel="noreferrer"
-              style={{ fontSize: "0.875rem", fontWeight: 600, color: "#111827", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.3125rem", whiteSpace: "nowrap", overflow: "hidden" }}
+              style={{ fontSize: "0.875rem", fontWeight: 600, color: "#1d1b18", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.3125rem", whiteSpace: "nowrap", overflow: "hidden" }}
               title={`${getLocalizedTitle(product, locale)} · ${lt(locale, "opens in shop, new tab", "mağazada açılır, yeni sekme", "s'ouvre dans la boutique, nouvel onglet", "se abre en la tienda, pestaña nueva", "si apre nel negozio, nuova scheda", "öffnet im Shop, neuer Tab")}`}
               onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
               onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
             >
               <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{getLocalizedTitle(product, locale)}</span>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.2" style={{ flexShrink: 0 }} aria-hidden>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a39a8d" strokeWidth="2.2" style={{ flexShrink: 0 }} aria-hidden>
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M15 3h6v6M10 14 21 3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -916,9 +916,9 @@ function InventoryProductRow({
             >
               {i18n.sku}: {sku}
             </I18nLink>
-            <div style={{ fontSize: "0.6875rem", color: "#6b7280", lineHeight: 1.2 }}>{i18n.ean}: {ean}</div>
+            <div style={{ fontSize: "0.6875rem", color: "#5e574e", lineHeight: 1.2 }}>{i18n.ean}: {ean}</div>
             {product.an_id && (
-              <div style={{ fontSize: "0.625rem", color: "#9ca3af", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>AN-ID: {product.an_id}</div>
+              <div style={{ fontSize: "0.625rem", color: "#a39a8d", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>AN-ID: {product.an_id}</div>
             )}
             {mergedParentLabel && (
               <div style={{ marginTop: "0.1875rem" }}>
@@ -938,8 +938,8 @@ function InventoryProductRow({
               </div>
             )}
           </div>
-          <div style={{ fontSize: "0.8125rem", color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>{inv}</div>
-          <div style={{ fontSize: "0.8125rem", color: "#111827", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>?{formatDecimal(price)}</div>
+          <div style={{ fontSize: "0.8125rem", color: "#1d1b18", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>{inv}</div>
+          <div style={{ fontSize: "0.8125rem", color: "#1d1b18", textAlign: "center", fontVariantNumeric: "tabular-nums", padding: "0.5rem", borderRight: EXCEL_BORDER }}>?{formatDecimal(price)}</div>
           <div style={{ fontSize: "0.75rem", color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "0.5rem", borderRight: EXCEL_BORDER, textAlign: "center" }}>
             {variationSummary || "?"}
           </div>
@@ -955,7 +955,7 @@ function InventoryProductRow({
               width: 32,
               height: 32,
               borderRadius: 8,
-              color: "#374151",
+              color: "#3a352f",
               textDecoration: "none",
             }}
           >
@@ -990,14 +990,14 @@ function InventoryProductRow({
                   width: 28,
                   height: 28,
                   padding: 0,
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e6dfd4",
                   borderRadius: 6,
                   background: "#fff",
                   cursor: "pointer",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#6b7280",
+                  color: "#5e574e",
                   fontSize: 16,
                   lineHeight: 1,
                   fontWeight: 700,
@@ -1016,7 +1016,7 @@ function InventoryProductRow({
                   zIndex: 10050,
                   minWidth: menuPos.width,
                   background: "#fff",
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e6dfd4",
                   borderRadius: 8,
                   boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                   overflow: "hidden",
@@ -1063,7 +1063,7 @@ function InventoryProductRow({
                     textAlign: "left",
                     padding: "0 12px",
                     fontSize: 13,
-                    color: "#111827",
+                    color: "#1d1b18",
                   }}
                 >
                   {ui.duplicate}
@@ -1085,7 +1085,7 @@ function InventoryProductRow({
                       textAlign: "left",
                       padding: "0 12px",
                       fontSize: 13,
-                      color: "#111827",
+                      color: "#1d1b18",
                     }}
                   >
                     {inventoryI18n.commissionRateBtn}
@@ -1234,38 +1234,38 @@ export default function InventoryPage() {
         gap: 0,
         borderBottom: EXCEL_BORDER,
         alignItems: "center",
-        background: "#f8fafc",
+        background: "#faf7f2",
         position: "sticky",
         top: 0,
         zIndex: 2,
       }}
     >
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem" }} />
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.select}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.status}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.select}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.status}</div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem" }} />
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.details}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "inventory_desc" ? "inventory_asc" : "inventory_desc"))}>{rowHead.inventory}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "price_desc" ? "price_asc" : "price_desc"))}>{rowHead.price}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.variations}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.details}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "inventory_desc" ? "inventory_asc" : "inventory_desc"))}>{rowHead.inventory}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "price_desc" ? "price_asc" : "price_desc"))}>{rowHead.price}</div>
+      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.variations}</div>
       <div style={{ padding: "0.5rem 0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem" }}>
-        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.375rem" }}>
-        <input value={inventoryMin} onChange={(e) => setInventoryMin(e.target.value)} placeholder="min" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
-        <input value={inventoryMax} onChange={(e) => setInventoryMax(e.target.value)} placeholder="max" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={inventoryMin} onChange={(e) => setInventoryMin(e.target.value)} placeholder="min" style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={inventoryMax} onChange={(e) => setInventoryMax(e.target.value)} placeholder="max" style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.375rem" }}>
-        <input value={priceMin} onChange={(e) => setPriceMin(e.target.value)} placeholder="min" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
-        <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="max" style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={priceMin} onChange={(e) => setPriceMin(e.target.value)} placeholder="min" style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="max" style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem" }}>
-        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "fr" ? "variante" : l === "es" ? "variante" : l === "it" ? "variante" : "variation"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d1d5db", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "fr" ? "variante" : l === "es" ? "variante" : l === "it" ? "variante" : "variation"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ padding: "6px" }} />
     </div>
@@ -1274,7 +1274,7 @@ export default function InventoryPage() {
   const TableShell = ({ children }) => (
     <div
       style={{
-        border: "1px solid #e5e7eb",
+        border: "1px solid #e6dfd4",
         borderRadius: 8,
         background: "#fff",
         maxHeight: "68vh",
@@ -1774,7 +1774,7 @@ export default function InventoryPage() {
         <div style={{
           display: "grid",
           gridTemplateColumns: INVENTORY_ROW_GRID,
-          background: "#f3f4f6",
+          background: "#f3eee6",
           borderBottom: EXCEL_BORDER,
         }}>
           <div style={{ gridColumn: "1 / -1", padding: "7px 16px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -1835,7 +1835,7 @@ export default function InventoryPage() {
             <button
               type="button"
               onClick={() => deleteManualGroup(group)}
-              style={{ marginLeft: "auto", border: "none", background: "none", color: "#6b7280", cursor: "pointer", fontSize: 11, textDecoration: "underline" }}
+              style={{ marginLeft: "auto", border: "none", background: "none", color: "#5e574e", cursor: "pointer", fontSize: 11, textDecoration: "underline" }}
               title={locale === "tr" ? "Grubu çöz (ürünler silinmez)" : locale === "de" ? "Gruppierung aufheben (Produkte bleiben erhalten)" : "Ungroup (products stay untouched)"}
             >
               {locale === "tr" ? "Grubu çöz" : locale === "de" ? "Gruppierung aufheben" : "Ungroup"}

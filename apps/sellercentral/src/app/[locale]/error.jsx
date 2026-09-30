@@ -30,14 +30,14 @@ export default function SellerError({ error, reset }) {
         padding: "48px 24px",
         fontFamily: "system-ui, sans-serif",
         textAlign: "center",
-        color: "#1f2937",
+        color: "#1d1b18",
       }}
     >
       <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
       <h1 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px" }}>
         {lt("Something went wrong", "Bir şeyler ters gitti", "Une erreur s'est produite", "Algo salió mal", "Qualcosa è andato storto", "Etwas ist schiefgelaufen")}
       </h1>
-      <p style={{ fontSize: 14, color: "#6b7280", maxWidth: 400, margin: "0 0 28px", lineHeight: 1.6 }}>
+      <p style={{ fontSize: 14, color: "#5e574e", maxWidth: 400, margin: "0 0 28px", lineHeight: 1.6 }}>
         {lt(
           "An unexpected error occurred. Please try again.",
           "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
@@ -53,7 +53,7 @@ export default function SellerError({ error, reset }) {
           onClick={reset}
           style={{
             padding: "10px 24px",
-            background: "#1f2937",
+            background: "#1d1b18",
             color: "#fff",
             border: "none",
             borderRadius: 8,
@@ -68,9 +68,9 @@ export default function SellerError({ error, reset }) {
           onClick={() => (window.location.href = `/${locale}/dashboard`)}
           style={{
             padding: "10px 24px",
-            background: "#f3f4f6",
-            color: "#374151",
-            border: "1px solid #d1d5db",
+            background: "#f3eee6",
+            color: "#3a352f",
+            border: "1px solid #d6ccbd",
             borderRadius: 8,
             fontSize: 14,
             fontWeight: 600,

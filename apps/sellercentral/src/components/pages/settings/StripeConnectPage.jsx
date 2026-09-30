@@ -195,7 +195,7 @@ export default function StripeConnectPage() {
                 {/* Connection dot */}
                 <span style={{
                   display: "inline-block", width: 12, height: 12, borderRadius: "50%", flexShrink: 0,
-                  background: status?.onboarding_complete ? "#10b981" : status?.connected ? "#f59e0b" : "#d1d5db",
+                  background: status?.onboarding_complete ? "#10b981" : status?.connected ? "#f59e0b" : "#d6ccbd",
                 }} />
                 <BlockStack gap="0">
                   <Text as="p" variant="bodyMd" fontWeight="semibold">

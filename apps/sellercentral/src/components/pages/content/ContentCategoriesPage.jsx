@@ -115,12 +115,12 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect, locale }
           paddingBottom: 10,
           paddingLeft: 16 + depth * 8,
           paddingRight: 16,
-          borderBottom: "1px solid #f1f1f1",
-          background: depth === 0 ? "#fafafa" : "#fff",
+          borderBottom: "1px solid #f3eee6",
+          background: depth === 0 ? "#faf7f2" : "#fff",
           gap: 8,
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = "#f6f6f7"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = depth === 0 ? "#fafafa" : "#fff"; }}
+        onMouseEnter={e => { e.currentTarget.style.background = "#faf7f2"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = depth === 0 ? "#faf7f2" : "#fff"; }}
       >
         {/* chevron */}
         <button
@@ -176,7 +176,7 @@ function TreeNode({ node, depth, onDelete, selectedIds, onToggleSelect, locale }
       </div>
 
       {hasKids && open && (
-        <div style={{ borderLeft: "3px solid #e5e7eb", marginLeft: 16 + depth * 8 + 20 }}>
+        <div style={{ borderLeft: "3px solid #e6dfd4", marginLeft: 16 + depth * 8 + 20 }}>
           {node.children.map(child => (
             <TreeNode key={child.id} node={child} depth={depth + 1} onDelete={onDelete} selectedIds={selectedIds} onToggleSelect={onToggleSelect} locale={locale} />
           ))}
@@ -686,9 +686,9 @@ export default function ContentCategoriesPage() {
                   </BlockStack>
                 </Box>
               ) : (
-                <div style={{ border: "1px solid #e1e3e5", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden" }}>
                   {/* header */}
-                  <div style={{ display: "flex", alignItems: "center", padding: "8px 16px 8px 60px", background: "#f6f6f7", borderBottom: "1px solid #e1e3e5", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", padding: "8px 16px 8px 60px", background: "#faf7f2", borderBottom: "1px solid #e6dfd4", gap: 8 }}>
                     <div style={{ width: 24 }} />
                     <div style={{ flex: "0 0 240px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Name</Text></div>
                     <div style={{ flex: "0 0 180px" }}><Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">Slug</Text></div>

@@ -554,6 +554,26 @@ body,
   --p-color-bg-fill-brand-active: #000;
   --p-border-radius-300: 16px;
   --p-border-radius-400: 20px;
+  /* Emphasis + info tones (were Polaris blue) in the warm palette */
+  --p-color-text-emphasis: var(--andertal-brand-text);
+  --p-color-text-emphasis-hover: #7f3f00;
+  --p-color-text-emphasis-active: #6a3400;
+  --p-color-icon-emphasis: var(--andertal-brand-text);
+  --p-color-border-emphasis: var(--andertal-brand);
+  --p-color-bg-fill-emphasis: var(--andertal-ink);
+  --p-color-bg-fill-emphasis-hover: #34302b;
+  --p-color-bg-fill-emphasis-active: #000;
+  --p-color-bg-surface-emphasis: var(--andertal-brand-soft);
+  --p-color-bg-surface-info: #fdf3e6;
+  --p-color-bg-surface-info-hover: #fcebd5;
+  --p-color-bg-surface-info-active: #f5d3a8;
+  --p-color-bg-fill-info: #f5d3a8;
+  --p-color-bg-fill-info-secondary: #fcebd5;
+  --p-color-text-info: #7f3f00;
+  --p-color-text-info-hover: #6a3400;
+  --p-color-text-info-on-bg-fill: #6a3400;
+  --p-color-icon-info: var(--andertal-brand-text);
+  --p-color-border-info: #f5d3a8;
   font-family: var(--p-font-family-sans);
 }
 html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }
@@ -575,6 +595,21 @@ html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "
   background-color: var(--andertal-ink) !important;
   --p-color-border: rgba(255, 255, 255, 0.1);
   --p-color-border-secondary: rgba(255, 255, 255, 0.1);
+  /* Polaris paints the whole nav with --p-color-nav-bg on :hover — keep it the same dark bar. */
+  --p-color-nav-bg: var(--andertal-ink);
+  --p-color-nav-bg-surface: transparent;
+  --p-color-nav-bg-surface-hover: rgba(255, 255, 255, 0.08);
+  --p-color-nav-bg-surface-active: rgba(255, 255, 255, 0.12);
+  --p-color-nav-bg-surface-selected: var(--andertal-brand);
+  --p-color-text: #e9e2d6;
+  --p-color-text-secondary: #b9b0a3;
+  --p-color-icon: #cfc6b8;
+  --p-color-icon-secondary: #b9b0a3;
+}
+#AppFrameNav .Polaris-Navigation__PrimaryNavigation,
+#AppFrameNav .Polaris-Navigation__PrimaryNavigation:hover {
+  background-color: var(--andertal-ink) !important;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 #AppFrameNav .Polaris-Navigation__Section--withSeparator,
 #AppFrameNav hr { border-color: rgba(255, 255, 255, 0.1) !important; }

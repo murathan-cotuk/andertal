@@ -34,7 +34,7 @@ function TreeNode({ node, depth, allOpen, renderRow }) {
           paddingRight: 12,
           paddingTop: 6,
           paddingBottom: 6,
-          borderBottom: "1px solid #f1f1f1",
+          borderBottom: "1px solid #f3eee6",
         }}
       >
         <button
@@ -57,7 +57,7 @@ function TreeNode({ node, depth, allOpen, renderRow }) {
             <span
               style={{
                 fontSize: 15,
-                color: "#6b7280",
+                color: "#5e574e",
                 display: "inline-block",
                 transform: `rotate(${open ? "90deg" : "0deg"})`,
                 transition: "transform 0.15s ease",
@@ -67,7 +67,7 @@ function TreeNode({ node, depth, allOpen, renderRow }) {
               ›
             </span>
           ) : (
-            <span style={{ fontSize: 16, color: "#d1d5db", lineHeight: 1 }}>·</span>
+            <span style={{ fontSize: 16, color: "#d6ccbd", lineHeight: 1 }}>·</span>
           )}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>{renderRow(node, depth)}</div>

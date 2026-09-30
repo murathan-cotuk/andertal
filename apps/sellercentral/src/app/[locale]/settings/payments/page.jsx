@@ -77,13 +77,13 @@ function KpiCard({ label, value, sub, tone, highlight, icon }) {
   const color =
     tone === "success" ? "#059669" :
     tone === "critical" ? "#dc2626" :
-    tone === "info" ? "#2563eb" : "#111827";
+    tone === "info" ? "#a65300" : "#1d1b18";
   return (
     <div style={{
       flex: "1 1 160px", minWidth: 150,
       background: highlight ? "#f0fdf4" : "#fff",
       borderRadius: 12, padding: "18px 20px",
-      border: highlight ? "1.5px solid #6ee7b7" : "1px solid #e5e7eb",
+      border: highlight ? "1.5px solid #6ee7b7" : "1px solid #e6dfd4",
       boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
     }}>
       <InlineStack gap="100" blockAlign="center">
@@ -226,7 +226,7 @@ function IbanSection() {
 
           {!editing && (
             savedIban ? (
-              <div style={{ background: "#f9fafb", borderRadius: 10, padding: "16px 20px", border: "1px solid #f3f4f6" }}>
+              <div style={{ background: "#faf7f2", borderRadius: 10, padding: "16px 20px", border: "1px solid #f3eee6" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px" }}>
                   <BlockStack gap="050">
                     <Text as="p" variant="bodySm" tone="subdued">IBAN</Text>
@@ -454,7 +454,7 @@ function AdminPaymentsView() {
           {/* Per-seller payout table */}
           <Box paddingBlockStart="400">
             <Card padding="0">
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3eee6" }}>
                 <Text variant="headingMd" as="h2">{txt.adminSellerPayouts(sellers.length)}</Text>
               </div>
               {loading ? (
@@ -463,7 +463,7 @@ function AdminPaymentsView() {
                 <Box padding="500"><Text tone="subdued" alignment="center">{txt.noDataPeriod}</Text></Box>
               ) : (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 120px 130px 100px auto", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 120px 130px 100px auto", gap: 8, padding: "10px 20px", borderBottom: "1px solid #e6dfd4", fontSize: 11, fontWeight: 600, color: "#5e574e", background: "#faf7f2" }}>
                     <div>{txt.sellerCol}</div>
                     <div style={{ textAlign: "right" }}>{txt.revenueLabel}</div>
                     <div style={{ textAlign: "right" }}>{txt.commission}</div>
@@ -477,7 +477,7 @@ function AdminPaymentsView() {
                     const reference = `${seller.seller_id}-${periodKey}`;
                     const isPaid = seller.status === "bezahlt" || seller.status === "paid";
                     return (
-                      <div key={seller.seller_id || i} style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 120px 130px 100px auto", gap: 8, padding: "12px 20px", borderBottom: "1px solid #f3f4f6", alignItems: "center", background: isPaid ? "#f0fdf4" : "#fff" }}>
+                      <div key={seller.seller_id || i} style={{ display: "grid", gridTemplateColumns: "1.8fr 100px 100px 120px 130px 100px auto", gap: 8, padding: "12px 20px", borderBottom: "1px solid #f3eee6", alignItems: "center", background: isPaid ? "#f0fdf4" : "#fff" }}>
                         <div>
                           <Text variant="bodyMd" fontWeight="semibold">{seller.store_name || seller.email}</Text>
                           {seller.store_name && <Text variant="bodySm" tone="subdued">{seller.email}</Text>}
@@ -485,11 +485,11 @@ function AdminPaymentsView() {
                         </div>
                         <div style={{ textAlign: "right", fontSize: 13 }}>{fmt(seller.total_cents || 0, locale)}</div>
                         <div style={{ textAlign: "right", fontSize: 13, color: "#059669", fontWeight: 600 }}>+{fmt(comm, locale)}</div>
-                        <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: isPaid ? "#6b7280" : "#dc2626" }}>
+                        <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: isPaid ? "#5e574e" : "#dc2626" }}>
                           {fmt(seller.payout_cents || 0, locale)}
                         </div>
                         <div>
-                          <code style={{ fontSize: 11, background: "#f3f4f6", padding: "2px 5px", borderRadius: 4, color: "#374151", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <code style={{ fontSize: 11, background: "#f3eee6", padding: "2px 5px", borderRadius: 4, color: "#3a352f", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {reference}
                           </code>
                         </div>

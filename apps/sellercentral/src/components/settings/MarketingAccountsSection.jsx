@@ -119,10 +119,10 @@ function Field({ label, hint, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
       {label ? (
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 4 }}>{label}</label>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#3a352f", marginBottom: 4 }}>{label}</label>
       ) : null}
       {children}
-      {hint && <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 3 }}>{hint}</div>}
     </div>
   );
 }
@@ -134,7 +134,7 @@ function MInput({ ...props }) {
       style={{
         width: "100%",
         padding: "8px 10px",
-        border: "1px solid #e5e7eb",
+        border: "1px solid #e6dfd4",
         borderRadius: 7,
         fontSize: 13,
         outline: "none",
@@ -160,7 +160,7 @@ function PlatformPanel({ platform, accountData, onSave, saving, lt }) {
   const keepPasswordPlaceholder = lt("Leave blank to keep current value", "Mevcut değeri korumak için boş bırakın", "Laisser vide pour conserver la valeur actuelle", "Dejar en blanco para mantener el valor actual", "Lasciare vuoto per mantenere il valore attuale", "Leer lassen um beizubehalten");
 
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
+    <div style={{ border: "1px solid #e6dfd4", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -182,10 +182,10 @@ function PlatformPanel({ platform, accountData, onSave, saving, lt }) {
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: isConnected && isActive ? "#22c55e" : "#d1d5db",
+              background: isConnected && isActive ? "#22c55e" : "#d6ccbd",
             }}
           />
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{platform.label}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#1d1b18" }}>{platform.label}</span>
           {isConnected && isActive && (
             <span
               style={{
@@ -201,11 +201,11 @@ function PlatformPanel({ platform, accountData, onSave, saving, lt }) {
             </span>
           )}
         </div>
-        <span style={{ fontSize: 18, color: "#6b7280" }}>{open ? "▲" : "▼"}</span>
+        <span style={{ fontSize: 18, color: "#5e574e" }}>{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
-        <div style={{ padding: "16px 16px 20px", borderTop: "1px solid #f3f4f6", background: "#fafafa" }}>
+        <div style={{ padding: "16px 16px 20px", borderTop: "1px solid #f3eee6", background: "#faf7f2" }}>
           {platform.fields.map((f) => (
             <Field key={f.key} label={f.label} hint={f.helpText}>
               <MInput
@@ -217,7 +217,7 @@ function PlatformPanel({ platform, accountData, onSave, saving, lt }) {
             </Field>
           ))}
           <Field label="">
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#374151" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: "#3a352f" }}>
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
               {lt("Account active", "Hesap aktif", "Compte actif", "Cuenta activa", "Account attivo", "Konto aktiv")}
             </label>
@@ -275,7 +275,7 @@ export default function MarketingAccountsSection({ hideFooterHint = false }) {
 
   if (loading) {
     return (
-      <div style={{ padding: 20, color: "#9ca3af", fontSize: 13 }}>
+      <div style={{ padding: 20, color: "#a39a8d", fontSize: 13 }}>
         {lt("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Laden…")}
       </div>
     );
@@ -324,7 +324,7 @@ export default function MarketingAccountsSection({ hideFooterHint = false }) {
         />
       ))}
       {!hideFooterHint && (
-        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: "#a39a8d", marginTop: 8 }}>
           {lt(
             "Saved credentials are used for automatic campaign creation in connected ad networks.",
             "Kayıtlı kimlik bilgileri bağlı reklam ağlarında otomatik kampanya oluşturma için kullanılır.",

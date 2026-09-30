@@ -73,9 +73,9 @@ function GroupHeader({ label, count, open, onToggle, countLabel }) {
         alignItems: "center",
         gap: 10,
         padding: "12px 16px",
-        background: "#f6f6f7",
+        background: "#faf7f2",
         border: "none",
-        borderBottom: "1px solid #e1e3e5",
+        borderBottom: "1px solid #e6dfd4",
         cursor: "pointer",
         textAlign: "left",
       }}
@@ -84,14 +84,14 @@ function GroupHeader({ label, count, open, onToggle, countLabel }) {
         style={{
           display: "inline-block",
           fontSize: 13,
-          color: "#6d7175",
+          color: "#5e574e",
           transform: `rotate(${open ? "90deg" : "0deg"})`,
           transition: "transform 0.15s ease",
         }}
       >
         ›
       </span>
-      <span style={{ fontWeight: 700, fontSize: 13, color: "#111827", flex: 1 }}>{label}</span>
+      <span style={{ fontWeight: 700, fontSize: 13, color: "#1d1b18", flex: 1 }}>{label}</span>
       <Badge>{countLabel}</Badge>
     </button>
   );
@@ -260,10 +260,10 @@ export default function ComplianceReviewPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <tbody>
                         {group.items.map((p) => (
-                          <tr key={p.id} style={{ borderTop: "1px solid #f1f1f1", cursor: "pointer" }} onClick={() => router.push(`/products/${p.id}`)}>
+                          <tr key={p.id} style={{ borderTop: "1px solid #f3eee6", cursor: "pointer" }} onClick={() => router.push(`/products/${p.id}`)}>
                             <td style={{ padding: "12px 16px", width: "28%" }}>
-                              <div style={{ fontWeight: 600, color: "#111827" }}>{p.title || "—"}</div>
-                              <div style={{ fontSize: 11, color: "#9ca3af" }}>{p.seller_id ? `${c.sellerLabel}: ${p.seller_name || p.seller_id}` : c.platformProduct}</div>
+                              <div style={{ fontWeight: 600, color: "#1d1b18" }}>{p.title || "—"}</div>
+                              <div style={{ fontSize: 11, color: "#a39a8d" }}>{p.seller_id ? `${c.sellerLabel}: ${p.seller_name || p.seller_id}` : c.platformProduct}</div>
                             </td>
                             <td style={{ padding: "12px 16px", width: "34%" }}>
                               <InlineStack gap="100" wrap>
@@ -272,14 +272,14 @@ export default function ComplianceReviewPage() {
                                 ))}
                               </InlineStack>
                             </td>
-                            <td style={{ padding: "12px 16px", color: "#6d7175", fontSize: 12, width: "18%" }}>{fmtDate(p.checked_at, locale)}</td>
+                            <td style={{ padding: "12px 16px", color: "#5e574e", fontSize: 12, width: "18%" }}>{fmtDate(p.checked_at, locale)}</td>
                             <td style={{ padding: "12px 16px", textAlign: "right" }}>
                               <Link
                                 href={`/products/${p.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                style={{ color: "#2563eb", fontWeight: 600, fontSize: 12, textDecoration: "none" }}
+                                style={{ color: "#a65300", fontWeight: 600, fontSize: 12, textDecoration: "none" }}
                               >
                                 {c.editProduct} →
                               </Link>

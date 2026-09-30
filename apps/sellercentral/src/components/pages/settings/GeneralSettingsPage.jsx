@@ -47,7 +47,7 @@ function LocaleToggle({ on, onChange, disabled, label }) {
         height: 26,
         borderRadius: 13,
         padding: 0,
-        background: on ? "#10b981" : "#d1d5db",
+        background: on ? "#10b981" : "#d6ccbd",
         border: "none",
         cursor: disabled ? "not-allowed" : "pointer",
         position: "relative",
@@ -626,10 +626,10 @@ export default function GeneralSettingsPage() {
                     <img
                       src={formData.shopLogoUrl}
                       alt=""
-                      style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
+                      style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 8, border: "1px solid #e6dfd4", background: "#fff" }}
                     />
                   ) : (
-                    <div style={{ width: 64, height: 64, borderRadius: 8, border: "1px dashed #d1d5db", background: "#f9fafb" }} />
+                    <div style={{ width: 64, height: 64, borderRadius: 8, border: "1px dashed #d6ccbd", background: "#faf7f2" }} />
                   )}
                   <Button size="slim" onClick={() => setLogoPickerOpen(true)}>
                     {locale === "tr" ? "Görsel seç" : locale === "en" ? "Choose image" : "Bild auswählen"}
@@ -923,7 +923,7 @@ export default function GeneralSettingsPage() {
                 <img
                   src={maintenanceImageUrl}
                   alt=""
-                  style={{ width: "100%", maxWidth: 320, borderRadius: 8, border: "1px solid #e5e7eb", display: "block" }}
+                  style={{ width: "100%", maxWidth: 320, borderRadius: 8, border: "1px solid #e6dfd4", display: "block" }}
                 />
               ) : (
                 <Text as="p" tone="subdued" variant="bodySm">

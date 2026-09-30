@@ -42,7 +42,7 @@ function orderStatus(o) {
 
 const STATUS_COLORS = {
   offen: "#f59e0b",
-  in_bearbeitung: "#3b82f6",
+  in_bearbeitung: "#ee8a12",
   abgeschlossen: "#10b981",
   storniert: "#ef4444",
   bezahlt: "#10b981",
@@ -50,14 +50,14 @@ const STATUS_COLORS = {
   zugestellt: "#059669",
 };
 
-function KpiCard({ icon, label, value, sub, accent = "#008060", onClick }) {
+function KpiCard({ icon, label, value, sub, accent = "#ee8a12", onClick }) {
   const inner = (
     <div
       style={{
         background: "#fff",
         borderRadius: 12,
         padding: "18px 20px",
-        border: "1px solid #e5e7eb",
+        border: "1px solid #e6dfd4",
         borderLeft: `4px solid ${accent}`,
         boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
         height: "100%",
@@ -77,15 +77,15 @@ function KpiCard({ icon, label, value, sub, accent = "#008060", onClick }) {
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.06em" }}>
           {label}
         </div>
         <span style={{ fontSize: 20, lineHeight: 1 }}>{icon}</span>
       </div>
-      <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", marginTop: 8, fontVariantNumeric: "tabular-nums" }}>
+      <div style={{ fontSize: 26, fontWeight: 800, color: "#1d1b18", marginTop: 8, fontVariantNumeric: "tabular-nums" }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: "#a39a8d", marginTop: 4 }}>{sub}</div>}
     </div>
   );
   if (onClick) {
@@ -100,11 +100,11 @@ function KpiCard({ icon, label, value, sub, accent = "#008060", onClick }) {
 
 function Panel({ title, subtitle, action, children, noPad }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", overflow: "hidden", height: "100%" }}>
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e6dfd4", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", overflow: "hidden", height: "100%" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3eee6", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#111827" }}>{title}</h2>
-          {subtitle && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>{subtitle}</p>}
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1d1b18" }}>{title}</h2>
+          {subtitle && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#5e574e" }}>{subtitle}</p>}
         </div>
         {action}
       </div>
@@ -121,15 +121,15 @@ function StatusBars({ counts, locale }) {
       {entries.map(([status, n]) => (
         <div key={status}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-            <span style={{ fontWeight: 600, color: "#374151", textTransform: "capitalize" }}>{status.replace(/_/g, " ")}</span>
-            <span style={{ color: "#6b7280" }}>{n}</span>
+            <span style={{ fontWeight: 600, color: "#3a352f", textTransform: "capitalize" }}>{status.replace(/_/g, " ")}</span>
+            <span style={{ color: "#5e574e" }}>{n}</span>
           </div>
-          <div style={{ height: 8, background: "#f3f4f6", borderRadius: 99, overflow: "hidden" }}>
+          <div style={{ height: 8, background: "#f3eee6", borderRadius: 99, overflow: "hidden" }}>
             <div
               style={{
                 width: `${(n / total) * 100}%`,
                 height: "100%",
-                background: STATUS_COLORS[status] || "#9ca3af",
+                background: STATUS_COLORS[status] || "#a39a8d",
                 borderRadius: 99,
                 transition: "width 0.35s ease",
               }}
@@ -137,7 +137,7 @@ function StatusBars({ counts, locale }) {
           </div>
         </div>
       ))}
-      {entries.length === 0 && <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{locale === "en" ? "No orders yet" : locale === "tr" ? "Henüz sipariş yok" : locale === "fr" ? "Aucune commande" : locale === "es" ? "Sin pedidos" : locale === "it" ? "Nessun ordine" : "Noch keine Bestellungen"}</p>}
+      {entries.length === 0 && <p style={{ fontSize: 13, color: "#a39a8d", margin: 0 }}>{locale === "en" ? "No orders yet" : locale === "tr" ? "Henüz sipariş yok" : locale === "fr" ? "Aucune commande" : locale === "es" ? "Sin pedidos" : locale === "it" ? "Nessun ordine" : "Noch keine Bestellungen"}</p>}
     </div>
   );
 }
@@ -324,8 +324,8 @@ export default function DashboardHome() {
 
       <div style={{ marginBottom: 24, display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800, color: "#111827" }}>{greeting}</h1>
-          <p style={{ margin: 0, fontSize: 14, color: "#6b7280" }}>
+          <h1 style={{ margin: "0 0 4px", fontSize: 24, fontWeight: 800, color: "#1d1b18" }}>{greeting}</h1>
+          <p style={{ margin: 0, fontSize: 14, color: "#5e574e" }}>
             {new Date().toLocaleDateString(
               locale === "de" ? "de-DE" : locale === "tr" ? "tr-TR" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "en-GB",
               { weekday: "long", day: "numeric", month: "long", year: "numeric" }
@@ -333,7 +333,7 @@ export default function DashboardHome() {
           </p>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-          <label htmlFor="dashboard-period" style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          <label htmlFor="dashboard-period" style={{ fontSize: 12, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             {t("Billing period", "Dönem", "Période", "Período", "Periodo", "Abrechnungszeitraum")}
           </label>
           <select
@@ -344,11 +344,11 @@ export default function DashboardHome() {
               minWidth: 220,
               padding: "8px 12px",
               borderRadius: 8,
-              border: "1px solid #d1d5db",
+              border: "1px solid #d6ccbd",
               background: "#fff",
               fontSize: 13,
               fontWeight: 600,
-              color: "#111827",
+              color: "#1d1b18",
               cursor: "pointer",
             }}
           >
@@ -373,8 +373,8 @@ export default function DashboardHome() {
           marginBottom: 20,
         }}
       >
-        <KpiCard icon="💰" label={t("Revenue", "Ciro", "Revenus", "Ingresos", "Fatturato", "Umsatz")} value={fmtEuro(stats.revenueCents)} sub={periodLabel} accent="#008060" onClick={() => router.push("/settings/payments")} />
-        <KpiCard icon="📦" label={ui.orders} value={stats.orderCount} sub={`Ø ${fmtEuro(stats.avg)} · ${periodLabel}`} accent="#2563eb" onClick={() => router.push("/orders")} />
+        <KpiCard icon="💰" label={t("Revenue", "Ciro", "Revenus", "Ingresos", "Fatturato", "Umsatz")} value={fmtEuro(stats.revenueCents)} sub={periodLabel} accent="#ee8a12" onClick={() => router.push("/settings/payments")} />
+        <KpiCard icon="📦" label={ui.orders} value={stats.orderCount} sub={`Ø ${fmtEuro(stats.avg)} · ${periodLabel}`} accent="#a65300" onClick={() => router.push("/orders")} />
         <KpiCard icon="↩️" label={t("Returns", "İadeler", "Retours", "Devoluciones", "Resi", "Retouren")} value={stats.returnsInPeriod} sub={stats.returnsOpenInPeriod > 0 ? `${stats.returnsOpenInPeriod} ${t("open in this period", "bu dönemde açık", "ouverts dans cette période", "abiertos en este período", "aperti in questo periodo", "offen in dieser Periode")}` : periodLabel} accent="#ef4444" onClick={() => router.push("/orders/returns")} />
         <KpiCard icon="⏳" label={ui.statusOpen} value={stats.pending} sub={t("All open orders", "Tüm açık siparişler", "Toutes les commandes ouvertes", "Todos los pedidos abiertos", "Tutti gli ordini aperti", "Alle offenen Bestellungen")} accent="#f59e0b" onClick={() => router.push("/orders")} />
         <KpiCard icon="🚚" label={t("Pending shipping", "Kargo bekliyor", "Expédition en attente", "Envío pendiente", "Spedizione in attesa", "Versand offen")} value={stats.toShip} sub={t("Open delivery status (total)", "Açık teslimat durumu (toplam)", "Statut de livraison ouvert (total)", "Estado de entrega abierto (total)", "Stato consegna aperto (totale)", "Lieferstatus offen (gesamt)")} accent="#6366f1" onClick={() => router.push("/orders")} />
@@ -384,7 +384,7 @@ export default function DashboardHome() {
       {/* Charts row */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 16, marginBottom: 20, alignItems: "stretch" }}>
         <Panel title={t("Revenue · Daily", "Ciro · Günlük", "Revenus · Quotidien", "Ingresos · Diario", "Fatturato · Giornaliero", "Umsatz · Tagesverlauf")} subtitle={periodLabel}>
-          <RevenueAreaChart data={chartData} accent="#008060" height={220} />
+          <RevenueAreaChart data={chartData} accent="#ee8a12" height={220} />
         </Panel>
         <Panel title={t("Order status", "Sipariş durumu", "Statut des commandes", "Estado de pedidos", "Stato ordini", "Bestellstatus")} subtitle={periodLabel}>
           <StatusBars counts={statusCounts} locale={locale} />
@@ -401,33 +401,33 @@ export default function DashboardHome() {
         >
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr style={{ background: "#f9fafb", textAlign: "left" }}>
+              <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                 {[ui.colNumber, ui.colCustomer, ui.colAmount, ui.colStatus, ui.colDate, ""].map((h) => (
-                  <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase" }}>{h}</th>
+                  <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {recentOrders.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>{ui.noOrders}</td>
+                  <td colSpan={6} style={{ padding: 32, textAlign: "center", color: "#a39a8d" }}>{ui.noOrders}</td>
                 </tr>
               )}
               {recentOrders.map((o) => {
                 const st = orderStatus(o);
                 return (
-                  <tr key={o.id} style={{ borderTop: "1px solid #f3f4f6", cursor: "pointer" }} onClick={() => router.push(`/orders/${o.id}`)}>
-                    <td style={{ padding: "12px 16px", fontWeight: 700, color: "#111827" }}>#{o.order_number || "—"}</td>
-                    <td style={{ padding: "12px 16px", color: "#374151" }}>
+                  <tr key={o.id} style={{ borderTop: "1px solid #f3eee6", cursor: "pointer" }} onClick={() => router.push(`/orders/${o.id}`)}>
+                    <td style={{ padding: "12px 16px", fontWeight: 700, color: "#1d1b18" }}>#{o.order_number || "—"}</td>
+                    <td style={{ padding: "12px 16px", color: "#3a352f" }}>
                       {[o.first_name, o.last_name].filter(Boolean).join(" ") || "—"}
                     </td>
                     <td style={{ padding: "12px 16px", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtEuro(orderTotalCents(o))}</td>
                     <td style={{ padding: "12px 16px" }}>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: `${STATUS_COLORS[st] || "#9ca3af"}22`, color: STATUS_COLORS[st] || "#6b7280" }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: `${STATUS_COLORS[st] || "#a39a8d"}22`, color: STATUS_COLORS[st] || "#5e574e" }}>
                         {statusLabel(locale, st)}
                       </span>
                     </td>
-                    <td style={{ padding: "12px 16px", color: "#6b7280", fontSize: 12 }}>{fmtDate(o.created_at)}</td>
+                    <td style={{ padding: "12px 16px", color: "#5e574e", fontSize: 12 }}>{fmtDate(o.created_at)}</td>
                     <td style={{ padding: "12px 16px" }}>
                       <Button size="slim" onClick={(e) => { e.stopPropagation(); router.push(`/orders/${o.id}`); }}>{ui.viewDetails}</Button>
                     </td>
@@ -442,7 +442,7 @@ export default function DashboardHome() {
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {getQuickSections(locale).map((section) => (
               <div key={section.title}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
                   {section.title}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -459,12 +459,12 @@ export default function DashboardHome() {
                           gap: 8,
                           padding: "10px 12px",
                           borderRadius: 10,
-                          border: "1px solid #e5e7eb",
-                          background: "#fafafa",
+                          border: "1px solid #e6dfd4",
+                          background: "#faf7f2",
                           cursor: "pointer",
                           fontSize: 13,
                           fontWeight: 600,
-                          color: "#111827",
+                          color: "#1d1b18",
                           textAlign: "left",
                           transition: "background 0.12s ease, border-color 0.12s ease",
                         }}
@@ -473,8 +473,8 @@ export default function DashboardHome() {
                           e.currentTarget.style.borderColor = "#86efac";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#fafafa";
-                          e.currentTarget.style.borderColor = "#e5e7eb";
+                          e.currentTarget.style.background = "#faf7f2";
+                          e.currentTarget.style.borderColor = "#e6dfd4";
                         }}
                       >
                         <span>{item.icon}</span>
@@ -494,8 +494,8 @@ export default function DashboardHome() {
           <Panel title={t("Monitoring", "İzleme", "Surveillance", "Monitoreo", "Monitoraggio", "Überwachung")} subtitle={t("Action required", "İşlem gerekli", "Action requise", "Acción requerida", "Azione richiesta", "Aktion erforderlich")}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {stats.toShip > 0 && (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "#eff6ff", borderRadius: 10, border: "1px solid #bfdbfe" }}>
-                  <span style={{ fontSize: 13, color: "#1e40af" }}>🚚 <strong>{stats.toShip}</strong> {t("order(s) waiting to ship", "sipariş kargoya verilmeyi bekliyor", "commande(s) en attente d'expédition", "pedido(s) esperando envío", "ordine/i in attesa di spedizione", "Bestellung(en) warten auf Versand")}</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "#fcebd5", borderRadius: 10, border: "1px solid #f5d3a8" }}>
+                  <span style={{ fontSize: 13, color: "#7f3f00" }}>🚚 <strong>{stats.toShip}</strong> {t("order(s) waiting to ship", "sipariş kargoya verilmeyi bekliyor", "commande(s) en attente d'expédition", "pedido(s) esperando envío", "ordine/i in attesa di spedizione", "Bestellung(en) warten auf Versand")}</span>
                   <Button size="slim" onClick={() => router.push("/orders")}>{ui.edit}</Button>
                 </div>
               )}
@@ -515,19 +515,19 @@ export default function DashboardHome() {
         <Panel title={t("Open returns", "Açık iadeler", "Retours ouverts", "Devoluciones abiertas", "Resi aperti", "Offene Retouren")} subtitle={t("Overview", "Özet", "Aperçu", "Resumen", "Panoramica", "Kurzübersicht")} action={<Button variant="plain" onClick={() => router.push("/orders/returns")}>{ui.viewAll}</Button>} noPad>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr style={{ background: "#f9fafb" }}>
+              <tr style={{ background: "#faf7f2" }}>
                 {[t("Return", "İade", "Retour", "Devolución", "Reso", "Retoure"), ui.orders, ui.colCustomer, t("Reason", "Neden", "Raison", "Motivo", "Motivo", "Grund")].map((h) => (
-                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280" }}>{h}</th>
+                  <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#5e574e" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pendingReturns.slice(0, 4).map((r) => (
-                <tr key={r.id} style={{ borderTop: "1px solid #f3f4f6" }}>
+                <tr key={r.id} style={{ borderTop: "1px solid #f3eee6" }}>
                   <td style={{ padding: "10px 16px", fontWeight: 600 }}>R-{r.return_number || String(r.id).slice(0, 8)}</td>
                   <td style={{ padding: "10px 16px" }}>#{r.order_number || "—"}</td>
                   <td style={{ padding: "10px 16px" }}>{[r.first_name, r.last_name].filter(Boolean).join(" ") || "—"}</td>
-                  <td style={{ padding: "10px 16px", color: "#6b7280" }}>{r.reason || "—"}</td>
+                  <td style={{ padding: "10px 16px", color: "#5e574e" }}>{r.reason || "—"}</td>
                 </tr>
               ))}
             </tbody>

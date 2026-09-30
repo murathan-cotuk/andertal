@@ -16,7 +16,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -39,13 +39,13 @@ const StatCard = styled(Card)`
 const StatValue = styled.div`
   font-size: 32px;
   font-weight: 700;
-  color: #0ea5e9;
+  color: #ee8a12;
   margin-bottom: 8px;
 `;
 
 const StatLabel = styled.div`
   font-size: 14px;
-  color: #6b7280;
+  color: #5e574e;
 `;
 
 export default function OrdersReportsPage() {
@@ -92,7 +92,7 @@ export default function OrdersReportsPage() {
       <Title>{c.title}</Title>
 
       <Section>
-        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18", marginBottom: "16px" }}>
           {c.salesOverview}
         </h2>
         <StatsGrid>
@@ -116,10 +116,10 @@ export default function OrdersReportsPage() {
       </Section>
 
       <Section>
-        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18", marginBottom: "16px" }}>
           {c.exportReports}
         </h2>
-        <p style={{ color: "#6b7280", marginBottom: "16px" }}>
+        <p style={{ color: "#5e574e", marginBottom: "16px" }}>
           {c.exportDescription}
         </p>
         <div style={{ display: "flex", gap: "12px" }}>
@@ -128,7 +128,7 @@ export default function OrdersReportsPage() {
             disabled={exporting !== ""}
             style={{
               padding: "12px 24px",
-              backgroundColor: "#0ea5e9",
+              backgroundColor: "#ee8a12",
               color: "white",
               border: "none",
               borderRadius: "8px",
@@ -145,8 +145,8 @@ export default function OrdersReportsPage() {
             style={{
               padding: "12px 24px",
               backgroundColor: "white",
-              color: "#0ea5e9",
-              border: "2px solid #0ea5e9",
+              color: "#ee8a12",
+              border: "2px solid #ee8a12",
               borderRadius: "8px",
               cursor: "pointer",
               fontWeight: "600",

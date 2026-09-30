@@ -94,12 +94,12 @@ function SmtpSection({ copy, ui, smtpProviders }) {
               onClick={() => handleProvider(p.value)}
               style={{
                 padding: "10px 8px",
-                border: `2px solid ${form.provider === p.value ? "#008060" : "#e5e7eb"}`,
+                border: `2px solid ${form.provider === p.value ? "#ee8a12" : "#e6dfd4"}`,
                 borderRadius: 8,
                 background: form.provider === p.value ? "#f0fdf4" : "#fff",
                 fontSize: 12,
                 fontWeight: 600,
-                color: form.provider === p.value ? "#065f46" : "#374151",
+                color: form.provider === p.value ? "#065f46" : "#3a352f",
                 cursor: "pointer",
                 textAlign: "center",
               }}
@@ -448,9 +448,9 @@ function SmtpSendersSection({ onToast, copy, ui }) {
               alignItems: "center",
               gap: 12,
               padding: "12px 14px",
-              border: "1px solid #e5e7eb",
+              border: "1px solid #e6dfd4",
               borderRadius: 10,
-              background: "#fafafa",
+              background: "#faf7f2",
             }}
           >
             <span style={{ fontWeight: 600, minWidth: 180 }}>{row.from_email}</span>
@@ -464,7 +464,7 @@ function SmtpSendersSection({ onToast, copy, ui }) {
               title={row.last_test_message || ""}
               style={{
                 fontSize: 18,
-                color: row.last_test_ok === true ? "#047857" : row.last_test_ok === false ? "#b91c1c" : "#9ca3af",
+                color: row.last_test_ok === true ? "#047857" : row.last_test_ok === false ? "#b91c1c" : "#a39a8d",
               }}
             >
               {row.last_test_ok === true ? "✓" : row.last_test_ok === false ? "✗" : "—"}
@@ -651,7 +651,7 @@ function IntegrationsAccordion({
   return (
     <div
       style={{
-        border: "1px solid #e5e7eb",
+        border: "1px solid #e6dfd4",
         borderRadius: 10,
         overflow: "hidden",
         background: "#fff",
@@ -671,7 +671,7 @@ function IntegrationsAccordion({
           justifyContent: "space-between",
           gap: 12,
           padding: "12px 14px",
-          background: open ? "#f9fafb" : "#fff",
+          background: open ? "#faf7f2" : "#fff",
           border: "none",
           cursor: "pointer",
           textAlign: "left",
@@ -680,11 +680,11 @@ function IntegrationsAccordion({
         <span style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
           {logo}
           <span style={{ minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "#111827", lineHeight: 1.25 }}>
+            <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: "#1d1b18", lineHeight: 1.25 }}>
               {title}
             </span>
             {subtitle ? (
-              <span style={{ display: "block", fontSize: 12, color: "#6b7280", marginTop: 3, lineHeight: 1.35 }}>
+              <span style={{ display: "block", fontSize: 12, color: "#5e574e", marginTop: 3, lineHeight: 1.35 }}>
                 {subtitle}
               </span>
             ) : null}
@@ -695,7 +695,7 @@ function IntegrationsAccordion({
           <span
             style={{
               display: "inline-flex",
-              color: "#6b7280",
+              color: "#5e574e",
               transition: "transform 0.2s ease",
               transform: open ? "rotate(180deg)" : "rotate(0deg)",
             }}
@@ -710,7 +710,7 @@ function IntegrationsAccordion({
           role="region"
           aria-labelledby={`integrations-trigger-${sectionId}`}
           style={{
-            borderTop: "1px solid #e5e7eb",
+            borderTop: "1px solid #e6dfd4",
             padding: "16px 18px 20px",
             background: "#fff",
           }}
@@ -743,11 +743,11 @@ function AccordionLogoWrap({ bg, children }) {
 
 function LogoMail() {
   return (
-    <AccordionLogoWrap bg="#eff6ff">
+    <AccordionLogoWrap bg="#fcebd5">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path
           d="M4 6h16v12H4V6zm0 0 8 6 8-6"
-          stroke="#2563eb"
+          stroke="#a65300"
           strokeWidth="1.75"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -779,10 +779,10 @@ function LogoMarketing() {
 
 function LogoDocuments() {
   return (
-    <AccordionLogoWrap bg="#eff6ff">
+    <AccordionLogoWrap bg="#fcebd5">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="#1d4ed8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M14 2v6h6" stroke="#1d4ed8" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="#7f3f00" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 2v6h6" stroke="#7f3f00" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </AccordionLogoWrap>
   );
@@ -905,7 +905,7 @@ function DocumentSourcesSection({ ui, onFindInStore, onConfigureApp }) {
                       key={inst.id}
                       style={{
                         background: "#fff",
-                        border: `1px solid ${connected ? "#d1fae5" : "#e5e7eb"}`,
+                        border: `1px solid ${connected ? "#d1fae5" : "#e6dfd4"}`,
                         borderRadius: 10,
                         padding: "14px 16px",
                       }}

@@ -251,22 +251,22 @@ export default function AffiliateAdminPage() {
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                    <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                       {[c.colEmail, c.colCode, c.colCountry, c.colCreated, ""].map((h) => (
-                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {pending.map((a) => (
-                      <tr key={a.id} style={{ borderTop: "1px solid #f1f1f1" }}>
+                      <tr key={a.id} style={{ borderTop: "1px solid #f3eee6" }}>
                         <td style={{ padding: "12px 16px" }}>
-                          <div style={{ fontWeight: 600, color: "#111827" }}>{a.full_name || "—"}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{a.email}</div>
+                          <div style={{ fontWeight: 600, color: "#1d1b18" }}>{a.full_name || "—"}</div>
+                          <div style={{ fontSize: 11, color: "#a39a8d" }}>{a.email}</div>
                         </td>
                         <td style={{ padding: "12px 16px" }}><code>{a.code}</code></td>
                         <td style={{ padding: "12px 16px" }}>{a.country || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#6d7175" }}>{fmtDate(a.created_at, locale)}</td>
+                        <td style={{ padding: "12px 16px", color: "#5e574e" }}>{fmtDate(a.created_at, locale)}</td>
                         <td style={{ padding: "12px 16px", textAlign: "right" }}>
                           <InlineStack gap="150" align="end">
                             <Button size="slim" onClick={() => reject(a.id)}>{c.reject}</Button>
@@ -343,22 +343,22 @@ export default function AffiliateAdminPage() {
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                    <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                       {[c.colAffiliate, c.colType, c.colSeverity, c.colCreated, ""].map((h) => (
-                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {fraud.map((f) => (
-                      <tr key={f.id} style={{ borderTop: "1px solid #f1f1f1" }}>
+                      <tr key={f.id} style={{ borderTop: "1px solid #f3eee6" }}>
                         <td style={{ padding: "12px 16px" }}>
-                          <div style={{ fontWeight: 600, color: "#111827" }}>{f.affiliate_code}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{f.affiliate_email}</div>
+                          <div style={{ fontWeight: 600, color: "#1d1b18" }}>{f.affiliate_code}</div>
+                          <div style={{ fontSize: 11, color: "#a39a8d" }}>{f.affiliate_email}</div>
                         </td>
                         <td style={{ padding: "12px 16px" }}>{f.flag_type}</td>
                         <td style={{ padding: "12px 16px" }}><Badge tone={SEVERITY_TONE[f.severity] || "info"}>{f.severity}</Badge></td>
-                        <td style={{ padding: "12px 16px", color: "#6d7175" }}>{fmtDate(f.created_at, locale)}</td>
+                        <td style={{ padding: "12px 16px", color: "#5e574e" }}>{fmtDate(f.created_at, locale)}</td>
                         <td style={{ padding: "12px 16px", textAlign: "right" }}>
                           <InlineStack gap="150" align="end">
                             <Button size="slim" onClick={() => resolveFlag(f.id, "resolve")}>{c.resolve}</Button>
@@ -382,23 +382,23 @@ export default function AffiliateAdminPage() {
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                    <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                       {[c.colAffiliate, c.colAmount, c.colStatus, c.colPeriod, c.colCreated].map((h) => (
-                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {payouts.map((p) => (
-                      <tr key={p.id} style={{ borderTop: "1px solid #f1f1f1" }}>
+                      <tr key={p.id} style={{ borderTop: "1px solid #f3eee6" }}>
                         <td style={{ padding: "12px 16px" }}>
-                          <div style={{ fontWeight: 600, color: "#111827" }}>{p.affiliate_code}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{p.affiliate_email}</div>
+                          <div style={{ fontWeight: 600, color: "#1d1b18" }}>{p.affiliate_code}</div>
+                          <div style={{ fontSize: 11, color: "#a39a8d" }}>{p.affiliate_email}</div>
                         </td>
                         <td style={{ padding: "12px 16px", fontWeight: 600 }}>{fmtEur(p.amount_cents)}</td>
                         <td style={{ padding: "12px 16px" }}><Badge tone={PAYOUT_STATUS_TONE[p.status] || "info"}>{p.status}</Badge></td>
-                        <td style={{ padding: "12px 16px", color: "#6d7175" }}>{p.period_start ? `${fmtDate(p.period_start, locale)} – ${fmtDate(p.period_end, locale)}` : "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#6d7175" }}>{fmtDate(p.created_at, locale)}</td>
+                        <td style={{ padding: "12px 16px", color: "#5e574e" }}>{p.period_start ? `${fmtDate(p.period_start, locale)} – ${fmtDate(p.period_end, locale)}` : "—"}</td>
+                        <td style={{ padding: "12px 16px", color: "#5e574e" }}>{fmtDate(p.created_at, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -475,18 +475,18 @@ export default function AffiliateAdminPage() {
                 ) : (
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                      <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                         {[c.colAffiliate, c.colType, c.colAmount, c.colReason, c.colBy, c.colCreated].map((h) => (
-                          <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                          <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {adjustments.map((a) => (
-                        <tr key={a.id} style={{ borderTop: "1px solid #f1f1f1" }}>
+                        <tr key={a.id} style={{ borderTop: "1px solid #f3eee6" }}>
                           <td style={{ padding: "12px 16px" }}>
-                            <div style={{ fontWeight: 600, color: "#111827" }}>{a.affiliate_code}</div>
-                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{a.affiliate_email}</div>
+                            <div style={{ fontWeight: 600, color: "#1d1b18" }}>{a.affiliate_code}</div>
+                            <div style={{ fontSize: 11, color: "#a39a8d" }}>{a.affiliate_email}</div>
                           </td>
                           <td style={{ padding: "12px 16px" }}>
                             <Badge tone={a.source_type === "manual_bonus" ? "success" : "critical"}>
@@ -494,9 +494,9 @@ export default function AffiliateAdminPage() {
                             </Badge>
                           </td>
                           <td style={{ padding: "12px 16px", fontWeight: 700 }}>{fmtEur(a.commission_cents)}</td>
-                          <td style={{ padding: "12px 16px", color: "#374151" }}>{a.adjustment_reason || "—"}</td>
-                          <td style={{ padding: "12px 16px", color: "#6d7175" }}>{a.adjustment_by || "—"}</td>
-                          <td style={{ padding: "12px 16px", color: "#6d7175" }}>{fmtDate(a.created_at, locale)}</td>
+                          <td style={{ padding: "12px 16px", color: "#3a352f" }}>{a.adjustment_reason || "—"}</td>
+                          <td style={{ padding: "12px 16px", color: "#5e574e" }}>{a.adjustment_by || "—"}</td>
+                          <td style={{ padding: "12px 16px", color: "#5e574e" }}>{fmtDate(a.created_at, locale)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -532,25 +532,25 @@ export default function AffiliateAdminPage() {
                 ) : (
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                      <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                         {[c.colShortCode, c.colType, c.colTarget, c.colLinkStatus, c.colCreated, ""].map((h) => (
-                          <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                          <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {links.map((l) => (
-                        <tr key={l.id} style={{ borderTop: "1px solid #f1f1f1" }}>
+                        <tr key={l.id} style={{ borderTop: "1px solid #f3eee6" }}>
                           <td style={{ padding: "12px 16px" }}><code>/r/{l.short_code}</code></td>
                           <td style={{ padding: "12px 16px" }}>{l.type}</td>
                           <td style={{ padding: "12px 16px", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={l.target_url}>{l.target_url}</td>
                           <td style={{ padding: "12px 16px" }}>
                             <Badge tone={l.disabled_at ? "critical" : "success"}>{l.disabled_at ? c.linkDisabled : c.linkEnabled}</Badge>
                             {l.disabled_at && l.disabled_reason && (
-                              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{l.disabled_reason}</div>
+                              <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 2 }}>{l.disabled_reason}</div>
                             )}
                           </td>
-                          <td style={{ padding: "12px 16px", color: "#6d7175" }}>{fmtDate(l.created_at, locale)}</td>
+                          <td style={{ padding: "12px 16px", color: "#5e574e" }}>{fmtDate(l.created_at, locale)}</td>
                           <td style={{ padding: "12px 16px", textAlign: "right" }}>
                             <Button size="slim" tone={l.disabled_at ? undefined : "critical"} loading={linksBusyId === l.id} onClick={() => toggleLink(l)}>
                               {l.disabled_at ? c.enable : c.disable}

@@ -20,7 +20,7 @@ function fmtCents(c, locale) {
 }
 
 const STATUS_STYLE = {
-  in_cart: { bg: "#eff6ff", color: "#1d4ed8" },
+  in_cart: { bg: "#fcebd5", color: "#7f3f00" },
   purchased: { bg: "#f0fdf4", color: "#15803d" },
   deleted: { bg: "#fef2f2", color: "#b91c1c" },
 };
@@ -40,11 +40,11 @@ function ExpandedCart({ cart, locale }) {
   const items = cart.items || [];
   return (
     <tr>
-      <td colSpan={9} style={{ padding: 0, background: "#f9fafb" }}>
-        <div style={{ padding: "12px 24px 16px", borderBottom: "1px solid #e5e7eb" }}>
+      <td colSpan={9} style={{ padding: 0, background: "#faf7f2" }}>
+        <div style={{ padding: "12px 24px 16px", borderBottom: "1px solid #e6dfd4" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
-              <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <tr style={{ color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 <th style={{ textAlign: "left", padding: "4px 8px" }}>{c.product}</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>{c.qty}</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>{c.unitPrice}</th>
@@ -53,10 +53,10 @@ function ExpandedCart({ cart, locale }) {
             </thead>
             <tbody>
               {items.length === 0 && (
-                <tr><td colSpan={4} style={{ padding: "8px", color: "#9ca3af", textAlign: "center" }}>{c.noItems}</td></tr>
+                <tr><td colSpan={4} style={{ padding: "8px", color: "#a39a8d", textAlign: "center" }}>{c.noItems}</td></tr>
               )}
               {items.map((it, i) => (
-                <tr key={i} style={{ borderTop: "1px solid #e5e7eb" }}>
+                <tr key={i} style={{ borderTop: "1px solid #e6dfd4" }}>
                   <td style={{ padding: "6px 8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 4 }} />}
@@ -143,15 +143,15 @@ export default function AbandonedCheckoutsPage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{c.pageTitle}</h1>
-          <p style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 0" }}>{c.pageSubtitle}</p>
+          <p style={{ fontSize: 13, color: "#5e574e", margin: "4px 0 0" }}>{c.pageSubtitle}</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "#6b7280" }}>{filteredCarts.length} {c.carts}</span>
+          <span style={{ fontSize: 13, color: "#5e574e" }}>{filteredCarts.length} {c.carts}</span>
           {counts.in_cart > 0 && (
             <button
               onClick={bulkMarkRemoved}
               disabled={bulkMarking}
-              style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600, cursor: bulkMarking ? "default" : "pointer" }}
+              style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #e6dfd4", background: "#fff", color: "#3a352f", fontSize: 13, fontWeight: 600, cursor: bulkMarking ? "default" : "pointer" }}
             >
               {bulkMarking ? c.bulkMarking : c.bulkMarkRemovedBtn}
             </button>
@@ -167,9 +167,9 @@ export default function AbandonedCheckoutsPage() {
             style={{
               padding: "7px 14px",
               borderRadius: 8,
-              border: tab === t.key ? "1px solid #2563eb" : "1px solid #e5e7eb",
-              background: tab === t.key ? "#eff6ff" : "#fff",
-              color: tab === t.key ? "#1d4ed8" : "#374151",
+              border: tab === t.key ? "1px solid #a65300" : "1px solid #e6dfd4",
+              background: tab === t.key ? "#fcebd5" : "#fff",
+              color: tab === t.key ? "#7f3f00" : "#3a352f",
               fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
@@ -180,12 +180,12 @@ export default function AbandonedCheckoutsPage() {
         ))}
       </div>
 
-      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "auto" }}>
+      <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e6dfd4", overflow: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+            <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
               {COLS.map((c, i) => (
-                <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, fontSize: 11, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
                   {c}
                 </th>
               ))}
@@ -193,11 +193,11 @@ export default function AbandonedCheckoutsPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
+              <tr><td colSpan={9} style={{ padding: 40, textAlign: "center", color: "#a39a8d" }}>{ui.loading}</td></tr>
             )}
             {!loading && filteredCarts.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
+                <td colSpan={9} style={{ padding: "60px 20px", textAlign: "center", color: "#a39a8d" }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🛒</div>
                   <div>{c.noCheckouts}</div>
                 </td>
@@ -206,30 +206,30 @@ export default function AbandonedCheckoutsPage() {
             {filteredCarts.map((cart) => (
               <React.Fragment key={cart.id}>
                 <tr
-                  style={{ borderBottom: "1px solid #f3f4f6" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+                  style={{ borderBottom: "1px solid #f3eee6" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#faf7f2"}
                   onMouseLeave={e => e.currentTarget.style.background = ""}
                 >
                   <td style={{ padding: "10px 8px 10px 12px", width: 32 }}>
                     <button onClick={() => setExpanded(e => ({ ...e, [cart.id]: !e[cart.id] }))}
-                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#6b7280", padding: 0 }}>
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#5e574e", padding: 0 }}>
                       {expanded[cart.id] ? "▼" : "▶"}
                     </button>
                   </td>
                   <td style={{ padding: "10px 12px", fontWeight: 500 }}>
                     {[cart.first_name, cart.last_name].filter(Boolean).join(" ") || "—"}
                   </td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? (cart.email || "—") : "—"}</td>
+                  <td style={{ padding: "10px 12px", color: "#5e574e" }}>{isSuperuser ? (cart.email || "—") : "—"}</td>
                   <td style={{ padding: "10px 12px", textAlign: "center" }}>
-                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#eff6ff", color: "#1d4ed8" }}>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600, background: "#fcebd5", color: "#7f3f00" }}>
                       {c.itemCount(cart.item_count || 0)}
                     </span>
                   </td>
                   <td style={{ padding: "10px 12px", fontWeight: 600 }}>
                     {fmtCents(cart.cart_total, locale)}
                   </td>
-                  <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280" }}>{fmtDate(cart.created_at, locale)}</td>
-                  <td style={{ padding: "10px 12px", fontSize: 12, color: "#6b7280" }}>{fmtDate(cart.updated_at, locale)}</td>
+                  <td style={{ padding: "10px 12px", fontSize: 12, color: "#5e574e" }}>{fmtDate(cart.created_at, locale)}</td>
+                  <td style={{ padding: "10px 12px", fontSize: 12, color: "#5e574e" }}>{fmtDate(cart.updated_at, locale)}</td>
                   <td style={{ padding: "10px 12px" }}>
                     <StatusBadge status={cart.status} copy={c} />
                   </td>
@@ -238,7 +238,7 @@ export default function AbandonedCheckoutsPage() {
                       <button
                         onClick={() => markRemoved(cart.id)}
                         disabled={markingId === cart.id}
-                        style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", color: "#374151", fontSize: 11, fontWeight: 600, cursor: markingId === cart.id ? "default" : "pointer", whiteSpace: "nowrap" }}
+                        style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #e6dfd4", background: "#fff", color: "#3a352f", fontSize: 11, fontWeight: 600, cursor: markingId === cart.id ? "default" : "pointer", whiteSpace: "nowrap" }}
                       >
                         {markingId === cart.id ? c.marking : c.markRemoved}
                       </button>

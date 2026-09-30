@@ -266,8 +266,8 @@ export default function CustomerNewsletterSubscribersPage() {
     const status = String(statusRaw || "active").toLowerCase();
     if (status === "active") return { label: t.status_active, bg: "#dcfce7", color: "#166534" };
     if (status === "unsubscribed") return { label: t.status_unsubscribed, bg: "#fee2e2", color: "#991b1b" };
-    if (status === "deactivated") return { label: t.status_deactivated, bg: "#e5e7eb", color: "#374151" };
-    return { label: status, bg: "#f3f4f6", color: "#4b5563" };
+    if (status === "deactivated") return { label: t.status_deactivated, bg: "#e6dfd4", color: "#3a352f" };
+    return { label: status, bg: "#f3eee6", color: "#4b5563" };
   };
 
   return (
@@ -299,7 +299,7 @@ export default function CustomerNewsletterSubscribersPage() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  style={{ minWidth: 170, padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8 }}
+                  style={{ minWidth: 170, padding: "8px 10px", border: "1px solid #d6ccbd", borderRadius: 8 }}
                 >
                   <option value="all">{t.allStatuses}</option>
                   <option value="active">{t.status_active}</option>
@@ -330,7 +330,7 @@ export default function CustomerNewsletterSubscribersPage() {
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                    <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                       {[t.colEmail, t.colName, t.colSource, t.colStatus, t.colLocale, t.colDate, t.colActions].map((h) => (
                         <th
                           key={h}
@@ -339,7 +339,7 @@ export default function CustomerNewsletterSubscribersPage() {
                             textAlign: "left",
                             fontWeight: 600,
                             fontSize: 11,
-                            color: "#6b7280",
+                            color: "#5e574e",
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             whiteSpace: "nowrap",
@@ -353,14 +353,14 @@ export default function CustomerNewsletterSubscribersPage() {
                   <tbody>
                     {loading && (
                       <tr>
-                        <td colSpan={7} style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>
+                        <td colSpan={7} style={{ padding: 36, textAlign: "center", color: "#a39a8d" }}>
                           {t.loading}
                         </td>
                       </tr>
                     )}
                     {!loading && filtered.length === 0 && (
                       <tr>
-                        <td colSpan={7} style={{ padding: 36, textAlign: "center", color: "#9ca3af" }}>
+                        <td colSpan={7} style={{ padding: 36, textAlign: "center", color: "#a39a8d" }}>
                           {t.noData}
                         </td>
                       </tr>
@@ -369,42 +369,42 @@ export default function CustomerNewsletterSubscribersPage() {
                       filtered.map((s, i) => (
                         <tr
                           key={s.id || i}
-                          style={{ borderBottom: "1px solid #f3f4f6" }}
+                          style={{ borderBottom: "1px solid #f3eee6" }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#fafafa";
+                            e.currentTarget.style.background = "#faf7f2";
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = "";
                           }}
                         >
-                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                          <td style={{ padding: "10px 12px", color: "#5e574e", fontSize: 12 }}>
                             {s.email || "—"}
                           </td>
-                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                          <td style={{ padding: "10px 12px", color: "#5e574e", fontSize: 12 }}>
                             {[s.first_name, s.last_name].filter(Boolean).join(" ") || "—"}
                           </td>
-                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12, textTransform: "capitalize" }}>
+                          <td style={{ padding: "10px 12px", color: "#5e574e", fontSize: 12, textTransform: "capitalize" }}>
                             {String(s.source || "landing_page").replace(/_/g, " ")}
                           </td>
-                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                          <td style={{ padding: "10px 12px", color: "#5e574e", fontSize: 12 }}>
                             <select
                               value={String(s.status || "active")}
                               disabled={busyId === s.id}
                               onChange={(e) => setStatus(s.id, e.target.value)}
-                              style={{ padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 8 }}
+                              style={{ padding: "5px 8px", border: "1px solid #d6ccbd", borderRadius: 8 }}
                             >
                               <option value="active">{t.status_active}</option>
                               <option value="unsubscribed">{t.status_unsubscribed}</option>
                               <option value="deactivated">{t.status_deactivated}</option>
                             </select>
                           </td>
-                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                          <td style={{ padding: "10px 12px", color: "#5e574e", fontSize: 12 }}>
                             {String(s.preferred_locale || "—").toUpperCase()}
                           </td>
-                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                          <td style={{ padding: "10px 12px", color: "#5e574e", fontSize: 12 }}>
                             {fmtDate(s.subscribed_at)}
                           </td>
-                          <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                          <td style={{ padding: "10px 12px", color: "#5e574e", fontSize: 12 }}>
                             <InlineStack gap="200">
                               <Button size="slim" onClick={() => router.push(`/customers/newsletter/${s.id}`)}>
                                 {t.open}

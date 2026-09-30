@@ -641,7 +641,7 @@ function RankingTable({ products, onBreakdown, strategy, t, router, maxScore }) 
           <ScoreBar key={`pop-${p.product_id}`} value={parseFloat(p.popularity_score)} color="#6366f1" />,
           <ScoreBar key={`fr-${p.product_id}`} value={parseFloat(p.freshness_override || p.freshness_score)} color="#10b981" />,
           <ScoreBar key={`v-${p.product_id}`} value={parseFloat(p.velocity_score)} color="#f59e0b" />,
-          <ScoreBar key={`c-${p.product_id}`} value={parseFloat(p.content_score)} color="#3b82f6" />,
+          <ScoreBar key={`c-${p.product_id}`} value={parseFloat(p.content_score)} color="#ee8a12" />,
           parseFloat(p.discount_pct) > 0 ? (
             <Badge key={`d-${p.product_id}`} tone="success">
               {parseFloat(p.discount_pct).toFixed(0)}%
@@ -812,7 +812,7 @@ function BreakdownModal({ productId, strategy, onClose, locale }) {
   const contribRows = [
     { key: "popularity", label: locale === "en" ? "Popularity" : locale === "tr" ? "Popülerlik" : locale === "fr" ? "Popularité" : locale === "es" ? "Popularidad" : locale === "it" ? "Popolarità" : "Popularität", color: "#6366f1" },
     { key: "freshness", label: locale === "en" ? "Freshness" : locale === "tr" ? "Tazelik" : locale === "fr" ? "Fraîcheur" : locale === "es" ? "Frescura" : locale === "it" ? "Freschezza" : "Frische", color: "#10b981" },
-    { key: "content", label: locale === "en" ? "Content" : locale === "tr" ? "İçerik" : locale === "fr" ? "Contenu" : locale === "es" ? "Contenido" : locale === "it" ? "Contenuto" : "Inhalt", color: "#3b82f6" },
+    { key: "content", label: locale === "en" ? "Content" : locale === "tr" ? "İçerik" : locale === "fr" ? "Contenu" : locale === "es" ? "Contenido" : locale === "it" ? "Contenuto" : "Inhalt", color: "#ee8a12" },
     { key: "discount", label: locale === "en" ? "Discount" : locale === "tr" ? "İndirim" : locale === "fr" ? "Remise" : locale === "es" ? "Descuento" : locale === "it" ? "Sconto" : "Rabatt", color: "#f59e0b" },
     { key: "seller", label: locale === "en" ? "Seller" : locale === "tr" ? "Satıcı" : locale === "fr" ? "Vendeur" : locale === "es" ? "Vendedor" : locale === "it" ? "Venditore" : "Verkäufer", color: "#ec4899" },
     { key: "velocity", label: locale === "en" ? "Trend" : locale === "tr" ? "Trend" : locale === "fr" ? "Tendance" : locale === "es" ? "Tendencia" : locale === "it" ? "Trend" : "Trend", color: "#f97316" },

@@ -26,19 +26,19 @@ function LocaleSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "#374151", fontSize: 13, fontWeight: 600 }}
+        style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "#3a352f", fontSize: 13, fontWeight: 600 }}
       >
         {current.label}
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       {open && (
-        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 50, minWidth: 80 }}>
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 50, minWidth: 80 }}>
           {LOCALES.map((l) => (
             <button
               key={l.code}
               type="button"
               onClick={() => { router.replace(pathname, { locale: l.code }); setOpen(false); }}
-              style={{ display: "block", width: "100%", padding: "8px 14px", background: l.code === locale ? "#f3f4f6" : "transparent", border: "none", cursor: "pointer", fontSize: 13, fontWeight: l.code === locale ? 700 : 400, textAlign: "left", color: "#111827" }}
+              style={{ display: "block", width: "100%", padding: "8px 14px", background: l.code === locale ? "#f3eee6" : "transparent", border: "none", cursor: "pointer", fontSize: 13, fontWeight: l.code === locale ? 700 : 400, textAlign: "left", color: "#1d1b18" }}
             >
               {l.label}
             </button>
@@ -146,7 +146,7 @@ function RegisterForm() {
     }
   };
 
-  const inputStyle = { width: "100%", padding: "10px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" };
+  const inputStyle = { width: "100%", padding: "10px 14px", border: "1.5px solid #d6ccbd", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" };
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f6f2ec", overflowX: "hidden", overflowY: "auto", touchAction: "pan-y", overscrollBehaviorX: "none", WebkitOverflowScrolling: "touch", padding: "16px", boxSizing: "border-box" }}>
@@ -165,39 +165,39 @@ function RegisterForm() {
         </div>
         <div style={{ background: "#fff", borderRadius: 24, padding: "clamp(20px, 5vw, 40px) clamp(16px, 4vw, 36px)", boxShadow: "0 0 0 1px rgba(29,27,24,0.06)" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{isInvited ? t("titleInvited") : t("title")}</h1>
-            <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>{isInvited ? t("subtitleInvited") : t("subtitle")}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: "#1d1b18", margin: "0 0 6px" }}>{isInvited ? t("titleInvited") : t("title")}</h1>
+            <p style={{ color: "#5e574e", fontSize: 15, margin: 0 }}>{isInvited ? t("subtitleInvited") : t("subtitle")}</p>
           </div>
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {isInvited ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("firstName")} *</label>
+                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("firstName")} *</label>
                   <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required style={inputStyle} placeholder={t("firstNamePlaceholder")} />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("lastName")} *</label>
+                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("lastName")} *</label>
                   <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required style={inputStyle} placeholder={t("lastNamePlaceholder")} />
                 </div>
               </div>
             ) : (
               <div>
-                <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("storeName")} *</label>
+                <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("storeName")} *</label>
                 <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} required style={inputStyle} placeholder={t("storeNamePlaceholder")} />
               </div>
             )}
             <div>
-              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("email")} *</label>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("email")} *</label>
               <input
                 type="email" value={email}
                 onChange={(e) => !isInvited && setEmail(e.target.value)}
                 required readOnly={isInvited}
-                style={{ ...inputStyle, background: isInvited ? "#f9fafb" : "#fff" }}
+                style={{ ...inputStyle, background: isInvited ? "#faf7f2" : "#fff" }}
                 placeholder={t("emailPlaceholder")}
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("password")} *</label>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("password")} *</label>
               <div style={{ position: "relative" }}>
                 <input
                   type={showPassword ? "text" : "password"} value={password}
@@ -209,7 +209,7 @@ function RegisterForm() {
                   e.preventDefault();
                   setShowPassword((v) => !v);
                 }}
-                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 0, display: "flex", alignItems: "center", zIndex: 2, touchAction: "manipulation" }}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#5e574e", padding: 0, display: "flex", alignItems: "center", zIndex: 2, touchAction: "manipulation" }}
                   tabIndex={-1}>
                   {showPassword ? (
                     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0 1 12 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 0 1 1.563-3.029m5.858.908a3 3 0 1 1 4.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88 6.59 6.59m7.532 7.532 3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0 1 12 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 0 1-4.132 5.411m0 0L21 21" /></svg>
@@ -230,7 +230,7 @@ function RegisterForm() {
                   setAgreementAccepted((v) => !v);
                 }
               }}
-              style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 14, color: "#374151" }}
+              style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", fontSize: 14, color: "#3a352f" }}
             >
               {/* CustomCheckbox already renders its own <label> around a hidden native
                   checkbox — wrapping it in ANOTHER <label> here (as before) is invalid nested
@@ -248,10 +248,10 @@ function RegisterForm() {
               <span>
                 {t.rich("agreeText", {
                   terms: (chunks) => (
-                    <a href="/terms" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#1f2937", textDecoration: "underline" }}>{chunks}</a>
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#1d1b18", textDecoration: "underline" }}>{chunks}</a>
                   ),
                   privacy: (chunks) => (
-                    <a href="/privacy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#1f2937", textDecoration: "underline" }}>{chunks}</a>
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: "#1d1b18", textDecoration: "underline" }}>{chunks}</a>
                   ),
                 })} *
               </span>
@@ -263,12 +263,12 @@ function RegisterForm() {
               <div style={{ background: "#d1fae5", border: "1px solid #10b981", borderRadius: 8, padding: "12px 14px", color: "#065f46", fontSize: 14 }}>{success}</div>
             )}
             <button type="submit" disabled={loading}
-              style={{ padding: "12px", background: loading ? "#9ca3af" : "#1d1b18", color: "#fff", border: "none", borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
+              style={{ padding: "12px", background: loading ? "#a39a8d" : "#1d1b18", color: "#fff", border: "none", borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
               {loading ? t("submitting") : (isInvited ? t("submitInvited") : t("submit"))}
             </button>
           </form>
-          <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-            <Link href="/login" style={{ color: "#1f2937", fontWeight: 600, textDecoration: "none" }}>{t("alreadyHaveAccount")}</Link>
+          <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#5e574e" }}>
+            <Link href="/login" style={{ color: "#1d1b18", fontWeight: 600, textDecoration: "none" }}>{t("alreadyHaveAccount")}</Link>
           </p>
         </div>
       </div>

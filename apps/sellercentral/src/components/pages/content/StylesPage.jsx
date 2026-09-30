@@ -770,17 +770,17 @@ function AccordionCard({ title, subtitle, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Layout.Section>
-      <div style={{ border: "1px solid #e1e3e5", borderRadius: 12, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+      <div style={{ border: "1px solid #e6dfd4", borderRadius: 12, overflow: "hidden", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
           style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", background: open ? "#fafbfc" : "#fff", border: "none", cursor: "pointer", textAlign: "left", gap: 12, transition: "background 0.15s" }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{title}</div>
-            {subtitle && <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{subtitle}</div>}
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1d1b18" }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 13, color: "#5e574e", marginTop: 2 }}>{subtitle}</div>}
           </div>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth="2.5" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }}>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#a39a8d" strokeWidth="2.5" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
           </svg>
         </button>
@@ -1220,7 +1220,7 @@ function ProductBadgesCard({ locale, client, ui }) {
                 )}
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{posLabel(locale, b.position)}</div>
-                  <div style={{ fontSize: 12, color: "#6d7175" }}>{targetSummary(b)}</div>
+                  <div style={{ fontSize: 12, color: "#5e574e" }}>{targetSummary(b)}</div>
                 </div>
               </InlineStack>
               <InlineStack gap="200" blockAlign="center">
@@ -1887,13 +1887,13 @@ export default function StylesPage() {
                       loop
                       playsInline
                       autoPlay
-                      style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
+                      style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e6dfd4", background: "#fff" }}
                     />
                   ) : (
                     <img
                       src={branding.not_found_image_url}
                       alt=""
-                      style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff" }}
+                      style={{ width: 120, height: 120, objectFit: "contain", borderRadius: 8, border: "1px solid #e6dfd4", background: "#fff" }}
                     />
                   )
                 ) : (
@@ -1934,7 +1934,7 @@ export default function StylesPage() {
             <BlockStack gap="500">
 
               {/* Device tabs */}
-              <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e5e7eb" }}>
+              <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #e6dfd4" }}>
                 {["desktop", "tablet", "mobile"].map((d) => (
                   <button
                     key={d}
@@ -1943,8 +1943,8 @@ export default function StylesPage() {
                     style={{
                       padding: "8px 20px", border: "none", background: "transparent", cursor: "pointer",
                       fontSize: 13, fontWeight: logoActiveDevice === d ? 700 : 500,
-                      color: logoActiveDevice === d ? "#111827" : "#6b7280",
-                      borderBottom: logoActiveDevice === d ? "2px solid #1f2937" : "2px solid transparent",
+                      color: logoActiveDevice === d ? "#1d1b18" : "#5e574e",
+                      borderBottom: logoActiveDevice === d ? "2px solid #1d1b18" : "2px solid transparent",
                       marginBottom: -1,
                     }}
                   >
@@ -1972,7 +1972,7 @@ export default function StylesPage() {
                   }));
                 const pickerKey = `logo_${section}_${logoActiveDevice}`;
                 return (
-                  <div key={section} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
+                  <div key={section} style={{ border: "1px solid #e6dfd4", borderRadius: 10, padding: 16 }}>
                     <Text as="h3" variant="headingSm">{label} — {logoActiveDevice === "desktop" ? "Desktop" : logoActiveDevice === "tablet" ? "Tablet" : "Mobile"}</Text>
                     <div style={{ marginTop: 12 }}>
                       <InlineStack gap="200" blockAlign="end" wrap>
@@ -2007,7 +2007,7 @@ export default function StylesPage() {
                           <div style={{ marginTop: 8, marginBottom: 14 }}>
                             <button
                               type="button"
-                              style={{ fontSize: 12, color: "#008060", background: "none", border: "1px solid #008060", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}
+                              style={{ fontSize: 12, color: "#ee8a12", background: "none", border: "1px solid #ee8a12", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}
                               onClick={() => {
                                 const img = new Image();
                                 img.onload = () => {
@@ -2029,14 +2029,14 @@ export default function StylesPage() {
                               { k: "pl", label: locale === "de" ? "Links" : locale === "tr" ? "Sol" : locale === "fr" ? "Gauche" : locale === "es" ? "Izquierda" : locale === "it" ? "Sinistra" : "Left" },
                             ].map(({ k, label: pl }) => (
                               <div key={k}>
-                                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>{pl}</div>
+                                <div style={{ fontSize: 11, color: "#5e574e", marginBottom: 3 }}>{pl}</div>
                                 <NumericInput
                                   value={dev[k] ?? 0}
                                   min={0}
                                   max={80}
                                   fallback={0}
                                   onChange={(n) => updateDev({ [k]: n })}
-                                  style={{ width: "100%", padding: "6px 8px", border: "1.5px solid #d1d5db", borderRadius: 6, fontSize: 13, textAlign: "center", boxSizing: "border-box" }}
+                                  style={{ width: "100%", padding: "6px 8px", border: "1.5px solid #d6ccbd", borderRadius: 6, fontSize: 13, textAlign: "center", boxSizing: "border-box" }}
                                 />
                               </div>
                             ))}
@@ -2045,7 +2045,7 @@ export default function StylesPage() {
 
                         {/* Live preview */}
                         <div style={{
-                          background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 8,
+                          background: "#f3eee6", border: "1px solid #e6dfd4", borderRadius: 8,
                           display: "inline-flex", alignItems: "center", justifyContent: "center",
                           minWidth: 80,
                         }}>
@@ -2586,7 +2586,7 @@ export default function StylesPage() {
                     { device: "tablet", label: locale === "de" ? "Tablet (768–1023px)" : "Tablet (768–1023px)" },
                     { device: "mobile", label: locale === "de" ? "Mobil (≤767px)" : locale === "tr" ? "Mobil (≤767px)" : "Mobile (≤767px)" },
                   ].map(({ device, label }) => (
-                    <div key={device} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
+                    <div key={device} style={{ border: "1px solid #e6dfd4", borderRadius: 8, padding: 12 }}>
                       <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued" style={{ marginBottom: 8 }}>{label}</Text>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginTop: 8 }}>
                         <ColorField
@@ -2836,7 +2836,7 @@ export default function StylesPage() {
                   textHelp: c.emptyGlobalText,
                 },
               ].map(({ device, bgKey, borderKey, textKey, activeKey, bgScrollKey, textScrollKey, label, bgLabel, borderLabel, textLabel, activeLabel, bgHelp, borderHelp, textHelp }) => (
-                <div key={device} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 14, marginBottom: 8 }}>
+                <div key={device} style={{ border: "1px solid #e6dfd4", borderRadius: 8, padding: 14, marginBottom: 8 }}>
                   <Text as="p" variant="bodySm" fontWeight="semibold">{label}</Text>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12, marginTop: 12 }}>
                     <TextField label={`${bgLabel} (${locale === "de" ? "Statisch" : locale === "tr" ? "Sabit" : "Static"})`} value={styles.secondNav[bgKey] ?? ""} onChange={(v) => updateSection("secondNav", bgKey, v)} placeholder={c.emptyFallbackBg} autoComplete="off" helpText={bgHelp} />

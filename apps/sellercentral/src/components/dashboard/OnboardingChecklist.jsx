@@ -171,22 +171,22 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
   if (visible.length === 0 && skippedItems.length === 0) return null;
 
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", marginBottom: 20, overflow: "hidden" }}>
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#111827" }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e6dfd4", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", marginBottom: 20, overflow: "hidden" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3eee6" }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1d1b18" }}>
           {t("Get set up", "Kurulumu tamamla", "Terminez votre configuration", "Complete su configuración", "Completa la configurazione", "Einrichtung abschließen")}
         </h2>
-        <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: "#5e574e" }}>
           {t("A few steps before you're ready to sell", "Satışa hazır olmadan önce birkaç adım", "Quelques étapes avant d'être prêt à vendre", "Unos pasos antes de estar listo para vender", "Alcuni passaggi prima di essere pronto a vendere", "Ein paar Schritte, bevor Sie verkaufsbereit sind")}
         </p>
       </div>
       <div style={{ padding: "8px 20px 16px" }}>
         {visible.map((it) => (
-          <div key={it.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+          <div key={it.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: "1px solid #f3eee6" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 6, border: "2px solid #d1d5db" }} />
+              <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 6, border: "2px solid #d6ccbd" }} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>
                   {it.label}
                   {it.required ? (
                     <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: "#b45309", textTransform: "uppercase" }}>
@@ -194,7 +194,7 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
                     </span>
                   ) : null}
                 </div>
-                <div style={{ fontSize: 12, color: "#9ca3af" }}>{it.sub}</div>
+                <div style={{ fontSize: 12, color: "#a39a8d" }}>{it.sub}</div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
@@ -211,7 +211,7 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
         ))}
         {skippedItems.length > 0 && (
           <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-            <span style={{ fontSize: 11, color: "#9ca3af", alignSelf: "center" }}>
+            <span style={{ fontSize: 11, color: "#a39a8d", alignSelf: "center" }}>
               {t("Postponed:", "Ertelenen:", "Reporté :", "Pospuesto:", "Rinviato:", "Zurückgestellt:")}
             </span>
             {skippedItems.map((it) => (
@@ -219,7 +219,7 @@ export default function OnboardingChecklist({ locale, isSuperuser }) {
                 key={it.key}
                 type="button"
                 onClick={() => toggleSkip(it.key)}
-                style={{ fontSize: 11, padding: "3px 8px", borderRadius: 20, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#6b7280", cursor: "pointer" }}
+                style={{ fontSize: 11, padding: "3px 8px", borderRadius: 20, border: "1px solid #e6dfd4", background: "#faf7f2", color: "#5e574e", cursor: "pointer" }}
               >
                 {it.label} · {t("show again", "tekrar göster", "réafficher", "mostrar de nuevo", "mostra di nuovo", "wieder anzeigen")}
               </button>

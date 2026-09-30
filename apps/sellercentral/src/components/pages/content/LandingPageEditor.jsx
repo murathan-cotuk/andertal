@@ -2055,7 +2055,7 @@ function BestsellerCarouselEditor({ container, onChange, deviceTab = 0, editLang
           noneLabel={c.chooseCategory}
           placeholder={c.chooseCategoryPh}
         />
-        <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280" }}>{c.bestsellerCategoryHelp}</div>
+        <div style={{ marginTop: 4, fontSize: 12, color: "#5e574e" }}>{c.bestsellerCategoryHelp}</div>
       </div>
       <TextField
         label={c.catalogLimit}
@@ -5342,8 +5342,8 @@ export default function LandingPageEditor() {
                                               cursor: "grab",
                                               opacity: isDragging ? 0.4 : 1,
                                               background: isSelected ? "var(--p-color-bg-surface-selected, #f1f5ff)" : "transparent",
-                                              border: isSelected ? "1px solid var(--p-color-border-emphasis, #2c6ecb)" : "1px solid transparent",
-                                              borderTop: isDragOver ? "2px solid var(--p-color-border-emphasis, #2c6ecb)" : undefined,
+                                              border: isSelected ? "1px solid var(--p-color-border-emphasis, #a65300)" : "1px solid transparent",
+                                              borderTop: isDragOver ? "2px solid var(--p-color-border-emphasis, #a65300)" : undefined,
                                             }}
                                           >
                                             <Text as="span" tone="subdued">⠿</Text>
@@ -5712,7 +5712,7 @@ export default function LandingPageEditor() {
                   <div
                     key={preset.id}
                     style={{
-                      border: "1px solid var(--p-color-border, #e1e3e5)",
+                      border: "1px solid var(--p-color-border, #e6dfd4)",
                       borderRadius: 10,
                       background: "#FCEBD5",
                       padding: 14,
@@ -5758,7 +5758,7 @@ export default function LandingPageEditor() {
                           <div
                             key={tpl.id}
                             style={{
-                              border: "1px solid var(--p-color-border, #e1e3e5)",
+                              border: "1px solid var(--p-color-border, #e6dfd4)",
                               borderRadius: 10,
                               background: "var(--p-color-bg-surface, #fff)",
                               padding: 12,
@@ -5801,10 +5801,10 @@ export default function LandingPageEditor() {
                         tabIndex={0}
                         onClick={() => addContainer(t.type)}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); addContainer(t.type); } }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--p-color-border-emphasis, #2c6ecb)"; e.currentTarget.style.boxShadow = "0 0 0 1px var(--p-color-border-emphasis, #2c6ecb)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--p-color-border, #e1e3e5)"; e.currentTarget.style.boxShadow = "none"; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--p-color-border-emphasis, #a65300)"; e.currentTarget.style.boxShadow = "0 0 0 1px var(--p-color-border-emphasis, #a65300)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--p-color-border, #e6dfd4)"; e.currentTarget.style.boxShadow = "none"; }}
                         style={{
-                          border: "1px solid var(--p-color-border, #e1e3e5)",
+                          border: "1px solid var(--p-color-border, #e6dfd4)",
                           borderRadius: 10,
                           background: "var(--p-color-bg-surface, #fff)",
                           padding: 12,

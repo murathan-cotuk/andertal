@@ -36,7 +36,7 @@ import RevenueAreaChart from "@/components/dashboard/RevenueAreaChart";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BRAND = "#ff971c";
+const BRAND = "#ee8a12";
 
 // DATE_RANGES values are API params — labels are resolved at render time via locale
 const DATE_RANGE_VALUES = [

@@ -1014,8 +1014,8 @@ export default function PolarisLayout({ children }) {
               )}
             </button>
             {notifOpen && (
-              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 400, maxWidth: "calc(100vw - 24px)", background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e5e7eb", zIndex: 9999 }}>
-                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3f4f6", fontSize: 13, fontWeight: 700, color: "#111827" }}>{notifCopy.title}</div>
+              <div style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", width: 400, maxWidth: "calc(100vw - 24px)", background: "#fff", borderRadius: 10, boxShadow: "0 8px 32px rgba(0,0,0,0.15)", border: "1px solid #e6dfd4", zIndex: 9999 }}>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #f3eee6", fontSize: 13, fontWeight: 700, color: "#1d1b18" }}>{notifCopy.title}</div>
                 <div style={{ maxHeight: 420, overflowY: "auto" }}>
                   {(!notifData?.recent_orders?.length &&
                     !notifData?.recent_returns?.length &&
@@ -1027,11 +1027,11 @@ export default function PolarisLayout({ children }) {
                     !notifData?.recent_seller_listings_pending?.length &&
                     !notifData?.recent_brand_authorizations_pending?.length &&
                     !notifData?.recent_eu_origin_pending?.length) ? (
-                    <div style={{ padding: "24px 16px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>{notifCopy.empty}</div>
+                    <div style={{ padding: "24px 16px", textAlign: "center", color: "#a39a8d", fontSize: 13 }}>{notifCopy.empty}</div>
                   ) : (
                     <>
                       {(notifData?.recent_support_cases || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.supportCases}
                         </div>
                       )}
@@ -1040,19 +1040,19 @@ export default function PolarisLayout({ children }) {
                           key={c.id}
                           href={`/inbox?case=${encodeURIComponent(c.reference_id || "")}`}
                           onClick={() => setNotifOpen(false)}
-                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}
                         >
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>💬</span>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.title || notifCopy.newSupportCase}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2, whiteSpace: "pre-line", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{c.title || notifCopy.newSupportCase}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e", lineHeight: 1.35, marginTop: 2, whiteSpace: "pre-line", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                               {String(c.body || "").split("\n")[0]}
                             </div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_seller_errors || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.sellerErrors}
                         </div>
                       )}
@@ -1061,21 +1061,21 @@ export default function PolarisLayout({ children }) {
                           key={e.id}
                           href="/sellers/errors"
                           onClick={() => setNotifOpen(false)}
-                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}
                         >
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>⚠️</span>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>
                               {notifCopy.sellerErrorTitle(e.store_name || e.seller_email || e.seller_id || "—")}
                             </div>
-                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: "#5e574e", lineHeight: 1.35, marginTop: 2 }}>
                               {e.error_code ? `[${e.error_code}] ` : ""}{String(e.error_message || "").slice(0, 120)}
                             </div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_campaigns_submitted || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.campaigns}
                         </div>
                       )}
@@ -1084,17 +1084,17 @@ export default function PolarisLayout({ children }) {
                           key={c.id}
                           href={c.reference_id ? `/marketing/campaigns/${c.reference_id}` : "/marketing/campaigns"}
                           onClick={() => setNotifOpen(false)}
-                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}
                         >
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📣</span>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.title || notifCopy.newCampaign}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2 }}>{c.body || ""}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{c.title || notifCopy.newCampaign}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e", lineHeight: 1.35, marginTop: 2 }}>{c.body || ""}</div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_brand_authorizations_pending || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.brandAuthorizations}
                         </div>
                       )}
@@ -1103,33 +1103,33 @@ export default function PolarisLayout({ children }) {
                           key={n.id}
                           href={n.reference_id ? `/content/brands?review=${encodeURIComponent(n.reference_id)}` : "/content/brands"}
                           onClick={() => setNotifOpen(false)}
-                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}
                         >
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>🏷️</span>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{n.title || notifCopy.brandPending}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.35, marginTop: 2 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{n.title || notifCopy.brandPending}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e", lineHeight: 1.35, marginTop: 2 }}>
                               {String(n.body || "")}
                             </div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_verifications || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.verifications}
                         </div>
                       )}
                       {(notifData?.recent_verifications || []).map((v) => (
-                        <Link key={v.id} href={v.reference_id || v.seller_id ? `/sellers/${v.reference_id || v.seller_id}` : "/sellers"} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
+                        <Link key={v.id} href={v.reference_id || v.seller_id ? `/sellers/${v.reference_id || v.seller_id}` : "/sellers"} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>{v.type === "seller_registered" ? "🆕" : "📋"}</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{v.title || (v.type === "seller_registered" ? notifCopy.sellerRegistered : notifCopy.docSubmitted)}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>{v.body || (v.type === "seller_registered" ? "" : notifCopy.docSubmittedBody)}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{v.title || (v.type === "seller_registered" ? notifCopy.sellerRegistered : notifCopy.docSubmitted)}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e" }}>{v.body || (v.type === "seller_registered" ? "" : notifCopy.docSubmittedBody)}</div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_eu_origin_pending || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.euOrigin}
                         </div>
                       )}
@@ -1138,17 +1138,17 @@ export default function PolarisLayout({ children }) {
                           key={e.id}
                           href={e.product_id ? `/products/${e.product_id}` : "/products/inventory"}
                           onClick={() => setNotifOpen(false)}
-                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}
                         >
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>🇪🇺</span>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{notifCopy.euOriginPending}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>{e.product_title || e.registry_id || e.country || ""}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{notifCopy.euOriginPending}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e" }}>{e.product_title || e.registry_id || e.country || ""}</div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_product_change_requests || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.productChanges}
                         </div>
                       )}
@@ -1162,7 +1162,7 @@ export default function PolarisLayout({ children }) {
                           key={cr.id}
                           href={href}
                           onClick={() => setNotifOpen(false)}
-                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}
                         >
                           <span
                             style={{
@@ -1195,37 +1195,37 @@ export default function PolarisLayout({ children }) {
                         );
                       })}
                       {(notifData?.recent_orders || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.orders}
                         </div>
                       )}
                       {(notifData?.recent_orders || []).map((o) => (
-                        <Link key={o.id} href={`/orders/${o.id}`} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
+                        <Link key={o.id} href={`/orders/${o.id}`} onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📦</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{notifCopy.newOrder(o.order_number || "—")}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>{o.first_name} {o.last_name} · {o.total_cents ? (o.total_cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : ""}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{notifCopy.newOrder(o.order_number || "—")}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e" }}>{o.first_name} {o.last_name} · {o.total_cents ? (o.total_cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : ""}</div>
                           </div>
                         </Link>
                       ))}
                       {(notifData?.recent_returns || []).length > 0 && (
-                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        <div style={{ padding: "8px 16px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                           {notifCopy.returns}
                         </div>
                       )}
                       {(notifData?.recent_returns || []).map((r) => (
-                        <Link key={r.id} href="/orders/returns" onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #f9fafb", textDecoration: "none" }}>
+                        <Link key={r.id} href="/orders/returns" onClick={() => setNotifOpen(false)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px", borderBottom: "1px solid #faf7f2", textDecoration: "none" }}>
                           <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>↩️</span>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{notifCopy.returnRequest(r.return_number || "—")}</div>
-                            <div style={{ fontSize: 11, color: "#6b7280" }}>{notifCopy.orderRef(r.order_number || "—")} · {localizeStatus(locale, r.status)}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{notifCopy.returnRequest(r.return_number || "—")}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e" }}>{notifCopy.orderRef(r.order_number || "—")} · {localizeStatus(locale, r.status)}</div>
                           </div>
                         </Link>
                       ))}
                     </>
                   )}
                 </div>
-                <div style={{ padding: "10px 16px", borderTop: "1px solid #f3f4f6" }}>
+                <div style={{ padding: "10px 16px", borderTop: "1px solid #f3eee6" }}>
                   <Link href="/notifications" onClick={() => setNotifOpen(false)} style={{ fontSize: 12, color: "#0284c7", textDecoration: "none", fontWeight: 600 }}>
                     {notifCopy.viewAll} →
                   </Link>
@@ -1290,8 +1290,8 @@ export default function PolarisLayout({ children }) {
                 onClick={() => unsaved.runSave()}
                 style={{
                   background: "#fff",
-                  color: "#202223",
-                  border: "2px solid #202223",
+                  color: "#1d1b18",
+                  border: "2px solid #1d1b18",
                   fontWeight: 600,
                   minWidth: 80,
                 }}
@@ -1431,7 +1431,7 @@ export default function PolarisLayout({ children }) {
         })}
       />
       {logoViewportTier === "mobile" && (
-        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--p-color-border-subdued, #e1e3e5)" }}>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid var(--p-color-border-subdued, #e6dfd4)" }}>
           {topBarIconsRow}
         </div>
       )}
@@ -1446,7 +1446,7 @@ export default function PolarisLayout({ children }) {
     if (status === "registered") {
       return {
         background: "#f59e0b",
-        color: "#111827",
+        color: "#1d1b18",
         text: bannerI18n.completeVerification,
         actionLabel: bannerI18n.goVerification,
         actionHref: "/settings/verification",
@@ -1476,7 +1476,7 @@ export default function PolarisLayout({ children }) {
     }
     if (status === "pending_approval" || status === "pending") {
       return {
-        background: "#2563eb",
+        background: "#a65300",
         color: "#fff",
         text: bannerI18n.pending,
       };

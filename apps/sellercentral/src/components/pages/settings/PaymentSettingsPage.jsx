@@ -54,7 +54,7 @@ function PayoutInfoBanner({ commissionRate }) {
                 background: "#fff",
                 borderRadius: 10,
                 padding: "14px 16px",
-                border: "1px solid #e5e7eb",
+                border: "1px solid #e6dfd4",
                 display: "flex",
                 flexDirection: "column",
                 gap: 6,
@@ -62,7 +62,7 @@ function PayoutInfoBanner({ commissionRate }) {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{
-                  width: 24, height: 24, borderRadius: "50%", background: "#111827",
+                  width: 24, height: 24, borderRadius: "50%", background: "#1d1b18",
                   color: "#fff", fontSize: 12, fontWeight: 700,
                   display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                 }}>{step}</span>

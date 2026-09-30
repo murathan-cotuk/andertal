@@ -23,12 +23,12 @@ function ArticleCard({ article, locale }) {
           transition: "border-color 0.12s, box-shadow 0.12s",
           boxShadow: "0 1px 2px rgba(16,24,40,0.03)",
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ff971c"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(16,24,40,0.08)"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ee8a12"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(16,24,40,0.08)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = CARD_BORDER; e.currentTarget.style.boxShadow = "0 1px 2px rgba(16,24,40,0.03)"; }}
       >
         <div style={{ fontSize: 22, marginBottom: 8 }}>{article.icon}</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginBottom: 6, lineHeight: 1.35 }}>{title}</div>
-        <div style={{ fontSize: 12.5, color: "#6b7280", lineHeight: 1.5 }}>{summary}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#1d1b18", marginBottom: 6, lineHeight: 1.35 }}>{title}</div>
+        <div style={{ fontSize: 12.5, color: "#5e574e", lineHeight: 1.5 }}>{summary}</div>
       </div>
     </Link>
   );
@@ -138,9 +138,9 @@ function CategoryChip({ active, label, onClick }) {
       type="button"
       onClick={onClick}
       style={{
-        border: `1px solid ${active ? "#ff971c" : CARD_BORDER}`,
+        border: `1px solid ${active ? "#ee8a12" : CARD_BORDER}`,
         background: active ? "#fff7ed" : "#fff",
-        color: active ? "#c2410c" : "#374151",
+        color: active ? "#c2410c" : "#3a352f",
         fontWeight: active ? 700 : 500,
         fontSize: 13,
         borderRadius: 999,

@@ -199,7 +199,7 @@ export default function AppStoreHub({ selectedTab, onTabChange, highlightHandle,
         key={app.id || app.handle}
         style={{
           background: "#fff",
-          border: "1px solid #e5e7eb",
+          border: "1px solid #e6dfd4",
           borderRadius: 10,
           padding: 16,
           display: "flex",
@@ -246,7 +246,7 @@ export default function AppStoreHub({ selectedTab, onTabChange, highlightHandle,
         key={inst.id}
         style={{
           background: "#fff",
-          border: `1px solid ${connected ? "#d1fae5" : "#e5e7eb"}`,
+          border: `1px solid ${connected ? "#d1fae5" : "#e6dfd4"}`,
           borderRadius: 10,
           padding: 16,
         }}
@@ -264,12 +264,12 @@ export default function AppStoreHub({ selectedTab, onTabChange, highlightHandle,
             </Badge>
           </InlineStack>
           {apiKey ? (
-            <div style={{ padding: "8px 12px", background: "#f9fafb", borderRadius: 6, fontSize: 12, color: "#6b7280", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
-              <span style={{ fontWeight: 600, color: "#374151" }}>{copy.apiKey}</span>
+            <div style={{ padding: "8px 12px", background: "#faf7f2", borderRadius: 6, fontSize: 12, color: "#5e574e", display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
+              <span style={{ fontWeight: 600, color: "#3a352f" }}>{copy.apiKey}</span>
               <span style={{ fontFamily: "ui-monospace, monospace" }}>{maskKey(apiKey)}</span>
               {inst.client_id && inst.client_id !== apiKey ? (
                 <>
-                  <span style={{ fontWeight: 600, color: "#374151" }}>{copy.clientId}</span>
+                  <span style={{ fontWeight: 600, color: "#3a352f" }}>{copy.clientId}</span>
                   <span style={{ fontFamily: "ui-monospace, monospace" }}>{maskKey(inst.client_id)}</span>
                 </>
               ) : null}

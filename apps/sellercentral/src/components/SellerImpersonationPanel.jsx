@@ -34,11 +34,11 @@ const TAB_STYLE = (active) => ({
   padding: "10px 20px",
   background: active ? "#fff" : "transparent",
   border: "none",
-  borderBottom: active ? "2px solid #1f2937" : "2px solid transparent",
+  borderBottom: active ? "2px solid #1d1b18" : "2px solid transparent",
   cursor: "pointer",
   fontSize: 14,
   fontWeight: active ? 700 : 500,
-  color: active ? "#111827" : "#6b7280",
+  color: active ? "#1d1b18" : "#5e574e",
   whiteSpace: "nowrap",
 });
 
@@ -143,14 +143,14 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "16px 24px",
-          borderBottom: "1px solid #e5e7eb",
-          background: "#1f2937",
+          borderBottom: "1px solid #e6dfd4",
+          background: "#1d1b18",
           flexShrink: 0,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: "50%",
-              background: "#374151",
+              background: "#3a352f",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 15, fontWeight: 700, color: "#fff",
             }}>
@@ -160,15 +160,15 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
               <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>
                 {seller.store_name || seller.email || "Seller"}
               </div>
-              <div style={{ fontSize: 12, color: "#9ca3af" }}>{seller.email}</div>
+              <div style={{ fontSize: 12, color: "#a39a8d" }}>{seller.email}</div>
             </div>
             <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right" }}>
+            <div style={{ fontSize: 12, color: "#a39a8d", textAlign: "right" }}>
               <div>{imp.loggedInAsSeller}</div>
-              <div style={{ color: "#e5e7eb", fontWeight: 600 }}>{seller.store_name || seller.email}</div>
+              <div style={{ color: "#e6dfd4", fontWeight: 600 }}>{seller.store_name || seller.email}</div>
             </div>
             <button
               onClick={handleClose}
@@ -186,8 +186,8 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
 
         {/* Tab bar */}
         <div style={{
-          display: "flex", borderBottom: "1px solid #e5e7eb",
-          overflowX: "auto", flexShrink: 0, background: "#f9fafb",
+          display: "flex", borderBottom: "1px solid #e6dfd4",
+          overflowX: "auto", flexShrink: 0, background: "#faf7f2",
         }}>
           {[
             { id: "profil", label: imp.profile },
@@ -220,15 +220,15 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
                     { label: imp.revenue, value: fmtCents(seller.revenue_cents, locale) },
                     { label: imp.commission, value: fmtCents(seller.commission_cents, locale) },
                   ].map((item) => (
-                    <div key={item.label} style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
-                      <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, marginBottom: 4 }}>{item.label}</div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", wordBreak: "break-all" }}>{item.value}</div>
+                    <div key={item.label} style={{ background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 10, padding: "14px 16px" }}>
+                      <div style={{ fontSize: 11, color: "#5e574e", fontWeight: 600, marginBottom: 4 }}>{item.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1d1b18", wordBreak: "break-all" }}>{item.value}</div>
                     </div>
                   ))}
                 </div>
                 {profile && (
-                  <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 12 }}>{imp.shopSettings}</div>
+                  <div style={{ background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 10, padding: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#3a352f", marginBottom: 12 }}>{imp.shopSettings}</div>
                     {[
                       [imp.shopName, profile.store_name],
                       [imp.description, profile.store_description],
@@ -238,8 +238,8 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
                       [imp.address, profile.store_address],
                     ].map(([k, v]) => v ? (
                       <div key={k} style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 13 }}>
-                        <span style={{ color: "#6b7280", minWidth: 120 }}>{k}</span>
-                        <span style={{ color: "#111827" }}>{v}</span>
+                        <span style={{ color: "#5e574e", minWidth: 120 }}>{k}</span>
+                        <span style={{ color: "#1d1b18" }}>{v}</span>
                       </div>
                     ) : null)}
                   </div>
@@ -253,14 +253,14 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
             loadingProducts ? (
               <div style={{ textAlign: "center", padding: 40 }}><Spinner size="small" /></div>
             ) : products.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>{imp.noProducts}</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#5e574e" }}>{imp.noProducts}</div>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+                    <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                       {["Bild", "Name", "Status", "Preis", "Lager", "Erstellt"].map((h) => (
-                        <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175" }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5e574e" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -270,13 +270,13 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
                       const price = p.variants?.[0]?.prices?.[0]?.amount;
                       const stock = p.variants?.reduce((s, v) => s + (v.inventory_quantity || 0), 0);
                       return (
-                        <tr key={p.id} style={{ borderBottom: "1px solid #f1f1f1", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                        <tr key={p.id} style={{ borderBottom: "1px solid #f3eee6", background: i % 2 === 0 ? "#fff" : "#faf7f2" }}>
                           <td style={{ padding: "8px 12px" }}>
-                            {thumb ? <img src={thumb} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} /> : <div style={{ width: 40, height: 40, background: "#e5e7eb", borderRadius: 6 }} />}
+                            {thumb ? <img src={thumb} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} /> : <div style={{ width: 40, height: 40, background: "#e6dfd4", borderRadius: 6 }} />}
                           </td>
                           <td style={{ padding: "8px 12px", fontWeight: 600, maxWidth: 220 }}>
                             <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
-                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{p.handle}</div>
+                            <div style={{ fontSize: 11, color: "#a39a8d" }}>{p.handle}</div>
                           </td>
                           <td style={{ padding: "8px 12px" }}>
                             <span style={{ background: p.status === "published" ? "#d1fae5" : "#fef3c7", color: p.status === "published" ? "#065f46" : "#92400e", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>
@@ -285,7 +285,7 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
                           </td>
                           <td style={{ padding: "8px 12px" }}>{price != null ? fmtCents(price) : "—"}</td>
                           <td style={{ padding: "8px 12px", textAlign: "center" }}>{stock ?? "—"}</td>
-                          <td style={{ padding: "8px 12px", color: "#9ca3af" }}>{fmtDate(p.created_at)}</td>
+                          <td style={{ padding: "8px 12px", color: "#a39a8d" }}>{fmtDate(p.created_at)}</td>
                         </tr>
                       );
                     })}
@@ -300,27 +300,27 @@ export default function SellerImpersonationPanel({ seller, token, onClose }) {
             loadingOrders ? (
               <div style={{ textAlign: "center", padding: 40 }}><Spinner size="small" /></div>
             ) : orders.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>{imp.noOrders}</div>
+              <div style={{ textAlign: "center", padding: 40, color: "#5e574e" }}>{imp.noOrders}</div>
             ) : (
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+                    <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                       {[imp.order, imp.customer, imp.status, imp.amount, imp.date].map((h) => (
-                        <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175" }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5e574e" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {orders.map((o, i) => (
-                      <tr key={o.id} style={{ borderBottom: "1px solid #f1f1f1", background: i % 2 === 0 ? "#fff" : "#fafafa" }}>
+                      <tr key={o.id} style={{ borderBottom: "1px solid #f3eee6", background: i % 2 === 0 ? "#fff" : "#faf7f2" }}>
                         <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 12 }}>#{o.display_id || o.id?.slice(-6)}</td>
                         <td style={{ padding: "8px 12px" }}>{o.shipping_address?.first_name} {o.shipping_address?.last_name}</td>
                         <td style={{ padding: "8px 12px" }}>
-                          <span style={{ background: "#f3f4f6", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>{localizeStatus(locale, o.order_status || o.status)}</span>
+                          <span style={{ background: "#f3eee6", padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 600 }}>{localizeStatus(locale, o.order_status || o.status)}</span>
                         </td>
                         <td style={{ padding: "8px 12px" }}>{fmtCents(o.total, locale)}</td>
-                        <td style={{ padding: "8px 12px", color: "#9ca3af" }}>{fmtDate(o.created_at, locale)}</td>
+                        <td style={{ padding: "8px 12px", color: "#a39a8d" }}>{fmtDate(o.created_at, locale)}</td>
                       </tr>
                     ))}
                   </tbody>

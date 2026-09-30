@@ -119,23 +119,23 @@ export default function BackInStockPage() {
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                  <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                     {[c.colEmail, c.colProduct, c.colSince, c.colStatus, ""].map((h) => (
-                      <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                      <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {subscribers.map((s) => (
-                    <tr key={s.id} style={{ borderTop: "1px solid #f1f1f1", cursor: "pointer" }} onClick={() => router.push(`/products/${s.product.id}`)}>
-                      <td style={{ padding: "12px 16px", fontWeight: 600, color: "#111827" }}>{s.email}</td>
+                    <tr key={s.id} style={{ borderTop: "1px solid #f3eee6", cursor: "pointer" }} onClick={() => router.push(`/products/${s.product.id}`)}>
+                      <td style={{ padding: "12px 16px", fontWeight: 600, color: "#1d1b18" }}>{s.email}</td>
                       <td style={{ padding: "12px 16px" }}>{s.product.title || "—"}</td>
-                      <td style={{ padding: "12px 16px", color: "#6d7175" }}>{fmtDate(s.created_at, locale)}</td>
+                      <td style={{ padding: "12px 16px", color: "#5e574e" }}>{fmtDate(s.created_at, locale)}</td>
                       <td style={{ padding: "12px 16px" }}>
                         <Badge tone={s.notified_at ? "success" : "attention"}>{s.notified_at ? c.notifiedBadge : c.waitingBadge}</Badge>
                       </td>
                       <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <span style={{ color: "#2563eb", fontWeight: 600, fontSize: 12 }}>{c.openProduct} →</span>
+                        <span style={{ color: "#a65300", fontWeight: 600, fontSize: 12 }}>{c.openProduct} →</span>
                       </td>
                     </tr>
                   ))}

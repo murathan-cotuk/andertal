@@ -113,7 +113,7 @@ function docKindsForOrder(order, docFilter, returnsSet) {
 function DocBtn({ orderId, kind, label, available, locale = "de" }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  if (!available) return <span style={{ color: "#d1d5db", fontSize: 12 }}>—</span>;
+  if (!available) return <span style={{ color: "#d6ccbd", fontSize: 12 }}>—</span>;
   const handleClick = async () => {
     setBusy(true);
     setErr("");
@@ -137,9 +137,9 @@ function DocBtn({ orderId, kind, label, available, locale = "de" }) {
           gap: 3,
           padding: "3px 7px",
           borderRadius: 4,
-          border: `1px solid ${err ? "#fecaca" : "#e5e7eb"}`,
-          background: err ? "#fef2f2" : "#f9fafb",
-          color: err ? "#b91c1c" : "#374151",
+          border: `1px solid ${err ? "#fecaca" : "#e6dfd4"}`,
+          background: err ? "#fef2f2" : "#faf7f2",
+          color: err ? "#b91c1c" : "#3a352f",
           fontSize: 11,
           fontWeight: 500,
           textDecoration: "none",
@@ -168,13 +168,13 @@ function ColHeader({ label, field, sort, onSort, align = "left" }) {
         padding: "7px 10px",
         textAlign: align,
         fontWeight: 600,
-        color: "#6d7175",
+        color: "#5e574e",
         cursor: "pointer",
         userSelect: "none",
-        background: "#f6f6f7",
+        background: "#faf7f2",
         whiteSpace: "nowrap",
         fontSize: 11,
-        borderBottom: "1px solid #e1e3e5",
+        borderBottom: "1px solid #e6dfd4",
       }}
     >
       {label} {active ? (sort.dir === "asc" ? "↑" : "↓") : ""}
@@ -217,9 +217,9 @@ function TotalsStrip({ items }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
       {items.map((s) => (
-        <div key={s.label} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px", background: "#fafafa" }}>
-          <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{s.label}</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: s.color || "#111827" }}>{s.value}</div>
+        <div key={s.label} style={{ border: "1px solid #e6dfd4", borderRadius: 8, padding: "8px 10px", background: "#faf7f2" }}>
+          <div style={{ fontSize: 11, color: "#5e574e", textTransform: "uppercase" }}>{s.label}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: s.color || "#1d1b18" }}>{s.value}</div>
         </div>
       ))}
     </div>
@@ -242,9 +242,9 @@ function SellerGroupHeader({ label }) {
           background: "#f0f5ff",
           fontWeight: 700,
           fontSize: 11,
-          color: "#1d4ed8",
-          borderTop: "2px solid #bfdbfe",
-          borderBottom: "1px solid #bfdbfe",
+          color: "#7f3f00",
+          borderTop: "2px solid #f5d3a8",
+          borderBottom: "1px solid #f5d3a8",
         }}
       >
         {label}
@@ -260,8 +260,8 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
   return (
     <tr
       style={{
-        borderBottom: "1px solid #f1f1f1",
-        background: selected ? "#eff6ff" : "#fff",
+        borderBottom: "1px solid #f3eee6",
+        background: selected ? "#fcebd5" : "#fff",
         minHeight: 32,
       }}
     >
@@ -276,15 +276,15 @@ function OrderDocRow({ order, selected, onToggle, returnsSet, locale, ui }) {
       <td style={{ padding: "6px 10px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
         <a
           href={`/${locale}/orders/${order.id}`}
-          style={{ color: "#1d4ed8", textDecoration: "none" }}
+          style={{ color: "#7f3f00", textDecoration: "none" }}
         >
           #{order.order_number || order.id?.slice(0, 8)}
         </a>
       </td>
-      <td style={{ padding: "6px 10px", fontSize: 12, color: "#374151", whiteSpace: "nowrap" }}>
+      <td style={{ padding: "6px 10px", fontSize: 12, color: "#3a352f", whiteSpace: "nowrap" }}>
         {fmtDate(order.created_at, locale)}
       </td>
-      <td style={{ padding: "6px 10px", fontSize: 12, color: "#374151" }}>
+      <td style={{ padding: "6px 10px", fontSize: 12, color: "#3a352f" }}>
         {customerName(order)}
       </td>
       <td style={{ padding: "6px 10px", fontSize: 12, textAlign: "right", whiteSpace: "nowrap" }}>
@@ -655,7 +655,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
             <thead>
               <tr>
                 <th
-                  style={{ padding: "7px 10px", width: 32, background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}
+                  style={{ padding: "7px 10px", width: 32, background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}
                 >
                   <input
                     type="checkbox"
@@ -675,10 +675,10 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                       padding: "7px 10px",
                       textAlign: "center",
                       fontWeight: 600,
-                      color: "#6d7175",
-                      background: "#f6f6f7",
+                      color: "#5e574e",
+                      background: "#faf7f2",
                       fontSize: 11,
-                      borderBottom: "1px solid #e1e3e5",
+                      borderBottom: "1px solid #e6dfd4",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -692,7 +692,7 @@ function OrderDocumentsTab({ isSuperuser, mySellerId }) {
                 <tr>
                   <td
                     colSpan={9}
-                    style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af" }}
+                    style={{ padding: "40px 16px", textAlign: "center", color: "#a39a8d" }}
                   >
                     {ui.noOrdersFound}
                   </td>
@@ -960,7 +960,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
     rows.map((inv) => (
       <tr
         key={inv.id}
-        style={{ borderBottom: "1px solid #f1f1f1", background: selected.has(inv.id) ? "#eff6ff" : "#fff" }}
+        style={{ borderBottom: "1px solid #f3eee6", background: selected.has(inv.id) ? "#fcebd5" : "#fff" }}
       >
         <td style={{ padding: "6px 10px", width: 32 }}>
           <input
@@ -970,17 +970,17 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
             style={{ cursor: "pointer" }}
           />
         </td>
-        <td style={{ padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "#374151" }}>
+        <td style={{ padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "#3a352f" }}>
           {inv.period || inv.period_label || "—"}
         </td>
-        <td style={{ padding: "6px 10px", fontSize: 12, color: "#374151" }}>
+        <td style={{ padding: "6px 10px", fontSize: 12, color: "#3a352f" }}>
           <span
             style={{
               display: "inline-block",
               padding: "2px 10px",
               borderRadius: 12,
-              background: "#eff6ff",
-              color: "#1d4ed8",
+              background: "#fcebd5",
+              color: "#7f3f00",
               fontWeight: 600,
               fontSize: 11,
             }}
@@ -1008,9 +1008,9 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                 gap: 4,
                 padding: "3px 9px",
                 borderRadius: 4,
-                border: "1px solid #e5e7eb",
-                background: "#f9fafb",
-                color: "#374151",
+                border: "1px solid #e6dfd4",
+                background: "#faf7f2",
+                color: "#3a352f",
                 fontSize: 11,
                 fontWeight: 500,
                 textDecoration: "none",
@@ -1020,7 +1020,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
               ↓ PDF
             </button>
           ) : (
-            <span style={{ color: "#d1d5db", fontSize: 11 }}>—</span>
+            <span style={{ color: "#d6ccbd", fontSize: 11 }}>—</span>
           )}
         </td>
       </tr>
@@ -1029,7 +1029,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
   const tableHead = (
     <thead>
       <tr>
-        <th style={{ padding: "7px 10px", width: 32, background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+        <th style={{ padding: "7px 10px", width: 32, background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
           <input
             type="checkbox"
             checked={sortedInvoices.length > 0 && sortedInvoices.every((i) => selected.has(i.id))}
@@ -1044,8 +1044,8 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
         <ColHeader label={lt(locale, "Payout", "Ödeme", "Paiement", "Pago", "Pagamento", "Auszahlung")} field="payout_cents" sort={sort} onSort={toggleSort} align="right" />
         <th
           style={{
-            padding: "7px 10px", textAlign: "center", fontWeight: 600, color: "#6d7175",
-            background: "#f6f6f7", fontSize: 11, borderBottom: "1px solid #e1e3e5",
+            padding: "7px 10px", textAlign: "center", fontWeight: 600, color: "#5e574e",
+            background: "#faf7f2", fontSize: 11, borderBottom: "1px solid #e6dfd4",
           }}
         >
           PDF
@@ -1107,7 +1107,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
       <Card padding="0">
         <div style={{ overflowX: "auto" }}>
           {sortedInvoices.length === 0 ? (
-            <div style={{ padding: "48px 16px", textAlign: "center", color: "#9ca3af" }}>
+            <div style={{ padding: "48px 16px", textAlign: "center", color: "#a39a8d" }}>
               <Text as="p" tone="subdued">
                 {ui.noInvoices}
               </Text>
@@ -1131,9 +1131,9 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                               background: "#f0f5ff",
                               fontWeight: 700,
                               fontSize: 11,
-                              color: "#1d4ed8",
-                              borderTop: "2px solid #bfdbfe",
-                              borderBottom: "1px solid #bfdbfe",
+                              color: "#7f3f00",
+                              borderTop: "2px solid #f5d3a8",
+                              borderBottom: "1px solid #f5d3a8",
                             }}
                           >
                             {ui.platformOwn}
@@ -1152,9 +1152,9 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                               background: "#f0f5ff",
                               fontWeight: 700,
                               fontSize: 11,
-                              color: "#1d4ed8",
-                              borderTop: "2px solid #bfdbfe",
-                              borderBottom: "1px solid #bfdbfe",
+                              color: "#7f3f00",
+                              borderTop: "2px solid #f5d3a8",
+                              borderBottom: "1px solid #f5d3a8",
                             }}
                           >
                             {sellerLabelMap[sid] || sid}
@@ -1167,7 +1167,7 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
                 ) : (
                   renderRows(sortedInvoices)
                 )}
-                <tr style={{ background: "#f9fafb", borderTop: "2px solid #e5e7eb", fontWeight: 700 }}>
+                <tr style={{ background: "#faf7f2", borderTop: "2px solid #e6dfd4", fontWeight: 700 }}>
                   <td style={{ padding: "7px 10px" }} colSpan={3}>
                     {lt(locale, "Sum", "Toplam", "Somme", "Suma", "Somma", "Summe")}
                   </td>
@@ -1188,11 +1188,11 @@ function CommissionInvoicesTab({ isSuperuser, mySellerId }) {
 function FinanzamtKpiCard({ label, value, hint, tone = "neutral", onOpen }) {
   const palette = {
     tax: { border: "#bbf7d0", bg: "#f0fdf4", label: "#15803d", value: "#14532d" },
-    pass: { border: "#e2e8f0", bg: "#f8fafc", label: "#64748b", value: "#0f172a" },
+    pass: { border: "#e6dfd4", bg: "#faf7f2", label: "#5e574e", value: "#1d1b18" },
     pay: { border: "#bae6fd", bg: "#f0f9ff", label: "#0369a1", value: "#0c4a6e" },
     warn: { border: "#fde68a", bg: "#fffbeb", label: "#b45309", value: "#92400e" },
-    neutral: { border: "#e5e7eb", bg: "#ffffff", label: "#6b7280", value: "#111827" },
-  }[tone] || { border: "#e5e7eb", bg: "#ffffff", label: "#6b7280", value: "#111827" };
+    neutral: { border: "#e6dfd4", bg: "#ffffff", label: "#5e574e", value: "#1d1b18" },
+  }[tone] || { border: "#e6dfd4", bg: "#ffffff", label: "#5e574e", value: "#1d1b18" };
   return (
     <button
       type="button"
@@ -1212,7 +1212,7 @@ function FinanzamtKpiCard({ label, value, hint, tone = "neutral", onOpen }) {
     >
       <span style={{ fontSize: 11, fontWeight: 600, color: palette.label, letterSpacing: 0.2 }}>{label}</span>
       <span style={{ fontSize: 18, fontWeight: 700, color: palette.value, lineHeight: 1.2 }}>{value}</span>
-      {hint ? <span style={{ fontSize: 11, color: "#64748b", marginTop: "auto" }}>{hint}</span> : null}
+      {hint ? <span style={{ fontSize: 11, color: "#5e574e", marginTop: "auto" }}>{hint}</span> : null}
     </button>
   );
 }
@@ -1584,18 +1584,18 @@ function FinanzamtTab() {
                         lt(locale, "Net", "Net", "Net", "Neto", "Netto", "Netto"),
                         "USt",
                       ].map((h, i) => (
-                        <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{h}</th>
+                        <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", borderBottom: "1px solid #e6dfd4", color: "#5e574e", fontSize: 11 }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {(detail.rows || []).map((row) => (
                       <tr key={row.country}>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6" }}>{row.country || "—"}</td>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{row.order_count || 0}</td>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{fmtCents(row.gross_cents, locale)}</td>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{fmtCents(row.net_cents, locale)}</td>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{fmtCents(row.vat_cents, locale)}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6" }}>{row.country || "—"}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6", textAlign: "right" }}>{row.order_count || 0}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6", textAlign: "right" }}>{fmtCents(row.gross_cents, locale)}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6", textAlign: "right" }}>{fmtCents(row.net_cents, locale)}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6", textAlign: "right" }}>{fmtCents(row.vat_cents, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1606,19 +1606,19 @@ function FinanzamtTab() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colSeller}</th>
-                      <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colPeriod}</th>
-                      <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colOrders}</th>
-                      <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11 }}>{colAmount}</th>
+                      <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e6dfd4", color: "#5e574e", fontSize: 11 }}>{colSeller}</th>
+                      <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #e6dfd4", color: "#5e574e", fontSize: 11 }}>{colPeriod}</th>
+                      <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e6dfd4", color: "#5e574e", fontSize: 11 }}>{colOrders}</th>
+                      <th style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #e6dfd4", color: "#5e574e", fontSize: 11 }}>{colAmount}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(detail?.rows || []).map((row, idx) => (
                       <tr key={`${row.name}-${row.period}-${idx}`}>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6" }}>{row.name}</td>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", color: "#6b7280" }}>{row.period}</td>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right" }}>{row.orders}</td>
-                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3f4f6", textAlign: "right", fontWeight: 600 }}>{detail?.format === "count" ? row.cents : fmtCents(row.cents, locale)}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6" }}>{row.name}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6", color: "#5e574e" }}>{row.period}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6", textAlign: "right" }}>{row.orders}</td>
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #f3eee6", textAlign: "right", fontWeight: 600 }}>{detail?.format === "count" ? row.cents : fmtCents(row.cents, locale)}</td>
                       </tr>
                     ))}
                   </tbody>

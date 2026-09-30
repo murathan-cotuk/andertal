@@ -15,7 +15,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -34,7 +34,7 @@ const Avatar = styled.div`
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  background: linear-gradient(135deg, #ee8a12 0%, #0284c7 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,10 +116,10 @@ export default function ProfilePage() {
         <AvatarSection>
           <Avatar>{getUserInitials()}</Avatar>
           <AvatarInfo>
-            <h2 style={{ fontSize: "24px", fontWeight: "600", color: "#1f2937", marginBottom: "8px" }}>
+            <h2 style={{ fontSize: "24px", fontWeight: "600", color: "#1d1b18", marginBottom: "8px" }}>
               {formData.storeName || t("Seller Account", "Satici Hesabi", "Compte vendeur", "Cuenta de vendedor", "Account venditore", "Verkauferkonto")}
             </h2>
-            <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "16px" }}>{formData.email}</p>
+            <p style={{ fontSize: "14px", color: "#5e574e", marginBottom: "16px" }}>{formData.email}</p>
             <Button variant="outline" style={{ padding: "8px 16px", fontSize: "14px" }}>
               <i className="fas fa-camera" style={{ marginRight: "8px" }} />
               {t("Change Avatar", "Avatari degistir", "Changer l'avatar", "Cambiar avatar", "Cambia avatar", "Avatar andern")}
@@ -190,7 +190,7 @@ export default function ProfilePage() {
           />
 
           <div>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
+            <label style={{ display: "block", fontSize: "14px", fontWeight: "600", color: "#3a352f", marginBottom: "8px" }}>
               {t("Description", "Aciklama", "Description", "Descripcion", "Descrizione", "Beschreibung")}
             </label>
             <textarea
@@ -199,7 +199,7 @@ export default function ProfilePage() {
               style={{
                 width: "100%",
                 padding: "12px 16px",
-                border: "2px solid #e5e7eb",
+                border: "2px solid #e6dfd4",
                 borderRadius: "8px",
                 minHeight: "120px",
                 fontFamily: "inherit",

@@ -68,36 +68,36 @@ export function CustomerFormModal({ initial, onClose, onSave }) {
     setSaving(false);
   };
 
-  const inputStyle = { width: "100%", padding: "9px 11px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13, boxSizing: "border-box", outline: "none", transition: "border-color .15s, box-shadow .15s" };
-  const labelStyle = { fontSize: 12, color: "#374151", fontWeight: 500, display: "block", marginBottom: 3 };
+  const inputStyle = { width: "100%", padding: "9px 11px", border: "1px solid #d6ccbd", borderRadius: 8, fontSize: 13, boxSizing: "border-box", outline: "none", transition: "border-color .15s, box-shadow .15s" };
+  const labelStyle = { fontSize: 12, color: "#3a352f", fontWeight: 500, display: "block", marginBottom: 3 };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: "#fff", borderRadius: 14, width: 560, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 18px 48px rgba(15,23,42,0.18)" }}>
-        <div style={{ padding: "18px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
+        <div style={{ padding: "18px 24px", borderBottom: "1px solid #e6dfd4", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#faf7f2" }}>
           <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{initial?.id ? lt("Edit customer", "Müşteriyi düzenle", "Modifier le client", "Editar cliente", "Modifica cliente", "Kunde bearbeiten") : lt("New customer", "Yeni müşteri", "Nouveau client", "Nuevo cliente", "Nuovo cliente", "Neuer Kunde")}</h2>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#5e574e" }}>×</button>
         </div>
         <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div style={{ gridColumn: "1/-1" }}>
             <label style={labelStyle}>{lt("Email", "E-posta", "E-mail", "Correo electrónico", "E-mail", "E-Mail")} *</label>
-            <input style={inputStyle} value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="customer@example.com" onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="customer@example.com" onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           <div>
             <label style={labelStyle}>{lt("First name", "Ad", "Prénom", "Nombre", "Nome", "Vorname")}</label>
-            <input style={inputStyle} value={form.first_name} onChange={(e) => set("first_name", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.first_name} onChange={(e) => set("first_name", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           <div>
             <label style={labelStyle}>{lt("Last name", "Soyad", "Nom", "Apellido", "Cognome", "Nachname")}</label>
-            <input style={inputStyle} value={form.last_name} onChange={(e) => set("last_name", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.last_name} onChange={(e) => set("last_name", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           <div>
             <label style={labelStyle}>{lt("Phone", "Telefon", "Téléphone", "Teléfono", "Telefono", "Telefon")}</label>
-            <input style={inputStyle} value={form.phone} onChange={(e) => set("phone", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.phone} onChange={(e) => set("phone", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           <div>
             <label style={labelStyle}>{lt("Customer type", "Müşteri tipi", "Type de client", "Tipo de cliente", "Tipo cliente", "Kundentyp")}</label>
-            <select style={inputStyle} value={form.account_type} onChange={(e) => set("account_type", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }}>
+            <select style={inputStyle} value={form.account_type} onChange={(e) => set("account_type", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }}>
               <option value="privat">{lt("Private customer", "Bireysel müşteri", "Client particulier", "Cliente particular", "Cliente privato", "Privatkunde")}</option>
               <option value="gewerbe">{lt("Business customer", "Kurumsal müşteri", "Client professionnel", "Cliente empresarial", "Cliente aziendale", "Gewerbekunde")}</option>
               <option value="gastkunde">{lt("Guest customer", "Misafir müşteri", "Client invité", "Cliente invitado", "Cliente ospite", "Gastkunde")}</option>
@@ -105,37 +105,37 @@ export function CustomerFormModal({ initial, onClose, onSave }) {
           </div>
           <div style={{ gridColumn: "1/-1" }}>
             <label style={labelStyle}>{lt("Street", "Sokak", "Rue", "Calle", "Via", "Straße")}</label>
-            <input style={inputStyle} value={form.address_line1} onChange={(e) => set("address_line1", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.address_line1} onChange={(e) => set("address_line1", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           <div>
             <label style={labelStyle}>{lt("Postal code", "Posta kodu", "Code postal", "Código postal", "CAP", "PLZ")}</label>
-            <input style={inputStyle} value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.zip_code} onChange={(e) => set("zip_code", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           <div>
             <label style={labelStyle}>{lt("City", "Şehir", "Ville", "Ciudad", "Città", "Stadt")}</label>
-            <input style={inputStyle} value={form.city} onChange={(e) => set("city", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.city} onChange={(e) => set("city", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           <div>
             <label style={labelStyle}>{lt("Country (code)", "Ülke (kod)", "Pays (code)", "País (código)", "Paese (codice)", "Land (Code)")}</label>
-            <input style={inputStyle} value={form.country} onChange={(e) => set("country", e.target.value)} placeholder="DE" onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+            <input style={inputStyle} value={form.country} onChange={(e) => set("country", e.target.value)} placeholder="DE" onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
           </div>
           {form.account_type === "gewerbe" && (
             <>
               <div>
                 <label style={labelStyle}>{lt("Company name", "Şirket adı", "Nom de l'entreprise", "Nombre de empresa", "Ragione sociale", "Firmenname")}</label>
-                <input style={inputStyle} value={form.company_name} onChange={(e) => set("company_name", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+                <input style={inputStyle} value={form.company_name} onChange={(e) => set("company_name", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
               </div>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={labelStyle}>{lt("VAT ID", "KDV no.", "N° TVA", "NIF/CIF", "P. IVA", "USt-IdNr.")}</label>
-                <input style={inputStyle} value={form.vat_number} onChange={(e) => set("vat_number", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#111827"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.boxShadow = "none"; }} />
+                <input style={inputStyle} value={form.vat_number} onChange={(e) => set("vat_number", e.target.value)} onFocus={(e) => { e.currentTarget.style.borderColor = "#1d1b18"; e.currentTarget.style.boxShadow = "0 0 0 2px rgba(17,24,39,0.08)"; }} onBlur={(e) => { e.currentTarget.style.borderColor = "#d6ccbd"; e.currentTarget.style.boxShadow = "none"; }} />
               </div>
             </>
           )}
         </div>
         {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
-        <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button type="button" onClick={onClose} style={{ padding: "8px 18px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>{lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}</button>
-          <button type="button" onClick={handleSave} disabled={saving} style={{ padding: "8px 18px", background: "#111827", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e6dfd4", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button type="button" onClick={onClose} style={{ padding: "8px 18px", border: "1px solid #e6dfd4", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>{lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}</button>
+          <button type="button" onClick={handleSave} disabled={saving} style={{ padding: "8px 18px", background: "#1d1b18", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
             {saving ? lt("Saving…", "Kaydediliyor…", "Enregistrement…", "Guardando…", "Salvataggio…", "Speichern…") : lt("Save", "Kaydet", "Enregistrer", "Guardar", "Salva", "Speichern")}
           </button>
         </div>

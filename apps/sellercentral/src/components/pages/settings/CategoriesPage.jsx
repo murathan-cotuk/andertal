@@ -47,7 +47,7 @@ function CategoryTreeNode({ node, depth = 0, onDelete, allOpen, copy, locale }) 
           <TreeName>{categoryDisplayName(node, locale)}</TreeName>
           <TreeMeta>
             <span style={{ fontFamily: "monospace", fontSize: 11 }}>{node.slug}</span>
-            {node.is_visible && <Badge $color="#dbeafe" $text="#1e40af">{copy.navBadge}</Badge>}
+            {node.is_visible && <Badge $color="#fcebd5" $text="#7f3f00">{copy.navBadge}</Badge>}
             {node.has_collection && <Badge $color="#d1fae5" $text="#065f46">{copy.collectionBadge}</Badge>}
             {!node.active && <Badge $color="#fee2e2" $text="#991b1b">{copy.inactiveBadge}</Badge>}
             {hasChildren && <Badge $color="#fef3c7" $text="#92400e">{copy.childrenCount(node.children.length)}</Badge>}
@@ -75,8 +75,8 @@ const TreeRow = styled.div`
   padding-top: 8px;
   padding-right: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #f3f4f6;
-  &:hover { background: #f9fafb; }
+  border-bottom: 1px solid #f3eee6;
+  &:hover { background: #faf7f2; }
 `;
 
 const TreeToggle = styled.button`
@@ -94,7 +94,7 @@ const TreeToggle = styled.button`
 
 const ChevronIcon = styled.span`
   font-size: 16px;
-  color: #6b7280;
+  color: #5e574e;
   display: inline-block;
   transform: rotate(${p => p.$open ? "90deg" : "0deg"});
   transition: transform 0.18s ease;
@@ -103,7 +103,7 @@ const ChevronIcon = styled.span`
 
 const DotIcon = styled.span`
   font-size: 18px;
-  color: #d1d5db;
+  color: #d6ccbd;
   line-height: 1;
 `;
 
@@ -119,7 +119,7 @@ const TreeInfo = styled.div`
 const TreeName = styled.span`
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: #1d1b18;
 `;
 
 const TreeMeta = styled.div`
@@ -148,7 +148,7 @@ const DeleteBtn = styled.button`
   background: none;
   border: none;
   cursor: pointer;
-  color: #9ca3af;
+  color: #a39a8d;
   font-size: 13px;
   padding: 2px 6px;
   border-radius: 4px;
@@ -162,7 +162,7 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+  background: linear-gradient(135deg, #1d1b18 0%, #1d1b18 100%);
   color: white;
   padding: 32px;
   border-radius: 12px;
@@ -177,7 +177,7 @@ const Title = styled.h1`
 
 const Subtitle = styled.p`
   font-size: 16px;
-  color: #d1d5db;
+  color: #d6ccbd;
   margin: 0;
 `;
 
@@ -196,14 +196,14 @@ const Label = styled.label`
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: #3a352f;
   margin-bottom: 8px;
 `;
 
 const TextArea = styled.textarea`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #e6dfd4;
   border-radius: 8px;
   font-size: 14px;
   font-family: 'Courier New', monospace;
@@ -213,7 +213,7 @@ const TextArea = styled.textarea`
 
   &:focus {
     outline: none;
-    border-color: #0ea5e9;
+    border-color: #ee8a12;
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
   }
 `;
@@ -408,7 +408,7 @@ export default function AdminCategoriesPage() {
               placeholder="electronics"
               required
             />
-            <small style={{ color: "#6b7280", marginTop: "4px", display: "block" }}>
+            <small style={{ color: "#5e574e", marginTop: "4px", display: "block" }}>
               {copy.slugHelp}
             </small>
           </div>
@@ -475,7 +475,7 @@ export default function AdminCategoriesPage() {
               onChange={(e) => setBulkJson(e.target.value)}
               placeholder={`[\n  {\n    "name": "Electronics",\n    "slug": "electronics",\n    "description": "Electronic products"\n  },\n  {\n    "name": "Clothing",\n    "slug": "clothing",\n    "description": "Clothing and apparel"\n  }\n]`}
             />
-            <small style={{ color: "#6b7280", marginTop: "8px", display: "block" }}>
+            <small style={{ color: "#5e574e", marginTop: "8px", display: "block" }}>
               {copy.bulkJsonHelp}
             </small>
           </div>
@@ -502,26 +502,26 @@ export default function AdminCategoriesPage() {
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={() => setAllOpen(true)}
-              style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" }}
+              style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e6dfd4", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#3a352f" }}
             >
               {copy.expandAll}
             </button>
             <button
               onClick={() => setAllOpen(false)}
-              style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#374151" }}
+              style={{ fontSize: 12, padding: "4px 12px", border: "1px solid #e6dfd4", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#3a352f" }}
             >
               {copy.collapseAll}
             </button>
           </div>
         </div>
         {loading ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>{copy.loading}</div>
+          <div style={{ textAlign: "center", padding: "40px", color: "#5e574e" }}>{copy.loading}</div>
         ) : categories.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+          <div style={{ textAlign: "center", padding: "40px", color: "#5e574e" }}>
             {copy.noCategories}
           </div>
         ) : (
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden" }}>
             {buildTree(categories).map(node => (
               <CategoryTreeNode key={node.id} node={node} depth={0} onDelete={handleDelete} allOpen={allOpen} copy={copy} locale={locale} />
             ))}

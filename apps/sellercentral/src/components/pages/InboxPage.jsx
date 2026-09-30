@@ -402,14 +402,14 @@ function CustomerInbox({ client, isSuperuser, sellerNames, readOnly = false }) {
     const customerName = [thread.order_first_name, thread.order_last_name].filter(Boolean).join(" ") || thread.order_email || (locale === "en" ? "Customer" : locale === "tr" ? "Müşteri" : locale === "fr" ? "Client" : locale === "es" ? "Cliente" : locale === "it" ? "Cliente" : "Kunde");
     const custNo = thread.customer_number != null ? ` · ${locale === "en" ? "Cust.No." : locale === "tr" ? "Müş.No." : locale === "fr" ? "N° client" : locale === "es" ? "N° cliente" : locale === "it" ? "N° cliente" : "Kd.Nr."} ${thread.customer_number}` : "";
     return (
-      <div key={`${thread.order_id || "__no_order__"}${keySuffix}`} style={{ borderBottom: "1px solid #e1e3e5" }}>
+      <div key={`${thread.order_id || "__no_order__"}${keySuffix}`} style={{ borderBottom: "1px solid #e6dfd4" }}>
         <button
           type="button"
           onClick={() => handleSelectThread(thread)}
           style={{
             width: "100%", textAlign: "left", padding: "10px 14px",
-            background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : unread > 0 ? "#eff6ff" : "transparent",
-            borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : unread > 0 ? "3px solid #3b82f6" : "3px solid transparent",
+            background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : unread > 0 ? "#fcebd5" : "transparent",
+            borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ee8a12)" : unread > 0 ? "3px solid #ee8a12" : "3px solid transparent",
             borderTop: "none", borderRight: "none", borderBottom: "none",
             cursor: "pointer", display: "block",
           }}
@@ -491,7 +491,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames, readOnly = false }) {
               )}
               {partitioned.sellerGroups.map((grp) => (
                 <div key={grp.sellerId}>
-                  <div style={{ padding: "12px 14px", background: "var(--p-color-bg-surface-secondary, #f3f4f6)", borderBottom: "1px solid var(--p-color-border)" }}>
+                  <div style={{ padding: "12px 14px", background: "var(--p-color-bg-surface-secondary, #f3eee6)", borderBottom: "1px solid var(--p-color-border)" }}>
                     <Text as="p" variant="bodySm" fontWeight="bold">
                       {locale === "en" ? "Seller" : locale === "tr" ? "Satıcı" : locale === "fr" ? "Vendeur" : locale === "es" ? "Vendedor" : locale === "it" ? "Venditore" : "Verkäufer"}: {grp.label}
                     </Text>
@@ -537,7 +537,7 @@ function CustomerInbox({ client, isSuperuser, sellerNames, readOnly = false }) {
                   <div key={m.id} style={{ display: "flex", justifyContent: isSeller ? "flex-end" : "flex-start" }}>
                     <div style={{
                       maxWidth: "72%",
-                      background: isSeller ? "var(--p-color-bg-fill-brand, #ff971c)" : "var(--p-color-bg-surface-secondary)",
+                      background: isSeller ? "var(--p-color-bg-fill-brand, #ee8a12)" : "var(--p-color-bg-surface-secondary)",
                       color: isSeller ? "#fff" : "var(--p-color-text)",
                       borderRadius: isSeller ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
                       padding: "9px 13px",
@@ -1008,14 +1008,14 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                 thread.messages.find((m) => m.seller_store_name && String(m.seller_store_name).trim())?.seller_store_name || null;
               const title = (rowStore && String(rowStore).trim()) || getSellerLabel(thread.seller_id);
               return (
-                <div key={thread.seller_id || "__unknown__"} style={{ borderBottom: "1px solid #e1e3e5" }}>
+                <div key={thread.seller_id || "__unknown__"} style={{ borderBottom: "1px solid #e6dfd4" }}>
                   <button
                     type="button"
                     onClick={() => handleSelectSeller(thread)}
                     style={{
                       width: "100%", textAlign: "left", padding: "10px 14px",
                       background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
-                      borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : (unread > 0 ? "3px solid #f59e0b" : "3px solid transparent"),
+                      borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ee8a12)" : (unread > 0 ? "3px solid #f59e0b" : "3px solid transparent"),
                       borderTop: "none", borderRight: "none", borderBottom: "none",
                       cursor: "pointer", display: "block",
                     }}
@@ -1088,14 +1088,14 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
             const unread = unreadForSubjectThread(thread);
             const isActive = !isNewSubject && selectedSubjectKey !== null && selectedSubjectKey === thread.subject_key;
             return (
-              <div key={`${isSuperuser ? selectedSellerThread?.seller_id : "me"}-${thread.subject_key || "__"}`} style={{ borderBottom: "1px solid #e1e3e5" }}>
+              <div key={`${isSuperuser ? selectedSellerThread?.seller_id : "me"}-${thread.subject_key || "__"}`} style={{ borderBottom: "1px solid #e6dfd4" }}>
                 <button
                   type="button"
                   onClick={() => handleSelectSubject(thread)}
                   style={{
                     width: "100%", textAlign: "left", padding: "10px 14px",
                     background: isActive ? "var(--p-color-bg-surface-selected, #fff7ed)" : "transparent",
-                    borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ff971c)" : "3px solid transparent",
+                    borderLeft: isActive ? "3px solid var(--p-color-bg-fill-brand, #ee8a12)" : "3px solid transparent",
                     borderTop: "none", borderRight: "none", borderBottom: "none",
                     cursor: "pointer", display: "block",
                   }}
@@ -1166,7 +1166,7 @@ function SupportInbox({ client, isSuperuser, mySellerID, sellerNames, sellerUser
                     <div key={m.id} style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start" }}>
                       <div style={{
                         maxWidth: "72%",
-                        background: isMe ? "var(--p-color-bg-fill-brand, #ff971c)" : "var(--p-color-bg-surface-secondary)",
+                        background: isMe ? "var(--p-color-bg-fill-brand, #ee8a12)" : "var(--p-color-bg-surface-secondary)",
                         color: isMe ? "#fff" : "var(--p-color-text)",
                         borderRadius: isMe ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
                         padding: "9px 13px",

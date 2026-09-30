@@ -47,18 +47,18 @@ function bonusSourceLabel(source, locale) {
 const STATUS_COLORS = {
   paid: { bg: "#d1fae5", color: "#065f46" }, bezahlt: { bg: "#d1fae5", color: "#065f46" },
   pending: { bg: "#fef3c7", color: "#92400e" }, ausstehend: { bg: "#fef3c7", color: "#92400e" },
-  versendet: { bg: "#dbeafe", color: "#1e40af" },
+  versendet: { bg: "#fcebd5", color: "#7f3f00" },
   abgeschlossen: { bg: "#d1fae5", color: "#065f46" },
   zugestellt: { bg: "#d1fae5", color: "#065f46" },
   cancelled: { bg: "#fee2e2", color: "#991b1b" }, storniert: { bg: "#fee2e2", color: "#991b1b" },
   offen: { bg: "#fff7ed", color: "#c2410c" },
   retoure: { bg: "#fef2f2", color: "#b91c1c" },
   retoure_anfrage: { bg: "#fffbeb", color: "#b45309" },
-  refunded: { bg: "#eff6ff", color: "#1d4ed8" },
+  refunded: { bg: "#fcebd5", color: "#7f3f00" },
 };
 function StatusBadge({ value }) {
   const locale = useLocale();
-  const s = STATUS_COLORS[value?.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280" };
+  const s = STATUS_COLORS[value?.toLowerCase()] || { bg: "#f3eee6", color: "#5e574e" };
   return (
     <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.color, fontWeight: 600 }}>
       {value ? statusLabel(locale, value) : "—"}
@@ -68,10 +68,10 @@ function StatusBadge({ value }) {
 
 function Card({ title, action, children }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
+    <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
       {title && (
-        <div style={{ padding: "13px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#111827" }}>{title}</h3>
+        <div style={{ padding: "13px 20px", borderBottom: "1px solid #e6dfd4", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#1d1b18" }}>{title}</h3>
           {action}
         </div>
       )}
@@ -82,12 +82,12 @@ function Card({ title, action, children }) {
 
 function InfoRow({ label, value, mono }) {
   return (
-    <div style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid #f9fafb", alignItems: "flex-start" }}>
-      <span style={{ width: 160, flexShrink: 0, fontSize: 12, color: "#6b7280", fontWeight: 500 }}>{label}</span>
+    <div style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid #faf7f2", alignItems: "flex-start" }}>
+      <span style={{ width: 160, flexShrink: 0, fontSize: 12, color: "#5e574e", fontWeight: 500 }}>{label}</span>
       <span
         style={{
           fontSize: 13,
-          color: "#111827",
+          color: "#1d1b18",
           flex: 1,
           minWidth: 0,
           wordBreak: "break-word",
@@ -104,9 +104,9 @@ function InfoRow({ label, value, mono }) {
 function AddressBlock({ label, line1, line2, zip, city, country }) {
   if (!line1 && !city) return <InfoRow label={label} value={null} />;
   return (
-    <div style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid #f9fafb" }}>
-      <span style={{ width: 160, flexShrink: 0, fontSize: 12, color: "#6b7280", fontWeight: 500 }}>{label}</span>
-      <div style={{ fontSize: 13, color: "#111827", flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+    <div style={{ display: "flex", gap: 12, padding: "8px 0", borderBottom: "1px solid #faf7f2" }}>
+      <span style={{ width: 160, flexShrink: 0, fontSize: 12, color: "#5e574e", fontWeight: 500 }}>{label}</span>
+      <div style={{ fontSize: 13, color: "#1d1b18", flex: 1, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>
         {line1 && <div>{line1}</div>}
         {line2 && <div>{line2}</div>}
         {(zip || city) && <div>{[zip, city].filter(Boolean).join(" ")}</div>}
@@ -122,8 +122,8 @@ function DiscountModal({ customerId, onClose, onAdded, ui, locale }) {
   const [err, setErr] = useState("");
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const inp = { padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" };
-  const lbl = { fontSize: 12, color: "#374151", fontWeight: 500, display: "block", marginBottom: 3 };
+  const inp = { padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const lbl = { fontSize: 12, color: "#3a352f", fontWeight: 500, display: "block", marginBottom: 3 };
 
   const handleSave = async () => {
     if (!form.code) { setErr(locale === "en" ? "Code is required" : locale === "tr" ? "Kod gereklidir" : locale === "fr" ? "Le code est requis" : locale === "es" ? "El código es obligatorio" : locale === "it" ? "Il codice è obbligatorio" : "Code ist erforderlich"); return; }
@@ -149,9 +149,9 @@ function DiscountModal({ customerId, onClose, onAdded, ui, locale }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: "#fff", borderRadius: 12, width: 460, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "16px 24px", borderBottom: "1px solid #e6dfd4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{locale === "en" ? "Create discount code" : locale === "tr" ? "İndirim kodu oluştur" : locale === "fr" ? "Créer un code de réduction" : locale === "es" ? "Crear código de descuento" : locale === "it" ? "Crea codice sconto" : "Rabattcode erstellen"}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#5e574e" }}>×</button>
         </div>
         <div style={{ padding: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div style={{ gridColumn: "1/-1" }}>
@@ -188,7 +188,7 @@ function DiscountModal({ customerId, onClose, onAdded, ui, locale }) {
           </div>
         </div>
         {err && <div style={{ margin: "0 24px 12px", color: "#ef4444", fontSize: 12 }}>{err}</div>}
-        <div style={{ padding: "12px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ padding: "12px 24px", borderTop: "1px solid #e6dfd4", display: "flex", justifyContent: "flex-end" }}>
           <InlineStack gap="200">
             <Button onClick={onClose}>{ui.cancel}</Button>
             <Button variant="primary" onClick={handleSave} loading={saving}>
@@ -449,7 +449,7 @@ export default function CustomerDetailPage() {
                 {customer.is_registered ? (
                   <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>{lt(locale, "Registered", "Kayıtlı", "Registered", "Registered", "Registered", "Registriert")}</span>
                 ) : (
-                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>{ui.guestCustomer}</span>
+                  <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#f3eee6", color: "#5e574e", fontWeight: 600 }}>{ui.guestCustomer}</span>
                 )}
                 {customer.newsletter_opted_in && (
                   <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontWeight: 600 }}>Newsletter</span>
@@ -458,7 +458,7 @@ export default function CustomerDetailPage() {
             )}
           </div>
           {isSuperuser && customer?.customer_number && (
-            <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>
+            <div style={{ fontSize: 13, color: "#5e574e", marginTop: 3 }}>
               #{customer.customer_number}{customer.email ? ` · ${customer.email}` : ""}
             </div>
           )}
@@ -467,7 +467,7 @@ export default function CustomerDetailPage() {
           <button
             type="button"
             onClick={() => setEditCustomerModal(true)}
-            style={{ padding: "7px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff", flexShrink: 0 }}
+            style={{ padding: "7px 16px", border: "1px solid #e6dfd4", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff", flexShrink: 0 }}
           >
             {ui.edit}
           </button>
@@ -475,10 +475,10 @@ export default function CustomerDetailPage() {
       </div>
 
       {loading && (
-        <div style={{ padding: 60, textAlign: "center", color: "#9ca3af", background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb" }}>{ui.loading}</div>
+        <div style={{ padding: 60, textAlign: "center", color: "#a39a8d", background: "#fff", borderRadius: 10, border: "1px solid #e6dfd4" }}>{ui.loading}</div>
       )}
       {!loading && error && (
-        <div style={{ padding: 40, textAlign: "center", color: "#ef4444", background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb" }}>{error}</div>
+        <div style={{ padding: 40, textAlign: "center", color: "#ef4444", background: "#fff", borderRadius: 10, border: "1px solid #e6dfd4" }}>{error}</div>
       )}
 
       {!loading && !error && customer && (
@@ -493,7 +493,7 @@ export default function CustomerDetailPage() {
                 { label: lt(locale, "Avg. order", "Ort. sipariş", "Avg. order", "Avg. order", "Avg. order", "Ø Bestellwert"), value: fmtCents(avgOrder, locale), icon: "📊" },
                 ...(isSuperuser ? [{ label: lt(locale, "Bonus points", "Bonus puanı", "Bonus points", "Bonus points", "Bonus points", "Bonuspunkte"), value: customer.bonus_points ?? 0, icon: "⭐", editable: true, onEdit: () => setShowBonusLedgerModal(true) }] : []),
               ].map((s, i) => (
-                <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
+                <div key={i} style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 10, padding: "14px 16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 18 }}>{s.icon}</span>
                     {s.editable && (
@@ -502,8 +502,8 @@ export default function CustomerDetailPage() {
                       </Button>
                     )}
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "#111827" }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>{s.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#1d1b18" }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: "#5e574e", marginTop: 3 }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -511,11 +511,11 @@ export default function CustomerDetailPage() {
             {/* Order history */}
             <Card title={`${lt(locale, "Order history", "Sipariş geçmişi", "Order history", "Order history", "Order history", "Bestellhistorie")} (${orders.length})`}>
               {orders.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>{ui.noOrders}</p>
+                <p style={{ fontSize: 13, color: "#a39a8d", padding: "12px 0" }}>{ui.noOrders}</p>
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
                   <thead>
-                    <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
+                    <tr style={{ color: "#5e574e", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colNumber}</th>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colOrderStatus}</th>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colPaymentStatus}</th>
@@ -528,12 +528,12 @@ export default function CustomerDetailPage() {
                     {orders.map((o, i) => (
                       <tr
                         key={i}
-                        style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+                        style={{ borderBottom: "1px solid #f3eee6", cursor: "pointer" }}
                         onClick={() => router.push(`/orders/${o.id}`)}
-                        onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+                        onMouseEnter={e => e.currentTarget.style.background = "#faf7f2"}
                         onMouseLeave={e => e.currentTarget.style.background = ""}
                       >
-                        <td style={{ padding: "9px 0", fontWeight: 600, color: "#202223" }}>#{o.order_number || "—"}</td>
+                        <td style={{ padding: "9px 0", fontWeight: 600, color: "#1d1b18" }}>#{o.order_number || "—"}</td>
                         <td style={{ padding: "9px 0" }}>
                           {returnsMap[o.id] ? (
                             <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#fef2f2", color: "#b91c1c", fontWeight: 600 }}>{ui.retoure}</span>
@@ -544,7 +544,7 @@ export default function CustomerDetailPage() {
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.payment_status} /></td>
                         <td style={{ padding: "9px 0" }}><StatusBadge value={o.delivery_status} /></td>
                         <td style={{ padding: "9px 0", textAlign: "right", fontWeight: 600 }}>{fmtCents(o.total_cents, locale)}</td>
-                        <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(o.created_at, locale)}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right", color: "#5e574e", fontSize: 12 }}>{fmtDateShort(o.created_at, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -555,11 +555,11 @@ export default function CustomerDetailPage() {
             {/* Reviews */}
             <Card title={`${ui.reviewsTitle} (${reviews.length})`}>
               {reviews.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>{ui.noReviews}</p>
+                <p style={{ fontSize: 13, color: "#a39a8d", padding: "12px 0" }}>{ui.noReviews}</p>
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
                   <thead>
-                    <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
+                    <tr style={{ color: "#5e574e", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>SKU / {ui.colProduct}</th>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colRating}</th>
                       <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{lt(locale, "Comment", "Yorum", "Comment", "Comment", "Comment", "Kommentar")}</th>
@@ -568,13 +568,13 @@ export default function CustomerDetailPage() {
                   </thead>
                   <tbody>
                     {reviews.map((r, i) => (
-                      <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "9px 0", color: "#374151" }}>{r.product_sku || r.product_title || r.product_id || "—"}</td>
+                      <tr key={i} style={{ borderBottom: "1px solid #f3eee6" }}>
+                        <td style={{ padding: "9px 0", color: "#3a352f" }}>{r.product_sku || r.product_title || r.product_id || "—"}</td>
                         <td style={{ padding: "9px 0" }}>
                           <span style={{ color: "#f59e0b", letterSpacing: 1 }}>{"★".repeat(r.rating || 0)}{"☆".repeat(5 - (r.rating || 0))}</span>
                         </td>
-                        <td style={{ padding: "9px 0", color: "#6b7280", maxWidth: 300 }}>{r.comment || "—"}</td>
-                        <td style={{ padding: "9px 0", textAlign: "right", color: "#6b7280", fontSize: 12 }}>{fmtDateShort(r.created_at, locale)}</td>
+                        <td style={{ padding: "9px 0", color: "#5e574e", maxWidth: 300 }}>{r.comment || "—"}</td>
+                        <td style={{ padding: "9px 0", textAlign: "right", color: "#5e574e", fontSize: 12 }}>{fmtDateShort(r.created_at, locale)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -594,11 +594,11 @@ export default function CustomerDetailPage() {
                   }
                 >
                   {discounts.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>{ui.noResults}</p>
+                    <p style={{ fontSize: 13, color: "#a39a8d", padding: "12px 0" }}>{ui.noResults}</p>
                   ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 8 }}>
                       <thead>
-                        <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
+                        <tr style={{ color: "#5e574e", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>
                           <th style={{ textAlign: "left", padding: "4px 0 10px" }}>Code</th>
                           <th style={{ textAlign: "left", padding: "4px 0 10px" }}>{ui.colType}</th>
                           <th style={{ textAlign: "right", padding: "4px 0 10px" }}>{lt(locale, "Value", "Değer", "Value", "Value", "Value", "Wert")}</th>
@@ -612,14 +612,14 @@ export default function CustomerDetailPage() {
                           const isExpired = d.expires_at && new Date(d.expires_at) < new Date();
                           const isExhausted = d.used_count >= d.max_uses;
                           return (
-                            <tr key={i} style={{ borderBottom: "1px solid #f3f4f6", opacity: (isExpired || isExhausted) ? 0.5 : 1 }}>
+                            <tr key={i} style={{ borderBottom: "1px solid #f3eee6", opacity: (isExpired || isExhausted) ? 0.5 : 1 }}>
                               <td style={{ padding: "8px 0", fontWeight: 700, fontFamily: "monospace", fontSize: 12 }}>{d.code}</td>
-                              <td style={{ padding: "8px 0", color: "#6b7280" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? (lt(locale, "Fixed", "Sabit", "Fixed", "Fixed", "Fixed", "Fest")) : ui.shipping}</td>
+                              <td style={{ padding: "8px 0", color: "#5e574e" }}>{d.type === "percentage" ? "%" : d.type === "fixed" ? (lt(locale, "Fixed", "Sabit", "Fixed", "Fixed", "Fixed", "Fest")) : ui.shipping}</td>
                               <td style={{ padding: "8px 0", textAlign: "right", fontWeight: 600 }}>
                                 {d.type === "percentage" ? `${d.value}%` : d.type === "fixed" ? `${Number(d.value).toFixed(2)} €` : "—"}
                               </td>
-                              <td style={{ padding: "8px 0", textAlign: "right", color: "#6b7280" }}>{d.used_count}/{d.max_uses}</td>
-                              <td style={{ padding: "8px 0", textAlign: "right", fontSize: 12, color: isExpired ? "#ef4444" : "#6b7280" }}>
+                              <td style={{ padding: "8px 0", textAlign: "right", color: "#5e574e" }}>{d.used_count}/{d.max_uses}</td>
+                              <td style={{ padding: "8px 0", textAlign: "right", fontSize: 12, color: isExpired ? "#ef4444" : "#5e574e" }}>
                                 {d.expires_at ? fmtDateShort(d.expires_at, locale) : "—"}
                               </td>
                               <td style={{ padding: "8px 0", textAlign: "right" }}>
@@ -647,7 +647,7 @@ export default function CustomerDetailPage() {
                       <textarea
                         value={notesVal}
                         onChange={e => setNotesVal(e.target.value)}
-                        style={{ width: "100%", height: 100, padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+                        style={{ width: "100%", height: 100, padding: "8px 12px", border: "1px solid #e6dfd4", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
                         placeholder={lt(locale, "Internal notes about the customer…", "Müşteri hakkında dahili notlar…", "Internal notes about the customer…", "Internal notes about the customer…", "Internal notes about the customer…", "Interne Notizen zum Kunden…")}
                         autoFocus
                       />
@@ -661,7 +661,7 @@ export default function CustomerDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <p style={{ fontSize: 13, color: notesVal ? "#111827" : "#9ca3af", margin: "10px 0 4px", whiteSpace: "pre-wrap" }}>
+                    <p style={{ fontSize: 13, color: notesVal ? "#1d1b18" : "#a39a8d", margin: "10px 0 4px", whiteSpace: "pre-wrap" }}>
                       {notesVal || (lt(locale, "No notes", "Not yok", "No notes", "No notes", "No notes", "Keine Notizen"))}
                     </p>
                   )}
@@ -687,21 +687,21 @@ export default function CustomerDetailPage() {
                     { label: lt(locale, "Redeemed (total)", "Kullanılan (toplam)", "Redeemed (total)", "Redeemed (total)", "Redeemed (total)", "Eingelöst (gesamt)"), value: `-${bonusSummary.redeemed_points} Pkt.`, color: "#991b1b" },
                     { label: lt(locale, "Reversed (net)", "Ters kayıt (net)", "Reversed (net)", "Reversed (net)", "Reversed (net)", "Storniert (netto)"), value: `${bonusSummary.reversed_points > 0 ? "+" : ""}${bonusSummary.reversed_points} Pkt.`, color: bonusSummary.reversed_points >= 0 ? "#065f46" : "#991b1b" },
                   ].map((s) => (
-                    <div key={s.label} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
-                      <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>{s.label}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: s.color || "#111827" }}>{s.value}</div>
-                      {s.sub && <div style={{ fontSize: 12, color: "#9ca3af" }}>{s.sub}</div>}
+                    <div key={s.label} style={{ border: "1px solid #e6dfd4", borderRadius: 8, padding: "8px 10px" }}>
+                      <div style={{ fontSize: 11, color: "#5e574e", textTransform: "uppercase" }}>{s.label}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: s.color || "#1d1b18" }}>{s.value}</div>
+                      {s.sub && <div style={{ fontSize: 12, color: "#a39a8d" }}>{s.sub}</div>}
                     </div>
                   ))}
                 </div>
               )}
               {bonusLedger.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>{lt(locale, "No ledger entries yet.", "Henüz kayıt yok.", "No ledger entries yet.", "No ledger entries yet.", "No ledger entries yet.", "Noch keine Einträge im Verlauf.")}</p>
+                <p style={{ fontSize: 13, color: "#a39a8d", padding: "8px 0" }}>{lt(locale, "No ledger entries yet.", "Henüz kayıt yok.", "No ledger entries yet.", "No ledger entries yet.", "No ledger entries yet.", "Noch keine Einträge im Verlauf.")}</p>
               ) : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
-                      <tr style={{ color: "#6b7280", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e5e7eb" }}>
+                      <tr style={{ color: "#5e574e", fontSize: 11, textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>
                         <th style={{ textAlign: "left", padding: "6px 8px 10px", width: 110 }}>{ui.colDate}</th>
                         <th style={{ textAlign: "left", padding: "6px 8px 10px" }}>{ui.colDescription}</th>
                         <th style={{ textAlign: "right", padding: "6px 8px 10px", width: 100 }}>{lt(locale, "Bonus points", "Bonus puan", "Bonus points", "Bonus points", "Bonus points", "Bonuspunkte")}</th>
@@ -709,15 +709,15 @@ export default function CustomerDetailPage() {
                     </thead>
                     <tbody>
                       {bonusLedger.map((row) => (
-                        <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6", verticalAlign: "top" }}>
-                          <td style={{ padding: "10px 8px", whiteSpace: "nowrap", color: "#6b7280", fontSize: 12 }}>
+                        <tr key={row.id} style={{ borderBottom: "1px solid #f3eee6", verticalAlign: "top" }}>
+                          <td style={{ padding: "10px 8px", whiteSpace: "nowrap", color: "#5e574e", fontSize: 12 }}>
                             {fmtDateShort(row.occurred_at, locale)}
                           </td>
                           <td style={{ padding: "10px 8px", minWidth: 180 }}>
                             <div>
-                              <span style={{ color: "#111827" }}>{row.description}</span>
+                              <span style={{ color: "#1d1b18" }}>{row.description}</span>
                               {row.source && row.source !== "manual" && (
-                                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{bonusSourceLabel(row.source, locale)}</div>
+                                <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 2 }}>{bonusSourceLabel(row.source, locale)}</div>
                               )}
                             </div>
                           </td>
@@ -772,7 +772,7 @@ export default function CustomerDetailPage() {
                 country={customer.country}
               />
               {!customer.address_line1 && !customer.city && (
-                <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>{lt(locale, "No delivery address", "Teslimat adresi yok", "No delivery address", "No delivery address", "No delivery address", "Keine Lieferadresse")}</p>
+                <p style={{ fontSize: 13, color: "#a39a8d", margin: "10px 0 4px" }}>{lt(locale, "No delivery address", "Teslimat adresi yok", "No delivery address", "No delivery address", "No delivery address", "Keine Lieferadresse")}</p>
               )}
             </Card>
 
@@ -797,14 +797,14 @@ export default function CustomerDetailPage() {
                     city={billingFromOrders.billing_city}
                     country={billingFromOrders.billing_country}
                   />
-                  <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 6 }}>{locale === "en" ? "From last order" : locale === "tr" ? "Son siparişten" : locale === "fr" ? "Dernière commande" : locale === "es" ? "Del último pedido" : locale === "it" ? "Dall'ultimo ordine" : "Aus letzter Bestellung"}</p>
+                  <p style={{ fontSize: 11, color: "#a39a8d", marginTop: 6 }}>{locale === "en" ? "From last order" : locale === "tr" ? "Son siparişten" : locale === "fr" ? "Dernière commande" : locale === "es" ? "Del último pedido" : locale === "it" ? "Dall'ultimo ordine" : "Aus letzter Bestellung"}</p>
                 </>
               ) : (customer.address_line1 || customer.city) ? (
-                <p style={{ fontSize: 13, color: "#6b7280", margin: "10px 0 4px", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 13, color: "#5e574e", margin: "10px 0 4px", lineHeight: 1.5 }}>
                   {lt(locale, "Same as delivery address (no separate billing address).", "Teslimat adresiyle aynı (ayrı fatura adresi yok).", "Same as delivery address (no separate billing address).", "Same as delivery address (no separate billing address).", "Same as delivery address (no separate billing address).", "Entspricht der Lieferadresse (keine abweichende Rechnungsadresse).")}
                 </p>
               ) : (
-                <p style={{ fontSize: 13, color: "#9ca3af", margin: "10px 0 4px" }}>
+                <p style={{ fontSize: 13, color: "#a39a8d", margin: "10px 0 4px" }}>
                   {lt(locale, "No billing address on file.", "Kayıtlı fatura adresi yok.", "No billing address on file.", "No billing address on file.", "No billing address on file.", "Keine Rechnungsadresse hinterlegt.")}
                 </p>
               )}
@@ -820,10 +820,10 @@ export default function CustomerDetailPage() {
                   orders.length > 1 && lastOrder && { date: lastOrder, text: lt(locale, "Last order", "Son sipariş", "Last order", "Last order", "Last order", "Letzte Bestellung") },
                 ].filter(Boolean).sort((a, b) => new Date(b.date) - new Date(a.date)).map((ev, i) => (
                   <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "flex-start" }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#008060", marginTop: 5, flexShrink: 0 }} />
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#ee8a12", marginTop: 5, flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{ev.text}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>{fmtDateShort(ev.date, locale)}</div>
+                      <div style={{ fontSize: 11, color: "#5e574e" }}>{fmtDateShort(ev.date, locale)}</div>
                     </div>
                   </div>
                 ))}

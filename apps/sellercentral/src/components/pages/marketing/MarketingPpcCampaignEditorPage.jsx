@@ -77,7 +77,7 @@ function StepHeader({ step, title, subtitle }) {
           {title}
         </Text>
         {subtitle ? (
-          <p style={{ margin: "6px 0 0", fontSize: 13, color: "#64748b", lineHeight: 1.45, maxWidth: 560 }}>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "#5e574e", lineHeight: 1.45, maxWidth: 560 }}>
             {subtitle}
           </p>
         ) : null}
@@ -93,13 +93,13 @@ function ShopPreviewMock({ mc, name, budgetEuro, goalLabel, targetType, productC
       style={{
         borderRadius: shell.cardRadius,
         border: shell.border,
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+        background: "linear-gradient(180deg, #ffffff 0%, #faf7f2 100%)",
         boxShadow: shell.cardShadow,
         overflow: "hidden",
       }}
     >
-      <div style={{ padding: "14px 16px", borderBottom: "1px solid #e2e8f0", background: "#fff" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#64748b", textTransform: "uppercase" }}>
+      <div style={{ padding: "14px 16px", borderBottom: "1px solid #e6dfd4", background: "#fff" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "#5e574e", textTransform: "uppercase" }}>
           {mc.liveShopPreview}
         </span>
       </div>
@@ -111,8 +111,8 @@ function ShopPreviewMock({ mc, name, budgetEuro, goalLabel, targetType, productC
               overflow: "hidden",
               marginBottom: 14,
               aspectRatio: "16/9",
-              background: "#0f172a",
-              border: "1px solid #e2e8f0",
+              background: "#1d1b18",
+              border: "1px solid #e6dfd4",
             }}
           >
             <video key={shopClip} src={shopClip} controls muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -121,7 +121,7 @@ function ShopPreviewMock({ mc, name, budgetEuro, goalLabel, targetType, productC
         <div
           style={{
             borderRadius: 14,
-            border: "1px solid #e2e8f0",
+            border: "1px solid #e6dfd4",
             padding: 14,
             background: "#fff",
             display: "flex",
@@ -139,7 +139,7 @@ function ShopPreviewMock({ mc, name, budgetEuro, goalLabel, targetType, productC
             }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 650, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 13, fontWeight: 650, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {name || mc.yourCampaign}
             </div>
             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -156,24 +156,24 @@ function ShopPreviewMock({ mc, name, budgetEuro, goalLabel, targetType, productC
               >
                 {mc.sponsored}
               </span>
-              <span style={{ fontSize: 11, color: "#64748b" }}>{goalLabel}</span>
+              <span style={{ fontSize: 11, color: "#5e574e" }}>{goalLabel}</span>
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 14, fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+        <div style={{ marginTop: 14, fontSize: 12, color: "#5e574e", lineHeight: 1.5 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
             <span>{mc.dailyBudget}</span>
-            <strong style={{ color: "#0f172a" }}>{budgetEuro ? `${budgetEuro} €` : "—"}</strong>
+            <strong style={{ color: "#1d1b18" }}>{budgetEuro ? `${budgetEuro} €` : "—"}</strong>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span>{mc.targetAudience}</span>
-            <strong style={{ color: "#0f172a" }}>
+            <strong style={{ color: "#1d1b18" }}>
               {targetType === "all" ? mc.allItems : targetType === "groups" ? mc.groups : mc.productCount(productCount)}
             </strong>
           </div>
           <div style={{ marginTop: 12 }}>
             <ProgressBar progress={budgetEuro ? 72 : 24} tone="primary" size="small" />
-            <span style={{ fontSize: 10, marginTop: 6, display: "block", color: "#94a3b8" }}>
+            <span style={{ fontSize: 10, marginTop: 6, display: "block", color: "#a39a8d" }}>
               {mc.visibilityHint}
             </span>
           </div>
@@ -205,7 +205,7 @@ function CampaignVideoSlot({
         borderRadius: 18,
         border: shell.border,
         padding: 20,
-        background: "linear-gradient(165deg, #fafbff 0%, #ffffff 52%, #f8fafc 100%)",
+        background: "linear-gradient(165deg, #fafbff 0%, #ffffff 52%, #faf7f2 100%)",
         boxShadow: shell.cardShadow,
         height: "100%",
       }}
@@ -213,8 +213,8 @@ function CampaignVideoSlot({
       <InlineStack align="space-between" blockAlign="start" wrap>
         <BlockStack gap="100">
           <Text as="span" variant="headingSm">{title}</Text>
-          <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>{roleLine}</p>
-          <p style={{ margin: 0, fontSize: 11, color: "#94a3b8", lineHeight: 1.45 }}>{specsLine}</p>
+          <p style={{ margin: 0, fontSize: 13, color: "#3a352f", lineHeight: 1.5 }}>{roleLine}</p>
+          <p style={{ margin: 0, fontSize: 11, color: "#a39a8d", lineHeight: 1.45 }}>{specsLine}</p>
         </BlockStack>
         <Badge tone="attention">{badge}</Badge>
       </InlineStack>
@@ -226,7 +226,7 @@ function CampaignVideoSlot({
           ...(wide ? { aspectRatio: "16/9" } : { aspectRatio: "9/16", maxWidth: 240, marginLeft: "auto", marginRight: "auto" }),
           borderRadius: 14,
           overflow: "hidden",
-          background: "linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #312e81 120%)",
+          background: "linear-gradient(145deg, #1d1b18 0%, #1d1b18 55%, #312e81 120%)",
           border: "1px solid rgba(148, 163, 184, 0.35)",
           display: "flex",
           alignItems: "center",
@@ -306,17 +306,17 @@ function CampaignImageSlot({ mc, url, uploading, onSelectFile, onClear }) {
   const resolved = url ? resolveImageUrl(url) : "";
 
   return (
-    <div style={{ borderRadius: 18, border: shell.border, padding: 20, background: "linear-gradient(165deg, #fafbff 0%, #ffffff 52%, #f8fafc 100%)", boxShadow: shell.cardShadow }}>
+    <div style={{ borderRadius: 18, border: shell.border, padding: 20, background: "linear-gradient(165deg, #fafbff 0%, #ffffff 52%, #faf7f2 100%)", boxShadow: shell.cardShadow }}>
       <InlineStack align="space-between" blockAlign="start" wrap>
         <BlockStack gap="100">
           <Text as="span" variant="headingSm">{mc.campaignImage}</Text>
-          <p style={{ margin: 0, fontSize: 13, color: "#475569", lineHeight: 1.5 }}>{mc.imageRoleLine}</p>
-          <p style={{ margin: 0, fontSize: 11, color: "#94a3b8" }}>{mc.imageSpecsLine}</p>
+          <p style={{ margin: 0, fontSize: 13, color: "#3a352f", lineHeight: 1.5 }}>{mc.imageRoleLine}</p>
+          <p style={{ margin: 0, fontSize: 11, color: "#a39a8d" }}>{mc.imageSpecsLine}</p>
         </BlockStack>
         <Badge tone="info">{mc.imageBadge}</Badge>
       </InlineStack>
 
-      <div style={{ marginTop: 16, width: "100%", aspectRatio: "16/9", borderRadius: 14, overflow: "hidden", background: "linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #312e81 120%)", border: "1px solid rgba(148,163,184,0.35)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 168 }}>
+      <div style={{ marginTop: 16, width: "100%", aspectRatio: "16/9", borderRadius: 14, overflow: "hidden", background: "linear-gradient(145deg, #1d1b18 0%, #1d1b18 55%, #312e81 120%)", border: "1px solid rgba(148,163,184,0.35)", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 168 }}>
         {resolved ? (
           <img src={resolved} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", maxHeight: 320 }} />
         ) : (
@@ -364,9 +364,9 @@ function LocaleContentEditor({ mc, localeContent, onChange }) {
               onClick={() => setActiveLocale(loc.code)}
               style={{
                 padding: "5px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
-                border: `1px solid ${activeLocale === loc.code ? shell.accent : "#e2e8f0"}`,
+                border: `1px solid ${activeLocale === loc.code ? shell.accent : "#e6dfd4"}`,
                 background: activeLocale === loc.code ? shell.accentSoft : "#fff",
-                color: activeLocale === loc.code ? "#4338ca" : (hasContent ? "#334155" : "#94a3b8"),
+                color: activeLocale === loc.code ? "#4338ca" : (hasContent ? "#3a352f" : "#a39a8d"),
               }}
             >
               {loc.label}{hasContent ? " ✓" : ""}
@@ -767,7 +767,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
         <Card>
           <div style={{ padding: 48, textAlign: "center" }}>
             <Spinner size="large" accessibilityLabel={mc.loadingCampaign} />
-            <p style={{ marginTop: 16, color: "#64748b", fontSize: 14 }}>{mc.loadingCampaign}</p>
+            <p style={{ marginTop: 16, color: "#5e574e", fontSize: 14 }}>{mc.loadingCampaign}</p>
           </div>
         </Card>
       </Page>
@@ -812,7 +812,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   fontSize: "clamp(1.65rem, 3vw, 2.25rem)",
                   fontWeight: 750,
                   letterSpacing: "-0.03em",
-                  color: "#f8fafc",
+                  color: "#faf7f2",
                   lineHeight: 1.15,
                   maxWidth: 720,
                   fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",
@@ -904,14 +904,14 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                 cursor: "pointer",
                                 padding: "14px 16px",
                                 borderRadius: 14,
-                                border: active ? "2px solid #6366f1" : "1px solid #e2e8f0",
-                                background: active ? "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.06))" : "#fafafa",
+                                border: active ? "2px solid #6366f1" : "1px solid #e6dfd4",
+                                background: active ? "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.06))" : "#faf7f2",
                                 transition: "border-color 0.15s, box-shadow 0.15s",
                                 boxShadow: active ? "0 4px 20px rgba(99, 102, 241, 0.12)" : "none",
                               }}
                             >
-                              <div style={{ fontWeight: 650, fontSize: 14, color: "#0f172a", marginBottom: 4 }}>{opt.label}</div>
-                              <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.45 }}>{opt.hint}</div>
+                              <div style={{ fontWeight: 650, fontSize: 14, color: "#1d1b18", marginBottom: 4 }}>{opt.label}</div>
+                              <div style={{ fontSize: 12, color: "#5e574e", lineHeight: 1.45 }}>{opt.hint}</div>
                             </button>
                           );
                         })}
@@ -932,9 +932,9 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                   borderRadius: 999,
                                   fontSize: 13,
                                   fontWeight: active ? 650 : 400,
-                                  border: active ? "2px solid #6366f1" : "1px solid #e2e8f0",
-                                  background: active ? "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08))" : "#fafafa",
-                                  color: active ? "#4338ca" : "#475569",
+                                  border: active ? "2px solid #6366f1" : "1px solid #e6dfd4",
+                                  background: active ? "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.08))" : "#faf7f2",
+                                  color: active ? "#4338ca" : "#3a352f",
                                   transition: "all 0.15s",
                                 }}
                               >
@@ -944,7 +944,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                           })}
                         </div>
                         {selectedAudiences.length > 0 && (
-                          <p style={{ margin: "8px 0 0", fontSize: 12, color: "#64748b" }}>
+                          <p style={{ margin: "8px 0 0", fontSize: 12, color: "#5e574e" }}>
                             {mc.selected}: {selectedAudiences.join(", ")}
                           </p>
                         )}
@@ -1007,7 +1007,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               flex: 1,
                               padding: "8px 12px",
                               borderRadius: 10,
-                              border: "1px solid #e2e8f0",
+                              border: "1px solid #e6dfd4",
                               fontSize: 13,
                               outline: "none",
                               fontFamily: "inherit",
@@ -1019,7 +1019,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                             style={{
                               padding: "8px 14px",
                               borderRadius: 10,
-                              border: "1px solid #e2e8f0",
+                              border: "1px solid #e6dfd4",
                               background: shell.accentSoft,
                               color: "#4338ca",
                               fontSize: 13,
@@ -1208,7 +1208,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                             <CustomCheckbox checked={checked} onChange={() => togglePlatform(p.value)} size={18} />
                             <div style={{ flex: 1 }}>
                               <span style={{ fontSize: 13, fontWeight: checked ? 600 : 400 }}>{p.label}</span>
-                              {!isConnected && <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 8 }}>{mc.notConnected}</span>}
+                              {!isConnected && <span style={{ fontSize: 11, color: "#a39a8d", marginLeft: 8 }}>{mc.notConnected}</span>}
                               {isConnected && <span style={{ fontSize: 11, color: "#22c55e", marginLeft: 8 }}>{mc.connected}</span>}
                             </div>
                           </label>
@@ -1223,7 +1223,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
               <div
                 style={{
                   borderRadius: shell.cardRadius,
-                  border: "1px solid #dbeafe",
+                  border: "1px solid #fcebd5",
                   background: "#f0f7ff",
                   boxShadow: shell.cardShadow,
                   padding: "26px 26px 28px",
@@ -1238,14 +1238,14 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 <BlockStack gap="400">
                   <div>
                     <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.keywordsLabel}</Text>
-                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
+                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#3a352f" }}>
                       {mc.keywordsHelp}
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8, minHeight: 32 }}>
                       {(form.gads_keywords || []).map((kw, i) => (
-                        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 20, background: "#dbeafe", color: "#1d4ed8", fontSize: 12, fontWeight: 600 }}>
+                        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 20, background: "#fcebd5", color: "#7f3f00", fontSize: 12, fontWeight: 600 }}>
                           {kw}
-                          <button type="button" onClick={() => setField("gads_keywords", (form.gads_keywords || []).filter((_, j) => j !== i))} style={{ border: "none", background: "none", cursor: "pointer", color: "#3b82f6", fontWeight: 700, padding: 0, lineHeight: 1 }}>×</button>
+                          <button type="button" onClick={() => setField("gads_keywords", (form.gads_keywords || []).filter((_, j) => j !== i))} style={{ border: "none", background: "none", cursor: "pointer", color: "#ee8a12", fontWeight: 700, padding: 0, lineHeight: 1 }}>×</button>
                         </span>
                       ))}
                     </div>
@@ -1253,7 +1253,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                       <input
                         type="text"
                         placeholder={mc.keywordGadsPlaceholder}
-                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, outline: "none" }}
+                        style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13, outline: "none" }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === ",") {
                             e.preventDefault();
@@ -1281,7 +1281,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   {/* Headlines */}
                   <div>
                     <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.headlinesLabel}</Text>
-                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
+                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#3a352f" }}>
                       {mc.headlinesHelp}
                     </p>
                     <BlockStack gap="200">
@@ -1297,7 +1297,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               maxLength={30}
                               value={val}
                               placeholder={isRequired ? mc.headlineRequired(i + 1) : mc.headlineOptional(i + 1)}
-                              style={{ width: "100%", padding: "8px 52px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#cbd5e1")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                              style={{ width: "100%", padding: "8px 52px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#d6ccbd")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
                               onChange={(e) => {
                                 const updated = [...(form.gads_headlines || [])];
                                 updated[i] = e.target.value;
@@ -1305,7 +1305,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                 setField("gads_headlines", updated);
                               }}
                             />
-                            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: overLimit ? "#dc2626" : "#94a3b8", fontWeight: 600 }}>{charCount}/30</span>
+                            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: overLimit ? "#dc2626" : "#a39a8d", fontWeight: 600 }}>{charCount}/30</span>
                           </div>
                         );
                       })}
@@ -1318,7 +1318,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   {/* Descriptions */}
                   <div>
                     <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.descriptionsLabel}</Text>
-                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#475569" }}>
+                    <p style={{ margin: "4px 0 10px", fontSize: 13, color: "#3a352f" }}>
                       {mc.descriptionsHelp}
                     </p>
                     <BlockStack gap="200">
@@ -1334,7 +1334,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               maxLength={90}
                               value={val}
                               placeholder={isRequired ? mc.descriptionRequired(i + 1) : mc.descriptionOptional(i + 1)}
-                              style={{ width: "100%", padding: "8px 56px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#cbd5e1")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                              style={{ width: "100%", padding: "8px 56px 8px 12px", borderRadius: 8, border: `1px solid ${overLimit ? "#f87171" : (isRequired && !val ? "#fcd34d" : "#d6ccbd")}`, fontSize: 13, boxSizing: "border-box", outline: "none" }}
                               onChange={(e) => {
                                 const updated = [...(form.gads_descriptions || [])];
                                 updated[i] = e.target.value;
@@ -1342,7 +1342,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                 setField("gads_descriptions", updated);
                               }}
                             />
-                            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: overLimit ? "#dc2626" : "#94a3b8", fontWeight: 600 }}>{charCount}/90</span>
+                            <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: overLimit ? "#dc2626" : "#a39a8d", fontWeight: 600 }}>{charCount}/90</span>
                           </div>
                         );
                       })}
@@ -1363,12 +1363,12 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     <div>
                       <Text as="span" variant="bodyMd" fontWeight="semibold">{mc.geoTargets}</Text>
-                      <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#64748b" }}>{mc.multiSelect}</p>
-                      <div style={{ border: "1px solid #e2e8f0", borderRadius: 10, overflow: "hidden" }}>
+                      <p style={{ margin: "4px 0 8px", fontSize: 12, color: "#5e574e" }}>{mc.multiSelect}</p>
+                      <div style={{ border: "1px solid #e6dfd4", borderRadius: 10, overflow: "hidden" }}>
                         {GEO_TARGET_OPTIONS.map((g) => {
                           const checked = (form.gads_geo_targets || []).includes(g.value);
                           return (
-                            <label key={g.value} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", cursor: "pointer", background: checked ? "#eff6ff" : "#fff", borderBottom: "1px solid #f1f5f9" }}>
+                            <label key={g.value} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", cursor: "pointer", background: checked ? "#fcebd5" : "#fff", borderBottom: "1px solid #f1f5f9" }}>
                               <CustomCheckbox checked={checked} onChange={() => {
                                 const cur = new Set(form.gads_geo_targets || []);
                                 if (cur.has(g.value)) cur.delete(g.value); else cur.add(g.value);
@@ -1439,9 +1439,9 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                       style={{
                         maxHeight: 460,
                         overflowY: "auto",
-                        border: "1px solid #e2e8f0",
+                        border: "1px solid #e6dfd4",
                         borderRadius: 14,
-                        background: "#fafafa",
+                        background: "#faf7f2",
                       }}
                     >
                       {filteredProducts.map((p) => {
@@ -1457,10 +1457,10 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                             <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: checked ? "#eef2ff" : "#fff", transition: "background 0.12s" }}>
                               <CustomCheckbox checked={checked} onChange={() => toggleProduct(p.id)} size={18} />
                               <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => toggleProduct(p.id)}>
-                                <div style={{ fontSize: 13, fontWeight: checked ? 650 : 500, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                <div style={{ fontSize: 13, fontWeight: checked ? 650 : 500, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {p.title || p.id}
                                 </div>
-                                {p.ean && <div style={{ fontSize: 11, color: "#64748b" }}>EAN {p.ean}</div>}
+                                {p.ean && <div style={{ fontSize: 11, color: "#5e574e" }}>EAN {p.ean}</div>}
                               </div>
                               {hasVariants && (
                                 <button
@@ -1482,11 +1482,11 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                                     <label key={vid} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px 8px 36px", cursor: "pointer", background: vChecked ? "#eef2ff" : "transparent", borderBottom: "1px solid #eff0fb" }}>
                                       <CustomCheckbox checked={vChecked} onChange={() => toggleVariant(vid)} size={16} />
                                       <div style={{ minWidth: 0 }}>
-                                        <div style={{ fontSize: 12, fontWeight: vChecked ? 650 : 400, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        <div style={{ fontSize: 12, fontWeight: vChecked ? 650 : 400, color: "#3a352f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                           {vLabel}
                                         </div>
                                         {v.price_cents != null && (
-                                          <div style={{ fontSize: 11, color: "#64748b" }}>{(v.price_cents / 100).toFixed(2)} €</div>
+                                          <div style={{ fontSize: 11, color: "#5e574e" }}>{(v.price_cents / 100).toFixed(2)} €</div>
                                         )}
                                       </div>
                                     </label>
@@ -1506,7 +1506,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                     {groups.length === 0 ? (
                       <Banner tone="info">{mc.noProductGroups}</Banner>
                     ) : (
-                      <div style={{ marginTop: 12, border: "1px solid #e2e8f0", borderRadius: 14, overflow: "hidden" }}>
+                      <div style={{ marginTop: 12, border: "1px solid #e6dfd4", borderRadius: 14, overflow: "hidden" }}>
                         {groups.map((g) => {
                           const checked = form.group_ids.includes(g.id);
                           return (
@@ -1525,7 +1525,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                               <CustomCheckbox checked={checked} onChange={() => toggleGroup(g.id)} size={18} />
                               <div>
                                 <div style={{ fontSize: 13, fontWeight: checked ? 650 : 500 }}>{g.name}</div>
-                                <div style={{ fontSize: 11, color: "#64748b" }}>{mc.productsCount((g.product_ids || []).length)}</div>
+                                <div style={{ fontSize: 11, color: "#5e574e" }}>{mc.productsCount((g.product_ids || []).length)}</div>
                               </div>
                             </label>
                           );
@@ -1562,7 +1562,7 @@ export default function MarketingPpcCampaignEditorPage({ campaignId }) {
                 <Button onClick={() => router.push("/marketing/campaigns")}>{mc.cancel}</Button>
               </InlineStack>
               {!isSuperuser && (
-                <p style={{ margin: 0, fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: 12, color: "#5e574e", lineHeight: 1.5 }}>
                   {mc.stripeNote(form.budget_daily_cents ? `${(parseFloat(form.budget_daily_cents) * 30).toFixed(2)} €` : "—")}
                 </p>
               )}

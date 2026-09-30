@@ -15,7 +15,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -28,7 +28,7 @@ const NotificationItem = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 16px 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e6dfd4;
 
   &:last-child {
     border-bottom: none;
@@ -42,13 +42,13 @@ const NotificationInfo = styled.div`
 const NotificationTitle = styled.h3`
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: #1d1b18;
   margin-bottom: 4px;
 `;
 
 const NotificationDescription = styled.p`
   font-size: 14px;
-  color: #6b7280;
+  color: #5e574e;
   margin: 0;
 `;
 
@@ -89,7 +89,7 @@ const Toggle = styled.label`
   }
 
   input:checked + span {
-    background-color: #0ea5e9;
+    background-color: #ee8a12;
   }
 
   input:checked + span:before {
@@ -121,10 +121,10 @@ export default function NotificationSettingsPage() {
       <Title>{copy.pageTitle}</Title>
 
       <Section>
-        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18", marginBottom: "16px" }}>
           {copy.emailTitle}
         </h2>
-        <p style={{ color: "#6b7280", marginBottom: "24px" }}>
+        <p style={{ color: "#5e574e", marginBottom: "24px" }}>
           {copy.emailSubtitle}
         </p>
 

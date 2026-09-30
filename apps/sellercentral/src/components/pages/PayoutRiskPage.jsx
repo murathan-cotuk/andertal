@@ -75,18 +75,18 @@ export default function PayoutRiskPage() {
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                   {[c.colSeller, c.colOrders, c.colOwed, c.colIban, ""].map((h) => (
-                    <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                    <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {sellers.map((s) => (
-                  <tr key={s.seller_id} style={{ borderTop: "1px solid #f1f1f1", cursor: "pointer" }} onClick={() => router.push(`/sellers/${s.seller_id}`)}>
+                  <tr key={s.seller_id} style={{ borderTop: "1px solid #f3eee6", cursor: "pointer" }} onClick={() => router.push(`/sellers/${s.seller_id}`)}>
                     <td style={{ padding: "12px 16px" }}>
-                      <div style={{ fontWeight: 600, color: "#111827" }}>{s.store_name || s.company_name || s.email || s.seller_id}</div>
-                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{s.email}</div>
+                      <div style={{ fontWeight: 600, color: "#1d1b18" }}>{s.store_name || s.company_name || s.email || s.seller_id}</div>
+                      <div style={{ fontSize: 11, color: "#a39a8d" }}>{s.email}</div>
                     </td>
                     <td style={{ padding: "12px 16px" }}>{s.order_count}</td>
                     <td style={{ padding: "12px 16px", fontWeight: 700, color: "#b91c1c" }}>{fmtEuro(s.owed_cents)}</td>
@@ -94,7 +94,7 @@ export default function PayoutRiskPage() {
                       <Badge tone="critical">{s.has_iban ? c.invalidIban : c.missingIban}</Badge>
                     </td>
                     <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                      <span style={{ color: "#2563eb", fontWeight: 600, fontSize: 12 }}>{c.openSeller} →</span>
+                      <span style={{ color: "#a65300", fontWeight: 600, fontSize: 12 }}>{c.openSeller} →</span>
                     </td>
                   </tr>
                 ))}

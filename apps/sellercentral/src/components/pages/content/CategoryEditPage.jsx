@@ -534,9 +534,9 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                   onClearButtonClick={() => setAddProductSearch("")}
                 />
                 {addProductSearch && filteredAddProducts.length > 0 && (
-                  <div style={{ border: "1px solid #e1e3e5", borderRadius: 8, overflow: "hidden", maxHeight: 240, overflowY: "auto" }}>
+                  <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden", maxHeight: 240, overflowY: "auto" }}>
                     {filteredAddProducts.slice(0, 10).map((p) => (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderBottom: "1px solid #f1f1f1" }}>
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderBottom: "1px solid #f3eee6" }}>
                         {p.thumbnail ? (
                           <Thumbnail source={resolveImageUrl(p.thumbnail)} alt={p.title} size="small" />
                         ) : (
@@ -572,7 +572,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                 ) : (
                   <BlockStack gap="200">
                     {categoryProducts.map((p) => (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f1f1f1" }}>
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f3eee6" }}>
                         <Link
                           href={`/products/${p.id}`}
                           style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}
@@ -625,7 +625,7 @@ export default function CategoryEditPage({ category: initialCategory, onReload }
                 ) : (
                   <BlockStack gap="100">
                     {categoryTreeRows.map((row) => (
-                      <div key={row.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #f1f1f1" }}>
+                      <div key={row.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #f3eee6" }}>
                         <span style={{ display: "inline-block", width: `${Math.min(20, row.depth * 12)}px` }} />
                         <Text as="span" variant="bodySm">{row.name}</Text>
                         <Text as="span" tone="subdued" variant="bodySm">/{row.slug}</Text>

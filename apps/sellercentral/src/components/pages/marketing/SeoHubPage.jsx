@@ -45,7 +45,7 @@ const filterSelectStyle = {
   marginTop: 4,
   padding: "7px 10px",
   borderRadius: 8,
-  border: "1px solid #cbd5e1",
+  border: "1px solid #d6ccbd",
   fontSize: 12,
   background: "#fff",
 };
@@ -73,16 +73,16 @@ function sellercentralEditPath(entity) {
 function LengthBar({ label, value, idealMin, idealMax, status }) {
   const len = String(value || "").length;
   const pct = Math.min(100, Math.round((len / Math.max(idealMax, 1)) * 100));
-  const color = status === "ok" ? "#15803d" : status === "warn" ? "#b45309" : status === "missing" ? "#94a3b8" : "#b91c1c";
+  const color = status === "ok" ? "#15803d" : status === "warn" ? "#b45309" : status === "missing" ? "#a39a8d" : "#b91c1c";
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#475569", marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#3a352f", marginBottom: 4 }}>
         <span>{label}</span>
         <span style={{ color, fontWeight: 600 }}>
           {len} / ideal {idealMin}–{idealMax}
         </span>
       </div>
-      <div style={{ height: 6, background: "#e2e8f0", borderRadius: 99, overflow: "hidden" }}>
+      <div style={{ height: 6, background: "#e6dfd4", borderRadius: 99, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width .2s" }} />
       </div>
     </div>
@@ -96,13 +96,13 @@ function StatChip({ label, value, warn }) {
         minWidth: 72,
         padding: "8px 10px",
         borderRadius: 10,
-        background: warn ? "#fef2f2" : "#f8fafc",
-        border: `1px solid ${warn ? "#fecaca" : "#e2e8f0"}`,
+        background: warn ? "#fef2f2" : "#faf7f2",
+        border: `1px solid ${warn ? "#fecaca" : "#e6dfd4"}`,
         textAlign: "center",
       }}
     >
-      <div style={{ fontSize: 18, fontWeight: 700, color: warn ? "#b91c1c" : "#0f172a" }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: warn ? "#b91c1c" : "#1d1b18" }}>{value}</div>
+      <div style={{ fontSize: 11, color: "#5e574e", marginTop: 2 }}>{label}</div>
     </div>
   );
 }
@@ -229,7 +229,7 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
             padding: "8px 12px 8px",
             paddingLeft: 12 + depth * 16,
             borderBottom: "1px solid #f1f5f9",
-            background: selectedId === node.id ? "#eff6ff" : depth === 0 ? "#fafafa" : "#fff",
+            background: selectedId === node.id ? "#fcebd5" : depth === 0 ? "#faf7f2" : "#fff",
           }}
         >
           <button
@@ -243,7 +243,7 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
               border: "none",
               background: "transparent",
               cursor: hasKids ? "pointer" : "default",
-              color: "#64748b",
+              color: "#5e574e",
               fontSize: 12,
               lineHeight: "20px",
             }}
@@ -264,15 +264,15 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
-              <span style={{ fontSize: 13, fontWeight: depth === 0 ? 650 : 500, color: "#0f172a" }}>
+              <span style={{ fontSize: 13, fontWeight: depth === 0 ? 650 : 500, color: "#1d1b18" }}>
                 {node.label}
-                {hasKids ? <span style={{ color: "#94a3b8", fontWeight: 400 }}> ({node.children.length})</span> : null}
+                {hasKids ? <span style={{ color: "#a39a8d", fontWeight: 400 }}> ({node.children.length})</span> : null}
               </span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[node.score] || "#64748b", textTransform: "uppercase" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[node.score] || "#5e574e", textTransform: "uppercase" }}>
                 {node.score === "needs_work" ? "warn" : node.score}
               </span>
             </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, fontFamily: "ui-monospace, monospace" }}>
+            <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 2, fontFamily: "ui-monospace, monospace" }}>
               /{node.handle || "—"}
             </div>
           </button>
@@ -284,12 +284,12 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
 
   return (
     <div>
-      <div style={{ padding: "10px 12px", borderBottom: "1px solid #e2e8f0", display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ padding: "10px 12px", borderBottom: "1px solid #e6dfd4", display: "flex", gap: 8, alignItems: "center" }}>
         <input
           value={search}
           onChange={(e) => onSearchChange?.(e.target.value)}
           placeholder="Search categories…"
-          style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+          style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "8px 10px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13 }}
         />
         {!q && tree.length > 0 ? (
           <button
@@ -300,7 +300,7 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
               walk(tree);
               setExpanded((prev) => (prev.size >= all.size ? new Set() : all));
             }}
-            style={{ border: "1px solid #cbd5e1", background: "#f8fafc", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#475569", padding: "6px 8px", whiteSpace: "nowrap" }}
+            style={{ border: "1px solid #d6ccbd", background: "#faf7f2", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#3a352f", padding: "6px 8px", whiteSpace: "nowrap" }}
           >
             Expand / collapse all
           </button>
@@ -310,7 +310,7 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
       <div style={{ maxHeight: "64vh", overflow: "auto" }}>
         {q ? (
           searchRows.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No match</div>
+            <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>No match</div>
           ) : (
             searchRows.map((row) => (
               <button
@@ -324,25 +324,25 @@ function CategorySeoNav({ items, selectedId, onSelect, search, onSearchChange })
                   padding: "10px 14px",
                   border: "none",
                   borderBottom: "1px solid #f1f5f9",
-                  background: selectedId === row.id ? "#eff6ff" : "#fff",
+                  background: selectedId === row.id ? "#fcebd5" : "#fff",
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>{row.breadcrumb || "—"}</div>
+                <div style={{ fontSize: 12, color: "#5e574e", marginBottom: 2 }}>{row.breadcrumb || "—"}</div>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 650, color: "#0f172a" }}>{row.label}</div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[row.score] || "#64748b", textTransform: "uppercase" }}>
+                  <div style={{ fontSize: 13, fontWeight: 650, color: "#1d1b18" }}>{row.label}</div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[row.score] || "#5e574e", textTransform: "uppercase" }}>
                     {row.score === "needs_work" ? "warn" : row.score}
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
+                <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
                   /{row.handle || "—"}
                 </div>
               </button>
             ))
           )
         ) : tree.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No categories</div>
+          <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>No categories</div>
         ) : (
           tree.map((node) => renderNode(node, 0))
         )}
@@ -606,8 +606,8 @@ export default function SeoHubPage() {
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "8px 4px 40px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 750, color: "#0f172a" }}>SEO Hub</h1>
-          <p style={{ margin: "6px 0 0", fontSize: 13, color: "#64748b", maxWidth: 560 }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 750, color: "#1d1b18" }}>SEO Hub</h1>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: "#5e574e", maxWidth: 560 }}>
             Meta title, description and keywords per shop language. Categories use a nested tree. Open the live shop page to verify the browser tab title.
           </p>
         </div>
@@ -618,7 +618,7 @@ export default function SeoHubPage() {
             style={{
               padding: "8px 14px",
               borderRadius: 8,
-              border: "1px solid #cbd5e1",
+              border: "1px solid #d6ccbd",
               background: "#fff",
               fontWeight: 600,
               fontSize: 13,
@@ -642,14 +642,14 @@ export default function SeoHubPage() {
       ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 360px) 1fr", gap: 16, alignItems: "start" }}>
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 4px rgba(15,23,42,0.04)" }}>
-          <div style={{ padding: 14, borderBottom: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 10 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
+        <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 4px rgba(15,23,42,0.04)" }}>
+          <div style={{ padding: 14, borderBottom: "1px solid #e6dfd4", display: "flex", flexDirection: "column", gap: 10 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#3a352f" }}>
               Content type
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13 }}
               >
                 {ENTITY_TYPES.map((t) => (
                   <option key={t.id} value={t.id}>{t.label}</option>
@@ -661,12 +661,12 @@ export default function SeoHubPage() {
                 value={q}
                 onChange={(e) => { setOffset(0); setQ(e.target.value); }}
                 placeholder="Search title / handle…"
-                style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13 }}
               />
             ) : null}
             {isProducts ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#5e574e" }}>
                   Seller
                   <select
                     value={sellerId}
@@ -681,7 +681,7 @@ export default function SeoHubPage() {
                     ))}
                   </select>
                 </label>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#5e574e" }}>
                   SEO status
                   <select
                     value={scoreFilter}
@@ -693,7 +693,7 @@ export default function SeoHubPage() {
                     ))}
                   </select>
                 </label>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e" }}>
                   Category
                   <div style={{ marginTop: 4 }}>
                     <CategoryDrilldownSelect
@@ -707,7 +707,7 @@ export default function SeoHubPage() {
                     />
                   </div>
                 </div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "#5e574e" }}>
                   Sort
                   <select
                     value={sort}
@@ -721,10 +721,10 @@ export default function SeoHubPage() {
                 </label>
               </div>
             ) : null}
-            <div style={{ fontSize: 12, color: "#94a3b8" }}>{total} items</div>
+            <div style={{ fontSize: 12, color: "#a39a8d" }}>{total} items</div>
           </div>
           {loading ? (
-            <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Loading…</div>
+            <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>Loading…</div>
           ) : isCategories ? (
             <CategorySeoNav
               items={items}
@@ -736,7 +736,7 @@ export default function SeoHubPage() {
           ) : (
           <div style={{ maxHeight: "70vh", overflow: "auto" }}>
             {items.length === 0 ? (
-              <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>No items</div>
+              <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>No items</div>
             ) : (
               items.map((item) => (
                 <button
@@ -750,21 +750,21 @@ export default function SeoHubPage() {
                     padding: "12px 14px",
                     border: "none",
                     borderBottom: "1px solid #f1f5f9",
-                    background: selectedId === item.id ? "#f8fafc" : "#fff",
+                    background: selectedId === item.id ? "#faf7f2" : "#fff",
                     cursor: "pointer",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "flex-start" }}>
-                    <div style={{ fontSize: 13, fontWeight: 650, color: "#0f172a" }}>{item.label}</div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[item.score] || "#64748b", textTransform: "uppercase" }}>
+                    <div style={{ fontSize: 13, fontWeight: 650, color: "#1d1b18" }}>{item.label}</div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: SCORE_COLOR[item.score] || "#5e574e", textTransform: "uppercase" }}>
                       {item.score === "needs_work" ? "warn" : item.score}
                     </span>
                   </div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
+                  <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 3, fontFamily: "ui-monospace, monospace" }}>
                     /{item.handle || "—"}
                     {item.seller_label ? ` · ${item.seller_label}` : ""}
                   </div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: 11, color: "#5e574e", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {item.meta_title || item.label || "No meta title"}
                   </div>
                 </button>
@@ -773,7 +773,7 @@ export default function SeoHubPage() {
           </div>
           )}
           {!isCategories ? (
-            <div style={{ display: "flex", justifyContent: "space-between", padding: 10, borderTop: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: 10, borderTop: "1px solid #e6dfd4" }}>
               <button type="button" disabled={offset <= 0} onClick={() => setOffset(Math.max(0, offset - limit))} style={{ fontSize: 12, cursor: offset <= 0 ? "default" : "pointer" }}>
                 ← Prev
               </button>
@@ -786,16 +786,16 @@ export default function SeoHubPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {!entity ? (
-            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 40, textAlign: "center", color: "#94a3b8", fontSize: 14 }}>
+            <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 14, padding: 40, textAlign: "center", color: "#a39a8d", fontSize: 14 }}>
               Select an item to edit SEO metadata and run analysis.
             </div>
           ) : (
             <>
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18 }}>
+              <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 14, padding: 18 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: "#94a3b8", textTransform: "uppercase" }}>{entity.type}</div>
-                    <h2 style={{ margin: "4px 0 0", fontSize: 18, color: "#0f172a" }}>{entity.label}</h2>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", color: "#a39a8d", textTransform: "uppercase" }}>{entity.type}</div>
+                    <h2 style={{ margin: "4px 0 0", fontSize: 18, color: "#1d1b18" }}>{entity.label}</h2>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {shopUrl ? (
@@ -806,12 +806,12 @@ export default function SeoHubPage() {
                         style={{
                           padding: "8px 14px",
                           borderRadius: 8,
-                          border: "1px solid #cbd5e1",
+                          border: "1px solid #d6ccbd",
                           background: "#fff",
                           fontWeight: 650,
                           fontSize: 13,
                           textDecoration: "none",
-                          color: "#0f172a",
+                          color: "#1d1b18",
                         }}
                       >
                         Open in shop ↗
@@ -823,12 +823,12 @@ export default function SeoHubPage() {
                         style={{
                           padding: "8px 14px",
                           borderRadius: 8,
-                          border: "1px solid #cbd5e1",
+                          border: "1px solid #d6ccbd",
                           background: "#fff",
                           fontWeight: 650,
                           fontSize: 13,
                           textDecoration: "none",
-                          color: "#0f172a",
+                          color: "#1d1b18",
                         }}
                       >
                         Open in Sellercentral
@@ -842,7 +842,7 @@ export default function SeoHubPage() {
                         padding: "8px 16px",
                         borderRadius: 8,
                         border: "none",
-                        background: "#0f172a",
+                        background: "#1d1b18",
                         color: "#fff",
                         fontWeight: 650,
                         fontSize: 13,
@@ -854,28 +854,28 @@ export default function SeoHubPage() {
                   </div>
                 </div>
 
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#3a352f", marginBottom: 12 }}>
                   Shop content language
                   <select
                     value={editLang}
                     onChange={(e) => setEditLang(e.target.value)}
-                    style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                    style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13 }}
                   >
                     {langOptions.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
-                  <span style={{ display: "block", marginTop: 6, fontWeight: 400, color: "#94a3b8" }}>
+                  <span style={{ display: "block", marginTop: 6, fontWeight: 400, color: "#a39a8d" }}>
                     DE = default columns. Other languages store translations (pages: meta_*_i18n, categories/products/collections: metadata.seo_i18n).
                   </span>
                 </label>
 
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#3a352f", marginBottom: 12 }}>
                   URL slug / handle
                   <input
                     value={draft.handle}
                     onChange={(e) => setDraft((d) => ({ ...d, handle: e.target.value.replace(/^\//, "") }))}
-                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, fontFamily: "ui-monospace, monospace" }}
+                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13, fontFamily: "ui-monospace, monospace" }}
                   />
                 </label>
 
@@ -885,13 +885,13 @@ export default function SeoHubPage() {
                   </div>
                 ) : null}
 
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#3a352f", marginBottom: 12 }}>
                   Meta title
                   <input
                     value={draft.meta_title}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_title: e.target.value }))}
                     placeholder={editLang === "de" ? (entity.label || "") : (entity.meta_title || entity.label || "")}
-                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13 }}
                   />
                 </label>
                 <LengthBar
@@ -902,14 +902,14 @@ export default function SeoHubPage() {
                   status={evalLive?.title?.status}
                 />
 
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#3a352f", marginBottom: 12 }}>
                   Meta description
                   <textarea
                     value={draft.meta_description}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_description: e.target.value }))}
                     rows={4}
                     placeholder={editLang === "de" ? (seoPlainPreview(entity.content_html, 160) || "") : (entity.meta_description || seoPlainPreview(entity.content_html, 160) || "")}
-                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, resize: "vertical" }}
+                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13, resize: "vertical" }}
                   />
                 </label>
                 <LengthBar
@@ -920,26 +920,26 @@ export default function SeoHubPage() {
                   status={evalLive?.description?.status}
                 />
 
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#3a352f", marginBottom: 6 }}>
                   Keywords {evalLive?.keywords?.status === "missing" ? <span style={{ color: "#b45309" }}>(recommended)</span> : <span style={{ color: "#15803d" }}>({evalLive?.keywords?.count || 0})</span>}
                   <input
                     value={draft.meta_keywords}
                     onChange={(e) => setDraft((d) => ({ ...d, meta_keywords: e.target.value }))}
                     placeholder={editLang === "de" ? "keyword1, keyword2, keyword3" : (entity.meta_keywords || "keyword1, keyword2, keyword3")}
-                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                    style={{ display: "block", width: "100%", marginTop: 6, padding: "9px 11px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13 }}
                   />
                 </label>
               </div>
 
-              <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18 }}>
-                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>SEO Meta in 1 Click</h3>
+              <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 14, padding: 18 }}>
+                <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 700, color: "#1d1b18" }}>SEO Meta in 1 Click</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, fontSize: 12, marginBottom: 14 }}>
-                  <div><div style={{ color: "#94a3b8", marginBottom: 2 }}>URL</div><div style={{ wordBreak: "break-all", color: "#0f172a" }}>{entity.url || "—"}</div></div>
-                  <div><div style={{ color: "#94a3b8", marginBottom: 2 }}>Canonical</div><div style={{ wordBreak: "break-all", color: "#0f172a" }}>{entity.canonical || "—"}</div></div>
-                  <div><div style={{ color: "#94a3b8", marginBottom: 2 }}>Robots</div><div style={{ color: "#0f172a" }}>{entity.robots || "—"}</div></div>
-                  <div><div style={{ color: "#94a3b8", marginBottom: 2 }}>Lang</div><div style={{ color: "#0f172a" }}>{entity.lang || "—"}</div></div>
-                  <div><div style={{ color: "#94a3b8", marginBottom: 2 }}>Author</div><div style={{ color: "#0f172a" }}>{entity.author || "—"}</div></div>
-                  <div><div style={{ color: "#94a3b8", marginBottom: 2 }}>Publisher</div><div style={{ color: "#0f172a" }}>{entity.publisher || "—"}</div></div>
+                  <div><div style={{ color: "#a39a8d", marginBottom: 2 }}>URL</div><div style={{ wordBreak: "break-all", color: "#1d1b18" }}>{entity.url || "—"}</div></div>
+                  <div><div style={{ color: "#a39a8d", marginBottom: 2 }}>Canonical</div><div style={{ wordBreak: "break-all", color: "#1d1b18" }}>{entity.canonical || "—"}</div></div>
+                  <div><div style={{ color: "#a39a8d", marginBottom: 2 }}>Robots</div><div style={{ color: "#1d1b18" }}>{entity.robots || "—"}</div></div>
+                  <div><div style={{ color: "#a39a8d", marginBottom: 2 }}>Lang</div><div style={{ color: "#1d1b18" }}>{entity.lang || "—"}</div></div>
+                  <div><div style={{ color: "#a39a8d", marginBottom: 2 }}>Author</div><div style={{ color: "#1d1b18" }}>{entity.author || "—"}</div></div>
+                  <div><div style={{ color: "#a39a8d", marginBottom: 2 }}>Publisher</div><div style={{ color: "#1d1b18" }}>{entity.publisher || "—"}</div></div>
                 </div>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
@@ -969,7 +969,7 @@ export default function SeoHubPage() {
                     value={liveUrl}
                     onChange={(e) => setLiveUrl(e.target.value)}
                     placeholder="https://… live URL to fetch & analyze"
-                    style={{ flex: 1, minWidth: 220, padding: "8px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+                    style={{ flex: 1, minWidth: 220, padding: "8px 10px", borderRadius: 8, border: "1px solid #d6ccbd", fontSize: 13 }}
                   />
                   <button
                     type="button"
@@ -978,8 +978,8 @@ export default function SeoHubPage() {
                     style={{
                       padding: "8px 14px",
                       borderRadius: 8,
-                      border: "1px solid #cbd5e1",
-                      background: "#f8fafc",
+                      border: "1px solid #d6ccbd",
+                      background: "#faf7f2",
                       fontWeight: 650,
                       fontSize: 13,
                       cursor: analyzing ? "wait" : "pointer",
@@ -990,20 +990,20 @@ export default function SeoHubPage() {
                 </div>
 
                 {liveResult ? (
-                  <div style={{ marginTop: 14, padding: 12, background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 12 }}>
+                  <div style={{ marginTop: 14, padding: 12, background: "#faf7f2", borderRadius: 10, border: "1px solid #e6dfd4", fontSize: 12 }}>
                     {liveResult.error ? (
                       <div style={{ color: "#b91c1c" }}>{liveResult.error}</div>
                     ) : (
                       <>
-                        <div style={{ fontWeight: 700, marginBottom: 8, color: "#0f172a" }}>Live fetch ({liveResult.status}) — {liveResult.finalUrl}</div>
+                        <div style={{ fontWeight: 700, marginBottom: 8, color: "#1d1b18" }}>Live fetch ({liveResult.status}) — {liveResult.finalUrl}</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          <div><span style={{ color: "#94a3b8" }}>Title tag:</span> {liveResult.titleTag || "—"}</div>
-                          <div><span style={{ color: "#94a3b8" }}>Meta description:</span> {liveResult.metaDescription || "—"}</div>
-                          <div><span style={{ color: "#94a3b8" }}>Canonical:</span> {liveResult.canonical || "—"}</div>
-                          <div><span style={{ color: "#94a3b8" }}>Robots:</span> {liveResult.robots || "—"}</div>
-                          <div><span style={{ color: "#94a3b8" }}>Lang:</span> {liveResult.lang || "—"}</div>
+                          <div><span style={{ color: "#a39a8d" }}>Title tag:</span> {liveResult.titleTag || "—"}</div>
+                          <div><span style={{ color: "#a39a8d" }}>Meta description:</span> {liveResult.metaDescription || "—"}</div>
+                          <div><span style={{ color: "#a39a8d" }}>Canonical:</span> {liveResult.canonical || "—"}</div>
+                          <div><span style={{ color: "#a39a8d" }}>Robots:</span> {liveResult.robots || "—"}</div>
+                          <div><span style={{ color: "#a39a8d" }}>Lang:</span> {liveResult.lang || "—"}</div>
                           <div>
-                            <span style={{ color: "#94a3b8" }}>H1–H6:</span>{" "}
+                            <span style={{ color: "#a39a8d" }}>H1–H6:</span>{" "}
                             {liveResult.analysis
                               ? `H1:${liveResult.analysis.headings?.h1 || 0} H2:${liveResult.analysis.headings?.h2 || 0} H3:${liveResult.analysis.headings?.h3 || 0} · img:${liveResult.analysis.images || 0} · a:${liveResult.analysis.links || 0}`
                               : "—"}

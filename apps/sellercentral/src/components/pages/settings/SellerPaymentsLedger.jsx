@@ -19,7 +19,7 @@ const PERIODS = generatePayoutPeriods(18);
 function amountColor(cents) {
   if (cents > 0) return "#059669";
   if (cents < 0) return "#dc2626";
-  return "#111827";
+  return "#1d1b18";
 }
 
 export default function SellerPaymentsLedger() {
@@ -157,7 +157,7 @@ export default function SellerPaymentsLedger() {
           </div>
           <div style={{
             flex: "1 1 220px", minWidth: 200, background: "#fff",
-            borderRadius: 12, padding: "18px 20px", border: "1px solid #e5e7eb",
+            borderRadius: 12, padding: "18px 20px", border: "1px solid #e6dfd4",
           }}>
             <Text variant="bodySm" tone="subdued">{allTime ? txt.allPeriods : txt.periodMovement}</Text>
             <div style={{ fontSize: 26, fontWeight: 700, color: amountColor(periodCents), marginTop: 6, letterSpacing: "-0.4px" }}>
@@ -174,7 +174,7 @@ export default function SellerPaymentsLedger() {
 
       <Box paddingBlockStart="400">
         <Card padding="0">
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3eee6" }}>
             <InlineStack align="space-between" blockAlign="center">
               <Text variant="headingMd" as="h2">{txt.transactions}</Text>
               <InlineStack gap="200">
@@ -190,7 +190,7 @@ export default function SellerPaymentsLedger() {
             </InlineStack>
           </div>
 
-          <div style={{ padding: "12px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ padding: "12px 20px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", display: "flex", gap: 12, flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 200px", minWidth: 180 }}>
               <TextField
                 label={txt.search}
@@ -249,8 +249,8 @@ export default function SellerPaymentsLedger() {
                 display: "grid",
                 gridTemplateColumns: "120px 120px 1fr 130px",
                 gap: 8, padding: "10px 20px",
-                borderBottom: "1px solid #e5e7eb",
-                fontSize: 11, fontWeight: 600, color: "#6b7280", background: "#fafafa",
+                borderBottom: "1px solid #e6dfd4",
+                fontSize: 11, fontWeight: 600, color: "#5e574e", background: "#faf7f2",
               }}>
                 <div>{txt.colDate}</div>
                 <div>{txt.colOrderNo}</div>
@@ -266,17 +266,17 @@ export default function SellerPaymentsLedger() {
                       display: "grid",
                       gridTemplateColumns: "120px 120px 1fr 130px",
                       gap: 8, padding: "11px 20px",
-                      borderBottom: "1px solid #f3f4f6",
+                      borderBottom: "1px solid #f3eee6",
                       fontSize: 13, alignItems: "center",
-                      background: i % 2 === 0 ? "#fff" : "#fafafa",
+                      background: i % 2 === 0 ? "#fff" : "#faf7f2",
                     }}
                   >
-                    <div style={{ color: "#374151" }}>{fmtDateShort(e.occurred_at, locale)}</div>
-                    <div style={{ fontWeight: 600, color: "#111827" }}>{e.order_number || "—"}</div>
-                    <div style={{ color: "#374151" }}>
+                    <div style={{ color: "#3a352f" }}>{fmtDateShort(e.occurred_at, locale)}</div>
+                    <div style={{ fontWeight: 600, color: "#1d1b18" }}>{e.order_number || "—"}</div>
+                    <div style={{ color: "#3a352f" }}>
                       {ledgerEntryLabel(e, locale)}
                       {e.charge_method === "card" && (
-                        <span style={{ marginLeft: 8, fontSize: 11, color: "#9ca3af" }}>{txt.chargedCard}</span>
+                        <span style={{ marginLeft: 8, fontSize: 11, color: "#a39a8d" }}>{txt.chargedCard}</span>
                       )}
                     </div>
                     <div style={{ textAlign: "right", fontWeight: 700, color: amountColor(cents), fontVariantNumeric: "tabular-nums" }}>
@@ -289,10 +289,10 @@ export default function SellerPaymentsLedger() {
                 display: "grid",
                 gridTemplateColumns: "120px 120px 1fr 130px",
                 gap: 8, padding: "11px 20px",
-                borderTop: "2px solid #e5e7eb",
-                fontSize: 13, fontWeight: 700, background: "#f9fafb",
+                borderTop: "2px solid #e6dfd4",
+                fontSize: 13, fontWeight: 700, background: "#faf7f2",
               }}>
-                <div style={{ color: "#6b7280", fontSize: 11 }}>{txt.sum}</div>
+                <div style={{ color: "#5e574e", fontSize: 11 }}>{txt.sum}</div>
                 <div />
                 <div />
                 <div style={{ textAlign: "right", color: amountColor(periodCents), fontVariantNumeric: "tabular-nums" }}>
@@ -300,7 +300,7 @@ export default function SellerPaymentsLedger() {
                 </div>
               </div>
               {ps > 0 && totalPages > 1 && (
-                <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "12px 20px", borderTop: "1px solid #f3eee6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <Text variant="bodySm" tone="subdued">
                     {page * ps + 1}–{Math.min((page + 1) * ps, totalFiltered)} {txt.of} {totalFiltered}
                   </Text>

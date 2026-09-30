@@ -100,7 +100,7 @@ export default function SettingsLayout({ children }) {
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             background: "none", border: "none", cursor: "pointer",
-            fontSize: 13, color: "#6b7280", fontWeight: 500, padding: "4px 0",
+            fontSize: 13, color: "#5e574e", fontWeight: 500, padding: "4px 0",
           }}
         >
           <svg width={16} height={16} viewBox="0 0 20 20" fill="none">
@@ -116,7 +116,7 @@ export default function SettingsLayout({ children }) {
         <div style={{ position: "sticky", top: 20 }}>
           {/* Header */}
           <div style={{
-            background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+            background: "linear-gradient(135deg, #1d1b18 0%, #1d1b18 100%)",
             borderRadius: "14px 14px 0 0",
             padding: "20px 20px 18px",
             display: "flex", alignItems: "center", gap: 12,
@@ -139,7 +139,7 @@ export default function SettingsLayout({ children }) {
           {/* Nav groups */}
           <div style={{
             background: "#fff",
-            border: "1px solid #e5e7eb",
+            border: "1px solid #e6dfd4",
             borderTop: "none",
             borderRadius: "0 0 14px 14px",
             overflow: "hidden",
@@ -147,16 +147,16 @@ export default function SettingsLayout({ children }) {
           }}>
             {visibleGroups.map((group, gi) => (
               <div key={group.label}>
-                {gi > 0 && <div style={{ height: 1, background: "#f1f5f9", margin: "0 16px" }} />}
+                {gi > 0 && <div style={{ height: 1, background: "#f3eee6", margin: "0 16px" }} />}
                 {/* Group label */}
-                <div style={{ padding: "12px 20px 4px", fontSize: 10, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                <div style={{ padding: "12px 20px 4px", fontSize: 10, fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                   {group.label}
                 </div>
                 {/* Items */}
                 {group.items.map((item) => {
                   const active = isActive(item.href);
                   const isSU = item.superuserOnly;
-                  const accentColor = isSU ? "#dc2626" : "#008060";
+                  const accentColor = isSU ? "#dc2626" : "#a65300";
                   return (
                     <Link key={item.href} href={item.href} style={{ textDecoration: "none", display: "block" }}>
                       <div style={{
@@ -164,32 +164,32 @@ export default function SettingsLayout({ children }) {
                         padding: "9px 20px 9px 16px",
                         margin: "2px 8px",
                         borderRadius: 8,
-                        background: active ? (isSU ? "rgba(220,38,38,0.08)" : "rgba(0,128,96,0.08)") : "transparent",
+                        background: active ? (isSU ? "rgba(220,38,38,0.08)" : "rgba(238,138,18,0.12)") : "transparent",
                         borderLeft: active ? `3px solid ${accentColor}` : "3px solid transparent",
                         transition: "all 0.15s ease",
                         cursor: "pointer",
                       }}
-                        onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#f8fafc"; }}
+                        onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#faf7f2"; }}
                         onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
                       >
                         {/* Icon */}
                         <div style={{
                           width: 30, height: 30, borderRadius: 7, flexShrink: 0,
-                          background: active ? (isSU ? "rgba(220,38,38,0.12)" : "rgba(0,128,96,0.1)") : (isSU ? "rgba(220,38,38,0.08)" : "#f1f5f9"),
+                          background: active ? (isSU ? "rgba(220,38,38,0.12)" : "rgba(238,138,18,0.18)") : (isSU ? "rgba(220,38,38,0.08)" : "#f3eee6"),
                           display: "flex", alignItems: "center", justifyContent: "center",
                           transition: "all 0.15s",
                         }}>
                           <Icon
                             d={ICONS[item.icon] || ICONS.general}
                             size={14}
-                            color={active ? accentColor : (isSU ? "#dc2626" : "#64748b")}
+                            color={active ? accentColor : (isSU ? "#dc2626" : "#5e574e")}
                           />
                         </div>
                         {/* Label */}
                         <span style={{
                           fontSize: 13,
                           fontWeight: active ? 600 : 400,
-                          color: active ? (isSU ? "#991b1b" : "#065f46") : (isSU ? "#dc2626" : "#374151"),
+                          color: active ? (isSU ? "#991b1b" : "#065f46") : (isSU ? "#dc2626" : "#3a352f"),
                           flex: 1,
                           letterSpacing: active ? "-0.01em" : "normal",
                         }}>

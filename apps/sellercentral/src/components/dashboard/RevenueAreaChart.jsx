@@ -5,7 +5,7 @@ import { useLocale } from "next-intl";
 import { useLt } from "@/lib/use-locale-text";
 import { dateLocaleFor, fmtMoney } from "@/lib/locale-text";
 
-const DEFAULT_ACCENT = "#008060";
+const DEFAULT_ACCENT = "#ee8a12";
 
 function niceMaxCents(cents) {
   const euro = cents / 100;
@@ -117,7 +117,7 @@ export default function RevenueAreaChart({
   const labelStep = Math.max(1, Math.ceil(data.length / 10));
 
   if (data.length === 0) {
-    return <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{resolvedEmptyLabel}</p>;
+    return <p style={{ fontSize: 13, color: "#a39a8d", margin: 0 }}>{resolvedEmptyLabel}</p>;
   }
 
   return (
@@ -130,7 +130,7 @@ export default function RevenueAreaChart({
           gap: 14,
           marginBottom: 8,
           fontSize: 11,
-          color: "#6b7280",
+          color: "#5e574e",
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -166,10 +166,10 @@ export default function RevenueAreaChart({
                 x2={padL + chartW}
                 y1={y}
                 y2={y}
-                stroke={i === 0 ? "#d1d5db" : "#f3f4f6"}
+                stroke={i === 0 ? "#d6ccbd" : "#f3eee6"}
                 strokeWidth={1}
               />
-              <text x={padL - 8} y={y + 4} textAnchor="end" fontSize={10} fill="#9ca3af">
+              <text x={padL - 8} y={y + 4} textAnchor="end" fontSize={10} fill="#a39a8d">
                 {fmtAxisEuro(valCents)}
               </text>
             </g>
@@ -233,7 +233,7 @@ export default function RevenueAreaChart({
               y={padT + chartH + 18}
               textAnchor="middle"
               fontSize={10}
-              fill="#9ca3af"
+              fill="#a39a8d"
             >
               {p.label || formatDayMonth(p.key)}
             </text>
@@ -260,7 +260,7 @@ export default function RevenueAreaChart({
           x2={padL + chartW}
           y1={padT + chartH}
           y2={padT + chartH}
-          stroke="#d1d5db"
+          stroke="#d6ccbd"
           strokeWidth={1.5}
         />
       </svg>
@@ -272,7 +272,7 @@ export default function RevenueAreaChart({
             left: `${(hover.x / W) * 100}%`,
             top: 0,
             transform: hover.x > W * 0.65 ? "translate(calc(-100% - 12px), 8px)" : "translate(12px, 8px)",
-            background: "#111827",
+            background: "#1d1b18",
             color: "#fff",
             borderRadius: 10,
             padding: "10px 14px",
@@ -286,27 +286,27 @@ export default function RevenueAreaChart({
         >
           <div style={{ fontWeight: 700, marginBottom: 6, fontSize: 13 }}>{formatFullDate(hover.key)}</div>
           <div>
-            <span style={{ color: "#9ca3af" }}>{lt("Revenue:", "Gelir:", "Chiffre d'affaires :", "Ingresos:", "Ricavi:", "Umsatz: ")}</span>
+            <span style={{ color: "#a39a8d" }}>{lt("Revenue:", "Gelir:", "Chiffre d'affaires :", "Ingresos:", "Ricavi:", "Umsatz: ")}</span>
             <strong>{fmtEuroCents(hover.revenue)}</strong>
           </div>
           {hover.orders != null && (
             <div>
-              <span style={{ color: "#9ca3af" }}>{lt("Orders:", "Siparişler:", "Commandes :", "Pedidos:", "Ordini:", "Bestellungen: ")}</span>
+              <span style={{ color: "#a39a8d" }}>{lt("Orders:", "Siparişler:", "Commandes :", "Pedidos:", "Ordini:", "Bestellungen: ")}</span>
               <strong>{hover.orders}</strong>
             </div>
           )}
           {hover.impressions != null && hover.impressions > 0 && (
             <div>
-              <span style={{ color: "#9ca3af" }}>{lt("Impressions:", "Gösterimler:", "Impressions :", "Impresiones:", "Impressioni:", "Impressions: ")}</span>
+              <span style={{ color: "#a39a8d" }}>{lt("Impressions:", "Gösterimler:", "Impressions :", "Impresiones:", "Impressioni:", "Impressions: ")}</span>
               <strong>{hover.impressions.toLocaleString(dateLoc)}</strong>
             </div>
           )}
           {hover.clicks != null && hover.clicks > 0 && (
             <div>
-              <span style={{ color: "#9ca3af" }}>{lt("Clicks:", "Tıklamalar:", "Clics :", "Clics:", "Clic:", "Klicks: ")}</span>
+              <span style={{ color: "#a39a8d" }}>{lt("Clicks:", "Tıklamalar:", "Clics :", "Clics:", "Clic:", "Klicks: ")}</span>
               <strong>{hover.clicks.toLocaleString(dateLoc)}</strong>
               {hover.impressions > 0 && (
-                <span style={{ color: "#9ca3af", marginLeft: 6 }}>
+                <span style={{ color: "#a39a8d", marginLeft: 6 }}>
                   CTR {((hover.clicks / hover.impressions) * 100).toFixed(1)} %
                 </span>
               )}

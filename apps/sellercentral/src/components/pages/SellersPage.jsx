@@ -68,7 +68,7 @@ function StatusBadge({ status, locale }) {
 
 function StatCard({ label, value, sub }) {
   return (
-    <div style={{ flex: 1, minWidth: 140, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
+    <div style={{ flex: 1, minWidth: 140, background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 10, padding: "14px 16px" }}>
       <Text as="p" variant="bodySm" tone="subdued">{label}</Text>
       <Text as="p" variant="headingMd" fontWeight="bold">{value}</Text>
       {sub && <Text as="p" variant="bodySm" tone="subdued">{sub}</Text>}
@@ -81,9 +81,9 @@ function SellerTable({ rows, router, onImpersonate, onDelete, deletingId, locale
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
-          <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+          <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
             {headers.map((h, i) => (
-              <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
+              <th key={i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5e574e", whiteSpace: "nowrap" }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -91,24 +91,24 @@ function SellerTable({ rows, router, onImpersonate, onDelete, deletingId, locale
           {rows.map((seller, i) => (
             <tr
               key={seller.id}
-              style={{ borderBottom: "1px solid #f1f1f1", background: i % 2 === 0 ? "#fff" : "#fafafa", cursor: "pointer" }}
+              style={{ borderBottom: "1px solid #f3eee6", background: i % 2 === 0 ? "#fff" : "#faf7f2", cursor: "pointer" }}
               onClick={() => router.push(`/sellers/${seller.id}`)}
               onMouseEnter={(e) => { e.currentTarget.style.background = "#f0f5ff"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#fafafa"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#faf7f2"; }}
             >
               <td style={{ padding: "10px 12px", fontWeight: 600 }}>
-                {seller.store_name || <span style={{ color: "#9ca3af" }}>—</span>}
+                {seller.store_name || <span style={{ color: "#a39a8d" }}>—</span>}
               </td>
-              <td style={{ padding: "10px 12px", color: "#374151" }}>{seller.email}</td>
-              <td style={{ padding: "10px 12px", color: "#6b7280" }}>{seller.company_name || "—"}</td>
+              <td style={{ padding: "10px 12px", color: "#3a352f" }}>{seller.email}</td>
+              <td style={{ padding: "10px 12px", color: "#5e574e" }}>{seller.company_name || "—"}</td>
               <td style={{ padding: "10px 12px" }}><StatusBadge status={seller.approval_status || "registered"} locale={locale} /></td>
               <td style={{ padding: "10px 12px", textAlign: "right" }}>{seller.product_count ?? 0}</td>
               <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.revenue_cents, locale)}</td>
               <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmtCents(seller.commission_cents, locale)}</td>
-              <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 11, color: "#6b7280" }}>
+              <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 11, color: "#5e574e" }}>
                 {seller.iban ? seller.iban.replace(/(.{4})/g, "$1 ").trim() : "—"}
               </td>
-              <td style={{ padding: "10px 12px", color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtDate(seller.created_at, locale)}</td>
+              <td style={{ padding: "10px 12px", color: "#a39a8d", whiteSpace: "nowrap" }}>{fmtDate(seller.created_at, locale)}</td>
               <td style={{ padding: "10px 12px" }}>
                 <InlineStack gap="200">
                   <Button

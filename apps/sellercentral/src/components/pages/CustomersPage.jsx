@@ -32,8 +32,8 @@ function accountTypeLabel(type, ui) {
 }
 
 const ACCOUNT_TYPE_COLORS = {
-  gastkunde: { bg: "#f3f4f6", color: "#6b7280" },
-  gewerbe:   { bg: "#dbeafe", color: "#1e40af" },
+  gastkunde: { bg: "#f3eee6", color: "#5e574e" },
+  gewerbe:   { bg: "#fcebd5", color: "#7f3f00" },
   privat:    { bg: "#d1fae5", color: "#065f46" },
 };
 
@@ -71,7 +71,7 @@ function ActionMenu({ customer, onEdit, onDelete, canManage, ui }) {
   };
 
   if (!canManage) {
-    return <span style={{ color: "#9ca3af", fontSize: 12 }}>—</span>;
+    return <span style={{ color: "#a39a8d", fontSize: 12 }}>—</span>;
   }
 
   return (
@@ -80,18 +80,18 @@ function ActionMenu({ customer, onEdit, onDelete, canManage, ui }) {
         type="button"
         ref={btnRef}
         onClick={handleToggle}
-        style={{ background: "none", border: "1px solid transparent", borderRadius: 5, padding: "3px 7px", cursor: "pointer", fontSize: 16, color: "#6b7280", lineHeight: 1 }}
-        onMouseEnter={e => e.currentTarget.style.background = "#f3f4f6"}
+        style={{ background: "none", border: "1px solid transparent", borderRadius: 5, padding: "3px 7px", cursor: "pointer", fontSize: 16, color: "#5e574e", lineHeight: 1 }}
+        onMouseEnter={e => e.currentTarget.style.background = "#f3eee6"}
         onMouseLeave={e => e.currentTarget.style.background = "none"}
       >
         ···
       </button>
       {open && (
-        <div ref={menuRef} style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 9999, minWidth: 150, overflow: "hidden" }}>
+        <div ref={menuRef} style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right, background: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 9999, minWidth: 150, overflow: "hidden" }}>
           <button
             onClick={() => { setOpen(false); onEdit(customer); }}
-            style={{ display: "block", width: "100%", padding: "9px 16px", textAlign: "left", background: "none", border: "none", fontSize: 13, cursor: "pointer", color: "#111827" }}
-            onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+            style={{ display: "block", width: "100%", padding: "9px 16px", textAlign: "left", background: "none", border: "none", fontSize: 13, cursor: "pointer", color: "#1d1b18" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#faf7f2"}
             onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
             {ui.edit}
@@ -253,18 +253,18 @@ export default function CustomersPage() {
       return (
         <tr
           key={c.id || i}
-          style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+          style={{ borderBottom: "1px solid #f3eee6", cursor: "pointer" }}
           onClick={() => c?.id && router.push(`/customers/${c.id}`)}
-          onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+          onMouseEnter={e => e.currentTarget.style.background = "#faf7f2"}
           onMouseLeave={e => e.currentTarget.style.background = ""}
         >
-          <td style={{ padding: "10px 12px", fontWeight: 700, color: "#6b7280", fontSize: 12 }}>
+          <td style={{ padding: "10px 12px", fontWeight: 700, color: "#5e574e", fontSize: 12 }}>
             {c.customer_number ? `#${c.customer_number}` : "—"}
           </td>
           <td style={{ padding: "10px 12px", fontWeight: 500 }}>
             {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
           </td>
-          <td style={{ padding: "10px 12px", color: "#6b7280" }}>{isSuperuser ? c.email : "—"}</td>
+          <td style={{ padding: "10px 12px", color: "#5e574e" }}>{isSuperuser ? c.email : "—"}</td>
           <td style={{ padding: "10px 12px" }}>
             <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: typeColor.bg, color: typeColor.color, fontWeight: 600 }}>
               {accountTypeLabel(c.account_type, ui)}
@@ -274,20 +274,20 @@ export default function CustomersPage() {
             {c.is_registered ? (
               <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#d1fae5", color: "#065f46", fontWeight: 600 }}>{ui.statusActive}</span>
             ) : (
-              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>{ui.guestCustomer}</span>
+              <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#f3eee6", color: "#5e574e", fontWeight: 600 }}>{ui.guestCustomer}</span>
             )}
           </td>
           <td style={{ padding: "10px 12px" }}>
             {c.newsletter_opted_in ? (
               <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "#ede9fe", color: "#6d28d9", fontWeight: 600 }}>✓</span>
             ) : (
-              <span style={{ fontSize: 11, color: "#9ca3af" }}>—</span>
+              <span style={{ fontSize: 11, color: "#a39a8d" }}>—</span>
             )}
           </td>
-          <td style={{ padding: "10px 12px", color: "#6b7280" }}>{c.country || "—"}</td>
+          <td style={{ padding: "10px 12px", color: "#5e574e" }}>{c.country || "—"}</td>
           <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>{c.order_count || 0}</td>
           <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>{fmtCents(c.total_spent)}</td>
-          <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 12, color: "#6b7280" }}>{fmtDate(c.last_order)}</td>
+          <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 12, color: "#5e574e" }}>{fmtDate(c.last_order)}</td>
           <td style={{ padding: "10px 8px", textAlign: "right" }}>
             <ActionMenu
               customer={c}
@@ -320,11 +320,11 @@ export default function CustomersPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 12, padding: 28, maxWidth: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <h3 style={{ margin: "0 0 10px", fontSize: 16, fontWeight: 700 }}>{ui.deleteCustomer}?</h3>
-            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#6b7280" }}>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "#5e574e" }}>
               {[confirmDelete.first_name, confirmDelete.last_name].filter(Boolean).join(" ") || confirmDelete.email}
             </p>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmDelete(null)} style={{ padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>{ui.cancel}</button>
+              <button onClick={() => setConfirmDelete(null)} style={{ padding: "8px 16px", border: "1px solid #e6dfd4", borderRadius: 7, fontSize: 13, cursor: "pointer", background: "#fff" }}>{ui.cancel}</button>
               <button onClick={handleDeleteConfirm} style={{ padding: "8px 16px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>{ui.delete}</button>
             </div>
           </div>
@@ -359,16 +359,16 @@ export default function CustomersPage() {
                     placeholder={ui.searchSeller + "…"}
                     value={sellerSearchFilter}
                     onChange={(e) => setSellerSearchFilter(e.target.value)}
-                    style={{ flex: 1, minWidth: 200, padding: "7px 12px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13 }}
+                    style={{ flex: 1, minWidth: 200, padding: "7px 12px", border: "1px solid #e6dfd4", borderRadius: 7, fontSize: 13 }}
                   />
                 )}
               </InlineStack>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                    <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                       {COLS.map((c, i) => (
-                        <th key={i} style={{ padding: "10px 12px", textAlign: i >= 7 && i <= 9 ? "center" : "left", fontWeight: 600, fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
+                        <th key={i} style={{ padding: "10px 12px", textAlign: i >= 7 && i <= 9 ? "center" : "left", fontWeight: 600, fontSize: 11, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>
                           {c}
                         </th>
                       ))}
@@ -376,11 +376,11 @@ export default function CustomersPage() {
                   </thead>
                   <tbody>
                     {loading && (
-                      <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{ui.loading}</td></tr>
+                      <tr><td colSpan={11} style={{ padding: 40, textAlign: "center", color: "#a39a8d" }}>{ui.loading}</td></tr>
                     )}
                     {!loading && customers.length === 0 && (
                       <tr>
-                        <td colSpan={11} style={{ padding: "60px 20px", textAlign: "center", color: "#9ca3af" }}>
+                        <td colSpan={11} style={{ padding: "60px 20px", textAlign: "center", color: "#a39a8d" }}>
                           <div style={{ marginBottom: 12 }}>👤</div>
                           <div>{ui.noCustomers}</div>
                         </td>
@@ -390,7 +390,7 @@ export default function CustomersPage() {
                       customers.length > 0 &&
                       (filteredCustomerGroups.length === 0 ? (
                         <tr>
-                          <td colSpan={11} style={{ padding: "16px 24px", color: "#9ca3af", fontSize: 13 }}>
+                          <td colSpan={11} style={{ padding: "16px 24px", color: "#a39a8d", fontSize: 13 }}>
                             {ui.noCustomers}{sellerSearchFilter.trim() ? " (Filter)" : ""}.
                           </td>
                         </tr>
@@ -400,9 +400,9 @@ export default function CustomersPage() {
                             sellerId === PLATFORM_SELLER_KEY ? (localeFromIntl === "en" ? "Platform · direct / unassigned" : localeFromIntl === "tr" ? "Platform · direkt / atanmamış" : localeFromIntl === "fr" ? "Plateforme · direct / non attribué" : localeFromIntl === "es" ? "Plataforma · directo / sin asignar" : localeFromIntl === "it" ? "Piattaforma · diretto / non assegnato" : "Plattform · direkt / nicht zugeordnet") : sellerLabelById[sellerId] || sellerId;
                           const open = sellerSectionOpen[sellerId] !== false;
                           const headerBg =
-                            sellerId === PLATFORM_SELLER_KEY ? "#eef2ff" : "#fafafa";
+                            sellerId === PLATFORM_SELLER_KEY ? "#eef2ff" : "#faf7f2";
                           const headerBorder =
-                            sellerId === PLATFORM_SELLER_KEY ? "#c7d2fe" : "#e5e7eb";
+                            sellerId === PLATFORM_SELLER_KEY ? "#c7d2fe" : "#e6dfd4";
                           const headerRow = (
                             <tr key={`h-${sellerId}`}>
                               <td
@@ -425,8 +425,8 @@ export default function CustomersPage() {
                                     textAlign: "left",
                                   }}
                                 >
-                                  <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
-                                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                                  <span style={{ fontWeight: 600, fontSize: 14, color: "#1d1b18" }}>{label}</span>
+                                  <span style={{ fontSize: 12, color: "#5e574e" }}>
                                     {open ? "▾" : "▸"} {items.length} {ui.customers}
                                   </span>
                                 </button>

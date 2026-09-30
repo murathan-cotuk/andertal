@@ -1123,7 +1123,7 @@ function FlowMergeFieldsPanel({ t, catalog, loading, errorText, stepIdx, onAppen
                       <code
                         style={{
                           fontSize: 12,
-                          background: "#f3f4f6",
+                          background: "#f3eee6",
                           padding: "3px 8px",
                           borderRadius: 6,
                           fontFamily: "ui-monospace, monospace",

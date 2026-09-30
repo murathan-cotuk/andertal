@@ -9,12 +9,12 @@ import { localizeShipmentEventDescription } from "@/lib/shipment-event-i18n";
 
 function getStatusMeta(lt) {
   return {
-    versendet: { label: lt("Shipped", "Gönderildi", "Expédié", "Enviado", "Spedito", "Versendet"), color: "#1d4ed8", bg: "#eff6ff", icon: "🚚" },
+    versendet: { label: lt("Shipped", "Gönderildi", "Expédié", "Enviado", "Spedito", "Versendet"), color: "#7f3f00", bg: "#fcebd5", icon: "🚚" },
     in_transit: { label: lt("In transit", "Yolda", "En transit", "En tránsito", "In transito", "Unterwegs"), color: "#7c3aed", bg: "#f5f3ff", icon: "📦" },
     zugestellt: { label: lt("Delivered", "Teslim edildi", "Livré", "Entregado", "Consegnato", "Zugestellt"), color: "#15803d", bg: "#f0fdf4", icon: "✅" },
     exception: { label: lt("Exception", "İstisna", "Exception", "Excepción", "Eccezione", "Ausnahme"), color: "#b91c1c", bg: "#fef2f2", icon: "⚠️" },
     retour: { label: lt("Return", "İade", "Retour", "Devolución", "Reso", "Retour"), color: "#c2410c", bg: "#fff7ed", icon: "↩️" },
-    manual: { label: lt("Manual", "Manuel", "Manuel", "Manual", "Manuale", "Manuell"), color: "#6b7280", bg: "#f9fafb", icon: "📝" },
+    manual: { label: lt("Manual", "Manuel", "Manuel", "Manual", "Manuale", "Manuell"), color: "#5e574e", bg: "#faf7f2", icon: "📝" },
   };
 }
 
@@ -135,9 +135,9 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
   const carrierName = order?.carrier_name?.trim();
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
+    <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 10, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#111827" }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#1d1b18" }}>
           {lt("Shipment tracking", "Gönderi takibi", "Suivi d'expédition", "Seguimiento de envío", "Tracciamento spedizione", "Sendungsverfolgung")}
         </h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -145,7 +145,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
             <button
               onClick={handleRefreshTracking}
               disabled={refreshing}
-              style={{ fontSize: 11, fontWeight: 600, color: "#374151", padding: "5px 10px", border: "1px solid #e5e7eb", borderRadius: 6, background: "#f9fafb", cursor: "pointer", opacity: refreshing ? 0.6 : 1 }}
+              style={{ fontSize: 11, fontWeight: 600, color: "#3a352f", padding: "5px 10px", border: "1px solid #e6dfd4", borderRadius: 6, background: "#faf7f2", cursor: "pointer", opacity: refreshing ? 0.6 : 1 }}
             >
               {refreshing
                 ? lt("Fetching…", "Alınıyor…", "Récupération…", "Obteniendo…", "Recupero…", "Wird abgerufen…")
@@ -157,7 +157,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
               href={trackingUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 12, fontWeight: 600, color: "#1d4ed8", textDecoration: "none", padding: "5px 12px", border: "1px solid #bfdbfe", borderRadius: 6, background: "#eff6ff", display: "flex", alignItems: "center", gap: 5 }}
+              style={{ fontSize: 12, fontWeight: 600, color: "#7f3f00", textDecoration: "none", padding: "5px 12px", border: "1px solid #f5d3a8", borderRadius: 6, background: "#fcebd5", display: "flex", alignItems: "center", gap: 5 }}
             >
               🔗 {lt("Track package", "Paketi takip et", "Suivre le colis", "Rastrear paquete", "Traccia pacco", "Paket verfolgen")}
             </a>
@@ -168,28 +168,28 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
         <div style={{ marginBottom: 10, padding: "6px 12px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 6, fontSize: 12, color: "#15803d" }}>{refreshMsg}</div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16, padding: "10px 14px", background: "#f9fafb", borderRadius: 8, fontSize: 13 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16, padding: "10px 14px", background: "#faf7f2", borderRadius: 8, fontSize: 13 }}>
         <div>
-          <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+          <div style={{ color: "#5e574e", fontSize: 11, marginBottom: 2 }}>
             {lt("Carrier", "Kargo firması", "Transporteur", "Transportista", "Corriere", "Versanddienstleister")}
           </div>
           <div style={{ fontWeight: 600 }}>{carrierName || "—"}</div>
         </div>
         <div>
-          <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+          <div style={{ color: "#5e574e", fontSize: 11, marginBottom: 2 }}>
             {lt("Tracking number", "Takip numarası", "Numéro de suivi", "Número de seguimiento", "Numero di tracciamento", "Trackingnummer")}
           </div>
           <div style={{ fontWeight: 600, fontFamily: "monospace" }}>
             {hasTracking ? (
               trackingUrl
-                ? <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#1d4ed8" }}>{order.tracking_number}</a>
+                ? <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#7f3f00" }}>{order.tracking_number}</a>
                 : order.tracking_number
             ) : "—"}
           </div>
         </div>
         {order?.shipped_at && (
           <div>
-            <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+            <div style={{ color: "#5e574e", fontSize: 11, marginBottom: 2 }}>
               {lt("Ship date", "Gönderim tarihi", "Date d'expédition", "Fecha de envío", "Data spedizione", "Versanddatum")}
             </div>
             <div>{fmtDateTime(order.shipped_at)}</div>
@@ -197,7 +197,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
         )}
         {order?.delivery_date && (
           <div>
-            <div style={{ color: "#6b7280", fontSize: 11, marginBottom: 2 }}>
+            <div style={{ color: "#5e574e", fontSize: 11, marginBottom: 2 }}>
               {lt("Delivery date", "Teslimat tarihi", "Date de livraison", "Fecha de entrega", "Data di consegna", "Lieferdatum")}
             </div>
             <div>{fmtDateTime(order.delivery_date)}</div>
@@ -206,16 +206,16 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
       </div>
 
       {loading ? (
-        <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "12px 0" }}>
+        <div style={{ color: "#a39a8d", fontSize: 13, textAlign: "center", padding: "12px 0" }}>
           {lt("Loading…", "Yükleniyor…", "Chargement…", "Cargando…", "Caricamento…", "Wird geladen…")}
         </div>
       ) : events.length === 0 ? (
-        <div style={{ color: "#9ca3af", fontSize: 13, textAlign: "center", padding: "12px 0", fontStyle: "italic" }}>
+        <div style={{ color: "#a39a8d", fontSize: 13, textAlign: "center", padding: "12px 0", fontStyle: "italic" }}>
           {lt("No shipment events yet.", "Henüz gönderi olayı yok.", "Aucun événement d'expédition pour le moment.", "Aún no hay eventos de envío.", "Nessun evento di spedizione ancora.", "Noch keine Sendungsereignisse vorhanden.")}
         </div>
       ) : (
         <div style={{ position: "relative", paddingLeft: 24 }}>
-          <div style={{ position: "absolute", left: 7, top: 4, bottom: 4, width: 2, background: "#e5e7eb", borderRadius: 2 }} />
+          <div style={{ position: "absolute", left: 7, top: 4, bottom: 4, width: 2, background: "#e6dfd4", borderRadius: 2 }} />
           {events.map((ev, i) => {
             const m = statusMeta[ev.status] || statusMeta.manual;
             const isLast = i === events.length - 1;
@@ -234,13 +234,13 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
                       <EventBadge status={ev.status} statusMeta={statusMeta} />
-                      {ev.location && <span style={{ fontSize: 11, color: "#6b7280" }}>📍 {ev.location}</span>}
-                      <span style={{ fontSize: 11, color: "#9ca3af" }}>{fmtDateTime(ev.event_time)}</span>
-                      {ev.source === "auto" && <span style={{ fontSize: 10, color: "#9ca3af", fontStyle: "italic" }}>auto</span>}
+                      {ev.location && <span style={{ fontSize: 11, color: "#5e574e" }}>📍 {ev.location}</span>}
+                      <span style={{ fontSize: 11, color: "#a39a8d" }}>{fmtDateTime(ev.event_time)}</span>
+                      {ev.source === "auto" && <span style={{ fontSize: 10, color: "#a39a8d", fontStyle: "italic" }}>auto</span>}
                       {ev.source === "api" && <span style={{ fontSize: 10, color: "#0369a1", fontWeight: 600 }}>DHL API</span>}
                     </div>
                     {localizedDesc && (
-                      <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{localizedDesc}</div>
+                      <div style={{ fontSize: 13, color: "#3a352f", marginTop: 2 }}>{localizedDesc}</div>
                     )}
                   </div>
                 </div>
@@ -255,19 +255,19 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
       )}
 
       {showAddForm ? (
-        <div style={{ marginTop: 16, padding: "14px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+        <div style={{ marginTop: 16, padding: "14px", background: "#faf7f2", borderRadius: 8, border: "1px solid #e6dfd4" }}>
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
             {lt("Add event", "Olay ekle", "Ajouter un événement", "Añadir evento", "Aggiungi evento", "Ereignis hinzufügen")}
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             <div>
-              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>
+              <label style={{ fontSize: 11, color: "#5e574e", display: "block", marginBottom: 3 }}>
                 {lt("Status", "Durum", "Statut", "Estado", "Stato", "Status")}
               </label>
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
+                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13 }}
               >
                 {Object.entries(statusMeta).map(([k, v]) => (
                   <option key={k} value={k}>{v.icon} {v.label}</option>
@@ -275,32 +275,32 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
               </select>
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>
+              <label style={{ fontSize: 11, color: "#5e574e", display: "block", marginBottom: 3 }}>
                 {lt("Description (optional)", "Açıklama (isteğe bağlı)", "Description (facultatif)", "Descripción (opcional)", "Descrizione (opzionale)", "Beschreibung (optional)")}
               </label>
               <input
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder={lt("e.g. Loaded onto delivery vehicle", "örn. Teslimat aracına yüklendi", "ex. Chargé sur le véhicule de livraison", "p. ej. Cargado en vehículo de reparto", "es. Caricato sul veicolo di consegna", "z.B. Im Zustellfahrzeug geladen")}
-                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
+                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
               />
             </div>
             <div>
-              <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 3 }}>
+              <label style={{ fontSize: 11, color: "#5e574e", display: "block", marginBottom: 3 }}>
                 {lt("Location (optional)", "Konum (isteğe bağlı)", "Lieu (facultatif)", "Ubicación (opcional)", "Posizione (opzionale)", "Standort (optional)")}
               </label>
               <input
                 value={form.location}
                 onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
                 placeholder={lt("e.g. Frankfurt am Main", "örn. Frankfurt am Main", "ex. Francfort-sur-le-Main", "p. ej. Fráncfort del Meno", "es. Francoforte sul Meno", "z.B. Frankfurt am Main")}
-                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
+                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
               />
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <button
                 onClick={handleAddEvent}
                 disabled={saving}
-                style={{ padding: "7px 16px", background: "#111827", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
+                style={{ padding: "7px 16px", background: "#1d1b18", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: saving ? 0.6 : 1 }}
               >
                 {saving
                   ? lt("Saving…", "Kaydediliyor…", "Enregistrement…", "Guardando…", "Salvataggio…", "Speichern…")
@@ -308,7 +308,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
               </button>
               <button
                 onClick={() => { setShowAddForm(false); setError(""); }}
-                style={{ padding: "7px 14px", background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
+                style={{ padding: "7px 14px", background: "#f3eee6", color: "#3a352f", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
               >
                 {lt("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}
               </button>
@@ -319,7 +319,7 @@ export default function TrackingSection({ orderId, order, onOrderStatusChanged }
         <div style={{ marginTop: 14 }}>
           <button
             onClick={() => setShowAddForm(true)}
-            style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, background: "#f9fafb", cursor: "pointer" }}
+            style={{ padding: "6px 14px", fontSize: 12, fontWeight: 600, color: "#3a352f", border: "1px solid #e6dfd4", borderRadius: 6, background: "#faf7f2", cursor: "pointer" }}
           >
             + {lt("Add event", "Olay ekle", "Ajouter un événement", "Añadir evento", "Aggiungi evento", "Ereignis hinzufügen")}
           </button>

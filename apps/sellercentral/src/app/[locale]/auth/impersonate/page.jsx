@@ -32,8 +32,8 @@ function ImpersonateInner() {
   }, [router]);
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "system-ui, sans-serif", background: "#f9fafb" }}>
-      <p style={{ color: "#6b7280", fontSize: 14 }}>Anmeldung wird vorbereitet…</p>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "system-ui, sans-serif", background: "#faf7f2" }}>
+      <p style={{ color: "#5e574e", fontSize: 14 }}>Anmeldung wird vorbereitet…</p>
     </div>
   );
 }

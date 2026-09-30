@@ -43,10 +43,10 @@ const COUNTRY_PICKER_STYLES = `
   stroke-dasharray: 241 9999999; stroke-dashoffset: 0;
 }
 .cp-checkbox-container input:checked ~ svg .cp-checkbox-path {
-  stroke: #008060; stroke-dasharray: 70.5 9999999; stroke-dashoffset: -262.27;
+  stroke: #ee8a12; stroke-dasharray: 70.5 9999999; stroke-dashoffset: -262.27;
 }
-.cp-item { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border:none; background:none; width:100%; text-align:left; font-size:13px; color:#202223; }
-.cp-item:hover { background:#f6f6f7; }
+.cp-item { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; border:none; background:none; width:100%; text-align:left; font-size:13px; color:#1d1b18; }
+.cp-item:hover { background:#faf7f2; }
 `;
 
 function CountryPicker({ selected, onChange, countries, copy }) {
@@ -93,7 +93,7 @@ function CountryPicker({ selected, onChange, countries, copy }) {
           onClick={openPanel}
         >
           <input
-            style={{ border: "none", outline: "none", width: "100%", fontSize: 13, background: "transparent", color: "#202223" }}
+            style={{ border: "none", outline: "none", width: "100%", fontSize: 13, background: "transparent", color: "#1d1b18" }}
             placeholder={copy.searchCountry}
             value={search}
             onChange={(e) => { setSearch(e.target.value); if (!open) openPanel(); }}
@@ -125,12 +125,12 @@ function CountryPicker({ selected, onChange, countries, copy }) {
                       <path d="M 0 16 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 16 L 32 48 L 64 16 V 8 A 8 8 90 0 0 56 0 H 8 A 8 8 90 0 0 0 8 V 56 A 8 8 90 0 0 8 64 H 56 A 8 8 90 0 0 64 56 V 16" pathLength="575.0541381835938" className="cp-checkbox-path" />
                     </svg>
                   </span>
-                  <span style={{ fontWeight: 600, color: "#6d7175", minWidth: 28, fontSize: 11 }}>{c.code}</span>
+                  <span style={{ fontWeight: 600, color: "#5e574e", minWidth: 28, fontSize: 11 }}>{c.code}</span>
                   <span>{c.label}</span>
                 </button>
               ))}
               {filtered.length > 80 && (
-                <div style={{ padding: "6px 14px", fontSize: 12, color: "#6d7175", borderTop: "1px solid #f1f1f1" }}>
+                <div style={{ padding: "6px 14px", fontSize: 12, color: "#5e574e", borderTop: "1px solid #f3eee6" }}>
                   {copy.moreCountries(filtered.length - 80)}
                 </div>
               )}
@@ -144,10 +144,10 @@ function CountryPicker({ selected, onChange, countries, copy }) {
             {selected.map((code) => {
               const country = countries.find((c) => c.code === code);
               return (
-                <span key={code} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "var(--p-color-bg-fill-secondary, #f3f4f6)", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151" }}>
-                  <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11 }}>{code}</span>
+                <span key={code} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", background: "var(--p-color-bg-fill-secondary, #f3eee6)", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 12, color: "#3a352f" }}>
+                  <span style={{ fontWeight: 600, color: "#5e574e", fontSize: 11 }}>{code}</span>
                   {country?.label}
-                  <button type="button" onClick={() => remove(code)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "#9ca3af", marginLeft: 2 }}>×</button>
+                  <button type="button" onClick={() => remove(code)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "#a39a8d", marginLeft: 2 }}>×</button>
                 </span>
               );
             })}
@@ -309,7 +309,7 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
                       {(g.prices || []).filter(p => p.price_cents > 0).map((p) => {
                         const country = countries.find((c) => c.code === p.country_code);
                         return (
-                          <span key={p.country_code} style={{ fontSize: 11, background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 6, padding: "2px 8px", color: "#374151" }}>
+                          <span key={p.country_code} style={{ fontSize: 11, background: "#f3eee6", border: "1px solid #e6dfd4", borderRadius: 6, padding: "2px 8px", color: "#3a352f" }}>
                             {country?.label || p.country_code}: {(p.price_cents / 100).toLocaleString(moneyLocale, { minimumFractionDigits: 2 })} €
                           </span>
                         );
@@ -370,13 +370,13 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
             {form.selectedCountries.length > 0 && (
               <BlockStack gap="200">
                 <Text variant="bodySm" fontWeight="semibold">{copy.shippingPrices}</Text>
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden" }}>
                   {form.selectedCountries.map((code, i) => {
                     const country = countries.find((c) => c.code === code);
                     return (
-                      <div key={code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderBottom: i < form.selectedCountries.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                        <span style={{ minWidth: 160, fontSize: 13, color: "#374151" }}>
-                          <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11, marginRight: 6 }}>{code}</span>
+                      <div key={code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderBottom: i < form.selectedCountries.length - 1 ? "1px solid #f3eee6" : "none", background: "#fff" }}>
+                        <span style={{ minWidth: 160, fontSize: 13, color: "#3a352f" }}>
+                          <span style={{ fontWeight: 600, color: "#5e574e", fontSize: 11, marginRight: 6 }}>{code}</span>
                           {country?.label || code}
                         </span>
                         <div style={{ flex: 1, maxWidth: 160 }}>
@@ -390,7 +390,7 @@ function ShippingGroupsSection({ carriers, countries, copy, ui, locale }) {
                         </div>
                         <button
                           onClick={() => handleCountriesChange(form.selectedCountries.filter(c => c !== code))}
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0 }}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#a39a8d", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0 }}
                           title={copy.removeCountry}
                         >
                           ×
@@ -443,7 +443,7 @@ function CarrierModal({ mode, carrier, onClose, onSaved, copy, ui }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 520, boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e6dfd4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Text variant="headingMd" as="h3">{mode === "edit" ? copy.editCarrier : copy.addCarrier}</Text>
           <Button variant="plain" onClick={onClose}>✕</Button>
         </div>
@@ -451,14 +451,14 @@ function CarrierModal({ mode, carrier, onClose, onSaved, copy, ui }) {
           <BlockStack gap="400">
             <TextField label={ui.colName} value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="DHL" autoComplete="off" />
             <TextField
-              label={<>{copy.trackingUrl} <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>({copy.trackingHelp})</span></>}
+              label={<>{copy.trackingUrl} <span style={{ color: "#a39a8d", fontWeight: 400, fontSize: 12 }}>({copy.trackingHelp})</span></>}
               value={form.tracking_url_template}
               onChange={(v) => setForm((f) => ({ ...f, tracking_url_template: v }))}
               placeholder="https://carrier.com/track/{tracking}"
               autoComplete="off"
             />
-            <TextField label={<>{copy.apiKey} <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>({copy.optional})</span></>} value={form.api_key} onChange={(v) => setForm((f) => ({ ...f, api_key: v }))} type="password" autoComplete="off" />
-            <TextField label={<>{copy.apiSecret} <span style={{ color: "#9ca3af", fontWeight: 400, fontSize: 12 }}>({copy.optional})</span></>} value={form.api_secret} onChange={(v) => setForm((f) => ({ ...f, api_secret: v }))} type="password" autoComplete="off" />
+            <TextField label={<>{copy.apiKey} <span style={{ color: "#a39a8d", fontWeight: 400, fontSize: 12 }}>({copy.optional})</span></>} value={form.api_key} onChange={(v) => setForm((f) => ({ ...f, api_key: v }))} type="password" autoComplete="off" />
+            <TextField label={<>{copy.apiSecret} <span style={{ color: "#a39a8d", fontWeight: 400, fontSize: 12 }}>({copy.optional})</span></>} value={form.api_secret} onChange={(v) => setForm((f) => ({ ...f, api_secret: v }))} type="password" autoComplete="off" />
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} />
               {copy.active}
@@ -466,7 +466,7 @@ function CarrierModal({ mode, carrier, onClose, onSaved, copy, ui }) {
             {err && <Banner tone="critical"><p>{err}</p></Banner>}
           </BlockStack>
         </div>
-        <div style={{ padding: "12px 20px", borderTop: "1px solid #e5e7eb" }}>
+        <div style={{ padding: "12px 20px", borderTop: "1px solid #e6dfd4" }}>
           <InlineStack gap="200" align="end">
             <Button onClick={onClose}>{ui.cancel}</Button>
             <Button variant="primary" onClick={handleSave} loading={saving}>{ui.save}</Button>
@@ -493,7 +493,7 @@ function CountryToggle({ checked, onChange, disabled }) {
       onClick={() => onChange(!checked)}
       style={{
         width: 40, height: 22, borderRadius: 999, border: "none", padding: 2,
-        background: checked ? "#008060" : "#d1d5db", cursor: disabled ? "default" : "pointer",
+        background: checked ? "#ee8a12" : "#d6ccbd", cursor: disabled ? "default" : "pointer",
         display: "inline-flex", alignItems: "center", transition: "background 0.15s", flexShrink: 0,
         opacity: disabled ? 0.6 : 1,
       }}
@@ -662,8 +662,8 @@ function CountryOverviewSection({ locale, copy }) {
 
             <div style={{
               display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center",
-              padding: "10px 12px", background: selected.size ? "#f0fdf4" : "#f9fafb",
-              border: `1px solid ${selected.size ? "#bbf7d0" : "#e5e7eb"}`, borderRadius: 8,
+              padding: "10px 12px", background: selected.size ? "#f0fdf4" : "#faf7f2",
+              border: `1px solid ${selected.size ? "#bbf7d0" : "#e6dfd4"}`, borderRadius: 8,
             }}>
               <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
                 <input
@@ -674,7 +674,7 @@ function CountryOverviewSection({ locale, copy }) {
                 />
                 {copy.countryOverviewSelectAll}
               </label>
-              <span style={{ fontSize: 12, color: "#6b7280" }}>
+              <span style={{ fontSize: 12, color: "#5e574e" }}>
                 {copy.countryOverviewSelected(selected.size)}
               </span>
               <div style={{ flex: 1 }} />
@@ -692,7 +692,7 @@ function CountryOverviewSection({ locale, copy }) {
             {filtered.length === 0 ? (
               <Text tone="subdued">{copy.countryOverviewNoSearchResults}</Text>
             ) : (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", maxHeight: 480, overflowY: "auto" }}>
+              <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden", maxHeight: 480, overflowY: "auto" }}>
                 {filtered.map((c, i) => {
                   const isSelected = selected.has(c.country_code);
                   return (
@@ -700,7 +700,7 @@ function CountryOverviewSection({ locale, copy }) {
                       key={c.country_code}
                       style={{
                         display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-                        borderBottom: i < filtered.length - 1 ? "1px solid #f3f4f6" : "none",
+                        borderBottom: i < filtered.length - 1 ? "1px solid #f3eee6" : "none",
                         background: isSelected ? "#ecfdf5" : "#fff",
                         opacity: c.is_enabled ? 1 : 0.65,
                       }}
@@ -712,11 +712,11 @@ function CountryOverviewSection({ locale, copy }) {
                         aria-label={c.label}
                         style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }}
                       />
-                      <span style={{ minWidth: 200, fontSize: 13, color: "#374151" }}>
-                        <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11, marginRight: 6 }}>{c.country_code}</span>
+                      <span style={{ minWidth: 200, fontSize: 13, color: "#3a352f" }}>
+                        <span style={{ fontWeight: 600, color: "#5e574e", fontSize: 11, marginRight: 6 }}>{c.country_code}</span>
                         {c.label}
                       </span>
-                      <span style={{ flex: 1, fontSize: 13, color: "#6d7175" }}>
+                      <span style={{ flex: 1, fontSize: 13, color: "#5e574e" }}>
                         {copy.countryOverviewProductCount(c.product_count)}
                       </span>
                       <CountryToggle
@@ -879,7 +879,7 @@ function SendcloudSection({ copy, ui }) {
         <Box padding="300" background="bg-surface-secondary" borderRadius="200">
           <BlockStack gap="100">
             <Text variant="bodySm" fontWeight="semibold" tone="subdued">{copy.webhookTitle}</Text>
-            <div style={{ fontFamily: "monospace", fontSize: 13, color: "#374151", background: "#f3f4f6", padding: "8px 12px", borderRadius: 6, userSelect: "all" }}>
+            <div style={{ fontFamily: "monospace", fontSize: 13, color: "#3a352f", background: "#f3eee6", padding: "8px 12px", borderRadius: 6, userSelect: "all" }}>
               https://api.andertal.com/webhook/sendcloud
             </div>
             <Text variant="bodySm" tone="subdued">{copy.webhookHelp}</Text>
@@ -1093,13 +1093,13 @@ export default function ShippingSettingsPage() {
             </InlineStack>
 
             {thresholdCountries.length > 0 && (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden" }}>
                 {thresholdCountries.map((code, i) => {
                   const country = countries.find((c) => c.code === code);
                   return (
-                    <div key={code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderBottom: i < thresholdCountries.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                      <span style={{ minWidth: 160, fontSize: 13, color: "#374151" }}>
-                        <span style={{ fontWeight: 600, color: "#6d7175", fontSize: 11, marginRight: 6 }}>{code}</span>
+                    <div key={code} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderBottom: i < thresholdCountries.length - 1 ? "1px solid #f3eee6" : "none", background: "#fff" }}>
+                      <span style={{ minWidth: 160, fontSize: 13, color: "#3a352f" }}>
+                        <span style={{ fontWeight: 600, color: "#5e574e", fontSize: 11, marginRight: 6 }}>{code}</span>
                         {country?.label || code}
                       </span>
                       <div style={{ flex: 1, maxWidth: 160 }}>
@@ -1117,7 +1117,7 @@ export default function ShippingSettingsPage() {
                           setThresholdCountries((prev) => prev.filter((c) => c !== code));
                           setThresholds((t) => { const n = { ...t }; delete n[code]; return n; });
                         }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0 }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#a39a8d", fontSize: 18, lineHeight: 1, padding: "0 4px", flexShrink: 0 }}
                         title={copy.remove}
                       >
                         ×
@@ -1201,7 +1201,7 @@ export default function ShippingSettingsPage() {
               <div style={{ padding: "14px 20px" }}>
                 <InlineStack align="space-between" blockAlign="center" gap="400">
                   <InlineStack gap="300" blockAlign="center">
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f3eee6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                       📦
                     </div>
                     <BlockStack gap="050">

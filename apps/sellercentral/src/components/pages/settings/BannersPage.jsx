@@ -168,9 +168,9 @@ export default function BannersPage() {
   const rows = banners.map((b) => [
     <InlineStack gap="200" blockAlign="center" key={b.id}>
       {b.image_url ? (
-        <img src={b.image_url} alt={b.title} style={{ width: 48, height: 30, objectFit: "cover", borderRadius: 4, border: "1px solid #e5e7eb" }} />
+        <img src={b.image_url} alt={b.title} style={{ width: 48, height: 30, objectFit: "cover", borderRadius: 4, border: "1px solid #e6dfd4" }} />
       ) : (
-        <div style={{ width: 48, height: 30, background: "#f3f4f6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 48, height: 30, background: "#f3eee6", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Text variant="bodySm" tone="subdued">–</Text>
         </div>
       )}
@@ -294,7 +294,7 @@ export default function BannersPage() {
               <img
                 src={form.image_url}
                 alt={t("Preview", "Önizleme", "Aperçu", "Vista previa", "Anteprima", "Vorschau")}
-                style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb" }}
+                style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6, border: "1px solid #e6dfd4" }}
                 onError={(e) => { e.target.style.display = "none"; }}
               />
             )}
@@ -309,7 +309,7 @@ export default function BannersPage() {
             {form.video_url && (
               <video
                 src={form.video_url}
-                style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb" }}
+                style={{ width: "100%", maxHeight: 160, objectFit: "cover", borderRadius: 6, border: "1px solid #e6dfd4" }}
                 muted
                 playsInline
                 onError={(e) => { e.target.style.display = "none"; }}

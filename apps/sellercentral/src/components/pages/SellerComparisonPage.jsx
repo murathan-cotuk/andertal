@@ -78,12 +78,12 @@ function scoreTone(score) {
 }
 
 const CSS = `
-.spc-page { font-size: 12px; color: #111827; }
+.spc-page { font-size: 12px; color: #1d1b18; }
 .spc-product-head { display: flex; align-items: center; gap: 12px; }
-.spc-thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: #f3f4f6; flex: 0 0 auto; }
+.spc-thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: #f3eee6; flex: 0 0 auto; }
 .spc-table { width: 100%; border-collapse: collapse; }
-.spc-table th, .spc-table td { font-size: 11px; padding: 6px 8px; border-bottom: 1px solid #f3f4f6; text-align: left; white-space: nowrap; }
-.spc-table th { color: #667085; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.02em; background: #fafafa; }
+.spc-table th, .spc-table td { font-size: 11px; padding: 6px 8px; border-bottom: 1px solid #f3eee6; text-align: left; white-space: nowrap; }
+.spc-table th { color: #667085; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.02em; background: #faf7f2; }
 .spc-table tr.spc-winner { background: #ecfdf5; }
 .spc-help { cursor: help; opacity: 0.55; display: inline-flex; vertical-align: -2px; }
 `;

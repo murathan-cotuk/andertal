@@ -14,7 +14,7 @@ function visualToHtml(html) {
 
 const STYLES = `
   .rte-wrap { border: 1px solid var(--p-color-border); border-radius: 8px; overflow: hidden; background: var(--p-color-bg-surface); }
-  .rte-wrap:focus-within { border-color: var(--p-color-border-focus, #005bd3); box-shadow: 0 0 0 2px rgba(0,91,211,.12); }
+  .rte-wrap:focus-within { border-color: var(--p-color-border-focus, #a65300); box-shadow: 0 0 0 2px rgba(0,91,211,.12); }
   .rte-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; border-bottom: 1px solid var(--p-color-border-subdued); background: var(--p-color-bg-surface-secondary); gap: 4px; flex-wrap: wrap; }
   .rte-toolbar-left { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
   .rte-btn { width: 30px; height: 30px; padding: 0; border: none; border-radius: 6px; cursor: pointer; background: transparent; color: var(--p-color-text-subdued); transition: background 0.15s, color 0.15s; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }

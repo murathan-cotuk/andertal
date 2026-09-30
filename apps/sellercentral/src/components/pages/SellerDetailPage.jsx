@@ -56,10 +56,10 @@ function AdminSellerCardSection({ sellerId }) {
       {err && <Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner>}
       {info?.has_card ? (
         <InlineStack gap="300" blockAlign="center">
-          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+          <div style={{ background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 8, padding: "10px 14px" }}>
             <Text as="p" variant="bodyMd" fontWeight="semibold">
               {brand} •••• {info.last4}
-              {exp ? <span style={{ fontWeight: 400, color: "#6b7280", marginLeft: 8 }}>{exp}</span> : null}
+              {exp ? <span style={{ fontWeight: 400, color: "#5e574e", marginLeft: 8 }}>{exp}</span> : null}
             </Text>
           </div>
           <Button tone="critical" variant="plain" size="slim" onClick={handleDelete} loading={deleting}>
@@ -232,7 +232,7 @@ function monthLabel(monthIdx, locale) {
 // ── Stat card ─────────────────────────────────────────────────────────────
 function Stat({ label, value, sub, tone }) {
   return (
-    <div style={{ flex: 1, minWidth: 130, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "14px 16px" }}>
+    <div style={{ flex: 1, minWidth: 130, background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 10, padding: "14px 16px" }}>
       <Text as="p" variant="bodySm" tone="subdued">{label}</Text>
       <Text as="p" variant="headingMd" fontWeight="bold" tone={tone}>{value}</Text>
       {sub && <Text as="p" variant="bodySm" tone="subdued">{sub}</Text>}
@@ -255,9 +255,9 @@ function BarChart({ data, locale }) {
           <div key={i} style={{ width: 22, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <div
               title={`${fmtMonth(d.month, locale)}: ${fmtCents(d.total_cents, locale)}`}
-              style={{ width: "100%", height: h, background: "#2563eb", borderRadius: "3px 3px 0 0", transition: "height .2s" }}
+              style={{ width: "100%", height: h, background: "#a65300", borderRadius: "3px 3px 0 0", transition: "height .2s" }}
             />
-            <span style={{ fontSize: 9, color: "#9ca3af", whiteSpace: "nowrap" }}>{fmtMonth(d.month, locale)}</span>
+            <span style={{ fontSize: 9, color: "#a39a8d", whiteSpace: "nowrap" }}>{fmtMonth(d.month, locale)}</span>
           </div>
         );
       })}
@@ -269,7 +269,7 @@ function BarChart({ data, locale }) {
 // ── Info row ─────────────────────────────────────────────────────────────
 function InfoRow({ label, value }) {
   return (
-    <div style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #f3f4f6" }}>
+    <div style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: "1px solid #f3eee6" }}>
       <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium" style={{ minWidth: 140, flexShrink: 0 }}>{label}</Text>
       <Text as="span" variant="bodySm">{value || "—"}</Text>
     </div>
@@ -771,9 +771,9 @@ ${"=".repeat(50)}
                                   style={{
                                     padding: "6px 10px",
                                     borderRadius: 8,
-                                    border: active ? "1px solid #111827" : "1px solid #d1d5db",
-                                    background: active ? "#111827" : "#fff",
-                                    color: active ? "#fff" : "#374151",
+                                    border: active ? "1px solid #1d1b18" : "1px solid #d6ccbd",
+                                    background: active ? "#1d1b18" : "#fff",
+                                    color: active ? "#fff" : "#3a352f",
                                     fontSize: 12,
                                     fontWeight: 700,
                                     cursor: "pointer",
@@ -802,7 +802,7 @@ ${"=".repeat(50)}
                                   style={{
                                     padding: "5px 9px",
                                     borderRadius: 8,
-                                    border: active ? "1px solid #0f766e" : "1px solid #d1d5db",
+                                    border: active ? "1px solid #0f766e" : "1px solid #d6ccbd",
                                     background: active ? "#ecfeff" : "#fff",
                                     color: active ? "#0f766e" : "#4b5563",
                                     fontSize: 12,
@@ -829,9 +829,9 @@ ${"=".repeat(50)}
                                   style={{
                                     padding: "6px 10px",
                                     borderRadius: 8,
-                                    border: active ? "1px solid #0284c7" : "1px solid #d1d5db",
+                                    border: active ? "1px solid #0284c7" : "1px solid #d6ccbd",
                                     background: active ? "#e0f2fe" : "#fff",
-                                    color: active ? "#0369a1" : "#374151",
+                                    color: active ? "#0369a1" : "#3a352f",
                                     fontSize: 12,
                                     cursor: selectable ? "pointer" : "not-allowed",
                                     opacity: selectable ? 1 : 0.45,
@@ -883,7 +883,7 @@ ${"=".repeat(50)}
                         <div style={{ overflowX: "auto" }}>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                             <thead>
-                              <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+                              <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                                 {(locale === "en"
                                   ? ["Order", "Customer", "Date", "Revenue", "Commission", "Payout", "Delivery", "Eligible"]
                                   : locale === "tr"
@@ -896,13 +896,13 @@ ${"=".repeat(50)}
                                   ? ["Ordine", "Cliente", "Data", "Fatturato", "Commissione", "Pagamento", "Consegna", "Idoneo"]
                                   : ["Bestellung", "Kunde", "Datum", "Umsatz", "Provision", "Auszahlung", "Lieferung", "Eligible"]
                                 ).map((h) => (
-                                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "#6d7175", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "#5e574e", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
                               {periodTransactions.map((t) => (
-                                <tr key={t.id} style={{ borderBottom: "1px solid #f1f1f1" }}>
+                                <tr key={t.id} style={{ borderBottom: "1px solid #f3eee6" }}>
                                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>#{t.order_number || "—"}</td>
                                   <td style={{ padding: "8px 10px" }}>{[t.first_name, t.last_name].filter(Boolean).join(" ") || "—"}</td>
                                   <td style={{ padding: "8px 10px", whiteSpace: "nowrap" }}>{fmtDate(t.created_at, locale)}</td>
@@ -930,7 +930,7 @@ ${"=".repeat(50)}
                     <div style={{ overflowX: "auto" }}>
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
-                          <tr style={{ background: "#f6f6f7", borderBottom: "1px solid #e1e3e5" }}>
+                          <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                             {(locale === "en"
                               ? ["Period", "Revenue", "Commission", "Payout", "Status", "IBAN", ""]
                               : locale === "tr"
@@ -943,13 +943,13 @@ ${"=".repeat(50)}
                               ? ["Periodo", "Fatturato", "Commissione", "Pagamento", "Stato", "IBAN", ""]
                               : ["Zeitraum", "Umsatz", "Provision", "Auszahlung", "Status", "IBAN", ""]
                             ).map((h, i) => (
-                              <th key={i} style={{ padding: "8px 12px", textAlign: i >= 2 && i <= 4 ? "right" : "left", fontWeight: 600, color: "#6d7175", whiteSpace: "nowrap" }}>{h}</th>
+                              <th key={i} style={{ padding: "8px 12px", textAlign: i >= 2 && i <= 4 ? "right" : "left", fontWeight: 600, color: "#5e574e", whiteSpace: "nowrap" }}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {seller.payouts.map((p) => (
-                            <tr key={p.id} style={{ borderBottom: "1px solid #f1f1f1" }}>
+                            <tr key={p.id} style={{ borderBottom: "1px solid #f3eee6" }}>
                               <td style={{ padding: "8px 12px", whiteSpace: "nowrap" }}>{fmtDate(p.period_start, locale)} – {fmtDate(p.period_end, locale)}</td>
                               <td style={{ padding: "8px 12px", textAlign: "right" }}>{fmtCents(p.total_cents, locale)}</td>
                               <td style={{ padding: "8px 12px", textAlign: "right", color: "#dc2626" }}>{fmtCents(p.commission_cents, locale)}</td>
@@ -959,7 +959,7 @@ ${"=".repeat(50)}
                                   {p.status === "bezahlt" ? (locale === "en" ? "Paid" : locale === "tr" ? "Ödendi" : locale === "fr" ? "Payé" : locale === "es" ? "Pagado" : locale === "it" ? "Pagato" : "Bezahlt") : (locale === "en" ? "Open" : locale === "tr" ? "Açık" : locale === "fr" ? "Ouvert" : locale === "es" ? "Abierto" : locale === "it" ? "Aperto" : "Offen")}
                                 </Badge>
                               </td>
-                              <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 11, color: "#6b7280" }}>
+                              <td style={{ padding: "8px 12px", fontFamily: "monospace", fontSize: 11, color: "#5e574e" }}>
                                 {(p.iban || seller.iban || "—").replace(/(.{4})/g, "$1 ").trim()}
                               </td>
                               <td style={{ padding: "8px 12px" }}>
@@ -994,12 +994,12 @@ ${"=".repeat(50)}
                         const total = seller.products_by_category.reduce((a, c) => a + c.count, 0);
                         const pct = total > 0 ? Math.round((cat.count / total) * 100) : 0;
                         return (
-                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f1f1f1" }}>
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f3eee6" }}>
                             <div style={{ flex: "0 0 180px" }}>
                               <Text as="span" variant="bodyMd">{cat.category || (locale === "en" ? "Uncategorized" : locale === "tr" ? "Kategorisiz" : locale === "fr" ? "Non catégorisé" : locale === "es" ? "Sin categoría" : locale === "it" ? "Non categorizzato" : "Unkategorisiert")}</Text>
                             </div>
-                            <div style={{ flex: 1, background: "#e5e7eb", borderRadius: 4, height: 8, overflow: "hidden" }}>
-                              <div style={{ width: `${pct}%`, height: "100%", background: "#2563eb", borderRadius: 4 }} />
+                            <div style={{ flex: 1, background: "#e6dfd4", borderRadius: 4, height: 8, overflow: "hidden" }}>
+                              <div style={{ width: `${pct}%`, height: "100%", background: "#a65300", borderRadius: 4 }} />
                             </div>
                             <div style={{ flex: "0 0 60px", textAlign: "right" }}>
                               <Text as="span" variant="bodyMd" fontWeight="semibold">{cat.count}</Text>
@@ -1046,7 +1046,7 @@ ${"=".repeat(50)}
                       <InfoRow label={locale === "en" ? "Accepted on" : locale === "tr" ? "Onaylandı" : locale === "fr" ? "Accepté le" : locale === "es" ? "Aceptado el" : locale === "it" ? "Accettato il" : "Akzeptiert am"} value={fmtDate(seller.agreement_accepted_at, locale)} />
                       <InfoRow label={locale === "en" ? "Version" : locale === "tr" ? "Versiyon" : locale === "fr" ? "Version" : locale === "es" ? "Versión" : locale === "it" ? "Versione" : "Version"} value={seller.agreement_version} />
                       <InfoRow label="IP" value={seller.agreement_ip} />
-                      <div style={{ marginTop: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                      <div style={{ marginTop: 8, borderTop: "1px solid #e6dfd4", paddingTop: 8 }}>
                         <Text as="h4" variant="headingSm">{locale === "en" ? "Handwritten signature" : locale === "tr" ? "El yazısı imza" : locale === "fr" ? "Signature manuscrite" : locale === "es" ? "Firma manuscrita" : locale === "it" ? "Firma autografa" : "Handschriftliche Unterschrift"}</Text>
                         {seller.signature_at ? (
                           <BlockStack gap="100">
@@ -1057,7 +1057,7 @@ ${"=".repeat(50)}
                                 <img
                                   src={seller.signature_data}
                                   alt={locale === "en" ? "Signature" : locale === "tr" ? "İmza" : locale === "fr" ? "Signature" : locale === "es" ? "Firma" : locale === "it" ? "Firma" : "Unterschrift"}
-                                  style={{ border: "1px solid #e5e7eb", borderRadius: 6, maxWidth: 240, maxHeight: 80, display: "block" }}
+                                  style={{ border: "1px solid #e6dfd4", borderRadius: 6, maxWidth: 240, maxHeight: 80, display: "block" }}
                                 />
                               </div>
                             )}
@@ -1097,7 +1097,7 @@ ${"=".repeat(50)}
                             const name = typeof doc === "string" ? `${docFallback} ${i + 1}` : (doc?.name || `${docFallback} ${i + 1}`);
                             const typeLabel = detectDocTypeLabel(doc, locale);
                             return (
-                              <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
+                              <div key={i} style={{ border: "1px solid #e6dfd4", borderRadius: 8, padding: "8px 10px" }}>
                                 <InlineStack align="space-between" blockAlign="start">
                                   <BlockStack gap="050">
                                     <Text as="p" variant="bodyMd" fontWeight="semibold">{name}</Text>
@@ -1126,7 +1126,7 @@ ${"=".repeat(50)}
                                             window.open(url, "_blank", "noopener,noreferrer");
                                           });
                                       }}
-                                      style={{ color: "#2563eb", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}
+                                      style={{ color: "#a65300", fontSize: 13, textDecoration: "underline", cursor: "pointer" }}
                                     >
                                       {locale === "en" ? "Download" : locale === "tr" ? "İndir" : locale === "fr" ? "Télécharger" : locale === "es" ? "Descargar" : locale === "it" ? "Scarica" : "Herunterladen"}
                                     </a>

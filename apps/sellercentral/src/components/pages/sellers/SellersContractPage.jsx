@@ -338,7 +338,7 @@ export default function SellersContractPage() {
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
+                  <tr style={{ textAlign: "left", borderBottom: "1px solid #e6dfd4" }}>
                     <th style={{ padding: "8px 10px" }}>{t.seller}</th>
                     <th style={{ padding: "8px 10px" }}>{t.version}</th>
                     <th style={{ padding: "8px 10px" }}>{t.signedAt}</th>
@@ -348,7 +348,7 @@ export default function SellersContractPage() {
                 </thead>
                 <tbody>
                   {signed.map((row) => (
-                    <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <tr key={row.id} style={{ borderBottom: "1px solid #f3eee6" }}>
                       <td style={{ padding: "10px" }}>
                         <BlockStack gap="050">
                           <Link href={`/sellers/${row.id}`} style={{ fontWeight: 600, color: "#136761", textDecoration: "none" }}>

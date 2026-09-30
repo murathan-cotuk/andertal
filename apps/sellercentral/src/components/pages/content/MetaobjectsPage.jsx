@@ -66,10 +66,10 @@ function DropZone({ onFile, accept, label, hint }) {
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
       style={{
-        border: `2px dashed ${drag ? "#2563eb" : "#d1d5db"}`,
+        border: `2px dashed ${drag ? "#a65300" : "#d6ccbd"}`,
         borderRadius: 10,
         padding: "24px 20px",
-        background: drag ? "#eff6ff" : "#fafafa",
+        background: drag ? "#fcebd5" : "#faf7f2",
         cursor: "pointer",
         textAlign: "center",
       }}
@@ -471,7 +471,7 @@ export default function MetaobjectsPage() {
                   />
                 </BlockStack>
               </Box>
-              <div style={{ borderTop: "1px solid #e5e7eb", maxHeight: 560, overflowY: "auto" }}>
+              <div style={{ borderTop: "1px solid #e6dfd4", maxHeight: 560, overflowY: "auto" }}>
                 {filteredKeys.length === 0 ? (
                   <Box padding="400"><Text as="p" tone="subdued" variant="bodySm">{sortedKeys.length ? c.noMatch : c.emptyHeading}</Text></Box>
                 ) : filteredKeys.map((key) => {
@@ -490,13 +490,13 @@ export default function MetaobjectsPage() {
                         gap: 8,
                         padding: "8px 12px",
                         border: "none",
-                        borderLeft: active ? "3px solid #111827" : "3px solid transparent",
-                        background: active ? "#f3f4f6" : "#fff",
+                        borderLeft: active ? "3px solid #1d1b18" : "3px solid transparent",
+                        background: active ? "#f3eee6" : "#fff",
                         cursor: "pointer",
                         textAlign: "left",
                       }}
                     >
-                      <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {localizedMetaobjectLabel(def, viewLang) || key}
                       </span>
                       <Badge>{(def?.values || []).length}</Badge>
@@ -546,7 +546,7 @@ export default function MetaobjectsPage() {
                             justifyContent: "space-between",
                             gap: 8,
                             padding: "6px 10px",
-                            border: "1px solid #e5e7eb",
+                            border: "1px solid #e6dfd4",
                             borderRadius: 8,
                             background: "#fff",
                           }}

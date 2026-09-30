@@ -16,7 +16,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -25,23 +25,23 @@ const Section = styled(Card)`
 `;
 
 const UploadArea = styled.div`
-  border: 2px dashed #d1d5db;
+  border: 2px dashed #d6ccbd;
   border-radius: 8px;
   padding: 60px 20px;
   text-align: center;
-  background-color: #f9fafb;
+  background-color: #faf7f2;
   transition: all 0.2s ease;
   cursor: pointer;
 
   &:hover {
-    border-color: #0ea5e9;
+    border-color: #ee8a12;
     background-color: #f0f9ff;
   }
 `;
 
 const UploadIcon = styled.div`
   font-size: 48px;
-  color: #0ea5e9;
+  color: #ee8a12;
   margin-bottom: 16px;
 `;
 
@@ -61,7 +61,7 @@ export default function BulkImagesPage() {
 
       <Section>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937" }}>{copy.sectionTitle}</h2>
+          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18" }}>{copy.sectionTitle}</h2>
           <Link href="/products/upload-templates">
             <Button variant="outline">
               <i className="fas fa-download" style={{ marginRight: "8px" }} />
@@ -82,15 +82,15 @@ export default function BulkImagesPage() {
           <UploadIcon>
             <i className="fas fa-images" />
           </UploadIcon>
-          <p style={{ fontSize: "16px", color: "#6b7280", marginBottom: "8px" }}>
+          <p style={{ fontSize: "16px", color: "#5e574e", marginBottom: "8px" }}>
             {copy.dropText}
           </p>
-          <p style={{ fontSize: "14px", color: "#9ca3af" }}>{copy.supportText}</p>
+          <p style={{ fontSize: "14px", color: "#a39a8d" }}>{copy.supportText}</p>
         </UploadArea>
 
         {files.length > 0 && (
           <div style={{ marginTop: "24px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: "600", color: "#1d1b18", marginBottom: "16px" }}>
               {copy.selectedLabel} ({files.length})
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "16px" }}>
@@ -100,9 +100,9 @@ export default function BulkImagesPage() {
                   style={{
                     position: "relative",
                     padding: "8px",
-                    border: "1px solid #e5e7eb",
+                    border: "1px solid #e6dfd4",
                     borderRadius: "8px",
-                    backgroundColor: "#f9fafb",
+                    backgroundColor: "#faf7f2",
                   }}
                 >
                   <img
@@ -110,7 +110,7 @@ export default function BulkImagesPage() {
                     alt={file.name}
                     style={{ width: "100%", height: "150px", objectFit: "cover", borderRadius: "4px" }}
                   />
-                  <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <p style={{ fontSize: "12px", color: "#5e574e", marginTop: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {file.name}
                   </p>
                 </div>

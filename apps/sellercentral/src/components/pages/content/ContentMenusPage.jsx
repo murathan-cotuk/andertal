@@ -482,7 +482,7 @@ function MenuEditorPanel(props) {
                 >
                   <span style={{
                     width: 32, height: 18, borderRadius: 9, display: "inline-block", flexShrink: 0, position: "relative",
-                    background: panelMenu?.categories_with_products ? "#16a34a" : "#d1d5db", transition: "background 0.15s",
+                    background: panelMenu?.categories_with_products ? "#16a34a" : "#d6ccbd", transition: "background 0.15s",
                   }}>
                     <span style={{
                       position: "absolute", top: 2, left: panelMenu?.categories_with_products ? 16 : 2,

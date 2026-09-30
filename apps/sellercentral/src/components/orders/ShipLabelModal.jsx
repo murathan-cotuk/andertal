@@ -34,12 +34,12 @@ export const CARRIER_LOGOS = {
 export function carrierBadge(code) {
   const key = (code || "").toLowerCase();
   const found = Object.entries(CARRIER_LOGOS).find(([k]) => key.includes(k));
-  if (!found) return { color: "#6b7280", text: "#fff", label: code || "?" };
+  if (!found) return { color: "#5e574e", text: "#fff", label: code || "?" };
   return found[1];
 }
 
-const inp = { padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box", outline: "none" };
-const lbl = { fontSize: 11, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" };
+const inp = { padding: "8px 10px", border: "1px solid #d6ccbd", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box", outline: "none" };
+const lbl = { fontSize: 11, fontWeight: 600, color: "#5e574e", display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" };
 
 function DimInput({ label, value, onChange, suffix }) {
   return (
@@ -52,7 +52,7 @@ function DimInput({ label, value, onChange, suffix }) {
           value={value}
           onChange={e => onChange(e.target.value)}
         />
-        <span style={{ fontSize: 12, color: "#9ca3af", whiteSpace: "nowrap", minWidth: 24 }}>{suffix}</span>
+        <span style={{ fontSize: 12, color: "#a39a8d", whiteSpace: "nowrap", minWidth: 24 }}>{suffix}</span>
       </div>
     </div>
   );
@@ -70,8 +70,8 @@ function RateCard({ rate, selected, onClick, locale }) {
       style={{
         display: "flex", alignItems: "center", gap: 14,
         width: "100%", padding: "14px 16px", borderRadius: 10, cursor: "pointer",
-        textAlign: "left", background: selected ? "#eff6ff" : "#fff",
-        border: selected ? "2px solid #2563eb" : "1px solid #e5e7eb",
+        textAlign: "left", background: selected ? "#fcebd5" : "#fff",
+        border: selected ? "2px solid #a65300" : "1px solid #e6dfd4",
         boxShadow: selected ? "0 0 0 3px rgba(37,99,235,0.1)" : "none",
         transition: "all 0.15s",
       }}
@@ -80,9 +80,9 @@ function RateCard({ rate, selected, onClick, locale }) {
         {badge.label}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rate.name}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{rate.name}</div>
         {(hasWeight || rate.delivery_days) && (
-          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: "#5e574e", marginTop: 2 }}>
             {/* Sendcloud returns min/max_weight already in kg (e.g. "23.001"), not grams —
                 a stray /1000 here used to shrink every real value down to ~0, always showing
                 "up to 0 kg" regardless of the actual bracket. */}
@@ -92,10 +92,10 @@ function RateCard({ rate, selected, onClick, locale }) {
         )}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: selected ? "#2563eb" : "#111827" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: selected ? "#a65300" : "#1d1b18" }}>
           {rate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €
         </div>
-        <div style={{ fontSize: 10, color: "#9ca3af" }}>{inclVat}</div>
+        <div style={{ fontSize: 10, color: "#a39a8d" }}>{inclVat}</div>
       </div>
     </button>
   );
@@ -213,13 +213,13 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
         <div style={{ padding: embedded ? 0 : "20px 24px" }}>
 
           {!embedded && (
-          <div style={{ background: "#f9fafb", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{t("Delivery address", "Teslimat adresi", "Adresse de livraison", "Dirección de entrega", "Indirizzo di consegna", "Lieferadresse")}</div>
-            <div style={{ fontWeight: 600, color: "#111827" }}>{[order.first_name, order.last_name].filter(Boolean).join(" ") || "—"}</div>
-            {order.address_line1 && <div style={{ color: "#374151" }}>{order.address_line1}</div>}
-            {order.address_line2 && <div style={{ color: "#374151" }}>{order.address_line2}</div>}
-            <div style={{ color: "#374151" }}>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
-            <div style={{ color: "#374151", fontWeight: 600 }}>{destCountry}</div>
+          <div style={{ background: "#faf7f2", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{t("Delivery address", "Teslimat adresi", "Adresse de livraison", "Dirección de entrega", "Indirizzo di consegna", "Lieferadresse")}</div>
+            <div style={{ fontWeight: 600, color: "#1d1b18" }}>{[order.first_name, order.last_name].filter(Boolean).join(" ") || "—"}</div>
+            {order.address_line1 && <div style={{ color: "#3a352f" }}>{order.address_line1}</div>}
+            {order.address_line2 && <div style={{ color: "#3a352f" }}>{order.address_line2}</div>}
+            <div style={{ color: "#3a352f" }}>{[order.postal_code, order.city].filter(Boolean).join(" ")}</div>
+            <div style={{ color: "#3a352f", fontWeight: 600 }}>{destCountry}</div>
           </div>
           )}
 
@@ -263,7 +263,7 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
 
           {!purchaseResult && (<>
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>{t("Package size — quick select", "Paket boyutu — hızlı seçim", "Taille colis — sélection rapide", "Tamaño paquete — selección rápida", "Dimensione pacco — selezione rapida", "Paketgröße — Schnellauswahl")}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>{t("Package size — quick select", "Paket boyutu — hızlı seçim", "Taille colis — sélection rapide", "Tamaño paquete — selección rápida", "Dimensione pacco — selezione rapida", "Paketgröße — Schnellauswahl")}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {PRESETS.map(p => (
                 <button
@@ -274,9 +274,9 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
                   style={{
                     padding: "6px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer",
                     fontWeight: selectedPreset === p.id ? 700 : 500,
-                    background: selectedPreset === p.id ? "#2563eb" : "#f3f4f6",
-                    color: selectedPreset === p.id ? "#fff" : "#374151",
-                    border: selectedPreset === p.id ? "2px solid #2563eb" : "2px solid transparent",
+                    background: selectedPreset === p.id ? "#a65300" : "#f3eee6",
+                    color: selectedPreset === p.id ? "#fff" : "#3a352f",
+                    border: selectedPreset === p.id ? "2px solid #a65300" : "2px solid transparent",
                     transition: "all 0.15s",
                   }}
                 >
@@ -285,14 +285,14 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
               ))}
             </div>
             {selectedPreset && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+              <div style={{ marginTop: 8, fontSize: 12, color: "#5e574e" }}>
                 {PRESETS.find(p => p.id === selectedPreset)?.note} · {dims.length_cm}×{dims.width_cm}×{dims.height_cm} cm · {dims.weight_kg} kg
               </div>
             )}
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>{t("Adjust dimensions", "Ölçüleri ayarla", "Ajuster dimensions", "Ajustar dimensiones", "Regola dimensioni", "Maße anpassen")}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>{t("Adjust dimensions", "Ölçüleri ayarla", "Ajuster dimensions", "Ajustar dimensiones", "Regola dimensioni", "Maße anpassen")}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
               <DimInput label={t("Weight", "Ağırlık", "Poids", "Peso", "Peso", "Gewicht")} value={dims.weight_kg} onChange={v => setDim("weight_kg", v)} suffix="kg" />
               <DimInput label={t("Length", "Uzunluk", "Longueur", "Largo", "Lunghezza", "Länge")} value={dims.length_cm} onChange={v => setDim("length_cm", v)} suffix="cm" />
@@ -309,14 +309,14 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
               style={{
                 display: "inline-flex", alignItems: "center", gap: 8,
                 padding: "10px 20px", borderRadius: 8, cursor: loadingRates ? "default" : "pointer",
-                background: dimsChanged ? "#2563eb" : "#f3f4f6",
-                color: dimsChanged ? "#fff" : "#374151",
+                background: dimsChanged ? "#a65300" : "#f3eee6",
+                color: dimsChanged ? "#fff" : "#3a352f",
                 border: "none", fontWeight: 600, fontSize: 13,
                 transition: "all 0.2s",
               }}
             >
               {loadingRates ? (
-                <><span style={{ width: 16, height: 16, border: "2px solid #9ca3af", borderTopColor: "#374151", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> {t("Loading shipping options…", "Kargo seçenekleri yükleniyor…", "Chargement des options…", "Cargando opciones de envío…", "Caricamento opzioni spedizione…", "Lade Versandoptionen…")}</>
+                <><span style={{ width: 16, height: 16, border: "2px solid #a39a8d", borderTopColor: "#3a352f", borderRadius: "50%", display: "inline-block", animation: "spin 0.7s linear infinite" }} /> {t("Loading shipping options…", "Kargo seçenekleri yükleniyor…", "Chargement des options…", "Cargando opciones de envío…", "Caricamento opzioni spedizione…", "Lade Versandoptionen…")}</>
               ) : (
                 <>{dimsChanged ? t("⟳ Update prices", "⟳ Fiyatları güncelle", "⟳ Mettre à jour les prix", "⟳ Actualizar precios", "⟳ Aggiorna prezzi", "⟳ Preise aktualisieren") : t("Fetch shipping options", "Kargo seçeneklerini getir", "Obtenir les options d'expédition", "Obtener opciones de envío", "Recupera opzioni di spedizione", "Versandoptionen abrufen")}</>
               )}
@@ -332,10 +332,10 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
           {rates && rates.length > 0 && (
             <div style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   {rates.length} {t("DHL options — sorted by price", "DHL seçeneği — fiyata göre", "options DHL — triées par prix", "opciones DHL — por precio", "opzioni DHL — per prezzo", "DHL-Optionen — nach Preis")}
                 </div>
-                {selectedRate && <div style={{ fontSize: 12, color: "#2563eb", fontWeight: 600 }}>✓ {t("Selected", "Seçildi", "Sélectionné", "Seleccionado", "Selezionato", "Ausgewählt")}</div>}
+                {selectedRate && <div style={{ fontSize: 12, color: "#a65300", fontWeight: 600 }}>✓ {t("Selected", "Seçildi", "Sélectionné", "Seleccionado", "Selezionato", "Ausgewählt")}</div>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {rates.map(rate => (
@@ -348,7 +348,7 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
                   />
                 ))}
               </div>
-              <div style={{ marginTop: 8, fontSize: 11, color: "#9ca3af" }}>
+              <div style={{ marginTop: 8, fontSize: 11, color: "#a39a8d" }}>
                 {t("Prices incl.", "Fiyatlar dahil", "Prix incl.", "Precios incl.", "Prezzi incl.", "Preise inkl.")} {dims.weight_kg} kg, {dims.length_cm}×{dims.width_cm}×{dims.height_cm} cm · {t("destination", "varış ülkesi", "pays de destination", "país destino", "paese destinazione", "Zielland")} {destCountry} · {t("incl.", "dahil", "incl.", "incl.", "incl.", "inkl.")} {platformFee}
               </div>
             </div>
@@ -368,20 +368,20 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
           )}
 
           {selectedRate && (
-            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "16px 18px", marginBottom: 4 }}>
-              <div style={{ fontSize: 12, color: "#1e40af", fontWeight: 600, marginBottom: 8 }}>{t("Summary", "Özet", "Résumé", "Resumen", "Riepilogo", "Zusammenfassung")}</div>
+            <div style={{ background: "#fcebd5", border: "1px solid #f5d3a8", borderRadius: 10, padding: "16px 18px", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, color: "#7f3f00", fontWeight: 600, marginBottom: 8 }}>{t("Summary", "Özet", "Résumé", "Resumen", "Riepilogo", "Zusammenfassung")}</div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                <span style={{ color: "#374151" }}>{selectedRate.name}</span>
+                <span style={{ color: "#3a352f" }}>{selectedRate.name}</span>
                 <span style={{ fontWeight: 600 }}>{selectedRate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €</span>
               </div>
-              <div style={{ fontSize: 11, color: "#6b7280" }}>
+              <div style={{ fontSize: 11, color: "#5e574e" }}>
                 {dims.weight_kg} kg · {dims.length_cm}×{dims.width_cm}×{dims.height_cm} cm → {destCountry}
               </div>
-              <div style={{ marginTop: 10, borderTop: "1px solid #bfdbfe", paddingTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14 }}>
+              <div style={{ marginTop: 10, borderTop: "1px solid #f5d3a8", paddingTop: 10, display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14 }}>
                 <span>{t("Total (incl. VAT)", "Toplam (KDV dahil)", "Total (TVA incl.)", "Total (IVA incl.)", "Totale (IVA incl.)", "Gesamt (inkl. MwSt.)")}</span>
-                <span style={{ color: "#1d4ed8" }}>{selectedRate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €</span>
+                <span style={{ color: "#7f3f00" }}>{selectedRate.price_eur.toLocaleString(numLoc, { minimumFractionDigits: 2 })} €</span>
               </div>
-              <div style={{ marginTop: 6, fontSize: 11, color: "#6b7280" }}>
+              <div style={{ marginTop: 6, fontSize: 11, color: "#5e574e" }}>
                 {t(
                   "Charged to your balance or saved card · Label is generated immediately and provided as PDF.",
                   "Bakiyenizden veya kayıtlı kartınızdan çekilir · Etiket hemen oluşturulur ve PDF olarak sunulur.",
@@ -397,13 +397,13 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
 
           <div style={{ marginTop: 16, display: "flex", justifyContent: embedded ? "flex-end" : "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             {!embedded && !purchaseResult && (
-              <button type="button" onClick={onClose} style={{ background: "none", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", color: "#374151", fontWeight: 500 }}>
+              <button type="button" onClick={onClose} style={{ background: "none", border: "1px solid #d6ccbd", borderRadius: 8, padding: "8px 16px", fontSize: 13, cursor: "pointer", color: "#3a352f", fontWeight: 500 }}>
                 {t("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen")}
               </button>
             )}
             {purchaseResult ? (
               !embedded && (
-                <button type="button" onClick={onClose} style={{ padding: "10px 22px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#111827", color: "#fff", border: "none", cursor: "pointer" }}>
+                <button type="button" onClick={onClose} style={{ padding: "10px 22px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#1d1b18", color: "#fff", border: "none", cursor: "pointer" }}>
                   {t("Close", "Kapat", "Fermer", "Cerrar", "Chiudi", "Schließen")}
                 </button>
               )
@@ -414,8 +414,8 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
               disabled={!selectedRate || checkingOut}
               style={{
                 padding: "10px 22px", borderRadius: 8, fontSize: 13, fontWeight: 700,
-                background: !selectedRate ? "#e5e7eb" : "#2563eb",
-                color: !selectedRate ? "#9ca3af" : "#fff",
+                background: !selectedRate ? "#e6dfd4" : "#a65300",
+                color: !selectedRate ? "#a39a8d" : "#fff",
                 border: "none", cursor: !selectedRate ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", gap: 8,
                 transition: "all 0.15s",
@@ -447,14 +447,14 @@ export default function ShipLabelModal({ order, onClose, locale: localeProp = "d
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
       <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 640, boxShadow: "0 24px 80px rgba(0,0,0,0.25)", margin: "auto" }}>
 
-        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #e6dfd4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: "#111827" }}>{t("Buy shipping label", "Kargo etiketi satın al", "Acheter une étiquette", "Comprar etiqueta de envío", "Acquista etichetta spedizione", "Versandetikett kaufen")}</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#1d1b18" }}>{t("Buy shipping label", "Kargo etiketi satın al", "Acheter une étiquette", "Comprar etiqueta de envío", "Acquista etichetta spedizione", "Versandetikett kaufen")}</div>
+            <div style={{ fontSize: 12, color: "#5e574e", marginTop: 2 }}>
               {t("Order", "Sipariş", "Commande", "Pedido", "Ordine", "Bestellung")} <strong>#{order.order_number || "—"}</strong>
             </div>
           </div>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1, padding: "0 4px" }}>×</button>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#a39a8d", lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
 
         {body}

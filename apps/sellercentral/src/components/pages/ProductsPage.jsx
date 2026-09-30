@@ -17,7 +17,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -45,24 +45,24 @@ const Label = styled.label`
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #374151;
+  color: #3a352f;
   margin-bottom: 8px;
 `;
 
 const Select = styled.select`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #e6dfd4;
   border-radius: 8px;
   font-size: 16px;
-  color: #1f2937;
+  color: #1d1b18;
   background: white;
   transition: all 0.2s ease;
   box-sizing: border-box;
 
   &:focus {
     outline: none;
-    border-color: #0ea5e9;
+    border-color: #ee8a12;
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
   }
 `;
@@ -75,10 +75,10 @@ const CategoryDropdown = styled.div`
 const CategoryButton = styled.button`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #e6dfd4;
   border-radius: 8px;
   font-size: 16px;
-  color: #1f2937;
+  color: #1d1b18;
   background: white;
   transition: all 0.2s ease;
   box-sizing: border-box;
@@ -90,12 +90,12 @@ const CategoryButton = styled.button`
 
   &:focus {
     outline: none;
-    border-color: #0ea5e9;
+    border-color: #ee8a12;
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
   }
 
   &:hover {
-    border-color: #0ea5e9;
+    border-color: #ee8a12;
   }
 `;
 
@@ -105,7 +105,7 @@ const CategoryDropdownMenu = styled.div`
   left: 0;
   right: 0;
   background: white;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #e6dfd4;
   border-radius: 8px;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   max-height: 400px;
@@ -121,9 +121,9 @@ const CategoryGroupTitle = styled.div`
   padding: 8px 16px;
   font-weight: 600;
   font-size: 14px;
-  color: #374151;
-  background-color: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  color: #3a352f;
+  background-color: #faf7f2;
+  border-bottom: 1px solid #e6dfd4;
 `;
 
 const CategoryOption = styled.label`
@@ -135,19 +135,19 @@ const CategoryOption = styled.label`
   transition: background-color 0.2s ease;
 
   &:hover {
-    background-color: #f3f4f6;
+    background-color: #f3eee6;
   }
 
   input[type="checkbox"] {
     width: 18px;
     height: 18px;
     cursor: pointer;
-    accent-color: #0ea5e9;
+    accent-color: #ee8a12;
   }
 
   span {
     font-size: 14px;
-    color: #1f2937;
+    color: #1d1b18;
   }
 `;
 
@@ -164,17 +164,17 @@ const SelectedCategoryTag = styled.span`
   gap: 6px;
   padding: 4px 12px;
   background-color: #f0f9ff;
-  border: 1px solid #0ea5e9;
+  border: 1px solid #ee8a12;
   border-radius: 16px;
   font-size: 12px;
-  color: #0ea5e9;
+  color: #ee8a12;
   font-weight: 500;
 `;
 
 const CategoryCloseButton = styled.button`
   background: none;
   border: none;
-  color: #0ea5e9;
+  color: #ee8a12;
   cursor: pointer;
   padding: 0;
   display: flex;
@@ -189,10 +189,10 @@ const CategoryCloseButton = styled.button`
 const TextArea = styled.textarea`
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e5e7eb;
+  border: 2px solid #e6dfd4;
   border-radius: 8px;
   font-size: 16px;
-  color: #1f2937;
+  color: #1d1b18;
   background: white;
   transition: all 0.2s ease;
   box-sizing: border-box;
@@ -202,13 +202,13 @@ const TextArea = styled.textarea`
 
   &:focus {
     outline: none;
-    border-color: #0ea5e9;
+    border-color: #ee8a12;
     box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
   }
 `;
 
 const VariantSection = styled.div`
-  border: 2px solid #e5e7eb;
+  border: 2px solid #e6dfd4;
   border-radius: 8px;
   padding: 16px;
   margin-top: 8px;
@@ -227,7 +227,7 @@ const VariantOption = styled.div`
   align-items: center;
   margin-bottom: 8px;
   padding: 8px;
-  background-color: #f9fafb;
+  background-color: #faf7f2;
   border-radius: 6px;
 `;
 
@@ -264,12 +264,12 @@ const ProductTitle = styled.h3`
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 8px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const ProductInfo = styled.p`
   font-size: 14px;
-  color: #6b7280;
+  color: #5e574e;
   margin-bottom: 4px;
 `;
 
@@ -683,7 +683,7 @@ export default function ProductsPage() {
 
       <Section>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937" }}>Manage your products</h2>
+          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18" }}>Manage your products</h2>
           <Button onClick={() => setShowForm(!showForm)}>
             {showForm ? "Cancel" : "Add New Product"}
           </Button>
@@ -730,13 +730,13 @@ export default function ProductsPage() {
                   </span>
                   <i
                     className={`fas fa-chevron-${categoryDropdownOpen ? "up" : "down"}`}
-                    style={{ fontSize: "12px", color: "#6b7280" }}
+                    style={{ fontSize: "12px", color: "#5e574e" }}
                   />
                 </CategoryButton>
                 {categoryDropdownOpen && (
                   <CategoryDropdownMenu>
                     {categoriesLoading ? (
-                      <div style={{ padding: "16px", textAlign: "center", color: "#6b7280" }}>
+                      <div style={{ padding: "16px", textAlign: "center", color: "#5e574e" }}>
                         <i className="fas fa-spinner fa-spin" style={{ marginRight: "8px" }} />
                         Loading categories...
                       </div>
@@ -750,12 +750,12 @@ export default function ProductsPage() {
                         </small>
                       </div>
                     ) : categories.length === 0 ? (
-                      <div style={{ padding: "16px", textAlign: "center", color: "#6b7280" }}>
+                      <div style={{ padding: "16px", textAlign: "center", color: "#5e574e" }}>
                         <i className="fas fa-info-circle" style={{ marginRight: "8px" }} />
                         No categories found. Seed categories via Medusa admin or run Medusa migrations.
                       </div>
                     ) : Object.keys(groupedCategories).length === 0 ? (
-                      <div style={{ padding: "16px", textAlign: "center", color: "#6b7280" }}>
+                      <div style={{ padding: "16px", textAlign: "center", color: "#5e574e" }}>
                         <i className="fas fa-info-circle" style={{ marginRight: "8px" }} />
                         No categories to display
                       </div>
@@ -955,14 +955,14 @@ export default function ProductsPage() {
           </Form>
         )}
 
-        <p style={{ marginTop: "16px", color: "#6b7280" }}>
+        <p style={{ marginTop: "16px", color: "#5e574e" }}>
           Total products: {products.length}
         </p>
       </Section>
 
       {products.length > 0 && (
         <Section>
-          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
+          <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18", marginBottom: "16px" }}>
             Your Products
           </h2>
           <ProductsList>
@@ -984,7 +984,7 @@ export default function ProductsPage() {
                       {expandedProducts.has(String(product.id)) ? ui.hideVariants : ui.showVariants}
                     </Button>
                     {expandedProducts.has(String(product.id)) && (
-                      <div style={{ marginTop: 10, border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, background: "#fafafa" }}>
+                      <div style={{ marginTop: 10, border: "1px solid #e6dfd4", borderRadius: 8, padding: 10, background: "#faf7f2" }}>
                         {(variantDrafts[String(product.id)] || []).map((v, idx) => (
                           <div key={`${product.id}-${idx}`} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 0.8fr 0.8fr", gap: 8, alignItems: "center", marginBottom: 8 }}>
                             <Input

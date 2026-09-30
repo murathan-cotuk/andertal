@@ -34,7 +34,7 @@ function getTypeLabel(type, locale) {
   return map[type] || type;
 }
 
-const TYPE_COLORS = { warehouse: "#0070f3", store: "#10b981", office: "#f59e0b", other: "#6b7280" };
+const TYPE_COLORS = { warehouse: "#0070f3", store: "#10b981", office: "#f59e0b", other: "#5e574e" };
 
 const PURPOSE_KEYS = ["is_shipping_from", "is_returns_to", "is_billing"];
 
@@ -54,9 +54,9 @@ function getPurposeMeta(locale) {
         "Standard-Absenderadresse für ausgehende Labels und Fulfillment.",
       ),
       defaultName: t("Main warehouse", "Ana depo", "Entrepôt principal", "Almacén principal", "Magazzino principale", "Hauptlager"),
-      color: "#1e40af",
-      bg: "#dbeafe",
-      border: "#93c5fd",
+      color: "#7f3f00",
+      bg: "#fcebd5",
+      border: "#f5d3a8",
     },
     is_returns_to: {
       key: "is_returns_to",
@@ -180,8 +180,8 @@ function LocationModal({ location, purposePreset, onSave, onClose, locale, ui })
         width: "min(560px, 95vw)", maxHeight: "90vh", overflowY: "auto",
       }}>
         <div style={{
-          padding: "18px 22px 14px", borderBottom: "1px solid #e5e7eb",
-          background: "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+          padding: "18px 22px 14px", borderBottom: "1px solid #e6dfd4",
+          background: "linear-gradient(135deg, #1d1b18 0%, #1d1b18 100%)",
           borderRadius: "12px 12px 0 0",
         }}>
           <Text variant="headingMd" as="h2" tone="text-inverse">
@@ -285,7 +285,7 @@ function LocationModal({ location, purposePreset, onSave, onClose, locale, ui })
             </BlockStack>
           </BlockStack>
         </div>
-        <div style={{ padding: "14px 22px 18px", borderTop: "1px solid #e5e7eb", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <div style={{ padding: "14px 22px 18px", borderTop: "1px solid #e6dfd4", display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <Button onClick={onClose} disabled={saving}>{ui.cancel}</Button>
           <Button variant="primary" onClick={handleSave} loading={saving}>
             {location?.id ? ui.save : ui.add}
@@ -352,14 +352,14 @@ function PurposeSlotCard({ purposeKey, loc, onEdit, onAdd, locale }) {
 
 function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
   const t = (en, tr, fr, es, it, de) => lt(locale, en, tr, fr, es, it, de);
-  const typeColor = TYPE_COLORS[loc.type] || "#6b7280";
+  const typeColor = TYPE_COLORS[loc.type] || "#5e574e";
   const typeLabel = getTypeLabel(loc.type, locale);
   const addressLines = formatAddressLines(loc);
   const purposeMeta = getPurposeMeta(locale);
 
   return (
     <div style={{
-      border: loc.is_primary ? "2px solid #008060" : "1px solid #e5e7eb",
+      border: loc.is_primary ? "2px solid #ee8a12" : "1px solid #e6dfd4",
       borderRadius: 10,
       padding: "16px 18px",
       background: loc.is_primary ? "#f0faf6" : "#fff",
@@ -386,7 +386,7 @@ function LocationCard({ loc, onEdit, onDelete, onSetPrimary, locale, ui }) {
               }}>{purposeMeta[k].short}</span>
             ))}
             {!loc.is_active && (
-              <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#f3f4f6", color: "#9ca3af" }}>{ui.inactive}</span>
+              <span style={{ display: "inline-block", padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: "#f3eee6", color: "#a39a8d" }}>{ui.inactive}</span>
             )}
           </InlineStack>
           {addressLines.length > 0 && (

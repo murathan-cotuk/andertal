@@ -114,7 +114,7 @@ export function ChangeRequestFieldBadge({ requests, fieldName }) {
             <>
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" tone="subdued">{l.cur}</Text>
-                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", color: "#6b7280", textDecoration: diff.changed ? "line-through" : "none" }}>
+                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", color: "#5e574e", textDecoration: diff.changed ? "line-through" : "none" }}>
                   {diff.before || l.empty}
                 </div>
               </BlockStack>
@@ -133,7 +133,7 @@ export function ChangeRequestFieldBadge({ requests, fieldName }) {
               {diff.rows.map((r) => (
                 <div key={r.path} style={{ borderLeft: "3px solid var(--p-color-border)", paddingLeft: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: "var(--p-color-text)", marginBottom: 2 }}>{r.path}</div>
-                  <div style={{ fontSize: 13, lineHeight: 1.45, color: "#9ca3af", textDecoration: "line-through", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                  <div style={{ fontSize: 13, lineHeight: 1.45, color: "#a39a8d", textDecoration: "line-through", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
                     {r.before ? r.before : l.empty}
                   </div>
                   {r.status === "removed" ? (

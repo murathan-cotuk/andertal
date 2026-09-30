@@ -10,19 +10,19 @@ import { getUI } from "@/lib/ui-strings";
 import { productCsvTemplateFilename } from "@/lib/download-names";
 
 const Container = styled.div`max-width: 1200px; margin: 0 auto;`;
-const Title = styled.h1`font-size: 32px; font-weight: 700; margin-bottom: 32px; color: #1f2937;`;
+const Title = styled.h1`font-size: 32px; font-weight: 700; margin-bottom: 32px; color: #1d1b18;`;
 const Section = styled(Card)`padding: 24px; margin-bottom: 24px;`;
 
 const UploadArea = styled.div`
-  border: 2px dashed #d1d5db;
+  border: 2px dashed #d6ccbd;
   border-radius: 8px;
   padding: 60px 20px;
   text-align: center;
-  background-color: #f9fafb;
+  background-color: #faf7f2;
   transition: all 0.2s ease;
   cursor: pointer;
-  &:hover { border-color: #0ea5e9; background-color: #f0f9ff; }
-  ${({ $isDragging }) => $isDragging && `border-color: #0ea5e9; background-color: #f0f9ff;`}
+  &:hover { border-color: #ee8a12; background-color: #f0f9ff; }
+  ${({ $isDragging }) => $isDragging && `border-color: #ee8a12; background-color: #f0f9ff;`}
 `;
 
 const CSV_COLUMNS = [
@@ -172,9 +172,9 @@ export default function BulkUploadPage() {
   return (
     <Container>
       <Title>{locale === "en" ? "Upload products via CSV" : locale === "tr" ? "CSV ile ürün yükle" : locale === "fr" ? "Importer des produits via CSV" : locale === "es" ? "Subir productos por CSV" : locale === "it" ? "Carica prodotti via CSV" : "Produkte per CSV hochladen"}</Title>
-      <p style={{ margin: "-24px 0 24px", fontSize: 14, color: "#6b7280" }}>
+      <p style={{ margin: "-24px 0 24px", fontSize: 14, color: "#5e574e" }}>
         {locale === "en" ? "Have a real Excel (.xlsx) file? Use " : locale === "tr" ? "Gerçek bir Excel (.xlsx) dosyanız mı var? " : locale === "fr" ? "Vous avez un vrai fichier Excel (.xlsx) ? Utilisez " : locale === "es" ? "¿Tienes un archivo Excel (.xlsx) real? Usa " : locale === "it" ? "Hai un vero file Excel (.xlsx)? Usa " : "Hast du eine echte Excel-Datei (.xlsx)? Nutze "}
-        <NextLink href="/import-export" style={{ color: "#0ea5e9", fontWeight: 600 }}>
+        <NextLink href="/import-export" style={{ color: "#ee8a12", fontWeight: 600 }}>
           {locale === "en" ? "Import & Export" : locale === "tr" ? "İçe/Dışa Aktar" : locale === "fr" ? "Import & Export" : locale === "es" ? "Importar y Exportar" : locale === "it" ? "Importa ed Esporta" : "Import & Export"}
         </NextLink>
         {locale === "en" ? " instead — it also matches categories/brands and updates existing products by SKU." : locale === "tr" ? " sayfasını kullanın — o araç ayrıca kategori/marka eşleştirmesi de yapar ve SKU'ya göre mevcut ürünleri günceller." : locale === "fr" ? " à la place — il associe aussi catégories/marques et met à jour les produits existants par SKU." : locale === "es" ? " en su lugar — también asocia categorías/marcas y actualiza productos existentes por SKU." : locale === "it" ? " invece — associa anche categorie/marchi e aggiorna i prodotti esistenti tramite SKU." : " stattdessen — es ordnet auch Kategorien/Marken zu und aktualisiert bestehende Produkte per SKU."}
@@ -182,12 +182,12 @@ export default function BulkUploadPage() {
 
       <Section>
         {/* Template download */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", backgroundColor: "#f3f4f6", borderRadius: "8px", marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", backgroundColor: "#f3eee6", borderRadius: "8px", marginBottom: "24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <i className="fas fa-file-csv" style={{ fontSize: "24px", color: "#0ea5e9" }} />
+            <i className="fas fa-file-csv" style={{ fontSize: "24px", color: "#ee8a12" }} />
             <div>
-              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>{locale === "en" ? "Download CSV template" : locale === "tr" ? "CSV şablonu indir" : locale === "fr" ? "Télécharger le modèle CSV" : locale === "es" ? "Descargar plantilla CSV" : locale === "it" ? "Scarica il modello CSV" : "CSV-Vorlage herunterladen"}</p>
-              <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>{locale === "en" ? "Columns" : locale === "tr" ? "Sütunlar" : locale === "fr" ? "Colonnes" : locale === "es" ? "Columnas" : locale === "it" ? "Colonne" : "Spalten"}: {CSV_COLUMNS.join(", ")}</p>
+              <p style={{ margin: 0, fontWeight: 600, color: "#1d1b18" }}>{locale === "en" ? "Download CSV template" : locale === "tr" ? "CSV şablonu indir" : locale === "fr" ? "Télécharger le modèle CSV" : locale === "es" ? "Descargar plantilla CSV" : locale === "it" ? "Scarica il modello CSV" : "CSV-Vorlage herunterladen"}</p>
+              <p style={{ margin: 0, fontSize: "14px", color: "#5e574e" }}>{locale === "en" ? "Columns" : locale === "tr" ? "Sütunlar" : locale === "fr" ? "Colonnes" : locale === "es" ? "Columnas" : locale === "it" ? "Colonne" : "Spalten"}: {CSV_COLUMNS.join(", ")}</p>
             </div>
           </div>
           <Button onClick={() => downloadTemplate(locale)}>
@@ -204,9 +204,9 @@ export default function BulkUploadPage() {
           onClick={() => fileInputRef.current?.click()}
         >
           <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
-          <i className="fas fa-cloud-upload-alt" style={{ fontSize: "48px", color: "#0ea5e9", marginBottom: "16px", display: "block" }} />
-          <p style={{ fontSize: "16px", color: "#6b7280", margin: "0 0 8px" }}>{locale === "en" ? "Drop CSV file here or click" : locale === "tr" ? "CSV dosyasını buraya bırakın veya tıklayın" : locale === "fr" ? "Déposez le fichier CSV ici ou cliquez" : locale === "es" ? "Suelta el archivo CSV aquí o haz clic" : locale === "it" ? "Trascina il file CSV qui o clicca" : "CSV-Datei hier ablegen oder klicken"}</p>
-          <p style={{ fontSize: "14px", color: "#9ca3af", margin: 0 }}>{locale === "en" ? ".csv only – max. 500 products, max. 10 MB" : locale === "tr" ? "Sadece .csv – max. 500 ürün, max. 10 MB" : locale === "fr" ? ".csv uniquement – max. 500 produits, max. 10 Mo" : locale === "es" ? "Solo .csv – máx. 500 productos, máx. 10 MB" : locale === "it" ? "Solo .csv – max. 500 prodotti, max. 10 MB" : "Nur .csv – max. 500 Produkte, max. 10 MB"}</p>
+          <i className="fas fa-cloud-upload-alt" style={{ fontSize: "48px", color: "#ee8a12", marginBottom: "16px", display: "block" }} />
+          <p style={{ fontSize: "16px", color: "#5e574e", margin: "0 0 8px" }}>{locale === "en" ? "Drop CSV file here or click" : locale === "tr" ? "CSV dosyasını buraya bırakın veya tıklayın" : locale === "fr" ? "Déposez le fichier CSV ici ou cliquez" : locale === "es" ? "Suelta el archivo CSV aquí o haz clic" : locale === "it" ? "Trascina il file CSV qui o clicca" : "CSV-Datei hier ablegen oder klicken"}</p>
+          <p style={{ fontSize: "14px", color: "#a39a8d", margin: 0 }}>{locale === "en" ? ".csv only – max. 500 products, max. 10 MB" : locale === "tr" ? "Sadece .csv – max. 500 ürün, max. 10 MB" : locale === "fr" ? ".csv uniquement – max. 500 produits, max. 10 Mo" : locale === "es" ? "Solo .csv – máx. 500 productos, máx. 10 MB" : locale === "it" ? "Solo .csv – max. 500 prodotti, max. 10 MB" : "Nur .csv – max. 500 Produkte, max. 10 MB"}</p>
         </UploadArea>
 
         {error && (
@@ -217,7 +217,7 @@ export default function BulkUploadPage() {
         {preview && !results && (
           <div style={{ marginTop: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <p style={{ margin: 0, fontWeight: 600, color: "#1f2937" }}>{preview.length} {locale === "en" ? "products detected" : locale === "tr" ? "ürün algılandı" : locale === "fr" ? "produits détectés" : locale === "es" ? "productos detectados" : locale === "it" ? "prodotti rilevati" : "Produkte erkannt"}</p>
+              <p style={{ margin: 0, fontWeight: 600, color: "#1d1b18" }}>{preview.length} {locale === "en" ? "products detected" : locale === "tr" ? "ürün algılandı" : locale === "fr" ? "produits détectés" : locale === "es" ? "productos detectados" : locale === "it" ? "prodotti rilevati" : "Produkte erkannt"}</p>
               <div style={{ display: "flex", gap: "8px" }}>
                 <Button onClick={() => { setFile(null); setPreview(null); setError(""); }}>{ui.cancel}</Button>
                 <Button onClick={handleUpload} disabled={uploading}>
@@ -226,30 +226,30 @@ export default function BulkUploadPage() {
               </div>
             </div>
             {uploading && (
-              <div style={{ width: "100%", height: "8px", backgroundColor: "#e5e7eb", borderRadius: "4px", marginBottom: "12px" }}>
-                <div style={{ width: `${progress}%`, height: "100%", backgroundColor: "#0ea5e9", borderRadius: "4px", transition: "width 0.3s" }} />
+              <div style={{ width: "100%", height: "8px", backgroundColor: "#e6dfd4", borderRadius: "4px", marginBottom: "12px" }}>
+                <div style={{ width: `${progress}%`, height: "100%", backgroundColor: "#ee8a12", borderRadius: "4px", transition: "width 0.3s" }} />
               </div>
             )}
-            <div style={{ overflowX: "auto", maxHeight: "320px", overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
+            <div style={{ overflowX: "auto", maxHeight: "320px", overflowY: "auto", border: "1px solid #e6dfd4", borderRadius: "8px" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
-                  <tr style={{ backgroundColor: "#f9fafb", position: "sticky", top: 0 }}>
+                  <tr style={{ backgroundColor: "#faf7f2", position: "sticky", top: 0 }}>
                     {[locale === "en" ? "Title" : locale === "tr" ? "Başlık" : locale === "fr" ? "Titre" : locale === "es" ? "Título" : locale === "it" ? "Titolo" : "Titel", "SKU", locale === "en" ? "Price" : locale === "tr" ? "Fiyat" : locale === "fr" ? "Prix" : locale === "es" ? "Precio" : locale === "it" ? "Prezzo" : "Preis", locale === "en" ? "Inventory" : locale === "tr" ? "Stok" : locale === "fr" ? "Inventaire" : locale === "es" ? "Inventario" : locale === "it" ? "Inventario" : "Bestand", "Status", "EAN", locale === "en" ? "Category" : locale === "tr" ? "Kategori" : locale === "fr" ? "Catégorie" : locale === "es" ? "Categoría" : locale === "it" ? "Categoria" : "Kategorie", locale === "en" ? "Brand" : locale === "tr" ? "Marka" : locale === "fr" ? "Marque" : locale === "es" ? "Marca" : locale === "it" ? "Marca" : "Marke"].map(h => (
-                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>{h}</th>
+                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e6dfd4", fontWeight: 600, color: "#3a352f", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {preview.slice(0, 100).map((row, i) => (
-                    <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <tr key={i} style={{ borderBottom: "1px solid #f3eee6" }}>
                       {[row.title || row.Title, row.sku || row.SKU, row.price || row.Price, row.inventory || row.Inventory, row.status || row.Status, row.ean || row.EAN, row.category || row.Category, row.brand || row.Brand].map((v, j) => (
-                        <td key={j} style={{ padding: "6px 12px", color: "#374151" }}>{v || "—"}</td>
+                        <td key={j} style={{ padding: "6px 12px", color: "#3a352f" }}>{v || "—"}</td>
                       ))}
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {preview.length > 100 && <p style={{ padding: "8px 12px", color: "#6b7280", margin: 0 }}>… {locale === "en" ? "and" : locale === "tr" ? "ve" : locale === "fr" ? "et" : locale === "es" ? "y" : locale === "it" ? "e" : "und"} {preview.length - 100} {locale === "en" ? "more rows" : locale === "tr" ? "satır daha" : locale === "fr" ? "lignes supplémentaires" : locale === "es" ? "filas más" : locale === "it" ? "righe in più" : "weitere Zeilen"}</p>}
+              {preview.length > 100 && <p style={{ padding: "8px 12px", color: "#5e574e", margin: 0 }}>… {locale === "en" ? "and" : locale === "tr" ? "ve" : locale === "fr" ? "et" : locale === "es" ? "y" : locale === "it" ? "e" : "und"} {preview.length - 100} {locale === "en" ? "more rows" : locale === "tr" ? "satır daha" : locale === "fr" ? "lignes supplémentaires" : locale === "es" ? "filas más" : locale === "it" ? "righe in più" : "weitere Zeilen"}</p>}
             </div>
           </div>
         )}
@@ -268,12 +268,12 @@ export default function BulkUploadPage() {
                 </div>
               ))}
             </div>
-            <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
+            <div style={{ overflowX: "auto", maxHeight: "400px", overflowY: "auto", border: "1px solid #e6dfd4", borderRadius: "8px" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
-                  <tr style={{ backgroundColor: "#f9fafb", position: "sticky", top: 0 }}>
+                  <tr style={{ backgroundColor: "#faf7f2", position: "sticky", top: 0 }}>
                     {[locale === "en" ? "Title" : locale === "tr" ? "Başlık" : locale === "fr" ? "Titre" : locale === "es" ? "Título" : locale === "it" ? "Titolo" : "Titel", "Status", "Info"].map(h => (
-                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e5e7eb", fontWeight: 600, color: "#374151" }}>{h}</th>
+                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", borderBottom: "1px solid #e6dfd4", fontWeight: 600, color: "#3a352f" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -281,12 +281,12 @@ export default function BulkUploadPage() {
                   {results.map((r, i) => {
                     const st = STATUS_COLOR[r.status] || {};
                     return (
-                      <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: "6px 12px", color: "#374151" }}>{r.title || "—"}</td>
+                      <tr key={i} style={{ borderBottom: "1px solid #f3eee6" }}>
+                        <td style={{ padding: "6px 12px", color: "#3a352f" }}>{r.title || "—"}</td>
                         <td style={{ padding: "6px 12px" }}>
                           <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "12px", backgroundColor: st.bg, color: st.color, fontWeight: 600 }}>{r.status}</span>
                         </td>
-                        <td style={{ padding: "6px 12px", color: "#6b7280" }}>{r.reason || r.id || ""}</td>
+                        <td style={{ padding: "6px 12px", color: "#5e574e" }}>{r.reason || r.id || ""}</td>
                       </tr>
                     );
                   })}

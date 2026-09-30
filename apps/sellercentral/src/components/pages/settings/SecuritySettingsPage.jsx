@@ -338,7 +338,7 @@ function TotpSetupCard({ onStatusChange, locale }) {
                   background: "#fff",
                   padding: 12,
                   borderRadius: 8,
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e6dfd4",
                   display: "inline-block",
                   boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
                 }}

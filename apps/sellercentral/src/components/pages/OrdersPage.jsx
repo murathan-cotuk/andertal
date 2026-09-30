@@ -79,22 +79,22 @@ function orderMerchantSellerIds(order) {
 
 const STATUS_COLORS = {
   offen: { bg: "#fff7ed", color: "#c2410c" },
-  in_bearbeitung: { bg: "#eff6ff", color: "#1d4ed8" },
+  in_bearbeitung: { bg: "#fcebd5", color: "#7f3f00" },
   abgeschlossen: { bg: "#f0fdf4", color: "#15803d" },
   retoure: { bg: "#fef2f2", color: "#b91c1c" },
   retoure_anfrage: { bg: "#fffbeb", color: "#b45309" },
-  refunded: { bg: "#eff6ff", color: "#1d4ed8" },
+  refunded: { bg: "#fcebd5", color: "#7f3f00" },
   storniert: { bg: "#fef2f2", color: "#b91c1c" },
   bezahlt: { bg: "#f0fdf4", color: "#15803d" },
   teil_erstattet: { bg: "#fffbeb", color: "#b45309" },
   erstattet: { bg: "#fef2f2", color: "#b91c1c" },
-  versendet: { bg: "#eff6ff", color: "#1d4ed8" },
+  versendet: { bg: "#fcebd5", color: "#7f3f00" },
   zugestellt: { bg: "#f0fdf4", color: "#15803d" },
 };
 
 function StatusBadge({ value }) {
   const locale = useLocale();
-  const s = STATUS_COLORS[value] || { bg: "#f3f4f6", color: "#6b7280" };
+  const s = STATUS_COLORS[value] || { bg: "#f3eee6", color: "#5e574e" };
   return (
     <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 4, fontSize: 11, fontWeight: 600, lineHeight: 1.3, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
       {value ? statusLabel(locale, value) : "—"}
@@ -111,7 +111,7 @@ function fmtAddressOneLine(order) {
   return parts.join(" · ");
 }
 
-const CELL = { padding: "2px 8px", borderRight: "1px solid #e5e7eb", verticalAlign: "middle", fontSize: 12, lineHeight: 1.25, whiteSpace: "nowrap" };
+const CELL = { padding: "2px 8px", borderRight: "1px solid #e6dfd4", verticalAlign: "middle", fontSize: 12, lineHeight: 1.25, whiteSpace: "nowrap" };
 
 /* ── Layout ───────── */
 const PageContainer = styled.div`
@@ -136,7 +136,7 @@ const PageTitle = styled.h1`
   font-size: 18px;
   font-weight: 650;
   margin: 0;
-  color: #111827;
+  color: #1d1b18;
 `;
 
 const HeaderMeta = styled.div`
@@ -154,7 +154,7 @@ const FilterBar = styled.div`
   padding: 5px 8px;
   margin-bottom: 8px;
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 8px;
 `;
 
@@ -164,20 +164,20 @@ const FilterInput = styled.input`
   max-width: 260px;
   height: 28px;
   padding: 0 8px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #d6ccbd;
   border-radius: 6px;
   font-size: 12px;
-  color: #1f2937;
+  color: #1d1b18;
   background: #fff;
   box-sizing: border-box;
 
   &:focus {
     outline: none;
-    border-color: #2563eb;
+    border-color: #a65300;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
   }
   &::placeholder {
-    color: #9ca3af;
+    color: #a39a8d;
   }
 `;
 
@@ -185,17 +185,17 @@ const FilterSelect = styled.select`
   height: 28px;
   max-width: 150px;
   padding: 0 6px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #d6ccbd;
   border-radius: 6px;
   font-size: 12px;
-  color: #1f2937;
+  color: #1d1b18;
   background: #fff;
   cursor: pointer;
   box-sizing: border-box;
 
   &:focus {
     outline: none;
-    border-color: #2563eb;
+    border-color: #a65300;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
   }
 `;
@@ -205,7 +205,7 @@ const TableCard = styled(Card)`
   margin-bottom: 8px;
   overflow: clip;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
 `;
 
 const BulkBar = styled.div`
@@ -215,37 +215,37 @@ const BulkBar = styled.div`
   gap: 8px;
   padding: 5px 10px;
   margin-bottom: 8px;
-  background: #f8fafc;
-  border: 1px solid #dbeafe;
+  background: #faf7f2;
+  border: 1px solid #fcebd5;
   border-radius: 8px;
 `;
 
 const SuperuserSectionLabel = styled.td`
   padding: 4px 10px !important;
-  background: #eff6ff !important;
-  border-bottom: 1px solid #bfdbfe !important;
+  background: #fcebd5 !important;
+  border-bottom: 1px solid #f5d3a8 !important;
   font-weight: 700 !important;
   font-size: 11px !important;
-  color: #1e40af !important;
+  color: #7f3f00 !important;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 `;
 
 const SellerOrdersSectionLabel = styled.td`
   padding: 4px 10px !important;
-  background: #f3f4f6 !important;
-  border-bottom: 1px solid #e5e7eb !important;
+  background: #f3eee6 !important;
+  border-bottom: 1px solid #e6dfd4 !important;
   font-weight: 700 !important;
   font-size: 11px !important;
-  color: #374151 !important;
+  color: #3a352f !important;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 `;
 
 const SellerGroupHeader = styled.td`
   padding: 0 !important;
-  background: #f9fafb !important;
-  border-bottom: 1px solid #e5e7eb !important;
+  background: #faf7f2 !important;
+  border-bottom: 1px solid #e6dfd4 !important;
 `;
 
 
@@ -289,7 +289,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
 
   return (
     <tr>
-      <td colSpan={colCount} style={{ padding: 0, background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+      <td colSpan={colCount} style={{ padding: 0, background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
         <div style={{ padding: "16px 24px 20px" }}>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             <Button url={getOrderPdfDownloadUrl(order.id, "invoice", locale)} external variant="secondary" size="slim">
@@ -311,16 +311,16 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
               padding: "16px 18px",
               background: "#fff",
               borderRadius: 8,
-              border: "1px solid #e5e7eb",
+              border: "1px solid #e6dfd4",
               fontSize: 13,
               boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
             }}
           >
-            <div style={{ fontWeight: 700, color: "#374151", marginBottom: 8, fontSize: 14 }}>{ui.shippingTracking}</div>
+            <div style={{ fontWeight: 700, color: "#3a352f", marginBottom: 8, fontSize: 14 }}>{ui.shippingTracking}</div>
             {order.carrier_name ? (
-              <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 8 }}>{ui.carrier}: <strong style={{ color: "#111827" }}>{order.carrier_name}</strong></div>
+              <div style={{ color: "#5e574e", fontSize: 12, marginBottom: 8 }}>{ui.carrier}: <strong style={{ color: "#1d1b18" }}>{order.carrier_name}</strong></div>
             ) : (
-              <div style={{ color: "#9ca3af", fontSize: 12, marginBottom: 8 }}>{ui.noCarrier}</div>
+              <div style={{ color: "#a39a8d", fontSize: 12, marginBottom: 8 }}>{ui.noCarrier}</div>
             )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
               <input
@@ -335,7 +335,7 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
                   maxWidth: 360,
                   padding: "10px 12px",
                   borderRadius: 8,
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e6dfd4",
                   fontFamily: "ui-monospace, monospace",
                   fontSize: 13,
                 }}
@@ -361,13 +361,13 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
             </div>
             {order.tracking_number ? (
               <div style={{ marginTop: 10, fontSize: 12 }}>
-                <span style={{ color: "#6b7280", marginRight: 6 }}>{ui.savedTracking}</span>
+                <span style={{ color: "#5e574e", marginRight: 6 }}>{ui.savedTracking}</span>
                 {trackingUrl ? (
                   <a
                     href={trackingUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "#111827", textDecoration: "underline", textDecorationColor: "#9ca3af" }}
+                    style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "#1d1b18", textDecoration: "underline", textDecorationColor: "#a39a8d" }}
                   >
                     {order.tracking_number}
                   </a>
@@ -375,16 +375,16 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
                   <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 600 }}>{order.tracking_number}</span>
                 )}
                 {trackingUrl ? (
-                  <span style={{ color: "#9ca3af", marginLeft: 8 }}>{ui.clickTracking}</span>
+                  <span style={{ color: "#a39a8d", marginLeft: 8 }}>{ui.clickTracking}</span>
                 ) : null}
               </div>
             ) : (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>{ui.noTrackingYet}</div>
+              <div style={{ marginTop: 8, fontSize: 12, color: "#a39a8d" }}>{ui.noTrackingYet}</div>
             )}
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid #e5e7eb" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, background: "#fff", borderRadius: 8, overflow: "hidden", border: "1px solid #e6dfd4" }}>
             <thead>
-              <tr style={{ color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+              <tr style={{ color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                 <th style={{ textAlign: "left", padding: "4px 8px" }}>{ui.product}</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>{ui.qty}</th>
                 <th style={{ textAlign: "right", padding: "4px 8px" }}>{ui.unitPrice}</th>
@@ -393,20 +393,20 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
             </thead>
             <tbody>
               {items.length === 0 && (
-                <tr><td colSpan={4} style={{ padding: "8px", color: "#9ca3af", textAlign: "center" }}>{ui.noItems}</td></tr>
+                <tr><td colSpan={4} style={{ padding: "8px", color: "#a39a8d", textAlign: "center" }}>{ui.noItems}</td></tr>
               )}
               {items.map((it, i) => {
                 const itemBrutto = (it.unit_price_cents || 0) * (it.quantity || 1);
                 const itemNetto = vat.rate > 0 ? Math.round(itemBrutto / (1 + vat.rate / 100)) : itemBrutto;
                 const { main: itemMain, note: itemNote } = splitItemTitle(it.title);
                 return (
-                  <tr key={i} style={{ borderTop: "1px solid #e5e7eb" }}>
+                  <tr key={i} style={{ borderTop: "1px solid #e6dfd4" }}>
                     <td style={{ padding: "6px 8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <div
                           style={{
                             width: 40, height: 40, flexShrink: 0, borderRadius: 6, overflow: "hidden",
-                            background: "#f4f4f5", border: "1px solid #e5e7eb",
+                            background: "#f4f4f5", border: "1px solid #e6dfd4",
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}
                         >
@@ -427,15 +427,15 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
                         </div>
                         <div>
                           {it.product_id ? (
-                            <a href={`/${locale}/products/${it.product_id}`} style={{ color: "#111827", textDecoration: "underline", textDecorationColor: "#d1d5db" }}>{itemMain || "—"}</a>
+                            <a href={`/${locale}/products/${it.product_id}`} style={{ color: "#1d1b18", textDecoration: "underline", textDecorationColor: "#d6ccbd" }}>{itemMain || "—"}</a>
                           ) : (
                             <div>{itemMain || "—"}</div>
                           )}
                           {itemNote && (
-                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{itemNote}</div>
+                            <div style={{ fontSize: 11, color: "#a39a8d" }}>{itemNote}</div>
                           )}
                           {vat.rate > 0 && (
-                            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 2 }}>
                               {ui.net}: {fmtCents(Math.round((it.unit_price_cents || 0) / (1 + vat.rate / 100)))} · +{vat.label} {vat.rate}%: {fmtCents(Math.round((it.unit_price_cents || 0) - (it.unit_price_cents || 0) / (1 + vat.rate / 100)))}
                             </div>
                           )}
@@ -451,8 +451,8 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
             </tbody>
             <tfoot>
               {/* 1. Netto */}
-              <tr style={{ borderTop: "1px solid #e5e7eb" }}>
-                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>
+              <tr style={{ borderTop: "1px solid #e6dfd4" }}>
+                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#5e574e" }}>
                   {ui.net}{vat.rate > 0 ? ` (excl. ${vat.label})` : ""}
                 </td>
                 <td style={{ textAlign: "right", padding: "5px 8px" }}>{fmtCents(totalNetto)}</td>
@@ -460,24 +460,24 @@ function ExpandedRow({ order, locale = "de", onSaveFields, colCount = 13, ui }) 
               {/* 2. Vergi */}
               {vat.rate > 0 && (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>
+                  <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#5e574e" }}>
                     {vat.label} ({vat.rate}%)
                   </td>
                   <td style={{ textAlign: "right", padding: "5px 8px" }}>{fmtCents(totalVat)}</td>
                 </tr>
               )}
               {/* 3. Brutto Zwischensumme (bold) */}
-              <tr style={{ borderTop: "1px solid #e5e7eb" }}>
+              <tr style={{ borderTop: "1px solid #e6dfd4" }}>
                 <td colSpan={3} style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>{ui.subtotal}</td>
                 <td style={{ textAlign: "right", padding: "6px 8px", fontWeight: 700 }}>{fmtCents(subtotal)}</td>
               </tr>
               {/* 4. Versandkosten */}
               <tr>
-                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#6b7280" }}>{ui.shipping}</td>
+                <td colSpan={3} style={{ textAlign: "right", padding: "5px 8px", color: "#5e574e" }}>{ui.shipping}</td>
                 <td style={{ textAlign: "right", padding: "5px 8px" }}>{ui.shippingFree}</td>
               </tr>
               {/* 5. Gesamtkosten (bolder) */}
-              <tr style={{ borderTop: "2px solid #e5e7eb" }}>
+              <tr style={{ borderTop: "2px solid #e6dfd4" }}>
                 <td colSpan={3} style={{ textAlign: "right", padding: "7px 8px", fontWeight: 800, fontSize: 13 }}>{ui.grandTotal}</td>
                 <td style={{ textAlign: "right", padding: "7px 8px", fontWeight: 800, fontSize: 13 }}>{fmtCents(total)}</td>
               </tr>
@@ -522,15 +522,15 @@ function CustomerCell({ order, locale, router, isSuperuser }) {
       {isSuperuser ? (
         <button
           onClick={handleClick}
-          style={{ background: "none", border: "none", padding: 0, cursor: navigating ? "wait" : "pointer", textAlign: "left", fontWeight: 600, fontSize: 12, color: navigating ? "#9ca3af" : "#111827", textDecoration: "underline", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          style={{ background: "none", border: "none", padding: 0, cursor: navigating ? "wait" : "pointer", textAlign: "left", fontWeight: 600, fontSize: 12, color: navigating ? "#a39a8d" : "#1d1b18", textDecoration: "underline", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
         >
           {label}
         </button>
       ) : (
-        <span style={{ fontWeight: 600, fontSize: 12, color: "#111827" }}>{label}</span>
+        <span style={{ fontWeight: 600, fontSize: 12, color: "#1d1b18" }}>{label}</span>
       )}
       {isSuperuser && order.is_guest && (
-        <span style={{ fontSize: 9, padding: "0 4px", marginLeft: 4, borderRadius: 4, background: "#f3f4f6", color: "#6b7280", fontWeight: 600 }}>
+        <span style={{ fontSize: 9, padding: "0 4px", marginLeft: 4, borderRadius: 4, background: "#f3eee6", color: "#5e574e", fontWeight: 600 }}>
           {_ui.guestBadge}
         </span>
       )}
@@ -606,14 +606,14 @@ function ActionMenu({ order, onUpdate, onDelete, onVersenden, isSuperuser, showS
               width: 22,
               height: 22,
               padding: 0,
-              border: "1px solid #e5e7eb",
+              border: "1px solid #e6dfd4",
               borderRadius: 4,
               background: "#fff",
               cursor: "pointer",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#6b7280",
+              color: "#5e574e",
               fontSize: 14,
               lineHeight: 1,
               fontWeight: 700,
@@ -925,7 +925,7 @@ function ManualOrderModal({ onClose, onCreated, locale = "de" }) {
 
           <div
             style={{
-              background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+              background: "var(--p-color-bg-surface-secondary, #faf7f2)",
               borderRadius: 8,
               padding: "12px 16px",
             }}
@@ -1269,15 +1269,15 @@ export default function OrdersPage() {
   const renderOrderRows = (list) =>
     sortOrdersClient(list).map((order) => (
       <React.Fragment key={order.id}>
-        <tr style={{ borderBottom: "1px solid #e5e7eb", cursor: "default", background: selected.has(order.id) ? "#eff6ff" : "#fff", height: 32 }}
-          onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#f9fafb"; }}
+        <tr style={{ borderBottom: "1px solid #e6dfd4", cursor: "default", background: selected.has(order.id) ? "#fcebd5" : "#fff", height: 32 }}
+          onMouseEnter={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#faf7f2"; }}
           onMouseLeave={e => { if (!selected.has(order.id)) e.currentTarget.style.background = "#fff"; }}
         >
           <td style={{ ...CELL, padding: "2px 6px 2px 8px", width: 28 }} onClick={e => e.stopPropagation()}>
             <CustomCheckbox checked={selected.has(order.id)} onChange={() => toggleOne(order.id)} size={14} />
           </td>
           <td style={{ ...CELL, padding: "2px 4px", width: 24, textAlign: "center" }}>
-            <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "#6b7280", padding: 0, lineHeight: 1 }}>
+            <button onClick={() => toggleExpand(order)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: "#5e574e", padding: 0, lineHeight: 1 }}>
               {loadingItems[order.id] ? "…" : expanded[order.id] ? "▼" : "▶"}
             </button>
           </td>
@@ -1285,7 +1285,7 @@ export default function OrdersPage() {
             <td style={{ ...CELL, fontWeight: 600 }}>
               <button
                 onClick={(e) => { e.stopPropagation(); router.push(`/orders/${order.id}`); }}
-                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 12, color: "#111827", textDecoration: "underline" }}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, fontSize: 12, color: "#1d1b18", textDecoration: "underline" }}
               >
                 #{order.order_number || "—"}
               </button>
@@ -1299,7 +1299,7 @@ export default function OrdersPage() {
           {!hc.has("address") && (
             <td
               title={fmtAddressOneLine(order) || undefined}
-              style={{ ...CELL, color: "#6b7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              style={{ ...CELL, color: "#5e574e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
             >
               {fmtAddressOneLine(order) || "—"}
             </td>
@@ -1339,7 +1339,7 @@ export default function OrdersPage() {
             </td>
           )}
           {!hc.has("date") && (
-            <td style={{ ...CELL, color: "#6b7280", whiteSpace: "nowrap" }}>
+            <td style={{ ...CELL, color: "#5e574e", whiteSpace: "nowrap" }}>
               {fmtDate(order.created_at)}
             </td>
           )}
@@ -1352,7 +1352,7 @@ export default function OrdersPage() {
             <td style={{ ...CELL, textAlign: "center" }}>
               {(() => {
                 const orderReviews = allReviews.filter((r) => r.order_id === order.id);
-                if (orderReviews.length === 0) return <span style={{ color: "#d1d5db", fontSize: 11 }}>★★★★★</span>;
+                if (orderReviews.length === 0) return <span style={{ color: "#d6ccbd", fontSize: 11 }}>★★★★★</span>;
                 const avg = orderReviews.reduce((s, r) => s + Number(r.rating || 0), 0) / orderReviews.length;
                 return (
                   <button
@@ -1384,7 +1384,7 @@ export default function OrdersPage() {
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); startPacking([order]); }}
-                      style={{ padding: "1px 6px", borderRadius: 4, border: "1px solid #2563eb", background: "#eff6ff", color: "#1d4ed8", fontSize: 10, fontWeight: 650, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1.3, flexShrink: 0 }}
+                      style={{ padding: "1px 6px", borderRadius: 4, border: "1px solid #a65300", background: "#fcebd5", color: "#7f3f00", fontSize: 10, fontWeight: 650, cursor: "pointer", whiteSpace: "nowrap", lineHeight: 1.3, flexShrink: 0 }}
                     >
                       {ui.ship}
                     </button>
@@ -1425,25 +1425,25 @@ export default function OrdersPage() {
       <PageHeader>
         <PageTitle>{ui.orders}</PageTitle>
         <HeaderMeta>
-          <span style={{ fontSize: 12, color: "#6b7280" }}>{orders.length} {ui.orders}</span>
+          <span style={{ fontSize: 12, color: "#5e574e" }}>{orders.length} {ui.orders}</span>
           {isSuperuser && (
             <div ref={colMenuRef} style={{ position: "relative" }}>
               <button
                 onClick={() => setShowColMenu(v => !v)}
-                style={{ padding: "4px 8px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 500, color: "#374151", lineHeight: 1, height: 28 }}
+                style={{ padding: "4px 8px", border: "1px solid #d6ccbd", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 500, color: "#3a352f", lineHeight: 1, height: 28 }}
               >
                 {ui.colColumns} {hiddenCols.size > 0 ? `(${COL_DEFS.filter(c => c.hideable).length - hiddenCols.size}/${COL_DEFS.filter(c => c.hideable).length})` : ""}
               </button>
               {showColMenu && (
-                <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 9999, minWidth: 190, padding: "6px 0" }}>
+                <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#fff", border: "1px solid #e6dfd4", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 9999, minWidth: 190, padding: "6px 0" }}>
                   {COL_DEFS.filter(c => c.hideable).map(col => (
                     <label
                       key={col.key}
-                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", cursor: "pointer", fontSize: 13, color: "#111827", userSelect: "none" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", cursor: "pointer", fontSize: 13, color: "#1d1b18", userSelect: "none" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#faf7f2"}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
-                      <input type="checkbox" checked={!hiddenCols.has(col.key)} onChange={() => toggleColVisibility(col.key)} style={{ accentColor: "#2563eb", width: 15, height: 15, cursor: "pointer" }} />
+                      <input type="checkbox" checked={!hiddenCols.has(col.key)} onChange={() => toggleColVisibility(col.key)} style={{ accentColor: "#a65300", width: 15, height: 15, cursor: "pointer" }} />
                       {col.labelKey ? (ui[col.labelKey] || col.labelKey) : col.label}
                     </label>
                   ))}
@@ -1461,7 +1461,7 @@ export default function OrdersPage() {
 
       {selected.size > 0 && (
         <BulkBar>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#1e3a8a" }}>{selected.size} {ui.selected}</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#7f3f00" }}>{selected.size} {ui.selected}</span>
           <InlineStack gap="200" wrap blockAlign="center">
             <Button variant="primary" size="slim" onClick={() => startPacking(selectedOrders)}>
               {ui.bulkShip}
@@ -1544,7 +1544,7 @@ export default function OrdersPage() {
             ))}
           </colgroup>
           <thead>
-            <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+            <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
               {visibleCols.map((col) => {
                 const colIdx = COL_DEFS.indexOf(col);
                 const isSortable = !!col.sortKey;
@@ -1557,7 +1557,7 @@ export default function OrdersPage() {
                       textAlign: col.align,
                       fontWeight: 600,
                       fontSize: 11,
-                      color: isSortable ? "#374151" : "#6b7280",
+                      color: isSortable ? "#3a352f" : "#5e574e",
                       textTransform: "uppercase",
                       letterSpacing: "0.03em",
                       whiteSpace: "nowrap",
@@ -1566,10 +1566,10 @@ export default function OrdersPage() {
                       position: "sticky",
                       top: 0,
                       zIndex: 2,
-                      background: "#f9fafb",
+                      background: "#faf7f2",
                       overflow: "hidden",
                       boxSizing: "border-box",
-                      borderRight: "1px solid #d1d5db",
+                      borderRight: "1px solid #d6ccbd",
                     }}
                   >
                     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 2 }}>
@@ -1601,10 +1601,10 @@ export default function OrdersPage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={visibleColCount} style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>{ui.loading}</td></tr>
+              <tr><td colSpan={visibleColCount} style={{ padding: 20, textAlign: "center", color: "#a39a8d", fontSize: 12 }}>{ui.loading}</td></tr>
             )}
             {!loading && orders.length === 0 && (
-              <tr><td colSpan={visibleColCount} style={{ padding: 20, textAlign: "center", color: "#9ca3af", fontSize: 12 }}>{ui.noOrders}</td></tr>
+              <tr><td colSpan={visibleColCount} style={{ padding: 20, textAlign: "center", color: "#a39a8d", fontSize: 12 }}>{ui.noOrders}</td></tr>
             )}
             {!loading && orders.length > 0 && (!isSuperuser || filterSellerId) && renderOrderRows(visibleOrders)}
             {!loading && orders.length > 0 && isSuperuser && !filterSellerId && (
@@ -1616,7 +1616,7 @@ export default function OrdersPage() {
                 </tr>
                 {ownOrdersList.length === 0 ? (
                   <tr>
-                    <td colSpan={visibleColCount} style={{ padding: "8px 12px", color: "#9ca3af", fontSize: 12 }}>
+                    <td colSpan={visibleColCount} style={{ padding: "8px 12px", color: "#a39a8d", fontSize: 12 }}>
                       {ui.noOrdersInSection}
                     </td>
                   </tr>
@@ -1630,7 +1630,7 @@ export default function OrdersPage() {
                 </tr>
                 {filteredSellerOrderGroups.length === 0 ? (
                   <tr>
-                    <td colSpan={visibleColCount} style={{ padding: "8px 12px", color: "#9ca3af", fontSize: 12 }}>
+                    <td colSpan={visibleColCount} style={{ padding: "8px 12px", color: "#a39a8d", fontSize: 12 }}>
                       {ui.noSellerOrders}{sellerSearchFilter.trim() ? lt(locale, " (filter)", " (filtre)", " (filtre)", " (filtro)", " (filtro)", " (Filter)") : ""}.
                     </td>
                   </tr>
@@ -1649,8 +1649,8 @@ export default function OrdersPage() {
                               padding: "4px 10px",
                             }}
                           >
-                            <span style={{ fontWeight: 600, fontSize: 12, color: "#111827" }}>{label}</span>
-                            <span style={{ fontSize: 11, color: "#6b7280" }}>
+                            <span style={{ fontWeight: 600, fontSize: 12, color: "#1d1b18" }}>{label}</span>
+                            <span style={{ fontSize: 11, color: "#5e574e" }}>
                               {items.length} {ui.orders}
                             </span>
                           </div>
@@ -1670,14 +1670,14 @@ export default function OrdersPage() {
   );
 }
 
-const selStyle = { padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 12, background: "#fff", cursor: "pointer" };
+const selStyle = { padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 7, fontSize: 12, background: "#fff", cursor: "pointer" };
 
 function MiniStars({ rating }) {
   const r = Math.round(Number(rating) || 0);
   return (
     <span style={{ fontSize: 11, letterSpacing: 0, lineHeight: 1 }}>
       {[1,2,3,4,5].map((n) => (
-        <span key={n} style={{ color: r >= n ? "#f59e0b" : "#d1d5db" }}>★</span>
+        <span key={n} style={{ color: r >= n ? "#f59e0b" : "#d6ccbd" }}>★</span>
       ))}
     </span>
   );
@@ -1688,26 +1688,26 @@ function ReviewPopup({ reviews, onClose, locale }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 480, maxHeight: "80vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e6dfd4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{_ui.reviewsTitle}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#5e574e" }}>×</button>
         </div>
         <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
           {reviews.map((rv) => (
-            <div key={rv.id} style={{ padding: "12px 16px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+            <div key={rv.id} style={{ padding: "12px 16px", background: "#faf7f2", borderRadius: 8, border: "1px solid #e6dfd4" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 6 }}>
                 <div>
-                  <span style={{ fontWeight: 600, fontSize: 13, color: "#111827", display: "block" }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: "#1d1b18", display: "block" }}>
                     {rv.product_title || rv.product_id}
                   </span>
-                  <span style={{ fontSize: 12, color: "#6b7280" }}>{rv.customer_name || "—"}</span>
+                  <span style={{ fontSize: 12, color: "#5e574e" }}>{rv.customer_name || "—"}</span>
                 </div>
                 <MiniStars rating={rv.rating} />
               </div>
-              {rv.comment && <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>{rv.comment}</p>}
+              {rv.comment && <p style={{ margin: 0, fontSize: 13, color: "#3a352f", lineHeight: 1.5 }}>{rv.comment}</p>}
             </div>
           ))}
-          {reviews.length === 0 && <p style={{ color: "#9ca3af", fontSize: 13, margin: 0 }}>{_ui.noReviews}</p>}
+          {reviews.length === 0 && <p style={{ color: "#a39a8d", fontSize: 13, margin: 0 }}>{_ui.noReviews}</p>}
         </div>
       </div>
     </div>

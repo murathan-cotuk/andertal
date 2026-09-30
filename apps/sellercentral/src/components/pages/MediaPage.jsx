@@ -57,14 +57,14 @@ function MediaTile({ item, onSelect }) {
     <div
       onClick={() => onSelect(item)}
       style={{
-        background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb",
+        background: "#fff", borderRadius: 10, border: "1px solid #e6dfd4",
         overflow: "hidden", cursor: "pointer", transition: "box-shadow .15s",
         position: "relative",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.12)"; e.currentTarget.style.borderColor = "#d1d5db"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "#e5e7eb"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.12)"; e.currentTarget.style.borderColor = "#d6ccbd"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "#e6dfd4"; }}
     >
-      <div style={{ height: 130, background: "#f9fafb", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+      <div style={{ height: 130, background: "#faf7f2", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
         {isImage(item.mime_type)
           ? <img src={item.url} alt={item.alt || ""} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
           : <div style={{ fontSize: 36 }}>📄</div>
@@ -79,10 +79,10 @@ function MediaTile({ item, onSelect }) {
         <span style={{ color: "#fff", fontSize: 11, fontWeight: 600, background: "rgba(0,0,0,.4)", padding: "4px 10px", borderRadius: 20 }}>{lt("Copy URL", "URL kopyala", "Copier l'URL", "Copiar URL", "Copia URL", "URL kopieren")}</span>
       </div>
       <div style={{ padding: "8px 10px" }}>
-        <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }} title={item.filename}>
+        <div style={{ fontSize: 11, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#3a352f" }} title={item.filename}>
           {item.filename}
         </div>
-        <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>{fmtSize(item.size)} · {fmtDate(item.created_at, locale)}</div>
+        <div style={{ fontSize: 10, color: "#a39a8d", marginTop: 2 }}>{fmtSize(item.size)} · {fmtDate(item.created_at, locale)}</div>
       </div>
     </div>
   );
@@ -215,13 +215,13 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
     <>
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.2)", zIndex: 900 }} onClick={onClose} />
       <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: 380, background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 901, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #e6dfd4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 290 }} title={item.filename}>{item.filename}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#6b7280" }}>✕</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#5e574e" }}>✕</button>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
           {/* Preview */}
-          <div style={{ background: "#f9fafb", borderRadius: 10, overflow: "hidden", marginBottom: 16, maxHeight: 240, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#faf7f2", borderRadius: 10, overflow: "hidden", marginBottom: 16, maxHeight: 240, display: "flex", alignItems: "center", justifyContent: "center" }}>
             {isImage(item.mime_type)
               ? <img src={item.url} alt={item.alt || ""} style={{ maxWidth: "100%", maxHeight: 240, objectFit: "contain" }} />
               : <div style={{ padding: 40, fontSize: 40 }}>📄</div>
@@ -229,9 +229,9 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
           </div>
 
           {/* URL row */}
-          <div style={{ background: "#f3f4f6", borderRadius: 8, padding: "8px 12px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
-            <span style={{ fontSize: 11, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#374151" }}>{item.url}</span>
-            <button onClick={copyUrl} style={{ padding: "4px 10px", borderRadius: 6, background: copied ? "#f0fdf4" : "#fff", border: "1px solid #e5e7eb", cursor: "pointer", fontSize: 11, fontWeight: 600, color: copied ? "#15803d" : "#374151", flexShrink: 0 }}>
+          <div style={{ background: "#f3eee6", borderRadius: 8, padding: "8px 12px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+            <span style={{ fontSize: 11, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#3a352f" }}>{item.url}</span>
+            <button onClick={copyUrl} style={{ padding: "4px 10px", borderRadius: 6, background: copied ? "#f0fdf4" : "#fff", border: "1px solid #e6dfd4", cursor: "pointer", fontSize: 11, fontWeight: 600, color: copied ? "#15803d" : "#3a352f", flexShrink: 0 }}>
               {copied ? lt("✓ Copied", "✓ Kopyalandı", "✓ Copié", "✓ Copiado", "✓ Copiato", "✓ Kopiert") : lt("Copy", "Kopyala", "Copier", "Copiar", "Copia", "Kopieren")}
             </button>
           </div>
@@ -245,8 +245,8 @@ function DetailPanel({ item, folders, onClose, onUpdated, onDeleted }) {
               [lt("Folder", "Klasör", "Dossier", "Carpeta", "Cartella", "Ordner"), item.folder_name || lt("No folder", "Klasör yok", "Aucun dossier", "Sin carpeta", "Nessuna cartella", "Kein Ordner")],
             ].map(([k, v]) => (
               <div key={k}>
-                <div style={{ color: "#9ca3af", fontSize: 10, textTransform: "uppercase", letterSpacing: ".04em" }}>{k}</div>
-                <div style={{ color: "#374151", fontWeight: 500, marginTop: 2 }}>{v}</div>
+                <div style={{ color: "#a39a8d", fontSize: 10, textTransform: "uppercase", letterSpacing: ".04em" }}>{k}</div>
+                <div style={{ color: "#3a352f", fontWeight: 500, marginTop: 2 }}>{v}</div>
               </div>
             ))}
           </div>
@@ -427,7 +427,7 @@ export default function MediaPage() {
 
   return (
     <div
-      style={{ display: "flex", height: "calc(100vh - 64px)", overflow: "hidden", background: "#f9fafb", position: "relative" }}
+      style={{ display: "flex", height: "calc(100vh - 64px)", overflow: "hidden", background: "#faf7f2", position: "relative" }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -437,21 +437,21 @@ export default function MediaPage() {
         <div style={{
           position: "absolute", inset: 0, zIndex: 100,
           background: "rgba(37,99,235,0.12)",
-          border: "3px dashed #2563eb",
+          border: "3px dashed #a65300",
           borderRadius: 12,
           display: "flex", alignItems: "center", justifyContent: "center",
           pointerEvents: "none",
         }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 52, marginBottom: 12 }}>📂</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#2563eb" }}>{c.dropImages}</div>
-            <div style={{ fontSize: 13, color: "#3b82f6", marginTop: 4 }}>{c.releaseToUpload}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#a65300" }}>{c.dropImages}</div>
+            <div style={{ fontSize: 13, color: "#ee8a12", marginTop: 4 }}>{c.releaseToUpload}</div>
           </div>
         </div>
       )}
       {/* Sidebar */}
-      <div style={{ width: 220, background: "#fff", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-        <div style={{ padding: "16px 16px 8px", borderBottom: "1px solid #f3f4f6" }}>
+      <div style={{ width: 220, background: "#fff", borderRight: "1px solid #e6dfd4", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+        <div style={{ padding: "16px 16px 8px", borderBottom: "1px solid #f3eee6" }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>{c.mediaLibrary}</div>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
@@ -464,9 +464,9 @@ export default function MediaPage() {
               onClick={() => handleFolderChange(item.id)}
               style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%",
-                padding: "7px 16px", background: activeFolder === item.id ? "#eff6ff" : "none",
+                padding: "7px 16px", background: activeFolder === item.id ? "#fcebd5" : "none",
                 border: "none", cursor: "pointer", fontSize: 13,
-                color: activeFolder === item.id ? "#1d4ed8" : "#374151",
+                color: activeFolder === item.id ? "#7f3f00" : "#3a352f",
                 fontWeight: activeFolder === item.id ? 600 : 400, textAlign: "left",
               }}
             >
@@ -475,7 +475,7 @@ export default function MediaPage() {
           ))}
 
           {folders.length > 0 && (
-            <div style={{ padding: "10px 16px 4px", fontSize: 10, color: "#9ca3af", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>{c.folders}</div>
+            <div style={{ padding: "10px 16px 4px", fontSize: 10, color: "#a39a8d", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em" }}>{c.folders}</div>
           )}
           {folders.map(f => (
             <div key={f.id} style={{ display: "flex", alignItems: "center" }}>
@@ -483,15 +483,15 @@ export default function MediaPage() {
                 onClick={() => handleFolderChange(f.id)}
                 style={{
                   flex: 1, display: "flex", alignItems: "center", gap: 8,
-                  padding: "7px 16px", background: activeFolder === f.id ? "#eff6ff" : "none",
+                  padding: "7px 16px", background: activeFolder === f.id ? "#fcebd5" : "none",
                   border: "none", cursor: "pointer", fontSize: 13,
-                  color: activeFolder === f.id ? "#1d4ed8" : "#374151",
+                  color: activeFolder === f.id ? "#7f3f00" : "#3a352f",
                   fontWeight: activeFolder === f.id ? 600 : 400, textAlign: "left",
                 }}
               >
                 <span>📁</span>
                 <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                {f.media_count > 0 && <span style={{ fontSize: 10, color: "#9ca3af" }}>{f.media_count}</span>}
+                {f.media_count > 0 && <span style={{ fontSize: 10, color: "#a39a8d" }}>{f.media_count}</span>}
               </button>
               <button
                 onClick={async () => {
@@ -501,7 +501,7 @@ export default function MediaPage() {
                   setFolders(prev => prev.filter(x => x.id !== f.id));
                   if (activeFolder === f.id) handleFolderChange("all");
                 }}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 10px", color: "#d1d5db", fontSize: 12 }}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 10px", color: "#d6ccbd", fontSize: 12 }}
                 title={c.deleteFolder}
               >
                 ✕
@@ -509,10 +509,10 @@ export default function MediaPage() {
             </div>
           ))}
         </div>
-        <div style={{ padding: "12px 16px", borderTop: "1px solid #f3f4f6" }}>
+        <div style={{ padding: "12px 16px", borderTop: "1px solid #f3eee6" }}>
           <button
             onClick={() => setShowCreateFolder(true)}
-            style={{ width: "100%", padding: "7px 0", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151" }}
+            style={{ width: "100%", padding: "7px 0", background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 7, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#3a352f" }}
           >
             {c.newFolder}
           </button>
@@ -522,9 +522,9 @@ export default function MediaPage() {
       {/* Main content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Top bar */}
-        <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div style={{ background: "#fff", borderBottom: "1px solid #e6dfd4", padding: "12px 20px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#111" }}>{folderLabel}</div>
-          <span style={{ fontSize: 12, color: "#9ca3af" }}>
+          <span style={{ fontSize: 12, color: "#a39a8d" }}>
             {isSuperuser
               ? lt(
                   `${ownMedia.length} own / platform · ${totalCount - ownMedia.length} sellers (${totalCount} total)`,
@@ -540,7 +540,7 @@ export default function MediaPage() {
             <select
               value={mediaSort}
               onChange={(e) => setMediaSort(e.target.value)}
-              style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, color: "#374151", background: "#fff" }}
+              style={{ padding: "6px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 12, color: "#3a352f", background: "#fff" }}
             >
               <option value="date_desc">{lt("Date: newest first", "Tarih: en yeni", "Date : plus récent", "Fecha: más reciente", "Data: più recente", "Datum: neu zuerst")}</option>
               <option value="date_asc">{lt("Date: oldest first", "Tarih: en eski", "Date : plus ancien", "Fecha: más antiguo", "Data: più vecchio", "Datum: alt zuerst")}</option>
@@ -557,19 +557,19 @@ export default function MediaPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={lt("Search filename…", "Dosya adı ara…", "Rechercher un fichier…", "Buscar archivo…", "Cerca file…", "Dateiname suchen…")}
-              style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: "6px 0 0 6px", fontSize: 13, outline: "none", width: 180 }}
+              style={{ padding: "6px 10px", border: "1px solid #e6dfd4", borderRadius: "6px 0 0 6px", fontSize: 13, outline: "none", width: 180 }}
             />
-            <button type="submit" style={{ padding: "6px 12px", background: "#f9fafb", border: "1px solid #e5e7eb", borderLeft: "none", borderRadius: "0 6px 6px 0", cursor: "pointer", fontSize: 13, color: "#374151" }}>🔍</button>
+            <button type="submit" style={{ padding: "6px 12px", background: "#faf7f2", border: "1px solid #e6dfd4", borderLeft: "none", borderRadius: "0 6px 6px 0", cursor: "pointer", fontSize: 13, color: "#3a352f" }}>🔍</button>
           </form>
           {/* URL add */}
-          <button onClick={() => setShowAddUrl(true)} style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+          <button onClick={() => setShowAddUrl(true)} style={{ padding: "7px 14px", background: "#fff", border: "1px solid #e6dfd4", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#3a352f" }}>
             🔗 {lt("Add URL", "URL ekle", "Ajouter URL", "Añadir URL", "Aggiungi URL", "URL hinzufügen")}
           </button>
           {/* Upload */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            style={{ padding: "7px 16px", background: uploading ? "#9ca3af" : "#111827", color: "#fff", border: "none", borderRadius: 7, cursor: uploading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}
+            style={{ padding: "7px 16px", background: uploading ? "#a39a8d" : "#1d1b18", color: "#fff", border: "none", borderRadius: 7, cursor: uploading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600 }}
           >
             {uploading ? lt("Uploading…", "Yükleniyor…", "Téléversement…", "Subiendo…", "Caricamento…", "Hochladen…") : `↑ ${lt("Upload", "Yükle", "Téléverser", "Subir", "Carica", "Hochladen")}`}
           </button>
@@ -586,10 +586,10 @@ export default function MediaPage() {
         {/* Grid */}
         <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
           {loading && (
-            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>{ui.loading}</div>
+            <div style={{ textAlign: "center", padding: 60, color: "#a39a8d" }}>{ui.loading}</div>
           )}
           {!loading && media.length === 0 && (
-            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>
+            <div style={{ textAlign: "center", padding: 60, color: "#a39a8d" }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🖼</div>
               <div style={{ fontSize: 15, marginBottom: 8 }}>{lt("No media", "Medya yok", "Aucun média", "Sin medios", "Nessun media", "Keine Medien")}</div>
               <div style={{ fontSize: 13 }}>{lt("Upload images or add via URL", "Görsel yükleyin veya URL ile ekleyin", "Téléversez des images ou ajoutez via URL", "Suba imágenes o añada por URL", "Carica immagini o aggiungi via URL", "Bilder hochladen oder per URL hinzufügen")}</div>
@@ -622,7 +622,7 @@ export default function MediaPage() {
                   {lt("Your superuser area — own and platform media", "Superuser alanınız — kendi ve platform medyası", "Votre espace superuser — médias propres et plateforme", "Su área superuser — medios propios y de plataforma", "Area superuser — media propri e piattaforma", "Ihr Superuser-Bereich — eigene und plattformweite Medien")} ({ownMedia.length})
                 </div>
                 {ownMedia.length === 0 ? (
-                  <div style={{ color: "#9ca3af", fontSize: 13, padding: "8px 4px" }}>{lt("No media in this section.", "Bu bölümde medya yok.", "Aucun média dans cette section.", "Sin medios en esta sección.", "Nessun media in questa sezione.", "Keine Medien in diesem Bereich.")}</div>
+                  <div style={{ color: "#a39a8d", fontSize: 13, padding: "8px 4px" }}>{lt("No media in this section.", "Bu bölümde medya yok.", "Aucun média dans cette section.", "Sin medios en esta sección.", "Nessun media in questa sezione.", "Keine Medien in diesem Bereich.")}</div>
                 ) : (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
                     {sortMediaList(ownMedia, mediaSort).map((item) => (
@@ -636,12 +636,12 @@ export default function MediaPage() {
                   style={{
                     padding: "10px 14px",
                     marginBottom: 10,
-                    background: "#f3f4f6",
+                    background: "#f3eee6",
                     borderRadius: 8,
-                    border: "1px solid #e5e7eb",
+                    border: "1px solid #e6dfd4",
                     fontWeight: 700,
                     fontSize: 12,
-                    color: "#374151",
+                    color: "#3a352f",
                     textTransform: "uppercase",
                     letterSpacing: "0.04em",
                   }}
@@ -654,11 +654,11 @@ export default function MediaPage() {
                   placeholder={lt("Search sellers (store name)…", "Satıcı ara (mağaza adı)…", "Rechercher vendeurs (nom boutique)…", "Buscar vendedores (nombre tienda)…", "Cerca venditori (nome negozio)…", "Verkäufer suchen (Store-Name)…")}
                   style={{
                     width: "100%", maxWidth: 360, padding: "8px 12px", marginBottom: 14,
-                    border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, boxSizing: "border-box",
+                    border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, boxSizing: "border-box",
                   }}
                 />
                 {filteredSellerMediaGroups.length === 0 ? (
-                  <div style={{ color: "#9ca3af", fontSize: 13 }}>
+                  <div style={{ color: "#a39a8d", fontSize: 13 }}>
                     {lt("No seller media", "Satıcı medyası yok", "Aucun média vendeur", "Sin medios de vendedores", "Nessun media venditore", "Keine Verkäufer-Medien")}{sellerSearchFilter.trim() ? lt(" (filter)", " (filtre)", " (filtre)", " (filtro)", " (filtro)", " (Filter)") : ""}.
                   </div>
                 ) : (
@@ -673,7 +673,7 @@ export default function MediaPage() {
                       return (
                         <div
                           key={sellerId}
-                          style={{ background: "#fafafa", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}
+                          style={{ background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 10, overflow: "hidden" }}
                         >
                           <button
                             type="button"
@@ -691,8 +691,8 @@ export default function MediaPage() {
                               textAlign: "left",
                             }}
                           >
-                            <span style={{ fontWeight: 600, fontSize: 14, color: "#111827" }}>{label}</span>
-                            <span style={{ fontSize: 12, color: "#6b7280" }}>
+                            <span style={{ fontWeight: 600, fontSize: 14, color: "#1d1b18" }}>{label}</span>
+                            <span style={{ fontSize: 12, color: "#5e574e" }}>
                               {open ? "▾" : "▸"} {sorted.length} Datei{sorted.length !== 1 ? "en" : ""}
                             </span>
                           </button>
@@ -750,8 +750,8 @@ export default function MediaPage() {
   );
 }
 
-const labelSt = { fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 };
-const inputSt = { width: "100%", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" };
-const btnPriSt = { padding: "8px 18px", background: "#111827", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 };
-const btnSecSt = { padding: "8px 14px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 13 };
-const btnDisSt = { padding: "8px 18px", background: "#9ca3af", color: "#fff", border: "none", borderRadius: 7, cursor: "not-allowed", fontSize: 13, fontWeight: 600 };
+const labelSt = { fontSize: 12, fontWeight: 600, color: "#3a352f", display: "block", marginBottom: 4 };
+const inputSt = { width: "100%", padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13, boxSizing: "border-box" };
+const btnPriSt = { padding: "8px 18px", background: "#1d1b18", color: "#fff", border: "none", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 };
+const btnSecSt = { padding: "8px 14px", background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 7, cursor: "pointer", fontSize: 13 };
+const btnDisSt = { padding: "8px 18px", background: "#a39a8d", color: "#fff", border: "none", borderRadius: 7, cursor: "not-allowed", fontSize: 13, fontWeight: 600 };

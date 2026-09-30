@@ -5,7 +5,7 @@ import { Page, Card, Text, BlockStack, Box } from "@shopify/polaris";
 import { Link } from "@/i18n/navigation";
 import { HELP_ARTICLES, HELP_CATEGORIES, helpLocaleBody, helpLocaleText } from "@/lib/help-articles";
 
-const ORANGE = "#ff971c";
+const ORANGE = "#ee8a12";
 
 function Block({ block }) {
   if (block.type === "h2") {
@@ -18,7 +18,7 @@ function Block({ block }) {
     return (
       <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6, listStyleType: "disc" }}>
         {block.items.map((item, i) => (
-          <li key={i} style={{ fontSize: 14, color: "#1f2937", lineHeight: 1.55, display: "list-item" }}>{item}</li>
+          <li key={i} style={{ fontSize: 14, color: "#1d1b18", lineHeight: 1.55, display: "list-item" }}>{item}</li>
         ))}
       </ul>
     );
@@ -30,10 +30,10 @@ function Block({ block }) {
         style={{
           borderRadius: 10,
           padding: "12px 16px",
-          background: isWarning ? "#fffbeb" : "#eff6ff",
-          border: `1px solid ${isWarning ? "#fde68a" : "#bfdbfe"}`,
+          background: isWarning ? "#fffbeb" : "#fcebd5",
+          border: `1px solid ${isWarning ? "#fde68a" : "#f5d3a8"}`,
           fontSize: 13.5,
-          color: isWarning ? "#92400e" : "#1e40af",
+          color: isWarning ? "#92400e" : "#7f3f00",
           lineHeight: 1.55,
         }}
       >
@@ -74,7 +74,7 @@ export default function HelpArticlePage({ slug }) {
   return (
     <Page fullWidth>
       <Box paddingBlockEnd="300">
-        <Link href="/help" style={{ color: "#6b7280", fontWeight: 600, fontSize: 13, textDecoration: "none" }}>
+        <Link href="/help" style={{ color: "#5e574e", fontWeight: 600, fontSize: 13, textDecoration: "none" }}>
           &larr; {t("back")}
         </Link>
       </Box>
@@ -89,7 +89,7 @@ export default function HelpArticlePage({ slug }) {
                     {category.icon} {helpLocaleText(category.label, locale)}
                   </Text>
                 )}
-                <div style={{ fontSize: 26, fontWeight: 800, color: "#111827", letterSpacing: "-0.01em" }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: "#1d1b18", letterSpacing: "-0.01em" }}>
                   {article.icon} {title}
                 </div>
               </BlockStack>
@@ -113,7 +113,7 @@ export default function HelpArticlePage({ slug }) {
                       <Link
                         key={a.slug}
                         href={`/help/${a.slug}`}
-                        style={{ fontSize: 13, color: "#374151", textDecoration: "none", display: "block", lineHeight: 1.4 }}
+                        style={{ fontSize: 13, color: "#3a352f", textDecoration: "none", display: "block", lineHeight: 1.4 }}
                       >
                         {a.icon} {helpLocaleText(a.title, locale)}
                       </Link>

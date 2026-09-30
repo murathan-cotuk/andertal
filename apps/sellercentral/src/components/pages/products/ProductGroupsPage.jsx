@@ -62,7 +62,7 @@ function SellerSection({ sellerLabel, groups, products, onEdit, onDelete, ui, lo
   return (
     <div style={{ marginBottom: 24 }}>
       <div style={{
-        background: "#f6f6f7",
+        background: "#faf7f2",
         borderRadius: 8,
         padding: "8px 14px",
         marginBottom: 4,
@@ -311,7 +311,7 @@ export default function ProductGroupsPage() {
             />
             <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid #e4e5e7", borderRadius: 8 }}>
               {filteredProducts.length === 0 ? (
-                <div style={{ padding: 16, color: "#6d7175", fontSize: 13 }}>{ui.noResults}.</div>
+                <div style={{ padding: 16, color: "#5e574e", fontSize: 13 }}>{ui.noResults}.</div>
               ) : (
                 filteredProducts.map((p) => {
                   const checked = form.product_ids.includes(p.id);
@@ -331,11 +331,11 @@ export default function ProductGroupsPage() {
                         size={18}
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {p.title || p.handle || p.id}
                         </div>
                         {p.ean && (
-                          <div style={{ fontSize: 11, color: "#6d7175" }}>EAN: {p.ean}</div>
+                          <div style={{ fontSize: 11, color: "#5e574e" }}>EAN: {p.ean}</div>
                         )}
                       </div>
                     </label>

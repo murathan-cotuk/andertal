@@ -502,8 +502,8 @@ export default function CampaignsPage() {
                         <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", cursor: "pointer", background: checked ? "#f0f9ff" : "transparent" }}>
                           <CustomCheckbox checked={checked} onChange={() => toggleProduct(p)} size={18} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title || p.id}</div>
-                            {p.ean && <div style={{ fontSize: 11, color: "#6d7175" }}>EAN: {p.ean}</div>}
+                            <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title || p.id}</div>
+                            {p.ean && <div style={{ fontSize: 11, color: "#5e574e" }}>EAN: {p.ean}</div>}
                           </div>
                         </label>
                         {checked && variants.length > 0 ? (
@@ -517,7 +517,7 @@ export default function CampaignsPage() {
                               return (
                                 <label key={vid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0 2px", cursor: "pointer" }}>
                                   <CustomCheckbox checked={vChecked} onChange={() => toggleVariant(p, vid)} size={16} />
-                                  <span style={{ fontSize: 12, color: "#202223" }}>{variantRowLabel(v)}</span>
+                                  <span style={{ fontSize: 12, color: "#1d1b18" }}>{variantRowLabel(v)}</span>
                                 </label>
                               );
                             })}
@@ -543,8 +543,8 @@ export default function CampaignsPage() {
                         <label key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: "pointer", background: checked ? "#f0f9ff" : "transparent", borderBottom: "1px solid #f4f5f7" }}>
                           <CustomCheckbox checked={checked} onChange={() => toggleGroup(g.id)} size={18} />
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#202223" }}>{g.name}</div>
-                            <div style={{ fontSize: 11, color: "#6d7175" }}>{(g.product_ids || []).length} {ui.products}</div>
+                            <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: "#1d1b18" }}>{g.name}</div>
+                            <div style={{ fontSize: 11, color: "#5e574e" }}>{(g.product_ids || []).length} {ui.products}</div>
                           </div>
                         </label>
                       );

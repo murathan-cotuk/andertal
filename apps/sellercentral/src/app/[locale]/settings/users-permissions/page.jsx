@@ -55,7 +55,7 @@ function PermissionsSelector({ value, onChange, permissionsList }) {
           <div key={group.group}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <Checkbox
-                label={<span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{group.group}</span>}
+                label={<span style={{ fontSize: 13, fontWeight: 600, color: "#3a352f" }}>{group.group}</span>}
                 checked={allOn}
                 onChange={() => toggleGroup(group.items)}
               />
@@ -201,7 +201,7 @@ function PermissionsSelectorFull({ value, onChange, permissionsList }) {
           <div key={group.group}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <Checkbox
-                label={<span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{group.group}</span>}
+                label={<span style={{ fontSize: 13, fontWeight: 600, color: "#3a352f" }}>{group.group}</span>}
                 checked={allOn}
                 onChange={() => toggleGroup(group.items)}
               />
@@ -384,7 +384,7 @@ function KybReviewModal({ user, onClose, onApproved, copy, ui, locale }) {
               <Text variant="headingSm" as="h3">{copy.documents(docs.length)}</Text>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
                 {docs.map((doc, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#faf7f2", borderRadius: 8, border: "1px solid #e6dfd4" }}>
                     <div style={{ flex: 1 }}>
                       <Text variant="bodySm" fontWeight="semibold">{doc.doc_type ? { trade_register: copy.docTradeRegister, id_passport: copy.docIdPassport, tax_document: copy.docTax }[doc.doc_type] || doc.doc_type : doc.name}</Text>
                       {doc.name && <Text variant="bodySm" tone="subdued">{doc.name}</Text>}
@@ -581,8 +581,8 @@ export default function UsersPermissionsPage() {
       borderRadius: 20,
       fontSize: 13,
       fontWeight: roleFilter === val ? 700 : 400,
-      background: roleFilter === val ? "#111827" : "#f3f4f6",
-      color: roleFilter === val ? "#fff" : "#374151",
+      background: roleFilter === val ? "#1d1b18" : "#f3eee6",
+      color: roleFilter === val ? "#fff" : "#3a352f",
       border: "none",
       cursor: "pointer",
     });
@@ -597,7 +597,7 @@ export default function UsersPermissionsPage() {
             {error && <Banner tone="critical" onDismiss={() => setError(null)}><Text>{error}</Text></Banner>}
             <Card padding="0">
               {/* Search + Sort + Filter toolbar */}
-              <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3eee6", display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
                 {/* Search */}
                 <div style={{ flex: "1 1 220px", minWidth: 180 }}>
                   <TextField
@@ -623,7 +623,7 @@ export default function UsersPermissionsPage() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  style={{ padding: "6px 10px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 13, background: "#fff", cursor: "pointer" }}
+                  style={{ padding: "6px 10px", border: "1.5px solid #d6ccbd", borderRadius: 8, fontSize: 13, background: "#fff", cursor: "pointer" }}
                 >
                   <option value="date_desc">{copy.sortDateDesc}</option>
                   <option value="date_asc">{copy.sortDateAsc}</option>
@@ -635,7 +635,7 @@ export default function UsersPermissionsPage() {
               </div>
 
               {/* Count line */}
-              <div style={{ padding: "8px 20px", borderBottom: "1px solid #f9fafb", background: "#fafafa" }}>
+              <div style={{ padding: "8px 20px", borderBottom: "1px solid #faf7f2", background: "#faf7f2" }}>
                 <Text variant="bodySm" tone="subdued">
                   {copy.userCount(filtered.length, users.length)}
                 </Text>
@@ -658,7 +658,7 @@ export default function UsersPermissionsPage() {
                       key={user.id}
                       style={{
                         padding: "14px 20px",
-                        borderBottom: i < arr.length - 1 ? "1px solid #f9fafb" : "none",
+                        borderBottom: i < arr.length - 1 ? "1px solid #faf7f2" : "none",
                         display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
                         background: user.email === myEmail ? "#f0fdf4" : undefined,
                       }}
@@ -757,7 +757,7 @@ export default function UsersPermissionsPage() {
 
           {/* Active sub-users */}
           <Card padding="0">
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3eee6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <Text variant="headingMd" as="h2">{copy.activeUsers(subusers.length + 1)}</Text>
               <Button onClick={fetchSellerData} loading={loading} size="slim">{ui.refresh}</Button>
             </div>
@@ -765,7 +765,7 @@ export default function UsersPermissionsPage() {
             {/* ── Current account row (always first) ── */}
             <div style={{
               padding: "14px 20px",
-              borderBottom: "1px solid #f9fafb",
+              borderBottom: "1px solid #faf7f2",
               display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
               background: "#f0fdf4",
             }}>
@@ -795,7 +795,7 @@ export default function UsersPermissionsPage() {
                   key={user.id}
                   style={{
                     padding: "14px 20px",
-                    borderBottom: i < subusers.length - 1 ? "1px solid #f9fafb" : "none",
+                    borderBottom: i < subusers.length - 1 ? "1px solid #faf7f2" : "none",
                     display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
                   }}
                 >
@@ -823,7 +823,7 @@ export default function UsersPermissionsPage() {
           {/* Pending invitations */}
           {pendingInvites.length > 0 && (
             <Card padding="0">
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6" }}>
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3eee6" }}>
                 <Text variant="headingMd" as="h2">{copy.pendingInvites(pendingInvites.length)}</Text>
               </div>
               {pendingInvites.map((invite, i) => (
@@ -831,7 +831,7 @@ export default function UsersPermissionsPage() {
                   key={invite.id}
                   style={{
                     padding: "14px 20px",
-                    borderBottom: i < pendingInvites.length - 1 ? "1px solid #f9fafb" : "none",
+                    borderBottom: i < pendingInvites.length - 1 ? "1px solid #faf7f2" : "none",
                     display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "center",
                   }}
                 >

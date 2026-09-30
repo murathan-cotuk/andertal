@@ -23,7 +23,7 @@ export default function AnalyticsLiveView() {
     <DashboardLayout>
       <div style={{ padding: "8px 4px 24px", maxWidth: 1100 }}>
         <h1 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 700 }}>Live View</h1>
-        <p style={{ margin: "0 0 20px", fontSize: 14, color: "#6b7280" }}>
+        <p style={{ margin: "0 0 20px", fontSize: 14, color: "#5e574e" }}>
           Echtzeit-Aktivität im Shop — Besucher, IP und Standort
         </p>
         <LiveVisitorsPanel defaultExpanded />

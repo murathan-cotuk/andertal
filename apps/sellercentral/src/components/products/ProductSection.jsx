@@ -19,7 +19,7 @@ export const PRODUCT_SECTION_STYLES = `
     display: block;
     height: 0;
     border: 0;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid #e6dfd4;
     margin: 14px 0 12px;
     box-shadow: none;
   }

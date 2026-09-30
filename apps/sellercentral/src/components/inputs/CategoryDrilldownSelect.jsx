@@ -197,7 +197,7 @@ export default function CategoryDrilldownSelect({
                 border: "none",
                 background: "none",
                 cursor: hasChildren ? "pointer" : "default",
-                color: "#9ca3af",
+                color: "#a39a8d",
                 fontSize: 11,
                 visibility: hasChildren ? "visible" : "hidden",
               }}
@@ -212,7 +212,7 @@ export default function CategoryDrilldownSelect({
                 flex: 1,
                 minWidth: 0,
                 border: "none",
-                background: value === node.id ? "#eff6ff" : "transparent",
+                background: value === node.id ? "#fcebd5" : "transparent",
                 textAlign: "left",
                 padding: "6px 10px",
                 borderRadius: 8,
@@ -223,11 +223,11 @@ export default function CategoryDrilldownSelect({
                 gap: 10,
               }}
             >
-              <span style={{ fontSize: 13, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 13, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {labelFor(node)}
               </span>
               {hasChildren && (
-                <span style={{ fontSize: 11, color: "#9ca3af", flex: "0 0 auto" }}>{node.children.length}</span>
+                <span style={{ fontSize: 11, color: "#a39a8d", flex: "0 0 auto" }}>{node.children.length}</span>
               )}
             </button>
           </div>
@@ -307,21 +307,21 @@ export default function CategoryDrilldownSelect({
                   onChange?.("");
                   setOpen(false);
                 }}
-                style={{ border: "none", background: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0 }}
+                style={{ border: "none", background: "none", color: "#a65300", cursor: "pointer", fontSize: 12, padding: 0 }}
               >
                 {noneLabel}
               </button>
               <button
                 type="button"
                 onClick={() => setExpandedIds(new Set(byId.keys()))}
-                style={{ border: "none", background: "none", color: "#374151", cursor: "pointer", fontSize: 12, padding: 0 }}
+                style={{ border: "none", background: "none", color: "#3a352f", cursor: "pointer", fontSize: 12, padding: 0 }}
               >
                 Expand all
               </button>
               <button
                 type="button"
                 onClick={() => setExpandedIds(new Set())}
-                style={{ border: "none", background: "none", color: "#374151", cursor: "pointer", fontSize: 12, padding: 0 }}
+                style={{ border: "none", background: "none", color: "#3a352f", cursor: "pointer", fontSize: 12, padding: 0 }}
               >
                 Collapse all
               </button>
@@ -338,25 +338,25 @@ export default function CategoryDrilldownSelect({
                     style={{
                       width: "100%",
                       border: "none",
-                      background: value === row.id ? "#eff6ff" : "transparent",
+                      background: value === row.id ? "#fcebd5" : "transparent",
                       textAlign: "left",
                       padding: "8px 10px",
                       borderRadius: 8,
                       cursor: "pointer",
                     }}
                   >
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{row.label}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{row.breadcrumb}</div>
-                    <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>ID: {row.id}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18" }}>{row.label}</div>
+                    <div style={{ fontSize: 11, color: "#5e574e", marginTop: 2 }}>{row.breadcrumb}</div>
+                    <div style={{ fontSize: 10, color: "#a39a8d", marginTop: 1 }}>ID: {row.id}</div>
                   </button>
                 ))
               : renderTreeNodes(tree, 0)}
 
             {search.trim() && searchResults.length === 0 && (
-              <div style={{ padding: "8px 10px", fontSize: 12, color: "#9ca3af" }}>No category found.</div>
+              <div style={{ padding: "8px 10px", fontSize: 12, color: "#a39a8d" }}>No category found.</div>
             )}
             {!search.trim() && tree.length === 0 && (
-              <div style={{ padding: "8px 10px", fontSize: 12, color: "#9ca3af" }}>No categories.</div>
+              <div style={{ padding: "8px 10px", fontSize: 12, color: "#a39a8d" }}>No categories.</div>
             )}
           </div>
         </div>,

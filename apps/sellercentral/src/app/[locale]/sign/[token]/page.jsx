@@ -261,7 +261,7 @@ export default function SignPage() {
     sub: { color: "#666", fontSize: 14, marginBottom: 20, lineHeight: 1.5, margin: "0 0 20px" },
     contractBox: {
       maxHeight: 320, overflowY: "auto", border: "1px solid #e5e5e5", borderRadius: 8,
-      padding: "14px 16px", marginBottom: 18, background: "#fafafa", fontSize: 13, lineHeight: 1.55, color: "#333",
+      padding: "14px 16px", marginBottom: 18, background: "#faf7f2", fontSize: 13, lineHeight: 1.55, color: "#333",
     },
     sectionH: { fontWeight: 700, margin: "14px 0 6px", fontSize: 13.5, color: "#111" },
     sectionB: { whiteSpace: "pre-line", margin: "0 0 8px", color: "#444" },

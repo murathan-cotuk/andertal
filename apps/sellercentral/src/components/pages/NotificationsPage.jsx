@@ -38,8 +38,8 @@ const TABLE_GRID = "40px 100px 90px minmax(120px, 1fr) minmax(90px, 0.8fr) minma
 function cellStyle(extra = {}) {
   return {
     padding: "10px 12px",
-    borderRight: "1px solid #e5e7eb",
-    borderBottom: "1px solid #e5e7eb",
+    borderRight: "1px solid #e6dfd4",
+    borderBottom: "1px solid #e6dfd4",
     fontSize: 13,
     lineHeight: 1.45,
     verticalAlign: "top",
@@ -58,9 +58,9 @@ function ChangeSuggestionsTable({ items, busy, selected, onToggle, onDeleteOne, 
           display: "grid",
           gridTemplateColumns: TABLE_GRID,
           minWidth: 960,
-          background: "#f3f4f6",
-          borderTop: "1px solid #e5e7eb",
-          borderLeft: "1px solid #e5e7eb",
+          background: "#f3eee6",
+          borderTop: "1px solid #e6dfd4",
+          borderLeft: "1px solid #e6dfd4",
           fontWeight: 600,
           fontSize: 11,
           color: "#4b5563",
@@ -75,7 +75,7 @@ function ChangeSuggestionsTable({ items, busy, selected, onToggle, onDeleteOne, 
         <div style={cellStyle()}>{tbl.colField}</div>
         <div style={{ ...cellStyle(), background: "#fef2f2" }}>{tbl.colCurrent}</div>
         <div style={{ ...cellStyle({ borderRight: "none" }), background: "#f0fdf4" }}>{tbl.colProposed}</div>
-        <div style={{ ...cellStyle({ borderRight: "none" }), background: "#f3f4f6" }}>{tbl.colActions}</div>
+        <div style={{ ...cellStyle({ borderRight: "none" }), background: "#f3eee6" }}>{tbl.colActions}</div>
       </div>
 
       {items.map((raw, idx) => {
@@ -84,7 +84,7 @@ function ChangeSuggestionsTable({ items, busy, selected, onToggle, onDeleteOne, 
         const href = it.href || "#";
         const currentVal = it.old_value != null ? formatChangeRequestValueForDisplay(it.old_value) : "—";
         const proposedVal = it.new_value != null ? formatChangeRequestValueForDisplay(it.new_value) : "—";
-        const rowBg = idx % 2 === 0 ? "#fff" : "#fafafa";
+        const rowBg = idx % 2 === 0 ? "#fff" : "#faf7f2";
 
         return (
           <div
@@ -93,25 +93,25 @@ function ChangeSuggestionsTable({ items, busy, selected, onToggle, onDeleteOne, 
               display: "grid",
               gridTemplateColumns: TABLE_GRID,
               minWidth: 960,
-              borderLeft: "1px solid #e5e7eb",
+              borderLeft: "1px solid #e6dfd4",
               background: it.read ? rowBg : "#fffbeb",
             }}
           >
             <div style={cellStyle({ display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 14 })}>
               <Checkbox label="" labelHidden checked={selected.has(k)} onChange={() => onToggle(k)} />
             </div>
-            <div style={cellStyle({ color: "#6b7280", whiteSpace: "nowrap" })}>{formatDateDmy(it.created_at, locale)}</div>
+            <div style={cellStyle({ color: "#5e574e", whiteSpace: "nowrap" })}>{formatDateDmy(it.created_at, locale)}</div>
             <div style={cellStyle({ fontWeight: 600 })}>{changeSuggestionTypeLabel(it, locale)}</div>
             <div style={cellStyle()}>
-              <Link href={href} style={{ color: "#111827", fontWeight: 600, textDecoration: "none" }}>
+              <Link href={href} style={{ color: "#1d1b18", fontWeight: 600, textDecoration: "none" }}>
                 {changeSuggestionItemLabel(it, locale)}
               </Link>
             </div>
-            <div style={cellStyle({ color: "#374151" })}>{changeSuggestionFieldLabel(it, locale)}</div>
-            <div style={{ ...cellStyle(), background: idx % 2 === 0 ? "#fffafa" : "#fef8f8", color: "#374151", whiteSpace: "pre-wrap" }}>
+            <div style={cellStyle({ color: "#3a352f" })}>{changeSuggestionFieldLabel(it, locale)}</div>
+            <div style={{ ...cellStyle(), background: idx % 2 === 0 ? "#fffafa" : "#fef8f8", color: "#3a352f", whiteSpace: "pre-wrap" }}>
               {currentVal}
             </div>
-            <div style={{ ...cellStyle({ borderRight: "none" }), background: idx % 2 === 0 ? "#f8fffa" : "#f3fdf6", color: "#111827", fontWeight: 600, whiteSpace: "pre-wrap" }}>
+            <div style={{ ...cellStyle({ borderRight: "none" }), background: idx % 2 === 0 ? "#f8fffa" : "#f3fdf6", color: "#1d1b18", fontWeight: 600, whiteSpace: "pre-wrap" }}>
               {proposedVal}
             </div>
             <div style={{ ...cellStyle({ borderRight: "none" }), display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
@@ -142,7 +142,7 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) 
         gap: 8,
         alignItems: "center",
         padding: "12px 16px",
-        borderBottom: "1px solid #f3f4f6",
+        borderBottom: "1px solid #f3eee6",
         background: it.read ? "#fff" : "#fffbeb",
       }}
     >
@@ -164,14 +164,14 @@ function NotificationRow({ it, busy, selected, onToggle, onDeleteOne, locale }) 
             />
           )}
           <Link href={it.href || "#"} style={{ textDecoration: "none", color: "inherit", fontWeight: it.read ? 500 : 700 }}>
-            <span style={{ fontSize: 14, color: "#111827" }}>{localized.title}</span>
+            <span style={{ fontSize: 14, color: "#1d1b18" }}>{localized.title}</span>
           </Link>
         </div>
         {localized.subtitle ? (
-          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, lineHeight: 1.4 }}>{localized.subtitle}</div>
+          <div style={{ fontSize: 12, color: "#5e574e", marginTop: 4, lineHeight: 1.4 }}>{localized.subtitle}</div>
         ) : null}
       </div>
-      <div style={{ fontSize: 12, color: "#9ca3af", whiteSpace: "nowrap" }}>{dt}</div>
+      <div style={{ fontSize: 12, color: "#a39a8d", whiteSpace: "nowrap" }}>{dt}</div>
       <div>
         <Button size="slim" variant="plain" tone="critical" disabled={busy} onClick={() => onDeleteOne(it)}>
           {c.removeFromList}
@@ -361,7 +361,7 @@ export default function NotificationsPage() {
                   gap: 10,
                   flexWrap: "wrap",
                   padding: "14px 16px",
-                  borderBottom: "1px solid #e5e7eb",
+                  borderBottom: "1px solid #e6dfd4",
                   background: "#fff",
                 }}
               >
@@ -374,9 +374,9 @@ export default function NotificationsPage() {
                       type="button"
                       onClick={() => setActiveGroupKey(g.key)}
                       style={{
-                        border: active ? "1px solid #111827" : "1px solid #d1d5db",
-                        background: active ? "#111827" : "#fff",
-                        color: active ? "#fff" : "#374151",
+                        border: active ? "1px solid #1d1b18" : "1px solid #d6ccbd",
+                        background: active ? "#1d1b18" : "#fff",
+                        color: active ? "#fff" : "#3a352f",
                         borderRadius: 999,
                         padding: "6px 12px",
                         fontSize: 13,
@@ -398,13 +398,13 @@ export default function NotificationsPage() {
                     gap: 0,
                     alignItems: "center",
                     padding: "10px 16px",
-                    borderBottom: "1px solid #e5e7eb",
+                    borderBottom: "1px solid #e6dfd4",
                     fontWeight: 600,
                     fontSize: 12,
-                    color: "#6b7280",
+                    color: "#5e574e",
                     textTransform: "uppercase",
                     letterSpacing: "0.04em",
-                    background: "#fafafa",
+                    background: "#faf7f2",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "center" }}>
@@ -424,7 +424,7 @@ export default function NotificationsPage() {
               )}
 
               {isChangeSuggestionTab && activeGroupItems.length > 0 && (
-                <div style={{ padding: "10px 16px", borderBottom: "1px solid #e5e7eb", background: "#fafafa" }}>
+                <div style={{ padding: "10px 16px", borderBottom: "1px solid #e6dfd4", background: "#faf7f2" }}>
                   <InlineStack gap="200" blockAlign="center">
                     <Checkbox
                       label=""

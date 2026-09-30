@@ -74,18 +74,18 @@ export default function AffiliateMarketingPage() {
         {error && <Banner tone="critical" onDismiss={() => setError("")}>{error}</Banner>}
 
         <InlineStack gap="300" wrap>
-          <div style={{ flex: "1 1 200px", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 18px" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.04em" }}>{c.kpiClicks}</div>
-            <div style={{ fontSize: 28, fontWeight: 750, color: "#111827", marginTop: 6 }}>{data ? fmtInt(totals.clicks_30d) : "—"}</div>
+          <div style={{ flex: "1 1 200px", background: "#fff", borderRadius: 12, border: "1px solid #e6dfd4", padding: "16px 18px" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.04em" }}>{c.kpiClicks}</div>
+            <div style={{ fontSize: 28, fontWeight: 750, color: "#1d1b18", marginTop: 6 }}>{data ? fmtInt(totals.clicks_30d) : "—"}</div>
           </div>
-          <div style={{ flex: "1 1 200px", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 18px" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.04em" }}>{c.kpiSales}</div>
-            <div style={{ fontSize: 28, fontWeight: 750, color: "#111827", marginTop: 6 }}>{data ? fmtInt(totals.attributed_sales_30d) : "—"}</div>
+          <div style={{ flex: "1 1 200px", background: "#fff", borderRadius: 12, border: "1px solid #e6dfd4", padding: "16px 18px" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.04em" }}>{c.kpiSales}</div>
+            <div style={{ fontSize: 28, fontWeight: 750, color: "#1d1b18", marginTop: 6 }}>{data ? fmtInt(totals.attributed_sales_30d) : "—"}</div>
           </div>
-          <div style={{ flex: "1 1 240px", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 18px" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.04em" }}>{c.kpiCommission}</div>
-            <div style={{ fontSize: 28, fontWeight: 750, color: "#111827", marginTop: 6 }}>{data ? fmtEur(totals.commission_paid_by_platform_cents_30d) : "—"}</div>
-            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>{c.kpiCommissionHint}</div>
+          <div style={{ flex: "1 1 240px", background: "#fff", borderRadius: 12, border: "1px solid #e6dfd4", padding: "16px 18px" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.04em" }}>{c.kpiCommission}</div>
+            <div style={{ fontSize: 28, fontWeight: 750, color: "#1d1b18", marginTop: 6 }}>{data ? fmtEur(totals.commission_paid_by_platform_cents_30d) : "—"}</div>
+            <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 4 }}>{c.kpiCommissionHint}</div>
           </div>
         </InlineStack>
 
@@ -97,17 +97,17 @@ export default function AffiliateMarketingPage() {
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ background: "#f6f6f7", textAlign: "left" }}>
+                <tr style={{ background: "#faf7f2", textAlign: "left" }}>
                   {[c.colProduct, c.colSku, c.colClicks, c.colSales].map((h) => (
-                    <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#6d7175", textTransform: "uppercase", borderBottom: "1px solid #e1e3e5" }}>{h}</th>
+                    <th key={h} style={{ padding: "10px 16px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", borderBottom: "1px solid #e6dfd4" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {products.map((p) => (
-                  <tr key={p.id} style={{ borderTop: "1px solid #f1f1f1" }}>
-                    <td style={{ padding: "12px 16px", fontWeight: 600, color: "#111827" }}>{p.title || "—"}</td>
-                    <td style={{ padding: "12px 16px", color: "#6d7175" }}>{p.sku || "—"}</td>
+                  <tr key={p.id} style={{ borderTop: "1px solid #f3eee6" }}>
+                    <td style={{ padding: "12px 16px", fontWeight: 600, color: "#1d1b18" }}>{p.title || "—"}</td>
+                    <td style={{ padding: "12px 16px", color: "#5e574e" }}>{p.sku || "—"}</td>
                     <td style={{ padding: "12px 16px" }}>{fmtInt(p.clicks_30d)}</td>
                     <td style={{ padding: "12px 16px" }}>{fmtInt(p.attributed_sales_30d)}</td>
                   </tr>

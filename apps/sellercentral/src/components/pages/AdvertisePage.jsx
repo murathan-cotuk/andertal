@@ -16,7 +16,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -53,19 +53,19 @@ const PlatformIcon = styled.div`
 const PlatformTitle = styled.h3`
   font-size: 20px;
   font-weight: 600;
-  color: #1f2937;
+  color: #1d1b18;
   margin-bottom: 8px;
 `;
 
 const PlatformDescription = styled.p`
   font-size: 14px;
-  color: #6b7280;
+  color: #5e574e;
   margin-bottom: 16px;
 `;
 
 const ConnectButton = styled.div`
   padding: 8px 16px;
-  background-color: #0ea5e9;
+  background-color: #ee8a12;
   color: white;
   border-radius: 6px;
   font-size: 14px;
@@ -113,10 +113,10 @@ export default function AdvertisePage() {
       <Title>{copy.title}</Title>
 
       <Section>
-        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "16px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18", marginBottom: "16px" }}>
           {copy.heading}
         </h2>
-        <p style={{ color: "#6b7280", marginBottom: "24px" }}>
+        <p style={{ color: "#5e574e", marginBottom: "24px" }}>
           {copy.subtitle}
         </p>
 

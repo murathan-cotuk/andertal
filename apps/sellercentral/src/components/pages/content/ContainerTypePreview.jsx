@@ -9,8 +9,8 @@ const FRAME = {
   width: 112,
   height: 72,
   borderRadius: 6,
-  background: "#f6f6f7",
-  border: "1px solid #e1e3e5",
+  background: "#faf7f2",
+  border: "1px solid #e6dfd4",
   overflow: "hidden",
   position: "relative",
   flexShrink: 0,
@@ -50,7 +50,7 @@ export function ContainerTypePreview({ type, label }) {
         <PreviewShell title={label}>
           <div style={{ ...block({ position: "absolute", inset: 4 }), background: "linear-gradient(135deg,#b8c4ce,#8a9bab)" }} />
           <div style={{ position: "absolute", left: "50%", top: "42%", transform: "translate(-50%,-50%)", width: 48, ...bar({ height: 5, background: "#fff" }) }} />
-          <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translate(-50%,-50%)", width: 28, height: 8, borderRadius: 3, background: "#202223" }} />
+          <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translate(-50%,-50%)", width: 28, height: 8, borderRadius: 3, background: "#1d1b18" }} />
         </PreviewShell>
       );
     case "promo_bento":
@@ -121,7 +121,7 @@ export function ContainerTypePreview({ type, label }) {
             <div style={ink({ width: "95%", height: 3 })} />
             <div style={ink({ width: "88%", height: 3 })} />
             <div style={ink({ width: "60%", height: 3 })} />
-            <div style={{ width: 36, height: 8, borderRadius: 3, background: "#202223", marginTop: 4 }} />
+            <div style={{ width: 36, height: 8, borderRadius: 3, background: "#1d1b18", marginTop: 4 }} />
           </div>
         </PreviewShell>
       );
@@ -134,7 +134,7 @@ export function ContainerTypePreview({ type, label }) {
               <div style={bar({ width: "90%", height: 5 })} />
               <div style={ink({ width: "100%", height: 2 })} />
               <div style={ink({ width: "80%", height: 2 })} />
-              <div style={{ width: 28, height: 7, borderRadius: 2, background: "#202223", marginTop: 2 }} />
+              <div style={{ width: 28, height: 7, borderRadius: 2, background: "#1d1b18", marginTop: 2 }} />
             </div>
           </div>
         </PreviewShell>
@@ -174,7 +174,7 @@ export function ContainerTypePreview({ type, label }) {
       // dashed-slot wireframe above so it reads as "already populated" in the picker.
       return (
         <PreviewShell title={label}>
-          <div style={{ background: "#e5e7eb", height: "100%", boxSizing: "border-box", padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ background: "#e6dfd4", height: "100%", boxSizing: "border-box", padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={bar({ width: "40%", height: 4 })} />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 3, flex: 1 }}>
               {[0, 1, 2, 3].map((i) => (
@@ -301,7 +301,7 @@ export function ContainerTypePreview({ type, label }) {
     case "video_block":
       return (
         <PreviewShell title={label}>
-          <div style={{ ...block({ position: "absolute", inset: 6 }), background: "#6d7175", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ ...block({ position: "absolute", inset: 6 }), background: "#5e574e", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{
               width: 0, height: 0,
               borderTop: "7px solid transparent",
@@ -315,7 +315,7 @@ export function ContainerTypePreview({ type, label }) {
     case "banner_cta":
       return (
         <PreviewShell title={label}>
-          <div style={{ position: "absolute", inset: 8, borderRadius: 4, background: "#202223", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+          <div style={{ position: "absolute", inset: 8, borderRadius: 4, background: "#1d1b18", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
             <div style={{ width: 50, height: 4, background: "#fff", borderRadius: 2 }} />
             <div style={{ width: 32, height: 8, borderRadius: 3, background: "#fff" }} />
           </div>
@@ -346,7 +346,7 @@ export function ContainerTypePreview({ type, label }) {
             {[0, 1, 2].map((i) => (
               <div key={i} style={{ ...block({ height: i === 0 ? 22 : 12, padding: "3px 5px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }) }}>
                 <div style={bar({ width: "55%", height: 3, background: "#8c9196" })} />
-                <div style={{ fontSize: 8, lineHeight: 1, color: "#6d7175" }}>{i === 0 ? "▾" : "▸"}</div>
+                <div style={{ fontSize: 8, lineHeight: 1, color: "#5e574e" }}>{i === 0 ? "▾" : "▸"}</div>
               </div>
             ))}
           </div>
@@ -357,7 +357,7 @@ export function ContainerTypePreview({ type, label }) {
         <PreviewShell title={label}>
           <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 4, height: "100%", boxSizing: "border-box" }}>
             <div style={{ display: "flex", gap: 3 }}>
-              <div style={{ ...bar({ height: 8, width: 28, background: "#202223" }) }} />
+              <div style={{ ...bar({ height: 8, width: 28, background: "#1d1b18" }) }} />
               <div style={{ ...bar({ height: 8, width: 24 }) }} />
               <div style={{ ...bar({ height: 8, width: 22 }) }} />
             </div>
@@ -376,7 +376,7 @@ export function ContainerTypePreview({ type, label }) {
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, justifyContent: "center" }}>
               <div style={bar({ width: "85%", height: 4 })} />
               <div style={ink({ width: "50%", height: 3 })} />
-              <div style={{ width: 30, height: 8, borderRadius: 2, background: "#202223", marginTop: 2 }} />
+              <div style={{ width: 30, height: 8, borderRadius: 2, background: "#1d1b18", marginTop: 2 }} />
             </div>
           </div>
         </PreviewShell>
@@ -388,7 +388,7 @@ export function ContainerTypePreview({ type, label }) {
             <div style={bar({ width: "60%", height: 5 })} />
             <div style={{ display: "flex", gap: 3, width: "90%" }}>
               <div style={{ flex: 1, height: 10, borderRadius: 2, border: "1px solid #c9cccf", background: "#fff" }} />
-              <div style={{ width: 22, height: 10, borderRadius: 2, background: "#202223" }} />
+              <div style={{ width: 22, height: 10, borderRadius: 2, background: "#1d1b18" }} />
             </div>
           </div>
         </PreviewShell>
@@ -432,7 +432,7 @@ export function ContainerTypePreview({ type, label }) {
             <div style={bar({ width: "55%", height: 5 })} />
             <div style={{ height: 12, borderRadius: 3, border: "#fff", border: "1px solid #c9cccf" }} />
             <div style={{ display: "flex", gap: 3 }}>
-              <div style={{ width: 36, height: 8, borderRadius: 2, background: "#202223" }} />
+              <div style={{ width: 36, height: 8, borderRadius: 2, background: "#1d1b18" }} />
               <div style={{ width: 36, height: 8, borderRadius: 2, border: "1px solid #c9cccf" }} />
             </div>
           </div>
@@ -445,10 +445,10 @@ export function ContainerTypePreview({ type, label }) {
             <div style={bar({ width: "40%", height: 4 })} />
             <div style={{ display: "flex", gap: 3, flex: 1 }}>
               {[0, 1, 2].map((i) => (
-                <div key={i} style={{ flex: 1, ...block({}), border: i === 0 ? "1px solid #202223" : "1px solid transparent" }} />
+                <div key={i} style={{ flex: 1, ...block({}), border: i === 0 ? "1px solid #1d1b18" : "1px solid transparent" }} />
               ))}
             </div>
-            <div style={{ alignSelf: "flex-end", width: 28, height: 8, borderRadius: 2, background: "#202223" }} />
+            <div style={{ alignSelf: "flex-end", width: 28, height: 8, borderRadius: 2, background: "#1d1b18" }} />
           </div>
         </PreviewShell>
       );

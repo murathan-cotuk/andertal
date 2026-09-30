@@ -28,29 +28,29 @@ function person(row) {
 }
 
 const TH = {
-  fontSize: 11, fontWeight: 600, color: "#6b7280", textAlign: "left", padding: "8px 10px",
-  borderBottom: "1px solid #e5e7eb", background: "#f9fafb", whiteSpace: "nowrap",
+  fontSize: 11, fontWeight: 600, color: "#5e574e", textAlign: "left", padding: "8px 10px",
+  borderBottom: "1px solid #e6dfd4", background: "#faf7f2", whiteSpace: "nowrap",
 };
-const TD = { fontSize: 12, padding: "7px 10px", borderBottom: "1px solid #f3f4f6", verticalAlign: "top" };
+const TD = { fontSize: 12, padding: "7px 10px", borderBottom: "1px solid #f3eee6", verticalAlign: "top" };
 const TD_NUM = { ...TD, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
 
 function Kpi({ label, value, hint, tone }) {
-  const color = tone === "blue" ? "#1d4ed8" : tone === "amber" ? "#b45309" : "#111827";
+  const color = tone === "blue" ? "#7f3f00" : tone === "amber" ? "#b45309" : "#1d1b18";
   return (
     <div style={{
       flex: "1 1 160px", minWidth: 150, padding: "12px 14px",
-      background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8,
+      background: "#fff", border: "1px solid #e6dfd4", borderRadius: 8,
     }}>
-      <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: 11, color: "#5e574e", fontWeight: 600 }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 700, color, letterSpacing: "-0.02em", marginTop: 2 }}>{value}</div>
-      {hint ? <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{hint}</div> : null}
+      {hint ? <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 2 }}>{hint}</div> : null}
     </div>
   );
 }
 
 function Empty({ children }) {
   return (
-    <div style={{ padding: "40px 16px", textAlign: "center", color: "#9ca3af" }}>
+    <div style={{ padding: "40px 16px", textAlign: "center", color: "#a39a8d" }}>
       <Text as="p" tone="subdued">{children}</Text>
     </div>
   );
@@ -451,8 +451,8 @@ export default function BonusPointsPage() {
                               <tr key={c.id}>
                                 <td style={TD}>{c.customer_number || "—"}</td>
                                 <td style={TD}>
-                                  <Link href={`/customers/${c.id}`} style={{ fontWeight: 600, color: "#1d4ed8", textDecoration: "none" }}>{person(c)}</Link>
-                                  <div style={{ fontSize: 11, color: "#6b7280" }}>{c.email}</div>
+                                  <Link href={`/customers/${c.id}`} style={{ fontWeight: 600, color: "#7f3f00", textDecoration: "none" }}>{person(c)}</Link>
+                                  <div style={{ fontSize: 11, color: "#5e574e" }}>{c.email}</div>
                                 </td>
                                 <td style={TD_NUM}>{c.bonus_points}</td>
                                 <td style={TD_NUM}>{fmtCents(c.balance_eur_cents, locale)}</td>
@@ -534,24 +534,24 @@ export default function BonusPointsPage() {
                                   />
                                 </td>
                                 <td style={TD}>
-                                  <Link href={`/orders/${o.id}`} style={{ fontWeight: 600, color: "#1d4ed8", textDecoration: "none" }}>#{o.order_number}</Link>
-                                  <div style={{ fontSize: 11, color: "#6b7280" }}>{fmtDate(o.created_at, locale)}{o.country ? ` · ${o.country}` : ""}</div>
+                                  <Link href={`/orders/${o.id}`} style={{ fontWeight: 600, color: "#7f3f00", textDecoration: "none" }}>#{o.order_number}</Link>
+                                  <div style={{ fontSize: 11, color: "#5e574e" }}>{fmtDate(o.created_at, locale)}{o.country ? ` · ${o.country}` : ""}</div>
                                 </td>
                                 <td style={TD}>
                                   {o.customer_id ? (
-                                    <Link href={`/customers/${o.customer_id}`} style={{ color: "#111827", textDecoration: "none" }}>{person(o)}</Link>
+                                    <Link href={`/customers/${o.customer_id}`} style={{ color: "#1d1b18", textDecoration: "none" }}>{person(o)}</Link>
                                   ) : person(o)}
-                                  <div style={{ fontSize: 11, color: "#6b7280" }}>{o.email}</div>
+                                  <div style={{ fontSize: 11, color: "#5e574e" }}>{o.email}</div>
                                 </td>
                                 <td style={TD}>
                                   {o.payment_method_label}
                                   {o.checkout_payment_kind === "platform_loyalty" ? (
-                                    <div style={{ fontSize: 11, color: "#1d4ed8" }}>0 € / {lt(locale, "points only", "sadece puan", "points seuls", "solo puntos", "solo punti", "nur Punkte")}</div>
+                                    <div style={{ fontSize: 11, color: "#7f3f00" }}>0 € / {lt(locale, "points only", "sadece puan", "points seuls", "solo puntos", "solo punti", "nur Punkte")}</div>
                                   ) : null}
                                 </td>
                                 <td style={TD_NUM}>{fmtCents(o.order_value_cents, locale)}</td>
                                 <td style={TD_NUM}>{fmtCents(o.customer_paid_cents, locale)}</td>
-                                <td style={{ ...TD_NUM, color: "#1d4ed8", fontWeight: 600 }}>{fmtCents(o.bonus_funding_cents, locale)}</td>
+                                <td style={{ ...TD_NUM, color: "#7f3f00", fontWeight: 600 }}>{fmtCents(o.bonus_funding_cents, locale)}</td>
                                 <td style={TD_NUM}>{o.bonus_points_redeemed}</td>
                                 <td style={TD}>
                                   <InlineStack gap="100">
@@ -601,9 +601,9 @@ export default function BonusPointsPage() {
                                 <td style={TD}>{fmtDate(e.occurred_at, locale)}</td>
                                 <td style={TD}>
                                   {e.customer_id ? (
-                                    <Link href={`/customers/${e.customer_id}`} style={{ color: "#111827", textDecoration: "none" }}>{person(e)}</Link>
+                                    <Link href={`/customers/${e.customer_id}`} style={{ color: "#1d1b18", textDecoration: "none" }}>{person(e)}</Link>
                                   ) : person(e)}
-                                  <div style={{ fontSize: 11, color: "#6b7280" }}>{e.email}</div>
+                                  <div style={{ fontSize: 11, color: "#5e574e" }}>{e.email}</div>
                                 </td>
                                 <td style={TD}>{e.source_label}</td>
                                 <td style={{ ...TD_NUM, color: e.points_delta < 0 ? "#b91c1c" : "#065f46", fontWeight: 600 }}>
@@ -612,7 +612,7 @@ export default function BonusPointsPage() {
                                 <td style={TD_NUM}>{fmtCents(e.eur_cents, locale)}</td>
                                 <td style={TD}>
                                   {e.order_id ? (
-                                    <button type="button" onClick={() => openOrder(e.order_id)} style={{ border: "none", background: "none", color: "#1d4ed8", cursor: "pointer", padding: 0, fontWeight: 600 }}>
+                                    <button type="button" onClick={() => openOrder(e.order_id)} style={{ border: "none", background: "none", color: "#7f3f00", cursor: "pointer", padding: 0, fontWeight: 600 }}>
                                       #{e.order_number || "…"}
                                     </button>
                                   ) : "—"}
@@ -690,7 +690,7 @@ export default function BonusPointsPage() {
                                 [lt(locale, "Points outstanding", "Açık puan", "Points ouverts", "Puntos abiertos", "Punti aperti", "Offene Punkte"), liab?.outstanding_points],
                               ].map(([k, v]) => (
                                 <tr key={k}>
-                                  <td style={{ ...TD, color: "#6b7280", width: "60%" }}>{k}</td>
+                                  <td style={{ ...TD, color: "#5e574e", width: "60%" }}>{k}</td>
                                   <td style={{ ...TD_NUM, fontWeight: 600 }}>{v}</td>
                                 </tr>
                               ))}
@@ -759,7 +759,7 @@ export default function BonusPointsPage() {
                       ["Stripe PI", detail.order.payment_intent_id || "—"],
                     ].map(([k, v]) => (
                       <tr key={k}>
-                        <td style={{ ...TD, color: "#6b7280", width: "40%" }}>{k}</td>
+                        <td style={{ ...TD, color: "#5e574e", width: "40%" }}>{k}</td>
                         <td style={{ ...TD, fontWeight: 600 }}>{v}</td>
                       </tr>
                     ))}
@@ -770,8 +770,8 @@ export default function BonusPointsPage() {
                 <BlockStack gap="150">
                   <Text as="h3" variant="headingSm">Ledger</Text>
                   {detail.ledger.map((e) => (
-                    <div key={e.id} style={{ fontSize: 12, display: "flex", gap: 12, borderBottom: "1px solid #f3f4f6", padding: "6px 0" }}>
-                      <span style={{ color: "#6b7280", minWidth: 90 }}>{fmtDate(e.occurred_at, locale)}</span>
+                    <div key={e.id} style={{ fontSize: 12, display: "flex", gap: 12, borderBottom: "1px solid #f3eee6", padding: "6px 0" }}>
+                      <span style={{ color: "#5e574e", minWidth: 90 }}>{fmtDate(e.occurred_at, locale)}</span>
                       <span style={{ flex: 1 }}>{e.source_label}</span>
                       <span style={{ fontWeight: 700, color: e.points_delta < 0 ? "#b91c1c" : "#065f46" }}>
                         {e.points_delta > 0 ? `+${e.points_delta}` : e.points_delta}

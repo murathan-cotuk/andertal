@@ -351,7 +351,7 @@ export default function VersandPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "#9ca3af" }}>{s.loadingOrders}</div>
+      <div style={{ padding: 40, textAlign: "center", color: "#a39a8d" }}>{s.loadingOrders}</div>
     );
   }
 
@@ -360,8 +360,8 @@ export default function VersandPage() {
       <div style={{ padding: 40, textAlign: "center" }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>📦</div>
         <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>{s.noOrdersToPack}</h2>
-        <p style={{ color: "#6b7280", fontSize: 14 }}>{s.noOrdersHint}</p>
-        <button onClick={() => router.push("/orders")} style={{ marginTop: 16, padding: "9px 20px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
+        <p style={{ color: "#5e574e", fontSize: 14 }}>{s.noOrdersHint}</p>
+        <button onClick={() => router.push("/orders")} style={{ marginTop: 16, padding: "9px 20px", background: "#a65300", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
           {s.backToOrders}
         </button>
       </div>
@@ -386,19 +386,19 @@ export default function VersandPage() {
           </div>
         )}
 
-        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#1e40af" }}>
+        <div style={{ background: "#fcebd5", border: "1px solid #f5d3a8", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#7f3f00" }}>
           {s.labelStepHint}
         </div>
 
         {orders.map((o) => (
-          <div key={o.id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 16 }}>
+          <div key={o.id} style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 12, padding: 20, marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>#{o.order_number || "—"}</div>
-                <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: "#5e574e", marginTop: 4 }}>
                   {[o.first_name, o.last_name].filter(Boolean).join(" ") || (isSuperuser ? o.email : null) || "—"}
                 </div>
-                <div style={{ fontSize: 13, color: "#6b7280" }}>
+                <div style={{ fontSize: 13, color: "#5e574e" }}>
                   {[o.address_line1, [o.postal_code, o.city].filter(Boolean).join(" "), o.country].filter(Boolean).join(", ")}
                 </div>
               </div>
@@ -407,7 +407,7 @@ export default function VersandPage() {
                   {o.tracking_number ? `${s.trackingNumber}: ${o.tracking_number}` : s.labelReady}
                   {o.sendcloud_label_url && (
                     <div>
-                      <a href={o.sendcloud_label_url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb" }}>
+                      <a href={o.sendcloud_label_url} target="_blank" rel="noopener noreferrer" style={{ color: "#a65300" }}>
                         {s.openLabelPdf}
                       </a>
                     </div>
@@ -423,18 +423,18 @@ export default function VersandPage() {
               onClose={() => {}}
             />
 
-            <details style={{ marginTop: 18, borderTop: "1px solid #f3f4f6", paddingTop: 14 }}>
-              <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#6b7280" }}>
+            <details style={{ marginTop: 18, borderTop: "1px solid #f3eee6", paddingTop: 14 }}>
+              <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#5e574e" }}>
                 {s.manualShipToggle}
               </summary>
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>{s.trackingNumber}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e", marginBottom: 4 }}>{s.trackingNumber}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <input
                     value={trackings[o.id] || ""}
                     onChange={(e) => setTrackings((t) => ({ ...t, [o.id]: e.target.value }))}
                     placeholder={s.trackingEnter}
-                    style={{ flex: 1, padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
+                    style={{ flex: 1, padding: "8px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13, boxSizing: "border-box" }}
                   />
                   {(() => {
                     const detectedName = resolveOrderCarrierName(o);
@@ -451,11 +451,11 @@ export default function VersandPage() {
                     value={manualCarrierOverride[o.id] || ""}
                     onChange={(e) => setManualCarrierOverride((m) => ({ ...m, [o.id]: e.target.value }))}
                     placeholder={s.carrierPlaceholder}
-                    style={{ marginTop: 8, padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" }}
+                    style={{ marginTop: 8, padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13, width: "100%", boxSizing: "border-box" }}
                   />
                 )}
               </div>
-              <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>{s.manualShipHint}</p>
+              <p style={{ fontSize: 12, color: "#a39a8d", marginTop: 8 }}>{s.manualShipHint}</p>
             </details>
           </div>
         ))}
@@ -494,28 +494,28 @@ export default function VersandPage() {
     <div style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <button onClick={() => router.push("/orders")} style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>{s.back}</button>
+          <button onClick={() => router.push("/orders")} style={{ background: "none", border: "1px solid #e6dfd4", borderRadius: 7, padding: "6px 14px", fontSize: 13, cursor: "pointer" }}>{s.back}</button>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>{s.packingCenter}</h1>
         </div>
-        <div style={{ fontSize: 13, color: "#6b7280" }}>
+        <div style={{ fontSize: 13, color: "#5e574e" }}>
           {s.orderOf(currentIndex + 1, orders.length)}
         </div>
       </div>
 
-      <div style={{ height: 6, background: "#e5e7eb", borderRadius: 4, marginBottom: 24, overflow: "hidden" }}>
-        <div style={{ height: "100%", background: "#008060", borderRadius: 4, width: `${progress}%`, transition: "width 0.3s" }} />
+      <div style={{ height: 6, background: "#e6dfd4", borderRadius: 4, marginBottom: 24, overflow: "hidden" }}>
+        <div style={{ height: "100%", background: "#ee8a12", borderRadius: 4, width: `${progress}%`, transition: "width 0.3s" }} />
       </div>
 
       {currentOrder && (
         <>
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
+          <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 10, padding: 20, marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>{s.order} #{currentOrder.order_number || "—"}</div>
-                <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: "#5e574e", marginTop: 4 }}>
                   {[currentOrder.first_name, currentOrder.last_name].filter(Boolean).join(" ") || "—"}{isSuperuser && currentOrder.email ? ` · ${currentOrder.email}` : ""}
                 </div>
-                <div style={{ fontSize: 13, color: "#6b7280" }}>
+                <div style={{ fontSize: 13, color: "#5e574e" }}>
                   {[currentOrder.address_line1, currentOrder.city, currentOrder.country].filter(Boolean).join(", ")}
                 </div>
               </div>
@@ -530,7 +530,7 @@ export default function VersandPage() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
                 {s.itemsScanned(orderScannedUnitsTotal(currentOrder.id), orderTotalUnits(items))}
               </div>
               {items.map((it, i) => {
@@ -541,15 +541,15 @@ export default function VersandPage() {
                 return (
                   <div
                     key={key || i}
-                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 8, background: done ? "#f0fdf4" : "#fff", border: `1px solid ${done ? "#86efac" : "#e5e7eb"}`, marginBottom: 8, transition: "all 0.15s" }}
+                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 8, background: done ? "#f0fdf4" : "#fff", border: `1px solid ${done ? "#86efac" : "#e6dfd4"}`, marginBottom: 8, transition: "all 0.15s" }}
                   >
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: done ? "#16a34a" : "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {done ? <span style={{ color: "#fff", fontSize: 14 }}>✓</span> : <span style={{ color: "#9ca3af", fontSize: 14 }}>○</span>}
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: done ? "#16a34a" : "#e6dfd4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {done ? <span style={{ color: "#fff", fontSize: 14 }}>✓</span> : <span style={{ color: "#a39a8d", fontSize: 14 }}>○</span>}
                     </div>
                     {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: "cover" }} />}
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: done ? 600 : 400, color: done ? "#15803d" : "#111827", textDecoration: done ? "line-through" : "none", opacity: done ? 0.7 : 1 }}>{it.title}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                      <div style={{ fontWeight: done ? 600 : 400, color: done ? "#15803d" : "#1d1b18", textDecoration: done ? "line-through" : "none", opacity: done ? 0.7 : 1 }}>{it.title}</div>
+                      <div style={{ fontSize: 12, color: "#5e574e" }}>
                         {s.qty} {cur}/{max}
                         {it.sku ? ` · SKU ${it.sku}` : ""}
                         {it.ean ? ` · EAN ${it.ean}` : ""}
@@ -560,7 +560,7 @@ export default function VersandPage() {
                         type="button"
                         onClick={() => adjustItemQty(it, -1)}
                         disabled={cur <= 0}
-                        style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: cur <= 0 ? "default" : "pointer", color: cur <= 0 ? "#d1d5db" : "#374151", fontSize: 15, lineHeight: 1 }}
+                        style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #e6dfd4", background: "#fff", cursor: cur <= 0 ? "default" : "pointer", color: cur <= 0 ? "#d6ccbd" : "#3a352f", fontSize: 15, lineHeight: 1 }}
                       >
                         −
                       </button>
@@ -569,7 +569,7 @@ export default function VersandPage() {
                         type="button"
                         onClick={() => adjustItemQty(it, 1)}
                         disabled={cur >= max}
-                        style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #e5e7eb", background: cur >= max ? "#fff" : "#111827", cursor: cur >= max ? "default" : "pointer", color: cur >= max ? "#d1d5db" : "#fff", fontSize: 15, lineHeight: 1 }}
+                        style={{ width: 26, height: 26, borderRadius: 6, border: "1px solid #e6dfd4", background: cur >= max ? "#fff" : "#1d1b18", cursor: cur >= max ? "default" : "pointer", color: cur >= max ? "#d6ccbd" : "#fff", fontSize: 15, lineHeight: 1 }}
                       >
                         +
                       </button>
@@ -618,7 +618,7 @@ export default function VersandPage() {
                   placeholder={s.barcodePlaceholder}
                   autoFocus={scannerConfig.auto_focus !== false}
                   autoComplete="off"
-                  style={{ flex: 1, padding: "10px 14px", border: `1px solid ${scanError ? "#ef4444" : "#e5e7eb"}`, borderRadius: 8, fontSize: 14 }}
+                  style={{ flex: 1, padding: "10px 14px", border: `1px solid ${scanError ? "#ef4444" : "#e6dfd4"}`, borderRadius: 8, fontSize: 14 }}
                 />
                 <Button submit variant="primary">
                   {s.add}
@@ -633,7 +633,7 @@ export default function VersandPage() {
                     top: "100%",
                     marginTop: 4,
                     background: "#fff",
-                    border: "1px solid #e5e7eb",
+                    border: "1px solid #e6dfd4",
                     borderRadius: 8,
                     boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
                     zIndex: 20,
@@ -657,14 +657,14 @@ export default function VersandPage() {
                         alignItems: "center",
                         padding: "10px 12px",
                         border: "none",
-                        background: idx === highlightIdx ? "#f3f4f6" : "#fff",
+                        background: idx === highlightIdx ? "#f3eee6" : "#fff",
                         cursor: "pointer",
                         fontSize: 13,
                       }}
                     >
                       {it.thumbnail && <img src={it.thumbnail} alt="" style={{ width: 28, height: 28, borderRadius: 4, objectFit: "cover" }} />}
                       <span style={{ flex: 1, fontWeight: 500 }}>{it.title}</span>
-                      <span style={{ color: "#6b7280", fontSize: 11 }}>
+                      <span style={{ color: "#5e574e", fontSize: 11 }}>
                         {[it.sku && `SKU ${it.sku}`, it.ean && `EAN ${it.ean}`].filter(Boolean).join(" · ")}
                       </span>
                     </button>
@@ -695,7 +695,7 @@ export default function VersandPage() {
             </Button>
           </InlineStack>
           {!allItemsScanned && (
-            <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 8 }}>
+            <p style={{ fontSize: 12, color: "#a39a8d", textAlign: "center", marginTop: 8 }}>
               {s.scanHint}
             </p>
           )}

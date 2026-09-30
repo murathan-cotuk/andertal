@@ -99,7 +99,7 @@ export default function LiveVisitorsPanel({ defaultExpanded = false }) {
         background: "linear-gradient(135deg, #1d1b18 0%, #2a2520 55%, #7a4a14 100%)",
         borderRadius: 14,
         padding: "20px 22px",
-        color: "#f8fafc",
+        color: "#faf7f2",
         boxShadow: "0 8px 32px rgba(15, 23, 42, 0.25)",
         marginBottom: 20,
       }}

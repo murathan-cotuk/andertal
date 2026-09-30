@@ -26,19 +26,19 @@ function LocaleSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "#374151", fontSize: 13, fontWeight: 600 }}
+        style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "#3a352f", fontSize: 13, fontWeight: 600 }}
       >
         {current.label}
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       {open && (
-        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 50, minWidth: 80 }}>
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 50, minWidth: 80 }}>
           {LOCALES.map((l) => (
             <button
               key={l.code}
               type="button"
               onClick={() => { router.replace(pathname, { locale: l.code }); setOpen(false); }}
-              style={{ display: "block", width: "100%", padding: "8px 14px", background: l.code === locale ? "#f3f4f6" : "transparent", border: "none", cursor: "pointer", fontSize: 13, fontWeight: l.code === locale ? 700 : 400, textAlign: "left", color: "#111827" }}
+              style={{ display: "block", width: "100%", padding: "8px 14px", background: l.code === locale ? "#f3eee6" : "transparent", border: "none", cursor: "pointer", fontSize: 13, fontWeight: l.code === locale ? 700 : 400, textAlign: "left", color: "#1d1b18" }}
             >
               {l.label}
             </button>
@@ -203,30 +203,30 @@ function LoginForm() {
           {!totpRequired ? (
             <>
               <div style={{ textAlign: "center", marginBottom: 32 }}>
-                <h1 style={{ fontSize: 28, fontWeight: 700, color: "#111827", margin: "0 0 6px" }}>{t("title")}</h1>
-                <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>{t("subtitle")}</p>
+                <h1 style={{ fontSize: 28, fontWeight: 700, color: "#1d1b18", margin: "0 0 6px" }}>{t("title")}</h1>
+                <p style={{ color: "#5e574e", fontSize: 15, margin: 0 }}>{t("subtitle")}</p>
               </div>
               <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("email")}</label>
+                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("email")}</label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #d6ccbd", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }}
                     placeholder={t("emailPlaceholder")}
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("password")}</label>
+                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("password")}</label>
                   <div style={{ position: "relative" }}>
                     <input
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      style={{ width: "100%", padding: "10px 44px 10px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }}
+                      style={{ width: "100%", padding: "10px 44px 10px 14px", border: "1.5px solid #d6ccbd", borderRadius: 8, fontSize: 15, outline: "none", boxSizing: "border-box" }}
                       placeholder={t("passwordPlaceholder")}
                     />
                     <button
@@ -235,7 +235,7 @@ function LoginForm() {
                         e.preventDefault();
                         setShowPassword((v) => !v);
                       }}
-                      style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#6b7280", padding: 0, display: "flex", alignItems: "center", zIndex: 2, touchAction: "manipulation" }}
+                      style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#5e574e", padding: 0, display: "flex", alignItems: "center", zIndex: 2, touchAction: "manipulation" }}
                       tabIndex={-1}
                     >
                       {showPassword ? (
@@ -254,24 +254,24 @@ function LoginForm() {
                 <button
                   type="submit"
                   disabled={loading}
-                  style={{ padding: "12px", background: loading ? "#9ca3af" : "#1d1b18", color: "#fff", border: "none", borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}
+                  style={{ padding: "12px", background: loading ? "#a39a8d" : "#1d1b18", color: "#fff", border: "none", borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}
                 >
                   {loading ? t("submitting") : t("submit")}
                 </button>
               </form>
-              <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#6b7280" }}>
-                <Link href="/register" style={{ color: "#1f2937", fontWeight: 600, textDecoration: "none" }}>{t("noAccount")}</Link>
+              <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#5e574e" }}>
+                <Link href="/register" style={{ color: "#1d1b18", fontWeight: 600, textDecoration: "none" }}>{t("noAccount")}</Link>
               </p>
             </>
           ) : (
             <>
               <div style={{ textAlign: "center", marginBottom: 24 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>{t("twoFactorTitle")}</h1>
-                <p style={{ color: "#6b7280", fontSize: 14, margin: 0, lineHeight: 1.5 }}>{t("twoFactorSubtitle")}</p>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1d1b18", margin: "0 0 8px" }}>{t("twoFactorTitle")}</h1>
+                <p style={{ color: "#5e574e", fontSize: 14, margin: 0, lineHeight: 1.5 }}>{t("twoFactorSubtitle")}</p>
               </div>
               <form onSubmit={handleTotpSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#374151", marginBottom: 6 }}>{t("totpCode")}</label>
+                  <label style={{ display: "block", fontSize: 14, fontWeight: 500, color: "#3a352f", marginBottom: 6 }}>{t("totpCode")}</label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -282,10 +282,10 @@ function LoginForm() {
                     autoFocus
                     maxLength={6}
                     aria-label={t("totpCode")}
-                    style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #d1d5db", borderRadius: 8, fontSize: 22, fontWeight: 700, textAlign: "center", letterSpacing: "0.25em", outline: "none", boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "12px 14px", border: "1.5px solid #d6ccbd", borderRadius: 8, fontSize: 22, fontWeight: 700, textAlign: "center", letterSpacing: "0.25em", outline: "none", boxSizing: "border-box" }}
                     placeholder="000000"
                   />
-                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "#9ca3af", textAlign: "center" }}>
+                  <p style={{ margin: "8px 0 0", fontSize: 12, color: "#a39a8d", textAlign: "center" }}>
                     {email}
                   </p>
                 </div>
@@ -297,14 +297,14 @@ function LoginForm() {
                 <button
                   type="submit"
                   disabled={loading || totpCode.length !== 6}
-                  style={{ padding: "12px", background: loading || totpCode.length !== 6 ? "#9ca3af" : "#1d1b18", color: "#fff", border: "none", borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: loading || totpCode.length !== 6 ? "not-allowed" : "pointer" }}
+                  style={{ padding: "12px", background: loading || totpCode.length !== 6 ? "#a39a8d" : "#1d1b18", color: "#fff", border: "none", borderRadius: 999, fontSize: 15, fontWeight: 700, cursor: loading || totpCode.length !== 6 ? "not-allowed" : "pointer" }}
                 >
                   {loading ? t("totpVerifying") : t("totpConfirm")}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setTotpRequired(false); setTotpCode(""); setError(""); }}
-                  style={{ background: "none", border: "none", color: "#6b7280", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}
+                  style={{ background: "none", border: "none", color: "#5e574e", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}
                 >
                   {t("totpBack")}
                 </button>

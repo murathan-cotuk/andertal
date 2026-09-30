@@ -126,7 +126,7 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, canVerify, onVerify, canRe
           </div>
         )}
         <InlineStack gap="200" blockAlign="center" wrap={false}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", border: "1px solid #e5e7eb", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", background: "var(--p-color-bg-fill-secondary)", border: "1px solid #e6dfd4", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
             {logoSrc ? (
               <img src={logoSrc} alt={brand.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
@@ -168,7 +168,7 @@ function BrandCard({ brand, baseUrl, onEdit, canEdit, canVerify, onVerify, canRe
 function ReviewField({ label, children }) {
   if (children == null || children === "" || children === false) return null;
   return (
-    <div style={{ padding: "10px 0", borderBottom: "1px solid #e5e7eb" }}>
+    <div style={{ padding: "10px 0", borderBottom: "1px solid #e6dfd4" }}>
       <Text as="p" variant="bodySm" tone="subdued">{label}</Text>
       <div style={{ marginTop: 4 }}>{typeof children === "string" ? <Text as="p" variant="bodyMd">{children}</Text> : children}</div>
     </div>
@@ -847,11 +847,11 @@ export default function BrandPage() {
             <InlineStack gap="300" blockAlign="center">
               {formData.logo_image ? (
                 <div>
-                  <img src={resolveUrl(formData.logo_image)} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: "50%", border: "1px solid #e5e7eb", display: "block", marginBottom: 4 }} />
+                  <img src={resolveUrl(formData.logo_image)} alt="" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: "50%", border: "1px solid #e6dfd4", display: "block", marginBottom: 4 }} />
                   <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, logo_image: "" }))}>{copy.remove}</Button>
                 </div>
               ) : (
-                <div style={{ width: 64, height: 64, borderRadius: "50%", border: "2px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#9ca3af", fontSize: 20 }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", border: "2px dashed #d6ccbd", display: "flex", alignItems: "center", justifyContent: "center", background: "#faf7f2", color: "#a39a8d", fontSize: 20 }}>
                   +
                 </div>
               )}
@@ -865,11 +865,11 @@ export default function BrandPage() {
             <InlineStack gap="300" blockAlign="center">
               {formData.banner_image ? (
                 <div>
-                  <img src={resolveUrl(formData.banner_image)} alt="" style={{ width: 160, height: 50, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb", display: "block", marginBottom: 4 }} />
+                  <img src={resolveUrl(formData.banner_image)} alt="" style={{ width: 160, height: 50, objectFit: "cover", borderRadius: 6, border: "1px solid #e6dfd4", display: "block", marginBottom: 4 }} />
                   <Button size="slim" variant="plain" tone="critical" onClick={() => setFormData((p) => ({ ...p, banner_image: "" }))}>{copy.remove}</Button>
                 </div>
               ) : (
-                <div style={{ width: 160, height: 50, borderRadius: 6, border: "2px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", background: "#f9fafb", color: "#9ca3af", fontSize: 11 }}>
+                <div style={{ width: 160, height: 50, borderRadius: 6, border: "2px dashed #d6ccbd", display: "flex", alignItems: "center", justifyContent: "center", background: "#faf7f2", color: "#a39a8d", fontSize: 11 }}>
                   Banner (21:6)
                 </div>
               )}

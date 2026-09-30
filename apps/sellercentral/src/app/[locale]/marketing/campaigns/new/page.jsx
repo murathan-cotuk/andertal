@@ -74,7 +74,7 @@ export default function MarketingCampaignNewRoute() {
                 <>
                   <Spinner accessibilityLabel={t("Creating", "Oluşturuluyor", "Création", "Creando", "Creazione", "Anlegen")} size="large" />
                   <BlockStack gap="100">
-                    <span style={{ fontSize: 14, color: "#6d7175" }}>{t("Creating campaign…", "Kampanya oluşturuluyor…", "Création de la campagne…", "Creando campaña…", "Creazione campagna…", "Kampagne wird angelegt …")}</span>
+                    <span style={{ fontSize: 14, color: "#5e574e" }}>{t("Creating campaign…", "Kampanya oluşturuluyor…", "Création de la campagne…", "Creando campaña…", "Creazione campagna…", "Kampagne wird angelegt …")}</span>
                   </BlockStack>
                 </>
               )}

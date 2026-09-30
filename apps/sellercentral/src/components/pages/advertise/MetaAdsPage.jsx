@@ -15,7 +15,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -36,10 +36,10 @@ export default function MetaAdsPage() {
       <Section>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
           <div>
-            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1f2937", marginBottom: "8px" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#1d1b18", marginBottom: "8px" }}>
               {copy.account}
             </h2>
-            <p style={{ color: "#6b7280" }}>
+            <p style={{ color: "#5e574e" }}>
               {isConnected ? copy.connected : copy.connectText}
             </p>
           </div>

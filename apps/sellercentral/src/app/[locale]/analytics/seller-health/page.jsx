@@ -131,7 +131,7 @@ function statusMeta(locale, status) {
     case "poor": return { label: t("Poor", "Kötü", "Faible", "Deficiente", "Scarso", "Schlecht"), tone: "critical", color: "#dc2626" };
     case "risky": return { label: t("Risky", "Riskli", "Risqué", "Riesgo", "Rischioso", "Riskant"), tone: "critical", color: "#b91c1c" };
     case "blocked": return { label: t("Blocked", "Bloke", "Bloqué", "Bloqueado", "Bloccato", "Gesperrt"), tone: "critical", color: "#991b1b" };
-    default: return { label: t("Insufficient data", "Yetersiz veri", "Données insuffisantes", "Datos insuficientes", "Dati insufficienti", "Unzureichende Daten"), tone: "info", color: "#6b7280" };
+    default: return { label: t("Insufficient data", "Yetersiz veri", "Données insuffisantes", "Datos insuficientes", "Dati insufficienti", "Unzureichende Daten"), tone: "info", color: "#5e574e" };
   }
 }
 
@@ -197,7 +197,7 @@ function issueLabel(locale, issue) {
 }
 
 const SH_CSS = `
-.sh-page { font-size: 12px; color: #111827; }
+.sh-page { font-size: 12px; color: #1d1b18; }
 .sh-page .Polaris-Header-Title { font-size: 18px !important; line-height: 1.25 !important; }
 .sh-hero { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 .sh-ring { position: relative; width: 128px; height: 128px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
@@ -209,14 +209,14 @@ const SH_CSS = `
 .sh-cat-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sh-cat-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px; }
 .sh-cat-card-link { font-size: 11px; font-weight: 600; color: #1b8880; flex: 0 0 auto; }
-.sh-crit-row { padding: 10px 14px; border-top: 1px solid #f3f4f6; }
+.sh-crit-row { padding: 10px 14px; border-top: 1px solid #f3eee6; }
 .sh-crit-row:first-child { border-top: none; }
-.sh-issue-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-top: 1px solid #f3f4f6; }
+.sh-issue-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-top: 1px solid #f3eee6; }
 .sh-issue-row:first-child { border-top: none; }
 .sh-hist-bars { display: flex; align-items: flex-end; gap: 2px; height: 90px; }
 .sh-hist-bar { flex: 1 1 auto; border-radius: 2px 2px 0 0; min-width: 2px; }
-.sh-table th, .sh-table td { font-size: 11px; padding: 6px 8px; border-bottom: 1px solid #f3f4f6; text-align: left; }
-.sh-table th { color: #667085; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.02em; background: #fafafa; }
+.sh-table th, .sh-table td { font-size: 11px; padding: 6px 8px; border-bottom: 1px solid #f3eee6; text-align: left; }
+.sh-table th { color: #667085; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.02em; background: #faf7f2; }
 .sh-chip { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 999px; background: #f2f4f7; color: #667085; font-weight: 600; }
 `;
 
@@ -461,7 +461,7 @@ function HistoryChart({ sellerId, copy, locale }) {
           <div className="sh-hist-bars">
             {history.map((h, i) => {
               const heightPct = h.score != null ? Math.max(4, (h.score / max) * 100) : 4;
-              const color = h.isBlocked ? "#991b1b" : h.score == null ? "#e5e7eb" : scoreColor(h.score);
+              const color = h.isBlocked ? "#991b1b" : h.score == null ? "#e6dfd4" : scoreColor(h.score);
               return (
                 <div
                   key={h.date || i}

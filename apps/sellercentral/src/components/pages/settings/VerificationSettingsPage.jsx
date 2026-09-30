@@ -613,7 +613,7 @@ function DocUploadRow({ label, hint, docType, doc, onUpload, uploading, t }) {
               </InlineStack>
             ) : (
               <InlineStack gap="150" blockAlign="center">
-                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#9ca3af", flexShrink: 0 }} />
+                <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#a39a8d", flexShrink: 0 }} />
                 <Text as="span" variant="bodySm" tone="subdued">{t.notUploaded}</Text>
               </InlineStack>
             )}
@@ -1072,7 +1072,7 @@ export default function VerificationSettingsPage() {
                         background: "none",
                         border: "none",
                         padding: 0,
-                        color: "#2563eb",
+                        color: "#a65300",
                         textDecoration: "underline",
                         cursor: "pointer",
                         fontSize: "inherit",
@@ -1090,7 +1090,7 @@ export default function VerificationSettingsPage() {
 
               {/* QR code signing section */}
               {agreementAccepted && !signed && (
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 16, marginTop: 4 }}>
+                <div style={{ borderTop: "1px solid #e6dfd4", paddingTop: 16, marginTop: 4 }}>
                   {qrLoading ? (
                     <InlineStack gap="200" blockAlign="center">
                       <Spinner size="small" />
@@ -1104,7 +1104,7 @@ export default function VerificationSettingsPage() {
                         {t.qrScanPrompt}
                       </Text>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-                        <img src={qrDataUrl} alt="QR Code" style={{ width: 180, height: 180, border: "1px solid #e5e7eb", borderRadius: 8 }} />
+                        <img src={qrDataUrl} alt="QR Code" style={{ width: 180, height: 180, border: "1px solid #e6dfd4", borderRadius: 8 }} />
                         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 8 }}>
                           <Spinner size="small" />
                           <Text as="p" variant="bodySm" tone="subdued">
@@ -1119,7 +1119,7 @@ export default function VerificationSettingsPage() {
 
               {/* Signed + PDF section */}
               {signed && (
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: 16, marginTop: 4 }}>
+                <div style={{ borderTop: "1px solid #e6dfd4", paddingTop: 16, marginTop: 4 }}>
                   <BlockStack gap="200">
                     <InlineStack gap="200" blockAlign="center">
                       <span style={{ color: "#10b981", fontSize: 18 }}>✓</span>
@@ -1215,7 +1215,7 @@ export default function VerificationSettingsPage() {
                       padding: "0 8px",
                       fontSize: 14,
                       background: "#fff",
-                      color: "#202223",
+                      color: "#1d1b18",
                       cursor: "pointer",
                       flexShrink: 0,
                       minWidth: 88,

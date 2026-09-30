@@ -15,7 +15,7 @@ const Title = styled.h1`
   font-size: 32px;
   font-weight: 700;
   margin-bottom: 32px;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const Section = styled(Card)`
@@ -74,7 +74,7 @@ export default function ReportsPage() {
             disabled={exporting !== ""}
             style={{
               padding: "12px 20px",
-              backgroundColor: "#0ea5e9",
+              backgroundColor: "#ee8a12",
               color: "#fff",
               border: "none",
               borderRadius: 8,
@@ -90,8 +90,8 @@ export default function ReportsPage() {
             style={{
               padding: "12px 20px",
               backgroundColor: "#fff",
-              color: "#0ea5e9",
-              border: "2px solid #0ea5e9",
+              color: "#ee8a12",
+              border: "2px solid #ee8a12",
               borderRadius: 8,
               cursor: "pointer",
               fontWeight: 600,

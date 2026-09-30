@@ -24,8 +24,8 @@ function CardDisplay({ brand, last4, expMonth, expYear, lt }) {
       display: "inline-flex",
       alignItems: "center",
       gap: 12,
-      background: "#f9fafb",
-      border: "1px solid #e5e7eb",
+      background: "#faf7f2",
+      border: "1px solid #e6dfd4",
       borderRadius: 10,
       padding: "12px 16px",
       minWidth: 220,
@@ -110,9 +110,9 @@ export default function SellerCreditCardSection({ title, subtitle, compact = fal
       style: {
         base: {
           fontSize: "14px",
-          color: "#202223",
+          color: "#1d1b18",
           fontFamily: "inherit",
-          "::placeholder": { color: "#6d7175" },
+          "::placeholder": { color: "#5e574e" },
         },
         invalid: { color: "#d72c0d" },
       },

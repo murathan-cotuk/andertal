@@ -56,13 +56,13 @@ function KpiCard({ label, value, sub, accent }) {
         padding: "18px 20px",
       }}
     >
-      <p style={{ margin: 0, fontSize: 12, color: "#64748b", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+      <p style={{ margin: 0, fontSize: 12, color: "#5e574e", fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
         {label}
       </p>
-      <p style={{ margin: "8px 0 0", fontSize: 26, fontWeight: 750, color: accent || "#0f172a", lineHeight: 1.1, fontFamily: "system-ui, sans-serif" }}>
+      <p style={{ margin: "8px 0 0", fontSize: 26, fontWeight: 750, color: accent || "#1d1b18", lineHeight: 1.1, fontFamily: "system-ui, sans-serif" }}>
         {value}
       </p>
-      {sub && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#94a3b8" }}>{sub}</p>}
+      {sub && <p style={{ margin: "4px 0 0", fontSize: 12, color: "#a39a8d" }}>{sub}</p>}
     </div>
   );
 }
@@ -74,7 +74,7 @@ function MiniBar({ value, max }) {
       <div style={{ flex: 1, height: 6, borderRadius: 999, background: "#f1f5f9", overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #6366f1, #818cf8)", transition: "width 0.4s" }} />
       </div>
-      <span style={{ fontSize: 12, color: "#64748b", minWidth: 36, textAlign: "right" }}>{fmt(value)}</span>
+      <span style={{ fontSize: 12, color: "#5e574e", minWidth: 36, textAlign: "right" }}>{fmt(value)}</span>
     </div>
   );
 }
@@ -105,27 +105,27 @@ function CampaignRow({ row, maxClicks, maxOrders, locale }) {
       }}
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {row.name}
         </div>
         <div style={{ marginTop: 3 }}>
           <Badge tone={AD_STATUS_TONE[adStatus] || "info"}>{AD_STATUS_LABEL[adStatus] || adStatus}</Badge>
         </div>
       </div>
-      <div style={{ fontSize: 13, color: "#475569" }}>{fmtEur(row.spend_cents)}</div>
+      <div style={{ fontSize: 13, color: "#3a352f" }}>{fmtEur(row.spend_cents)}</div>
       <div>
         <MiniBar value={row.impressions || 0} max={row.impressions || 0} />
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(row.impressions)} {impressionsLabel}</span>
+        <span style={{ fontSize: 11, color: "#a39a8d" }}>{fmt(row.impressions)} {impressionsLabel}</span>
       </div>
       <div>
         <MiniBar value={row.clicks || 0} max={maxClicks} />
-        {ctr != null && <span style={{ fontSize: 11, color: "#94a3b8" }}>CTR {ctr} %</span>}
+        {ctr != null && <span style={{ fontSize: 11, color: "#a39a8d" }}>CTR {ctr} %</span>}
       </div>
       <div>
         <MiniBar value={row.orders || 0} max={maxOrders} />
-        <span style={{ fontSize: 11, color: "#94a3b8" }}>{fmt(row.orders)} {ordersLabel}</span>
+        <span style={{ fontSize: 11, color: "#a39a8d" }}>{fmt(row.orders)} {ordersLabel}</span>
       </div>
-      <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 600 }}>{fmtEur(row.revenue_cents)}</div>
+      <div style={{ fontSize: 13, color: "#1d1b18", fontWeight: 600 }}>{fmtEur(row.revenue_cents)}</div>
       <div>
         {acos != null ? (
           <span
@@ -142,9 +142,9 @@ function CampaignRow({ row, maxClicks, maxOrders, locale }) {
             {acos} % ACoS
           </span>
         ) : (
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>—</span>
+          <span style={{ fontSize: 12, color: "#a39a8d" }}>—</span>
         )}
-        {roas != null && <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>ROAS {roas}×</div>}
+        {roas != null && <div style={{ fontSize: 11, color: "#5e574e", marginTop: 3 }}>ROAS {roas}×</div>}
       </div>
     </div>
   );
@@ -310,7 +310,7 @@ export default function MarketingAttributionPage() {
           <Card>
             <div style={{ padding: 48, textAlign: "center" }}>
               <Spinner size="large" accessibilityLabel={ui.loading} />
-              <p style={{ marginTop: 16, color: "#64748b", fontSize: 14 }}>{locale === "de" ? "Attributionsdaten werden geladen …" : locale === "tr" ? "Atıf verileri yükleniyor…" : locale === "fr" ? "Chargement des données d'attribution…" : locale === "es" ? "Cargando datos de atribución…" : locale === "it" ? "Caricamento dati di attribuzione…" : "Loading attribution data…"}</p>
+              <p style={{ marginTop: 16, color: "#5e574e", fontSize: 14 }}>{locale === "de" ? "Attributionsdaten werden geladen …" : locale === "tr" ? "Atıf verileri yükleniyor…" : locale === "fr" ? "Chargement des données d'attribution…" : locale === "es" ? "Cargando datos de atribución…" : locale === "it" ? "Caricamento dati di attribuzione…" : "Loading attribution data…"}</p>
             </div>
           </Card>
         ) : (
@@ -327,7 +327,7 @@ export default function MarketingAttributionPage() {
               <KpiCard label={locale === "de" ? "Einblendungen" : locale === "tr" ? "Gösterimler" : locale === "fr" ? "Impressions" : locale === "es" ? "Impresiones" : locale === "it" ? "Impressioni" : "Impressions"} value={hasRealData ? fmt(totals.impressions) : "—"} />
               <KpiCard label={locale === "de" ? "Klicks" : locale === "tr" ? "Tıklamalar" : locale === "fr" ? "Clics" : locale === "es" ? "Clics" : locale === "it" ? "Clic" : "Clicks"} value={hasRealData ? fmt(totals.clicks) : "—"} sub={totalCtr ? `CTR ${totalCtr} %` : undefined} />
               <KpiCard label={locale === "de" ? "Bestellungen" : locale === "tr" ? "Siparişler" : locale === "fr" ? "Commandes" : locale === "es" ? "Pedidos" : locale === "it" ? "Ordini" : "Orders"} value={hasRealData ? fmt(totals.orders) : "—"} />
-              <KpiCard label={locale === "de" ? "Umsatz" : locale === "tr" ? "Gelir" : locale === "fr" ? "Chiffre d'affaires" : locale === "es" ? "Ingresos" : locale === "it" ? "Fatturato" : "Revenue"} value={hasRealData ? fmtEur(totals.revenue) : "—"} accent="#0ea5e9" />
+              <KpiCard label={locale === "de" ? "Umsatz" : locale === "tr" ? "Gelir" : locale === "fr" ? "Chiffre d'affaires" : locale === "es" ? "Ingresos" : locale === "it" ? "Fatturato" : "Revenue"} value={hasRealData ? fmtEur(totals.revenue) : "—"} accent="#ee8a12" />
               <KpiCard
                 label="ACoS"
                 value={hasRealData && totalAcos ? `${totalAcos} %` : "—"}
@@ -337,7 +337,7 @@ export default function MarketingAttributionPage() {
             </div>
 
             {/* Attribution Model Info */}
-            <div style={{ padding: "10px 16px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 13, color: "#475569" }}>
+            <div style={{ padding: "10px 16px", borderRadius: 12, background: "#faf7f2", border: "1px solid #e6dfd4", fontSize: 13, color: "#3a352f" }}>
               <strong>{locale === "de" ? "Modell" : locale === "tr" ? "Model" : locale === "fr" ? "Modèle" : locale === "es" ? "Modelo" : locale === "it" ? "Modello" : "Model"}:</strong>{" "}
               {model === "last_click" && (locale === "de" ? "Letzter Klick — der letzte Klick vor dem Kauf erhält 100 % der Attribution." : locale === "tr" ? "Son Tıklama — satın almadan önceki son tıklama %100 atıf alır." : locale === "fr" ? "Dernier clic — le dernier clic avant l'achat reçoit 100 % de l'attribution." : locale === "es" ? "Último clic — el último clic antes de la compra recibe el 100 % de la atribución." : locale === "it" ? "Ultimo clic — l'ultimo clic prima dell'acquisto riceve il 100 % dell'attribuzione." : "Last click — the last click before purchase receives 100 % of attribution.")}
               {model === "first_click" && (locale === "de" ? "Erster Klick — der erste Klick einer Session erhält 100 % der Attribution." : locale === "tr" ? "İlk Tıklama — bir oturumun ilk tıklaması %100 atıf alır." : locale === "fr" ? "Premier clic — le premier clic d'une session reçoit 100 % de l'attribution." : locale === "es" ? "Primer clic — el primer clic de una sesión recibe el 100 % de la atribución." : locale === "it" ? "Primo clic — il primo clic di una sessione riceve il 100 % dell'attribuzione." : "First click — the first click of a session receives 100 % of attribution.")}
@@ -354,13 +354,13 @@ export default function MarketingAttributionPage() {
                     gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1fr 1fr",
                     gap: 12,
                     padding: "10px 16px",
-                    borderBottom: "1px solid #e2e8f0",
-                    background: "#f8fafc",
+                    borderBottom: "1px solid #e6dfd4",
+                    background: "#faf7f2",
                     borderRadius: "12px 12px 0 0",
                   }}
                 >
                   {tableHeaders.map((h) => (
-                    <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    <span key={h} style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                       {h}
                     </span>
                   ))}
@@ -380,7 +380,7 @@ export default function MarketingAttributionPage() {
             )}
 
             {/* Attribution Window Info */}
-            <div style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#fff", fontSize: 12, color: "#94a3b8" }}>
+            <div style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #e6dfd4", background: "#fff", fontSize: 12, color: "#a39a8d" }}>
               {locale === "de" ? "Attributionsfenster: 7 Tage nach Klick · 1 Tag nach Einblendung." : locale === "tr" ? "Atıf penceresi: tıklamadan sonra 7 gün · gösterimden sonra 1 gün." : locale === "fr" ? "Fenêtre d'attribution : 7 jours après le clic · 1 jour après l'impression." : locale === "es" ? "Ventana de atribución: 7 días tras el clic · 1 día tras la impresión." : locale === "it" ? "Finestra di attribuzione: 7 giorni dopo il clic · 1 giorno dopo l'impressione." : "Attribution window: 7 days after click · 1 day after impression."}
               {isSuperuser && (" " + (locale === "de" ? "Superuser sieht alle Verkäufer-Kampagnen zusammen." : locale === "tr" ? "Süper kullanıcı tüm satıcı kampanyalarını birlikte görür." : locale === "fr" ? "Le superutilisateur voit toutes les campagnes vendeur ensemble." : locale === "es" ? "El superusuario ve todas las campañas de vendedores juntas." : locale === "it" ? "Il superutente vede tutte le campagne dei venditori insieme." : "Superuser sees all seller campaigns together."))}
             </div>

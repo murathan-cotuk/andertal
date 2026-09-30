@@ -150,14 +150,14 @@ export default function CustomerNewsletterSubscriberDetailPage() {
                   </InlineStack>
                   <InlineStack gap="300" wrap={false}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", marginBottom: 6, fontSize: 12, color: "#6b7280" }}>{copy.status}</label>
-                      <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}>
+                      <label style={{ display: "block", marginBottom: 6, fontSize: 12, color: "#5e574e" }}>{copy.status}</label>
+                      <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #d6ccbd" }}>
                         {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", marginBottom: 6, fontSize: 12, color: "#6b7280" }}>{copy.preferredLocale}</label>
-                      <select value={form.preferred_locale || ""} onChange={(e) => setForm((p) => ({ ...p, preferred_locale: e.target.value }))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #d1d5db" }}>
+                      <label style={{ display: "block", marginBottom: 6, fontSize: 12, color: "#5e574e" }}>{copy.preferredLocale}</label>
+                      <select value={form.preferred_locale || ""} onChange={(e) => setForm((p) => ({ ...p, preferred_locale: e.target.value }))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid #d6ccbd" }}>
                         <option value="">—</option>
                         {LOCALE_OPTIONS.map((s) => <option key={s} value={s}>{s.toUpperCase()}</option>)}
                       </select>
@@ -184,15 +184,15 @@ export default function CustomerNewsletterSubscriberDetailPage() {
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                      <tr style={{ background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }}>
                         {[copy.colSubject, copy.colProvider, copy.colStatus, copy.colTrigger, copy.colSentAt].map((h) => (
-                          <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase", color: "#6b7280" }}>{h}</th>
+                          <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, textTransform: "uppercase", color: "#5e574e" }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {emails.map((m) => (
-                        <tr key={m.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <tr key={m.id} style={{ borderBottom: "1px solid #f3eee6" }}>
                           <td style={{ padding: "10px 12px" }}>{m.subject || "—"}</td>
                           <td style={{ padding: "10px 12px" }}>{m.provider || "—"}</td>
                           <td style={{ padding: "10px 12px" }}>{m.delivery_status || "—"}</td>

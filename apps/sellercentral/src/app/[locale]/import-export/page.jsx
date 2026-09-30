@@ -107,10 +107,10 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
               display: "flex",
               alignItems: "stretch",
               gap: 0,
-              borderBottom: "1px solid #f3f4f6",
+              borderBottom: "1px solid #f3eee6",
               minHeight: 44,
               cursor: hasKids ? "pointer" : "default",
-              background: isOpen ? "#f8fafc" : "#fff",
+              background: isOpen ? "#faf7f2" : "#fff",
               marginLeft: depth * 18,
             }}
           >
@@ -127,7 +127,7 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
                 <div
                   style={{
                     fontSize: depth > 0 ? 12 : 13,
-                    color: depth > 0 ? "#374151" : "#111827",
+                    color: depth > 0 ? "#3a352f" : "#1d1b18",
                     fontWeight: depth > 0 ? 500 : 600,
                     lineHeight: 1.3,
                     paddingLeft: depth > 0 ? 4 : 0,
@@ -146,9 +146,9 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
                   width: 58,
                   minHeight: 44,
                   padding: 0,
-                  background: "#f8fafc",
-                  borderLeft: "1px solid #e5e7eb",
-                  color: "#374151",
+                  background: "#faf7f2",
+                  borderLeft: "1px solid #e6dfd4",
+                  color: "#3a352f",
                   fontSize: 22,
                   fontWeight: 700,
                   display: "flex",
@@ -171,9 +171,9 @@ function CategoryMultiDrilldown({ tree, selectedSlugs, onToggle, onToggleSubtree
 
   return (
     <div>
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
+      <div style={{ border: "1px solid #e6dfd4", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
         {!Array.isArray(tree) || tree.length === 0 ? (
-          <div style={{ padding: "16px 12px", fontSize: 13, color: "#9ca3af" }}>{t.noSubcategories}</div>
+          <div style={{ padding: "16px 12px", fontSize: 13, color: "#a39a8d" }}>{t.noSubcategories}</div>
         ) : (
           renderNodes(tree, 0)
         )}
@@ -188,7 +188,7 @@ function SectionCard({ icon, title, subtitle, children }) {
     <Card>
       <BlockStack gap="400">
         <InlineStack gap="300" blockAlign="center">
-          <div style={{ color: "#2563eb", fontSize: 22 }}>{icon}</div>
+          <div style={{ color: "#a65300", fontSize: 22 }}>{icon}</div>
           <BlockStack gap="050">
             <Text as="h2" variant="headingMd">{title}</Text>
             <Text as="p" variant="bodySm" tone="subdued">{subtitle}</Text>
@@ -226,10 +226,10 @@ function DropZone({ onFile, accept, label, hint }) {
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
       style={{
-        border: `2px dashed ${drag ? "#2563eb" : "#d1d5db"}`,
+        border: `2px dashed ${drag ? "#a65300" : "#d6ccbd"}`,
         borderRadius: 10,
         padding: "28px 24px",
-        background: drag ? "#eff6ff" : "#fafafa",
+        background: drag ? "#fcebd5" : "#faf7f2",
         cursor: "pointer",
         textAlign: "center",
         transition: "all .15s",
@@ -602,8 +602,8 @@ export default function ImportExportPage() {
                         t={t}
                       />
                     </div>
-                    <div style={{ flex: 1, minWidth: 260, border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
-                      <div style={{ padding: "10px 12px", borderBottom: "1px solid #f1f2f4", background: "#fafafa" }}>
+                    <div style={{ flex: 1, minWidth: 260, border: "1px solid #e6dfd4", borderRadius: 10, background: "#fff", maxHeight: 460, overflowY: "auto" }}>
+                      <div style={{ padding: "10px 12px", borderBottom: "1px solid #f1f2f4", background: "#faf7f2" }}>
                         <Text as="p" variant="bodySm" fontWeight="semibold">{t.selectedCategories}</Text>
                       </div>
                       {selectedCategoryDetails.length === 0 ? (
@@ -613,10 +613,10 @@ export default function ImportExportPage() {
                       ) : (
                         selectedCategoryDetails.map((row) => (
                           <div key={row.slug} style={{ padding: "8px 12px", borderBottom: "1px solid #f5f6f7" }}>
-                            <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.2, marginBottom: 2 }}>
+                            <div style={{ fontSize: 11, color: "#5e574e", lineHeight: 1.2, marginBottom: 2 }}>
                               {row.breadcrumb || t.parent}
                             </div>
-                            <div style={{ fontSize: 13, color: "#111827", fontWeight: 600, lineHeight: 1.25 }}>
+                            <div style={{ fontSize: 13, color: "#1d1b18", fontWeight: 600, lineHeight: 1.25 }}>
                               {row.name}
                             </div>
                           </div>
@@ -647,10 +647,10 @@ export default function ImportExportPage() {
                     <div
                       key={type}
                       style={{
-                        border: `1px solid ${primary ? "#bfdbfe" : "#e5e7eb"}`,
+                        border: `1px solid ${primary ? "#f5d3a8" : "#e6dfd4"}`,
                         borderRadius: 10,
                         padding: "16px",
-                        background: primary ? "#eff6ff" : "#fff",
+                        background: primary ? "#fcebd5" : "#fff",
                         display: "flex",
                         flexDirection: "column",
                         gap: 10,
@@ -758,7 +758,7 @@ export default function ImportExportPage() {
               subtitle={t.exportSubtitle}
             >
               <BlockStack gap="400">
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                <div style={{ border: "1px solid #e6dfd4", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
                     <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportScope}</Text>
                     <Text as="p" variant="bodySm" tone="subdued">{t.exportScopeHint}</Text>
@@ -779,10 +779,10 @@ export default function ImportExportPage() {
                             onClick={() => setExportDataset(ds.key)}
                             style={{
                               textAlign: "left",
-                              border: `2px solid ${selected ? "#2563eb" : "#e5e7eb"}`,
+                              border: `2px solid ${selected ? "#a65300" : "#e6dfd4"}`,
                               borderRadius: 10,
                               padding: "12px 14px",
-                              background: selected ? "#eff6ff" : "#fff",
+                              background: selected ? "#fcebd5" : "#fff",
                               cursor: "pointer",
                             }}
                           >
@@ -794,13 +794,13 @@ export default function ImportExportPage() {
                   </BlockStack>
                 </div>
 
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                <div style={{ border: "1px solid #e6dfd4", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
                     <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportFilters}</Text>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
-                      <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder={t.filterSearch} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      <input value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} placeholder={t.filterSearch} style={{ padding: "9px 10px", border: "1px solid #d6ccbd", borderRadius: 8 }} />
                       {(exportDataset === "products" || exportDataset === "orders") ? (
-                      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}>
+                      <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d6ccbd", borderRadius: 8, background: "#fff" }}>
                         <option value="">{t.filterStatusAll}</option>
                         {(exportDataset === "products" ? [
                           ["published", t.statusPublished],
@@ -815,8 +815,8 @@ export default function ImportExportPage() {
                         ))}
                       </select>
                       ) : null}
-                      <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
-                      <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8 }} />
+                      <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d6ccbd", borderRadius: 8 }} />
+                      <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ padding: "9px 10px", border: "1px solid #d6ccbd", borderRadius: 8 }} />
                     </div>
                     <InlineStack gap="300">
                       {isSuperuser ? (
@@ -829,7 +829,7 @@ export default function ImportExportPage() {
                   </BlockStack>
                 </div>
 
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                <div style={{ border: "1px solid #e6dfd4", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
                     <InlineStack align="space-between" blockAlign="center">
                       <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportColumns}</Text>
@@ -840,11 +840,11 @@ export default function ImportExportPage() {
                       </InlineStack>
                     </InlineStack>
                     <Badge tone="success">{t.columnsSelected(selectedColumns.size)}</Badge>
-                    <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
+                    <div style={{ maxHeight: 320, overflowY: "auto", border: "1px solid #e6dfd4", borderRadius: 8, padding: 10 }}>
                       {exportSpec.groups.map((group) => (
                         <div key={group.id} style={{ marginBottom: 12 }}>
                           {exportSpec.groups.length > 1 ? (
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em", textTransform: "uppercase", margin: "6px 4px" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", letterSpacing: "0.04em", textTransform: "uppercase", margin: "6px 4px" }}>
                               {group.label}
                             </div>
                           ) : null}
@@ -871,11 +871,11 @@ export default function ImportExportPage() {
                   </BlockStack>
                 </div>
 
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 14, background: "#fff" }}>
+                <div style={{ border: "1px solid #e6dfd4", borderRadius: 10, padding: 14, background: "#fff" }}>
                   <BlockStack gap="250">
                     <Text as="p" variant="bodyMd" fontWeight="semibold">{t.exportFormat}</Text>
                     <div style={{ maxWidth: 260 }}>
-                      <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} style={{ width: "100%", padding: "9px 10px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff" }}>
+                      <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} style={{ width: "100%", padding: "9px 10px", border: "1px solid #d6ccbd", borderRadius: 8, background: "#fff" }}>
                         <option value="xlsx">XLSX</option>
                         <option value="csv">CSV</option>
                         <option value="txt">TXT</option>

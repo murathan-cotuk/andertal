@@ -49,18 +49,18 @@ function formatPaymentMethod(pm) {
 
 const STATUS_COLORS = {
   offen: { bg: "#fff7ed", color: "#c2410c" },
-  in_bearbeitung: { bg: "#eff6ff", color: "#1d4ed8" },
+  in_bearbeitung: { bg: "#fcebd5", color: "#7f3f00" },
   abgeschlossen: { bg: "#f0fdf4", color: "#15803d" },
   storniert: { bg: "#fef2f2", color: "#b91c1c" },
   bezahlt: { bg: "#f0fdf4", color: "#15803d" },
   teil_erstattet: { bg: "#fffbeb", color: "#b45309" },
   erstattet: { bg: "#fef2f2", color: "#b91c1c" },
-  versendet: { bg: "#eff6ff", color: "#1d4ed8" },
+  versendet: { bg: "#fcebd5", color: "#7f3f00" },
   zugestellt: { bg: "#f0fdf4", color: "#15803d" },
 };
 
 function Badge({ value, locale }) {
-  const s = STATUS_COLORS[value] || { bg: "#f3f4f6", color: "#6b7280" };
+  const s = STATUS_COLORS[value] || { bg: "#f3eee6", color: "#5e574e" };
   return (
     <span style={{ padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: s.bg, color: s.color }}>
       {value ? statusLabel(locale, value) : "—"}
@@ -70,8 +70,8 @@ function Badge({ value, locale }) {
 
 function Section({ title, children }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 16 }}>
-      {title && <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "#111827" }}>{title}</h3>}
+    <div style={{ background: "#fff", border: "1px solid #e6dfd4", borderRadius: 10, padding: 20, marginBottom: 16 }}>
+      {title && <h3 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 700, color: "#1d1b18" }}>{title}</h3>}
       {children}
     </div>
   );
@@ -79,17 +79,17 @@ function Section({ title, children }) {
 
 function InfoRow({ label, value }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
-      <span style={{ color: "#6b7280" }}>{label}</span>
-      <span style={{ fontWeight: 500, color: "#111827" }}>{value}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #f3eee6", fontSize: 13 }}>
+      <span style={{ color: "#5e574e" }}>{label}</span>
+      <span style={{ fontWeight: 500, color: "#1d1b18" }}>{value}</span>
     </div>
   );
 }
 
 function StatusSelect({ label, value, options, onChange, saving, locale }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderBottom: "1px solid #f3f4f6" }}>
-      <span style={{ fontSize: 13, color: "#6b7280", minWidth: 120, flexShrink: 0 }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderBottom: "1px solid #f3eee6" }}>
+      <span style={{ fontSize: 13, color: "#5e574e", minWidth: 120, flexShrink: 0 }}>{label}</span>
       <div style={{ minWidth: 130, flexShrink: 0 }}>
         <Badge value={value} locale={locale} />
       </div>
@@ -97,7 +97,7 @@ function StatusSelect({ label, value, options, onChange, saving, locale }) {
         value={value || ""}
         onChange={e => onChange(e.target.value)}
         disabled={saving}
-        style={{ padding: "5px 8px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, background: "#fff", cursor: "pointer" }}
+        style={{ padding: "5px 8px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 12, background: "#fff", cursor: "pointer" }}
       >
         {options.map(o => <option key={o} value={o}>{statusLabel(locale, o)}</option>)}
       </select>
@@ -235,7 +235,7 @@ export default function OrderDetailPage() {
   };
 
   if (loading) {
-    return <div style={{ padding: 24, color: "#9ca3af", textAlign: "center", marginTop: 60 }}>{ui.loading}</div>;
+    return <div style={{ padding: 24, color: "#a39a8d", textAlign: "center", marginTop: 60 }}>{ui.loading}</div>;
   }
 
   if (error && !order) {
@@ -314,7 +314,7 @@ export default function OrderDetailPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
             {c.orderTitle} #{order?.order_number || "—"}
           </h1>
-          <span style={{ fontSize: 12, color: "#9ca3af" }}>{fmtDate(order?.created_at)}</span>
+          <span style={{ fontSize: 12, color: "#a39a8d" }}>{fmtDate(order?.created_at)}</span>
         </div>
         {order?.id && (
           <div
@@ -350,7 +350,7 @@ export default function OrderDetailPage() {
           <Section title={ui.items}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11, textTransform: "uppercase" }}>
+                <tr style={{ borderBottom: "1px solid #e6dfd4", color: "#5e574e", fontSize: 11, textTransform: "uppercase" }}>
                   <th style={{ textAlign: "left", padding: "4px 0 8px" }}>{ui.colProduct}</th>
                   <th style={{ textAlign: "right", padding: "4px 0 8px" }}>{ui.qty}</th>
                   <th style={{ textAlign: "right", padding: "4px 0 8px" }}>{ui.unitPrice}</th>
@@ -359,7 +359,7 @@ export default function OrderDetailPage() {
               </thead>
               <tbody>
                 {items.length === 0 && (
-                  <tr><td colSpan={4} style={{ padding: "20px 0", color: "#9ca3af", textAlign: "center" }}>{ui.noItems}</td></tr>
+                  <tr><td colSpan={4} style={{ padding: "20px 0", color: "#a39a8d", textAlign: "center" }}>{ui.noItems}</td></tr>
                 )}
                 {items.map((it, i) => {
                   const productUrl = it.product_id
@@ -369,27 +369,27 @@ export default function OrderDetailPage() {
                     : null;
                   const { main: itemMain, note: itemNote } = splitItemTitle(it.title);
                   return (
-                  <tr key={i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <tr key={i} style={{ borderBottom: "1px solid #f3eee6" }}>
                     <td style={{ padding: "10px 0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         {it.thumbnail && (
-                          <img src={it.thumbnail} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6, border: "1px solid #e5e7eb" }} />
+                          <img src={it.thumbnail} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6, border: "1px solid #e6dfd4" }} />
                         )}
                         <div>
                           {productUrl ? (
-                            <a href={productUrl} style={{ fontWeight: 500, color: "#111827", textDecoration: "underline", textDecorationColor: "#d1d5db" }}>
+                            <a href={productUrl} style={{ fontWeight: 500, color: "#1d1b18", textDecoration: "underline", textDecorationColor: "#d6ccbd" }}>
                               {itemMain || "—"}
                             </a>
                           ) : (
                             <div style={{ fontWeight: 500 }}>{itemMain || "—"}</div>
                           )}
-                          {itemNote && <div style={{ fontSize: 11, color: "#9ca3af" }}>{itemNote}</div>}
-                          {it.product_handle && <div style={{ fontSize: 11, color: "#9ca3af" }}>{it.product_handle}</div>}
+                          {itemNote && <div style={{ fontSize: 11, color: "#a39a8d" }}>{itemNote}</div>}
+                          {it.product_handle && <div style={{ fontSize: 11, color: "#a39a8d" }}>{it.product_handle}</div>}
                         </div>
                       </div>
                     </td>
-                    <td style={{ textAlign: "right", padding: "10px 0", color: "#374151" }}>{it.quantity}</td>
-                    <td style={{ textAlign: "right", padding: "10px 0", color: "#374151" }}>{fmtCents(it.unit_price_cents, locale)}</td>
+                    <td style={{ textAlign: "right", padding: "10px 0", color: "#3a352f" }}>{it.quantity}</td>
+                    <td style={{ textAlign: "right", padding: "10px 0", color: "#3a352f" }}>{fmtCents(it.unit_price_cents, locale)}</td>
                     <td style={{ textAlign: "right", padding: "10px 0", fontWeight: 600 }}>{fmtCents((it.unit_price_cents || 0) * (it.quantity || 1), locale)}</td>
                   </tr>
                   );
@@ -397,27 +397,27 @@ export default function OrderDetailPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "right", padding: "8px 0 4px", color: "#6b7280", fontSize: 12 }}>{ui.shipping}</td>
+                  <td colSpan={3} style={{ textAlign: "right", padding: "8px 0 4px", color: "#5e574e", fontSize: 12 }}>{ui.shipping}</td>
                   <td style={{ textAlign: "right", padding: "8px 0 4px", fontSize: 12 }}>
                     {shippingCents > 0 ? fmtCents(shippingCents, locale) : ui.shippingFree}
                   </td>
                 </tr>
                 {couponDisc > 0 && (
                   <tr>
-                    <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#6b7280", fontSize: 12 }}>
+                    <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", color: "#5e574e", fontSize: 12 }}>
                       {c.coupon}{order?.coupon_code ? ` (${order.coupon_code})` : ""}
                     </td>
                     <td style={{ textAlign: "right", padding: "4px 0", fontSize: 12, color: "#15803d" }}>−{fmtCents(couponDisc, locale)}</td>
                   </tr>
                 )}
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10 }}>{ui.grandTotal}</td>
-                  <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e5e7eb", paddingTop: 10, fontSize: 15 }}>{fmtCents(total, locale)}</td>
+                  <td colSpan={3} style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e6dfd4", paddingTop: 10 }}>{ui.grandTotal}</td>
+                  <td style={{ textAlign: "right", padding: "4px 0", fontWeight: 700, borderTop: "2px solid #e6dfd4", paddingTop: 10, fontSize: 15 }}>{fmtCents(total, locale)}</td>
                 </tr>
               </tfoot>
             </table>
 
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #f3f4f6", display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #f3eee6", display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap" }}>
               <div style={{ minWidth: 260, flex: 1 }}>
                 <SearchableSelect
                   label={c.addProduct}
@@ -428,13 +428,13 @@ export default function OrderDetailPage() {
                 />
               </div>
               <div style={{ width: 80 }}>
-                <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 3 }}>{c.qty}</label>
+                <label style={{ fontSize: 12, color: "#5e574e", display: "block", marginBottom: 3 }}>{c.qty}</label>
                 <input
                   type="number"
                   min="1"
                   value={addQty}
                   onChange={(e) => setAddQty(e.target.value)}
-                  style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13 }}
+                  style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 13 }}
                 />
               </div>
               <Button onClick={handleAddItem} loading={addingItem} disabled={addingItem}>
@@ -468,15 +468,15 @@ export default function OrderDetailPage() {
           {/* Flows — superuser only: did the automation emails for this order actually send? */}
           {isSuperuser && (
             <Section title={c.flows}>
-              <p style={{ margin: "0 0 12px", fontSize: 12, color: "#6b7280" }}>{c.flowsSub}</p>
+              <p style={{ margin: "0 0 12px", fontSize: 12, color: "#5e574e" }}>{c.flowsSub}</p>
               {flowLogsLoading ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{c.flowsLoading}</p>
+                <p style={{ fontSize: 13, color: "#a39a8d", margin: 0 }}>{c.flowsLoading}</p>
               ) : !flowLogs || flowLogs.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9ca3af", margin: 0 }}>{c.flowsEmpty}</p>
+                <p style={{ fontSize: 13, color: "#a39a8d", margin: 0 }}>{c.flowsEmpty}</p>
               ) : (
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ borderBottom: "1px solid #e5e7eb", color: "#6b7280", fontSize: 11, textTransform: "uppercase" }}>
+                    <tr style={{ borderBottom: "1px solid #e6dfd4", color: "#5e574e", fontSize: 11, textTransform: "uppercase" }}>
                       <th style={{ textAlign: "left", padding: "4px 8px 8px 0" }}>{c.flows}</th>
                       <th style={{ textAlign: "left", padding: "4px 8px 8px" }}>{c.flowRecipient}</th>
                       <th style={{ textAlign: "left", padding: "4px 8px 8px" }}>{ui.colDate}</th>
@@ -491,20 +491,20 @@ export default function OrderDetailPage() {
                           : log.status === "failed"
                           ? { bg: "#fef2f2", color: "#b91c1c", label: c.flowStatusFailed }
                           : log.status === "skipped"
-                          ? { bg: "#f3f4f6", color: "#6b7280", label: c.flowStatusSkipped }
+                          ? { bg: "#f3eee6", color: "#5e574e", label: c.flowStatusSkipped }
                           : { bg: "#fff7ed", color: "#c2410c", label: c.flowStatusPending };
                       const audienceLabel = log.audience === "seller" ? c.flowAudienceSeller : c.flowAudienceCustomer;
                       return (
-                        <tr key={log.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <tr key={log.id} style={{ borderBottom: "1px solid #f3eee6" }}>
                           <td style={{ padding: "8px 8px 8px 0" }}>
                             <div style={{ fontWeight: 500 }}>{log.flow_name || log.trigger_key}</div>
-                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{log.trigger_key} · {audienceLabel}</div>
+                            <div style={{ fontSize: 11, color: "#a39a8d" }}>{log.trigger_key} · {audienceLabel}</div>
                             {log.status === "failed" && log.error_message && (
                               <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 2 }}>{log.error_message}</div>
                             )}
                           </td>
-                          <td style={{ padding: "8px", color: "#374151" }}>{log.recipient_email || "—"}</td>
-                          <td style={{ padding: "8px", color: "#6b7280", fontSize: 12 }}>{fmtDate(log.sent_at || log.created_at, locale)}</td>
+                          <td style={{ padding: "8px", color: "#3a352f" }}>{log.recipient_email || "—"}</td>
+                          <td style={{ padding: "8px", color: "#5e574e", fontSize: 12 }}>{fmtDate(log.sent_at || log.created_at, locale)}</td>
                           <td style={{ padding: "8px 0 8px 8px", textAlign: "right" }}>
                             <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: badge.bg, color: badge.color }}>
                               {badge.label}
@@ -529,21 +529,21 @@ export default function OrderDetailPage() {
                 <a
                   href={order?.customer_id ? `/${locale}/customers/${order.customer_id}` : `/${locale}/customers`}
                   onClick={goToCustomerProfile}
-                  style={{ color: "#202223", textDecoration: "underline" }}
+                  style={{ color: "#1d1b18", textDecoration: "underline" }}
                 >
                   {customerLabel}
                 </a>
               ) : (
-                <span style={{ color: "#202223" }}>{customerLabel}</span>
+                <span style={{ color: "#1d1b18" }}>{customerLabel}</span>
               )}
             </div>
             {isSuperuser && order?.email && (
-              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 2 }}>
-                <a href={`mailto:${order.email}`} style={{ color: "#1d4ed8" }}>{order.email}</a>
+              <div style={{ fontSize: 13, color: "#5e574e", marginBottom: 2 }}>
+                <a href={`mailto:${order.email}`} style={{ color: "#7f3f00" }}>{order.email}</a>
               </div>
             )}
             {isSuperuser && order?.phone && (
-              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>{order.phone}</div>
+              <div style={{ fontSize: 13, color: "#5e574e", marginBottom: 10 }}>{order.phone}</div>
             )}
             {isSuperuser && (
               <>
@@ -556,7 +556,7 @@ export default function OrderDetailPage() {
 
           {/* Shipping address */}
           <Section title={c.shippingAddress}>
-            <div style={{ fontSize: 13, lineHeight: 1.7, color: "#374151" }}>
+            <div style={{ fontSize: 13, lineHeight: 1.7, color: "#3a352f" }}>
               {[order?.first_name, order?.last_name].filter(Boolean).join(" ")}<br />
               {order?.address_line1 && <>{order.address_line1}<br /></>}
               {order?.address_line2 && <>{order.address_line2}<br /></>}
@@ -568,9 +568,9 @@ export default function OrderDetailPage() {
           {/* Billing address */}
           <Section title={c.billingAddress}>
             {billingSame ? (
-              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{c.sameAsShipping}</div>
+              <div style={{ fontSize: 13, color: "#5e574e", fontStyle: "italic" }}>{c.sameAsShipping}</div>
             ) : hasBillingAddr ? (
-              <div style={{ fontSize: 13, lineHeight: 1.7, color: "#374151" }}>
+              <div style={{ fontSize: 13, lineHeight: 1.7, color: "#3a352f" }}>
                 {[order?.first_name, order?.last_name].filter(Boolean).join(" ")}<br />
                 {order.billing_address_line1}<br />
                 {order?.billing_address_line2 && <>{order.billing_address_line2}<br /></>}
@@ -578,7 +578,7 @@ export default function OrderDetailPage() {
                 {order?.billing_country || ""}
               </div>
             ) : (
-              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>{c.sameAsShipping}</div>
+              <div style={{ fontSize: 13, color: "#5e574e", fontStyle: "italic" }}>{c.sameAsShipping}</div>
             )}
           </Section>
 
@@ -594,7 +594,7 @@ export default function OrderDetailPage() {
           {isSuperuser && (
           <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: 10, padding: 16 }}>
             <h3 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: "#b91c1c" }}>{ui.deleteOrder}</h3>
-            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 12px" }}>{c.dangerText}</p>
+            <p style={{ fontSize: 12, color: "#5e574e", margin: "0 0 12px" }}>{c.dangerText}</p>
             <button onClick={handleDelete} style={{ padding: "7px 14px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
               {ui.deleteOrder}
             </button>
@@ -606,4 +606,4 @@ export default function OrderDetailPage() {
   );
 }
 
-const btnStyle = { marginTop: 16, padding: "8px 16px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 7, cursor: "pointer", fontSize: 13 };
+const btnStyle = { marginTop: 16, padding: "8px 16px", background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 7, cursor: "pointer", fontSize: 13 };

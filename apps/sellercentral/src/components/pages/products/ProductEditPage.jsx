@@ -2648,7 +2648,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .product-media-item { aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--p-color-bg-fill-secondary); position: relative; cursor: grab; border: 2px solid transparent; transition: border-color 0.15s, opacity 0.15s, box-shadow 0.15s; }
         .product-media-item:active { cursor: grabbing; }
         .product-media-item.dragging { opacity: 0.35; }
-        .product-media-item.drag-over { border-color: var(--p-color-border-info, #2c6ecb); box-shadow: 0 0 0 2px rgba(44,110,203,0.2); }
+        .product-media-item.drag-over { border-color: var(--p-color-border-info, #a65300); box-shadow: 0 0 0 2px rgba(44,110,203,0.2); }
         .product-media-item img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
         .product-media-drag-hint { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); font-size: 11px; color: rgba(255,255,255,0.9); background: rgba(0,0,0,0.45); border-radius: 4px; padding: 1px 5px; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
         .product-media-item:hover .product-media-drag-hint { opacity: 1; }
@@ -2714,7 +2714,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vg-drag-handle { color: var(--p-color-icon-subdued); font-size: 18px; cursor: grab; user-select: none; flex-shrink: 0; padding: 2px 4px; border-radius: 4px; }
         .vg-drag-handle:hover { background: var(--p-color-bg-surface-hover); color: var(--p-color-icon); }
         .vg-option-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--p-color-bg-surface-secondary); border: 1.5px solid var(--p-color-border); border-radius: 30px; padding: 4px 4px 4px 10px; transition: border-color .12s; }
-        .vg-option-chip:focus-within { border-color: var(--p-color-border-focus, #005bd3); box-shadow: 0 0 0 2px rgba(0,91,211,.12); }
+        .vg-option-chip:focus-within { border-color: var(--p-color-border-focus, #a65300); box-shadow: 0 0 0 2px rgba(0,91,211,.12); }
         .vg-option-chip input { border: none; outline: none; background: transparent; font-size: 13px; color: var(--p-color-text); min-width: 64px; width: 90px; }
         .vg-option-chip input::placeholder { color: var(--p-color-text-subdued); }
         .vg-remove-btn { border: none; background: none; cursor: pointer; color: var(--p-color-icon-subdued); font-size: 15px; line-height: 1; padding: 2px 5px; border-radius: 50%; display: inline-flex; align-items: center; }
@@ -2733,7 +2733,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           gap: 10px;
           padding: 7px 12px;
         }
-        .vm-head { background: var(--p-color-bg-surface-secondary, #f6f6f7); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--p-color-text-subdued); border-bottom: 1px solid var(--p-color-border); }
+        .vm-head { background: var(--p-color-bg-surface-secondary, #faf7f2); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--p-color-text-subdued); border-bottom: 1px solid var(--p-color-border); }
         .vm-head > span { min-width: 0; }
         .vm-head .vm-num-h { text-align: right; padding-right: 7px; }
         .vm-row { border-top: 1px solid var(--p-color-border); }
@@ -2743,12 +2743,12 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         .vm-check { display: flex; align-items: center; }
         .vm-cell { min-width: 0; }
         .vm-opts { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-        .vm-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--p-color-text); background: var(--p-color-bg-surface-secondary, #f1f1f1); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+        .vm-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--p-color-text); background: var(--p-color-bg-surface-secondary, #f3eee6); border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
         .vm-opt i { font-style: normal; color: var(--p-color-text-subdued); }
         .vm-inp { width: 100%; border: 1px solid transparent; border-radius: 6px; background: transparent; padding: 5px 7px; font-size: 13px; color: var(--p-color-text); font-variant-numeric: tabular-nums; box-sizing: border-box; }
         .vm-inp::placeholder { color: var(--p-color-text-disabled, #b5b5b5); }
         .vm-inp:hover { background: var(--p-color-bg-fill-transparent-hover, rgba(0,0,0,.04)); }
-        .vm-inp:focus { outline: none; border-color: var(--p-color-border-emphasis, #2c6ecb); background: var(--p-color-bg-surface, #fff); }
+        .vm-inp:focus { outline: none; border-color: var(--p-color-border-emphasis, #a65300); background: var(--p-color-bg-surface, #fff); }
         .vm-inp.vm-err { border-color: var(--p-color-border-critical, #d82c0d); background: var(--p-color-bg-surface-critical, #fff4f4); }
         .vm-inp[readonly] { cursor: default; color: var(--p-color-text-subdued); }
         .vm-inp[readonly]:hover, .vm-inp[readonly]:focus { background: transparent; border-color: transparent; }
@@ -2975,7 +2975,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             <BlockStack gap="150">
                               <BlockStack gap="050">
                                 <Text as="p" variant="bodyXs" tone="subdued">{beforeLbl}</Text>
-                                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", color: "#6b7280", textDecoration: diff.changed ? "line-through" : "none" }}>
+                                <div style={{ fontSize: 13, lineHeight: 1.45, wordBreak: "break-word", whiteSpace: "pre-wrap", color: "#5e574e", textDecoration: diff.changed ? "line-through" : "none" }}>
                                   {diff.before || emptyMark}
                                 </div>
                               </BlockStack>
@@ -3001,9 +3001,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               {`${diff.rows.length} ${lt(locale, "field(s) changed", "alan değişti", "champ(s) modifié(s)", "campo(s) modificado(s)", "campo/i modificato/i", "Feld(er) geändert")}`}
                             </Text>
                             {diff.rows.map((r) => (
-                              <div key={r.path} style={{ borderLeft: "3px solid #e2e8f0", paddingLeft: 10 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: "#334155", marginBottom: 2 }}>{r.path}</div>
-                                <div style={{ fontSize: 13, lineHeight: 1.45, color: "#9ca3af", textDecoration: "line-through", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
+                              <div key={r.path} style={{ borderLeft: "3px solid #e6dfd4", paddingLeft: 10 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#3a352f", marginBottom: 2 }}>{r.path}</div>
+                                <div style={{ fontSize: 13, lineHeight: 1.45, color: "#a39a8d", textDecoration: "line-through", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
                                   {r.before ? r.before : emptyMark}
                                 </div>
                                 {r.status === "removed" ? (
@@ -3110,7 +3110,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                   icon={MenuHorizontalIcon}
                   onClick={() => setMoreActionsOpen((v) => !v)}
                   accessibilityLabel={pe.moreActions}
-                  style={{ background: "#1f2937", color: "#fff", border: "none" }}
+                  style={{ background: "#1d1b18", color: "#fff", border: "none" }}
                 >
                   {pe.moreActions}
                 </Button>
@@ -3967,7 +3967,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                 >
                                   {opt.swatch_image
                                     ? <img src={resolveMediaUrl(opt.swatch_image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                    : <span style={{ fontSize: 10, lineHeight: 1, color: "#6b7280" }}>SW</span>}
+                                    : <span style={{ fontSize: 10, lineHeight: 1, color: "#5e574e" }}>SW</span>}
                                 </button>
                                 {opt.swatch_image && (
                                   <button
@@ -4041,7 +4041,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                             role="button"
                                             tabIndex={0}
                                             onClick={() => { vg_addLinkedOptionValue(gi, search.trim()); setVgValueSearch((p) => ({ ...p, [gi]: "" })); setVgValuePopover((p) => ({ ...p, [gi]: false })); }}
-                                            style={{ padding: "6px 8px", fontSize: 13, cursor: "pointer", borderRadius: 4, color: "var(--p-color-text-brand, #2c6ecb)" }}
+                                            style={{ padding: "6px 8px", fontSize: 13, cursor: "pointer", borderRadius: 4, color: "var(--p-color-text-brand, #a65300)" }}
                                           >
                                             "{search.trim()}" {lt(locale, "propose new", "yeni öner", "proposer nouveau", "proponer nuevo", "proponi nuovo", "neu vorschlagen")}
                                           </div>
@@ -4910,7 +4910,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                       : "";
                     const isPdf = fileUrl.toLowerCase().includes(".pdf");
                     return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#faf7f2", borderRadius: 8, border: "1px solid #e6dfd4" }}>
                         <span style={{ fontSize: 15, flexShrink: 0 }}>
                           {isPdf ? "📄" : "📎"}
                         </span>
@@ -4921,7 +4921,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                             onChange={(e) => updateProductFileName(i, e.target.value)}
                             placeholder={locale === "en" ? "Display name in shop" : locale === "tr" ? "Mağazada görünen ad" : locale === "fr" ? "Nom d'affichage dans la boutique" : locale === "es" ? "Nombre a mostrar en la tienda" : locale === "it" ? "Nome visualizzato nel negozio" : "Anzeigename im Shop"}
                             style={{
-                              width: "100%", border: "1px solid #d1d5db", borderRadius: 6,
+                              width: "100%", border: "1px solid #d6ccbd", borderRadius: 6,
                               padding: "4px 8px", fontSize: 13, background: "#fff",
                               outline: "none", boxSizing: "border-box",
                             }}
@@ -4936,7 +4936,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                               {resolvedFileUrl}
                             </a>
                           ) : (
-                            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>—</div>
+                            <div style={{ fontSize: 11, color: "#a39a8d", marginTop: 2 }}>—</div>
                           )}
                         </div>
                         <button

@@ -257,7 +257,7 @@ function fmtDate(d, locale = "de") {
 function amountColor(cents) {
   if (cents > 0) return "#059669";
   if (cents < 0) return "#dc2626";
-  return "#111827";
+  return "#1d1b18";
 }
 
 function signedAmount(cents, locale) {
@@ -271,7 +271,7 @@ function signedAmount(cents, locale) {
 const PERIODS = generatePayoutPeriods(18);
 
 const TX_CSS = `
-.tx-page { font-size: 12px; color: #111827; }
+.tx-page { font-size: 12px; color: #1d1b18; }
 .tx-page .Polaris-Header-Title { font-size: 18px !important; line-height: 1.25 !important; }
 .tx-page .Polaris-Header-Title__SubTitle { font-size: 11px !important; }
 .tx-page .Polaris-ShadowBevel:has(.tx-kpis) { overflow: visible !important; }
@@ -280,10 +280,10 @@ const TX_CSS = `
 .tx-kpi:hover { border-color: #d0d5dd; box-shadow: 0 4px 12px rgba(16,24,40,.08); z-index: 4; }
 .tx-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
 .tx-kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .02em; color: #667085; line-height: 1.25; }
-.tx-kpi-i { flex: 0 0 14px; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #d0d5dd; color: #98a2b3; font-size: 9px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; background: #f9fafb; }
+.tx-kpi-i { flex: 0 0 14px; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #d0d5dd; color: #98a2b3; font-size: 9px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; background: #faf7f2; }
 .tx-kpi-value { font-size: 15px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .tx-kpi-note { font-size: 10px; color: #98a2b3; margin-top: 3px; }
-.tx-kpi-tip { display: none; position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 30; background: #111827; color: #fff; font-size: 11px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; box-shadow: 0 8px 24px rgba(16,24,40,.18); }
+.tx-kpi-tip { display: none; position: absolute; left: 8px; right: 8px; bottom: calc(100% + 6px); z-index: 30; background: #1d1b18; color: #fff; font-size: 11px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; box-shadow: 0 8px 24px rgba(16,24,40,.18); }
 .tx-kpi:hover .tx-kpi-tip { display: block; }
 .tx-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
 .tx-table { font-variant-numeric: tabular-nums; }
@@ -328,7 +328,7 @@ function StatBox({ label, value, note, color, hint }) {
         <div className="tx-kpi-label">{label}</div>
         {hint ? <span className="tx-kpi-i" aria-hidden>i</span> : null}
       </div>
-      <div className="tx-kpi-value" style={{ color: color || "#111827" }}>{value}</div>
+      <div className="tx-kpi-value" style={{ color: color || "#1d1b18" }}>{value}</div>
       {note ? <div className="tx-kpi-note">{note}</div> : null}
       {hint ? <div className="tx-kpi-tip" role="tooltip">{hint}</div> : null}
     </div>
@@ -464,7 +464,7 @@ function LedgerTable({
 
   return (
     <Card padding="0">
-      <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #f3f4f6", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #f3eee6", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 600 }}>{copy.movements}</div>
         {(filterSearch.trim() || filterType !== "all") && (
           <Button size="slim" variant="plain" onClick={() => { setFilterSearch(""); setFilterType("all"); }}>
@@ -472,7 +472,7 @@ function LedgerTable({
           </Button>
         )}
       </div>
-      <div style={{ padding: "8px 14px", borderBottom: "1px solid #f3f4f6", background: "#fafafa", display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ padding: "8px 14px", borderBottom: "1px solid #f3eee6", background: "#faf7f2", display: "flex", gap: 8, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 180px", minWidth: 160 }}>
           <TextField
             label={copy.searchPlaceholder}
@@ -497,8 +497,8 @@ function LedgerTable({
         <div className="tx-table">
           <div style={{
             display: "grid", gridTemplateColumns: cols, gap: 6, padding: "6px 14px",
-            borderBottom: "1px solid #e5e7eb", fontSize: 10, fontWeight: 600, color: "#667085",
-            background: "#fafafa", letterSpacing: "0.02em", textTransform: "uppercase",
+            borderBottom: "1px solid #e6dfd4", fontSize: 10, fontWeight: 600, color: "#667085",
+            background: "#faf7f2", letterSpacing: "0.02em", textTransform: "uppercase",
           }}>
             <div>{copy.colDate}</div>
             <div>{copy.colType}</div>
@@ -514,19 +514,19 @@ function LedgerTable({
                 key={e.id || i}
                 style={{
                   display: "grid", gridTemplateColumns: cols, gap: 6, padding: "5px 14px",
-                  borderBottom: "1px solid #f3f4f6", fontSize: 11, alignItems: "center",
+                  borderBottom: "1px solid #f3eee6", fontSize: 11, alignItems: "center",
                   background: i % 2 === 0 ? "#fff" : "#fbfbfc", minHeight: 28,
                 }}
               >
                 <div style={{ color: "#4b5563" }}>{fmtDate(e.occurred_at, locale)}</div>
-                <div style={{ color: "#111827" }}>
+                <div style={{ color: "#1d1b18" }}>
                   {ledgerEntryLabel(e, locale)}
                   {e.charge_method === "card" && (
-                    <span style={{ marginLeft: 6, fontSize: 10, color: "#9ca3af" }}>{copy.chargedCard}</span>
+                    <span style={{ marginLeft: 6, fontSize: 10, color: "#a39a8d" }}>{copy.chargedCard}</span>
                   )}
                 </div>
-                <div style={{ fontWeight: 600, color: "#111827" }}>{e.order_number || "—"}</div>
-                {isSuperuser && <div style={{ fontSize: 11, color: "#6b7280" }}>{e.store_name || e.seller_id || "—"}</div>}
+                <div style={{ fontWeight: 600, color: "#1d1b18" }}>{e.order_number || "—"}</div>
+                {isSuperuser && <div style={{ fontSize: 11, color: "#5e574e" }}>{e.store_name || e.seller_id || "—"}</div>}
                 <div style={{ textAlign: "right", fontWeight: 600, color: amountColor(cents) }}>
                   {signedAmount(cents, locale)}
                   {isSuperuser && isManual && (
@@ -548,9 +548,9 @@ function LedgerTable({
           })}
           <div style={{
             display: "grid", gridTemplateColumns: cols, gap: 6, padding: "7px 14px",
-            borderTop: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, background: "#f9fafb",
+            borderTop: "1px solid #e6dfd4", fontSize: 11, fontWeight: 700, background: "#faf7f2",
           }}>
-            <div style={{ color: "#6b7280", fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>{copy.sum}</div>
+            <div style={{ color: "#5e574e", fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>{copy.sum}</div>
             <div />
             <div />
             {isSuperuser && <div />}
@@ -578,7 +578,7 @@ function PayoutOrdersTable({ title, hint, rows, total, copy, locale, isSuperuser
     : (showEligibleCol ? "90px 1.5fr 100px 100px 110px" : "90px 1.7fr 100px 110px");
   return (
     <Card padding="0">
-      <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #f3f4f6" }}>
+      <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #f3eee6" }}>
         <div style={{ fontSize: 12, fontWeight: 600 }}>{title}</div>
         <div style={{ fontSize: 11, color: "#98a2b3", marginTop: 2 }}>{hint}</div>
       </div>
@@ -588,8 +588,8 @@ function PayoutOrdersTable({ title, hint, rows, total, copy, locale, isSuperuser
         <div className="tx-table">
           <div style={{
             display: "grid", gridTemplateColumns: cols, gap: 6, padding: "6px 14px",
-            borderBottom: "1px solid #e5e7eb", fontSize: 10, fontWeight: 600, color: "#667085",
-            background: "#fafafa", letterSpacing: "0.02em", textTransform: "uppercase",
+            borderBottom: "1px solid #e6dfd4", fontSize: 10, fontWeight: 600, color: "#667085",
+            background: "#faf7f2", letterSpacing: "0.02em", textTransform: "uppercase",
           }}>
             <div>{copy.colOrder}</div>
             <div>{copy.colDelivered}</div>
@@ -604,13 +604,13 @@ function PayoutOrdersTable({ title, hint, rows, total, copy, locale, isSuperuser
                 key={o.id || i}
                 style={{
                   display: "grid", gridTemplateColumns: cols, gap: 6, padding: "5px 14px",
-                  borderBottom: "1px solid #f3f4f6", fontSize: 11, alignItems: "center",
+                  borderBottom: "1px solid #f3eee6", fontSize: 11, alignItems: "center",
                   background: i % 2 === 0 ? "#fff" : "#fbfbfc", minHeight: 28,
                 }}
               >
-                <div style={{ fontWeight: 600, color: "#111827" }}>{o.order_number || "—"}</div>
+                <div style={{ fontWeight: 600, color: "#1d1b18" }}>{o.order_number || "—"}</div>
                 <div style={{ color: "#4b5563" }}>{fmtDate(o.delivery_date, locale)}</div>
-                {isSuperuser && <div style={{ fontSize: 11, color: "#6b7280" }}>{o.store_name || o.seller_id || "—"}</div>}
+                {isSuperuser && <div style={{ fontSize: 11, color: "#5e574e" }}>{o.store_name || o.seller_id || "—"}</div>}
                 {showEligibleCol && <div style={{ color: "#b45309" }}>{eligibleFrom ? fmtDate(eligibleFrom, locale) : "—"}</div>}
                 <div style={{ textAlign: "right", fontWeight: 600, color: "#059669" }}>
                   {fmtCents(o.payout_cents, "EUR", locale)}
@@ -620,9 +620,9 @@ function PayoutOrdersTable({ title, hint, rows, total, copy, locale, isSuperuser
           })}
           <div style={{
             display: "grid", gridTemplateColumns: cols, gap: 6, padding: "7px 14px",
-            borderTop: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, background: "#f9fafb",
+            borderTop: "1px solid #e6dfd4", fontSize: 11, fontWeight: 700, background: "#faf7f2",
           }}>
-            <div style={{ color: "#6b7280", fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>{copy.sum}</div>
+            <div style={{ color: "#5e574e", fontSize: 10, fontWeight: 600, textTransform: "uppercase" }}>{copy.sum}</div>
             <div />
             {isSuperuser && <div />}
             {showEligibleCol && <div />}
@@ -1060,10 +1060,10 @@ function AdminTransactionsView() {
             {!filterSeller && overviewSellers.length > 0 && (
               <Box paddingBlockStart="300">
                 <Card padding="0">
-                  <div style={{ padding: "10px 14px", borderBottom: "1px solid #f3f4f6", fontSize: 12, fontWeight: 600 }}>
+                  <div style={{ padding: "10px 14px", borderBottom: "1px solid #f3eee6", fontSize: 12, fontWeight: 600 }}>
                     {copy.sellerOverview} · {selectedPeriod.label}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 88px 88px 100px 72px auto", gap: 6, padding: "5px 14px", borderBottom: "1px solid #f3f4f6", fontSize: 10, fontWeight: 600, color: "#667085", textTransform: "uppercase", letterSpacing: "0.02em" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 88px 88px 100px 72px auto", gap: 6, padding: "5px 14px", borderBottom: "1px solid #f3eee6", fontSize: 10, fontWeight: 600, color: "#667085", textTransform: "uppercase", letterSpacing: "0.02em" }}>
                     <div>{copy.seller}</div>
                     <div style={{ textAlign: "right" }}>{copy.revenue}</div>
                     <div style={{ textAlign: "right" }}>{copy.commissionPlain}</div>
@@ -1076,14 +1076,14 @@ function AdminTransactionsView() {
                     const paid = Number(t.payouts_cents || 0) > 0;
                     const net = Number(t.net_cents || 0);
                     return (
-                      <div key={s.seller_id} style={{ display: "grid", gridTemplateColumns: "1.5fr 88px 88px 100px 72px auto", gap: 6, padding: "5px 14px", minHeight: 28, borderBottom: i < overviewSellers.length - 1 ? "1px solid #f9fafb" : "none", alignItems: "center", fontSize: 11 }}>
+                      <div key={s.seller_id} style={{ display: "grid", gridTemplateColumns: "1.5fr 88px 88px 100px 72px auto", gap: 6, padding: "5px 14px", minHeight: 28, borderBottom: i < overviewSellers.length - 1 ? "1px solid #faf7f2" : "none", alignItems: "center", fontSize: 11 }}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{s.store_name}</div>
-                          <div style={{ fontSize: 10, color: "#9ca3af" }}>{copy.ordersShort(t.order_count || 0)}</div>
+                          <div style={{ fontSize: 10, color: "#a39a8d" }}>{copy.ordersShort(t.order_count || 0)}</div>
                         </div>
                         <div style={{ textAlign: "right" }}>{fmtCents(t.merchandise_cents, "EUR", locale)}</div>
                         <div style={{ textAlign: "right", color: "#059669", fontWeight: 600 }}>+{fmtCents(t.commission_cents, "EUR", locale)}</div>
-                        <div style={{ textAlign: "right", fontWeight: 700, color: paid ? "#6b7280" : amountColor(net) }}>{signedAmount(net, locale)}</div>
+                        <div style={{ textAlign: "right", fontWeight: 700, color: paid ? "#5e574e" : amountColor(net) }}>{signedAmount(net, locale)}</div>
                         <div style={{ textAlign: "center" }}>
                           <Badge tone={paid ? "success" : net > 0 ? "warning" : "new"}>
                             {paid ? copy.paid : net > 0 ? copy.open : "—"}

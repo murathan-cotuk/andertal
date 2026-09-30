@@ -342,7 +342,7 @@ export default function Dac7Page() {
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
-                      <tr style={{ background: "#f3f4f6" }}>
+                      <tr style={{ background: "#f3eee6" }}>
                         {[t.seller, t.vatId, t.taxId, t.lucidNumber, t.revenue, t.transactions, t.exceeds].map((h) => (
                           <th
                             key={h}
@@ -350,7 +350,7 @@ export default function Dac7Page() {
                               padding: "8px 10px",
                               textAlign: "left",
                               fontWeight: 600,
-                              borderBottom: "1px solid #e5e7eb",
+                              borderBottom: "1px solid #e6dfd4",
                               whiteSpace: "nowrap",
                             }}
                           >
@@ -361,8 +361,8 @@ export default function Dac7Page() {
                     </thead>
                     <tbody>
                       {report.sellers.map((s, i) => (
-                        <tr key={s.seller_id} style={{ background: i % 2 === 0 ? "#fff" : "#f9fafb" }}>
-                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e5e7eb" }}>
+                        <tr key={s.seller_id} style={{ background: i % 2 === 0 ? "#fff" : "#faf7f2" }}>
+                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e6dfd4" }}>
                             <Text as="span" variant="bodySm" fontWeight="semibold">
                               {s.store_name || s.seller_id}
                             </Text>
@@ -371,18 +371,18 @@ export default function Dac7Page() {
                               {s.email}
                             </Text>
                           </td>
-                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e5e7eb", fontFamily: "monospace" }}>
+                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e6dfd4", fontFamily: "monospace" }}>
                             {s.vat_id || "—"}
                           </td>
-                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e5e7eb", fontFamily: "monospace" }}>
+                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e6dfd4", fontFamily: "monospace" }}>
                             {s.tax_id || "—"}
                           </td>
-                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e5e7eb", fontFamily: "monospace" }}>
+                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e6dfd4", fontFamily: "monospace" }}>
                             {s.lucid_number || "—"}
                           </td>
-                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e5e7eb" }}>€{s.revenue_eur}</td>
-                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e5e7eb" }}>{s.transaction_count}</td>
-                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e5e7eb" }}>
+                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e6dfd4" }}>€{s.revenue_eur}</td>
+                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e6dfd4" }}>{s.transaction_count}</td>
+                          <td style={{ padding: "7px 10px", borderBottom: "1px solid #e6dfd4" }}>
                             <span
                               style={{
                                 background: "#fef3c7",

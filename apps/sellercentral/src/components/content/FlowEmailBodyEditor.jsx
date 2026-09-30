@@ -40,7 +40,7 @@ export function htmlToPlainText(html) {
 
 const STYLES = `
   .flow-rte-wrap { border: 1px solid var(--p-color-border); border-radius: 8px; overflow: hidden; background: var(--p-color-bg-surface); }
-  .flow-rte-wrap:focus-within { border-color: var(--p-color-border-focus, #005bd3); box-shadow: 0 0 0 2px rgba(0,91,211,.12); }
+  .flow-rte-wrap:focus-within { border-color: var(--p-color-border-focus, #a65300); box-shadow: 0 0 0 2px rgba(0,91,211,.12); }
   .flow-rte-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; border-bottom: 1px solid var(--p-color-border-subdued); background: var(--p-color-bg-surface-secondary); gap: 8px; flex-wrap: wrap; }
   .flow-rte-toolbar-left { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; flex: 1; min-width: 0; }
   .flow-rte-mode-group { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }

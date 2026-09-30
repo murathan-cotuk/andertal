@@ -9,24 +9,24 @@ import { getAutomationsCopy } from "@/lib/marketing-i18n";
 function ActiveFlowsPanel({ copy, flows, loading }) {
   const activeFlows = flows.filter((f) => f.status === "active");
   return (
-    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", boxShadow: "0 1px 4px rgba(15,23,42,0.05)", padding: "20px 22px", marginBottom: 20 }}>
+    <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e6dfd4", boxShadow: "0 1px 4px rgba(15,23,42,0.05)", padding: "20px 22px", marginBottom: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>{copy.activeFlowsTitle}</h2>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1d1b18" }}>{copy.activeFlowsTitle}</h2>
         <a
           href="/content/flows"
-          style={{ fontSize: 12, fontWeight: 600, color: "#3b82f6", textDecoration: "none" }}
+          style={{ fontSize: 12, fontWeight: 600, color: "#ee8a12", textDecoration: "none" }}
         >
           {copy.manageInFlows} →
         </a>
       </div>
       {loading ? (
-        <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>{copy.loading}</div>
+        <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>{copy.loading}</div>
       ) : activeFlows.length === 0 ? (
-        <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>{copy.noActiveFlows}</div>
+        <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>{copy.noActiveFlows}</div>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
+            <tr style={{ textAlign: "left", color: "#5e574e", borderBottom: "1px solid #e6dfd4" }}>
               <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colName}</th>
               <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colTrigger}</th>
               <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colAudience}</th>
@@ -36,10 +36,10 @@ function ActiveFlowsPanel({ copy, flows, loading }) {
           <tbody>
             {activeFlows.map((f) => (
               <tr key={f.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                <td style={{ padding: "10px 6px", color: "#0f172a", fontWeight: 600 }}>{f.name}</td>
-                <td style={{ padding: "10px 6px", color: "#475569", fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{f.trigger}</td>
-                <td style={{ padding: "10px 6px", color: "#64748b" }}>{f.audience === "seller" ? copy.audienceSeller : copy.audienceCustomer}</td>
-                <td style={{ padding: "10px 6px", color: "#64748b" }}>{f.sent_count ?? 0}</td>
+                <td style={{ padding: "10px 6px", color: "#1d1b18", fontWeight: 600 }}>{f.name}</td>
+                <td style={{ padding: "10px 6px", color: "#3a352f", fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{f.trigger}</td>
+                <td style={{ padding: "10px 6px", color: "#5e574e" }}>{f.audience === "seller" ? copy.audienceSeller : copy.audienceCustomer}</td>
+                <td style={{ padding: "10px 6px", color: "#5e574e" }}>{f.sent_count ?? 0}</td>
               </tr>
             ))}
           </tbody>
@@ -117,15 +117,15 @@ function FlowExecutionLogPanel({ copy }) {
       padding: "20px 22px",
       borderRadius: 14,
       background: "#fff",
-      border: "1px solid #e2e8f0",
+      border: "1px solid #e6dfd4",
       boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1d1b18" }}>
             {copy.flowActivityTitle}
           </h2>
-          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#64748b", maxWidth: 620 }}>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#5e574e", maxWidth: 620 }}>
             {isSuperuser ? copy.flowActivitySuperuser : copy.flowActivitySeller}
           </p>
         </div>
@@ -136,10 +136,10 @@ function FlowExecutionLogPanel({ copy }) {
             style={{
               padding: "8px 10px",
               borderRadius: 8,
-              border: "1px solid #e2e8f0",
+              border: "1px solid #e6dfd4",
               fontSize: 13,
               background: "#fff",
-              color: "#334155",
+              color: "#3a352f",
             }}
           >
             <option value="">{copy.allStatuses}</option>
@@ -155,11 +155,11 @@ function FlowExecutionLogPanel({ copy }) {
             style={{
               padding: "8px 14px",
               borderRadius: 8,
-              border: "1px solid #cbd5e1",
-              background: "#f8fafc",
+              border: "1px solid #d6ccbd",
+              background: "#faf7f2",
               fontSize: 13,
               fontWeight: 600,
-              color: "#334155",
+              color: "#3a352f",
               cursor: loading ? "wait" : "pointer",
             }}
           >
@@ -175,8 +175,8 @@ function FlowExecutionLogPanel({ copy }) {
       )}
 
       {isSuperuser && execStats != null && typeof execStats.total_in_window === "number" && (
-        <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 12, color: "#475569" }}>
-          <strong style={{ color: "#334155" }}>{copy.dayOverview(execStats.days || 30)}:</strong>{" "}
+        <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 8, background: "#faf7f2", border: "1px solid #e6dfd4", fontSize: 12, color: "#3a352f" }}>
+          <strong style={{ color: "#3a352f" }}>{copy.dayOverview(execStats.days || 30)}:</strong>{" "}
           {execStats.total_in_window.toLocaleString(copy.dateLocale)} {copy.executions}
           {Array.isArray(execStats.by_status) && execStats.by_status.length > 0 && (
             <> · {execStats.by_status.map((r) => `${r.status}: ${r.c}`).join(", ")}</>
@@ -186,15 +186,15 @@ function FlowExecutionLogPanel({ copy }) {
 
       <div style={{ marginTop: 16, overflowX: "auto" }}>
         {loading && logs.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>{copy.loading}</div>
+          <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>{copy.loading}</div>
         ) : logs.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+          <div style={{ padding: 24, textAlign: "center", color: "#a39a8d", fontSize: 13 }}>
             {copy.noLogEntries}
           </div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
+              <tr style={{ textAlign: "left", color: "#5e574e", borderBottom: "1px solid #e6dfd4" }}>
                 <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colTime}</th>
                 <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colStatus}</th>
                 <th style={{ padding: "8px 6px", fontWeight: 600 }}>{copy.colTrigger}</th>
@@ -218,7 +218,7 @@ function FlowExecutionLogPanel({ copy }) {
                         setExpandedId(open ? null : id);
                       }}
                     >
-                      <td style={{ padding: "10px 6px", color: "#334155", whiteSpace: "nowrap" }}>{formatDt(row.created_at)}</td>
+                      <td style={{ padding: "10px 6px", color: "#3a352f", whiteSpace: "nowrap" }}>{formatDt(row.created_at)}</td>
                       <td style={{ padding: "10px 6px" }}>
                         <span style={{
                           display: "inline-block",
@@ -233,26 +233,26 @@ function FlowExecutionLogPanel({ copy }) {
                           {row.status || "—"}
                         </span>
                       </td>
-                      <td style={{ padding: "10px 6px", color: "#475569", maxWidth: 120 }} title={row.trigger_key}>
+                      <td style={{ padding: "10px 6px", color: "#3a352f", maxWidth: 120 }} title={row.trigger_key}>
                         <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {row.trigger_key || "—"}
                         </span>
                       </td>
-                      <td style={{ padding: "10px 6px", color: "#475569", maxWidth: 160 }} title={row.flow_name || ""}>
+                      <td style={{ padding: "10px 6px", color: "#3a352f", maxWidth: 160 }} title={row.flow_name || ""}>
                         <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {row.flow_name || "—"}
                         </span>
                       </td>
-                      <td style={{ padding: "10px 6px", color: "#64748b" }}>{row.step_order ?? "—"}</td>
-                      <td style={{ padding: "10px 6px", color: "#475569", maxWidth: 200 }} title={row.recipient_email || ""}>
+                      <td style={{ padding: "10px 6px", color: "#5e574e" }}>{row.step_order ?? "—"}</td>
+                      <td style={{ padding: "10px 6px", color: "#3a352f", maxWidth: 200 }} title={row.recipient_email || ""}>
                         <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {row.recipient_email || "—"}
                         </span>
                       </td>
-                      <td style={{ padding: "10px 6px", color: "#64748b" }}>{row.attempts ?? "—"}</td>
+                      <td style={{ padding: "10px 6px", color: "#5e574e" }}>{row.attempts ?? "—"}</td>
                     </tr>
                     {open && row.error_message ? (
-                      <tr style={{ background: "#fafafa" }}>
+                      <tr style={{ background: "#faf7f2" }}>
                         <td colSpan={7} style={{ padding: "10px 12px", fontSize: 11, color: "#b91c1c", wordBreak: "break-word", fontFamily: "ui-monospace, monospace" }}>
                           <strong style={{ color: "#7f1d1d" }}>{copy.errorPrefix}</strong>
                           {row.error_message}
@@ -269,7 +269,7 @@ function FlowExecutionLogPanel({ copy }) {
 
       {total > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, flexWrap: "wrap", gap: 8 }}>
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>
+          <span style={{ fontSize: 12, color: "#a39a8d" }}>
             {copy.entriesTotal(total, offset + 1, offset + logs.length)}
           </span>
           <div style={{ display: "flex", gap: 8 }}>
@@ -280,11 +280,11 @@ function FlowExecutionLogPanel({ copy }) {
               style={{
                 padding: "6px 12px",
                 borderRadius: 8,
-                border: "1px solid #e2e8f0",
+                border: "1px solid #e6dfd4",
                 background: "#fff",
                 fontSize: 12,
                 fontWeight: 600,
-                color: "#334155",
+                color: "#3a352f",
                 cursor: !hasPrev || loading ? "not-allowed" : "pointer",
                 opacity: !hasPrev || loading ? 0.45 : 1,
               }}
@@ -298,11 +298,11 @@ function FlowExecutionLogPanel({ copy }) {
               style={{
                 padding: "6px 12px",
                 borderRadius: 8,
-                border: "1px solid #e2e8f0",
+                border: "1px solid #e6dfd4",
                 background: "#fff",
                 fontSize: 12,
                 fontWeight: 600,
-                color: "#334155",
+                color: "#3a352f",
                 cursor: !hasNext || loading ? "not-allowed" : "pointer",
                 opacity: !hasNext || loading ? 0.45 : 1,
               }}
@@ -320,7 +320,7 @@ function statusColor(st) {
   const s = String(st || "").toLowerCase();
   if (s === "sent") return { bg: "#d1fae5", fg: "#047857", border: "#6ee7b7" };
   if (s === "failed") return { bg: "#fee2e2", fg: "#b91c1c", border: "#fca5a5" };
-  if (s === "skipped") return { bg: "#f3f4f6", fg: "#4b5563", border: "#d1d5db" };
+  if (s === "skipped") return { bg: "#f3eee6", fg: "#4b5563", border: "#d6ccbd" };
   if (s === "pending") return { bg: "#fef3c7", fg: "#b45309", border: "#fcd34d" };
   return { bg: "#e0e7ff", fg: "#3730a3", border: "#a5b4fc" };
 }
@@ -353,9 +353,9 @@ export default function MarketingAutomationsPage() {
   const dateLoc = copy.dateLocale;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
+    <div style={{ minHeight: "100vh", background: "#faf7f2" }}>
       <div style={{
-        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f2744 100%)",
+        background: "linear-gradient(135deg, #1d1b18 0%, #1d1b18 60%, #0f2744 100%)",
         padding: "36px 32px 28px",
         position: "relative", overflow: "hidden",
       }}>
@@ -368,7 +368,7 @@ export default function MarketingAutomationsPage() {
               <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: "-0.5px" }}>
                 {copy.pageTitle}
               </h1>
-              <p style={{ margin: "6px 0 0", fontSize: 14, color: "#94a3b8" }}>
+              <p style={{ margin: "6px 0 0", fontSize: 14, color: "#a39a8d" }}>
                 {copy.pageSubtitle}
               </p>
             </div>
@@ -377,11 +377,11 @@ export default function MarketingAutomationsPage() {
           <div style={{ display: "flex", gap: 24, marginTop: 24, flexWrap: "wrap" }}>
             {[
               { label: copy.statActiveFlows, value: loading ? "—" : activeCount, color: "#6ee7b7" },
-              { label: copy.statTriggered, value: loading ? "—" : totalSent.toLocaleString(dateLoc), color: "#93c5fd" },
+              { label: copy.statTriggered, value: loading ? "—" : totalSent.toLocaleString(dateLoc), color: "#f5d3a8" },
             ].map(s => (
               <div key={s.label}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: "-0.5px" }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
+                <div style={{ fontSize: 11, color: "#5e574e", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -399,8 +399,8 @@ export default function MarketingAutomationsPage() {
 
         <FlowExecutionLogPanel copy={copy} />
 
-        <div style={{ marginTop: 8, padding: "16px 20px", borderRadius: 12, background: "#fff", border: "1px solid #e2e8f0", fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
-          <strong style={{ color: "#64748b" }}>{copy.howItWorksTitle}</strong>
+        <div style={{ marginTop: 8, padding: "16px 20px", borderRadius: 12, background: "#fff", border: "1px solid #e6dfd4", fontSize: 12, color: "#a39a8d", lineHeight: 1.6 }}>
+          <strong style={{ color: "#5e574e" }}>{copy.howItWorksTitle}</strong>
           {" "}{copy.howItWorksBody}
         </div>
       </div>
