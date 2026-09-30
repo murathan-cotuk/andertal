@@ -10,6 +10,7 @@ import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { useLocale, useTranslations } from "next-intl";
 
 const STRIPE_PK = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
 const stripePromise = STRIPE_PK ? loadStripe(STRIPE_PK) : null;
@@ -35,6 +36,7 @@ function BrandLogo({ brand }) {
 }
 
 function SavedCard({ pm, onDelete, deleting }) {
+  const t = useTranslations("paymentPage");
   const card = pm.card || {};
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff" }}>
@@ -47,7 +49,7 @@ function SavedCard({ pm, onDelete, deleting }) {
           </span>
         </div>
         <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
-          Läuft ab {String(card.exp_month).padStart(2, "0")}/{card.exp_year}
+          {t("expires", { date: `${String(card.exp_month).padStart(2, "0")}/${card.exp_year}` })}
         </div>
       </div>
       <button
@@ -55,13 +57,14 @@ function SavedCard({ pm, onDelete, deleting }) {
         disabled={deleting === pm.id}
         style={{ background: "none", border: "1px solid #fecaca", borderRadius: 7, padding: "5px 10px", fontSize: 12, color: "#ef4444", cursor: "pointer", fontWeight: 600 }}
       >
-        {deleting === pm.id ? "…" : "Entfernen"}
+        {deleting === pm.id ? "…" : t("remove")}
       </button>
     </div>
   );
 }
 
 function AddCardForm({ onSuccess, onCancel }) {
+  const t = useTranslations("paymentPage");
   const stripe = useStripe();
   const elements = useElements();
   const [saving, setSaving] = useState(false);
@@ -78,7 +81,7 @@ function AddCardForm({ onSuccess, onCancel }) {
       redirect: "if_required",
     });
     if (error) {
-      setErr(error.message || "Fehler beim Speichern");
+      setErr(error.message || t("saveError"));
       setSaving(false);
       return;
     }
@@ -87,7 +90,7 @@ function AddCardForm({ onSuccess, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "20px 18px" }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 14 }}>Neue Zahlungsmethode hinzufügen</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 14 }}>{t("addTitle")}</div>
       <PaymentElement />
       {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 10 }}>{err}</p>}
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -96,14 +99,14 @@ function AddCardForm({ onSuccess, onCancel }) {
           disabled={saving || !stripe}
           style={{ flex: 1, padding: "9px 0", background: "#ee8a12", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)" }}
         >
-          {saving ? "Wird gespeichert…" : "Speichern"}
+          {saving ? t("saving") : t("save")}
         </button>
         <button
           type="button"
           onClick={onCancel}
           style={{ padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff" }}
         >
-          Abbrechen
+          {t("cancel")}
         </button>
       </div>
     </form>
@@ -112,6 +115,8 @@ function AddCardForm({ onSuccess, onCancel }) {
 
 export default function PaymentMethodsPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
+  const t = useTranslations("paymentPage");
+  const locale = useLocale();
   const { logout } = useAuth();
   const router = useRouter();
 
@@ -132,10 +137,10 @@ export default function PaymentMethodsPage() {
       const data = await client.request("/store/payment-methods", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (data?.__error) throw new Error(data.message || "Fehler");
+      if (data?.__error) throw new Error(data.message || t("error"));
       setPaymentMethods(data?.payment_methods || []);
     } catch (e) {
-      setErr(e?.message || "Fehler beim Laden");
+      setErr(e?.message || t("loadError"));
     } finally {
       setLoading(false);
     }
@@ -154,7 +159,7 @@ export default function PaymentMethodsPage() {
       });
       setPaymentMethods((prev) => prev.filter((pm) => pm.id !== pmId));
     } catch (e) {
-      setErr(e?.message || "Fehler beim Entfernen");
+      setErr(e?.message || t("removeError"));
     } finally {
       setDeleting(null);
     }
@@ -171,11 +176,11 @@ export default function PaymentMethodsPage() {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      if (data?.__error) throw new Error(data.message || "Fehler");
+      if (data?.__error) throw new Error(data.message || t("error"));
       setClientSecret(data.client_secret);
       setShowAddForm(true);
     } catch (e) {
-      setErr(e?.message || "Fehler");
+      setErr(e?.message || t("error"));
     } finally {
       setSetupLoading(false);
     }
@@ -192,7 +197,7 @@ export default function PaymentMethodsPage() {
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
-          <AccountPageLayout title="Zahlungsmethoden">
+          <AccountPageLayout title={t("title")}>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {loading && <GlobalPageLoader />}
               {err && (
@@ -204,7 +209,7 @@ export default function PaymentMethodsPage() {
                 <>
                   {paymentMethods.length === 0 && (
                     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "40px 24px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
-                      Keine gespeicherten Zahlungsmethoden.
+                      {t("empty")}
                     </div>
                   )}
                   {paymentMethods.map((pm) => (
@@ -215,12 +220,12 @@ export default function PaymentMethodsPage() {
                     disabled={setupLoading}
                     style={{ alignSelf: "flex-start", padding: "9px 18px", background: "#ee8a12", color: "#fff", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)", marginTop: 4 }}
                   >
-                    {setupLoading ? "…" : "+ Zahlungsmethode hinzufügen"}
+                    {setupLoading ? "…" : t("add")}
                   </button>
                 </>
               )}
               {showAddForm && clientSecret && stripePromise && (
-                <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: "stripe" } }}>
+                <Elements stripe={stripePromise} options={{ clientSecret, locale, appearance: { theme: "stripe" } }}>
                   <AddCardForm onSuccess={handleAddSuccess} onCancel={() => { setShowAddForm(false); setClientSecret(null); }} />
                 </Elements>
               )}

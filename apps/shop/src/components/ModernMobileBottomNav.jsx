@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { useVisualViewportBottomInset } from "@/hooks/useVisualViewportBottomInset";
 
+import { useTranslations } from "next-intl";
 const DEFAULT_ACCENT = "#1b8880";
 
 function backdropBlurFromToken(raw) {
@@ -27,6 +28,7 @@ export default function ModernMobileBottomNav({
   blur,
   boxShadow,
 }) {
+  const tUi = useTranslations("shopUi");
   const finalItems = useMemo(() => {
     const valid = Array.isArray(items) && items.length >= 2 && items.length <= 5;
     return valid ? items : [];
@@ -79,7 +81,7 @@ export default function ModernMobileBottomNav({
 
   return (
     <nav
-      aria-label="Mobile Navigation"
+      aria-label={tUi("mobileNav")}
       aria-hidden={isFixed && hideT >= 0.98 ? true : undefined}
       style={{
         "--component-active-color": accentColor,

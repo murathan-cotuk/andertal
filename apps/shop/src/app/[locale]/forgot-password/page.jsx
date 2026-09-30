@@ -8,6 +8,7 @@ import { tokens } from "@/design-system/tokens";
 const MEDUSA_BACKEND_URL = (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");
 
 export default function ForgotPasswordPage() {
+  const tUi = useTranslations("shopUi");
   const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -80,7 +81,7 @@ export default function ForgotPasswordPage() {
           ) : null}
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <label htmlFor="forgot-email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail</label>
+            <label htmlFor="forgot-email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{tUi("email")}</label>
             <input
               id="forgot-email"
               type="email"

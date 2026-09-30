@@ -1512,7 +1512,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 }
                 value={effectiveMeta("hersteller")}
                 onChange={(val) => updateVariantMeta("hersteller", val || undefined)}
-                placeholder={locale === "en" ? "e.g. Acme GmbH" : "z. B. Acme GmbH"}
+                placeholder={locale === "tr" ? "örn. Acme GmbH" : locale === "en" ? "e.g. Acme GmbH" : locale === "fr" ? "p. ex. Acme SARL" : locale === "es" ? "p. ej. Acme S.L." : locale === "it" ? "ad es. Acme S.r.l." : "z. B. Acme GmbH"}
                 autoComplete="off"
                 disabled={isFieldLocked("hersteller")}
               />
@@ -1535,7 +1535,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 }
                 value={effectiveMeta("hersteller_information")}
                 onChange={(val) => updateVariantMeta("hersteller_information", val || undefined)}
-                placeholder={locale === "en" ? "Street, city, country, email/phone" : "Straße, Ort, Land, E-Mail/Telefon"}
+                placeholder={locale === "tr" ? "Sokak, şehir, ülke, e-posta/telefon" : locale === "en" ? "Street, city, country, email/phone" : locale === "fr" ? "Rue, ville, pays, e-mail/téléphone" : locale === "es" ? "Calle, ciudad, país, e-mail/teléfono" : locale === "it" ? "Via, città, paese, e-mail/telefono" : "Straße, Ort, Land, E-Mail/Telefon"}
                 multiline={2}
                 autoComplete="off"
                 disabled={isFieldLocked("hersteller_information")}
@@ -1559,7 +1559,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 }
                 value={effectiveMeta("verantwortliche_person_information")}
                 onChange={(val) => updateVariantMeta("verantwortliche_person_information", val || undefined)}
-                placeholder={locale === "en" ? "Name, EU address, email/phone" : "Name, EU-Adresse, E-Mail/Telefon"}
+                placeholder={locale === "tr" ? "Ad, AB adresi, e-posta/telefon" : locale === "en" ? "Name, EU address, email/phone" : locale === "fr" ? "Nom, adresse UE, e-mail/téléphone" : locale === "es" ? "Nombre, dirección UE, e-mail/teléfono" : locale === "it" ? "Nome, indirizzo UE, e-mail/telefono" : "Name, EU-Adresse, E-Mail/Telefon"}
                 multiline={2}
                 autoComplete="off"
                 disabled={isFieldLocked("verantwortliche_person_information")}
@@ -1593,7 +1593,7 @@ export default function VariantEditPage({ product: initialProduct, idOrHandle, v
                 }
                 value={isFieldLocked("eu_origin_country") ? getMeta(product, "eu_origin_country") : (vm.eu_origin_country ?? "")}
                 onChange={(val) => updateVariantMeta("eu_origin_country", val || undefined)}
-                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
+                placeholder={locale === "tr" ? "örn. DE, FR, IT" : locale === "en" ? "e.g. DE, FR, IT" : locale === "fr" ? "p. ex. DE, FR, IT" : locale === "es" ? "p. ej. DE, FR, IT" : locale === "it" ? "ad es. DE, FR, IT" : "z. B. DE, FR, IT"}
                 autoComplete="off"
                 disabled={isFieldLocked("eu_origin_country")}
               />

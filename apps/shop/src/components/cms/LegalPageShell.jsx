@@ -182,6 +182,7 @@ const Article = styled.article`
 `;
 
 export default function LegalPageShell({ slug, title, html, hero = "", updatedAt = null }) {
+  const tUi = useTranslations("shopUi");
   const locale = useLocale();
   const tCommon = useTranslations("common");
   const [menu, setMenu] = useState(null);
@@ -211,7 +212,7 @@ export default function LegalPageShell({ slug, title, html, hero = "", updatedAt
 
   return (
     <Wrap>
-      <Crumbs aria-label="Breadcrumb">
+      <Crumbs data-breadcrumb="" aria-label={tUi("breadcrumb")}>
         <Link href="/">{tCommon("home")}</Link>
         <span aria-hidden="true">›</span>
         <b>{title}</b>

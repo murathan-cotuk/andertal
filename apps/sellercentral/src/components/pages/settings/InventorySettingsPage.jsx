@@ -156,7 +156,7 @@ export default function InventorySettingsPage() {
                     value={newWindowDays}
                     onChange={setNewWindowDays}
                     helpText={copy.newWindowDaysHelp}
-                    suffix={locale === "tr" ? "gün" : locale === "en" ? "days" : "Tage"}
+                    suffix={locale === "tr" ? "gün" : locale === "en" ? "days" : locale === "fr" ? "jours" : locale === "es" ? "días" : locale === "it" ? "giorni" : "Tage"}
                   />
                 </Box>
               </BlockStack>

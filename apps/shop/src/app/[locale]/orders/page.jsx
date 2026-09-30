@@ -11,7 +11,7 @@ import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { createOrderSupportCase, primaryCaseIdFromCreate } from "@/lib/create-order-support-case";
 import { destinationCountryFromOrder, formatVatPercent, getGoodsVatRatePercent, splitInclusiveVat } from "@/lib/goods-vat";
@@ -33,29 +33,37 @@ const T = {
 
 /* ─────────────── Status config ─────────────── */
 const STATUS = {
-  offen:           { label: "Offen",              dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
-  pending:         { label: "Offen",              dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
-  bezahlt:         { label: "Bezahlt",            dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
-  in_bearbeitung:  { label: "In Bearbeitung",     dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
-  processing:      { label: "In Bearbeitung",     dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
-  versendet:       { label: "Versendet",          dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
-  shipped:         { label: "Versendet",          dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
-  zugestellt:      { label: "Zugestellt",         dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
-  delivered:       { label: "Zugestellt",         dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
-  abgeschlossen:   { label: "Abgeschlossen",      dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
-  completed:       { label: "Abgeschlossen",      dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
-  storniert:       { label: "Storniert",          dot: "#ef4444", bg: "#fef2f2", color: "#991b1b" },
-  cancelled:       { label: "Storniert",          dot: "#ef4444", bg: "#fef2f2", color: "#991b1b" },
-  refunded:        { label: "Erstattet",          dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
-  retoure:         { label: "Retoure",            dot: "#ef4444", bg: "#fef2f2", color: "#b91c1c" },
-  retoure_anfrage: { label: "Rückgabe wird geprüft", dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
+  offen:           { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
+  pending:         { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
+  bezahlt:         { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
+  in_bearbeitung:  { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
+  processing:      { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
+  versendet:       { dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
+  shipped:         { dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
+  zugestellt:      { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
+  delivered:       { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
+  abgeschlossen:   { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
+  completed:       { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
+  storniert:       { dot: "#ef4444", bg: "#fef2f2", color: "#991b1b" },
+  cancelled:       { dot: "#ef4444", bg: "#fef2f2", color: "#991b1b" },
+  refunded:        { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
+  retoure:         { dot: "#ef4444", bg: "#fef2f2", color: "#b91c1c" },
+  retoure_anfrage: { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
 };
 
 const RETURN_STATUS = {
-  offen:         { label: "Offen",         color: "#92400e", bg: "#fffbeb" },
-  genehmigt:     { label: "Genehmigt",     color: "#065f46", bg: "#ecfdf5" },
-  abgelehnt:     { label: "Abgelehnt",     color: "#991b1b", bg: "#fef2f2" },
-  abgeschlossen: { label: "Abgeschlossen", color: "#374151", bg: "#f3f4f6" },
+  offen:         { color: "#92400e", bg: "#fffbeb" },
+  genehmigt:     { color: "#065f46", bg: "#ecfdf5" },
+  abgelehnt:     { color: "#991b1b", bg: "#fef2f2" },
+  abgeschlossen: { color: "#374151", bg: "#f3f4f6" },
+};
+
+/** English / German status aliases → translation key (ordersPage.status_*). */
+const STATUS_KEY = {
+  offen: "offen", pending: "offen", bezahlt: "bezahlt", in_bearbeitung: "in_bearbeitung", processing: "in_bearbeitung",
+  versendet: "versendet", shipped: "versendet", zugestellt: "zugestellt", delivered: "zugestellt",
+  abgeschlossen: "abgeschlossen", completed: "abgeschlossen", storniert: "storniert", cancelled: "storniert",
+  refunded: "refunded", retoure: "retoure", retoure_anfrage: "retoure_anfrage",
 };
 
 /* ─────────────── Carrier tracking ─────────────── */
@@ -84,12 +92,12 @@ function buildTrackingUrl(carrier, num) {
 }
 
 /* ─────────────── Helpers ─────────────── */
-function fmtDate(d) {
+function fmtDate(d, locale = "de") {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 }
-function fmtEur(cents) {
-  return (Number(cents || 0) / 100).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+function fmtEur(cents, locale = "de") {
+  return (Number(cents || 0) / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
 function displayStatus(order) {
@@ -244,8 +252,11 @@ const PulsingDot = styled.span`
 `;
 
 function StatusPill({ status }) {
+  const t = useTranslations("ordersPage");
   const k = (status || "").toLowerCase();
-  const s = STATUS[k] || { label: status || "—", dot: "#9ca3af", bg: "#f3f4f6", color: "#374151" };
+  const s = STATUS[k]
+    ? { ...STATUS[k], label: t(`status_${STATUS_KEY[k]}`) }
+    : { label: status || "—", dot: "#9ca3af", bg: "#f3f4f6", color: "#374151" };
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
@@ -261,6 +272,7 @@ function StatusPill({ status }) {
 
 /* Tracking chip */
 function TrackingChip({ carrier, number }) {
+  const t = useTranslations("ordersPage");
   const url = buildTrackingUrl(carrier, number);
   const carrierInfo = resolveCarrier(carrier);
   const displayName = carrierInfo?.name || carrier || "";
@@ -320,7 +332,7 @@ function TrackingChip({ carrier, number }) {
             textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
           }}
         >
-          Sendung verfolgen
+          {t("trackShipment")}
           <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M5.22 14.78a.75.75 0 001.06 0l7.22-7.22v5.69a.75.75 0 001.5 0v-7.5a.75.75 0 00-.75-.75h-7.5a.75.75 0 000 1.5h5.69l-7.22 7.22a.75.75 0 000 1.06z" clipRule="evenodd"/>
           </svg>
@@ -392,7 +404,7 @@ function ItemRow({ item, isLast, locale }) {
 
       {/* Price */}
       <div style={{ fontSize: 13, fontWeight: 700, color: T.dark, flexShrink: 0, textAlign: "right", minWidth: 72 }}>
-        {fmtEur(lineTotal)}
+        {fmtEur(lineTotal, locale)}
       </div>
     </div>
   );
@@ -421,7 +433,8 @@ function ActionBtn({ children, onClick, disabled, color = T.dark, bg = "#f9fafb"
   );
 }
 
-/* Retoure reasons */
+/* Retoure reasons — the German text is the value stored with the return (sellers read it in
+ * Sellercentral); the label shown to the customer comes from ordersPage.reason_<index>. */
 const RETOURE_REASONS = [
   "Falsches Produkt erhalten",
   "Defektes / beschädigtes Produkt",
@@ -435,6 +448,7 @@ const RETOURE_REASONS = [
 /* ─────────────── OrderCard ─────────────── */
 function OrderCard({ order, expanded, onToggle, onRefresh }) {
   const locale = useLocale();
+  const t = useTranslations("ordersPage");
   const router = useRouter();
   const items = order.items || [];
   const returns = order.returns || [];
@@ -467,7 +481,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
 
   async function withBusy(key, fn) {
     setBusy(key); setActionErr(null); setActionOk(null);
-    try { await fn(); } catch (e) { setActionErr(e.message || "Fehler"); } finally { setBusy(null); }
+    try { await fn(); } catch (e) { setActionErr(e.message || t("error")); } finally { setBusy(null); }
   }
 
   const token = () => getToken("customer");
@@ -498,7 +512,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
           <Link href={`/order/${order.id}`} onClick={e => e.stopPropagation()} style={{ textDecoration: "none" }}>
             <OrderNumText>#{orderNum}</OrderNumText>
           </Link>
-          <OrderDate>{fmtDate(order.created_at)}</OrderDate>
+          <OrderDate>{fmtDate(order.created_at, locale)}</OrderDate>
         </OrderNum>
 
         {/* Col 2: product names (hidden on mobile via CSS) */}
@@ -526,7 +540,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
         <HeaderRight>
           <StatusPill status={status} />
           <span style={{ fontSize: 14, fontWeight: 800, color: T.dark, letterSpacing: -0.4, fontFamily: T.font }}>
-            {fmtEur(total)}
+            {fmtEur(total, locale)}
           </span>
         </HeaderRight>
 
@@ -545,7 +559,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
           {/* Items */}
           {items.length > 0 && (
             <Section>
-              <SectionLabel>Artikel ({items.length})</SectionLabel>
+              <SectionLabel>{t("items", { count: items.length })}</SectionLabel>
               {items.map((item, i) => (
                 <ItemRow key={item.id || i} item={item} isLast={i === items.length - 1} locale={locale} />
               ))}
@@ -555,14 +569,14 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
           {/* Price breakdown */}
           <Section>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <PriceRow label="Zwischensumme" value={fmtEur(subtotal || (total - shipping + discount))} />
-              <PriceRow label="Versand" value={shipping === 0 ? "Kostenlos" : fmtEur(shipping)} />
-              {discount > 0 && <PriceRow label="Rabatt" value={`−${fmtEur(discount)}`} color="#dc2626" />}
+              <PriceRow label={t("subtotal")} value={fmtEur(subtotal || (total - shipping + discount), locale)} />
+              <PriceRow label={t("shipping")} value={shipping === 0 ? t("free") : fmtEur(shipping, locale)} />
+              {discount > 0 && <PriceRow label={t("discount")} value={`−${fmtEur(discount, locale)}`} color="#dc2626" />}
               <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 6, paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: T.dark, fontFamily: T.font }}>Gesamt</span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: T.dark, fontFamily: T.font }}>{fmtEur(total)}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: T.dark, fontFamily: T.font }}>{t("total")}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: T.dark, fontFamily: T.font }}>{fmtEur(total, locale)}</span>
               </div>
-              <PriceRow label={`davon ${formatVatPercent(vatRate)}% MwSt.`} value={fmtEur(vatAmount)} muted />
+              <PriceRow label={t("vatIncluded", { rate: formatVatPercent(vatRate) })} value={fmtEur(vatAmount, locale)} muted />
             </div>
           </Section>
 
@@ -576,11 +590,12 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
           {/* Return requests */}
           {returns.length > 0 && (
             <Section>
-              <SectionLabel>Retouren</SectionLabel>
+              <SectionLabel>{t("returns")}</SectionLabel>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {returns.map((r, i) => {
                   const rs = (r.status || "offen").toLowerCase();
-                  const s = RETURN_STATUS[rs] || { label: r.status, color: "#374151", bg: "#f3f4f6" };
+                  const s = RETURN_STATUS[rs] ? { ...RETURN_STATUS[rs], label: t(`ret_${rs}`) } : { label: r.status, color: "#374151", bg: "#f3f4f6" };
+                  const reasonIdx = RETOURE_REASONS.indexOf(r.reason);
                   return (
                     <div key={i} style={{
                       display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
@@ -591,12 +606,12 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                         <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/>
                       </svg>
                       <span style={{ fontWeight: 700 }}>
-                        Retoure{r.return_number ? ` #${r.return_number}` : ""}
+                        {t("returnLabel")}{r.return_number ? ` #${r.return_number}` : ""}
                       </span>
                       <span style={{ opacity: 0.8 }}>· {s.label}</span>
-                      {r.reason && <span style={{ opacity: 0.65 }}>· {r.reason}</span>}
+                      {r.reason && <span style={{ opacity: 0.65 }}>· {reasonIdx >= 0 ? t(`reason_${reasonIdx}`) : r.reason}</span>}
                       {r.created_at && (
-                        <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.7 }}>{fmtDate(r.created_at)}</span>
+                        <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.7 }}>{fmtDate(r.created_at, locale)}</span>
                       )}
                     </div>
                   );
@@ -629,7 +644,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
                 <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
               </svg>
-              {busy === "invoice" ? "…" : "Rechnung"}
+              {busy === "invoice" ? "…" : t("invoice")}
             </ActionBtn>
 
             {/* Retourenschein */}
@@ -639,7 +654,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 disabled={busy === "retourenschein"}
                 onClick={e => { e.stopPropagation(); withBusy("retourenschein", () => downloadBlob(`/api/store-return-retourenschein/${order.id}`, `Retourenschein-${orderNum}.pdf`, token())); }}
               >
-                {busy === "retourenschein" ? "…" : "Retourenschein"}
+                {busy === "retourenschein" ? "…" : t("returnSlip")}
               </ActionBtn>
             )}
 
@@ -649,7 +664,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 color="#0369a1" bg="#e0f2fe"
                 onClick={e => { e.stopPropagation(); window.open(returnWithLabel.label_url, "_blank", "noopener,noreferrer"); }}
               >
-                Rücksende-Etikett
+                {t("returnShippingLabel")}
               </ActionBtn>
             )}
 
@@ -662,7 +677,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/>
                 </svg>
-                Retoure anfragen
+                {t("requestReturn")}
               </ActionBtn>
             )}
 
@@ -674,7 +689,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
               </svg>
-              Nachricht
+              {t("message")}
             </ActionBtn>
 
             {/* Stornieren */}
@@ -684,15 +699,15 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 disabled={busy === "cancel"}
                 onClick={e => {
                   e.stopPropagation();
-                  if (!confirm("Bestellung wirklich stornieren?")) return;
+                  if (!confirm(t("confirmCancel"))) return;
                   withBusy("cancel", async () => {
                     const res = await getMedusaClient().request(`/store/orders/${order.id}/cancel`, {
                       method: "POST",
                       headers: { Authorization: `Bearer ${token()}` },
                       body: JSON.stringify({}),
                     });
-                    if (res?.__error) throw new Error(res.message || "Stornierung fehlgeschlagen");
-                    setActionOk("Bestellung erfolgreich storniert.");
+                    if (res?.__error) throw new Error(res.message || t("cancelFailed"));
+                    setActionOk(t("cancelled"));
                     onRefresh?.();
                   });
                 }}
@@ -700,7 +715,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
                 </svg>
-                {busy === "cancel" ? "…" : "Stornieren"}
+                {busy === "cancel" ? "…" : t("cancel")}
               </ActionBtn>
             )}
 
@@ -717,7 +732,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 fontFamily: T.font, whiteSpace: "nowrap",
               }}
             >
-              Details
+              {t("details")}
               <svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
               </svg>
@@ -727,21 +742,21 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
           {/* Retoure form */}
           {showRetoure && (
             <div style={{ margin: "0 18px 16px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "14px", fontFamily: T.font }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 12 }}>Rückgabe anfragen</div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Grund</label>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 12 }}>{t("returnFormTitle")}</div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>{t("reason")}</label>
               <select
                 value={retoureReason}
                 onChange={e => setRetoureReason(e.target.value)}
                 style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, background: "#fff", marginBottom: 10, fontFamily: T.font }}
               >
-                {RETOURE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                {RETOURE_REASONS.map((r, i) => <option key={r} value={r}>{t(`reason_${i}`)}</option>)}
               </select>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Anmerkungen (optional)</label>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>{t("notes")}</label>
               <textarea
                 value={retoureNotes}
                 onChange={e => setRetoureNotes(e.target.value)}
                 rows={3}
-                placeholder="Beschreiben Sie den Grund genauer…"
+                placeholder={t("notesPlaceholder")}
                 style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, resize: "vertical", fontFamily: T.font, boxSizing: "border-box", marginBottom: 10 }}
               />
               <div style={{ display: "flex", gap: 8 }}>
@@ -754,8 +769,8 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                         headers: { Authorization: `Bearer ${token()}` },
                         body: JSON.stringify({ reason: retoureReason, notes: retoureNotes }),
                       });
-                      if (res?.__error) throw new Error(res.message || "Fehler");
-                      setActionOk("Retouranfrage erfolgreich eingereicht.");
+                      if (res?.__error) throw new Error(res.message || t("error"));
+                      setActionOk(t("returnSubmitted"));
                       setShowRetoure(false);
                       onRefresh?.();
                     });
@@ -763,13 +778,13 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                   disabled={busy === "retoure"}
                   style={{ fontSize: 13, fontWeight: 700, color: "#fff", background: T.orange, border: "none", borderRadius: 8, padding: "8px 18px", cursor: "pointer", fontFamily: T.font }}
                 >
-                  {busy === "retoure" ? "Wird gesendet…" : "Anfrage senden"}
+                  {busy === "retoure" ? t("sending") : t("sendRequest")}
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); setShowRetoure(false); }}
                   style={{ fontSize: 13, color: T.gray2, background: "none", border: "none", cursor: "pointer", padding: "8px", fontFamily: T.font }}
                 >
-                  Abbrechen
+                  {t("abort")}
                 </button>
               </div>
             </div>
@@ -779,16 +794,16 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
           {showMessage && (
             <div style={{ margin: "0 18px 16px", background: "#f8fafc", border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px", fontFamily: T.font }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 12 }}>
-                {messageStep === "pick" ? "Produkt wählen" : "Nachricht senden"}
+                {messageStep === "pick" ? t("pickProduct") : t("sendMessage")}
               </div>
 
               {messageStep === "pick" && (
                 <>
                   <p style={{ fontSize: 12.5, color: T.gray1, margin: "0 0 10px" }}>
-                    Wählen Sie zuerst das Produkt, zu dem Ihre Nachricht gehört.
+                    {t("pickHint")}
                   </p>
                   {items.length === 0 && (
-                    <p style={{ fontSize: 12.5, color: "#b91c1c" }}>Keine Produkte in dieser Bestellung gefunden.</p>
+                    <p style={{ fontSize: 12.5, color: "#b91c1c" }}>{t("noItems")}</p>
                   )}
                   {items.map((it) => (
                     <button
@@ -815,7 +830,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {it.title || it.product_title || "Produkt"}
+                          {it.title || it.product_title || t("product")}
                         </div>
                         <div style={{ fontSize: 11, color: T.gray3 }}>× {it.quantity}</div>
                       </div>
@@ -826,7 +841,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                     onClick={e => { e.stopPropagation(); setShowMessage(false); }}
                     style={{ fontSize: 13, color: T.gray2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", fontFamily: T.font }}
                   >
-                    Abbrechen
+                    {t("abort")}
                   </button>
                 </>
               )}
@@ -841,7 +856,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                         ) : null}
                       </div>
                       <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {selectedMessageItem.title || selectedMessageItem.product_title || "Produkt"}
+                        {selectedMessageItem.title || selectedMessageItem.product_title || t("product")}
                       </div>
                       {items.length > 1 && (
                         <button
@@ -849,21 +864,21 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                           onClick={(e) => { e.stopPropagation(); setMessageStep("pick"); setMessageBody(""); }}
                           style={{ background: "none", border: "none", color: T.orange, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: T.font }}
                         >
-                          Ändern
+                          {t("change")}
                         </button>
                       )}
                     </div>
                   )}
-                  <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>Nachricht</label>
+                  <label style={{ fontSize: 11.5, fontWeight: 600, color: T.dark2, display: "block", marginBottom: 5 }}>{t("message")}</label>
                   <textarea
                     value={messageBody}
                     onChange={e => setMessageBody(e.target.value)}
                     rows={4}
-                    placeholder={`Ihre Frage zur Bestellung #${orderNum}…`}
+                    placeholder={t("messagePlaceholder", { number: orderNum })}
                     style={{ width: "100%", fontSize: 13, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, color: T.dark, resize: "vertical", fontFamily: T.font, boxSizing: "border-box", marginBottom: 10 }}
                   />
                   <div style={{ fontSize: 12, color: T.gray2, marginBottom: 10 }}>
-                    Die Nachricht wird als Support-Fall angelegt und unter Nachrichten fortgesetzt.
+                    {t("messageHint")}
                   </div>
                   {actionErr && <div style={{ fontSize: 12, color: "#b91c1c", marginBottom: 8 }}>{actionErr}</div>}
                   <div style={{ display: "flex", gap: 8 }}>
@@ -876,13 +891,13 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                           const res = await createOrderSupportCase({
                             orderId: order.id,
                             itemIds: [selectedItemId],
-                            title: `Anfrage zu Bestellung #${orderNum}`,
+                            title: t("caseTitle", { number: orderNum }),
                             description: messageBody.trim(),
                             locale,
                             category: "seller",
                             subcategory: "message",
                           });
-                          if (res?.__error) throw new Error(res.message || "Fehler");
+                          if (res?.__error) throw new Error(res.message || t("error"));
                           const caseId = primaryCaseIdFromCreate(res);
                           setShowMessage(false);
                           setMessageBody("");
@@ -896,14 +911,14 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                         fontFamily: T.font, opacity: (!messageBody.trim() || busy === "message" || !selectedItemId) ? 0.5 : 1,
                       }}
                     >
-                      {busy === "message" ? "Wird gesendet…" : "Absenden"}
+                      {busy === "message" ? t("sending") : t("submit")}
                     </button>
                     <button
                       type="button"
                       onClick={e => { e.stopPropagation(); setShowMessage(false); }}
                       style={{ fontSize: 13, color: T.gray2, background: "none", border: "none", cursor: "pointer", padding: "8px", fontFamily: T.font }}
                     >
-                      Abbrechen
+                      {t("abort")}
                     </button>
                   </div>
                 </>
@@ -930,6 +945,7 @@ function PriceRow({ label, value, color, muted }) {
 /* ─────────────── Page ─────────────── */
 export default function OrdersPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
+  const t = useTranslations("ordersPage");
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -941,7 +957,7 @@ export default function OrdersPage() {
     if (!tok) { setLoading(false); return; }
     getMedusaClient().request("/store/orders/me", { headers: { Authorization: `Bearer ${tok}` } })
       .then(res => {
-        if (res?.__error) setError(res.message || "Fehler");
+        if (res?.__error) setError(res.message || t("error"));
         else setOrders(res?.orders || []);
       })
       .catch(e => setError(e.message))
@@ -957,7 +973,7 @@ export default function OrdersPage() {
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
-          <AccountPageLayout title="Meine Bestellungen">
+          <AccountPageLayout title={t("title")}>
             <div>
               {loading && <GlobalPageLoader />}
 
@@ -967,7 +983,7 @@ export default function OrdersPage() {
                   color: "#dc2626", padding: "12px 16px", borderRadius: T.radius,
                   fontSize: 13, fontFamily: T.font,
                 }}>
-                  Fehler beim Laden der Bestellungen.
+                  {t("loadError")}
                 </div>
               )}
 
@@ -982,10 +998,10 @@ export default function OrdersPage() {
                     </svg>
                   </div>
                   <p style={{ color: T.gray1, fontSize: 15, fontWeight: 600, margin: "0 0 8px" }}>
-                    Noch keine Bestellungen
+                    {t("empty")}
                   </p>
                   <p style={{ color: T.gray3, fontSize: 13, margin: "0 0 24px" }}>
-                    Ihre Bestellungen erscheinen hier.
+                    {t("emptyHint")}
                   </p>
                   <Link href="/" style={{
                     display: "inline-flex", alignItems: "center", gap: 6,
@@ -994,7 +1010,7 @@ export default function OrdersPage() {
                     fontSize: 13.5, fontFamily: T.font,
                     border: "1px solid #e6dfd4", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
                   }}>
-                    Zum Shop
+                    {t("toShop")}
                   </Link>
                 </div>
               )}

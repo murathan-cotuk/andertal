@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { ProductGrid } from "@/components/ProductGrid";
@@ -298,13 +299,15 @@ function renderStars(avg, size = 18) {
   );
 }
 
-function fmtDate(d) {
+function fmtDate(d, locale = "de") {
   if (!d) return "";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(d).toLocaleDateString(locale, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export default function SellerProfilePage() {
   const { seller_id } = useParams();
+  const t = useTranslations("sellerPage");
+  const locale = useLocale();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -333,17 +336,17 @@ export default function SellerProfilePage() {
   const about = seller?.shop_about || "";
   const returnConditions = seller?.return_conditions || "";
   const askHref = legal.email
-    ? `mailto:${legal.email}?subject=${encodeURIComponent(`Frage zu ${storeName}`)}`
+    ? `mailto:${legal.email}?subject=${encodeURIComponent(t("askSubject", { name: storeName }))}`
     : null;
   const impressumRows = [
-    [legal.company_name && "Firma", legal.company_name],
-    [legal.representative && "Vertretungsberechtigt", legal.representative],
-    [(legal.street || legal.city) && "Anschrift", [legal.street, legal.city].filter(Boolean).join(", ")],
-    [legal.register_court && "Registergericht", legal.register_court],
-    [legal.trade_register && "Handelsregister", legal.trade_register],
-    [legal.vat_id && "USt-IdNr.", legal.vat_id],
-    [legal.tax_id && "Steuernummer", legal.tax_id],
-    [legal.email && "E-Mail", legal.email],
+    [legal.company_name && t("company"), legal.company_name],
+    [legal.representative && t("representative"), legal.representative],
+    [(legal.street || legal.city) && t("address"), [legal.street, legal.city].filter(Boolean).join(", ")],
+    [legal.register_court && t("registerCourt"), legal.register_court],
+    [legal.trade_register && t("tradeRegister"), legal.trade_register],
+    [legal.vat_id && t("vatId"), legal.vat_id],
+    [legal.tax_id && t("taxId"), legal.tax_id],
+    [legal.email && t("email"), legal.email],
   ].filter(([k, v]) => k && v);
 
   return (
@@ -376,15 +379,15 @@ export default function SellerProfilePage() {
                   <RatingRow>
                     {renderStars(avg)}
                     <RatingNum>{Number(avg).toFixed(1)}</RatingNum>
-                    <RatingCount>({count} Bewertung{count !== 1 ? "en" : ""})</RatingCount>
+                    <RatingCount>{t("ratingCount", { count })}</RatingCount>
                   </RatingRow>
                 ) : (
-                  <RatingCount>Noch keine Bewertungen</RatingCount>
+                  <RatingCount>{t("noRatings")}</RatingCount>
                 )}
                 {about && <AboutText>{about}</AboutText>}
                 {askHref && (
                   <AskBtn href={askHref}>
-                    <span aria-hidden>✉</span> Fragen stellen
+                    <span aria-hidden>✉</span> {t("ask")}
                   </AskBtn>
                 )}
               </SellerInfo>
@@ -411,7 +414,7 @@ export default function SellerProfilePage() {
         {(loading || products.length > 0) && (
           <div style={{ marginBottom: 40 }}>
             <SectionTitle>
-              {loading ? <Bone style={{ width: 160, height: 20 }} /> : `Produkte von ${storeName}`}
+              {loading ? <Bone style={{ width: 160, height: 20 }} /> : t("productsBy", { name: storeName })}
             </SectionTitle>
             {loading ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
@@ -428,7 +431,7 @@ export default function SellerProfilePage() {
         {/* ── Brands ── */}
         {!loading && brands.length > 0 && (
           <div style={{ marginBottom: 32 }}>
-            <SectionTitle>Marken von {storeName}</SectionTitle>
+            <SectionTitle>{t("brandsBy", { name: storeName })}</SectionTitle>
             <BrandChips>
               {brands.map((b) => (
                 b.handle
@@ -442,7 +445,7 @@ export default function SellerProfilePage() {
         {/* ── Return / refund conditions ── */}
         {!loading && returnConditions && (
           <div style={{ marginBottom: 32 }}>
-            <SectionTitle>Rücksende- und Erstattungsbedingungen</SectionTitle>
+            <SectionTitle>{t("returnPolicy")}</SectionTitle>
             <InfoCard>
               <AboutText style={{ margin: 0, maxWidth: "none" }}>{returnConditions}</AboutText>
             </InfoCard>
@@ -452,7 +455,7 @@ export default function SellerProfilePage() {
         {/* ── Impressum ── */}
         {!loading && impressumRows.length > 0 && (
           <div style={{ marginBottom: 32 }}>
-            <SectionTitle>Impressum</SectionTitle>
+            <SectionTitle>{t("imprint")}</SectionTitle>
             <InfoCard>
               <ImpressumGrid>
                 {impressumRows.map(([k, v]) => (
@@ -472,7 +475,7 @@ export default function SellerProfilePage() {
             {loading ? (
               <Bone style={{ width: 120, height: 20 }} />
             ) : (
-              `Bewertungen${count > 0 ? ` (${count})` : ""}`
+              `${t("reviews")}${count > 0 ? ` (${count})` : ""}`
             )}
           </SectionTitle>
 
@@ -486,7 +489,7 @@ export default function SellerProfilePage() {
 
           {!loading && reviews.length === 0 && (
             <div style={{ textAlign: "center", padding: "40px 0", color: "#9ca3af", fontSize: 14 }}>
-              Noch keine Bewertungen vorhanden.
+              {t("noReviews")}
             </div>
           )}
 
@@ -495,12 +498,12 @@ export default function SellerProfilePage() {
               <ReviewHeader>
                 <div>
                   {renderStars(r.rating, 15)}
-                  <ReviewAuthor style={{ marginLeft: 6 }}>{r.customer_name || "Anonym"}</ReviewAuthor>
+                  <ReviewAuthor style={{ marginLeft: 6 }}>{r.customer_name || t("anonymous")}</ReviewAuthor>
                   {r.product_title && (
                     <ReviewProduct>· {r.product_title}</ReviewProduct>
                   )}
                 </div>
-                <ReviewDate>{fmtDate(r.created_at)}</ReviewDate>
+                <ReviewDate>{fmtDate(r.created_at, locale)}</ReviewDate>
               </ReviewHeader>
               {r.comment && <ReviewComment>{r.comment}</ReviewComment>}
             </ReviewCard>

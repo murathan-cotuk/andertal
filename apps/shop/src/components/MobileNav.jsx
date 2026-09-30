@@ -338,6 +338,7 @@ function appPathFromPathname(pathname) {
 
 /* ─── Main component ─────────────────────────────────────── */
 export default function MobileNav({ layout = "fixed" }) {
+  const tUi = useTranslations("shopUi");
   const shopStyles = useShopStyles();
   const mc = shopStyles?.mobileChrome || {};
   const { mobileBottomNavScroll, productPageActive } = useMobileBottomNavScroll();
@@ -507,7 +508,7 @@ export default function MobileNav({ layout = "fixed" }) {
         style={css.drawer(drawerOpen, reducedMotion)}
         role="dialog"
         aria-modal="true"
-        aria-label="Navigation"
+        aria-label={tUi("navigation")}
       >
         {/* Drawer head */}
         <div style={css.drawerHead}>
@@ -674,7 +675,7 @@ export default function MobileNav({ layout = "fixed" }) {
             : "translateY(0)",
           pointerEvents: bottomNavRecessProgress >= 0.95 ? "none" : "auto",
         }}
-        aria-label="Mobile Navigation"
+        aria-label={tUi("mobileNav")}
         aria-hidden={bottomNavRecessProgress >= 0.98 ? true : undefined}
       >
         {/* Home */}

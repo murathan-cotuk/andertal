@@ -1272,7 +1272,7 @@ export default function PolarisLayout({ children }) {
             </Link>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <GroupedDropdownSearch placeholder="Search products, orders, customers..." />
+            <GroupedDropdownSearch />
           </div>
           {unsaved?.isDirty && (
             <>

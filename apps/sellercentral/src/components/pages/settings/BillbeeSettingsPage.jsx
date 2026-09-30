@@ -52,8 +52,8 @@ function CopyField({ label, value, helpText, multiline, masked = false, locale =
               variant="plain"
               size="slim"
               disabled={!value}
-              accessibilityLabel={hidden ? (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen") : (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Ausblenden")}
-              title={hidden ? (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen") : (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Ausblenden")}
+              accessibilityLabel={hidden ? (locale === "tr" ? "Göster" : locale === "en" ? "Show" : locale === "fr" ? "Afficher" : locale === "es" ? "Mostrar" : locale === "it" ? "Mostra" : "Anzeigen") : (locale === "tr" ? "Gizle" : locale === "en" ? "Hide" : locale === "fr" ? "Masquer" : locale === "es" ? "Ocultar" : locale === "it" ? "Nascondi" : "Ausblenden")}
+              title={hidden ? (locale === "tr" ? "Göster" : locale === "en" ? "Show" : locale === "fr" ? "Afficher" : locale === "es" ? "Mostrar" : locale === "it" ? "Mostra" : "Anzeigen") : (locale === "tr" ? "Gizle" : locale === "en" ? "Hide" : locale === "fr" ? "Masquer" : locale === "es" ? "Ocultar" : locale === "it" ? "Nascondi" : "Ausblenden")}
               onClick={() => setVisible((v) => !v)}
             />
           ) : null}
@@ -62,8 +62,8 @@ function CopyField({ label, value, helpText, multiline, masked = false, locale =
             variant="plain"
             size="slim"
             disabled={!value}
-            accessibilityLabel={copied ? (locale === "en" ? "Copied" : locale === "tr" ? "Kopyalandı" : "Kopiert") : (locale === "en" ? "Copy" : locale === "tr" ? "Kopyala" : "Kopieren")}
-            title={copied ? (locale === "en" ? "Copied" : locale === "tr" ? "Kopyalandı" : "Kopiert") : (locale === "en" ? "Copy" : locale === "tr" ? "Kopyala" : "Kopieren")}
+            accessibilityLabel={copied ? (locale === "tr" ? "Kopyalandı" : locale === "en" ? "Copied" : locale === "fr" ? "Copié" : locale === "es" ? "Copiado" : locale === "it" ? "Copiato" : "Kopiert") : (locale === "tr" ? "Kopyala" : locale === "en" ? "Copy" : locale === "fr" ? "Copier" : locale === "es" ? "Copiar" : locale === "it" ? "Copia" : "Kopieren")}
+            title={copied ? (locale === "tr" ? "Kopyalandı" : locale === "en" ? "Copied" : locale === "fr" ? "Copié" : locale === "es" ? "Copiado" : locale === "it" ? "Copiato" : "Kopiert") : (locale === "tr" ? "Kopyala" : locale === "en" ? "Copy" : locale === "fr" ? "Copier" : locale === "es" ? "Copiar" : locale === "it" ? "Copia" : "Kopieren")}
             onClick={copy}
           />
         </InlineStack>
@@ -111,7 +111,7 @@ export default function BillbeeSettingsPage({ embedded = false }) {
       setBasicPass(data?.basic_auth_password || "");
       setHint(data?.hint || "");
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Connection data could not be loaded." : locale === "tr" ? "Bağlantı verileri yüklenemedi." : "Verbindungsdaten konnten nicht geladen werden."));
+      setErr(e?.message || (locale === "tr" ? "Bağlantı verileri yüklenemedi." : locale === "en" ? "Connection data could not be loaded." : locale === "fr" ? "Impossible de charger les données de connexion." : locale === "es" ? "No se pudieron cargar los datos de conexión." : locale === "it" ? "Impossibile caricare i dati di connessione." : "Verbindungsdaten konnten nicht geladen werden."));
     }
     setLoading(false);
   }, [client]);
@@ -121,16 +121,16 @@ export default function BillbeeSettingsPage({ embedded = false }) {
   }, [load]);
 
   const handleRotateSecret = async () => {
-    if (!(await confirmDelete(locale === "en" ? "Generate new Basic Auth password? You will need to update it in Billbee afterwards." : locale === "tr" ? "Yeni Basic Auth şifresi oluşturulsun mu? Ardından Billbee'de güncellemeniz gerekecek." : "Neues Basic-Auth-Passwort erzeugen? In Billbee musst du das Passwort danach aktualisieren."))) return;
+    if (!(await confirmDelete(locale === "tr" ? "Yeni Basic Auth şifresi oluşturulsun mu? Ardından Billbee'de güncellemeniz gerekecek." : locale === "en" ? "Generate new Basic Auth password? You will need to update it in Billbee afterwards." : locale === "fr" ? "Générer un nouveau mot de passe Basic Auth ? Vous devrez ensuite le mettre à jour dans Billbee." : locale === "es" ? "¿Generar una nueva contraseña Basic Auth? Después tendrás que actualizarla en Billbee." : locale === "it" ? "Generare una nuova password Basic Auth? Dovrai poi aggiornarla in Billbee." : "Neues Basic-Auth-Passwort erzeugen? In Billbee musst du das Passwort danach aktualisieren."))) return;
     setRotating(true);
     setErr("");
     setOkBanner("");
     try {
       const data = await client.rotateBillbeeMarketplaceSecret();
       if (data?.basic_auth_password) setBasicPass(data.basic_auth_password);
-      setOkBanner(locale === "en" ? "New password saved. Please update it in Billbee." : locale === "tr" ? "Yeni şifre kaydedildi. Lütfen Billbee'de güncelleyin." : "Neues Passwort gespeichert. Bitte in Billbee eintragen.");
+      setOkBanner(locale === "tr" ? "Yeni şifre kaydedildi. Lütfen Billbee'de güncelleyin." : locale === "en" ? "New password saved. Please update it in Billbee." : locale === "fr" ? "Nouveau mot de passe enregistré. Mettez-le à jour dans Billbee." : locale === "es" ? "Nueva contraseña guardada. Actualízala en Billbee." : locale === "it" ? "Nuova password salvata. Aggiornala in Billbee." : "Neues Passwort gespeichert. Bitte in Billbee eintragen.");
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Error generating new password." : locale === "tr" ? "Yeni şifre oluşturma hatası." : "Fehler beim Erneuern."));
+      setErr(e?.message || (locale === "tr" ? "Yeni şifre oluşturma hatası." : locale === "en" ? "Error generating new password." : locale === "fr" ? "Erreur lors de la génération du mot de passe." : locale === "es" ? "Error al generar la contraseña." : locale === "it" ? "Errore nella generazione della password." : "Fehler beim Erneuern."));
     }
     setRotating(false);
   };
@@ -214,22 +214,22 @@ export default function BillbeeSettingsPage({ embedded = false }) {
       />
 
       <CopyField
-        label={locale === "en" ? "Basic Auth Username" : locale === "tr" ? "Basic Auth Kullanıcı Adı" : "Basic Auth Benutzername"}
+        label={locale === "tr" ? "Basic Auth Kullanıcı Adı" : locale === "en" ? "Basic Auth Username" : locale === "fr" ? "Nom d’utilisateur Basic Auth" : locale === "es" ? "Usuario Basic Auth" : locale === "it" ? "Nome utente Basic Auth" : "Basic Auth Benutzername"}
         value={loading ? "" : basicUser}
-        helpText={locale === "en" ? "Your Seller Central email address" : locale === "tr" ? "Seller Central e-posta adresiniz" : "Deine Seller-Central E-Mail-Adresse"}
+        helpText={locale === "tr" ? "Seller Central e-posta adresiniz" : locale === "en" ? "Your Seller Central email address" : locale === "fr" ? "Votre adresse e-mail Seller Central" : locale === "es" ? "Tu dirección de e-mail de Seller Central" : locale === "it" ? "Il tuo indirizzo e-mail Seller Central" : "Deine Seller-Central E-Mail-Adresse"}
         locale={locale}
       />
 
       <BlockStack gap="200">
         <CopyField
-          label={locale === "en" ? "Basic Auth Password" : locale === "tr" ? "Basic Auth Şifresi" : "Basic Auth Passwort"}
+          label={locale === "tr" ? "Basic Auth Şifresi" : locale === "en" ? "Basic Auth Password" : locale === "fr" ? "Mot de passe Basic Auth" : locale === "es" ? "Contraseña Basic Auth" : locale === "it" ? "Password Basic Auth" : "Basic Auth Passwort"}
           value={loading ? "" : basicPass}
-          helpText={locale === "en" ? "Eye icon: show/hide. Duplicate icon: copy." : locale === "tr" ? "Göz ikonu: göster/gizle. Kopyala ikonu: kopyala." : "Auge-Symbol: ein-/ausblenden. Doppelblatt-Symbol: kopieren."}
+          helpText={locale === "tr" ? "Göz ikonu: göster/gizle. Kopyala ikonu: kopyala." : locale === "en" ? "Eye icon: show/hide. Duplicate icon: copy." : locale === "fr" ? "Icône œil : afficher/masquer. Icône double page : copier." : locale === "es" ? "Icono de ojo: mostrar/ocultar. Icono de copia: copiar." : locale === "it" ? "Icona occhio: mostra/nascondi. Icona copia: copia." : "Auge-Symbol: ein-/ausblenden. Doppelblatt-Symbol: kopieren."}
           masked
           locale={locale}
         />
         <Button onClick={handleRotateSecret} loading={rotating} disabled={loading}>
-          {locale === "en" ? "Generate new password" : locale === "tr" ? "Yeni şifre oluştur" : "Neues Passwort erzeugen"}
+          {locale === "tr" ? "Yeni şifre oluştur" : locale === "en" ? "Generate new password" : locale === "fr" ? "Générer un nouveau mot de passe" : locale === "es" ? "Generar nueva contraseña" : locale === "it" ? "Genera nuova password" : "Neues Passwort erzeugen"}
         </Button>
       </BlockStack>
 

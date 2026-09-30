@@ -196,6 +196,7 @@ const SOCIAL_ICONS = {
 };
 
 export default function Footer() {
+  const tUi = useTranslations("shopUi");
   const locale = useLocale();
   const tCommon = useTranslations("common");
   const styles = useShopStyles();
@@ -271,7 +272,7 @@ export default function Footer() {
                   <FooterLink key={item.id} href={menuItemHref(item)}>{item.label}</FooterLink>
                 ))
               ) : (
-                menu ? <Placeholder>Keine Einträge</Placeholder> : null
+                menu ? <Placeholder>{tUi("noEntries")}</Placeholder> : null
               )}
             </Column>
           ))}

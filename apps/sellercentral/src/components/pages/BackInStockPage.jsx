@@ -14,7 +14,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 function fmtDate(d, locale) {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleDateString(locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE", {
+    return new Date(d).toLocaleDateString(locale === "tr" ? "tr-TR" : locale === "en" ? "en-GB" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE", {
       day: "2-digit", month: "2-digit", year: "numeric",
     });
   } catch {

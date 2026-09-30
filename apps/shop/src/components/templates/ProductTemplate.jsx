@@ -1062,6 +1062,7 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 export default function ProductTemplate() {
+  const tUi = useTranslations("shopUi");
   useMarkProductPage();
   const router = useRouter();
   const params = useParams();
@@ -1302,7 +1303,7 @@ export default function ProductTemplate() {
 
   if (loading) return null;
   if (error) return <Container>Fehler: {error}</Container>;
-  if (!product) return <Container>Produkt nicht gefunden.</Container>;
+  if (!product) return <Container>{tUi("productNotFound")}</Container>;
 
   const { title: displayTitle, description: displayDescription } = getLocalizedProduct(product, locale);
   const localeMedia = localizedProductMediaList(product, locale);
@@ -1741,7 +1742,7 @@ export default function ProductTemplate() {
                   }
                   if (k === "share_button") {
                     return pdpVisible("share_button") ? (
-                      <GalleryActionBtn key="share_button" type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
+                      <GalleryActionBtn key="share_button" type="button" aria-label={tUi("shareProduct")} title={tUi("shareProduct")} onClick={shareProduct}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                           <circle cx="18" cy="5" r="3"></circle>
                           <circle cx="6" cy="12" r="3"></circle>
@@ -2041,9 +2042,9 @@ export default function ProductTemplate() {
               <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
                 {{ de: "Produktsicherheitsinformationen", en: "Product safety information", tr: "Ürün güvenlik bilgileri", fr: "Informations de sécurité produit", it: "Informazioni di sicurezza prodotto", es: "Información de seguridad del producto" }[locale] ?? "Produktsicherheitsinformationen"}
               </h3>
-              {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>Hersteller:</strong> {String(meta.hersteller)}</p>}
-              {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Hersteller-Informationen:</strong><br />{String(meta.hersteller_information)}</p>}
-              {meta.verantwortliche_person_information && <p style={{ marginBottom: extraCompliance.length > 0 ? 8 : 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Verantwortliche Person (EU):</strong><br />{String(meta.verantwortliche_person_information)}</p>}
+              {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>{tUi("manufacturer")}</strong> {String(meta.hersteller)}</p>}
+              {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>{tUi("manufacturerInfo")}</strong><br />{String(meta.hersteller_information)}</p>}
+              {meta.verantwortliche_person_information && <p style={{ marginBottom: extraCompliance.length > 0 ? 8 : 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>{tUi("responsiblePerson")}</strong><br />{String(meta.verantwortliche_person_information)}</p>}
               {extraCompliance.map((key, i) => {
                 const value = String(meta[key]);
                 const label = localizeMetaKey(key, locale);
@@ -2142,7 +2143,7 @@ export default function ProductTemplate() {
                         ))}
                       </span>
                       <span style={{ fontSize: 12, color: "#6b7280" }}>
-                        {new Date(rv.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                        {new Date(rv.created_at).toLocaleDateString(locale, { day: "2-digit", month: "2-digit", year: "numeric" })}
                       </span>
                     </div>
                   </div>
@@ -2154,7 +2155,7 @@ export default function ProductTemplate() {
             <p className="text-gray-500 text-sm mt-2">{tp("noReviews")}</p>
           ) : null}
           <TrustpilotTrustBox
-            locale={locale === "en" ? "en-US" : "de-DE"}
+            locale={{ de: "de-DE", en: "en-US", tr: "tr-TR", fr: "fr-FR", es: "es-ES", it: "it-IT" }[locale] || "en-US"}
             style={{ marginTop: 28 }}
           />
       </ReviewsSection>

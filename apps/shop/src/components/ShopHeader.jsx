@@ -1289,6 +1289,7 @@ const SHOP_LOCALES = [
 ];
 
 export default function ShopHeader() {
+  const tUi = useTranslations("shopUi");
   const { showHeaderFilterBar, landingHeaderBg, landingHeaderStatusColor, secondNavDesktopClassic } = useLandingChrome();
   const { publishMobileBottomNavScroll } = useMobileBottomNavScroll();
   const ctxPrefix = useMarketPrefix();
@@ -2180,9 +2181,9 @@ export default function ShopHeader() {
                 </MiddleBarLocaleBtn>
                 <LocaleDropdown $open={localeDropdownOpen}>
                   <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0", minWidth: 0 }}>
-                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Land</div>
+                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>{tUi("country")}</div>
                     {shopCountries.length === 0 ? (
-                      <div style={{ padding: "8px 16px", fontSize: 13, color: "#9ca3af" }}>Keine Länder konfiguriert</div>
+                      <div style={{ padding: "8px 16px", fontSize: 13, color: "#9ca3af" }}>{tUi("noCountries")}</div>
                     ) : shopCountries.map((c) => (
                       <LocaleOption
                         key={c.code}
@@ -2201,7 +2202,7 @@ export default function ShopHeader() {
                     ))}
                   </div>
                   <div style={{ flex: 1, padding: "16px 0", minWidth: 0 }}>
-                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>Sprache</div>
+                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>{tUi("language")}</div>
                     {SHOP_LOCALES.filter((l) => enabledShopLocales.includes(l.code)).map((l) => (
                       <LocaleOption
                         key={l.code}

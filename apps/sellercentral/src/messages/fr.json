@@ -318,5 +318,19 @@
     "noInvoices": "Aucune facture de commission.",
     "platformOwn": "Plateforme (propre)",
     "loading": "Chargement…"
+  },
+  "globalSearch": {
+    "placeholder": "Rechercher produits, commandes, clients…",
+    "searching": "Recherche…",
+    "noResults": "Aucun résultat pour « {query} »",
+    "products": "Produits",
+    "orders": "Commandes",
+    "customers": "Clients",
+    "navigation": "Navigation",
+    "bulkUpload": "Import en masse",
+    "singleUpload": "Ajouter un produit",
+    "ranking": "Classement",
+    "shipping": "Livraison",
+    "payments": "Paiements"
   }
 }

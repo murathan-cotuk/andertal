@@ -7,37 +7,34 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { useLocale, useTranslations } from "next-intl";
 
 const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
 const GRAY = "#6b7280";
 const BORDER = "#e5e7eb";
 
-function fmtLedgerDate(iso) {
+function fmtLedgerDate(iso, locale = "de") {
   if (!iso) return { date: "—", time: "" };
   try {
     const d = new Date(iso);
     return {
-      date: d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }),
-      time: d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }),
+      date: d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit", year: "numeric" }),
+      time: d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }),
     };
   } catch {
     return { date: String(iso), time: "" };
   }
 }
 
-function sourceLabel(source) {
-  const m = {
-    registration: "Registrierung",
-    order_earn: "Bestellung",
-    order_redeem: "Einlösung",
-    manual: "Anpassung",
-  };
-  return m[source] || source || "—";
-}
+const LEDGER_SOURCES = ["registration", "order_earn", "order_redeem", "manual"];
 
 export default function BonusPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
+  const t = useTranslations("bonusPage");
+  const locale = useLocale();
+  const sourceLabel = (source) => (LEDGER_SOURCES.includes(source) ? t(`src_${source}`) : source || "—");
+  const b = (chunks) => <strong>{chunks}</strong>;
   const { user, isLoading: authLoading, isAuthenticated, token: authToken } = useAuth();
   const [points, setPoints] = useState(null);
   const [ledger, setLedger] = useState([]);
@@ -76,8 +73,8 @@ export default function BonusPage() {
       <main style={{ flex: 1, width: "100%", boxSizing: "border-box" }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
           <AccountPageLayout
-            title="Meine Bonuspunkte"
-            description="Sammeln und einlösen Sie Punkte bei jedem Einkauf — inklusive Übersicht Ihrer letzten Bewegungen."
+            title={t("title")}
+            description={t("description")}
           >
             <div style={{ minWidth: 0 }}>
               <div
@@ -91,23 +88,23 @@ export default function BonusPage() {
                 }}
               >
                 <div style={{ fontSize: 13, fontWeight: 600, color: GRAY, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                  Aktueller Kontostand
+                  {t("balance")}
                 </div>
                 {loading ? (
                   <div style={{ fontSize: 20, color: GRAY }}>…</div>
                 ) : (
                   <div style={{ fontSize: 42, fontWeight: 800, color: ORANGE, lineHeight: 1.2 }}>
-                    {points ?? 0} <span style={{ fontSize: 20, fontWeight: 600, color: DARK }}>Punkte</span>
+                    {points ?? 0} <span style={{ fontSize: 20, fontWeight: 600, color: DARK }}>{t("points")}</span>
                   </div>
                 )}
               </div>
 
               <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "14px 10px 14px", marginBottom: 24 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 12px", paddingLeft: 4 }}>Verlauf</h2>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 12px", paddingLeft: 4 }}>{t("history")}</h2>
                 {loading ? (
                   <GlobalPageLoader />
                 ) : ledger.length === 0 ? (
-                  <p style={{ color: GRAY, margin: 0 }}>Noch keine Einträge.</p>
+                  <p style={{ color: GRAY, margin: 0 }}>{t("empty")}</p>
                 ) : (
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, tableLayout: "fixed" }}>
                     <colgroup>
@@ -118,15 +115,15 @@ export default function BonusPage() {
                     </colgroup>
                     <thead>
                       <tr style={{ color: GRAY, fontSize: 11, textAlign: "left", borderBottom: `1px solid ${BORDER}` }}>
-                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Datum</th>
-                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Punkte</th>
-                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Herkunft</th>
-                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>Beschreibung</th>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>{t("colDate")}</th>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>{t("colPoints")}</th>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>{t("colSource")}</th>
+                        <th style={{ padding: "8px 4px", fontWeight: 600 }}>{t("colDescription")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {ledger.map((row) => {
-                        const { date, time } = fmtLedgerDate(row.occurred_at || row.created_at);
+                        const { date, time } = fmtLedgerDate(row.occurred_at || row.created_at, locale);
                         return (
                           <tr key={row.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
                             <td style={{ padding: "10px 4px", color: DARK }}>
@@ -151,22 +148,12 @@ export default function BonusPage() {
               </div>
 
               <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${BORDER}`, padding: "24px 28px" }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 16px" }}>So funktioniert es</h2>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: DARK, margin: "0 0 16px" }}>{t("howTitle")}</h2>
                 <ul style={{ margin: 0, paddingLeft: 20, color: DARK, fontSize: 15, lineHeight: 1.7 }}>
-                  <li>
-                    <strong>Registrierung:</strong> Bei Kontoeröffnung erhalten Sie <strong>100 Willkommenspunkte</strong>.
-                  </li>
-                  <li>
-                    <strong>Pro Bestellung:</strong> Punkte erhalten Sie vom <strong>tatsächlich gezahlten Gesamtbetrag</strong>
-                    (Waren nach allen Rabatten inkl. Bonuspunkte sowie Versand) — auf ganze Euro aufgerundet, z. B.{" "}
-                    <strong>78,29 €</strong> gezahlt → <strong>79 Punkte</strong>.
-                  </li>
-                  <li>
-                    <strong>Einlösen:</strong> An der Kasse: <strong>50 Punkte = 1 € Rabatt</strong> und frei einlösbar
-                    (z. B. <strong>68 Punkte = 1,36 €</strong>). Der Rabatt zählt als Plattform-Vorteil:{" "}
-                    <strong>Verkäufer werden weiterhin zum vollen Listenpreis der Ware</strong> abgerechnet.
-                  </li>
-                  <li>Sie zahlen den reduzierten Betrag mit Ihrer Zahlungsart.</li>
+                  <li>{t.rich("howRegistration", { b })}</li>
+                  <li>{t.rich("howOrder", { b })}</li>
+                  <li>{t.rich("howRedeem", { b })}</li>
+                  <li>{t("howPay")}</li>
                 </ul>
               </div>
             </div>

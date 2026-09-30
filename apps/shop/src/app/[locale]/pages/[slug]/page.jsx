@@ -4,7 +4,7 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { getMedusaClient } from "@/lib/medusa-client";
 import { resolveImageUrl } from "@/lib/image-url";
@@ -60,6 +60,7 @@ function cmsPagePadding(tmpl) {
 export default function CmsPageBySlug() {
   const params = useParams();
   const locale = useLocale();
+  const tState = useTranslations("pageStates");
   const router = useRouter();
   const slug = params?.slug != null ? String(params.slug) : undefined;
   const catalogDest = catalogShopPathForSlug(slug);
@@ -124,8 +125,8 @@ export default function CmsPageBySlug() {
       <div className="min-h-screen flex flex-col">
         <ShopHeader />
         <main className="flex-1 container mx-auto px-4 py-12">
-          <h1 className="text-2xl font-semibold text-gray-800">Page not found</h1>
-          <p className="text-gray-500 mt-2">The page you are looking for does not exist or is not published.</p>
+          <h1 className="text-2xl font-semibold text-gray-800">{tState("notFoundTitle")}</h1>
+          <p className="text-gray-500 mt-2">{tState("notFoundText")}</p>
         </main>
         <Footer />
       </div>
@@ -210,7 +211,7 @@ export default function CmsPageBySlug() {
           ) : null}
           {!hasContainers ? <h1>{localizedTitle}</h1> : null}
           {!safeBody && !hasContainers ? (
-            <p className="text-gray-500">No content.</p>
+            <p className="text-gray-500">{tState("noContent")}</p>
           ) : null}
         </div>
         {/* Full-bleed backdrop behind the richtext block — spans the page's full width,

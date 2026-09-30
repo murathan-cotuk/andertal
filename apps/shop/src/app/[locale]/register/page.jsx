@@ -82,6 +82,7 @@ const sectionLabel = {
 
 /* ── Page ───────────────────────────────────────────────────────────────── */
 export default function RegisterPage() {
+  const tUi = useTranslations("shopUi");
   useAuthGuard({ requiredRole: "customer", redirectTo: "/", redirectIfAuthenticated: true });
 
   const t = useTranslations("auth");
@@ -491,7 +492,7 @@ export default function RegisterPage() {
 
             {/* Email */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail *</label>
+              <label htmlFor="email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{tUi("emailRequired")}</label>
               <input
                 type="email" id="email" value={formData.email} onChange={set("email")}
                 placeholder={t("emailPlaceholder")} required autoComplete="email"
@@ -548,7 +549,7 @@ export default function RegisterPage() {
                     }
                   }}
                   autoComplete="off"
-                  placeholder="Land suchen..."
+                  placeholder={tUi("searchCountry")}
                   style={inp}
                   onFocus={(e) => {
                     focusStyle(e);
@@ -636,7 +637,7 @@ export default function RegisterPage() {
                 <div style={{ ...sectionLabel, gridColumn: "1 / -1" }}>{t("billingAddress")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, gridColumn: "1 / -1" }}>
                   <label htmlFor="billingAddress" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("street")}</label>
-                  <input id="billingAddress" value={formData.billingAddress || ""} onChange={set("billingAddress")} placeholder="Musterstraße 1" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+                  <input id="billingAddress" value={formData.billingAddress || ""} onChange={set("billingAddress")} placeholder={tUi("streetPlaceholder")} style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="billingZipCode" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("postalCode")}</label>
@@ -644,7 +645,7 @@ export default function RegisterPage() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="billingCity" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("city")}</label>
-                  <input id="billingCity" value={formData.billingCity || ""} onChange={set("billingCity")} placeholder="Berlin" style={inp} onFocus={focusStyle} onBlur={blurStyle} />
+                  <input id="billingCity" value={formData.billingCity || ""} onChange={set("billingCity")} placeholder={tUi("cityPlaceholder")} style={inp} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <label htmlFor="billingCountry" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{t("country")}</label>
@@ -662,7 +663,7 @@ export default function RegisterPage() {
                         }
                       }}
                       autoComplete="off"
-                      placeholder="Land suchen..."
+                      placeholder={tUi("searchCountry")}
                       style={inp}
                       onFocus={(e) => {
                         focusStyle(e);

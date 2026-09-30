@@ -93,7 +93,7 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "en" }) {
             {/* Error info */}
             {error.error_code && (
               <BlockStack gap="100">
-                <Text as="p" variant="bodyMd" fontWeight="bold">Hata Kodu</Text>
+                <Text as="p" variant="bodyMd" fontWeight="bold">{sec.errorCode}</Text>
                 <code style={{ background: "#f1f5f9", padding: "4px 8px", borderRadius: 4, fontSize: 13, color: "#dc2626", fontFamily: "monospace" }}>
                   {error.error_code}
                 </code>
@@ -101,21 +101,21 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "en" }) {
             )}
             {error.context && (
               <BlockStack gap="100">
-                <Text as="p" variant="bodyMd" fontWeight="bold">Bağlam / Endpoint</Text>
+                <Text as="p" variant="bodyMd" fontWeight="bold">{sec.context}</Text>
                 <code style={{ background: "#f1f5f9", padding: "4px 8px", borderRadius: 4, fontSize: 12, color: "#3a352f", fontFamily: "monospace" }}>
                   {error.context}
                 </code>
               </BlockStack>
             )}
             <BlockStack gap="100">
-              <Text as="p" variant="bodyMd" fontWeight="bold">Hata Mesajı</Text>
+              <Text as="p" variant="bodyMd" fontWeight="bold">{sec.errorMessage}</Text>
               <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, padding: "10px 12px", fontSize: 13, color: "#7f1d1d", wordBreak: "break-word" }}>
                 {error.error_message}
               </div>
             </BlockStack>
             {error.terminal_output && (
               <BlockStack gap="100">
-                <Text as="p" variant="bodyMd" fontWeight="bold">Terminal Çıktısı</Text>
+                <Text as="p" variant="bodyMd" fontWeight="bold">{sec.terminalOutput}</Text>
                 <pre style={{
                   background: "#1d1b18", color: "#d1fae5", padding: "12px 14px",
                   borderRadius: 8, fontSize: 11, lineHeight: 1.6,
@@ -134,7 +134,7 @@ function ErrorDetailModal({ error, onClose, onUpdate, locale = "en" }) {
               onChange={setStatus}
             />
             <TextField
-              label="Çözüm / Notlar"
+              label={sec.resolutionNotes}
               value={resolution}
               onChange={setResolution}
               multiline={4}
@@ -303,7 +303,7 @@ export default function SellerErrorsPage() {
         <Card padding="0">
           {loading ? (
             <Box padding="400">
-              <InlineStack gap="200" blockAlign="center"><Spinner size="small" /><Text as="p" tone="subdued">Yükleniyor…</Text></InlineStack>
+              <InlineStack gap="200" blockAlign="center"><Spinner size="small" /><Text as="p" tone="subdued">{sec.loading}</Text></InlineStack>
             </Box>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -311,17 +311,17 @@ export default function SellerErrorsPage() {
                 <thead>
                   <tr>
                     <th style={{ padding: "10px 12px", background: "#faf7f2", borderBottom: "1px solid #e6dfd4", width: 8 }} />
-                    <Th label="Tarih" field="created_at" />
-                    <Th label="Satıcı" field="seller" />
-                    <Th label="Hata Kodu" field="error_code" />
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5e574e", background: "#faf7f2", borderBottom: "1px solid #e6dfd4", fontSize: 12 }}>Mesaj</th>
-                    <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5e574e", background: "#faf7f2", borderBottom: "1px solid #e6dfd4", fontSize: 12 }}>Durum</th>
+                    <Th label={sec.date} field="created_at" />
+                    <Th label={sec.seller} field="seller" />
+                    <Th label={sec.errorCode} field="error_code" />
+                    <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5e574e", background: "#faf7f2", borderBottom: "1px solid #e6dfd4", fontSize: 12 }}>{sec.message}</th>
+                    <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "#5e574e", background: "#faf7f2", borderBottom: "1px solid #e6dfd4", fontSize: 12 }}>{sec.status}</th>
                     <th style={{ padding: "10px 12px", background: "#faf7f2", borderBottom: "1px solid #e6dfd4" }} />
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.length === 0 ? (
-                    <tr><td colSpan={7} style={{ padding: "40px 16px", textAlign: "center", color: "#a39a8d" }}>Kayıt bulunamadı.</td></tr>
+                    <tr><td colSpan={7} style={{ padding: "40px 16px", textAlign: "center", color: "#a39a8d" }}>{sec.noRecords}</td></tr>
                   ) : sorted.map((e) => (
                     <tr
                       key={e.id}
@@ -376,15 +376,15 @@ export default function SellerErrorsPage() {
         >
           <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", width: "min(540px, 95vw)", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ padding: "16px 22px", borderBottom: "1px solid #e6dfd4", background: "linear-gradient(135deg, #1d1b18 0%, #1d1b18 100%)", borderRadius: "12px 12px 0 0" }}>
-              <Text variant="headingMd" as="h2" tone="text-inverse">Manuel Hata Ekle</Text>
+              <Text variant="headingMd" as="h2" tone="text-inverse">{sec.addManualTitle}</Text>
             </div>
             <div style={{ padding: "20px 22px" }}>
               <BlockStack gap="300">
-                <TextField label="Satıcı ID" value={newError.seller_id} onChange={v => setNewError(f => ({...f, seller_id: v}))} autoComplete="off" placeholder="seller_xxx" />
-                <TextField label="Hata Kodu" value={newError.error_code} onChange={v => setNewError(f => ({...f, error_code: v}))} autoComplete="off" placeholder="E001" />
-                <TextField label="Bağlam / Endpoint" value={newError.context} onChange={v => setNewError(f => ({...f, context: v}))} autoComplete="off" placeholder="/admin-hub/v1/..." />
-                <TextField label="Hata Mesajı *" value={newError.error_message} onChange={v => setNewError(f => ({...f, error_message: v}))} multiline={3} autoComplete="off" />
-                <TextField label="Terminal Çıktısı" value={newError.terminal_output} onChange={v => setNewError(f => ({...f, terminal_output: v}))} multiline={5} autoComplete="off" placeholder="Stack trace veya konsol çıktısı…" />
+                <TextField label={sec.sellerId} value={newError.seller_id} onChange={v => setNewError(f => ({...f, seller_id: v}))} autoComplete="off" placeholder="seller_xxx" />
+                <TextField label={sec.errorCode} value={newError.error_code} onChange={v => setNewError(f => ({...f, error_code: v}))} autoComplete="off" placeholder="E001" />
+                <TextField label={sec.context} value={newError.context} onChange={v => setNewError(f => ({...f, context: v}))} autoComplete="off" placeholder="/admin-hub/v1/..." />
+                <TextField label={`${sec.errorMessage} *`} value={newError.error_message} onChange={v => setNewError(f => ({...f, error_message: v}))} multiline={3} autoComplete="off" />
+                <TextField label={sec.terminalOutput} value={newError.terminal_output} onChange={v => setNewError(f => ({...f, terminal_output: v}))} multiline={5} autoComplete="off" placeholder={sec.terminalPlaceholder} />
               </BlockStack>
             </div>
             <div style={{ padding: "14px 22px 18px", borderTop: "1px solid #e6dfd4", display: "flex", gap: 10, justifyContent: "flex-end" }}>

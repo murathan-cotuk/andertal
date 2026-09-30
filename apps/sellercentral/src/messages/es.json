@@ -214,8 +214,7 @@
     "sellerOrders": "Pedidos vendedores",
     "noSellerOrders": "No hay más pedidos de vendedores",
     "activeReturn": "Devolución (activa)",
-    "guestBadge": "Invitado",
-    "noOrders": "No se encontraron pedidos"
+    "guestBadge": "Invitado"
   },
   "settings": {
     "back": "Volver",
@@ -279,5 +278,19 @@
     "noInvoices": "No hay facturas de comisión.",
     "platformOwn": "Plataforma (propia)",
     "loading": "Cargando…"
+  },
+  "globalSearch": {
+    "placeholder": "Buscar productos, pedidos, clientes…",
+    "searching": "Buscando…",
+    "noResults": "Sin resultados para «{query}»",
+    "products": "Productos",
+    "orders": "Pedidos",
+    "customers": "Clientes",
+    "navigation": "Navegación",
+    "bulkUpload": "Carga masiva",
+    "singleUpload": "Añadir un producto",
+    "ranking": "Ranking",
+    "shipping": "Envío",
+    "payments": "Pagos"
   }
 }

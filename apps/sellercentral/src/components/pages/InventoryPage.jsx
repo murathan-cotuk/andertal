@@ -575,8 +575,8 @@ function GroupProductsModal({ locale, ownProducts, manualGroupedIdSet, initialSe
 
   const submit = async () => {
     setErr("");
-    if (!name.trim()) { setErr(l === "tr" ? "Grup adı gerekli." : l === "de" ? "Gruppenname erforderlich." : "Group name is required."); return; }
-    if (checked.size < 2) { setErr(l === "tr" ? "En az 2 ürün seçin." : l === "de" ? "Mindestens 2 Produkte auswählen." : "Select at least 2 products."); return; }
+    if (!name.trim()) { setErr(l === "tr" ? "Grup adı gerekli." : l === "en" ? "Group name is required." : l === "fr" ? "Le nom du groupe est obligatoire." : l === "es" ? "El nombre del grupo es obligatorio." : l === "it" ? "Il nome del gruppo è obbligatorio." : "Gruppenname erforderlich."); return; }
+    if (checked.size < 2) { setErr(l === "tr" ? "En az 2 ürün seçin." : l === "en" ? "Select at least 2 products." : l === "fr" ? "Sélectionnez au moins 2 produits." : l === "es" ? "Selecciona al menos 2 productos." : l === "it" ? "Seleziona almeno 2 prodotti." : "Mindestens 2 Produkte auswählen."); return; }
     setSaving(true);
     try {
       await onCreate({ name: name.trim(), sku: sku.trim(), member_ids: [...checked] });
@@ -591,33 +591,29 @@ function GroupProductsModal({ locale, ownProducts, manualGroupedIdSet, initialSe
     <Modal
       open
       onClose={onClose}
-      title={l === "tr" ? "Ürünleri grupla" : l === "de" ? "Produkte gruppieren" : "Group products"}
-      primaryAction={{ content: l === "tr" ? "Grup oluştur" : l === "de" ? "Gruppe erstellen" : "Create group", onAction: submit, loading: saving }}
-      secondaryActions={[{ content: l === "tr" ? "İptal" : l === "de" ? "Abbrechen" : "Cancel", onAction: onClose }]}
+      title={l === "tr" ? "Ürünleri grupla" : l === "en" ? "Group products" : l === "fr" ? "Grouper les produits" : l === "es" ? "Agrupar productos" : l === "it" ? "Raggruppa prodotti" : "Produkte gruppieren"}
+      primaryAction={{ content: l === "tr" ? "Grup oluştur" : l === "en" ? "Create group" : l === "fr" ? "Créer le groupe" : l === "es" ? "Crear grupo" : l === "it" ? "Crea gruppo" : "Gruppe erstellen", onAction: submit, loading: saving }}
+      secondaryActions={[{ content: l === "tr" ? "İptal" : l === "en" ? "Cancel" : l === "fr" ? "Annuler" : l === "es" ? "Cancelar" : l === "it" ? "Annulla" : "Abbrechen", onAction: onClose }]}
     >
       <Modal.Section>
         <BlockStack gap="300">
           <Text as="p" tone="subdued" variant="bodySm">
-            {l === "tr"
-              ? "Bu sadece Envanter sayfanızı düzenli görüntülemek içindir — shop'ta hiçbir etkisi yoktur ve sadece siz görürsünüz."
-              : l === "de"
-                ? "Nur zur übersichtlicheren Darstellung deiner Inventory-Seite — hat keine Auswirkung auf den Shop und ist nur für dich sichtbar."
-                : "Purely to keep your own Inventory page tidy — has no effect on the shop and is only visible to you."}
+            {l === "tr" ? "Bu sadece Envanter sayfanızı düzenli görüntülemek içindir — shop'ta hiçbir etkisi yoktur ve sadece siz görürsünüz." : l === "en" ? "Purely to keep your own Inventory page tidy — has no effect on the shop and is only visible to you." : l === "fr" ? "Uniquement pour garder votre page Inventaire lisible — sans effet sur la boutique et visible par vous seul." : l === "es" ? "Solo para ordenar tu página de Inventario: no afecta a la tienda y solo lo ves tú." : l === "it" ? "Solo per tenere ordinata la tua pagina Inventario — nessun effetto sul negozio, visibile solo a te." : "Nur zur übersichtlicheren Darstellung deiner Inventory-Seite — hat keine Auswirkung auf den Shop und ist nur für dich sichtbar."}
           </Text>
           {err && <Banner tone="critical">{err}</Banner>}
-          <TextField label={l === "tr" ? "Grup adı" : l === "de" ? "Gruppenname" : "Group name"} value={name} onChange={setName} autoComplete="off" />
-          <TextField label="SKU" value={sku} onChange={setSku} autoComplete="off" helpText={l === "tr" ? "İsteğe bağlı, sadece kendi referansınız için." : l === "de" ? "Optional, nur zu deiner eigenen Referenz." : "Optional, for your own reference only."} />
+          <TextField label={l === "tr" ? "Grup adı" : l === "en" ? "Group name" : l === "fr" ? "Nom du groupe" : l === "es" ? "Nombre del grupo" : l === "it" ? "Nome del gruppo" : "Gruppenname"} value={name} onChange={setName} autoComplete="off" />
+          <TextField label="SKU" value={sku} onChange={setSku} autoComplete="off" helpText={l === "tr" ? "İsteğe bağlı, sadece kendi referansınız için." : l === "en" ? "Optional, for your own reference only." : l === "fr" ? "Facultatif, uniquement pour votre propre référence." : l === "es" ? "Opcional, solo como referencia propia." : l === "it" ? "Facoltativo, solo come tuo riferimento." : "Optional, nur zu deiner eigenen Referenz."} />
           <TextField
-            label={l === "tr" ? "Ürün ara" : l === "de" ? "Produkte suchen" : "Search products"}
+            label={l === "tr" ? "Ürün ara" : l === "en" ? "Search products" : l === "fr" ? "Rechercher des produits" : l === "es" ? "Buscar productos" : l === "it" ? "Cerca prodotti" : "Produkte suchen"}
             value={q}
             onChange={setQ}
             autoComplete="off"
-            placeholder={l === "tr" ? "isim veya SKU" : l === "de" ? "Name oder SKU" : "name or SKU"}
+            placeholder={l === "tr" ? "isim veya SKU" : l === "en" ? "name or SKU" : l === "fr" ? "nom ou SKU" : l === "es" ? "nombre o SKU" : l === "it" ? "nome o SKU" : "Name oder SKU"}
           />
-          <Text as="p" variant="bodySm" tone="subdued">{checked.size} {l === "tr" ? "seçildi" : l === "de" ? "ausgewählt" : "selected"}</Text>
+          <Text as="p" variant="bodySm" tone="subdued">{checked.size} {l === "tr" ? "seçildi" : l === "en" ? "selected" : l === "fr" ? "sélectionné(s)" : l === "es" ? "seleccionados" : l === "it" ? "selezionati" : "ausgewählt"}</Text>
           <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #e6dfd4", borderRadius: 8 }}>
             {candidates.length === 0 && (
-              <div style={{ padding: 16, color: "#a39a8d", fontSize: 13 }}>{l === "tr" ? "Ürün yok" : l === "de" ? "Keine Produkte" : "No products"}</div>
+              <div style={{ padding: 16, color: "#a39a8d", fontSize: 13 }}>{l === "tr" ? "Ürün yok" : l === "en" ? "No products" : l === "fr" ? "Aucun produit" : l === "es" ? "Sin productos" : l === "it" ? "Nessun prodotto" : "Keine Produkte"}</div>
             )}
             {candidates.map((p) => (
               <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px", borderBottom: "1px solid #f3eee6", cursor: "pointer", fontSize: 13 }}>
@@ -924,9 +920,9 @@ function InventoryProductRow({
               <div style={{ marginTop: "0.1875rem" }}>
                 <span
                   style={{ display: "inline-block", padding: "0.0625rem 0.375rem", borderRadius: 999, fontSize: "0.625rem", fontWeight: 600, background: "#eef2ff", color: "#3730a3" }}
-                  title={l === "tr" ? "Bu ürün başka bir üründe varyasyon olarak gösteriliyor" : l === "de" ? "Dieses Produkt wird als Variante eines anderen Produkts angezeigt" : "This product is displayed as a variant of another product"}
+                  title={l === "tr" ? "Bu ürün başka bir üründe varyasyon olarak gösteriliyor" : l === "en" ? "This product is displayed as a variant of another product" : l === "fr" ? "Ce produit est affiché comme variante d’un autre produit" : l === "es" ? "Este producto se muestra como variante de otro producto" : l === "it" ? "Questo prodotto è mostrato come variante di un altro prodotto" : "Dieses Produkt wird als Variante eines anderen Produkts angezeigt"}
                 >
-                  {(l === "tr" ? "Grup: " : l === "de" ? "Gruppe: " : "Group: ") + mergedParentLabel}
+                  {(l === "tr" ? "Grup: " : l === "en" ? "Group: " : l === "fr" ? "Groupe : " : l === "es" ? "Grupo: " : l === "it" ? "Gruppo: " : "Gruppe: ") + mergedParentLabel}
                 </span>
               </div>
             )}
@@ -1254,7 +1250,7 @@ export default function InventoryPage() {
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem" }}>
-        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : "name / sku / ean"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={detailsFilter} onChange={(e) => setDetailsFilter(e.target.value)} placeholder={l === "tr" ? "isim / sku / ean" : l === "en" ? "name / sku / ean" : l === "fr" ? "nom / sku / ean" : l === "es" ? "nombre / sku / ean" : l === "it" ? "nome / sku / ean" : "Name / SKU / EAN"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.375rem" }}>
         <input value={inventoryMin} onChange={(e) => setInventoryMin(e.target.value)} placeholder="min" style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
@@ -1265,7 +1261,7 @@ export default function InventoryPage() {
         <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="max" style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.375rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem 0.5rem" }}>
-        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "fr" ? "variante" : l === "es" ? "variante" : l === "it" ? "variante" : "variation"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
+        <input value={variationFilter} onChange={(e) => setVariationFilter(e.target.value)} placeholder={l === "tr" ? "varyasyon" : l === "en" ? "variation" : l === "fr" ? "variante" : l === "es" ? "variante" : l === "it" ? "variante" : "Variante"} style={{ width: "100%", height: "1.75rem", border: "1px solid #d6ccbd", borderRadius: "0.25rem", padding: "0 0.5rem", fontSize: "0.75rem", boxSizing: "border-box", textAlign: "center" }} />
       </div>
       <div style={{ padding: "6px" }} />
     </div>
@@ -1780,7 +1776,7 @@ export default function InventoryPage() {
           <div style={{ gridColumn: "1 / -1", padding: "7px 16px", display: "flex", alignItems: "center", gap: 10 }}>
             <Text as="span" variant="bodySm" fontWeight="semibold">{groupTitle}</Text>
             <Text as="span" variant="bodySm" tone="subdued">
-              ? {items.length} {locale === "tr" ? "varyasyon" : locale === "de" ? "Varianten" : "variants"}
+              ? {items.length} {locale === "tr" ? "varyasyon" : locale === "en" ? "variants" : locale === "fr" ? "variantes" : locale === "es" ? "variantes" : locale === "it" ? "varianti" : "Varianten"}
             </Text>
           </div>
         </div>
@@ -1822,23 +1818,23 @@ export default function InventoryPage() {
               onClick={() => toggleManualGroupExpanded(group)}
               style={{ width: 22, height: 22, borderRadius: 5, border: "1px solid #c7d2fe", background: "#fff", color: "#3730a3", cursor: "pointer", fontSize: 11, lineHeight: 1, flexShrink: 0 }}
               title={isOpen
-                ? (locale === "tr" ? "Grubu kapat" : locale === "de" ? "Gruppe einklappen" : "Collapse group")
-                : (locale === "tr" ? "Grubu aç" : locale === "de" ? "Gruppe ausklappen" : "Expand group")}
+                ? (locale === "tr" ? "Grubu kapat" : locale === "en" ? "Collapse group" : locale === "fr" ? "Replier le groupe" : locale === "es" ? "Contraer grupo" : locale === "it" ? "Comprimi gruppo" : "Gruppe einklappen")
+                : (locale === "tr" ? "Grubu aç" : locale === "en" ? "Expand group" : locale === "fr" ? "Déplier le groupe" : locale === "es" ? "Expandir grupo" : locale === "it" ? "Espandi gruppo" : "Gruppe ausklappen")}
             >
               {isOpen ? "▼" : "▶"}
             </button>
             <Text as="span" variant="bodySm" fontWeight="semibold">{group.name}</Text>
             {group.sku && <Text as="span" variant="bodySm" tone="subdued">SKU: {group.sku}</Text>}
             <Text as="span" variant="bodySm" tone="subdued">
-              {items.length} {locale === "tr" ? "ürün" : locale === "de" ? "Produkte" : "products"} · {locale === "tr" ? "toplam stok" : locale === "de" ? "Bestand gesamt" : "total stock"}: {totalInv}
+              {items.length} {locale === "tr" ? "ürün" : locale === "en" ? "products" : locale === "fr" ? "produits" : locale === "es" ? "productos" : locale === "it" ? "prodotti" : "Produkte"} · {locale === "tr" ? "toplam stok" : locale === "en" ? "total stock" : locale === "fr" ? "stock total" : locale === "es" ? "stock total" : locale === "it" ? "scorte totali" : "Bestand gesamt"}: {totalInv}
             </Text>
             <button
               type="button"
               onClick={() => deleteManualGroup(group)}
               style={{ marginLeft: "auto", border: "none", background: "none", color: "#5e574e", cursor: "pointer", fontSize: 11, textDecoration: "underline" }}
-              title={locale === "tr" ? "Grubu çöz (ürünler silinmez)" : locale === "de" ? "Gruppierung aufheben (Produkte bleiben erhalten)" : "Ungroup (products stay untouched)"}
+              title={locale === "tr" ? "Grubu çöz (ürünler silinmez)" : locale === "en" ? "Ungroup (products stay untouched)" : locale === "fr" ? "Dissocier (les produits sont conservés)" : locale === "es" ? "Desagrupar (los productos se mantienen)" : locale === "it" ? "Separa (i prodotti restano invariati)" : "Gruppierung aufheben (Produkte bleiben erhalten)"}
             >
-              {locale === "tr" ? "Grubu çöz" : locale === "de" ? "Gruppierung aufheben" : "Ungroup"}
+              {locale === "tr" ? "Grubu çöz" : locale === "en" ? "Ungroup" : locale === "fr" ? "Dissocier" : locale === "es" ? "Desagrupar" : locale === "it" ? "Separa" : "Gruppierung aufheben"}
             </button>
           </div>
         </div>
@@ -2006,10 +2002,10 @@ export default function InventoryPage() {
             >
               <p>
                 {payoutSetupMissing.card && payoutSetupMissing.iban
-                  ? (l === "tr" ? "Ürünlerinizi yönetmeye devam edebilirsiniz, ama Gebühren için kredi kartı ve Auszahlung için IBAN eklemeden gerçek satış/ödeme akışı tamamlanmış sayılmaz." : l === "de" ? "Sie können Ihre Produkte weiter verwalten, aber ohne Kreditkarte (Gebühren) und IBAN (Auszahlung) gilt die Einrichtung für den echten Verkauf nicht als abgeschlossen." : "You can keep managing products, but without a credit card (fees) and IBAN (payouts) your seller setup isn't complete for real sales.")
+                  ? (l === "tr" ? "Ürünlerinizi yönetmeye devam edebilirsiniz, ama Gebühren için kredi kartı ve Auszahlung için IBAN eklemeden gerçek satış/ödeme akışı tamamlanmış sayılmaz." : l === "en" ? "You can keep managing products, but without a credit card (fees) and IBAN (payouts) your seller setup isn't complete for real sales." : l === "fr" ? "Vous pouvez continuer à gérer vos produits, mais sans carte bancaire (frais) ni IBAN (versements), votre configuration vendeur n’est pas complète pour vendre réellement." : l === "es" ? "Puedes seguir gestionando productos, pero sin tarjeta de crédito (comisiones) ni IBAN (pagos) tu configuración de vendedor no está completa para vender de verdad." : l === "it" ? "Puoi continuare a gestire i prodotti, ma senza carta di credito (commissioni) e IBAN (pagamenti) la configurazione del venditore non è completa per vendere davvero." : "Sie können Ihre Produkte weiter verwalten, aber ohne Kreditkarte (Gebühren) und IBAN (Auszahlung) gilt die Einrichtung für den echten Verkauf nicht als abgeschlossen.")
                   : payoutSetupMissing.card
-                  ? (l === "tr" ? "Platform ücretleri (Gebühren) için kredi kartı eklemediniz." : l === "de" ? "Sie haben noch keine Kreditkarte für die Plattformgebühren (Gebühren) hinterlegt." : "You haven't added a credit card for platform fees yet.")
-                  : (l === "tr" ? "Ödemelerinizin (Auszahlung) yatırılabilmesi için IBAN eklemediniz." : l === "de" ? "Sie haben noch keine IBAN für Ihre Auszahlungen hinterlegt." : "You haven't added an IBAN for your payouts yet.")}
+                  ? (l === "tr" ? "Platform ücretleri (Gebühren) için kredi kartı eklemediniz." : l === "en" ? "You haven't added a credit card for platform fees yet." : l === "fr" ? "Vous n’avez pas encore ajouté de carte bancaire pour les frais de la plateforme." : l === "es" ? "Aún no has añadido una tarjeta de crédito para las comisiones de la plataforma." : l === "it" ? "Non hai ancora aggiunto una carta di credito per le commissioni della piattaforma." : "Sie haben noch keine Kreditkarte für die Plattformgebühren (Gebühren) hinterlegt.")
+                  : (l === "tr" ? "Ödemelerinizin (Auszahlung) yatırılabilmesi için IBAN eklemediniz." : l === "en" ? "You haven't added an IBAN for your payouts yet." : l === "fr" ? "Vous n’avez pas encore ajouté d’IBAN pour vos versements." : l === "es" ? "Aún no has añadido un IBAN para tus pagos." : l === "it" ? "Non hai ancora aggiunto un IBAN per i tuoi pagamenti." : "Sie haben noch keine IBAN für Ihre Auszahlungen hinterlegt.")}
               </p>
             </Banner>
           </Layout.Section>
@@ -2369,23 +2365,11 @@ export default function InventoryPage() {
         <Modal.Section>
           <BlockStack gap="400">
             <Text as="p" tone="subdued">
-              {locale === "en"
-                ? "Selected products become variants under one parent. Absorbed products are archived (not deleted). Orders keep their history."
-                : locale === "tr"
-                  ? "Seçilen ürünler tek bir parent altında varyant olur. Diğer ürünler arşivlenir (silinmez). Sipariş geçmişi korunur."
-                  : locale === "de"
-                    ? "Ausgewählte Produkte werden Varianten unter einem Parent. Übernommene Produkte werden archiviert (nicht gelöscht). Bestellhistorie bleibt erhalten."
-                    : "Selected products become variants under one parent. Absorbed products are archived."}
+              {locale === "tr" ? "Seçilen ürünler tek bir parent altında varyant olur. Diğer ürünler arşivlenir (silinmez). Sipariş geçmişi korunur." : locale === "en" ? "Selected products become variants under one parent. Absorbed products are archived (not deleted). Orders keep their history." : locale === "fr" ? "Les produits sélectionnés deviennent des variantes d’un même parent. Les produits absorbés sont archivés (pas supprimés). L’historique des commandes est conservé." : locale === "es" ? "Los productos seleccionados pasan a ser variantes de un mismo padre. Los productos absorbidos se archivan (no se eliminan). Los pedidos conservan su historial." : locale === "it" ? "I prodotti selezionati diventano varianti di un unico prodotto principale. I prodotti assorbiti vengono archiviati (non eliminati). Lo storico ordini resta invariato." : "Ausgewählte Produkte werden Varianten unter einem Parent. Übernommene Produkte werden archiviert (nicht gelöscht). Bestellhistorie bleibt erhalten."}
             </Text>
             <Select
               label={
-                locale === "en"
-                  ? "Parent product"
-                  : locale === "tr"
-                    ? "Ana ürün"
-                    : locale === "de"
-                      ? "Elternprodukt"
-                      : "Parent product"
+                locale === "tr" ? "Ana ürün" : locale === "en" ? "Parent product" : locale === "fr" ? "Produit parent" : locale === "es" ? "Producto principal" : locale === "it" ? "Prodotto principale" : "Elternprodukt"
               }
               options={selectedIds.map((id) => {
                 const prod = products.find((p) => p.id === id);
@@ -2396,36 +2380,18 @@ export default function InventoryPage() {
             />
             <TextField
               label={
-                locale === "en"
-                  ? "Option name"
-                  : locale === "tr"
-                    ? "Seçenek adı"
-                    : locale === "de"
-                      ? "Optionsname"
-                      : "Option name"
+                locale === "tr" ? "Seçenek adı" : locale === "en" ? "Option name" : locale === "fr" ? "Nom de l’option" : locale === "es" ? "Nombre de la opción" : locale === "it" ? "Nome opzione" : "Optionsname"
               }
               value={combineOptionName}
               onChange={setCombineOptionName}
               autoComplete="off"
               helpText={
-                locale === "en"
-                  ? 'e.g. Color, Size'
-                  : locale === "tr"
-                    ? "örn. Renk, Beden"
-                    : locale === "de"
-                      ? "z. B. Farbe, Größe"
-                      : "e.g. Color, Size"
+                locale === "tr" ? "örn. Renk, Beden" : locale === "en" ? 'e.g. Color, Size' : locale === "fr" ? "p. ex. Couleur, Taille" : locale === "es" ? "p. ej. Color, Talla" : locale === "it" ? "ad es. Colore, Taglia" : "z. B. Farbe, Größe"
               }
             />
             <BlockStack gap="200">
               <Text as="h3" variant="headingSm">
-                {locale === "en"
-                  ? "Variant labels"
-                  : locale === "tr"
-                    ? "Varyant etiketleri"
-                    : locale === "de"
-                      ? "Variantenbezeichnungen"
-                      : "Variant labels"}
+                {locale === "tr" ? "Varyant etiketleri" : locale === "en" ? "Variant labels" : locale === "fr" ? "Libellés des variantes" : locale === "es" ? "Etiquetas de variantes" : locale === "it" ? "Etichette varianti" : "Variantenbezeichnungen"}
               </Text>
               {selectedIds.map((id) => {
                 const prod = products.find((p) => p.id === id);
@@ -2623,7 +2589,7 @@ export default function InventoryPage() {
                 : "Filtered products are exported: one parent row per product, one child row per variant (first column: product_type)."}
             </Text>
             <Select
-              label={l === "tr" ? "Format" : "Format"}
+              label={l === "tr" ? "Format" : l === "en" ? "Format" : l === "fr" ? "Format" : l === "es" ? "Formato" : l === "it" ? "Formato" : "Format"}
               value={exportFormat}
               onChange={setExportFormat}
               options={[

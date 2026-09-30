@@ -3,36 +3,37 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import { useTranslations } from "next-intl";
 
 const NAV_ITEMS = [
-  { category: "Navigation", label: "Home", url: "/", keywords: "home dashboard" },
-  { category: "Orders", label: "Orders", url: "/orders", keywords: "orders" },
-  { category: "Orders", label: "Drafts", url: "/orders/drafts", keywords: "drafts" },
-  { category: "Orders", label: "Abandoned checkouts", url: "/orders/abandoned-checkouts", keywords: "abandoned checkout" },
-  { category: "Orders", label: "Returns", url: "/orders/returns", keywords: "returns" },
-  { category: "Products", label: "Collections", url: "/products/collections", keywords: "collections" },
-  { category: "Products", label: "Inventory", url: "/products/inventory", keywords: "products inventory" },
-  { category: "Products", label: "Gift Cards", url: "/products/gift-cards", keywords: "gift cards" },
-  { category: "Products", label: "Bulk upload", url: "/products/bulk-upload", keywords: "bulk upload" },
-  { category: "Products", label: "Single upload", url: "/products/single-upload", keywords: "add product" },
-  { category: "Customers", label: "Customers", url: "/customers", keywords: "customers" },
-  { category: "Marketing", label: "Campaigns", url: "/marketing/campaigns", keywords: "campaigns" },
-  { category: "Marketing", label: "Attribution", url: "/marketing/attribution", keywords: "attribution" },
-  { category: "Marketing", label: "SEO", url: "/marketing/seo", keywords: "seo meta search engine" },
-  { category: "Marketing", label: "Automations", url: "/marketing/automations", keywords: "automations" },
-  { category: "Navigation", label: "Discounts", url: "/discounts", keywords: "discounts" },
-  { category: "Content", label: "Categories", url: "/content/categories", keywords: "categories" },
-  { category: "Content", label: "Media", url: "/content/media", keywords: "media library upload" },
-  { category: "Content", label: "Pages", url: "/content/pages", keywords: "pages cms" },
-  { category: "Content", label: "Menus", url: "/content/menus", keywords: "menus" },
-  { category: "Content", label: "Brands", url: "/content/brands", keywords: "brands" },
-  { category: "Analytics", label: "Reports", url: "/analytics/reports", keywords: "reports analytics" },
-  { category: "Analytics", label: "Ranking", url: "/analytics/ranking", keywords: "ranking produkt product score" },
-  { category: "Analytics", label: "Live View", url: "/analytics/live-view", keywords: "live" },
-  { category: "Navigation", label: "Import/Export", url: "/import-export", keywords: "import export bulk" },
-  { category: "Settings", label: "Settings", url: "/settings", keywords: "settings" },
-  { category: "Settings", label: "Shipping", url: "/settings/shipping", keywords: "shipping" },
-  { category: "Settings", label: "Payments", url: "/settings/payments", keywords: "payments" },
+  { category: "Navigation", label: "Home", labelKey: "nav.home", url: "/", keywords: "home dashboard" },
+  { category: "Orders", label: "Orders", labelKey: "nav.orders", url: "/orders", keywords: "orders" },
+  { category: "Orders", label: "Drafts", labelKey: "nav.drafts", url: "/orders/drafts", keywords: "drafts" },
+  { category: "Orders", label: "Abandoned checkouts", labelKey: "nav.abandonedCheckouts", url: "/orders/abandoned-checkouts", keywords: "abandoned checkout" },
+  { category: "Orders", label: "Returns", labelKey: "nav.returns", url: "/orders/returns", keywords: "returns" },
+  { category: "Products", label: "Collections", labelKey: "nav.collections", url: "/products/collections", keywords: "collections" },
+  { category: "Products", label: "Inventory", labelKey: "nav.inventory", url: "/products/inventory", keywords: "products inventory" },
+  { category: "Products", label: "Gift Cards", labelKey: "nav.giftCards", url: "/products/gift-cards", keywords: "gift cards" },
+  { category: "Products", label: "Bulk upload", labelKey: "globalSearch.bulkUpload", url: "/products/bulk-upload", keywords: "bulk upload" },
+  { category: "Products", label: "Single upload", labelKey: "globalSearch.singleUpload", url: "/products/single-upload", keywords: "add product" },
+  { category: "Customers", label: "Customers", labelKey: "nav.customers", url: "/customers", keywords: "customers" },
+  { category: "Marketing", label: "Campaigns", labelKey: "nav.campaigns", url: "/marketing/campaigns", keywords: "campaigns" },
+  { category: "Marketing", label: "Attribution", labelKey: "nav.attribution", url: "/marketing/attribution", keywords: "attribution" },
+  { category: "Marketing", label: "SEO", labelKey: "nav.seo", url: "/marketing/seo", keywords: "seo meta search engine" },
+  { category: "Marketing", label: "Automations", labelKey: "nav.automations", url: "/marketing/automations", keywords: "automations" },
+  { category: "Navigation", label: "Discounts", labelKey: "nav.discounts", url: "/discounts", keywords: "discounts" },
+  { category: "Content", label: "Categories", labelKey: "nav.categories", url: "/content/categories", keywords: "categories" },
+  { category: "Content", label: "Media", labelKey: "nav.media", url: "/content/media", keywords: "media library upload" },
+  { category: "Content", label: "Pages", labelKey: "nav.pages", url: "/content/pages", keywords: "pages cms" },
+  { category: "Content", label: "Menus", labelKey: "nav.menus", url: "/content/menus", keywords: "menus" },
+  { category: "Content", label: "Brands", labelKey: "nav.brands", url: "/content/brands", keywords: "brands" },
+  { category: "Analytics", label: "Reports", labelKey: "nav.reports", url: "/analytics/reports", keywords: "reports analytics" },
+  { category: "Analytics", label: "Ranking", labelKey: "globalSearch.ranking", url: "/analytics/ranking", keywords: "ranking produkt product score" },
+  { category: "Analytics", label: "Live View", labelKey: "nav.liveView", url: "/analytics/live-view", keywords: "live" },
+  { category: "Navigation", label: "Import/Export", labelKey: "nav.importExport", url: "/import-export", keywords: "import export bulk" },
+  { category: "Settings", label: "Settings", labelKey: "nav.settings", url: "/settings", keywords: "settings" },
+  { category: "Settings", label: "Shipping", labelKey: "globalSearch.shipping", url: "/settings/shipping", keywords: "shipping" },
+  { category: "Settings", label: "Payments", labelKey: "globalSearch.payments", url: "/settings/payments", keywords: "payments" },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,7 +107,16 @@ function matchQ(text, q) {
 const DEBOUNCE_MS = 250;
 const MAX_PER_SECTION = 5;
 
-export default function GroupedDropdownSearch({ placeholder = "Search products, orders, customers…" }) {
+export default function GroupedDropdownSearch({ placeholder: placeholderProp }) {
+  const tSearch = useTranslations("globalSearch");
+  const tNav = useTranslations("nav");
+  const placeholder = placeholderProp || tSearch("placeholder");
+  const navLabel = (item) => {
+    const [ns, key] = String(item.labelKey || "").split(".");
+    if (ns === "nav") return tNav(key);
+    if (ns === "globalSearch") return tSearch(key);
+    return item.label;
+  };
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [products, setProducts] = useState(null); // null = not loaded yet
@@ -172,7 +182,7 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
   // ── Filter nav items ──
   const navHits = q
     ? NAV_ITEMS.filter((item) =>
-        matchQ(`${item.label} ${item.keywords}`.toLowerCase(), q)
+        matchQ(`${item.label} ${navLabel(item)} ${item.keywords}`.toLowerCase(), q)
       ).slice(0, MAX_PER_SECTION)
     : [];
 
@@ -208,18 +218,18 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
       {isOpen && q && (
         <div className="andertal-search-dropdown" role="listbox">
           {loading && (
-            <div className="andertal-search-empty" style={{ fontStyle: "italic" }}>Searching…</div>
+            <div className="andertal-search-empty" style={{ fontStyle: "italic" }}>{tSearch("searching")}</div>
           )}
 
           {!loading && !hasAny && (
-            <div className="andertal-search-empty">No results for &quot;{query}&quot;</div>
+            <div className="andertal-search-empty">{tSearch("noResults", { query })}</div>
           )}
 
           {/* Products */}
           {productHits.length > 0 && (
             <div>
               <div className="andertal-search-category">
-                Products <span className="andertal-search-category-count">{productHits.length}</span>
+                {tSearch("products")} <span className="andertal-search-category-count">{productHits.length}</span>
               </div>
               {productHits.map((p) => {
                 const meta = p.metadata || {};
@@ -242,7 +252,7 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
           {orderHits.length > 0 && (
             <div>
               <div className="andertal-search-category">
-                Orders <span className="andertal-search-category-count">{orderHits.length}</span>
+                {tSearch("orders")} <span className="andertal-search-category-count">{orderHits.length}</span>
               </div>
               {orderHits.map((o) => {
                 const num = o.display_id != null ? `#${o.display_id}` : (o.order_number != null ? `#${o.order_number}` : o.id?.slice(0, 8));
@@ -264,7 +274,7 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
           {customerHits.length > 0 && (
             <div>
               <div className="andertal-search-category">
-                Customers <span className="andertal-search-category-count">{customerHits.length}</span>
+                {tSearch("customers")} <span className="andertal-search-category-count">{customerHits.length}</span>
               </div>
               {customerHits.map((c) => {
                 const name = [c.first_name, c.last_name].filter(Boolean).join(" ") || c.email;
@@ -284,11 +294,11 @@ export default function GroupedDropdownSearch({ placeholder = "Search products, 
           {navHits.length > 0 && (
             <div>
               <div className="andertal-search-category">
-                Navigation <span className="andertal-search-category-count">{navHits.length}</span>
+                {tSearch("navigation")} <span className="andertal-search-category-count">{navHits.length}</span>
               </div>
               {navHits.map((item) => (
                 <Link key={item.url} href={item.url} className="andertal-search-hit" onClick={close}>
-                  {item.label}
+                  {navLabel(item)}
                 </Link>
               ))}
             </div>

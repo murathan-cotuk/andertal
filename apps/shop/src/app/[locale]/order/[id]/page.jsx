@@ -136,7 +136,7 @@ function getTrackingUrl(carrier, number) {
   return null;
 }
 
-async function openPdf(apiPath) {
+async function openPdf(apiPath, failMessage = "PDF konnte nicht geladen werden.") {
   const token = getToken("customer");
   let popup = null;
   try { popup = window.open("about:blank", "_blank"); } catch (_) {}
@@ -150,7 +150,7 @@ async function openPdf(apiPath) {
     setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 120000);
   } catch (e) {
     if (popup && !popup.closed) popup.close();
-    alert(e?.message || "PDF konnte nicht geladen werden.");
+    alert(e?.message || failMessage);
   }
 }
 
@@ -305,6 +305,7 @@ function ReturnModal({ order, onClose, onDone }) {
 }
 
 function ReturnTrackingForm({ order, activeReturn, onSaved }) {
+  const tUi = useTranslations("shopUi");
   const t = useTranslations("order");
   const [tracking, setTracking] = useState(() => String(activeReturn?.customer_tracking_number || ""));
   const [carrier, setCarrier] = useState(() => String(activeReturn?.customer_carrier_name || ""));
@@ -352,7 +353,7 @@ function ReturnTrackingForm({ order, activeReturn, onSaved }) {
       <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("carrierOptionalLabel")}</label>
       <input value={carrier} onChange={(e) => setCarrier(e.target.value)}
         style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}
-        placeholder="DHL / Hermes / DPD…"
+        placeholder={tUi("carrierPlaceholder")}
       />
       {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 0 }}>{err}</p>}
       <button type="button" onClick={submit} disabled={busy}
@@ -454,9 +455,7 @@ function MessageModal({ order, onClose }) {
               )}
             </div>
             <div style={{ padding: "14px 20px", color: "#6b7280", fontSize: 13 }}>
-              {t.has?.("messageCreatesCaseHint")
-                ? t("messageCreatesCaseHint")
-                : "Ihre Nachricht wird als Support-Fall angelegt und unter Nachrichten fortgesetzt."}
+              {t("messageCreatesCaseHint")}
             </div>
             <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6" }}>
               {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
@@ -480,6 +479,7 @@ function MessageModal({ order, onClose }) {
 
 /* ── Post-checkout confirmation (S3.16) ── */
 function OrderConfirmationView({ order }) {
+  const tUi = useTranslations("shopUi");
   const t = useTranslations("order");
   const locale = useLocale();
   const router = useRouter();
@@ -533,7 +533,7 @@ function OrderConfirmationView({ order }) {
           </div>
           {order.email && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0" }}>
-              <span style={{ fontWeight: 500, color: "#6b7280" }}>E-Mail</span>
+              <span style={{ fontWeight: 500, color: "#6b7280" }}>{tUi("email")}</span>
               <span style={{ color: "#111827", fontWeight: 500 }}>{order.email}</span>
             </div>
           )}
@@ -1005,7 +1005,7 @@ export default function OrderDetailPage() {
         <Card>
           <CardTitle>{t("actionsHeading")}</CardTitle>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <ActionBtn bg="#f0f9ff" color="#0369a1" onClick={() => openPdf(`/api/store-invoice/${order.id}`)}>
+            <ActionBtn bg="#f0f9ff" color="#0369a1" onClick={() => openPdf(`/api/store-invoice/${order.id}`, t("pdfLoadFailed"))}>
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
               {t("downloadInvoice")}
             </ActionBtn>
@@ -1020,7 +1020,7 @@ export default function OrderDetailPage() {
               </ActionBtn>
             )}
             {approvedReturn && (
-              <ActionBtn bg="#fffbeb" color="#92400e" onClick={() => openPdf(`/api/store-return-retourenschein/${order.id}`)}>
+              <ActionBtn bg="#fffbeb" color="#92400e" onClick={() => openPdf(`/api/store-return-retourenschein/${order.id}`, t("pdfLoadFailed"))}>
                 {t("returnSlip")}
               </ActionBtn>
             )}

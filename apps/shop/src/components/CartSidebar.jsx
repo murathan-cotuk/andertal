@@ -778,7 +778,7 @@ export default function CartSidebar() {
               </RecommendedWrap>
               {bestsellers.length > 0 && (
                 <BestsellerSection>
-                  <BestsellerSectionTitle>{locale === "de" ? "Bestseller" : locale === "tr" ? "Çok Satanlar" : "Bestsellers"}</BestsellerSectionTitle>
+                  <BestsellerSectionTitle>{{ de: "Bestseller", en: "Bestsellers", tr: "Çok satanlar", fr: "Meilleures ventes", es: "Más vendidos", it: "Più venduti" }[locale] || "Bestsellers"}</BestsellerSectionTitle>
                   <RecommendedStrip role="region" aria-label="Bestsellers">
                     {bestsellers.map((p) => (
                       <RecommendedCard key={p.id}>

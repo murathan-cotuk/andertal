@@ -458,6 +458,7 @@ a {
    BREADCRUMBS — always hidden on mobile
    ══════════════════════════════════════════════════════ */
 @media (max-width: 767px) {
+  nav[data-breadcrumb],
   nav[aria-label="Breadcrumb"],
   nav[aria-label="breadcrumb"] {
     display: none !important;

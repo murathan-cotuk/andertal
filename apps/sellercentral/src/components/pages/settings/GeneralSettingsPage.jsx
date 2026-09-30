@@ -143,62 +143,30 @@ export default function GeneralSettingsPage() {
   const [localeSaving, setLocaleSaving] = useState(false);
 
   const copy = {
-    pageIntro: locale === "tr"
-      ? "Mağaza adı, şirket ve yasal bilgiler. Adresler (depo / iade / fatura) Ayarlar → Konumlar’da yönetilir."
-      : locale === "en"
-        ? "Store name, company and legal details. Addresses (warehouse / returns / billing) are managed under Settings → Locations."
-        : "Shopname, Firmen- und Rechtsdaten. Adressen (Lager / Retoure / Rechnung) verwalten Sie unter Einstellungen → Standorte.",
-    storeCard: locale === "tr" ? "Mağaza" : locale === "en" ? "Store" : "Shop",
-    storeCardSub: locale === "tr"
-      ? "Shop’ta ürün sayfalarında Verkäufer olarak görünür."
-      : locale === "en"
-        ? "Shown as Verkäufer on product pages in the shop."
-        : "Wird im Shop auf Produktseiten als Verkäufer angezeigt.",
+    pageIntro: locale === "tr" ? "Mağaza adı, şirket ve yasal bilgiler. Adresler (depo / iade / fatura) Ayarlar → Konumlar’da yönetilir." : locale === "en" ? "Store name, company and legal details. Addresses (warehouse / returns / billing) are managed under Settings → Locations." : locale === "fr" ? "Nom de la boutique, données de l’entreprise et mentions légales. Les adresses (entrepôt / retours / facturation) se gèrent dans Paramètres → Emplacements." : locale === "es" ? "Nombre de la tienda, datos de la empresa y legales. Las direcciones (almacén / devoluciones / facturación) se gestionan en Ajustes → Ubicaciones." : locale === "it" ? "Nome del negozio, dati aziendali e legali. Gli indirizzi (magazzino / resi / fatturazione) si gestiscono in Impostazioni → Sedi." : "Shopname, Firmen- und Rechtsdaten. Adressen (Lager / Retoure / Rechnung) verwalten Sie unter Einstellungen → Standorte.",
+    storeCard: locale === "tr" ? "Mağaza" : locale === "en" ? "Store" : locale === "fr" ? "Boutique" : locale === "es" ? "Tienda" : locale === "it" ? "Negozio" : "Shop",
+    storeCardSub: locale === "tr" ? "Shop’ta ürün sayfalarında satıcı olarak görünür." : locale === "en" ? "Shown as the seller on product pages in the shop." : locale === "fr" ? "Affiché comme vendeur sur les pages produit de la boutique." : locale === "es" ? "Se muestra como vendedor en las páginas de producto de la tienda." : locale === "it" ? "Mostrato come venditore nelle pagine prodotto del negozio." : "Wird im Shop auf Produktseiten als Verkäufer angezeigt.",
     companyCard: isSuperuser
-      ? (locale === "tr" ? "Şirket & platform işletmecisi" : locale === "en" ? "Company & platform operator" : "Firma & Plattformbetreiber")
-      : (locale === "tr" ? "Şirket bilgileri" : locale === "en" ? "Company details" : "Firmendaten"),
+      ? (locale === "tr" ? "Şirket & platform işletmecisi" : locale === "en" ? "Company & platform operator" : locale === "fr" ? "Entreprise et opérateur de la plateforme" : locale === "es" ? "Empresa y operador de la plataforma" : locale === "it" ? "Azienda e gestore della piattaforma" : "Firma & Plattformbetreiber")
+      : (locale === "tr" ? "Şirket bilgileri" : locale === "en" ? "Company details" : locale === "fr" ? "Données de l’entreprise" : locale === "es" ? "Datos de la empresa" : locale === "it" ? "Dati aziendali" : "Firmendaten"),
     companyCardSub: isSuperuser
-      ? (locale === "tr"
-        ? "Tek form: satıcı hesabı ve platform Impressum / sözleşme PDF’i aynı kaynaktan beslenir."
-        : locale === "en"
-          ? "One form feeds both your seller account and the platform Impressum / seller-agreement PDF."
-          : "Ein Formular speist Konto und Plattform-Impressum / Seller-Agreement-PDF.")
-      : (locale === "tr"
-        ? "Yasal şirket adı, vergi bilgileri ve kayıtlı iş adresi."
-        : locale === "en"
-          ? "Legal company name, tax details and registered business address."
-          : "Rechtlicher Firmenname, Steuerdaten und eingetragene Geschäftsadresse."),
-    identity: locale === "tr" ? "Kimlik" : locale === "en" ? "Identity" : "Identität",
-    address: locale === "tr" ? "Kayıtlı iş adresi" : locale === "en" ? "Registered business address" : "Eingetragene Geschäftsadresse",
-    register: locale === "tr" ? "Ticaret sicili" : locale === "en" ? "Trade register" : "Handelsregister",
-    contact: locale === "tr" ? "İletişim" : locale === "en" ? "Contact" : "Kontakt",
-    compliance: locale === "de" ? "Verpackungsgesetz (LUCID / EPR)" : locale === "tr" ? "Ambalaj Geri Dönüşüm (LUCID / EPR)" : "Packaging Recycling (LUCID / EPR)",
-    complianceSub: locale === "de"
-      ? "Pflichtangabe nach VerpackG. Ohne gültige LUCID-Registrierung keine Listings auf DE-Marktplätzen."
-      : locale === "tr"
-        ? "VerpackG gereği zorunlu. Geçerli LUCID olmadan Almanya’da ürün listelenemez."
-        : "Required under VerpackG. Without valid LUCID you cannot list on DE marketplaces.",
-    docs: locale === "tr" ? "Şirket belgeleri" : locale === "en" ? "Company documents" : "Firmendokumente",
-    docsSub: locale === "tr"
-      ? "Ticaret sicili, vergi belgesi vb. yükleyin."
-      : locale === "en"
-        ? "Upload trade license, tax certificate, registration documents, etc."
-        : "Handelsregister, Steuerbescheinigung, Registrierungsunterlagen usw. hochladen.",
-    locationsNote: locale === "tr"
-      ? "Depo, iade ve fatura adresleri →"
-      : locale === "en"
-        ? "Warehouse, returns and billing addresses →"
-        : "Lager-, Retouren- und Rechnungsadressen →",
-    locationsLink: locale === "tr" ? "Konumlar" : locale === "en" ? "Locations" : "Standorte",
-    managingDirector: locale === "de" ? "Vertreten durch (Geschäftsführer)" : locale === "tr" ? "Yetkili kişi (Geschäftsführer)" : "Managing Director",
-    tradeReg: locale === "de" ? "Handelsregisternummer" : locale === "tr" ? "Ticaret sicil no." : "Trade Register No.",
-    regCourt: locale === "de" ? "Registergericht" : locale === "tr" ? "Sicil mahkemesi" : "Registry Court",
-    legalEmail: locale === "tr" ? "Yasal / Impressum e-posta" : locale === "en" ? "Legal / Impressum email" : "Rechtliche / Impressum-E-Mail",
-    ibanNote: locale === "de"
-      ? "IBAN und Bankverbindung: Einstellungen → Zahlungen."
-      : locale === "tr"
-        ? "IBAN ve banka bilgileri: Ayarlar → Ödemeler."
-        : "IBAN and bank details: Settings → Payments.",
+      ? (locale === "tr" ? "Tek form: satıcı hesabı ve platform Impressum / sözleşme PDF’i aynı kaynaktan beslenir." : locale === "en" ? "One form feeds both your seller account and the platform Impressum / seller-agreement PDF." : locale === "fr" ? "Un seul formulaire alimente votre compte vendeur et les mentions légales / le PDF du contrat vendeur de la plateforme." : locale === "es" ? "Un solo formulario alimenta tu cuenta de vendedor y el aviso legal / PDF del contrato de vendedor de la plataforma." : locale === "it" ? "Un unico modulo alimenta il tuo account venditore e le note legali / il PDF del contratto venditore della piattaforma." : "Ein Formular speist Konto und Plattform-Impressum / Seller-Agreement-PDF.")
+      : (locale === "tr" ? "Yasal şirket adı, vergi bilgileri ve kayıtlı iş adresi." : locale === "en" ? "Legal company name, tax details and registered business address." : locale === "fr" ? "Raison sociale, données fiscales et adresse du siège." : locale === "es" ? "Razón social, datos fiscales y domicilio social." : locale === "it" ? "Ragione sociale, dati fiscali e sede legale." : "Rechtlicher Firmenname, Steuerdaten und eingetragene Geschäftsadresse."),
+    identity: locale === "tr" ? "Kimlik" : locale === "en" ? "Identity" : locale === "fr" ? "Identité" : locale === "es" ? "Identidad" : locale === "it" ? "Identità" : "Identität",
+    address: locale === "tr" ? "Kayıtlı iş adresi" : locale === "en" ? "Registered business address" : locale === "fr" ? "Adresse du siège" : locale === "es" ? "Domicilio social" : locale === "it" ? "Sede legale" : "Eingetragene Geschäftsadresse",
+    register: locale === "tr" ? "Ticaret sicili" : locale === "en" ? "Trade register" : locale === "fr" ? "Registre du commerce" : locale === "es" ? "Registro mercantil" : locale === "it" ? "Registro delle imprese" : "Handelsregister",
+    contact: locale === "tr" ? "İletişim" : locale === "en" ? "Contact" : locale === "fr" ? "Contact" : locale === "es" ? "Contacto" : locale === "it" ? "Contatto" : "Kontakt",
+    compliance: locale === "tr" ? "Ambalaj Geri Dönüşüm (LUCID / EPR)" : locale === "en" ? "Packaging Recycling (LUCID / EPR)" : locale === "fr" ? "Emballages (LUCID / REP)" : locale === "es" ? "Envases (LUCID / RAP)" : locale === "it" ? "Imballaggi (LUCID / EPR)" : "Verpackungsgesetz (LUCID / EPR)",
+    complianceSub: locale === "tr" ? "VerpackG gereği zorunlu. Geçerli LUCID olmadan Almanya’da ürün listelenemez." : locale === "en" ? "Required under VerpackG. Without valid LUCID you cannot list on DE marketplaces." : locale === "fr" ? "Obligatoire selon la loi allemande VerpackG. Sans enregistrement LUCID valide, aucune mise en vente sur les marketplaces allemandes." : locale === "es" ? "Obligatorio según la ley alemana VerpackG. Sin registro LUCID válido no se puede vender en marketplaces alemanes." : locale === "it" ? "Obbligatorio secondo la legge tedesca VerpackG. Senza registrazione LUCID valida non si può vendere sui marketplace tedeschi." : "Pflichtangabe nach VerpackG. Ohne gültige LUCID-Registrierung keine Listings auf DE-Marktplätzen.",
+    docs: locale === "tr" ? "Şirket belgeleri" : locale === "en" ? "Company documents" : locale === "fr" ? "Documents de l’entreprise" : locale === "es" ? "Documentos de la empresa" : locale === "it" ? "Documenti aziendali" : "Firmendokumente",
+    docsSub: locale === "tr" ? "Ticaret sicili, vergi belgesi vb. yükleyin." : locale === "en" ? "Upload trade license, tax certificate, registration documents, etc." : locale === "fr" ? "Téléversez extrait du registre du commerce, attestation fiscale, documents d’enregistrement, etc." : locale === "es" ? "Sube el registro mercantil, certificado fiscal, documentos de registro, etc." : locale === "it" ? "Carica visura camerale, certificato fiscale, documenti di registrazione, ecc." : "Handelsregister, Steuerbescheinigung, Registrierungsunterlagen usw. hochladen.",
+    locationsNote: locale === "tr" ? "Depo, iade ve fatura adresleri →" : locale === "en" ? "Warehouse, returns and billing addresses →" : locale === "fr" ? "Adresses d’entrepôt, de retour et de facturation →" : locale === "es" ? "Direcciones de almacén, devoluciones y facturación →" : locale === "it" ? "Indirizzi di magazzino, resi e fatturazione →" : "Lager-, Retouren- und Rechnungsadressen →",
+    locationsLink: locale === "tr" ? "Konumlar" : locale === "en" ? "Locations" : locale === "fr" ? "Emplacements" : locale === "es" ? "Ubicaciones" : locale === "it" ? "Sedi" : "Standorte",
+    managingDirector: locale === "tr" ? "Yetkili kişi (Geschäftsführer)" : locale === "en" ? "Managing Director" : locale === "fr" ? "Représenté par (gérant)" : locale === "es" ? "Representado por (administrador)" : locale === "it" ? "Rappresentato da (amministratore)" : "Vertreten durch (Geschäftsführer)",
+    tradeReg: locale === "tr" ? "Ticaret sicil no." : locale === "en" ? "Trade Register No." : locale === "fr" ? "N° au registre du commerce" : locale === "es" ? "N.º de registro mercantil" : locale === "it" ? "N. registro imprese" : "Handelsregisternummer",
+    regCourt: locale === "tr" ? "Sicil mahkemesi" : locale === "en" ? "Registry Court" : locale === "fr" ? "Tribunal d’immatriculation" : locale === "es" ? "Juzgado del registro" : locale === "it" ? "Tribunale del registro" : "Registergericht",
+    legalEmail: locale === "tr" ? "Yasal / Impressum e-posta" : locale === "en" ? "Legal / Impressum email" : locale === "fr" ? "E-mail légal / mentions légales" : locale === "es" ? "E-mail legal / aviso legal" : locale === "it" ? "E-mail legale / note legali" : "Rechtliche / Impressum-E-Mail",
+    ibanNote: locale === "tr" ? "IBAN ve banka bilgileri: Ayarlar → Ödemeler." : locale === "en" ? "IBAN and bank details: Settings → Payments." : locale === "fr" ? "IBAN et coordonnées bancaires : Paramètres → Paiements." : locale === "es" ? "IBAN y datos bancarios: Ajustes → Pagos." : locale === "it" ? "IBAN e dati bancari: Impostazioni → Pagamenti." : "IBAN und Bankverbindung: Einstellungen → Zahlungen.",
   };
 
   useEffect(() => {
@@ -408,11 +376,7 @@ export default function GeneralSettingsPage() {
       next = prev.filter((c) => c !== code);
       if (!next.length) {
         setLocalesError(
-          locale === "tr"
-            ? "En az bir dil açık kalmalı."
-            : locale === "en"
-              ? "At least one language must stay enabled."
-              : "Mindestens eine Sprache muss aktiv bleiben.",
+          locale === "tr" ? "En az bir dil açık kalmalı." : locale === "en" ? "At least one language must stay enabled." : locale === "fr" ? "Au moins une langue doit rester activée." : locale === "es" ? "Al menos un idioma debe permanecer activo." : locale === "it" ? "Almeno una lingua deve restare attiva." : "Mindestens eine Sprache muss aktiv bleiben.",
         );
         return;
       }
@@ -581,16 +545,12 @@ export default function GeneralSettingsPage() {
       <Card>
         <BlockStack gap="300">
           <SectionLabel
-            title={locale === "tr" ? "Arayüz dili" : locale === "en" ? "Interface language" : "Sprache der Benutzeroberfläche"}
-            subtitle={locale === "tr"
-              ? "Sellercentral dil tercihi hesabınıza kaydedilir."
-              : locale === "en"
-                ? "Sellercentral language preference is saved to your account."
-                : "Die Sellercentral-Spracheinstellung wird in Ihrem Konto gespeichert."}
+            title={locale === "tr" ? "Arayüz dili" : locale === "en" ? "Interface language" : locale === "fr" ? "Langue de l’interface" : locale === "es" ? "Idioma de la interfaz" : locale === "it" ? "Lingua dell’interfaccia" : "Sprache der Benutzeroberfläche"}
+            subtitle={locale === "tr" ? "Sellercentral dil tercihi hesabınıza kaydedilir." : locale === "en" ? "Sellercentral language preference is saved to your account." : locale === "fr" ? "La langue de Sellercentral est enregistrée dans votre compte." : locale === "es" ? "El idioma de Sellercentral se guarda en tu cuenta." : locale === "it" ? "La lingua di Sellercentral viene salvata nel tuo account." : "Die Sellercentral-Spracheinstellung wird in Ihrem Konto gespeichert."}
           />
           <Box maxWidth="320px">
             <Select
-              label={locale === "tr" ? "Dil" : locale === "en" ? "Language" : "Sprache"}
+              label={locale === "tr" ? "Dil" : locale === "en" ? "Language" : locale === "fr" ? "Langue" : locale === "es" ? "Idioma" : locale === "it" ? "Lingua" : "Sprache"}
               labelHidden
               options={routing.locales.map((loc) => ({ label: t(loc), value: loc }))}
               value={uiLocale}
@@ -615,11 +575,7 @@ export default function GeneralSettingsPage() {
               />
               <div>
                 <Text as="p" variant="bodySm" tone="subdued">
-                  {locale === "tr"
-                    ? "Mağaza logosu (herkese açık satıcı sayfanızda görünür)"
-                    : locale === "en"
-                      ? "Store logo (shown on your public seller page)"
-                      : "Shop-Logo (erscheint auf Ihrer öffentlichen Verkäuferseite)"}
+                  {locale === "tr" ? "Mağaza logosu (herkese açık satıcı sayfanızda görünür)" : locale === "en" ? "Store logo (shown on your public seller page)" : locale === "fr" ? "Logo de la boutique (affiché sur votre page vendeur publique)" : locale === "es" ? "Logo de la tienda (se muestra en tu página pública de vendedor)" : locale === "it" ? "Logo del negozio (mostrato nella tua pagina venditore pubblica)" : "Shop-Logo (erscheint auf Ihrer öffentlichen Verkäuferseite)"}
                 </Text>
                 <InlineStack gap="300" blockAlign="center">
                   {formData.shopLogoUrl ? (
@@ -632,11 +588,11 @@ export default function GeneralSettingsPage() {
                     <div style={{ width: 64, height: 64, borderRadius: 8, border: "1px dashed #d6ccbd", background: "#faf7f2" }} />
                   )}
                   <Button size="slim" onClick={() => setLogoPickerOpen(true)}>
-                    {locale === "tr" ? "Görsel seç" : locale === "en" ? "Choose image" : "Bild auswählen"}
+                    {locale === "tr" ? "Görsel seç" : locale === "en" ? "Choose image" : locale === "fr" ? "Choisir une image" : locale === "es" ? "Elegir imagen" : locale === "it" ? "Scegli immagine" : "Bild auswählen"}
                   </Button>
                   {formData.shopLogoUrl ? (
                     <Button size="slim" tone="critical" variant="plain" onClick={() => setFormData((p) => ({ ...p, shopLogoUrl: "" }))}>
-                      {ui.remove || (locale === "tr" ? "Kaldır" : locale === "en" ? "Remove" : "Entfernen")}
+                      {ui.remove || (locale === "tr" ? "Kaldır" : locale === "en" ? "Remove" : locale === "fr" ? "Supprimer" : locale === "es" ? "Eliminar" : locale === "it" ? "Rimuovi" : "Entfernen")}
                     </Button>
                   ) : null}
                 </InlineStack>
@@ -663,7 +619,7 @@ export default function GeneralSettingsPage() {
                 </Box>
               </InlineStack>
               <TextField
-                label={locale === "tr" ? "Mağaza hakkında (herkese açık satıcı sayfasında görünür)" : locale === "en" ? "About the shop (shown on your public seller page)" : "Über den Shop (erscheint auf deiner öffentlichen Verkäuferseite)"}
+                label={locale === "tr" ? "Mağaza hakkında (herkese açık satıcı sayfasında görünür)" : locale === "en" ? "About the shop (shown on your public seller page)" : locale === "fr" ? "À propos de la boutique (affiché sur votre page vendeur publique)" : locale === "es" ? "Sobre la tienda (se muestra en tu página pública de vendedor)" : locale === "it" ? "Informazioni sul negozio (mostrate nella tua pagina venditore pubblica)" : "Über den Shop (erscheint auf deiner öffentlichen Verkäuferseite)"}
                 value={formData.shopAbout}
                 onChange={(v) => setFormData((p) => ({ ...p, shopAbout: v }))}
                 multiline={3}
@@ -672,7 +628,7 @@ export default function GeneralSettingsPage() {
                 showCharacterCount
               />
               <TextField
-                label={locale === "tr" ? "Rücksende- und Erstattungsbedingungen (herkese açık satıcı sayfasında görünür)" : locale === "en" ? "Return & refund conditions (shown on your public seller page)" : "Rücksende- und Erstattungsbedingungen (erscheint auf deiner öffentlichen Verkäuferseite)"}
+                label={locale === "tr" ? "İade ve geri ödeme koşulları (herkese açık satıcı sayfasında görünür)" : locale === "en" ? "Return & refund conditions (shown on your public seller page)" : locale === "fr" ? "Conditions de retour et de remboursement (affichées sur votre page vendeur publique)" : locale === "es" ? "Condiciones de devolución y reembolso (se muestran en tu página pública de vendedor)" : locale === "it" ? "Condizioni di reso e rimborso (mostrate nella tua pagina venditore pubblica)" : "Rücksende- und Erstattungsbedingungen (erscheint auf deiner öffentlichen Verkäuferseite)"}
                 value={formData.returnConditions}
                 onChange={(v) => setFormData((p) => ({ ...p, returnConditions: v }))}
                 multiline={4}
@@ -743,7 +699,7 @@ export default function GeneralSettingsPage() {
                 </Box>
                 <Box minWidth="160px">
                   <TextField
-                    label={locale === "de" ? "Stadt" : locale === "tr" ? "Şehir" : "City"}
+                    label={locale === "tr" ? "Şehir" : locale === "en" ? "City" : locale === "fr" ? "Ville" : locale === "es" ? "Ciudad" : locale === "it" ? "Città" : "Stadt"}
                     value={formData.businessCity}
                     onChange={(v) => setFormData((p) => ({ ...p, businessCity: v }))}
                     autoComplete="address-level2"
@@ -751,7 +707,7 @@ export default function GeneralSettingsPage() {
                 </Box>
                 <Box minWidth="140px">
                   <TextField
-                    label={locale === "de" ? "Land" : locale === "tr" ? "Ülke" : "Country"}
+                    label={locale === "tr" ? "Ülke" : locale === "en" ? "Country" : locale === "fr" ? "Pays" : locale === "es" ? "País" : locale === "it" ? "Paese" : "Land"}
                     value={formData.businessCountry}
                     onChange={(v) => setFormData((p) => ({ ...p, businessCountry: v }))}
                     autoComplete="country-name"
@@ -811,7 +767,7 @@ export default function GeneralSettingsPage() {
               <SectionLabel title={copy.compliance} subtitle={copy.complianceSub} />
               <Box maxWidth="320px">
                 <TextField
-                  label={locale === "de" ? "LUCID-Registrierungsnummer" : locale === "tr" ? "LUCID Kayıt Numarası" : "LUCID Registration Number"}
+                  label={locale === "tr" ? "LUCID Kayıt Numarası" : locale === "en" ? "LUCID Registration Number" : locale === "fr" ? "Numéro d’enregistrement LUCID" : locale === "es" ? "Número de registro LUCID" : locale === "it" ? "Numero di registrazione LUCID" : "LUCID-Registrierungsnummer"}
                   value={formData.lucidNumber}
                   onChange={(v) => setFormData((p) => ({ ...p, lucidNumber: v }))}
                   placeholder="DE1234567890123"
@@ -855,12 +811,8 @@ export default function GeneralSettingsPage() {
         <Card>
           <BlockStack gap="400">
             <SectionLabel
-              title={locale === "tr" ? "Website dilleri" : locale === "en" ? "Website languages" : "Website-Sprachen"}
-              subtitle={locale === "tr"
-                ? "Shop’ta gösterilecek dilleri aç/kapa."
-                : locale === "en"
-                  ? "Toggle which languages appear on the shop."
-                  : "Sprachen für den Shop ein-/ausschalten."}
+              title={locale === "tr" ? "Website dilleri" : locale === "en" ? "Website languages" : locale === "fr" ? "Langues du site" : locale === "es" ? "Idiomas del sitio" : locale === "it" ? "Lingue del sito" : "Website-Sprachen"}
+              subtitle={locale === "tr" ? "Shop’ta gösterilecek dilleri aç/kapa." : locale === "en" ? "Toggle which languages appear on the shop." : locale === "fr" ? "Activez ou désactivez les langues affichées dans la boutique." : locale === "es" ? "Activa o desactiva los idiomas que aparecen en la tienda." : locale === "it" ? "Attiva o disattiva le lingue mostrate nel negozio." : "Sprachen für den Shop ein-/ausschalten."}
             />
             <BlockStack gap="300">
               {ALL_SHOP_LOCALES.map((l) => {
@@ -897,16 +849,12 @@ export default function GeneralSettingsPage() {
         <Card>
           <BlockStack gap="400">
             <SectionLabel
-              title={locale === "tr" ? "Bakım modu (Coming soon)" : locale === "en" ? "Maintenance mode (Coming soon)" : "Wartungsmodus (Coming soon)"}
-              subtitle={locale === "tr"
-                ? "Açıldığında shop'taki tüm sayfalar seçilen görselle tam ekran kaplanır."
-                : locale === "en"
-                  ? "When on, every page on the shop is covered full-screen by the selected image."
-                  : "Wenn aktiviert, wird jede Shop-Seite vollflächig vom ausgewählten Bild überdeckt."}
+              title={locale === "tr" ? "Bakım modu (Coming soon)" : locale === "en" ? "Maintenance mode (Coming soon)" : locale === "fr" ? "Mode maintenance (Coming soon)" : locale === "es" ? "Modo mantenimiento (Coming soon)" : locale === "it" ? "Modalità manutenzione (Coming soon)" : "Wartungsmodus (Coming soon)"}
+              subtitle={locale === "tr" ? "Açıldığında shop'taki tüm sayfalar seçilen görselle tam ekran kaplanır." : locale === "en" ? "When on, every page on the shop is covered full-screen by the selected image." : locale === "fr" ? "Une fois activé, chaque page de la boutique est recouverte en plein écran par l’image choisie." : locale === "es" ? "Al activarlo, cada página de la tienda queda cubierta a pantalla completa por la imagen elegida." : locale === "it" ? "Se attivo, ogni pagina del negozio viene coperta a tutto schermo dall’immagine scelta." : "Wenn aktiviert, wird jede Shop-Seite vollflächig vom ausgewählten Bild überdeckt."}
             />
             <InlineStack align="space-between" blockAlign="center" wrap={false}>
               <Text as="span" variant="bodyMd">
-                {locale === "tr" ? "Siteyi duraklat" : locale === "en" ? "Pause the site" : "Website pausieren"}
+                {locale === "tr" ? "Siteyi duraklat" : locale === "en" ? "Pause the site" : locale === "fr" ? "Mettre le site en pause" : locale === "es" ? "Pausar el sitio" : locale === "it" ? "Metti in pausa il sito" : "Website pausieren"}
               </Text>
               <LocaleToggle
                 on={maintenanceEnabled}
@@ -917,7 +865,7 @@ export default function GeneralSettingsPage() {
             </InlineStack>
             <BlockStack gap="200">
               <Text as="span" variant="bodyMd">
-                {locale === "tr" ? "Görsel" : locale === "en" ? "Image" : "Bild"}
+                {locale === "tr" ? "Görsel" : locale === "en" ? "Image" : locale === "fr" ? "Image" : locale === "es" ? "Imagen" : locale === "it" ? "Immagine" : "Bild"}
               </Text>
               {maintenanceImageUrl ? (
                 <img
@@ -927,12 +875,12 @@ export default function GeneralSettingsPage() {
                 />
               ) : (
                 <Text as="p" tone="subdued" variant="bodySm">
-                  {locale === "tr" ? "Henüz görsel seçilmedi." : locale === "en" ? "No image selected yet." : "Noch kein Bild ausgewählt."}
+                  {locale === "tr" ? "Henüz görsel seçilmedi." : locale === "en" ? "No image selected yet." : locale === "fr" ? "Aucune image sélectionnée." : locale === "es" ? "Aún no se ha elegido imagen." : locale === "it" ? "Nessuna immagine selezionata." : "Noch kein Bild ausgewählt."}
                 </Text>
               )}
               <InlineStack gap="200">
                 <Button onClick={() => setMaintenancePickerOpen(true)} disabled={maintenanceSaving}>
-                  {locale === "tr" ? "Görsel seç" : locale === "en" ? "Choose image" : "Bild auswählen"}
+                  {locale === "tr" ? "Görsel seç" : locale === "en" ? "Choose image" : locale === "fr" ? "Choisir une image" : locale === "es" ? "Elegir imagen" : locale === "it" ? "Scegli immagine" : "Bild auswählen"}
                 </Button>
               </InlineStack>
             </BlockStack>

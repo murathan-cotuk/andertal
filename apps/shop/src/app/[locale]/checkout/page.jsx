@@ -1828,6 +1828,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
 }
 
 export default function CheckoutPage() {
+  const tUi = useTranslations("shopUi");
   const t = useTranslations("checkout");
   const locale = useLocale();
   const router = useRouter();
@@ -2060,7 +2061,7 @@ export default function CheckoutPage() {
       const client = getMedusaClient();
       const out = await client.patchStoreCart(cart.id, { coupon_code: code });
       if (out?.__error) {
-        setCouponErr(out.message || "Coupon konnte nicht angewendet werden.");
+        setCouponErr(out.message || tUi("couponApplyFailed"));
         return;
       }
       const newCode = out?.coupon_code ?? out?.cart?.coupon_code ?? code;
@@ -2070,7 +2071,7 @@ export default function CheckoutPage() {
       setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (e) {
-      setCouponErr(e?.message || "Coupon konnte nicht angewendet werden.");
+      setCouponErr(e?.message || tUi("couponApplyFailed"));
     } finally {
       setCouponApplying(false);
     }
@@ -2084,7 +2085,7 @@ export default function CheckoutPage() {
       const client = getMedusaClient();
       const out = await client.patchStoreCart(cart.id, { coupon_code: "" });
       if (out?.__error) {
-        setCouponErr(out.message || "Coupon konnte nicht entfernt werden.");
+        setCouponErr(out.message || tUi("couponRemoveFailed"));
         return;
       }
       setCart((prev) => (prev ? { ...prev, coupon_code: null, coupon_discount_cents: 0 } : prev));
@@ -2092,7 +2093,7 @@ export default function CheckoutPage() {
       setZeroCheckoutMode(false);
       setPiRefreshKey((k) => k + 1);
     } catch (e) {
-      setCouponErr(e?.message || "Coupon konnte nicht entfernt werden.");
+      setCouponErr(e?.message || tUi("couponRemoveFailed"));
     } finally {
       setCouponApplying(false);
     }
@@ -2375,7 +2376,7 @@ export default function CheckoutPage() {
                       <input
                         type="text"
                         inputMode="numeric"
-                        aria-label="Bonuspunkte einlösen"
+                        aria-label={tUi("redeemBonus")}
                         value={bonusDraft}
                         onChange={(e) => setBonusDraft(e.target.value)}
                         placeholder={t("bonusPlaceholder")}
@@ -2418,10 +2419,10 @@ export default function CheckoutPage() {
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   <input
                     type="text"
-                    aria-label="Coupon-Code"
+                    aria-label={tUi("couponCode")}
                     value={couponDraft}
                     onChange={(e) => setCouponDraft(e.target.value)}
-                    placeholder="z. B. SAVE10"
+                    placeholder={tUi("couponPlaceholder")}
                     style={{
                       flex: "1 1 120px",
                       minWidth: 100,

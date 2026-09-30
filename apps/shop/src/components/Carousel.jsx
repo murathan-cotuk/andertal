@@ -306,6 +306,7 @@ export default function Carousel({
   className,
 }) {
   const tc = useTranslations("common");
+  const tUi = useTranslations("shopUi");
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -428,7 +429,7 @@ export default function Carousel({
             {header != null ? header : hasTitle ? <Title>{title}</Title> : null}
           </TitleRowLeft>
           {navInHeader && (
-            <div style={{ display: "flex", gap: 10 }} role="group" aria-label="Carousel navigation">
+            <div style={{ display: "flex", gap: 10 }} role="group" aria-label={tUi("carouselNav")}>
               <NavBtn
                 type="button"
                 onClick={() => scroll(-1)}

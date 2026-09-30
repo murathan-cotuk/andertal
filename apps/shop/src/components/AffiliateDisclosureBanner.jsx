@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 // One-time, discrete disclosure shown the first time a visitor lands via an affiliate link
 // (docs/affiliate.md PR 9 — BGH 2017 requirement that affiliate/referral links be disclosed as
@@ -20,6 +20,7 @@ const TEXTS = {
 };
 
 export default function AffiliateDisclosureBanner() {
+  const tUi = useTranslations("shopUi");
   const locale = useLocale();
   const [visible, setVisible] = useState(false);
 
@@ -57,7 +58,7 @@ export default function AffiliateDisclosureBanner() {
       {text}
       <button
         onClick={() => setVisible(false)}
-        aria-label="Close"
+        aria-label={tUi("close")}
         style={{
           position: "absolute",
           top: 6,

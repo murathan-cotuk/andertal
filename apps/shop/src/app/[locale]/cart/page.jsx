@@ -362,6 +362,7 @@ const EmptyState = styled.div`
 `;
 
 export default function CartPage() {
+  const tUi = useTranslations("shopUi");
   const t = useTranslations("cart");
   const tAccount = useTranslations("pages.account");
   const locale = useLocale();
@@ -528,7 +529,7 @@ export default function CartPage() {
                 </SummaryRowLine>
                 {bonusDiscountCents > 0 && (
                   <SummaryRowLine style={{ color: "#15803d" }}>
-                    <span>Bonusrabatt</span>
+                    <span>{tUi("bonusDiscount")}</span>
                     <SummaryAmount style={{ color: "#16a34a" }}>
                       −{formatPriceCents(bonusDiscountCents)} €
                     </SummaryAmount>
@@ -554,7 +555,7 @@ export default function CartPage() {
                 </SummaryTotalAmount>
               </SummaryTotalBar>
               <PayNowButton href="/checkout">{t("checkout")}</PayNowButton>
-              <ContinueLink href="/">Weiter einkaufen</ContinueLink>
+              <ContinueLink href="/">{tUi("continueShopping")}</ContinueLink>
               <ClearCartBtn
                 type="button"
                 onClick={() => clearCart?.()}

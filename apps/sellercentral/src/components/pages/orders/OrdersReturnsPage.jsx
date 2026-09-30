@@ -730,7 +730,7 @@ export default function OrdersReturnsPage() {
             onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setSort("created_desc"); }}
             style={{ height: "1.75rem", padding: "0 0.625rem", borderRadius: "0.375rem", fontSize: "0.75rem", cursor: "pointer", background: "#fff", color: "#5e574e", border: "1px solid #d6ccbd" }}
           >
-            {ui.clearFilters || (locale === "tr" ? "Filtreleri temizle" : locale === "de" ? "Filter zurücksetzen" : "Clear filters")}
+            {ui.clearFilters || (locale === "tr" ? "Filtreleri temizle" : locale === "en" ? "Clear filters" : locale === "fr" ? "Effacer les filtres" : locale === "es" ? "Borrar filtros" : locale === "it" ? "Cancella filtri" : "Filter zurücksetzen")}
           </button>
         )}
       </div>

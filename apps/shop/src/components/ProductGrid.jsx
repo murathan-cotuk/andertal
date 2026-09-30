@@ -4,6 +4,7 @@ import { ProductCard, ProductListItem } from "@/components/ProductCard";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
 import { isBestsellerMetadata } from "@/lib/bestseller";
 import styled from "styled-components";
+import { useTranslations } from "next-intl";
 
 const MOBILE_GRID_GAP = 10;
 
@@ -88,8 +89,9 @@ export function ProductGrid({
   activeFilters = {},
 }) {
   const isMobile = useIsNarrow(767);
+  const t = useTranslations("accountMisc");
   const list = (Array.isArray(products) ? products : []).filter((p) => p && p.id);
-  if (!list.length) return <Empty>No products found</Empty>;
+  if (!list.length) return <Empty>{t("noProducts")}</Empty>;
 
   const cols = clampCols(maxColumns);
   const m = clampCols(maxColumnsMobile);

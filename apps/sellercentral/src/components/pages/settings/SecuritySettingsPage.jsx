@@ -21,7 +21,7 @@ import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 function formatJoined(d, locale) {
   if (!d) return "—";
   try {
-    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+    const loc = locale === "tr" ? "tr-TR" : locale === "en" ? "en-GB" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE";
     return new Date(d).toLocaleDateString(loc, {
       day: "2-digit",
       month: "long",
@@ -35,7 +35,7 @@ function formatJoined(d, locale) {
 function formatSessionDate(d, locale) {
   if (!d) return "—";
   try {
-    const loc = locale === "en" ? "en-GB" : locale === "tr" ? "tr-TR" : "de-DE";
+    const loc = locale === "tr" ? "tr-TR" : locale === "en" ? "en-GB" : locale === "fr" ? "fr-FR" : locale === "es" ? "es-ES" : locale === "it" ? "it-IT" : "de-DE";
     return new Date(d).toLocaleString(loc, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
   } catch {
     return "—";
@@ -235,14 +235,14 @@ function TotpSetupCard({ onStatusChange, locale }) {
       setCode("");
       setStep("qr");
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Setup failed." : locale === "tr" ? "Kurulum başarısız." : "Setup fehlgeschlagen."));
+      setErr(e?.message || (locale === "tr" ? "Kurulum başarısız." : locale === "en" ? "Setup failed." : locale === "fr" ? "Échec de la configuration." : locale === "es" ? "La configuración falló." : locale === "it" ? "Configurazione non riuscita." : "Setup fehlgeschlagen."));
       setStep("idle");
     }
   };
 
   const verifyCode = async () => {
     if (!code) {
-      setErr(locale === "en" ? "Please enter the code." : locale === "tr" ? "Lütfen kodu girin." : "Bitte Code eingeben.");
+      setErr(locale === "tr" ? "Lütfen kodu girin." : locale === "en" ? "Please enter the code." : locale === "fr" ? "Veuillez saisir le code." : locale === "es" ? "Introduce el código." : locale === "it" ? "Inserisci il codice." : "Bitte Code eingeben.");
       return;
     }
     setErr("");
@@ -251,17 +251,17 @@ function TotpSetupCard({ onStatusChange, locale }) {
       await getMedusaAdminClient().verify2fa(code);
       setEnabled(true);
       setStep("done");
-      setOk(locale === "en" ? "2FA successfully activated!" : locale === "tr" ? "2FA başarıyla etkinleştirildi!" : "2FA erfolgreich aktiviert!");
+      setOk(locale === "tr" ? "2FA başarıyla etkinleştirildi!" : locale === "en" ? "2FA successfully activated!" : locale === "fr" ? "2FA activée avec succès !" : locale === "es" ? "¡2FA activada correctamente!" : locale === "it" ? "2FA attivata con successo!" : "2FA erfolgreich aktiviert!");
       onStatusChange?.(true);
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Invalid code." : locale === "tr" ? "Geçersiz kod." : "Ungültiger Code."));
+      setErr(e?.message || (locale === "tr" ? "Geçersiz kod." : locale === "en" ? "Invalid code." : locale === "fr" ? "Code invalide." : locale === "es" ? "Código no válido." : locale === "it" ? "Codice non valido." : "Ungültiger Code."));
       setStep("qr");
     }
   };
 
   const disable2fa = async () => {
     if (!disableCode && !disablePassword) {
-      setErr(locale === "en" ? "Please enter your current code or password." : locale === "tr" ? "Lütfen mevcut kodunuzu veya şifrenizi girin." : "Bitte aktuellen Code oder Passwort eingeben.");
+      setErr(locale === "tr" ? "Lütfen mevcut kodunuzu veya şifrenizi girin." : locale === "en" ? "Please enter your current code or password." : locale === "fr" ? "Veuillez saisir votre code actuel ou votre mot de passe." : locale === "es" ? "Introduce tu código actual o tu contraseña." : locale === "it" ? "Inserisci il codice attuale o la password." : "Bitte aktuellen Code oder Passwort eingeben.");
       return;
     }
     setErr("");
@@ -271,10 +271,10 @@ function TotpSetupCard({ onStatusChange, locale }) {
       setEnabled(false);
       setDisableCode("");
       setDisablePassword("");
-      setOk(locale === "en" ? "2FA has been disabled." : locale === "tr" ? "2FA devre dışı bırakıldı." : "2FA wurde deaktiviert.");
+      setOk(locale === "tr" ? "2FA devre dışı bırakıldı." : locale === "en" ? "2FA has been disabled." : locale === "fr" ? "La 2FA a été désactivée." : locale === "es" ? "La 2FA se ha desactivado." : locale === "it" ? "La 2FA è stata disattivata." : "2FA wurde deaktiviert.");
       onStatusChange?.(false);
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Deactivation failed." : locale === "tr" ? "Devre dışı bırakma başarısız." : "Deaktivierung fehlgeschlagen."));
+      setErr(e?.message || (locale === "tr" ? "Devre dışı bırakma başarısız." : locale === "en" ? "Deactivation failed." : locale === "fr" ? "Échec de la désactivation." : locale === "es" ? "No se pudo desactivar." : locale === "it" ? "Disattivazione non riuscita." : "Deaktivierung fehlgeschlagen."));
     } finally {
       setDisabling(false);
     }
@@ -285,18 +285,14 @@ function TotpSetupCard({ onStatusChange, locale }) {
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center" wrap>
           <Text variant="headingMd" as="h2">
-            {locale === "en" ? "Two-factor authentication (2FA)" : locale === "tr" ? "İki faktörlü kimlik doğrulama (2FA)" : "Zwei-Faktor-Authentifizierung (2FA)"}
+            {locale === "tr" ? "İki faktörlü kimlik doğrulama (2FA)" : locale === "en" ? "Two-factor authentication (2FA)" : locale === "fr" ? "Authentification à deux facteurs (2FA)" : locale === "es" ? "Autenticación de dos factores (2FA)" : locale === "it" ? "Autenticazione a due fattori (2FA)" : "Zwei-Faktor-Authentifizierung (2FA)"}
           </Text>
           <Badge tone={enabled ? "success" : "attention"}>
-            {enabled ? (locale === "en" ? "Enabled" : locale === "tr" ? "Etkin" : "Aktiviert") : (locale === "en" ? "Not enabled" : locale === "tr" ? "Etkin değil" : "Nicht aktiviert")}
+            {enabled ? (locale === "tr" ? "Etkin" : locale === "en" ? "Enabled" : locale === "fr" ? "Activée" : locale === "es" ? "Activada" : locale === "it" ? "Attiva" : "Aktiviert") : (locale === "tr" ? "Etkin değil" : locale === "en" ? "Not enabled" : locale === "fr" ? "Non activée" : locale === "es" ? "No activada" : locale === "it" ? "Non attiva" : "Nicht aktiviert")}
           </Badge>
         </InlineStack>
         <Text as="p" tone="subdued">
-          {locale === "en"
-            ? "An authenticator app (e.g. Google Authenticator, Authy) is used to request an additional one-time code at login. This protects your account even if your password is stolen."
-            : locale === "tr"
-            ? "Giriş sırasında ek bir tek kullanımlık kod istemek için bir kimlik doğrulayıcı uygulama (ör. Google Authenticator, Authy) kullanılır. Bu, şifreniz çalınsa bile hesabınızı korur."
-            : "Mit einem Authenticator-App (z. B. Google Authenticator, Authy) wird beim Anmelden ein zusätzlicher einmaliger Code abgefragt. Dadurch ist Ihr Konto auch bei gestohlenen Passwörtern geschützt."}
+          {locale === "tr" ? "Giriş sırasında ek bir tek kullanımlık kod istemek için bir kimlik doğrulayıcı uygulama (ör. Google Authenticator, Authy) kullanılır. Bu, şifreniz çalınsa bile hesabınızı korur." : locale === "en" ? "An authenticator app (e.g. Google Authenticator, Authy) is used to request an additional one-time code at login. This protects your account even if your password is stolen." : locale === "fr" ? "Une application d’authentification (p. ex. Google Authenticator, Authy) demande un code à usage unique supplémentaire à la connexion. Votre compte reste protégé même si votre mot de passe est volé." : locale === "es" ? "Una app de autenticación (p. ej. Google Authenticator, Authy) solicita un código de un solo uso adicional al iniciar sesión. Así tu cuenta queda protegida aunque te roben la contraseña." : locale === "it" ? "Un’app di autenticazione (ad es. Google Authenticator, Authy) richiede un codice monouso aggiuntivo all’accesso. Il tuo account resta protetto anche se la password viene rubata." : "Mit einem Authenticator-App (z. B. Google Authenticator, Authy) wird beim Anmelden ein zusätzlicher einmaliger Code abgefragt. Dadurch ist Ihr Konto auch bei gestohlenen Passwörtern geschützt."}
         </Text>
 
         {err ? (
@@ -312,7 +308,7 @@ function TotpSetupCard({ onStatusChange, locale }) {
 
         {!enabled && step === "idle" && (
           <Button variant="primary" onClick={startSetup}>
-            {locale === "en" ? "Set up 2FA" : locale === "tr" ? "2FA'yı kur" : "2FA einrichten"}
+            {locale === "tr" ? "2FA'yı kur" : locale === "en" ? "Set up 2FA" : locale === "fr" ? "Configurer la 2FA" : locale === "es" ? "Configurar 2FA" : locale === "it" ? "Configura la 2FA" : "2FA einrichten"}
           </Button>
         )}
 
@@ -323,14 +319,10 @@ function TotpSetupCard({ onStatusChange, locale }) {
         {step === "qr" && qrCode && (
           <BlockStack gap="400">
             <Text as="p" fontWeight="semibold">
-              {locale === "en" ? "Step 1: Scan QR code" : locale === "tr" ? "Adım 1: QR kodu tara" : "Schritt 1: QR-Code scannen"}
+              {locale === "tr" ? "Adım 1: QR kodu tara" : locale === "en" ? "Step 1: Scan QR code" : locale === "fr" ? "Étape 1 : scanner le QR code" : locale === "es" ? "Paso 1: escanear el código QR" : locale === "it" ? "Passo 1: scansiona il codice QR" : "Schritt 1: QR-Code scannen"}
             </Text>
             <Text as="p" tone="subdued">
-              {locale === "en"
-                ? "Open your authenticator app (Google Authenticator, Authy, Microsoft Authenticator, etc.) and scan this QR code:"
-                : locale === "tr"
-                ? "Kimlik doğrulayıcı uygulamanızı (Google Authenticator, Authy, Microsoft Authenticator vb.) açın ve bu QR kodunu tarayın:"
-                : "Öffnen Sie Ihre Authenticator-App (Google Authenticator, Authy, Microsoft Authenticator usw.) und scannen Sie diesen QR-Code:"}
+              {locale === "tr" ? "Kimlik doğrulayıcı uygulamanızı (Google Authenticator, Authy, Microsoft Authenticator vb.) açın ve bu QR kodunu tarayın:" : locale === "en" ? "Open your authenticator app (Google Authenticator, Authy, Microsoft Authenticator, etc.) and scan this QR code:" : locale === "fr" ? "Ouvrez votre application d’authentification (Google Authenticator, Authy, Microsoft Authenticator, etc.) et scannez ce QR code :" : locale === "es" ? "Abre tu app de autenticación (Google Authenticator, Authy, Microsoft Authenticator, etc.) y escanea este código QR:" : locale === "it" ? "Apri la tua app di autenticazione (Google Authenticator, Authy, Microsoft Authenticator, ecc.) e scansiona questo codice QR:" : "Öffnen Sie Ihre Authenticator-App (Google Authenticator, Authy, Microsoft Authenticator usw.) und scannen Sie diesen QR-Code:"}
             </Text>
             <div style={{ display: "flex", justifyContent: "flex-start" }}>
               <div
@@ -350,7 +342,7 @@ function TotpSetupCard({ onStatusChange, locale }) {
               <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                 <BlockStack gap="100">
                   <Text variant="bodySm" tone="subdued">
-                    {locale === "en" ? "QR code not readable? Enter the secret key manually:" : locale === "tr" ? "QR kod okunamıyor mu? Gizli anahtarı manuel girin:" : "QR-Code nicht lesbar? Geheimschlüssel manuell eingeben:"}
+                    {locale === "tr" ? "QR kod okunamıyor mu? Gizli anahtarı manuel girin:" : locale === "en" ? "QR code not readable? Enter the secret key manually:" : locale === "fr" ? "QR code illisible ? Saisissez la clé secrète manuellement :" : locale === "es" ? "¿No se puede leer el QR? Introduce la clave secreta manualmente:" : locale === "it" ? "Codice QR non leggibile? Inserisci manualmente la chiave segreta:" : "QR-Code nicht lesbar? Geheimschlüssel manuell eingeben:"}
                   </Text>
                   <InlineStack gap="200" blockAlign="center">
                     <Text variant="bodyMd" fontWeight="semibold">
@@ -363,7 +355,7 @@ function TotpSetupCard({ onStatusChange, locale }) {
                       size="slim"
                       onClick={() => setShowSecret((v) => !v)}
                     >
-                      {showSecret ? (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Verbergen") : (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen")}
+                      {showSecret ? (locale === "tr" ? "Gizle" : locale === "en" ? "Hide" : locale === "fr" ? "Masquer" : locale === "es" ? "Ocultar" : locale === "it" ? "Nascondi" : "Verbergen") : (locale === "tr" ? "Göster" : locale === "en" ? "Show" : locale === "fr" ? "Afficher" : locale === "es" ? "Mostrar" : locale === "it" ? "Mostra" : "Anzeigen")}
                     </Button>
                   </InlineStack>
                 </BlockStack>
@@ -371,14 +363,14 @@ function TotpSetupCard({ onStatusChange, locale }) {
             )}
             <Divider />
             <Text as="p" fontWeight="semibold">
-              {locale === "en" ? "Step 2: Confirm code" : locale === "tr" ? "Adım 2: Kodu onayla" : "Schritt 2: Code bestätigen"}
+              {locale === "tr" ? "Adım 2: Kodu onayla" : locale === "en" ? "Step 2: Confirm code" : locale === "fr" ? "Étape 2 : confirmer le code" : locale === "es" ? "Paso 2: confirmar el código" : locale === "it" ? "Passo 2: conferma il codice" : "Schritt 2: Code bestätigen"}
             </Text>
             <Text as="p" tone="subdued">
-              {locale === "en" ? "Enter the 6-digit code from your app to activate 2FA:" : locale === "tr" ? "2FA'yı etkinleştirmek için uygulamanızdaki 6 haneli kodu girin:" : "Geben Sie den 6-stelligen Code aus Ihrer App ein, um 2FA zu aktivieren:"}
+              {locale === "tr" ? "2FA'yı etkinleştirmek için uygulamanızdaki 6 haneli kodu girin:" : locale === "en" ? "Enter the 6-digit code from your app to activate 2FA:" : locale === "fr" ? "Saisissez le code à 6 chiffres de votre application pour activer la 2FA :" : locale === "es" ? "Introduce el código de 6 dígitos de tu app para activar la 2FA:" : locale === "it" ? "Inserisci il codice a 6 cifre della tua app per attivare la 2FA:" : "Geben Sie den 6-stelligen Code aus Ihrer App ein, um 2FA zu aktivieren:"}
             </Text>
             <div style={{ maxWidth: 200 }}>
               <TextField
-                label={locale === "en" ? "6-digit code" : locale === "tr" ? "6 haneli kod" : "6-stelliger Code"}
+                label={locale === "tr" ? "6 haneli kod" : locale === "en" ? "6-digit code" : locale === "fr" ? "Code à 6 chiffres" : locale === "es" ? "Código de 6 dígitos" : locale === "it" ? "Codice a 6 cifre" : "6-stelliger Code"}
                 value={code}
                 onChange={setCode}
                 type="text"
@@ -390,7 +382,7 @@ function TotpSetupCard({ onStatusChange, locale }) {
             </div>
             <InlineStack gap="300">
               <Button variant="primary" onClick={verifyCode} loading={step === "verifying"}>
-                {locale === "en" ? "Confirm code & activate" : locale === "tr" ? "Kodu onayla & etkinleştir" : "Code bestätigen & aktivieren"}
+                {locale === "tr" ? "Kodu onayla & etkinleştir" : locale === "en" ? "Confirm code & activate" : locale === "fr" ? "Confirmer le code et activer" : locale === "es" ? "Confirmar código y activar" : locale === "it" ? "Conferma codice e attiva" : "Code bestätigen & aktivieren"}
               </Button>
               <Button variant="plain" onClick={() => { setStep("idle"); setQrCode(null); setSecret(null); }}>
                 {ui.cancel}
@@ -401,7 +393,7 @@ function TotpSetupCard({ onStatusChange, locale }) {
 
         {step === "done" && enabled && (
           <Banner tone="success">
-            <Text as="p">{locale === "en" ? "2FA is now active. You will be asked for a code at next login." : locale === "tr" ? "2FA artık aktif. Bir sonraki girişte kod istenecek." : "2FA ist jetzt aktiv. Beim nächsten Login wird ein Code abgefragt."}</Text>
+            <Text as="p">{locale === "tr" ? "2FA artık aktif. Bir sonraki girişte kod istenecek." : locale === "en" ? "2FA is now active. You will be asked for a code at next login." : locale === "fr" ? "La 2FA est active. Un code vous sera demandé à la prochaine connexion." : locale === "es" ? "La 2FA ya está activa. Se te pedirá un código en el próximo inicio de sesión." : locale === "it" ? "La 2FA è attiva. Al prossimo accesso ti verrà chiesto un codice." : "2FA ist jetzt aktiv. Beim nächsten Login wird ein Code abgefragt."}</Text>
           </Banner>
         )}
 
@@ -409,13 +401,13 @@ function TotpSetupCard({ onStatusChange, locale }) {
           <>
             <Divider />
             <BlockStack gap="300">
-              <Text variant="headingSm" as="h3">{locale === "en" ? "Disable 2FA" : locale === "tr" ? "2FA'yı devre dışı bırak" : "2FA deaktivieren"}</Text>
+              <Text variant="headingSm" as="h3">{locale === "tr" ? "2FA'yı devre dışı bırak" : locale === "en" ? "Disable 2FA" : locale === "fr" ? "Désactiver la 2FA" : locale === "es" ? "Desactivar 2FA" : locale === "it" ? "Disattiva la 2FA" : "2FA deaktivieren"}</Text>
               <Text as="p" tone="subdued">
-                {locale === "en" ? "To confirm, enter either your current authenticator code or your password:" : locale === "tr" ? "Onaylamak için mevcut kimlik doğrulayıcı kodunuzu veya şifrenizi girin:" : "Zur Bestätigung geben Sie entweder Ihren aktuellen Authenticator-Code oder Ihr Passwort ein:"}
+                {locale === "tr" ? "Onaylamak için mevcut kimlik doğrulayıcı kodunuzu veya şifrenizi girin:" : locale === "en" ? "To confirm, enter either your current authenticator code or your password:" : locale === "fr" ? "Pour confirmer, saisissez votre code d’authentification actuel ou votre mot de passe :" : locale === "es" ? "Para confirmar, introduce tu código de autenticación actual o tu contraseña:" : locale === "it" ? "Per confermare, inserisci il codice di autenticazione attuale o la password:" : "Zur Bestätigung geben Sie entweder Ihren aktuellen Authenticator-Code oder Ihr Passwort ein:"}
               </Text>
               <div style={{ maxWidth: 240 }}>
                 <TextField
-                  label={locale === "en" ? "Current authenticator code" : locale === "tr" ? "Mevcut kimlik doğrulayıcı kodu" : "Aktueller Authenticator-Code"}
+                  label={locale === "tr" ? "Mevcut kimlik doğrulayıcı kodu" : locale === "en" ? "Current authenticator code" : locale === "fr" ? "Code d’authentification actuel" : locale === "es" ? "Código de autenticación actual" : locale === "it" ? "Codice di autenticazione attuale" : "Aktueller Authenticator-Code"}
                   value={disableCode}
                   onChange={setDisableCode}
                   type="text"
@@ -424,10 +416,10 @@ function TotpSetupCard({ onStatusChange, locale }) {
                   placeholder="000000"
                 />
               </div>
-              <Text as="p" tone="subdued" variant="bodySm">{locale === "en" ? "or" : locale === "tr" ? "veya" : "oder"}</Text>
+              <Text as="p" tone="subdued" variant="bodySm">{locale === "tr" ? "veya" : locale === "en" ? "or" : locale === "fr" ? "ou" : locale === "es" ? "o" : locale === "it" ? "oppure" : "oder"}</Text>
               <div style={{ maxWidth: 240 }}>
                 <TextField
-                  label={locale === "en" ? "Your password" : locale === "tr" ? "Şifreniz" : "Ihr Passwort"}
+                  label={locale === "tr" ? "Şifreniz" : locale === "en" ? "Your password" : locale === "fr" ? "Votre mot de passe" : locale === "es" ? "Tu contraseña" : locale === "it" ? "La tua password" : "Ihr Passwort"}
                   type="password"
                   value={disablePassword}
                   onChange={setDisablePassword}
@@ -436,7 +428,7 @@ function TotpSetupCard({ onStatusChange, locale }) {
               </div>
               <InlineStack gap="300">
                 <Button tone="critical" onClick={disable2fa} loading={disabling}>
-                  {locale === "en" ? "Disable 2FA" : locale === "tr" ? "2FA'yı devre dışı bırak" : "2FA deaktivieren"}
+                  {locale === "tr" ? "2FA'yı devre dışı bırak" : locale === "en" ? "Disable 2FA" : locale === "fr" ? "Désactiver la 2FA" : locale === "es" ? "Desactivar 2FA" : locale === "it" ? "Disattiva la 2FA" : "2FA deaktivieren"}
                 </Button>
               </InlineStack>
             </BlockStack>
@@ -479,7 +471,7 @@ export default function SecuritySettingsPage() {
       setAccount(data?.user || null);
     } catch (e) {
       setAccount(null);
-      setErr(e?.message || (locale === "en" ? "Could not load profile." : locale === "tr" ? "Profil yüklenemedi." : "Profil konnte nicht geladen werden."));
+      setErr(e?.message || (locale === "tr" ? "Profil yüklenemedi." : locale === "en" ? "Could not load profile." : locale === "fr" ? "Impossible de charger le profil." : locale === "es" ? "No se pudo cargar el perfil." : locale === "it" ? "Impossibile caricare il profilo." : "Profil konnte nicht geladen werden."));
     } finally {
       setLoading(false);
     }
@@ -497,10 +489,10 @@ export default function SecuritySettingsPage() {
   })();
 
   const roleLabel = account?.is_superuser
-    ? (locale === "en" ? "Platform superuser" : locale === "tr" ? "Platform süper kullanıcısı" : "Plattform-Superuser")
+    ? (locale === "tr" ? "Platform süper kullanıcısı" : locale === "en" ? "Platform superuser" : locale === "fr" ? "Superutilisateur de la plateforme" : locale === "es" ? "Superusuario de la plataforma" : locale === "it" ? "Superutente della piattaforma" : "Plattform-Superuser")
     : account?.is_team_member
-      ? (locale === "en" ? "Team access" : locale === "tr" ? "Takım erişimi" : "Team-Zugang")
-      : (locale === "en" ? "Seller account" : locale === "tr" ? "Satıcı hesabı" : "Verkäufer-Konto");
+      ? (locale === "tr" ? "Takım erişimi" : locale === "en" ? "Team access" : locale === "fr" ? "Accès équipe" : locale === "es" ? "Acceso de equipo" : locale === "it" ? "Accesso team" : "Team-Zugang")
+      : (locale === "tr" ? "Satıcı hesabı" : locale === "en" ? "Seller account" : locale === "fr" ? "Compte vendeur" : locale === "es" ? "Cuenta de vendedor" : locale === "it" ? "Account venditore" : "Verkäufer-Konto");
 
   const roleTone = account?.is_superuser ? "info" : account?.is_team_member ? "attention" : "success";
 
@@ -529,7 +521,7 @@ export default function SecuritySettingsPage() {
       setAccount((a) => ({ ...a, ...(data?.user || {}) }));
       setEditingAccount(false);
     } catch (e) {
-      setAccErr(e?.message || (locale === "en" ? "Could not save." : locale === "tr" ? "Kaydedilemedi." : "Konnte nicht gespeichert werden."));
+      setAccErr(e?.message || (locale === "tr" ? "Kaydedilemedi." : locale === "en" ? "Could not save." : locale === "fr" ? "Impossible d’enregistrer." : locale === "es" ? "No se pudo guardar." : locale === "it" ? "Impossibile salvare." : "Konnte nicht gespeichert werden."));
     } finally {
       setAccSaving(false);
     }
@@ -540,11 +532,11 @@ export default function SecuritySettingsPage() {
     setErr("");
     setOk("");
     if (newPw !== confirmPw) {
-      setErr(locale === "en" ? "The new passwords do not match." : locale === "tr" ? "Yeni şifreler eşleşmiyor." : "Die neuen Passwörter stimmen nicht überein.");
+      setErr(locale === "tr" ? "Yeni şifreler eşleşmiyor." : locale === "en" ? "The new passwords do not match." : locale === "fr" ? "Les nouveaux mots de passe ne correspondent pas." : locale === "es" ? "Las nuevas contraseñas no coinciden." : locale === "it" ? "Le nuove password non corrispondono." : "Die neuen Passwörter stimmen nicht überein.");
       return;
     }
     if (newPw.length < 8 || !/[a-zA-Z]/.test(newPw) || !/[0-9]/.test(newPw)) {
-      setErr(locale === "en" ? "New password must be at least 8 characters and contain a letter and a number." : locale === "tr" ? "Yeni şifre en az 8 karakter, bir harf ve bir rakam içermelidir." : "Neues Passwort muss mindestens 8 Zeichen, einen Buchstaben und eine Zahl enthalten.");
+      setErr(locale === "tr" ? "Yeni şifre en az 8 karakter, bir harf ve bir rakam içermelidir." : locale === "en" ? "New password must be at least 8 characters and contain a letter and a number." : locale === "fr" ? "Le nouveau mot de passe doit contenir au moins 8 caractères, une lettre et un chiffre." : locale === "es" ? "La nueva contraseña debe tener al menos 8 caracteres, una letra y un número." : locale === "it" ? "La nuova password deve avere almeno 8 caratteri, una lettera e un numero." : "Neues Passwort muss mindestens 8 Zeichen, einen Buchstaben und eine Zahl enthalten.");
       return;
     }
     setSaving(true);
@@ -553,12 +545,12 @@ export default function SecuritySettingsPage() {
         current_password: currentPw,
         new_password: newPw,
       });
-      setOk(locale === "en" ? "Password changed." : locale === "tr" ? "Şifre değiştirildi." : "Passwort wurde geändert.");
+      setOk(locale === "tr" ? "Şifre değiştirildi." : locale === "en" ? "Password changed." : locale === "fr" ? "Mot de passe modifié." : locale === "es" ? "Contraseña cambiada." : locale === "it" ? "Password modificata." : "Passwort wurde geändert.");
       setCurrentPw("");
       setNewPw("");
       setConfirmPw("");
     } catch (e) {
-      setErr(e?.message || (locale === "en" ? "Could not change password." : locale === "tr" ? "Şifre değiştirilemedi." : "Passwort konnte nicht geändert werden."));
+      setErr(e?.message || (locale === "tr" ? "Şifre değiştirilemedi." : locale === "en" ? "Could not change password." : locale === "fr" ? "Impossible de modifier le mot de passe." : locale === "es" ? "No se pudo cambiar la contraseña." : locale === "it" ? "Impossibile modificare la password." : "Passwort konnte nicht geändert werden."));
     } finally {
       setSaving(false);
     }
@@ -569,7 +561,7 @@ export default function SecuritySettingsPage() {
       <Card>
         <Box padding="400">
           <Text as="p" tone="subdued">
-            {locale === "en" ? "Loading security settings…" : locale === "tr" ? "Güvenlik ayarları yükleniyor…" : "Sicherheitseinstellungen werden geladen…"}
+            {locale === "tr" ? "Güvenlik ayarları yükleniyor…" : locale === "en" ? "Loading security settings…" : locale === "fr" ? "Chargement des paramètres de sécurité…" : locale === "es" ? "Cargando ajustes de seguridad…" : locale === "it" ? "Caricamento impostazioni di sicurezza…" : "Sicherheitseinstellungen werden geladen…"}
           </Text>
         </Box>
       </Card>
@@ -579,11 +571,7 @@ export default function SecuritySettingsPage() {
   return (
     <BlockStack gap="500">
       <Text as="p" tone="subdued">
-        {locale === "en"
-          ? "These details and password apply only to your own login account — not to other users of your seller profile."
-          : locale === "tr"
-          ? "Bu bilgiler ve şifre yalnızca kendi giriş hesabınız için geçerlidir — satıcı profilinizin diğer kullanıcıları için değil."
-          : "Diese Angaben und das Passwort gelten nur für Ihr eigenes Anmeldekonto — nicht für andere Benutzer Ihres Verkäuferprofils."}
+        {locale === "tr" ? "Bu bilgiler ve şifre yalnızca kendi giriş hesabınız için geçerlidir — satıcı profilinizin diğer kullanıcıları için değil." : locale === "en" ? "These details and password apply only to your own login account — not to other users of your seller profile." : locale === "fr" ? "Ces informations et le mot de passe ne concernent que votre propre compte de connexion — pas les autres utilisateurs de votre profil vendeur." : locale === "es" ? "Estos datos y la contraseña solo se aplican a tu propia cuenta de acceso, no a otros usuarios de tu perfil de vendedor." : locale === "it" ? "Questi dati e la password valgono solo per il tuo account di accesso — non per gli altri utenti del tuo profilo venditore." : "Diese Angaben und das Passwort gelten nur für Ihr eigenes Anmeldekonto — nicht für andere Benutzer Ihres Verkäuferprofils."}
       </Text>
 
       {err ? (
@@ -601,13 +589,13 @@ export default function SecuritySettingsPage() {
         <BlockStack gap="400">
           <InlineStack align="space-between" blockAlign="center" wrap>
             <Text variant="headingMd" as="h2">
-              {locale === "en" ? "Your account" : locale === "tr" ? "Hesabınız" : "Ihr Konto"}
+              {locale === "tr" ? "Hesabınız" : locale === "en" ? "Your account" : locale === "fr" ? "Votre compte" : locale === "es" ? "Tu cuenta" : locale === "it" ? "Il tuo account" : "Ihr Konto"}
             </Text>
             <InlineStack gap="200" blockAlign="center">
               <Badge tone={roleTone}>{roleLabel}</Badge>
               {account?.is_superuser && !editingAccount ? (
                 <Button size="slim" onClick={startEditAccount}>
-                  {locale === "en" ? "Edit" : locale === "tr" ? "Düzenle" : "Bearbeiten"}
+                  {locale === "tr" ? "Düzenle" : locale === "en" ? "Edit" : locale === "fr" ? "Modifier" : locale === "es" ? "Editar" : locale === "it" ? "Modifica" : "Bearbeiten"}
                 </Button>
               ) : null}
             </InlineStack>
@@ -617,11 +605,7 @@ export default function SecuritySettingsPage() {
           {editingAccount ? (
             <BlockStack gap="300">
               <Text as="p" tone="subdued">
-                {locale === "en"
-                  ? "As a superuser you can edit your own name and login email directly."
-                  : locale === "tr"
-                  ? "Süper kullanıcı olarak kendi adını ve giriş e-postanı doğrudan düzenleyebilirsin."
-                  : "Als Superuser können Sie Ihren eigenen Namen und Ihre Anmelde-E-Mail direkt bearbeiten."}
+                {locale === "tr" ? "Süper kullanıcı olarak kendi adını ve giriş e-postanı doğrudan düzenleyebilirsin." : locale === "en" ? "As a superuser you can edit your own name and login email directly." : locale === "fr" ? "En tant que superutilisateur, vous pouvez modifier directement votre nom et votre e-mail de connexion." : locale === "es" ? "Como superusuario puedes editar directamente tu nombre y tu e-mail de acceso." : locale === "it" ? "Come superutente puoi modificare direttamente il tuo nome e l’e-mail di accesso." : "Als Superuser können Sie Ihren eigenen Namen und Ihre Anmelde-E-Mail direkt bearbeiten."}
               </Text>
               {accErr ? (
                 <Banner tone="critical" onDismiss={() => setAccErr("")}>
@@ -631,7 +615,7 @@ export default function SecuritySettingsPage() {
               <InlineStack gap="300" wrap>
                 <div style={{ minWidth: 200, flex: 1 }}>
                   <TextField
-                    label={locale === "en" ? "First name" : locale === "tr" ? "Ad" : "Vorname"}
+                    label={locale === "tr" ? "Ad" : locale === "en" ? "First name" : locale === "fr" ? "Prénom" : locale === "es" ? "Nombre" : locale === "it" ? "Nome" : "Vorname"}
                     value={accFirstName}
                     onChange={setAccFirstName}
                     autoComplete="given-name"
@@ -639,7 +623,7 @@ export default function SecuritySettingsPage() {
                 </div>
                 <div style={{ minWidth: 200, flex: 1 }}>
                   <TextField
-                    label={locale === "en" ? "Last name" : locale === "tr" ? "Soyad" : "Nachname"}
+                    label={locale === "tr" ? "Soyad" : locale === "en" ? "Last name" : locale === "fr" ? "Nom" : locale === "es" ? "Apellidos" : locale === "it" ? "Cognome" : "Nachname"}
                     value={accLastName}
                     onChange={setAccLastName}
                     autoComplete="family-name"
@@ -647,7 +631,7 @@ export default function SecuritySettingsPage() {
                 </div>
               </InlineStack>
               <TextField
-                label={locale === "en" ? "Email (login)" : locale === "tr" ? "E-posta (giriş)" : "E-Mail (Anmeldung)"}
+                label={locale === "tr" ? "E-posta (giriş)" : locale === "en" ? "Email (login)" : locale === "fr" ? "E-mail (connexion)" : locale === "es" ? "E-mail (acceso)" : locale === "it" ? "E-mail (accesso)" : "E-Mail (Anmeldung)"}
                 type="email"
                 value={accEmail}
                 onChange={setAccEmail}
@@ -655,7 +639,7 @@ export default function SecuritySettingsPage() {
               />
               <InlineStack gap="200">
                 <Button variant="primary" onClick={saveAccount} loading={accSaving}>
-                  {locale === "en" ? "Save" : locale === "tr" ? "Kaydet" : "Speichern"}
+                  {locale === "tr" ? "Kaydet" : locale === "en" ? "Save" : locale === "fr" ? "Enregistrer" : locale === "es" ? "Guardar" : locale === "it" ? "Salva" : "Speichern"}
                 </Button>
                 <Button onClick={cancelEditAccount} disabled={accSaving}>
                   {ui.cancel}
@@ -666,7 +650,7 @@ export default function SecuritySettingsPage() {
           <BlockStack gap="200">
             <div>
               <Text variant="bodySm" tone="subdued">
-                {locale === "en" ? "Name" : locale === "tr" ? "Ad" : "Name"}
+                {locale === "tr" ? "Ad" : locale === "en" ? "Name" : locale === "fr" ? "Nom" : locale === "es" ? "Nombre" : locale === "it" ? "Nome" : "Name"}
               </Text>
               <Text variant="bodyMd" as="p" fontWeight="semibold">
                 {displayName}
@@ -674,7 +658,7 @@ export default function SecuritySettingsPage() {
             </div>
             <div>
               <Text variant="bodySm" tone="subdued">
-                {locale === "en" ? "Email (login)" : locale === "tr" ? "E-posta (giriş)" : "E-Mail (Anmeldung)"}
+                {locale === "tr" ? "E-posta (giriş)" : locale === "en" ? "Email (login)" : locale === "fr" ? "E-mail (connexion)" : locale === "es" ? "E-mail (acceso)" : locale === "it" ? "E-mail (accesso)" : "E-Mail (Anmeldung)"}
               </Text>
               <Text variant="bodyMd" as="p" fontWeight="semibold">
                 {account?.email || "—"}
@@ -683,7 +667,7 @@ export default function SecuritySettingsPage() {
             {account?.store_name ? (
               <div>
                 <Text variant="bodySm" tone="subdued">
-                  {locale === "en" ? "Shop / Display name" : locale === "tr" ? "Mağaza / Görünen ad" : "Shop / Anzeigename"}
+                  {locale === "tr" ? "Mağaza / Görünen ad" : locale === "en" ? "Shop / Display name" : locale === "fr" ? "Boutique / nom affiché" : locale === "es" ? "Tienda / nombre visible" : locale === "it" ? "Negozio / nome visualizzato" : "Shop / Anzeigename"}
                 </Text>
                 <Text variant="bodyMd" as="p">
                   {account.store_name}
@@ -692,7 +676,7 @@ export default function SecuritySettingsPage() {
             ) : null}
             <div>
               <Text variant="bodySm" tone="subdued">
-                {locale === "en" ? "Seller ID" : locale === "tr" ? "Satıcı kimliği" : "Verkäufer-ID"}
+                {locale === "tr" ? "Satıcı kimliği" : locale === "en" ? "Seller ID" : locale === "fr" ? "ID vendeur" : locale === "es" ? "ID de vendedor" : locale === "it" ? "ID venditore" : "Verkäufer-ID"}
               </Text>
               <Text variant="bodyMd" as="p">
                 <span style={{ fontFamily: "monospace", fontSize: 13 }}>{account?.seller_id || "—"}</span>
@@ -700,7 +684,7 @@ export default function SecuritySettingsPage() {
             </div>
             <div>
               <Text variant="bodySm" tone="subdued">
-                {locale === "en" ? "Account since" : locale === "tr" ? "Hesap tarihi" : "Konto seit"}
+                {locale === "tr" ? "Hesap tarihi" : locale === "en" ? "Account since" : locale === "fr" ? "Compte depuis" : locale === "es" ? "Cuenta desde" : locale === "it" ? "Account dal" : "Konto seit"}
               </Text>
               <Text variant="bodyMd" as="p">
                 {formatJoined(account?.created_at, locale)}
@@ -714,48 +698,48 @@ export default function SecuritySettingsPage() {
       <Card>
         <BlockStack gap="400">
           <Text variant="headingMd" as="h2">
-            {locale === "en" ? "Change password" : locale === "tr" ? "Şifre değiştir" : "Passwort ändern"}
+            {locale === "tr" ? "Şifre değiştir" : locale === "en" ? "Change password" : locale === "fr" ? "Changer le mot de passe" : locale === "es" ? "Cambiar contraseña" : locale === "it" ? "Cambia password" : "Passwort ändern"}
           </Text>
           <Text as="p" tone="subdued">
-            {locale === "en" ? "Choose a secure password that you do not use anywhere else." : locale === "tr" ? "Başka hiçbir yerde kullanmadığınız güvenli bir şifre seçin." : "Wählen Sie ein sicheres Passwort, das Sie nirgendwo woanders verwenden."}
+            {locale === "tr" ? "Başka hiçbir yerde kullanmadığınız güvenli bir şifre seçin." : locale === "en" ? "Choose a secure password that you do not use anywhere else." : locale === "fr" ? "Choisissez un mot de passe sûr que vous n’utilisez nulle part ailleurs." : locale === "es" ? "Elige una contraseña segura que no uses en ningún otro sitio." : locale === "it" ? "Scegli una password sicura che non usi altrove." : "Wählen Sie ein sicheres Passwort, das Sie nirgendwo woanders verwenden."}
           </Text>
           <form onSubmit={submitPassword}>
             <BlockStack gap="300">
               <TextField
-                label={locale === "en" ? "Current password" : locale === "tr" ? "Mevcut şifre" : "Aktuelles Passwort"}
+                label={locale === "tr" ? "Mevcut şifre" : locale === "en" ? "Current password" : locale === "fr" ? "Mot de passe actuel" : locale === "es" ? "Contraseña actual" : locale === "it" ? "Password attuale" : "Aktuelles Passwort"}
                 type="password"
                 value={currentPw}
                 onChange={setCurrentPw}
                 autoComplete="current-password"
               />
               <TextField
-                label={locale === "en" ? "New password" : locale === "tr" ? "Yeni şifre" : "Neues Passwort"}
+                label={locale === "tr" ? "Yeni şifre" : locale === "en" ? "New password" : locale === "fr" ? "Nouveau mot de passe" : locale === "es" ? "Nueva contraseña" : locale === "it" ? "Nuova password" : "Neues Passwort"}
                 type={showNewPw ? "text" : "password"}
                 value={newPw}
                 onChange={setNewPw}
                 autoComplete="new-password"
-                helpText={locale === "en" ? "At least 8 characters, one letter and one number" : locale === "tr" ? "En az 8 karakter, bir harf ve bir rakam" : "Mindestens 8 Zeichen, ein Buchstabe und eine Zahl"}
+                helpText={locale === "tr" ? "En az 8 karakter, bir harf ve bir rakam" : locale === "en" ? "At least 8 characters, one letter and one number" : locale === "fr" ? "Au moins 8 caractères, une lettre et un chiffre" : locale === "es" ? "Al menos 8 caracteres, una letra y un número" : locale === "it" ? "Almeno 8 caratteri, una lettera e un numero" : "Mindestens 8 Zeichen, ein Buchstabe und eine Zahl"}
                 suffix={
                   <Button variant="plain" size="slim" onClick={() => setShowNewPw((v) => !v)}>
-                    {showNewPw ? (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Verbergen") : (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen")}
+                    {showNewPw ? (locale === "tr" ? "Gizle" : locale === "en" ? "Hide" : locale === "fr" ? "Masquer" : locale === "es" ? "Ocultar" : locale === "it" ? "Nascondi" : "Verbergen") : (locale === "tr" ? "Göster" : locale === "en" ? "Show" : locale === "fr" ? "Afficher" : locale === "es" ? "Mostrar" : locale === "it" ? "Mostra" : "Anzeigen")}
                   </Button>
                 }
               />
               <TextField
-                label={locale === "en" ? "Confirm new password" : locale === "tr" ? "Yeni şifreyi onayla" : "Neues Passwort bestätigen"}
+                label={locale === "tr" ? "Yeni şifreyi onayla" : locale === "en" ? "Confirm new password" : locale === "fr" ? "Confirmer le nouveau mot de passe" : locale === "es" ? "Confirmar nueva contraseña" : locale === "it" ? "Conferma nuova password" : "Neues Passwort bestätigen"}
                 type={showConfirmPw ? "text" : "password"}
                 value={confirmPw}
                 onChange={setConfirmPw}
                 autoComplete="new-password"
                 suffix={
                   <Button variant="plain" size="slim" onClick={() => setShowConfirmPw((v) => !v)}>
-                    {showConfirmPw ? (locale === "en" ? "Hide" : locale === "tr" ? "Gizle" : "Verbergen") : (locale === "en" ? "Show" : locale === "tr" ? "Göster" : "Anzeigen")}
+                    {showConfirmPw ? (locale === "tr" ? "Gizle" : locale === "en" ? "Hide" : locale === "fr" ? "Masquer" : locale === "es" ? "Ocultar" : locale === "it" ? "Nascondi" : "Verbergen") : (locale === "tr" ? "Göster" : locale === "en" ? "Show" : locale === "fr" ? "Afficher" : locale === "es" ? "Mostrar" : locale === "it" ? "Mostra" : "Anzeigen")}
                   </Button>
                 }
               />
               <InlineStack gap="300">
                 <Button variant="primary" submit loading={saving}>
-                  {locale === "en" ? "Save password" : locale === "tr" ? "Şifreyi kaydet" : "Passwort speichern"}
+                  {locale === "tr" ? "Şifreyi kaydet" : locale === "en" ? "Save password" : locale === "fr" ? "Enregistrer le mot de passe" : locale === "es" ? "Guardar contraseña" : locale === "it" ? "Salva password" : "Passwort speichern"}
                 </Button>
               </InlineStack>
             </BlockStack>

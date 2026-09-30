@@ -54,7 +54,7 @@ const Container = styled.div`
   @media (max-width: 767px) {
     /* room for the sticky price bar + bottom navigation */
     padding: 0 12px calc(150px + env(safe-area-inset-bottom, 0px));
-    > nav[aria-label="Breadcrumb"] {
+    > nav[data-breadcrumb] {
       display: none;
     }
   }
@@ -1194,6 +1194,7 @@ function findAncestors(nodes, slug, path = []) {
 }
 
 export default function ProductTemplateMobile() {
+  const tUi = useTranslations("shopUi");
   useMarkProductPage();
   const params = useParams();
   const router = useRouter();
@@ -1438,7 +1439,7 @@ export default function ProductTemplateMobile() {
 
   if (loading) return null;
   if (error) return <Container>Fehler: {error}</Container>;
-  if (!product) return <Container>Produkt nicht gefunden.</Container>;
+  if (!product) return <Container>{tUi("productNotFound")}</Container>;
 
   const { title: displayTitle, description: displayDescription } = getLocalizedProduct(product, locale);
   const localeMedia = localizedProductMediaList(product, locale);
@@ -1873,7 +1874,7 @@ export default function ProductTemplateMobile() {
                 <div style={{ position: "relative" }}>
                   <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
                 </div>
-                <GalleryActionBtn type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
+                <GalleryActionBtn type="button" aria-label={tUi("shareProduct")} title={tUi("shareProduct")} onClick={shareProduct}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="18" cy="5" r="3" />
                     <circle cx="6" cy="12" r="3" />
@@ -2045,7 +2046,7 @@ export default function ProductTemplateMobile() {
                 <div style={{ position: "relative" }}>
                   <ProductWishlistHeart productId={product.id} positionAbsolute={false} />
                 </div>
-                <GalleryActionBtn type="button" aria-label="Share product" title="Share product" onClick={shareProduct}>
+                <GalleryActionBtn type="button" aria-label={tUi("shareProduct")} title={tUi("shareProduct")} onClick={shareProduct}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="18" cy="5" r="3"></circle>
                     <circle cx="6" cy="12" r="3"></circle>
@@ -2312,9 +2313,9 @@ export default function ProductTemplateMobile() {
             <h3 style={{ fontSize: "1.125rem", fontWeight: 600, marginBottom: 12, color: "#1f2937" }}>
               {{ de: "Produktsicherheitsinformationen", en: "Product safety information", tr: "Ürün güvenlik bilgileri", fr: "Informations de sécurité produit", it: "Informazioni di sicurezza prodotto", es: "Información de seguridad del producto" }[locale] ?? "Produktsicherheitsinformationen"}
             </h3>
-            {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>Hersteller:</strong> {String(meta.hersteller)}</p>}
-            {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Hersteller-Informationen:</strong><br />{String(meta.hersteller_information)}</p>}
-            {meta.verantwortliche_person_information && <p style={{ marginBottom: extraCompliance.length > 0 ? 8 : 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>Verantwortliche Person (EU):</strong><br />{String(meta.verantwortliche_person_information)}</p>}
+            {meta.hersteller && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem" }}><strong>{tUi("manufacturer")}</strong> {String(meta.hersteller)}</p>}
+            {meta.hersteller_information && <p style={{ marginBottom: 8, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>{tUi("manufacturerInfo")}</strong><br />{String(meta.hersteller_information)}</p>}
+            {meta.verantwortliche_person_information && <p style={{ marginBottom: extraCompliance.length > 0 ? 8 : 0, color: "#4b5563", fontSize: "0.9375rem", whiteSpace: "pre-wrap" }}><strong>{tUi("responsiblePerson")}</strong><br />{String(meta.verantwortliche_person_information)}</p>}
             {extraCompliance.map((key, i) => {
               const value = String(meta[key]);
               const label = localizeMetaKey(key, locale);
@@ -2413,7 +2414,7 @@ export default function ProductTemplateMobile() {
                       ))}
                     </span>
                     <span style={{ fontSize: 12, color: "#6b7280" }}>
-                      {new Date(rv.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                      {new Date(rv.created_at).toLocaleDateString(locale, { day: "2-digit", month: "2-digit", year: "numeric" })}
                     </span>
                   </div>
                 </div>
@@ -2425,7 +2426,7 @@ export default function ProductTemplateMobile() {
           <p className="text-gray-500 text-sm mt-2">{tp("noReviews")}</p>
         ) : null}
         <TrustpilotTrustBox
-          locale={locale === "en" ? "en-US" : "de-DE"}
+          locale={{ de: "de-DE", en: "en-US", tr: "tr-TR", fr: "fr-FR", es: "es-ES", it: "it-IT" }[locale] || "en-US"}
           style={{ marginTop: 28 }}
         />
       </ReviewsSection>

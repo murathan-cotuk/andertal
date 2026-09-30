@@ -876,7 +876,7 @@ function apiRuleLabel(locale, key) {
     bestseller_category: locale === "de" ? "Bestseller" : locale === "tr" ? "Çok Satan (Bestseller)" : locale === "fr" ? "Best-seller" : locale === "es" ? "Más vendido" : locale === "it" ? "Bestseller" : "Bestseller",
     sale: locale === "de" ? "Sale" : locale === "tr" ? "İndirimli (Sale)" : locale === "fr" ? "En promotion" : locale === "es" ? "En oferta" : locale === "it" ? "In offerta" : "On sale",
     new: locale === "de" ? "Neu" : locale === "tr" ? "Yeni ürün" : locale === "fr" ? "Nouveau" : locale === "es" ? "Nuevo" : locale === "it" ? "Nuovo" : "New",
-    made_in_europe: locale === "de" ? "Made in Europe" : locale === "tr" ? "Made in Europe (AB menşei)" : "Made in Europe",
+    made_in_europe: locale === "tr" ? "Made in Europe (AB menşei)" : locale === "en" ? "Made in Europe" : locale === "fr" ? "Made in Europe" : locale === "es" ? "Made in Europe" : locale === "it" ? "Made in Europe" : "Made in Europe",
   }[key];
 }
 
@@ -1087,7 +1087,7 @@ function ProductBadgesCard({ locale, client, ui }) {
   const handleSubmit = async () => {
     if (form.badge_type === "image") {
       if (!(form.image_url || "").trim()) {
-        setErrMsg(locale === "de" ? "Badge-Bild ist erforderlich." : locale === "tr" ? "Badge görseli gerekli." : "Badge image is required.");
+        setErrMsg(locale === "tr" ? "Badge görseli gerekli." : locale === "en" ? "Badge image is required." : locale === "fr" ? "L’image du badge est obligatoire." : locale === "es" ? "La imagen del distintivo es obligatoria." : locale === "it" ? "L’immagine del badge è obbligatoria." : "Badge-Bild ist erforderlich.");
         return;
       }
     } else if (!form.label.trim()) {
@@ -1140,8 +1140,8 @@ function ProductBadgesCard({ locale, client, ui }) {
   const apiRuleSelectOptions = ["bestseller_category", "sale", "new", "made_in_europe"].map((r) => ({ label: apiRuleLabel(locale, r), value: r }));
   const groupSelectOptions = [{ label: "—", value: "" }, ...groups.map((g) => ({ label: g.name, value: g.id }))];
   const badgeTypeOptions = [
-    { label: locale === "de" ? "Text" : locale === "tr" ? "Metin" : "Text", value: "text" },
-    { label: locale === "de" ? "Bild" : locale === "tr" ? "Görsel" : "Image", value: "image" },
+    { label: locale === "tr" ? "Metin" : locale === "en" ? "Text" : locale === "fr" ? "Texte" : locale === "es" ? "Texto" : locale === "it" ? "Testo" : "Text", value: "text" },
+    { label: locale === "tr" ? "Görsel" : locale === "en" ? "Image" : locale === "fr" ? "Image" : locale === "es" ? "Imagen" : locale === "it" ? "Immagine" : "Bild", value: "image" },
   ];
 
   const t = {
@@ -1157,15 +1157,11 @@ function ProductBadgesCard({ locale, client, ui }) {
     save: locale === "de" ? "Speichern" : locale === "tr" ? "Kaydet" : locale === "fr" ? "Enregistrer" : locale === "es" ? "Guardar" : locale === "it" ? "Salva" : "Save",
     cancel: locale === "de" ? "Abbrechen" : locale === "tr" ? "İptal" : locale === "fr" ? "Annuler" : locale === "es" ? "Cancelar" : locale === "it" ? "Annulla" : "Cancel",
     badgeText: locale === "de" ? "Badge-Text" : locale === "tr" ? "Badge metni" : locale === "fr" ? "Texte du badge" : locale === "es" ? "Texto de la insignia" : locale === "it" ? "Testo del badge" : "Badge text",
-    badgeType: locale === "de" ? "Badge-Typ" : locale === "tr" ? "Badge tipi" : "Badge type",
-    badgeImage: locale === "de" ? "Badge-Bild" : locale === "tr" ? "Badge görseli" : "Badge image",
-    shopLang: locale === "de" ? "Shop-Inhaltssprache" : locale === "tr" ? "Shop içerik dili" : "Shop content language",
-    shopLangHelp: locale === "de"
-      ? "DE = Standard. Andere Sprachen: Text/Bild-Übersetzung für den Shop."
-      : locale === "tr"
-        ? "DE = varsayılan. Diğer diller: shop’ta görünen metin/görsel çevirisi."
-        : "DE = default. Other languages: text/image translation shown in the shop.",
-    fromMedia: locale === "de" ? "Aus Medien" : locale === "tr" ? "Medyadan seç" : "From media",
+    badgeType: locale === "tr" ? "Badge tipi" : locale === "en" ? "Badge type" : locale === "fr" ? "Type de badge" : locale === "es" ? "Tipo de distintivo" : locale === "it" ? "Tipo di badge" : "Badge-Typ",
+    badgeImage: locale === "tr" ? "Badge görseli" : locale === "en" ? "Badge image" : locale === "fr" ? "Image du badge" : locale === "es" ? "Imagen del distintivo" : locale === "it" ? "Immagine del badge" : "Badge-Bild",
+    shopLang: locale === "tr" ? "Shop içerik dili" : locale === "en" ? "Shop content language" : locale === "fr" ? "Langue du contenu de la boutique" : locale === "es" ? "Idioma del contenido de la tienda" : locale === "it" ? "Lingua dei contenuti del negozio" : "Shop-Inhaltssprache",
+    shopLangHelp: locale === "tr" ? "DE = varsayılan. Diğer diller: shop’ta görünen metin/görsel çevirisi." : locale === "en" ? "DE = default. Other languages: text/image translation shown in the shop." : locale === "fr" ? "DE = par défaut. Autres langues : traduction du texte/de l’image affichée dans la boutique." : locale === "es" ? "DE = predeterminado. Otros idiomas: traducción de texto/imagen mostrada en la tienda." : locale === "it" ? "DE = predefinita. Altre lingue: traduzione di testo/immagine mostrata nel negozio." : "DE = Standard. Andere Sprachen: Text/Bild-Übersetzung für den Shop.",
+    fromMedia: locale === "tr" ? "Medyadan seç" : locale === "en" ? "From media" : locale === "fr" ? "Depuis les médias" : locale === "es" ? "Desde medios" : locale === "it" ? "Dai media" : "Aus Medien",
     position: locale === "de" ? "Position" : locale === "tr" ? "Konum" : locale === "fr" ? "Position" : locale === "es" ? "Posición" : locale === "it" ? "Posizione" : "Position",
     style: locale === "de" ? "Stil" : locale === "tr" ? "Stil" : locale === "fr" ? "Style" : locale === "es" ? "Estilo" : locale === "it" ? "Stile" : "Style",
     bgColor: locale === "de" ? "Hintergrundfarbe" : locale === "tr" ? "Arka plan rengi" : locale === "fr" ? "Couleur de fond" : locale === "es" ? "Color de fondo" : locale === "it" ? "Colore di sfondo" : "Background color",
@@ -1173,16 +1169,12 @@ function ProductBadgesCard({ locale, client, ui }) {
     borderWidth: locale === "de" ? "Rahmenbreite (px)" : locale === "tr" ? "Kenarlık kalınlığı (px)" : locale === "fr" ? "Épaisseur de bordure (px)" : locale === "es" ? "Grosor del borde (px)" : locale === "it" ? "Spessore bordo (px)" : "Border width (px)",
     borderColor: locale === "de" ? "Rahmenfarbe" : locale === "tr" ? "Kenarlık rengi" : locale === "fr" ? "Couleur de bordure" : locale === "es" ? "Color del borde" : locale === "it" ? "Colore del bordo" : "Border color",
     borderRadius: locale === "de" ? "Eckenradius (px)" : locale === "tr" ? "Köşe yuvarlaklığı (px)" : locale === "fr" ? "Rayon des coins (px)" : locale === "es" ? "Radio de esquina (px)" : locale === "it" ? "Raggio angoli (px)" : "Corner radius (px)",
-    fontSize: locale === "de" ? "Schriftgröße (% der Bildbreite)" : locale === "tr" ? "Yazı boyutu (görsel genişliğinin %)" : "Font size (% of image width)",
-    offsetX: locale === "de" ? "Abstand X (%, 0 = bündig am Rand)" : locale === "tr" ? "Mesafe X (%, 0 = köşeye yapışık)" : "Offset X (%, 0 = flush edge)",
-    offsetY: locale === "de" ? "Abstand Y (%, 0 = bündig am Rand)" : locale === "tr" ? "Mesafe Y (%, 0 = köşeye yapışık)" : "Offset Y (%, 0 = flush edge)",
-    imageWidth: locale === "de" ? "Breite (% vom Produktbild, leer = auto)" : locale === "tr" ? "Genişlik (ürün görselinin %, boş = otomatik)" : "Width (% of product image, empty = auto)",
-    imageHeight: locale === "de" ? "Höhe (%, leer = auto)" : locale === "tr" ? "Yükseklik (%, boş = otomatik)" : "Height (%, empty = auto)",
-    sizeHelp: locale === "de"
-      ? "Breite/Höhe steuern die Badge-Box im Shop (% vom Produktbild). Leer = Inhalt bestimmt die Größe. Text: zusätzlich Schriftgröße."
-      : locale === "tr"
-        ? "Genişlik/yükseklik shop’taki badge kutusunu belirler (ürün görselinin %). Boş = içeriğe göre. Metin: ayrıca yazı boyutu."
-        : "Width/height control the badge box in the shop (% of product image). Empty = size to content. Text: also font size.",
+    fontSize: locale === "tr" ? "Yazı boyutu (görsel genişliğinin %)" : locale === "en" ? "Font size (% of image width)" : locale === "fr" ? "Taille de police (% de la largeur de l’image)" : locale === "es" ? "Tamaño de letra (% del ancho de la imagen)" : locale === "it" ? "Dimensione carattere (% della larghezza immagine)" : "Schriftgröße (% der Bildbreite)",
+    offsetX: locale === "tr" ? "Mesafe X (%, 0 = köşeye yapışık)" : locale === "en" ? "Offset X (%, 0 = flush edge)" : locale === "fr" ? "Décalage X (%, 0 = collé au bord)" : locale === "es" ? "Desplazamiento X (%, 0 = al borde)" : locale === "it" ? "Scostamento X (%, 0 = a filo del bordo)" : "Abstand X (%, 0 = bündig am Rand)",
+    offsetY: locale === "tr" ? "Mesafe Y (%, 0 = köşeye yapışık)" : locale === "en" ? "Offset Y (%, 0 = flush edge)" : locale === "fr" ? "Décalage Y (%, 0 = collé au bord)" : locale === "es" ? "Desplazamiento Y (%, 0 = al borde)" : locale === "it" ? "Scostamento Y (%, 0 = a filo del bordo)" : "Abstand Y (%, 0 = bündig am Rand)",
+    imageWidth: locale === "tr" ? "Genişlik (ürün görselinin %, boş = otomatik)" : locale === "en" ? "Width (% of product image, empty = auto)" : locale === "fr" ? "Largeur (% de l’image produit, vide = auto)" : locale === "es" ? "Ancho (% de la imagen del producto, vacío = auto)" : locale === "it" ? "Larghezza (% dell’immagine prodotto, vuoto = auto)" : "Breite (% vom Produktbild, leer = auto)",
+    imageHeight: locale === "tr" ? "Yükseklik (%, boş = otomatik)" : locale === "en" ? "Height (%, empty = auto)" : locale === "fr" ? "Hauteur (%, vide = auto)" : locale === "es" ? "Alto (%, vacío = auto)" : locale === "it" ? "Altezza (%, vuoto = auto)" : "Höhe (%, leer = auto)",
+    sizeHelp: locale === "tr" ? "Genişlik/yükseklik shop’taki badge kutusunu belirler (ürün görselinin %). Boş = içeriğe göre. Metin: ayrıca yazı boyutu." : locale === "en" ? "Width/height control the badge box in the shop (% of product image). Empty = size to content. Text: also font size." : locale === "fr" ? "Largeur/hauteur définissent la zone du badge dans la boutique (% de l’image produit). Vide = taille selon le contenu. Texte : aussi la taille de police." : locale === "es" ? "Ancho/alto controlan la caja del distintivo en la tienda (% de la imagen del producto). Vacío = según el contenido. Texto: también el tamaño de letra." : locale === "it" ? "Larghezza/altezza controllano il riquadro del badge nel negozio (% dell’immagine prodotto). Vuoto = in base al contenuto. Testo: anche la dimensione del carattere." : "Breite/Höhe steuern die Badge-Box im Shop (% vom Produktbild). Leer = Inhalt bestimmt die Größe. Text: zusätzlich Schriftgröße.",
     preview: locale === "de" ? "Vorschau" : locale === "tr" ? "Önizleme" : locale === "fr" ? "Aperçu" : locale === "es" ? "Vista previa" : locale === "it" ? "Anteprima" : "Preview",
     target: locale === "de" ? "Ziel" : locale === "tr" ? "Hedef" : locale === "fr" ? "Cible" : locale === "es" ? "Objetivo" : locale === "it" ? "Target" : "Target",
     apiRule: locale === "de" ? "API-Regel" : locale === "tr" ? "API kuralı" : locale === "fr" ? "Règle API" : locale === "es" ? "Regla API" : locale === "it" ? "Regola API" : "API rule",
@@ -1193,11 +1185,7 @@ function ProductBadgesCard({ locale, client, ui }) {
   return (
     <BlockStack gap="400">
       <Text as="p" tone="subdued">
-        {locale === "de"
-          ? "Beliebig viele Text- oder Bild-Badges auf Produktbildern — Position, Stil, Ziel und Sprache frei wählbar. Unter Ziel → API-Regel: Bestseller, Sale, Neu oder Made in Europe."
-          : locale === "tr"
-            ? "Ürün görsellerinde metin veya görsel badge’ler — konum, stil, hedef ve dil serbestçe seçilebilir. Hedef → API kuralı: Bestseller, Sale, Yeni veya Made in Europe."
-            : "Text or image badges on product images — position, style, target and language are configurable. Target → API rule: Bestseller, Sale, New, or Made in Europe."}
+        {locale === "tr" ? "Ürün görsellerinde metin veya görsel badge’ler — konum, stil, hedef ve dil serbestçe seçilebilir. Hedef → API kuralı: Bestseller, Sale, Yeni veya Made in Europe." : locale === "en" ? "Text or image badges on product images — position, style, target and language are configurable. Target → API rule: Bestseller, Sale, New, or Made in Europe." : locale === "fr" ? "Badges texte ou image sur les images produit — position, style, cible et langue configurables. Cible → règle API : Bestseller, Sale, Nouveau ou Made in Europe." : locale === "es" ? "Distintivos de texto o imagen en las imágenes de producto: posición, estilo, destino e idioma configurables. Destino → regla API: Bestseller, Sale, Nuevo o Made in Europe." : locale === "it" ? "Badge di testo o immagine sulle immagini prodotto — posizione, stile, destinazione e lingua configurabili. Destinazione → regola API: Bestseller, Sale, Nuovo o Made in Europe." : "Beliebig viele Text- oder Bild-Badges auf Produktbildern — Position, Stil, Ziel und Sprache frei wählbar. Unter Ziel → API-Regel: Bestseller, Sale, Neu oder Made in Europe."}
       </Text>
 
       <InlineStack>
@@ -1282,7 +1270,7 @@ function ProductBadgesCard({ locale, client, ui }) {
                     onChange={setDisplayedLabel}
                     autoComplete="off"
                     placeholder={isDe ? "Alt text" : (form.label || "Alt text")}
-                    helpText={locale === "de" ? "Optional: Alt-Text / Name" : locale === "tr" ? "İsteğe bağlı: alt metin / ad" : "Optional: alt text / name"}
+                    helpText={locale === "tr" ? "İsteğe bağlı: alt metin / ad" : locale === "en" ? "Optional: alt text / name" : locale === "fr" ? "Facultatif : texte alternatif / nom" : locale === "es" ? "Opcional: texto alternativo / nombre" : locale === "it" ? "Facoltativo: testo alternativo / nome" : "Optional: Alt-Text / Name"}
                   />
                 </BlockStack>
               ) : (
@@ -1752,14 +1740,10 @@ export default function StylesPage() {
                 {loadError && !loading ? (
                   <>
                     <Text as="p" tone="critical" alignment="center">
-                      {locale === "tr"
-                        ? "Ayarlar yüklenemedi (backend'e ulaşılamadı). Mevcut ayarlarınızın üzerine yazılmaması için form açılmadı."
-                        : locale === "de"
-                          ? "Einstellungen konnten nicht geladen werden (Backend nicht erreichbar). Das Formular wurde nicht geöffnet, damit Ihre bestehenden Einstellungen nicht überschrieben werden."
-                          : "Could not load settings (backend unreachable). The form was not opened, so your existing settings won't be overwritten."}
+                      {locale === "tr" ? "Ayarlar yüklenemedi (backend'e ulaşılamadı). Mevcut ayarlarınızın üzerine yazılmaması için form açılmadı." : locale === "en" ? "Could not load settings (backend unreachable). The form was not opened, so your existing settings won't be overwritten." : locale === "fr" ? "Impossible de charger les paramètres (backend injoignable). Le formulaire n’a pas été ouvert pour ne pas écraser vos paramètres existants." : locale === "es" ? "No se pudieron cargar los ajustes (backend no disponible). El formulario no se abrió para no sobrescribir tus ajustes actuales." : locale === "it" ? "Impossibile caricare le impostazioni (backend non raggiungibile). Il modulo non è stato aperto per non sovrascrivere le impostazioni esistenti." : "Einstellungen konnten nicht geladen werden (Backend nicht erreichbar). Das Formular wurde nicht geöffnet, damit Ihre bestehenden Einstellungen nicht überschrieben werden."}
                     </Text>
                     <Button onClick={loadStyles}>
-                      {locale === "tr" ? "Tekrar Dene" : locale === "de" ? "Erneut versuchen" : "Retry"}
+                      {locale === "tr" ? "Tekrar Dene" : locale === "en" ? "Retry" : locale === "fr" ? "Réessayer" : locale === "es" ? "Reintentar" : locale === "it" ? "Riprova" : "Erneut versuchen"}
                     </Button>
                   </>
                 ) : (
@@ -1791,11 +1775,11 @@ export default function StylesPage() {
           </Banner>
         </Layout.Section>
         <AccordionCard
-          title={locale === "tr" ? "Tasarım şablonu: Warmer Marktplatz" : locale === "de" ? "Design-Vorlage: Warmer Marktplatz" : "Design preset: Warmer Marktplatz"}
+          title={locale === "tr" ? "Tasarım şablonu: Warmer Marktplatz" : locale === "en" ? "Design preset: Warmer Marktplatz" : locale === "fr" ? "Modèle de design : Warmer Marktplatz" : locale === "es" ? "Plantilla de diseño: Warmer Marktplatz" : locale === "it" ? "Modello di design: Warmer Marktplatz" : "Design-Vorlage: Warmer Marktplatz"}
           subtitle={
             styles?.design_preset === WARM_MARKETPLACE_PRESET_ID
-              ? (locale === "tr" ? "Aktif" : locale === "de" ? "Aktiv" : "Active")
-              : (locale === "tr" ? "Renkler, yazı tipleri, header, footer ve butonlar tek tıkla" : locale === "de" ? "Farben, Schriften, Header, Footer und Buttons mit einem Klick" : "Colors, fonts, header, footer and buttons in one click")
+              ? (locale === "tr" ? "Aktif" : locale === "en" ? "Active" : locale === "fr" ? "Actif" : locale === "es" ? "Activo" : locale === "it" ? "Attivo" : "Aktiv")
+              : (locale === "tr" ? "Renkler, yazı tipleri, header, footer ve butonlar tek tıkla" : locale === "en" ? "Colors, fonts, header, footer and buttons in one click" : locale === "fr" ? "Couleurs, polices, en-tête, pied de page et boutons en un clic" : locale === "es" ? "Colores, fuentes, cabecera, pie y botones en un clic" : locale === "it" ? "Colori, font, header, footer e pulsanti con un clic" : "Farben, Schriften, Header, Footer und Buttons mit einem Klick")
           }
         >
           <BlockStack gap="300">
@@ -1806,15 +1790,11 @@ export default function StylesPage() {
               <Text as="span" tone="subdued">Bricolage Grotesque · Instrument Sans</Text>
             </InlineStack>
             <Text as="p" tone="subdued">
-              {locale === "tr"
-                ? "Mevcut ayarların üzerine şablonun renk, yazı tipi, header, second nav, footer ve buton değerlerini yazar. Mevcut buton varyantların silinmez, sadece pasif olur. Logo, topbar metinleri, SEO ve rozetler değişmez. Kaydet'e basana kadar mağazada hiçbir şey değişmez."
-                : locale === "de"
-                  ? "Übernimmt Farben, Schriften, Header, Second Nav, Footer und Buttons der Vorlage. Bestehende Button-Varianten bleiben erhalten (nur inaktiv). Logo, Topbar-Texte, SEO und Badges bleiben unverändert. Im Shop ändert sich erst etwas, wenn du speicherst."
-                  : "Applies the preset's colors, fonts, header, second nav, footer and buttons. Existing button variants are kept (set inactive). Logo, topbar texts, SEO and badges stay unchanged. Nothing changes in the shop until you save."}
+              {locale === "tr" ? "Mevcut ayarların üzerine şablonun renk, yazı tipi, header, second nav, footer ve buton değerlerini yazar. Mevcut buton varyantların silinmez, sadece pasif olur. Logo, topbar metinleri, SEO ve rozetler değişmez. Kaydet'e basana kadar mağazada hiçbir şey değişmez." : locale === "en" ? "Applies the preset's colors, fonts, header, second nav, footer and buttons. Existing button variants are kept (set inactive). Logo, topbar texts, SEO and badges stay unchanged. Nothing changes in the shop until you save." : locale === "fr" ? "Applique les couleurs, polices, l’en-tête, la seconde navigation, le pied de page et les boutons du modèle. Les variantes de boutons existantes sont conservées (désactivées). Logo, textes de la barre supérieure, SEO et badges restent inchangés. Rien ne change dans la boutique tant que vous n’enregistrez pas." : locale === "es" ? "Aplica los colores, fuentes, cabecera, segunda navegación, pie y botones de la plantilla. Las variantes de botones existentes se conservan (inactivas). Logo, textos de la barra superior, SEO y distintivos no cambian. En la tienda no cambia nada hasta que guardes." : locale === "it" ? "Applica colori, font, header, seconda navigazione, footer e pulsanti del modello. Le varianti di pulsanti esistenti restano (disattivate). Logo, testi della barra superiore, SEO e badge non cambiano. Nel negozio non cambia nulla finché non salvi." : "Übernimmt Farben, Schriften, Header, Second Nav, Footer und Buttons der Vorlage. Bestehende Button-Varianten bleiben erhalten (nur inaktiv). Logo, Topbar-Texte, SEO und Badges bleiben unverändert. Im Shop ändert sich erst etwas, wenn du speicherst."}
             </Text>
             <InlineStack gap="200">
               <Button variant="primary" onClick={() => setStyles((prev) => applyWarmMarketplacePreset(prev))}>
-                {locale === "tr" ? "Şablonu uygula" : locale === "de" ? "Vorlage übernehmen" : "Apply preset"}
+                {locale === "tr" ? "Şablonu uygula" : locale === "en" ? "Apply preset" : locale === "fr" ? "Appliquer le modèle" : locale === "es" ? "Aplicar plantilla" : locale === "it" ? "Applica modello" : "Vorlage übernehmen"}
               </Button>
               {styles?.design_preset !== CLASSIC_DESIGN_PRESET_ID && classicBaseRef.current ? (
                 <Button
@@ -1827,12 +1807,12 @@ export default function StylesPage() {
                     });
                   }}
                 >
-                  {locale === "tr" ? "Klasik tasarıma dön" : locale === "de" ? "Klassisches Design verwenden" : "Use classic design"}
+                  {locale === "tr" ? "Klasik tasarıma dön" : locale === "en" ? "Use classic design" : locale === "fr" ? "Utiliser le design classique" : locale === "es" ? "Usar el diseño clásico" : locale === "it" ? "Usa il design classico" : "Klassisches Design verwenden"}
                 </Button>
               ) : null}
               {isDirty ? (
                 <Button onClick={handleDiscard}>
-                  {locale === "tr" ? "Değişiklikleri geri al" : locale === "de" ? "Änderungen verwerfen" : "Discard changes"}
+                  {locale === "tr" ? "Değişiklikleri geri al" : locale === "en" ? "Discard changes" : locale === "fr" ? "Annuler les modifications" : locale === "es" ? "Descartar cambios" : locale === "it" ? "Annulla modifiche" : "Änderungen verwerfen"}
                 </Button>
               ) : null}
             </InlineStack>
@@ -1857,7 +1837,7 @@ export default function StylesPage() {
                   onChange={(v) => setStyles((prev) => ({ ...prev, seo_home_description: v }))}
                   autoComplete="off"
                   multiline={3}
-                  placeholder={locale === "de" ? "Kurze Beschreibung fuer Suchergebnisse und Social Preview" : "Short description for search results and social preview"}
+                  placeholder={locale === "tr" ? "Arama sonuçları ve sosyal önizleme için kısa açıklama" : locale === "en" ? "Short description for search results and social preview" : locale === "fr" ? "Courte description pour les résultats de recherche et l’aperçu social" : locale === "es" ? "Descripción breve para resultados de búsqueda y vista previa social" : locale === "it" ? "Breve descrizione per risultati di ricerca e anteprima social" : "Kurze Beschreibung fuer Suchergebnisse und Social Preview"}
                 />
               </BlockStack>
           </AccordionCard>
@@ -1911,11 +1891,7 @@ export default function StylesPage() {
                 </BlockStack>
               </InlineStack>
               <Text as="p" tone="subdued" variant="bodySm">
-                {locale === "de"
-                  ? "Ohne Medium bleibt die Standard-404-Animation im Shop erhalten. GIF und Video werden wie im Shop abgespielt."
-                  : locale === "tr"
-                    ? "Medya seçilmezse shop'ta varsayılan 404 animasyonu gösterilir. GIF ve video shop'taki 404 sayfasında da oynatılır."
-                    : "Without media, the shop keeps its default animated 404 illustration. GIF and video play on the shop 404 page too."}
+                {locale === "tr" ? "Medya seçilmezse shop'ta varsayılan 404 animasyonu gösterilir. GIF ve video shop'taki 404 sayfasında da oynatılır." : locale === "en" ? "Without media, the shop keeps its default animated 404 illustration. GIF and video play on the shop 404 page too." : locale === "fr" ? "Sans média, la boutique garde son illustration 404 animée par défaut. Les GIF et vidéos sont aussi lus sur la page 404 de la boutique." : locale === "es" ? "Sin medio, la tienda mantiene su ilustración 404 animada por defecto. GIF y vídeo también se reproducen en la página 404 de la tienda." : locale === "it" ? "Senza media, il negozio mantiene l’illustrazione 404 animata predefinita. GIF e video vengono riprodotti anche nella pagina 404 del negozio." : "Ohne Medium bleibt die Standard-404-Animation im Shop erhalten. GIF und Video werden wie im Shop abgespielt."}
               </Text>
             </BlockStack>
             <MediaPickerModal
@@ -1996,7 +1972,7 @@ export default function StylesPage() {
                       <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 16, alignItems: "start" }}>
                         <div>
                           <NumericTextField
-                            label={locale === "de" ? "Größe (px)" : "Size (px)"}
+                            label={locale === "tr" ? "Boyut (px)" : locale === "en" ? "Size (px)" : locale === "fr" ? "Taille (px)" : locale === "es" ? "Tamaño (px)" : locale === "it" ? "Dimensione (px)" : "Größe (px)"}
                             value={logoSlotSize(dev, section === "shop" ? 34 : 30)}
                             min={8}
                             max={400}
@@ -2103,7 +2079,7 @@ export default function StylesPage() {
         {isSuperuser && (
           <AccordionCard
             title="Product Badges"
-            subtitle={locale === "de" ? "Text-/Bild-Badges auf Produktbildern — Ziel inkl. API-Regel (Bestseller, Sale, Neu, Made in Europe)" : locale === "tr" ? "Ürün görsellerinde metin/görsel badge’ler — hedef dahil API kuralı (Bestseller, Sale, Yeni, Made in Europe)" : "Text/image badges on product images — target includes API rules (Bestseller, Sale, New, Made in Europe)"}
+            subtitle={locale === "tr" ? "Ürün görsellerinde metin/görsel badge’ler — hedef dahil API kuralı (Bestseller, Sale, Yeni, Made in Europe)" : locale === "en" ? "Text/image badges on product images — target includes API rules (Bestseller, Sale, New, Made in Europe)" : locale === "fr" ? "Badges texte/image sur les images produit — cible avec règles API (Bestseller, Sale, Nouveau, Made in Europe)" : locale === "es" ? "Distintivos de texto/imagen en imágenes de producto: destino con reglas API (Bestseller, Sale, Nuevo, Made in Europe)" : locale === "it" ? "Badge di testo/immagine sulle immagini prodotto — destinazione con regole API (Bestseller, Sale, Nuovo, Made in Europe)" : "Text-/Bild-Badges auf Produktbildern — Ziel inkl. API-Regel (Bestseller, Sale, Neu, Made in Europe)"}
           >
             <ProductBadgesCard locale={locale} client={client} ui={ui} />
           </AccordionCard>
@@ -2235,7 +2211,7 @@ export default function StylesPage() {
                   </Text>
                   <Divider />
                   <TypographyLevelRow
-                    heading={locale === "de" ? "Produkttitel (Produktseite)" : "Product title (product page)"}
+                    heading={locale === "tr" ? "Ürün başlığı (ürün sayfası)" : locale === "en" ? "Product title (product page)" : locale === "fr" ? "Titre du produit (page produit)" : locale === "es" ? "Título del producto (página de producto)" : locale === "it" ? "Titolo prodotto (pagina prodotto)" : "Produkttitel (Produktseite)"}
                     levelKey="product_title"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -2244,7 +2220,7 @@ export default function StylesPage() {
                   />
                   <Divider />
                   <TypographyLevelRow
-                    heading={locale === "de" ? "Katalog-Titel (Kategorien, Kollektionen, Marken-Seiten)" : "Catalog title (categories, collections, brand pages)"}
+                    heading={locale === "tr" ? "Katalog başlığı (kategoriler, koleksiyonlar, marka sayfaları)" : locale === "en" ? "Catalog title (categories, collections, brand pages)" : locale === "fr" ? "Titre de catalogue (catégories, collections, pages de marque)" : locale === "es" ? "Título de catálogo (categorías, colecciones, páginas de marca)" : locale === "it" ? "Titolo catalogo (categorie, collezioni, pagine marchio)" : "Katalog-Titel (Kategorien, Kollektionen, Marken-Seiten)"}
                     levelKey="catalog_title"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -2253,7 +2229,7 @@ export default function StylesPage() {
                   />
                   <Divider />
                   <TypographyLevelRow
-                    heading={locale === "de" ? "Menü: Kategorien-Dropdown" : "Menu: categories dropdown"}
+                    heading={locale === "tr" ? "Menü: kategori açılır listesi" : locale === "en" ? "Menu: categories dropdown" : locale === "fr" ? "Menu : liste déroulante des catégories" : locale === "es" ? "Menú: desplegable de categorías" : locale === "it" ? "Menu: tendina delle categorie" : "Menü: Kategorien-Dropdown"}
                     levelKey="menu_catalog"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -2262,7 +2238,7 @@ export default function StylesPage() {
                   />
                   <Divider />
                   <TypographyLevelRow
-                    heading={locale === "de" ? "Filter-Seitenleiste: Gruppen- / Abschnitts-Titel" : locale === "tr" ? "Filtre kenar çubuğu: grup / bölüm başlıkları" : "Filter sidebar: group / section titles"}
+                    heading={locale === "tr" ? "Filtre kenar çubuğu: grup / bölüm başlıkları" : locale === "en" ? "Filter sidebar: group / section titles" : locale === "fr" ? "Barre de filtres : titres de groupes / sections" : locale === "es" ? "Barra de filtros: títulos de grupo / sección" : locale === "it" ? "Barra filtri: titoli di gruppo / sezione" : "Filter-Seitenleiste: Gruppen- / Abschnitts-Titel"}
                     levelKey="sidebar_nav"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -2270,15 +2246,11 @@ export default function StylesPage() {
                     onLevelChange={updateTypoLevel}
                   />
                   <Text as="p" variant="bodySm" tone="subdued">
-                    {locale === "de"
-                      ? "Facetten-Titel (z. B. Farbe, Größe) und Abschnitts-Titel (z. B. Kategorien) — unabhängig von H4."
-                      : locale === "tr"
-                        ? "Facet başlıkları (örn. Renk, Beden) ve bölüm başlıkları (örn. Kategoriler) — H4’ten bağımsız."
-                        : "Facet titles (e.g. Color, Size) and section titles (e.g. Categories) — independent of H4."}
+                    {locale === "tr" ? "Facet başlıkları (örn. Renk, Beden) ve bölüm başlıkları (örn. Kategoriler) — H4’ten bağımsız." : locale === "en" ? "Facet titles (e.g. Color, Size) and section titles (e.g. Categories) — independent of H4." : locale === "fr" ? "Titres des facettes (p. ex. Couleur, Taille) et des sections (p. ex. Catégories) — indépendants du H4." : locale === "es" ? "Títulos de facetas (p. ej. Color, Talla) y de sección (p. ej. Categorías), independientes del H4." : locale === "it" ? "Titoli delle faccette (ad es. Colore, Taglia) e delle sezioni (ad es. Categorie) — indipendenti da H4." : "Facetten-Titel (z. B. Farbe, Größe) und Abschnitts-Titel (z. B. Kategorien) — unabhängig von H4."}
                   </Text>
                   <Divider />
                   <TypographyLevelRow
-                    heading={locale === "de" ? "Filter-Seitenleiste: Subkategorien & Optionen" : locale === "tr" ? "Filtre kenar çubuğu: alt kategoriler ve seçenekler" : "Filter sidebar: subcategories & options"}
+                    heading={locale === "tr" ? "Filtre kenar çubuğu: alt kategoriler ve seçenekler" : locale === "en" ? "Filter sidebar: subcategories & options" : locale === "fr" ? "Barre de filtres : sous-catégories et options" : locale === "es" ? "Barra de filtros: subcategorías y opciones" : locale === "it" ? "Barra filtri: sottocategorie e opzioni" : "Filter-Seitenleiste: Subkategorien & Optionen"}
                     levelKey="sidebar_submenu"
                     typo={styles.typography}
                     families={googleFontList || []}
@@ -2286,11 +2258,7 @@ export default function StylesPage() {
                     onLevelChange={updateTypoLevel}
                   />
                   <Text as="p" variant="bodySm" tone="subdued">
-                    {locale === "de"
-                      ? "Links in der Subkategorie-Liste und Facetten-Optionen (Checkbox-Zeilen)."
-                      : locale === "tr"
-                        ? "Alt kategori listesindeki linkler ve facet seçenekleri (onay kutusu satırları)."
-                        : "Links in the subcategory list and facet options (checkbox rows)."}
+                    {locale === "tr" ? "Alt kategori listesindeki linkler ve facet seçenekleri (onay kutusu satırları)." : locale === "en" ? "Links in the subcategory list and facet options (checkbox rows)." : locale === "fr" ? "Liens de la liste des sous-catégories et options de facettes (lignes à cocher)." : locale === "es" ? "Enlaces de la lista de subcategorías y opciones de facetas (filas con casilla)." : locale === "it" ? "Link dell’elenco sottocategorie e opzioni delle faccette (righe con casella)." : "Links in der Subkategorie-Liste und Facetten-Optionen (Checkbox-Zeilen)."}
                   </Text>
                 </BlockStack>
               )}
@@ -2417,15 +2385,15 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("topbar", "variant", v)}
                 />
                 <ColorField
-                  label={locale === "de" ? "Hintergrundfarbe (Statisch / Oben)" : locale === "tr" ? "Arka plan (Sabit / Üstte)" : "Background (Static / At Top)"}
+                  label={locale === "tr" ? "Arka plan (Sabit / Üstte)" : locale === "en" ? "Background (Static / At Top)" : locale === "fr" ? "Arrière-plan (statique / en haut)" : locale === "es" ? "Fondo (estático / arriba)" : locale === "it" ? "Sfondo (statico / in alto)" : "Hintergrundfarbe (Statisch / Oben)"}
                   value={styles.topbar.bg_color}
                   onChange={(v) => updateSection("topbar", "bg_color", v)}
                 />
                 <ColorField
-                  label={locale === "de" ? "Hintergrundfarbe (beim Scrollen)" : locale === "tr" ? "Arka plan (Kaydırırken)" : "Background (On Scroll)"}
+                  label={locale === "tr" ? "Arka plan (Kaydırırken)" : locale === "en" ? "Background (On Scroll)" : locale === "fr" ? "Arrière-plan (au défilement)" : locale === "es" ? "Fondo (al desplazar)" : locale === "it" ? "Sfondo (durante lo scorrimento)" : "Hintergrundfarbe (beim Scrollen)"}
                   value={styles.topbar.bg_color_scroll ?? ""}
                   onChange={(v) => updateSection("topbar", "bg_color_scroll", v)}
-                  helpText={locale === "de" ? "Leer = gleiche Farbe wie oben" : locale === "tr" ? "Boş = yukarıdaki renk" : "Empty = same as static color"}
+                  helpText={locale === "tr" ? "Boş = yukarıdaki renk" : locale === "en" ? "Empty = same as static color" : locale === "fr" ? "Vide = même couleur qu’en haut" : locale === "es" ? "Vacío = mismo color que arriba" : locale === "it" ? "Vuoto = stesso colore di sopra" : "Leer = gleiche Farbe wie oben"}
                 />
                 <ColorField
                   label={c.textColor}
@@ -2433,10 +2401,10 @@ export default function StylesPage() {
                   onChange={(v) => updateSection("topbar", "text_color", v)}
                 />
                 <ColorField
-                  label={locale === "de" ? "Textfarbe (beim Scrollen)" : locale === "tr" ? "Yazı rengi (Kaydırırken)" : "Text Color (On Scroll)"}
+                  label={locale === "tr" ? "Yazı rengi (Kaydırırken)" : locale === "en" ? "Text Color (On Scroll)" : locale === "fr" ? "Couleur du texte (au défilement)" : locale === "es" ? "Color del texto (al desplazar)" : locale === "it" ? "Colore testo (durante lo scorrimento)" : "Textfarbe (beim Scrollen)"}
                   value={styles.topbar.text_color_scroll ?? ""}
                   onChange={(v) => updateSection("topbar", "text_color_scroll", v)}
-                  helpText={locale === "de" ? "Leer = gleiche Farbe wie oben" : locale === "tr" ? "Boş = yukarıdaki renk" : "Empty = same as static"}
+                  helpText={locale === "tr" ? "Boş = yukarıdaki renk" : locale === "en" ? "Empty = same as static" : locale === "fr" ? "Vide = même couleur qu’en haut" : locale === "es" ? "Vacío = mismo color que arriba" : locale === "it" ? "Vuoto = stesso colore di sopra" : "Leer = gleiche Farbe wie oben"}
                 />
                 <TextField
                   label={c.height}
@@ -2577,41 +2545,41 @@ export default function StylesPage() {
               />
               <div style={{ gridColumn: "1 / -1" }}>
                 <BlockStack gap="300">
-                  <Text as="h4" variant="headingSm">{locale === "de" ? "Farben: Statisch (Oben) vs. Scrollen — pro Gerät" : locale === "tr" ? "Renkler: Sabit (Üstte) vs. Kaydırırken — cihaza göre" : "Colors: Static (At Top) vs. Scroll — Per Device"}</Text>
+                  <Text as="h4" variant="headingSm">{locale === "tr" ? "Renkler: Sabit (Üstte) vs. Kaydırırken — cihaza göre" : locale === "en" ? "Colors: Static (At Top) vs. Scroll — Per Device" : locale === "fr" ? "Couleurs : statique (en haut) vs défilement — par appareil" : locale === "es" ? "Colores: estático (arriba) vs. desplazamiento — por dispositivo" : locale === "it" ? "Colori: statico (in alto) vs scorrimento — per dispositivo" : "Farben: Statisch (Oben) vs. Scrollen — pro Gerät"}</Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    {locale === "de" ? "Navbar-Hintergrund und Textfarbe je nach Scroll-Zustand und Gerät. Leer = globale Farbe oben verwendet." : locale === "tr" ? "Navbar arka planı ve yazı rengi, cihaz ve kaydırma durumuna göre. Boş = yukarıdaki global renk kullanılır." : "Navbar background and text color by scroll state and device. Empty = global color above is used."}
+                    {locale === "tr" ? "Navbar arka planı ve yazı rengi, cihaz ve kaydırma durumuna göre. Boş = yukarıdaki global renk kullanılır." : locale === "en" ? "Navbar background and text color by scroll state and device. Empty = global color above is used." : locale === "fr" ? "Arrière-plan et couleur du texte de la barre de navigation selon le défilement et l’appareil. Vide = couleur globale ci-dessus." : locale === "es" ? "Fondo y color del texto de la barra de navegación según desplazamiento y dispositivo. Vacío = se usa el color global de arriba." : locale === "it" ? "Sfondo e colore testo della navbar in base a scorrimento e dispositivo. Vuoto = viene usato il colore globale sopra." : "Navbar-Hintergrund und Textfarbe je nach Scroll-Zustand und Gerät. Leer = globale Farbe oben verwendet."}
                   </Text>
                   {[
-                    { device: "desktop", label: locale === "de" ? "Desktop (≥1024px)" : "Desktop (≥1024px)" },
-                    { device: "tablet", label: locale === "de" ? "Tablet (768–1023px)" : "Tablet (768–1023px)" },
-                    { device: "mobile", label: locale === "de" ? "Mobil (≤767px)" : locale === "tr" ? "Mobil (≤767px)" : "Mobile (≤767px)" },
+                    { device: "desktop", label: locale === "tr" ? "Masaüstü (≥1024px)" : locale === "en" ? "Desktop (≥1024px)" : locale === "fr" ? "Ordinateur (≥1024px)" : locale === "es" ? "Escritorio (≥1024px)" : locale === "it" ? "Desktop (≥1024px)" : "Desktop (≥1024px)" },
+                    { device: "tablet", label: locale === "tr" ? "Tablet (768–1023px)" : locale === "en" ? "Tablet (768–1023px)" : locale === "fr" ? "Tablette (768–1023px)" : locale === "es" ? "Tableta (768–1023px)" : locale === "it" ? "Tablet (768–1023px)" : "Tablet (768–1023px)" },
+                    { device: "mobile", label: locale === "tr" ? "Mobil (≤767px)" : locale === "en" ? "Mobile (≤767px)" : locale === "fr" ? "Mobile (≤767px)" : locale === "es" ? "Móvil (≤767px)" : locale === "it" ? "Mobile (≤767px)" : "Mobil (≤767px)" },
                   ].map(({ device, label }) => (
                     <div key={device} style={{ border: "1px solid #e6dfd4", borderRadius: 8, padding: 12 }}>
                       <Text as="p" variant="bodySm" fontWeight="semibold" tone="subdued" style={{ marginBottom: 8 }}>{label}</Text>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginTop: 8 }}>
                         <ColorField
-                          label={locale === "de" ? "Hintergrund – Statisch" : locale === "tr" ? "Arka plan – Sabit" : "Bg – Static (At Top)"}
+                          label={locale === "tr" ? "Arka plan – Sabit" : locale === "en" ? "Bg – Static (At Top)" : locale === "fr" ? "Fond – statique" : locale === "es" ? "Fondo – estático" : locale === "it" ? "Sfondo – statico" : "Hintergrund – Statisch"}
                           value={styles.header[`bg_color_top_${device}`] ?? ""}
                           onChange={(v) => updateSection("header", `bg_color_top_${device}`, v)}
-                          helpText={locale === "de" ? "Leer = globale Farbe" : locale === "tr" ? "Boş = global renk" : "Empty = global color"}
+                          helpText={locale === "tr" ? "Boş = global renk" : locale === "en" ? "Empty = global color" : locale === "fr" ? "Vide = couleur globale" : locale === "es" ? "Vacío = color global" : locale === "it" ? "Vuoto = colore globale" : "Leer = globale Farbe"}
                         />
                         <ColorField
-                          label={locale === "de" ? "Hintergrund – Scrollen" : locale === "tr" ? "Arka plan – Kaydırırken" : "Bg – On Scroll"}
+                          label={locale === "tr" ? "Arka plan – Kaydırırken" : locale === "en" ? "Bg – On Scroll" : locale === "fr" ? "Fond – défilement" : locale === "es" ? "Fondo – al desplazar" : locale === "it" ? "Sfondo – scorrimento" : "Hintergrund – Scrollen"}
                           value={styles.header[`bg_color_scroll_${device}`] ?? ""}
                           onChange={(v) => updateSection("header", `bg_color_scroll_${device}`, v)}
-                          helpText={locale === "de" ? "Leer = statische Farbe" : locale === "tr" ? "Boş = sabit renk" : "Empty = static color"}
+                          helpText={locale === "tr" ? "Boş = sabit renk" : locale === "en" ? "Empty = static color" : locale === "fr" ? "Vide = couleur statique" : locale === "es" ? "Vacío = color estático" : locale === "it" ? "Vuoto = colore statico" : "Leer = statische Farbe"}
                         />
                         <ColorField
-                          label={locale === "de" ? "Text – Statisch" : locale === "tr" ? "Yazı – Sabit" : "Text – Static"}
+                          label={locale === "tr" ? "Yazı – Sabit" : locale === "en" ? "Text – Static" : locale === "fr" ? "Texte – statique" : locale === "es" ? "Texto – estático" : locale === "it" ? "Testo – statico" : "Text – Statisch"}
                           value={styles.header[`text_color_top_${device}`] ?? ""}
                           onChange={(v) => updateSection("header", `text_color_top_${device}`, v)}
-                          helpText={locale === "de" ? "Leer = globale Textfarbe" : locale === "tr" ? "Boş = global yazı rengi" : "Empty = global text color"}
+                          helpText={locale === "tr" ? "Boş = global yazı rengi" : locale === "en" ? "Empty = global text color" : locale === "fr" ? "Vide = couleur de texte globale" : locale === "es" ? "Vacío = color de texto global" : locale === "it" ? "Vuoto = colore testo globale" : "Leer = globale Textfarbe"}
                         />
                         <ColorField
-                          label={locale === "de" ? "Text – Scrollen" : locale === "tr" ? "Yazı – Kaydırırken" : "Text – On Scroll"}
+                          label={locale === "tr" ? "Yazı – Kaydırırken" : locale === "en" ? "Text – On Scroll" : locale === "fr" ? "Texte – défilement" : locale === "es" ? "Texto – al desplazar" : locale === "it" ? "Testo – scorrimento" : "Text – Scrollen"}
                           value={styles.header[`text_color_scroll_${device}`] ?? ""}
                           onChange={(v) => updateSection("header", `text_color_scroll_${device}`, v)}
-                          helpText={locale === "de" ? "Leer = statische Textfarbe" : locale === "tr" ? "Boş = sabit yazı rengi" : "Empty = static text color"}
+                          helpText={locale === "tr" ? "Boş = sabit yazı rengi" : locale === "en" ? "Empty = static text color" : locale === "fr" ? "Vide = couleur de texte statique" : locale === "es" ? "Vacío = color de texto estático" : locale === "it" ? "Vuoto = colore testo statico" : "Leer = statische Textfarbe"}
                         />
                       </div>
                     </div>
@@ -2813,7 +2781,7 @@ export default function StylesPage() {
               {[
                 { device: "desktop", bgKey: "bg_desktop", borderKey: "border_desktop", textKey: "text_color_desktop", activeKey: "active_color_desktop",
                   bgScrollKey: "bg_scroll_desktop", textScrollKey: "text_color_scroll_desktop",
-                  label: locale === "de" ? "Desktop (≥1024px)" : "Desktop (≥1024px)",
+                  label: locale === "tr" ? "Masaüstü (≥1024px)" : locale === "en" ? "Desktop (≥1024px)" : locale === "fr" ? "Ordinateur (≥1024px)" : locale === "es" ? "Escritorio (≥1024px)" : locale === "it" ? "Desktop (≥1024px)" : "Desktop (≥1024px)",
                   bgLabel: c.desktopBgCss, borderLabel: c.desktopBorderCss, textLabel: c.desktopTextColor, activeLabel: c.desktopActiveColor,
                   bgHelp: fieldEffectiveHelp(c, styles.secondNav.bg_desktop, effectiveLayout.secondNav.desktop.bg) || c.bgExample,
                   borderHelp: fieldEffectiveHelp(c, styles.secondNav.border_desktop, effectiveLayout.secondNav.desktop.border) || c.borderExample,
@@ -2821,7 +2789,7 @@ export default function StylesPage() {
                 },
                 { device: "tablet", bgKey: "bg_tablet", borderKey: "border_tablet", textKey: "text_color_tablet", activeKey: "active_color_tablet",
                   bgScrollKey: "bg_scroll_tablet", textScrollKey: "text_color_scroll_tablet",
-                  label: locale === "de" ? "Tablet (768–1023px)" : "Tablet (768–1023px)",
+                  label: locale === "tr" ? "Tablet (768–1023px)" : locale === "en" ? "Tablet (768–1023px)" : locale === "fr" ? "Tablette (768–1023px)" : locale === "es" ? "Tableta (768–1023px)" : locale === "it" ? "Tablet (768–1023px)" : "Tablet (768–1023px)",
                   bgLabel: c.tabletBgCss, borderLabel: c.tabletBorderCss, textLabel: c.tabletTextColor, activeLabel: c.tabletActiveColor,
                   bgHelp: fieldEffectiveHelp(c, styles.secondNav.bg_tablet, effectiveLayout.secondNav.tablet.bg),
                   borderHelp: fieldEffectiveHelp(c, styles.secondNav.border_tablet, effectiveLayout.secondNav.tablet.border),
@@ -2829,7 +2797,7 @@ export default function StylesPage() {
                 },
                 { device: "mobile", bgKey: "bg_mobile", borderKey: "border_mobile", textKey: "text_color_mobile", activeKey: "active_color_mobile",
                   bgScrollKey: "bg_scroll_mobile", textScrollKey: "text_color_scroll_mobile",
-                  label: locale === "de" ? "Mobil (≤767px)" : locale === "tr" ? "Mobil (≤767px)" : "Mobile (≤767px)",
+                  label: locale === "tr" ? "Mobil (≤767px)" : locale === "en" ? "Mobile (≤767px)" : locale === "fr" ? "Mobile (≤767px)" : locale === "es" ? "Móvil (≤767px)" : locale === "it" ? "Mobile (≤767px)" : "Mobil (≤767px)",
                   bgLabel: c.mobileBgCss, borderLabel: c.mobileBorderCss, textLabel: c.mobileTextColor, activeLabel: c.mobileActiveColor,
                   bgHelp: fieldEffectiveHelp(c, styles.secondNav.bg_mobile, effectiveLayout.secondNav.mobile.bg),
                   borderHelp: fieldEffectiveHelp(c, styles.secondNav.border_mobile, effectiveLayout.secondNav.mobile.border),
@@ -2839,11 +2807,11 @@ export default function StylesPage() {
                 <div key={device} style={{ border: "1px solid #e6dfd4", borderRadius: 8, padding: 14, marginBottom: 8 }}>
                   <Text as="p" variant="bodySm" fontWeight="semibold">{label}</Text>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12, marginTop: 12 }}>
-                    <TextField label={`${bgLabel} (${locale === "de" ? "Statisch" : locale === "tr" ? "Sabit" : "Static"})`} value={styles.secondNav[bgKey] ?? ""} onChange={(v) => updateSection("secondNav", bgKey, v)} placeholder={c.emptyFallbackBg} autoComplete="off" helpText={bgHelp} />
-                    <TextField label={`${bgLabel} (${locale === "de" ? "Scrollen" : locale === "tr" ? "Kaydırırken" : "On Scroll"})`} value={styles.secondNav[bgScrollKey] ?? ""} onChange={(v) => updateSection("secondNav", bgScrollKey, v)} placeholder={c.emptyFallbackBg} autoComplete="off" helpText={locale === "de" ? "Leer = statische Farbe" : locale === "tr" ? "Boş = sabit renk" : "Empty = static color"} />
+                    <TextField label={`${bgLabel} (${locale === "tr" ? "Sabit" : locale === "en" ? "Static" : locale === "fr" ? "Statique" : locale === "es" ? "Estático" : locale === "it" ? "Statico" : "Statisch"})`} value={styles.secondNav[bgKey] ?? ""} onChange={(v) => updateSection("secondNav", bgKey, v)} placeholder={c.emptyFallbackBg} autoComplete="off" helpText={bgHelp} />
+                    <TextField label={`${bgLabel} (${locale === "tr" ? "Kaydırırken" : locale === "en" ? "On Scroll" : locale === "fr" ? "Au défilement" : locale === "es" ? "Al desplazar" : locale === "it" ? "Scorrimento" : "Scrollen"})`} value={styles.secondNav[bgScrollKey] ?? ""} onChange={(v) => updateSection("secondNav", bgScrollKey, v)} placeholder={c.emptyFallbackBg} autoComplete="off" helpText={locale === "tr" ? "Boş = sabit renk" : locale === "en" ? "Empty = static color" : locale === "fr" ? "Vide = couleur statique" : locale === "es" ? "Vacío = color estático" : locale === "it" ? "Vuoto = colore statico" : "Leer = statische Farbe"} />
                     <TextField label={borderLabel} value={styles.secondNav[borderKey] ?? ""} onChange={(v) => updateSection("secondNav", borderKey, v)} placeholder={c.emptyFallbackBorder} autoComplete="off" helpText={borderHelp} />
-                    <ColorField label={`${textLabel} (${locale === "de" ? "Statisch" : locale === "tr" ? "Sabit" : "Static"})`} value={styles.secondNav[textKey] ?? ""} onChange={(v) => updateSection("secondNav", textKey, v)} helpText={textHelp} />
-                    <ColorField label={`${textLabel} (${locale === "de" ? "Scrollen" : locale === "tr" ? "Kaydırırken" : "On Scroll"})`} value={styles.secondNav[textScrollKey] ?? ""} onChange={(v) => updateSection("secondNav", textScrollKey, v)} helpText={locale === "de" ? "Leer = statische Textfarbe" : locale === "tr" ? "Boş = sabit yazı rengi" : "Empty = static text color"} />
+                    <ColorField label={`${textLabel} (${locale === "tr" ? "Sabit" : locale === "en" ? "Static" : locale === "fr" ? "Statique" : locale === "es" ? "Estático" : locale === "it" ? "Statico" : "Statisch"})`} value={styles.secondNav[textKey] ?? ""} onChange={(v) => updateSection("secondNav", textKey, v)} helpText={textHelp} />
+                    <ColorField label={`${textLabel} (${locale === "tr" ? "Kaydırırken" : locale === "en" ? "On Scroll" : locale === "fr" ? "Au défilement" : locale === "es" ? "Al desplazar" : locale === "it" ? "Scorrimento" : "Scrollen"})`} value={styles.secondNav[textScrollKey] ?? ""} onChange={(v) => updateSection("secondNav", textScrollKey, v)} helpText={locale === "tr" ? "Boş = sabit yazı rengi" : locale === "en" ? "Empty = static text color" : locale === "fr" ? "Vide = couleur de texte statique" : locale === "es" ? "Vacío = color de texto estático" : locale === "it" ? "Vuoto = colore testo statico" : "Leer = statische Textfarbe"} />
                     <ColorField label={activeLabel} value={styles.secondNav[activeKey] ?? ""} onChange={(v) => updateSection("secondNav", activeKey, v)} helpText={c.emptyGlobalActive} />
                   </div>
                 </div>
@@ -3079,7 +3047,7 @@ export default function StylesPage() {
               autoComplete="off"
             />
             <TextField
-              label={locale === "tr" ? "Logo altı metin" : locale === "de" ? "Text unter dem Logo" : "Text under the logo"}
+              label={locale === "tr" ? "Logo altı metin" : locale === "en" ? "Text under the logo" : locale === "fr" ? "Texte sous le logo" : locale === "es" ? "Texto bajo el logo" : locale === "it" ? "Testo sotto il logo" : "Text unter dem Logo"}
               value={styles.footer.tagline || ""}
               onChange={(v) => updateSection("footer", "tagline", v)}
               autoComplete="off"

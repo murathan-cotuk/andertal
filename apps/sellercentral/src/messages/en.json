@@ -398,5 +398,19 @@
     "deliveryNote_label": "Delivery note",
     "shippingLabel_label": "Shipping label",
     "return_label": "Return"
+  },
+  "globalSearch": {
+    "placeholder": "Search products, orders, customers…",
+    "searching": "Searching…",
+    "noResults": "No results for “{query}”",
+    "products": "Products",
+    "orders": "Orders",
+    "customers": "Customers",
+    "navigation": "Navigation",
+    "bulkUpload": "Bulk upload",
+    "singleUpload": "Single upload",
+    "ranking": "Ranking",
+    "shipping": "Shipping",
+    "payments": "Payments"
   }
 }

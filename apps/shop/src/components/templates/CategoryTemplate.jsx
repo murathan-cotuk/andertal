@@ -732,6 +732,7 @@ function visibleSubcats(children) {
 }
 
 export default function CategoryTemplate() {
+  const tUi = useTranslations("shopUi");
   const tCommon = useTranslations("common");
   const tFilter = useTranslations("filterPanel");
   const tSort = useTranslations("catalogSort");
@@ -1107,7 +1108,7 @@ export default function CategoryTemplate() {
               </FilterBtn>
             )}
             {/* Breadcrumb — desktop only */}
-            <Breadcrumb aria-label="Breadcrumb" style={{ margin: 0 }}>
+            <Breadcrumb data-breadcrumb="" aria-label={tUi("breadcrumb")} style={{ margin: 0 }}>
               <Link href="/">{tCommon("home")}</Link>
               {ancestors.map((anc) => {
                 const ancSlug = String(anc.slug || anc.handle || "").replace(/^\//, "");
@@ -1124,7 +1125,7 @@ export default function CategoryTemplate() {
           </SortBarLeft>
           <SortWrap>
             <SortLabel>{tSort("sortBy")}</SortLabel>
-            <SortSelect value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} aria-label="Sort products">
+            <SortSelect value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} aria-label={tUi("sortProducts")}>
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{sortLabel(o)}</option>
               ))}

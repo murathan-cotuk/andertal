@@ -9,6 +9,7 @@ const STORAGE_KEY = "andertal_cookie_consent";
 
 const TEXTS = {
   de: {
+    alwaysActive: "Immer aktiv",
     title: "Wir verwenden Cookies",
     body: "Wir setzen Cookies ein, um dein Erlebnis zu verbessern, den Traffic zu analysieren und personalisierte Inhalte anzuzeigen. Einige Cookies sind für den Betrieb der Website notwendig.",
     acceptAll: "Alle akzeptieren",
@@ -23,6 +24,7 @@ const TEXTS = {
     privacyLink: "Datenschutzerklärung",
   },
   tr: {
+    alwaysActive: "Her zaman etkin",
     title: "Çerez kullanımı",
     body: "Deneyimi geliştirmek, trafiği analiz etmek ve kişiselleştirilmiş içerik göstermek için çerezler kullanıyoruz. Bazı çerezler sitenin çalışması için zorunludur.",
     acceptAll: "Tümünü kabul et",
@@ -37,6 +39,7 @@ const TEXTS = {
     privacyLink: "Gizlilik politikası",
   },
   en: {
+    alwaysActive: "Always active",
     title: "We use cookies",
     body: "We use cookies to improve your experience, analyze traffic, and show personalized content. Some cookies are required for the website to function.",
     acceptAll: "Accept all",
@@ -51,6 +54,7 @@ const TEXTS = {
     privacyLink: "Privacy policy",
   },
   fr: {
+    alwaysActive: "Toujours actif",
     title: "Nous utilisons des cookies",
     body: "Nous utilisons des cookies pour améliorer votre expérience, analyser le trafic et afficher du contenu personnalisé. Certains cookies sont nécessaires au fonctionnement du site.",
     acceptAll: "Tout accepter",
@@ -65,6 +69,7 @@ const TEXTS = {
     privacyLink: "Politique de confidentialité",
   },
   es: {
+    alwaysActive: "Siempre activas",
     title: "Usamos cookies",
     body: "Usamos cookies para mejorar tu experiencia, analizar el tráfico y mostrar contenido personalizado. Algunas cookies son necesarias para el funcionamiento del sitio.",
     acceptAll: "Aceptar todo",
@@ -79,6 +84,7 @@ const TEXTS = {
     privacyLink: "Política de privacidad",
   },
   it: {
+    alwaysActive: "Sempre attivi",
     title: "Utilizziamo i cookie",
     body: "Utilizziamo cookie per migliorare la tua esperienza, analizzare il traffico e mostrare contenuti personalizzati. Alcuni cookie sono necessari per il funzionamento del sito.",
     acceptAll: "Accetta tutto",
@@ -241,7 +247,7 @@ export default function CookieBanner() {
                 />
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
-                    {cat.label}{cat.fixed && <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 400, marginLeft: 6 }}>Immer aktiv</span>}
+                    {cat.label}{cat.fixed && <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 400, marginLeft: 6 }}>{t.alwaysActive}</span>}
                   </div>
                   <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{cat.desc}</div>
                 </div>

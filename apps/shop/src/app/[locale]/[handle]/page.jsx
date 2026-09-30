@@ -738,7 +738,9 @@ const Desc = styled.div`
 const COLL_SORT_KEYS = new Set(["default", "bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"]);
 
 function CollectionPage() {
+  const tUi = useTranslations("shopUi");
   const tCommon = useTranslations("common");
+  const tState = useTranslations("pageStates");
   const tSort = useTranslations("catalogSort");
   const collSortLabel = (o) => (COLL_SORT_KEYS.has(o.value) ? tSort(o.value) : o.label);
   const params = useParams();
@@ -1166,7 +1168,7 @@ function CollectionPage() {
             <CmsPageWithSidebar>
               <CmsPageSidebar>
                 <CmsPageSidebarTitle>
-                  {locale === "de" ? "Kategorien" : locale === "tr" ? "Kategoriler" : locale === "fr" ? "Catégories" : locale === "es" ? "Categorías" : locale === "it" ? "Categorie" : "Categories"}
+                  {tCommon("categories")}
                 </CmsPageSidebarTitle>
                 {cmsPageCategoryLinks.map((l) => (
                   <CmsPageSidebarLink key={l.slug} href={`/${l.slug}?sort=bestseller`}>
@@ -1217,7 +1219,7 @@ function CollectionPage() {
       <ShopHeader />
       <Main>
         <div style={{ padding: "64px 32px", textAlign: "center" }}>
-          <p style={{ fontSize: 15, color: "#6b7280" }}>Die Seite wurde nicht gefunden.</p>
+          <p style={{ fontSize: 15, color: "#6b7280" }}>{tState("pageNotFound")}</p>
         </div>
       </Main>
       <Footer />
@@ -1330,10 +1332,10 @@ function CollectionPage() {
                 }}
                 style={{ gap: 4 }}
               >
-                % {locale === "de" ? "Sale" : locale === "tr" ? "İndirim" : "Sale"}
+                % {tState("sale")}
               </FilterBtn>
               {/* Breadcrumb — desktop only */}
-              <Breadcrumb aria-label="Breadcrumb" style={{ margin: 0 }}>
+              <Breadcrumb data-breadcrumb="" aria-label={tUi("breadcrumb")} style={{ margin: 0 }}>
                 <Link href="/">{tCommon("home")}</Link>
                 <span style={{ color: "#b8afa2", margin: "0 2px" }}>›</span>
                 <b>{title}</b>
@@ -1344,7 +1346,7 @@ function CollectionPage() {
               <SortSelect
                 value={sort}
                 onChange={e => { setSort(e.target.value); setPage(1); }}
-                aria-label="Sort products"
+                aria-label={tUi("sortProducts")}
               >
                 {SORT_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{collSortLabel(o)}</option>
@@ -1470,10 +1472,10 @@ function CollectionPage() {
               />
             )}
 
-            {/* Önerilen ürünler */}
+            {/* Recommended products */}
             {recommendedProducts.length > 0 && (
               <section style={{ marginTop: 48, marginBottom: 24 }}>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16, color: "#111" }}>Önerilen ürünler</h2>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: 16, color: "#111" }}>{tState("recommendedProducts")}</h2>
                 <ProductGrid products={recommendedProducts} maxColumns={4} maxColumnsMobile={2} />
               </section>
             )}

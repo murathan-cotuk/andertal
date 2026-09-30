@@ -398,5 +398,19 @@
     "deliveryNote_label": "Lieferschein",
     "shippingLabel_label": "Versandlabel",
     "return_label": "Retoure"
+  },
+  "globalSearch": {
+    "placeholder": "Produkte, Bestellungen, Kunden suchen…",
+    "searching": "Suche läuft…",
+    "noResults": "Keine Ergebnisse für „{query}“",
+    "products": "Produkte",
+    "orders": "Bestellungen",
+    "customers": "Kunden",
+    "navigation": "Navigation",
+    "bulkUpload": "Massen-Upload",
+    "singleUpload": "Einzelnes Produkt anlegen",
+    "ranking": "Ranking",
+    "shipping": "Versand",
+    "payments": "Zahlungen"
   }
 }

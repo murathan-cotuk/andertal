@@ -301,7 +301,7 @@ export default function Dac7Page() {
       <Card>
         <BlockStack gap="300">
           <Text as="h2" variant="headingMd">
-            {locale === "tr" ? "Rapor aracı" : locale === "de" ? "Berichtswerkzeug" : "Reporting tool"}
+            {locale === "tr" ? "Rapor aracı" : locale === "en" ? "Reporting tool" : locale === "fr" ? "Outil de déclaration" : locale === "es" ? "Herramienta de informes" : locale === "it" ? "Strumento di rendicontazione" : "Berichtswerkzeug"}
           </Text>
           <Text as="p" variant="bodySm" tone="subdued">
             {t.thresholdHint}

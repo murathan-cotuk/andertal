@@ -5,6 +5,7 @@ import styled from "styled-components";
 import GlobalPageLoader from "@/components/ui/GlobalPageLoader";
 import { BrandCard } from "@/components/BrandCard";
 
+import { useTranslations } from "next-intl";
 const Container = styled.div`
   max-width: ${(p) => {
     const w = p.$maxWidth;
@@ -148,6 +149,42 @@ function copyFor(locale) {
       all: "Tümü",
     };
   }
+  if (locale === "fr") {
+    return {
+      cta: "Voir la marque",
+      empty: "Aucune marque pour l’instant.",
+      noMatch: "Aucune marque ne correspond à votre recherche.",
+      searchPlaceholder: "Rechercher une marque…",
+      sortNameAsc: "Nom (A-Z)",
+      sortNameDesc: "Nom (Z-A)",
+      sortNewest: "Plus récentes",
+      all: "Toutes",
+    };
+  }
+  if (locale === "es") {
+    return {
+      cta: "Ver la marca",
+      empty: "Aún no hay marcas.",
+      noMatch: "Ninguna marca coincide con tu búsqueda.",
+      searchPlaceholder: "Buscar marca…",
+      sortNameAsc: "Nombre (A-Z)",
+      sortNameDesc: "Nombre (Z-A)",
+      sortNewest: "Más recientes",
+      all: "Todas",
+    };
+  }
+  if (locale === "it") {
+    return {
+      cta: "Vai al marchio",
+      empty: "Ancora nessun marchio.",
+      noMatch: "Nessun marchio corrisponde alla ricerca.",
+      searchPlaceholder: "Cerca marchio…",
+      sortNameAsc: "Nome (A-Z)",
+      sortNameDesc: "Nome (Z-A)",
+      sortNewest: "Più recenti",
+      all: "Tutti",
+    };
+  }
   if (locale === "de") {
     return {
       cta: "Zur Marke",
@@ -187,6 +224,7 @@ export default function BrandsDirectoryBlock({
   maxWidth = 1440,
   showLoader = true,
 }) {
+  const tUi = useTranslations("shopUi");
   const copy = useMemo(() => copyFor(locale), [locale]);
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -270,7 +308,7 @@ export default function BrandsDirectoryBlock({
                 {visibleBrands.length}
                 {brands.length > limit ? ` / ${brands.length}` : ""}
               </ResultCount>
-              <SortSelect value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+              <SortSelect value={sort} onChange={(e) => setSort(e.target.value)} aria-label={tUi("sortProducts")}>
                 <option value="newest">{copy.sortNewest}</option>
                 <option value="name_asc">{copy.sortNameAsc}</option>
                 <option value="name_desc">{copy.sortNameDesc}</option>

@@ -1548,24 +1548,24 @@ function PersonalizedProductRow({ container, locale = "de" }) {
   const tileSpans = Array.isArray(container.tile_spans) ? container.tile_spans : [];
 
   const DEFAULT_TITLES = {
-    recently_viewed:  { de: "Weitermachen, wo du aufgehört hast", en: "Continue where you left off", tr: "Kaldığın yerden devam et" },
-    reorder:          { de: "Schon früher bestellt — wieder bestellen?", en: "Order again?", tr: "Tekrar sipariş ver" },
-    also_bought:      { de: "Andere kauften auch", en: "Others also bought", tr: "Başkaları da aldı" },
-    trending_in_your_categories: { de: "Trends in deinen Kategorien", en: "Trending in your categories", tr: "Kategorilerinde trend" },
-    trending_for_you: { de: "Trending für dich", en: "Trending for you", tr: "Senin için trend" },
-    top_categories_bestsellers: { de: "Bestseller aus deinen Lieblingskategorien", en: "Bestsellers from your favorite categories", tr: "Favori kategorilerinden çok satanlar" },
-    top_picks:        { de: "Top-Empfehlungen", en: "Top picks for you", tr: "Senin için seçtiklerimiz" },
-    bestsellers:      { de: "Bestseller", en: "Bestsellers", tr: "Çok satanlar" },
-    new_arrivals:     { de: "Neuheiten für dich", en: "New arrivals for you", tr: "Senin için yenilikler" },
-    on_sale:          { de: "Angebote für dich", en: "Deals for you", tr: "Senin için fırsatlar" },
-    favorited:        { de: "Deine Favoriten", en: "Your favorites", tr: "Favorilerin" },
-    favorited_low_stock: { de: "Favoriten — bald ausverkauft", en: "Favorites — almost sold out", tr: "Favoriler — tükenmek üzere" },
-    favorited_price_drop: { de: "Favoriten im Preis gesenkt", en: "Favorites with a price drop", tr: "Favorilerinde fiyat düştü" },
-    category_bestsellers_from_purchases: { de: "Bestseller aus deinen Kaufkategorien", en: "Bestsellers from your purchase categories", tr: "Satın aldığın kategorilerden çok satanlar" },
-    category_similar_from_favorites: { de: "Ähnlich zu deinen Favoriten", en: "Similar to your favorites", tr: "Favorilerine benzer" },
-    others_in_your_category: { de: "Beliebt in deinen Kategorien", en: "Popular in your categories", tr: "Kategorilerinde popüler" },
-    new_in_viewed_categories: { de: "Neu in deinen Kategorien", en: "New in your categories", tr: "Kategorilerinde yeni" },
-    abandoned_cart_items: { de: "In deinem Warenkorb geblieben", en: "Left in your cart", tr: "Sepetinde kalanlar" },
+    recently_viewed:  { de: "Weitermachen, wo du aufgehört hast", en: "Continue where you left off", tr: "Kaldığın yerden devam et", fr: "Reprendre là où vous vous êtes arrêté", es: "Continúa donde lo dejaste", it: "Riprendi da dove eri rimasto" },
+    reorder:          { de: "Schon früher bestellt — wieder bestellen?", en: "Order again?", tr: "Tekrar sipariş ver", fr: "Commander à nouveau ?", es: "¿Volver a pedir?", it: "Ordinare di nuovo?" },
+    also_bought:      { de: "Andere kauften auch", en: "Others also bought", tr: "Başkaları da aldı", fr: "Les autres ont aussi acheté", es: "Otros también compraron", it: "Altri hanno acquistato anche" },
+    trending_in_your_categories: { de: "Trends in deinen Kategorien", en: "Trending in your categories", tr: "Kategorilerinde trend", fr: "Tendances dans vos catégories", es: "Tendencias en tus categorías", it: "Di tendenza nelle tue categorie" },
+    trending_for_you: { de: "Trending für dich", en: "Trending for you", tr: "Senin için trend", fr: "Tendances pour vous", es: "Tendencias para ti", it: "Di tendenza per te" },
+    top_categories_bestsellers: { de: "Bestseller aus deinen Lieblingskategorien", en: "Bestsellers from your favorite categories", tr: "Favori kategorilerinden çok satanlar", fr: "Meilleures ventes de vos catégories préférées", es: "Más vendidos de tus categorías favoritas", it: "Più venduti delle tue categorie preferite" },
+    top_picks:        { de: "Top-Empfehlungen", en: "Top picks for you", tr: "Senin için seçtiklerimiz", fr: "Notre sélection pour vous", es: "Selección para ti", it: "I nostri consigli per te" },
+    bestsellers:      { de: "Bestseller", en: "Bestsellers", tr: "Çok satanlar", fr: "Meilleures ventes", es: "Más vendidos", it: "Più venduti" },
+    new_arrivals:     { de: "Neuheiten für dich", en: "New arrivals for you", tr: "Senin için yenilikler", fr: "Nouveautés pour vous", es: "Novedades para ti", it: "Novità per te" },
+    on_sale:          { de: "Angebote für dich", en: "Deals for you", tr: "Senin için fırsatlar", fr: "Promotions pour vous", es: "Ofertas para ti", it: "Offerte per te" },
+    favorited:        { de: "Deine Favoriten", en: "Your favorites", tr: "Favorilerin", fr: "Vos favoris", es: "Tus favoritos", it: "I tuoi preferiti" },
+    favorited_low_stock: { de: "Favoriten — bald ausverkauft", en: "Favorites — almost sold out", tr: "Favoriler — tükenmek üzere", fr: "Favoris — bientôt épuisés", es: "Favoritos: casi agotados", it: "Preferiti — quasi esauriti" },
+    favorited_price_drop: { de: "Favoriten im Preis gesenkt", en: "Favorites with a price drop", tr: "Favorilerinde fiyat düştü", fr: "Favoris en baisse de prix", es: "Favoritos con bajada de precio", it: "Preferiti con prezzo ribassato" },
+    category_bestsellers_from_purchases: { de: "Bestseller aus deinen Kaufkategorien", en: "Bestsellers from your purchase categories", tr: "Satın aldığın kategorilerden çok satanlar", fr: "Meilleures ventes de vos catégories d’achat", es: "Más vendidos de las categorías que compras", it: "Più venduti delle categorie che acquisti" },
+    category_similar_from_favorites: { de: "Ähnlich zu deinen Favoriten", en: "Similar to your favorites", tr: "Favorilerine benzer", fr: "Similaires à vos favoris", es: "Similares a tus favoritos", it: "Simili ai tuoi preferiti" },
+    others_in_your_category: { de: "Beliebt in deinen Kategorien", en: "Popular in your categories", tr: "Kategorilerinde popüler", fr: "Populaire dans vos catégories", es: "Popular en tus categorías", it: "Popolari nelle tue categorie" },
+    new_in_viewed_categories: { de: "Neu in deinen Kategorien", en: "New in your categories", tr: "Kategorilerinde yeni", fr: "Nouveau dans vos catégories", es: "Nuevo en tus categorías", it: "Novità nelle tue categorie" },
+    abandoned_cart_items: { de: "In deinem Warenkorb geblieben", en: "Left in your cart", tr: "Sepetinde kalanlar", fr: "Restés dans votre panier", es: "Se quedaron en tu carrito", it: "Rimasti nel carrello" },
   };
 
   function getTitle() {
@@ -2274,6 +2274,7 @@ function BlogCarousel({ container, locale = "de" }) {
 
 // ── Newsletter (form POST to external URL or internal endpoint) ───────────────
 function NewsletterSignup({ container, locale = "de" }) {
+  const tUi = useTranslations("shopUi");
   const tNewsletter = useTranslations("newsletter");
   const tAuth = useTranslations("auth");
   const action = (container.form_action || "").trim();
@@ -2370,12 +2371,12 @@ function NewsletterSignup({ container, locale = "de" }) {
               <input type="text" name={firstNameFieldName} required placeholder={lt(container, "first_name_placeholder", locale) || tAuth("firstName")} autoComplete="given-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
               <input type="text" name={lastNameFieldName} required placeholder={lt(container, "last_name_placeholder", locale) || tAuth("lastName")} autoComplete="family-name" style={{ ...sharedInputStyle, ...nameInputStyle }} />
             </div>
-            <input type="email" name={emailName} required placeholder={lt(container, "email_placeholder", locale) || "E-Mail"} autoComplete="email" style={sharedInputStyle} />
-            <button type="submit" style={sharedBtnStyle}>{lt(container, "button_text", locale) || "Abonnieren"}</button>
+            <input type="email" name={emailName} required placeholder={lt(container, "email_placeholder", locale) || tUi("email")} autoComplete="email" style={sharedInputStyle} />
+            <button type="submit" style={sharedBtnStyle}>{lt(container, "button_text", locale) || tUi("subscribe")}</button>
           </form>
         ) : internalState === "success" ? (
           <p style={{ fontSize: 16, color: "#059669", fontWeight: 600, margin: "12px 0 0" }}>
-            {container.success_text || "Danke! Sie sind jetzt angemeldet."}
+            {lt(container, "success_text", locale) || tUi("subscribed")}
           </p>
         ) : (
           <form onSubmit={handleInternalSubmit} style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "stretch" }}>
@@ -2404,12 +2405,12 @@ function NewsletterSignup({ container, locale = "de" }) {
               required
               value={internalEmail}
               onChange={(e) => setInternalEmail(e.target.value)}
-              placeholder={lt(container, "email_placeholder", locale) || "E-Mail"}
+              placeholder={lt(container, "email_placeholder", locale) || tUi("email")}
               autoComplete="email"
               style={sharedInputStyle}
             />
             <button type="submit" disabled={internalState === "loading"} style={{ ...sharedBtnStyle, opacity: internalState === "loading" ? 0.7 : 1 }}>
-              {internalState === "loading" ? "…" : (lt(container, "button_text", locale) || "Abonnieren")}
+              {internalState === "loading" ? "…" : (lt(container, "button_text", locale) || tUi("subscribe"))}
             </button>
             {internalState === "error" && (
               <p style={{ fontSize: 13, color: "#ef4444", margin: 0 }}>{tNewsletter("error")}</p>

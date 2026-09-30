@@ -237,7 +237,7 @@ export default function MarketingCampaignsPage() {
       const r = await getMedusaAdminClient().publishCampaign(id);
       const count = r?.platforms_published?.length || 0;
       const budgetPerPlatform = r?.budget_per_platform_cents ? `${(r.budget_per_platform_cents / 100).toFixed(2)} €` : "";
-      const errDetail = r?.errors?.length ? ` ${locale === "de" ? "Fehler" : "Errors"}: ${r.errors.map(e => `${e.platform}: ${e.error}`).join(" | ")}` : "";
+      const errDetail = r?.errors?.length ? ` ${locale === "tr" ? "Hatalar" : locale === "en" ? "Errors" : locale === "fr" ? "Erreurs" : locale === "es" ? "Errores" : locale === "it" ? "Errori" : "Fehler"}: ${r.errors.map(e => `${e.platform}: ${e.error}`).join(" | ")}` : "";
       if (r?.warning) {
         setMsg({ tone: "warning", text: r.warning + errDetail });
       } else if (count > 0) {

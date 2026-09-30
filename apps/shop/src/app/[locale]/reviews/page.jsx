@@ -9,6 +9,7 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import AccountPageLayout, { ACCOUNT_PAGE_MAIN_INNER } from "@/components/account/AccountPageLayout";
 import { getMedusaClient } from "@/lib/medusa-client";
+import { useLocale, useTranslations } from "next-intl";
 import { useCustomerAuth as useAuth } from "@andertal/lib";
 
 const ORANGE = "#ee8a12";
@@ -47,12 +48,13 @@ function StarDisplay({ value }) {
   );
 }
 
-function fmtDate(d) {
+function fmtDate(d, locale = "de") {
   if (!d) return "";
-  return new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(d).toLocaleDateString(locale, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl }) {
+  const t = useTranslations("accountMisc");
   const [rating, setRating] = useState(existing?.rating || 0);
   const [comment, setComment] = useState(existing?.comment || "");
   const [saving, setSaving] = useState(false);
@@ -60,7 +62,7 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
   const [done, setDone] = useState(false);
 
   const handleSubmit = async () => {
-    if (!rating) { setErr("Bitte eine Bewertung auswählen."); return; }
+    if (!rating) { setErr(t("pickRating")); return; }
     setSaving(true); setErr("");
     try {
       const token = getToken("customer");
@@ -73,7 +75,7 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
       setDone(true);
       onSaved({ order_id: orderId, product_id: item.product_id, rating, comment });
     } catch (e) {
-      setErr(e?.message || "Fehler beim Speichern");
+      setErr(e?.message || t("saveError"));
     }
     setSaving(false);
   };
@@ -81,14 +83,14 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
   if (done) {
     return (
       <div style={{ padding: "12px 16px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
-        <p style={{ margin: "0 0 4px", fontSize: 13, color: "#15803d", fontWeight: 600 }}>✓ Bewertung gespeichert</p>
+        <p style={{ margin: "0 0 4px", fontSize: 13, color: "#15803d", fontWeight: 600 }}>{t("reviewSaved")}</p>
         <StarDisplay value={rating} />
         {comment && <p style={{ margin: "6px 0 0", fontSize: 13, color: "#374151" }}>{comment}</p>}
         {trustpilotEvaluateUrl ? (
           <p style={{ margin: "12px 0 0", fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-            Optional: dieselbe Bewertung auch öffentlich bei Trustpilot abgeben —{" "}
+            {t("trustpilotOptional")}{" "}
             <a href={trustpilotEvaluateUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#048068", fontWeight: 600 }}>
-              Zu Trustpilot
+              {t("toTrustpilot")}
             </a>
           </p>
         ) : null}
@@ -104,7 +106,7 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={3}
-        placeholder="Kommentar (optional)..."
+        placeholder={t("commentPlaceholder")}
         style={{ width: "100%", marginTop: 10, padding: "8px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
       />
       {err && <p style={{ color: "#ef4444", fontSize: 12, margin: "6px 0 0" }}>{err}</p>}
@@ -114,7 +116,7 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
         disabled={saving}
         style={{ marginTop: 10, padding: "8px 18px", background: ORANGE, color: "#fff", border: "1px solid #e6dfd4", borderRadius: 7, fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 0 0 1px rgba(29,27,24,0.08)" }}
       >
-        {saving ? "…" : existing ? "Aktualisieren" : "Bewertung abgeben"}
+        {saving ? "…" : existing ? t("update") : t("submitReview")}
       </button>
     </div>
   );
@@ -122,6 +124,8 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
 
 export default function ReviewsPage() {
   useAuthGuard({ requiredRole: "customer", redirectTo: "/login" });
+  const t = useTranslations("accountMisc");
+  const locale = useLocale();
   const { user, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -180,11 +184,11 @@ export default function ReviewsPage() {
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
-          <AccountPageLayout title="Bewertungen">
+          <AccountPageLayout title={t("reviewsTitle")}>
             <div>
               {loading && <GlobalPageLoader />}
               {!loading && ordersWithItems.length === 0 && (
-                <p style={{ color: GRAY }}>Noch keine Bestellungen vorhanden.</p>
+                <p style={{ color: GRAY }}>{t("noOrders")}</p>
               )}
               {ordersWithItems.map((order) => {
                 const isOpen = expandedOrder === order.id;
@@ -203,11 +207,11 @@ export default function ReviewsPage() {
                     >
                       <div>
                         <p style={{ margin: 0, fontWeight: 700, fontSize: 15, color: DARK }}>
-                          Bestellung #{order.order_number || "—"}
+                          {t("orderNumber", { number: order.order_number || "—" })}
                         </p>
                         <p style={{ margin: "2px 0 0", fontSize: 12, color: GRAY }}>
-                          {fmtDate(order.created_at)} · {items.length} Produkt{items.length !== 1 ? "e" : ""}
-                          {reviewedCount > 0 && ` · ${reviewedCount}/${items.length} bewertet`}
+                          {fmtDate(order.created_at, locale)} · {t("productCount", { count: items.length })}
+                          {reviewedCount > 0 && ` · ${t("reviewedCount", { done: reviewedCount, total: items.length })}`}
                         </p>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -218,7 +222,7 @@ export default function ReviewsPage() {
                             ))}
                           </span>
                         ) : (
-                          <span style={{ fontSize: 13, color: ORANGE, fontWeight: 600 }}>Jetzt bewerten</span>
+                          <span style={{ fontSize: 13, color: ORANGE, fontWeight: 600 }}>{t("reviewNow")}</span>
                         )}
                         <span style={{ color: GRAY, fontSize: 14 }}>{isOpen ? "▲" : "▼"}</span>
                       </div>
@@ -251,7 +255,7 @@ export default function ReviewsPage() {
                                     {trustpilotEvaluateUrl ? (
                                       <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
                                         <a href={trustpilotEvaluateUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#048068", fontWeight: 600 }}>
-                                          Auch bei Trustpilot bewerten
+                                          {t("alsoTrustpilot")}
                                         </a>
                                       </p>
                                     ) : null}
@@ -260,7 +264,7 @@ export default function ReviewsPage() {
                                       onClick={() => setEditingKey(key)}
                                       style={{ marginTop: 8, fontSize: 12, color: ORANGE, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                                     >
-                                      Bearbeiten
+                                      {t("edit")}
                                     </button>
                                   </div>
                                 ) : (

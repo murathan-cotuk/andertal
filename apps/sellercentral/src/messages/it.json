@@ -214,8 +214,7 @@
     "sellerOrders": "Ordini venditori",
     "noSellerOrders": "Nessun altro ordine venditore",
     "activeReturn": "Reso (attivo)",
-    "guestBadge": "Ospite",
-    "noOrders": "Nessun ordine trovato"
+    "guestBadge": "Ospite"
   },
   "settings": {
     "back": "Indietro",
@@ -279,5 +278,19 @@
     "noInvoices": "Nessuna fattura di commissione.",
     "platformOwn": "Piattaforma (propria)",
     "loading": "Caricamento…"
+  },
+  "globalSearch": {
+    "placeholder": "Cerca prodotti, ordini, clienti…",
+    "searching": "Ricerca in corso…",
+    "noResults": "Nessun risultato per “{query}”",
+    "products": "Prodotti",
+    "orders": "Ordini",
+    "customers": "Clienti",
+    "navigation": "Navigazione",
+    "bulkUpload": "Caricamento massivo",
+    "singleUpload": "Aggiungi un prodotto",
+    "ranking": "Classifica",
+    "shipping": "Spedizione",
+    "payments": "Pagamenti"
   }
 }

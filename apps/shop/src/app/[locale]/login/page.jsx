@@ -65,6 +65,7 @@ function MonkeyAvatar({ isBlind }) {
 
 /* ── Page ─────────────────────────────────────────────────── */
 export default function LoginPage() {
+  const tUi = useTranslations("shopUi");
   useAuthGuard({ requiredRole: "customer", redirectTo: "/", redirectIfAuthenticated: true });
 
   const t = useTranslations("auth");
@@ -263,7 +264,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 18 }}>
             {/* Email */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label htmlFor="login-email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>E-Mail</label>
+              <label htmlFor="login-email" style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A" }}>{tUi("email")}</label>
               <input
                 id="login-email"
                 type="email"

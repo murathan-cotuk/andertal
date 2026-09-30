@@ -3,16 +3,18 @@
 import React from "react";
 import { Link } from "@/i18n/navigation";
 
+import { useTranslations } from "next-intl";
 /**
  * @param {{ label: string, href: string | null }[]} [props.items]
  */
 export default function Breadcrumbs({ items: customItems }) {
+  const tUi = useTranslations("shopUi");
   const items = Array.isArray(customItems) ? customItems.filter((i) => i?.label) : [];
 
   if (items.length === 0) return null;
 
   return (
-    <nav aria-label="Breadcrumb" style={{ marginBottom: 18 }}>
+    <nav data-breadcrumb="" aria-label={tUi("breadcrumb")} style={{ marginBottom: 18 }}>
       <ol style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 8px", listStyle: "none", margin: 0, padding: 0, fontSize: 13 }}>
         {items.map((item, i) => (
           <li key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>

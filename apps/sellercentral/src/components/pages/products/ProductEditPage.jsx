@@ -1260,11 +1260,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
     } else if (cl === "1") {
       setMessage({
         type: "success",
-        text: locale === "tr"
-          ? "Mevcut katalog ürününe listing eklendi. Ortak alanlar (isim, açıklama vb.) doğrudan değişmez."
-          : locale === "de"
-          ? "Listing zum bestehenden Katalogprodukt hinzugefügt. Gemeinsame Felder ändern sich nicht direkt."
-          : "Listing added to the existing catalog product. Shared fields are not changed directly.",
+        text: locale === "tr" ? "Mevcut katalog ürününe listing eklendi. Ortak alanlar (isim, açıklama vb.) doğrudan değişmez." : locale === "en" ? "Listing added to the existing catalog product. Shared fields are not changed directly." : locale === "fr" ? "Offre ajoutée au produit existant du catalogue. Les champs partagés ne sont pas modifiés directement." : locale === "es" ? "Oferta añadida al producto existente del catálogo. Los campos compartidos no se modifican directamente." : locale === "it" ? "Offerta aggiunta al prodotto esistente in catalogo. I campi condivisi non vengono modificati direttamente." : "Listing zum bestehenden Katalogprodukt hinzugefügt. Gemeinsame Felder ändern sich nicht direkt.",
       });
     } else {
       return;
@@ -1635,11 +1631,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           } else {
             setMessage({
               type: "success",
-              text: locale === "tr"
-                ? "Mevcut katalog ürününe listing eklendi. Ortak alanlar (isim, açıklama vb.) doğrudan değişmez; kendi fiyat/SKU/kargonuzu kaydedin."
-                : locale === "de"
-                ? "Listing zum bestehenden Katalogprodukt hinzugefügt. Gemeinsame Felder (Name, Beschreibung usw.) ändern sich nicht direkt — trage deinen eigenen Preis/SKU/Versand ein."
-                : "Listing added to the existing catalog product. Shared fields (name, description, etc.) are not changed directly — enter your own price/SKU/shipping.",
+              text: locale === "tr" ? "Mevcut katalog ürününe listing eklendi. Ortak alanlar (isim, açıklama vb.) doğrudan değişmez; kendi fiyat/SKU/kargonuzu kaydedin." : locale === "en" ? "Listing added to the existing catalog product. Shared fields (name, description, etc.) are not changed directly — enter your own price/SKU/shipping." : locale === "fr" ? "Offre ajoutée au produit existant du catalogue. Les champs partagés (nom, description, etc.) ne sont pas modifiés directement — saisissez votre propre prix/SKU/livraison." : locale === "es" ? "Oferta añadida al producto existente del catálogo. Los campos compartidos (nombre, descripción, etc.) no se modifican directamente: introduce tu propio precio/SKU/envío." : locale === "it" ? "Offerta aggiunta al prodotto esistente in catalogo. I campi condivisi (nome, descrizione, ecc.) non vengono modificati direttamente — inserisci il tuo prezzo/SKU/spedizione." : "Listing zum bestehenden Katalogprodukt hinzugefügt. Gemeinsame Felder (Name, Beschreibung usw.) ändern sich nicht direkt — trage deinen eigenen Preis/SKU/Versand ein.",
             });
           }
         } else {
@@ -3212,16 +3204,8 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
               {eanLookupState === "found" && (
                 <Banner tone="warning">
                   {eanMatchedOn === "variant"
-                    ? (locale === "tr"
-                        ? "Bu EAN, katalogdaki bir üst ürünün varyasyonuna ait. Form yüklendi — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle. Ürün adı/açıklama gibi ortak alanları doğrudan değiştiremezsin; kaydettiğinde değişiklik talebi ekibimize iletilir."
-                        : locale === "de"
-                        ? "Diese EAN gehört zu einer Variante eines Katalogprodukts. Formular geladen — füge deinen eigenen Preis, SKU und Versand hinzu. Gemeinsame Felder (Titel/Beschreibung) kannst du nicht direkt ändern; beim Speichern geht ein Änderungsantrag an unser Team."
-                        : "This EAN belongs to a catalog product variant. Form loaded — add your own price, SKU, and shipping. You cannot directly change shared fields (title/description); saving sends a change request to our team.")
-                    : (locale === "tr"
-                        ? "Bu EAN katalogda zaten kayıtlı. Form katalog verileriyle dolduruldu — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle. Ürün adı, açıklama ve diğer ortak alanlar doğrudan değişmez; kaydettiğinde değişiklik talebi ekibimize iletilir ve incelenir."
-                        : locale === "de"
-                        ? "Diese EAN ist bereits im Katalog. Formular vorausgefüllt — füge deinen eigenen Preis, SKU und Versand hinzu. Titel, Beschreibung und andere gemeinsame Felder ändern sich nicht direkt; beim Speichern wird ein Änderungsantrag an unser Team gesendet."
-                        : "This EAN is already in the catalog. Form pre-filled — add your own price, SKU, and shipping. Title, description, and other shared fields cannot be changed directly; saving sends a change request to our team for review.")}
+                    ? (locale === "tr" ? "Bu EAN, katalogdaki bir üst ürünün varyasyonuna ait. Form yüklendi — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle. Ürün adı/açıklama gibi ortak alanları doğrudan değiştiremezsin; kaydettiğinde değişiklik talebi ekibimize iletilir." : locale === "en" ? "This EAN belongs to a catalog product variant. Form loaded — add your own price, SKU, and shipping. You cannot directly change shared fields (title/description); saving sends a change request to our team." : locale === "fr" ? "Cet EAN appartient à une variante d’un produit du catalogue. Formulaire chargé — ajoutez votre propre prix, SKU et livraison. Vous ne pouvez pas modifier directement les champs partagés (titre/description) ; l’enregistrement envoie une demande de modification à notre équipe." : locale === "es" ? "Este EAN pertenece a una variante de un producto del catálogo. Formulario cargado: añade tu propio precio, SKU y envío. No puedes cambiar directamente los campos compartidos (título/descripción); al guardar se envía una solicitud de cambio a nuestro equipo." : locale === "it" ? "Questo EAN appartiene a una variante di un prodotto in catalogo. Modulo caricato — aggiungi il tuo prezzo, SKU e spedizione. Non puoi modificare direttamente i campi condivisi (titolo/descrizione); salvando invii una richiesta di modifica al nostro team." : "Diese EAN gehört zu einer Variante eines Katalogprodukts. Formular geladen — füge deinen eigenen Preis, SKU und Versand hinzu. Gemeinsame Felder (Titel/Beschreibung) kannst du nicht direkt ändern; beim Speichern geht ein Änderungsantrag an unser Team.")
+                    : (locale === "tr" ? "Bu EAN katalogda zaten kayıtlı. Form katalog verileriyle dolduruldu — kendi fiyatını, SKU'nu ve kargo bilgilerini ekle. Ürün adı, açıklama ve diğer ortak alanlar doğrudan değişmez; kaydettiğinde değişiklik talebi ekibimize iletilir ve incelenir." : locale === "en" ? "This EAN is already in the catalog. Form pre-filled — add your own price, SKU, and shipping. Title, description, and other shared fields cannot be changed directly; saving sends a change request to our team for review." : locale === "fr" ? "Cet EAN figure déjà dans le catalogue. Formulaire pré-rempli — ajoutez votre propre prix, SKU et livraison. Titre, description et autres champs partagés ne peuvent pas être modifiés directement ; l’enregistrement envoie une demande de modification à notre équipe." : locale === "es" ? "Este EAN ya está en el catálogo. Formulario rellenado: añade tu propio precio, SKU y envío. El título, la descripción y otros campos compartidos no se pueden cambiar directamente; al guardar se envía una solicitud de cambio a nuestro equipo." : locale === "it" ? "Questo EAN è già in catalogo. Modulo precompilato — aggiungi il tuo prezzo, SKU e spedizione. Titolo, descrizione e altri campi condivisi non si modificano direttamente; salvando invii una richiesta di modifica al nostro team." : "Diese EAN ist bereits im Katalog. Formular vorausgefüllt — füge deinen eigenen Preis, SKU und Versand hinzu. Titel, Beschreibung und andere gemeinsame Felder ändern sich nicht direkt; beim Speichern wird ein Änderungsantrag an unser Team gesendet.")}
                 </Banner>
               )}
 
@@ -3229,17 +3213,13 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 <Banner tone="info">
                   <InlineStack gap="300" blockAlign="center" align="space-between" wrap>
                     <Text as="p" variant="bodySm">
-                      {locale === "tr"
-                        ? `Bu ürünün kataloğda ${meta.master_total_variants} varyasyonu var. Sadece bu tekini ekledin.`
-                        : locale === "de"
-                        ? `Dieses Produkt hat ${meta.master_total_variants} Varianten im Katalog. Du hast nur diese eine hinzugefügt.`
-                        : `This product has ${meta.master_total_variants} variants in the catalog. You've added only this one.`}
+                      {locale === "tr" ? `Bu ürünün kataloğda ${meta.master_total_variants} varyasyonu var. Sadece bu tekini ekledin.` : locale === "en" ? `This product has ${meta.master_total_variants} variants in the catalog. You've added only this one.` : locale === "fr" ? `Ce produit a ${meta.master_total_variants} variantes dans le catalogue. Vous n’avez ajouté que celle-ci.` : locale === "es" ? `Este producto tiene ${meta.master_total_variants} variantes en el catálogo. Solo has añadido esta.` : locale === "it" ? `Questo prodotto ha ${meta.master_total_variants} varianti in catalogo. Hai aggiunto solo questa.` : `Dieses Produkt hat ${meta.master_total_variants} Varianten im Katalog. Du hast nur diese eine hinzugefügt.`}
                     </Text>
                     <Button
                       size="slim"
                       onClick={() => window.open(`/products/add-existing?product_id=${encodeURIComponent(meta.master_product_id)}`, "_blank", "noopener,noreferrer")}
                     >
-                      {locale === "tr" ? "Diğer varyasyonları gör" : locale === "de" ? "Andere Varianten ansehen" : "See other variations"}
+                      {locale === "tr" ? "Diğer varyasyonları gör" : locale === "en" ? "See other variations" : locale === "fr" ? "Voir les autres variantes" : locale === "es" ? "Ver otras variantes" : locale === "it" ? "Vedi le altre varianti" : "Andere Varianten ansehen"}
                     </Button>
                   </InlineStack>
                 </Banner>
@@ -4600,7 +4580,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 }
                 value={meta.eu_origin_country ?? ""}
                 onChange={(v) => updateMeta("eu_origin_country", v || undefined)}
-                placeholder={locale === "en" ? "e.g. DE, FR, IT" : locale === "tr" ? "örn. DE, FR, IT" : "z. B. DE, FR, IT"}
+                placeholder={locale === "tr" ? "örn. DE, FR, IT" : locale === "en" ? "e.g. DE, FR, IT" : locale === "fr" ? "p. ex. DE, FR, IT" : locale === "es" ? "p. ej. DE, FR, IT" : locale === "it" ? "ad es. DE, FR, IT" : "z. B. DE, FR, IT"}
                 autoComplete="off"
               />
               <TextField
@@ -4796,7 +4776,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 requiredIndicator
                 value={meta.hersteller ?? ""}
                 onChange={(v) => updateMeta("hersteller", v || undefined)}
-                placeholder={locale === "en" ? "e.g. Acme GmbH" : locale === "tr" ? "örn. Acme GmbH" : "z. B. Acme GmbH"}
+                placeholder={locale === "tr" ? "örn. Acme GmbH" : locale === "en" ? "e.g. Acme GmbH" : locale === "fr" ? "p. ex. Acme SARL" : locale === "es" ? "p. ej. Acme S.L." : locale === "it" ? "ad es. Acme S.r.l." : "z. B. Acme GmbH"}
                 autoComplete="off"
               />
               <TextField
@@ -4819,7 +4799,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 requiredIndicator
                 value={meta.hersteller_information ?? ""}
                 onChange={(v) => updateMeta("hersteller_information", v || undefined)}
-                placeholder={locale === "en" ? "Street, city, country, email/phone" : locale === "tr" ? "Sokak, şehir, ülke, e-posta/telefon" : "Straße, Ort, Land, E-Mail/Telefon"}
+                placeholder={locale === "tr" ? "Sokak, şehir, ülke, e-posta/telefon" : locale === "en" ? "Street, city, country, email/phone" : locale === "fr" ? "Rue, ville, pays, e-mail/téléphone" : locale === "es" ? "Calle, ciudad, país, e-mail/teléfono" : locale === "it" ? "Via, città, paese, e-mail/telefono" : "Straße, Ort, Land, E-Mail/Telefon"}
                 multiline={2}
               />
               <TextField
@@ -4842,7 +4822,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                 requiredIndicator
                 value={meta.verantwortliche_person_information ?? ""}
                 onChange={(v) => updateMeta("verantwortliche_person_information", v || undefined)}
-                placeholder={locale === "en" ? "Name, EU address, email/phone" : locale === "tr" ? "Ad, AB adresi, e-posta/telefon" : "Name, EU-Adresse, E-Mail/Telefon"}
+                placeholder={locale === "tr" ? "Ad, AB adresi, e-posta/telefon" : locale === "en" ? "Name, EU address, email/phone" : locale === "fr" ? "Nom, adresse UE, e-mail/téléphone" : locale === "es" ? "Nombre, dirección UE, e-mail/teléfono" : locale === "it" ? "Nome, indirizzo UE, e-mail/telefono" : "Name, EU-Adresse, E-Mail/Telefon"}
                 multiline={2}
               />
               </BlockStack>

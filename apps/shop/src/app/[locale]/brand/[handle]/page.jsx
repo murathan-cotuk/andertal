@@ -586,6 +586,7 @@ const Desc = styled.div`
  *  Page
  * ─────────────────────────────────────────────────────────── */
 export default function BrandPage() {
+  const tUi = useTranslations("shopUi");
   const params   = useParams();
   const locale   = params?.locale ?? "en";
   const marketPrefixVal = useMarketPrefix();
@@ -883,11 +884,11 @@ export default function BrandPage() {
             )}
 
             <SortWrap>
-              <SortLabel>Sort:</SortLabel>
+              <SortLabel>{tUi("sort")}</SortLabel>
               <SortSelect
                 value={sort}
                 onChange={e => { setSort(e.target.value); setPage(1); }}
-                aria-label="Sort products"
+                aria-label={tUi("sortProducts")}
               >
                 {SORT_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -897,8 +898,8 @@ export default function BrandPage() {
           </FilterBarInner>
         </FilterBar>
 
-        <Breadcrumb aria-label="Breadcrumb">
-          <Link href={`/${locale}`}>Home</Link>
+        <Breadcrumb data-breadcrumb="" aria-label={tUi("breadcrumb")}>
+          <Link href={`/${locale}`}>{tUi("home")}</Link>
           <span style={{ color: "#ccc" }}>/</span>
           <b>{title}</b>
         </Breadcrumb>

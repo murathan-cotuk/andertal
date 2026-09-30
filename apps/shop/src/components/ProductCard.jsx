@@ -551,6 +551,7 @@ const MAX_CHIPS = 3;
  * ─────────────────────────────────────────────────────────── */
 
 export function ProductCard({ product, activeFilters = {}, plainImage = false, isBestseller: _isBestsellerProp, rank, hideBestsellerBadge: _hideBestsellerBadge = false }) {
+  const tUi = useTranslations("shopUi");
   const locale = useLocale();
   const tp = useTranslations("product");
   const marketPrefixVal = useMarketPrefix();
@@ -844,7 +845,7 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
       {imgSrc2 && !plainImage ? <Image className="img-secondary" src={imgSrc2} alt="" aria-hidden fill sizes="(max-width: 767px) 50vw, 300px" /> : null}
     </>
   ) : (
-    <ImgPlaceholder>No image</ImgPlaceholder>
+    <ImgPlaceholder>{tUi("noImage")}</ImgPlaceholder>
   );
 
   return (

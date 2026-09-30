@@ -398,5 +398,19 @@
     "deliveryNote_label": "İrsaliye",
     "shippingLabel_label": "Kargo etiketi",
     "return_label": "İade"
+  },
+  "globalSearch": {
+    "placeholder": "Ürün, sipariş, müşteri ara…",
+    "searching": "Aranıyor…",
+    "noResults": "“{query}” için sonuç yok",
+    "products": "Ürünler",
+    "orders": "Siparişler",
+    "customers": "Müşteriler",
+    "navigation": "Gezinme",
+    "bulkUpload": "Toplu yükleme",
+    "singleUpload": "Tekli ürün ekle",
+    "ranking": "Sıralama",
+    "shipping": "Kargo",
+    "payments": "Ödemeler"
   }
 }

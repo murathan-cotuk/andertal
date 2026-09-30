@@ -160,6 +160,7 @@ function normalizeItems(tb) {
 }
 
 export default function ShopTopBar() {
+  const tUi = useTranslations("shopUi");
   const tc = useTranslations("common");
   const styles = useShopStyles();
   const tb = styles?.topbar || {};
@@ -200,7 +201,7 @@ export default function ShopTopBar() {
 
   if (mode === "inline") {
     return (
-      <Outer className="topbar shop-topbar" role="region" aria-label="Hinweise">
+      <Outer className="topbar shop-topbar" role="region" aria-label={tUi("notices")}>
         <InlineInner>
           {items.map((item, i) => (
             <React.Fragment key={`${item.href}-${i}`}>
@@ -233,7 +234,7 @@ export default function ShopTopBar() {
     <Outer
       className="topbar shop-topbar"
       role="region"
-      aria-label="Hinweise"
+      aria-label={tUi("notices")}
       onMouseEnter={() => { pausedRef.current = true; }}
       onMouseLeave={() => { pausedRef.current = false; }}
     >
@@ -253,7 +254,7 @@ export default function ShopTopBar() {
           tabIndex={0}
           role="group"
           aria-roledescription="Karussell"
-          aria-label="Top-Bar Hinweise"
+          aria-label={tUi("notices")}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           onKeyDown={(e) => {

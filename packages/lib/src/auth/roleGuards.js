@@ -108,6 +108,28 @@ export function serverSideAuthGuard(context, options = {}) {
 }
 
 /**
+ * Leading locale / market segments of a path ("/de/account" → "/de", "/de/de/orders" → "/de/de").
+ * Keeps guard redirects in the language the visitor is browsing in — an unprefixed "/login"
+ * would let the middleware pick a language from the browser instead.
+ */
+export function localePrefixFromPath(pathname) {
+  const segs = String(pathname || '').split('/').filter(Boolean);
+  const out = [];
+  for (let i = 0; i < segs.length - 1 && out.length < 2; i += 1) {
+    if (!/^[a-z]{2}(-[a-z]{2})?$/i.test(segs[i])) break;
+    out.push(segs[i]);
+  }
+  return out.length ? `/${out.join('/')}` : '';
+}
+
+function withLocalePrefix(target, pathname) {
+  if (!target || !target.startsWith('/') || target.startsWith('//')) return target;
+  const prefix = localePrefixFromPath(pathname);
+  if (!prefix || target === prefix || target.startsWith(`${prefix}/`)) return target;
+  return target === '/' ? prefix : `${prefix}${target}`;
+}
+
+/**
  * Client-side authentication guard hook
  * Redirects to login if not authenticated
  * 
@@ -136,14 +158,13 @@ export function useAuthGuard(options = {}) {
 
     // Redirect if already authenticated (for login pages)
     if (redirectIfAuthenticated && isAuthenticated) {
-      const destination = requiredRole === 'customer' ? '/' : '/';
-      router.replace(destination);
+      router.replace(withLocalePrefix('/', pathname));
       return;
     }
 
     // Redirect if not authenticated
     if (!redirectIfAuthenticated && !isAuthenticated) {
-      router.replace(`${redirectTo}?redirect=${encodeURIComponent(pathname)}`);
+      router.replace(`${withLocalePrefix(redirectTo, pathname)}?redirect=${encodeURIComponent(pathname)}`);
       return;
     }
 
@@ -155,7 +176,7 @@ export function useAuthGuard(options = {}) {
       // Role mismatch
       if (userRole && userRole !== requiredRole) {
         console.warn(`[roleGuards] Role mismatch: expected ${requiredRole}, got ${userRole}`);
-        router.replace('/unauthorized');
+        router.replace(withLocalePrefix('/unauthorized', pathname));
       }
     }
   }, [requiredRole, redirectTo, redirectIfAuthenticated, router, pathname]);

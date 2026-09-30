@@ -2,8 +2,10 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 export default function LocaleError({ error, reset }) {
+  const t = useTranslations("pageStates");
   useEffect(() => {
     // Sentry automatically picks this up via withSentryConfig.
     // Log to console in dev for quick debugging.
@@ -31,11 +33,10 @@ export default function LocaleError({ error, reset }) {
       </div>
 
       <h1 style={{ fontSize: 22, fontWeight: 700, margin: "16px 0 8px" }}>
-        Etwas ist schiefgelaufen
+        {t("errorTitle")}
       </h1>
       <p style={{ fontSize: 15, color: "#6b7280", maxWidth: 420, margin: "0 0 32px", lineHeight: 1.6 }}>
-        Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut
-        oder kehren Sie zur Startseite zurück.
+        {t("errorText")}
       </p>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
@@ -53,7 +54,7 @@ export default function LocaleError({ error, reset }) {
             boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
           }}
         >
-          Erneut versuchen
+          {t("retry")}
         </button>
         <Link
           href="/"
@@ -69,7 +70,7 @@ export default function LocaleError({ error, reset }) {
             boxShadow: "0 0 0 1px rgba(29,27,24,0.08)",
           }}
         >
-          Zur Startseite
+          {t("toHome")}
         </Link>
       </div>
 

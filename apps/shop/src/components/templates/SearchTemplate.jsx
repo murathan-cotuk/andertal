@@ -530,6 +530,7 @@ function buildSearchUrl(pathname, q, cat) {
 }
 
 export default function SearchTemplate() {
+  const tUi = useTranslations("shopUi");
   const tCommon = useTranslations("common");
   const tSort = useTranslations("catalogSort");
   const tHome = useTranslations("home");
@@ -887,7 +888,7 @@ export default function SearchTemplate() {
     return (
       <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
         <ShopHeader />
-        <main className="flex-grow" aria-label="Search results">
+        <main className="flex-grow" aria-label={tUi("searchResults")}>
           <Bone style={{ height: 220 }} />
           <div style={{ maxWidth: 1440, margin: "0 auto", padding: "14px 32px" }}>
             <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
@@ -916,7 +917,7 @@ export default function SearchTemplate() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--shop-bg, #fff)" }}>
       <ShopHeader />
-      <main className="flex-grow" aria-label="Search results">
+      <main className="flex-grow" aria-label={tUi("searchResults")}>
         <ColHeader style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
           <CategoryTitle>{title}</CategoryTitle>
         </ColHeader>
@@ -942,7 +943,7 @@ export default function SearchTemplate() {
                   {tCommon("filter")}{activeCount > 0 ? ` (${activeCount})` : ""}
                 </FilterBtn>
               )}
-              <Breadcrumb aria-label="Breadcrumb">
+              <Breadcrumb data-breadcrumb="" aria-label={tUi("breadcrumb")}>
                 <Link href="/">{tCommon("home")}</Link>
                 <span style={{ color: "#b8afa2" }}>›</span>
                 <b>{tSearch("label")}</b>
@@ -959,7 +960,7 @@ export default function SearchTemplate() {
               <SortSelect
                 value={sort}
                 onChange={(e) => { setSort(e.target.value); setPage(1); }}
-                aria-label="Sort products"
+                aria-label={tUi("sortProducts")}
               >
                 {SORT_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{SEARCH_SORT_KEYS.has(o.value) ? tSort(o.value) : o.label}</option>
@@ -1072,7 +1073,7 @@ export default function SearchTemplate() {
             {q && paginated.length === 0 ? (
               <>
                 <div style={{ textAlign: "center", padding: "24px 0 14px", color: "#6b7280", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  Keine direkten Treffer - wir zeigen ähnliche Produkte.
+                  {tUi("noDirectHits")}
                 </div>
                 <ProductGrid
                   products={applyCatalogSort(products || [], sort, { bestsellerOnly: false }).slice(0, PER_PAGE)}

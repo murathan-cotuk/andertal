@@ -10,7 +10,7 @@ export async function generateMetadata({ params }) {
   const h = await headers();
   const market = marketFromHeader(h.get("x-andertal-market-prefix"), locale);
   const page = await fetchCatalogCmsPage("brands", { revalidate: 0 });
-  const fallback = locale === "tr" ? "Markalar" : locale === "de" ? "Marken" : "Brands";
+  const fallback = { de: "Marken", en: "Brands", tr: "Markalar", fr: "Marques", es: "Marcas", it: "Marchi" }[locale] || "Brands";
   const seo = catalogCmsSeo(page, locale, fallback);
   const title = (seo.title || fallback).trim() || "Andertal";
   return {
