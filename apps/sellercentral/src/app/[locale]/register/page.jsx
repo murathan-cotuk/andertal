@@ -125,7 +125,6 @@ function RegisterForm() {
       const extra = {
         ...(inviteToken ? { invite_token: inviteToken, first_name: firstName, last_name: lastName } : {}),
         agreement_accepted: true,
-        agreement_version: "1.0",
       };
       const data = await getMedusaAdminClient().registerSeller(
         email.trim().toLowerCase(), password, isInvited ? null : storeName.trim(), extra

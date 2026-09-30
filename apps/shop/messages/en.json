@@ -1213,6 +1213,7 @@
     "error": "Error",
     "subscribe": "Subscribe",
     "subscribed": "Thank you! You are now subscribed.",
-    "home": "Home"
+    "home": "Home",
+    "brandNotFound": "Brand not found."
   }
 }

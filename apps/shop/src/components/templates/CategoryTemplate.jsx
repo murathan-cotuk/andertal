@@ -885,7 +885,9 @@ export default function CategoryTemplate() {
   const catBannerStyle  = tmpl.banner_style || "strip";
   const catBannerPreset = CAT_BANNER_PRESETS[catBannerStyle] || CAT_BANNER_PRESETS.strip;
   const showCatBanner   = catBannerStyle !== "none" && (!!bannerUrl || !!bannerVideoUrl);
-  const showSidebar     = tmpl.show_sidebar !== false && landingSettings.show_product_filter_bar !== false;
+  // Filter sidebar / mobile filter sheet follow the category template only. The landing flag
+  // show_product_filter_bar belongs to the landing page's own hub filter bar (LandingContainers).
+  const showSidebar     = tmpl.show_sidebar !== false;
   const sidebarWidth    = tmpl.sidebar_width || "280px";
   const colsPerRow      = Number(tmpl.products_per_row) || 4;
   const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;

@@ -7,7 +7,6 @@ import StackedFilterPanel, {
   FilterSheetHeader,
   FilterSheetScroll,
   FilterSheetFooter,
-  FilterSheetCategoryGroup,
 } from "@/components/catalog/StackedFilterPanel";
 import styled, { keyframes } from "styled-components";
 import { useTranslations } from "next-intl";
@@ -804,7 +803,7 @@ export default function SearchTemplate() {
   const showCatalogSidebar =
     Boolean(q)
     && (textHits.length > 0)
-    && (hasNavPane || hasFacets || baseAfterCat.length > 0)
+    && (hasFacets || baseAfterCat.length > 0)
     && !treeLoading
     && showSidebarTmpl;
 
@@ -817,71 +816,6 @@ export default function SearchTemplate() {
   };
 
   const title = q ? `„${q}“` : tSearch("label");
-
-  // ── Nav content helpers ──────────────────────────────────────────────────────
-
-  function renderDesktopNavPane() {
-    if (!hasNavPane) return null;
-    return (
-      <SidebarPane>
-        {branchNav && hasSubcategories ? (
-          <SubcategoryGroup style={{ marginTop: 0 }}>
-            {parentCategory && (
-              <SubcategoryLink
-                href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                $active={false}
-                style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-              >
-                ← {parentCategory.name || parentCategory.slug}
-              </SubcategoryLink>
-            )}
-            <div className="shop-typo-sidebar-nav" style={{ marginBottom: 4, marginTop: parentCategory ? 4 : 0 }}>
-              {displayTitle}
-            </div>
-            <SubcategoryLink href={searchHrefForSub("")} $active={!effectiveCat} onClick={() => { setFilters({}); setPage(1); }}>
-              Alle
-            </SubcategoryLink>
-            {subcategories.map((sub) => {
-              const subSlug = String(sub.slug || "").replace(/^\//, "");
-              return (
-                <SubcategoryLink key={sub.id} href={searchHrefForSub(subSlug)} $active={effectiveCat === subSlug} onClick={() => { setFilters({}); setPage(1); }}>
-                  {sub.name || sub.slug}
-                </SubcategoryLink>
-              );
-            })}
-          </SubcategoryGroup>
-        ) : parentCategory && (
-          <SubcategoryGroup style={{ marginTop: 0 }}>
-            <SubcategoryLink
-              href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-              $active={false}
-              style={{ fontSize: 11, color: "#9ca3af", marginBottom: 2 }}
-            >
-              ← {parentCategory.name || parentCategory.slug}
-            </SubcategoryLink>
-            <div className="shop-typo-sidebar-nav" style={{ marginBottom: 4, marginTop: 4 }}>
-              {parentCategory.name || parentCategory.slug}
-            </div>
-            <SubcategoryLink
-              href={searchHrefForSub(String(parentCategory.slug || "").replace(/^\//, ""))}
-              $active={effectiveCat === String(parentCategory.slug || "").replace(/^\//, "")}
-              onClick={() => { setFilters({}); setPage(1); }}
-            >
-              Alle
-            </SubcategoryLink>
-            {subcategories.map((sibling) => {
-              const sibSlug = String(sibling.slug || "").replace(/^\//, "");
-              return (
-                <SubcategoryLink key={sibling.id} href={searchHrefForSub(sibSlug)} $active={effectiveCat === sibSlug} onClick={() => { setFilters({}); setPage(1); }}>
-                  {sibling.name || sibling.slug}
-                </SubcategoryLink>
-              );
-            })}
-          </SubcategoryGroup>
-        )}
-      </SidebarPane>
-    );
-  }
 
 
   if (loading && !textHits.length) {
@@ -989,7 +923,7 @@ export default function SearchTemplate() {
               {/* Desktop: accordion layout */}
               <DesktopSidebarContent>
                 <SidebarSplit>
-                  {renderDesktopNavPane()}
+                  {/* Search shows product filters only; sub-category navigation is category-page only. */}
                   <SidebarPane>
                     <StackedFilterPanel {...extra.panelProps} />
                   </SidebarPane>
@@ -999,41 +933,7 @@ export default function SearchTemplate() {
               {/* Mobile / tablet drawer: stacked groups like the MobileFilter artboard */}
               <MobileDrawerChrome>
                 <FilterSheetScroll>
-                  <StackedFilterPanel
-                    {...extra.panelProps}
-                    showHeader={false}
-                    before={hasNavPane ? (
-                      <FilterSheetCategoryGroup current={(effectiveCat && categorySlugToName?.get?.(effectiveCat)) || displayTitle || tCommon("categories")}>
-                        {parentCategory ? (
-                          <Link
-                            href={parentCategory.slug ? `/${String(parentCategory.slug).replace(/^\//, "")}` : "#"}
-                            data-muted="true"
-                            onClick={() => { extra.resetAll(); setPanelOpen(false); }}
-                          >
-                            ‹ {parentCategory.name || parentCategory.slug}
-                          </Link>
-                        ) : null}
-                        {branchNav && hasSubcategories ? (
-                          <Link href={searchHrefForSub("")} aria-current={!effectiveCat ? "page" : undefined} onClick={() => { extra.resetAll(); setPanelOpen(false); }}>
-                            Alle
-                          </Link>
-                        ) : null}
-                        {subcategories.map((sub) => {
-                          const subSlug = String(sub.slug || "").replace(/^\//, "");
-                          return (
-                            <Link
-                              key={sub.id || subSlug}
-                              href={searchHrefForSub(subSlug)}
-                              aria-current={effectiveCat === subSlug ? "page" : undefined}
-                              onClick={() => { extra.resetAll(); setPanelOpen(false); }}
-                            >
-                              {sub.name || sub.slug}
-                            </Link>
-                          );
-                        })}
-                      </FilterSheetCategoryGroup>
-                    ) : null}
-                  />
+                  <StackedFilterPanel {...extra.panelProps} showHeader={false} />
                 </FilterSheetScroll>
                 <FilterSheetFooter count={total} onClick={() => setPanelOpen(false)} />
               </MobileDrawerChrome>

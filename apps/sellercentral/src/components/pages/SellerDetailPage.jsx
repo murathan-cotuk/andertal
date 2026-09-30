@@ -563,7 +563,7 @@ export default function SellerDetailPage({ sellerId }) {
       notes: locale === "en" ? "Notes" : locale === "tr" ? "Notlar" : locale === "fr" ? "Notes" : locale === "es" ? "Notas" : locale === "it" ? "Note" : "Notizen",
     };
     const text = `${t.title}\n${"=".repeat(50)}\n
-${t.issuer}: Andertal GmbH
+${t.issuer}: Andertal
 ${t.date}: ${today}
 
 ${t.recipient}:

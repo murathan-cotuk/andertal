@@ -72,6 +72,14 @@ export default function ModernMobileBottomNav({
     };
   }, [activeIndex, finalItems]);
 
+  /* Elements pinned above the bar (e.g. the product page's price/cart bar) follow the same offset. */
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const root = document.documentElement;
+    root.style.setProperty("--bottom-nav-inset", `${layout !== "inline" ? visualInset : 0}px`);
+    return () => root.style.removeProperty("--bottom-nav-inset");
+  }, [visualInset, layout]);
+
   if (!finalItems.length) return null;
 
   const isFixed = layout !== "inline";
@@ -88,8 +96,9 @@ export default function ModernMobileBottomNav({
         display: "grid",
         gridTemplateColumns: `repeat(${finalItems.length}, minmax(0, 1fr))`,
         position: isFixed ? "fixed" : "relative",
-        /* Pinned to the layout viewport's bottom edge at every scroll position (incl. the very top). */
-        bottom: isFixed ? 0 : undefined,
+        /* Visible screen edge, including after Chrome's bottom bar hides (inset may be negative);
+           a plain bottom: 0 leaves the bar floating above an empty strip on those browsers. */
+        bottom: isFixed ? visualInset : undefined,
         left: isFixed ? 0 : undefined,
         right: isFixed ? 0 : undefined,
         width: "100%",

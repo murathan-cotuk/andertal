@@ -1213,6 +1213,7 @@
     "error": "Hata",
     "subscribe": "Abone ol",
     "subscribed": "Teşekkürler! Artık abonesiniz.",
-    "home": "Ana sayfa"
+    "home": "Ana sayfa",
+    "brandNotFound": "Marka bulunamadı."
   }
 }

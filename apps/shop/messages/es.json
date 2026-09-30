@@ -1198,6 +1198,7 @@
     "error": "Error",
     "subscribe": "Suscribirse",
     "subscribed": "¡Gracias! Ya estás suscrito.",
-    "home": "Inicio"
+    "home": "Inicio",
+    "brandNotFound": "Marca no encontrada."
   }
 }

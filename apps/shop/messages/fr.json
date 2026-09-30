@@ -1196,6 +1196,7 @@
     "error": "Erreur",
     "subscribe": "S’abonner",
     "subscribed": "Merci ! Vous êtes maintenant inscrit(e).",
-    "home": "Accueil"
+    "home": "Accueil",
+    "brandNotFound": "Marque introuvable."
   }
 }

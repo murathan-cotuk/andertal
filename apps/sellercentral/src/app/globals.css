@@ -541,7 +541,7 @@ body[data-pathname*="/settings"] .andertal-page-content .Polaris-Page-Header__Ti
 body,
 .Polaris-Frame {
   --p-font-family-sans: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --p-color-bg: var(--andertal-ground);
+  --p-color-bg: #ffffff;
   --p-color-bg-surface-secondary: #faf7f2;
   --p-color-bg-surface-hover: #faf6ef;
   --p-color-border: var(--andertal-line);
@@ -579,7 +579,7 @@ body,
 html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }
 
 /* Page area on the warm ground */
-.andertal-page-content { background: var(--andertal-ground); }
+.andertal-page-content { background: #ffffff; }
 
 /* Headings in the display face */
 .Polaris-Text--headingXl, .Polaris-Text--heading2xl, .Polaris-Text--heading3xl,
@@ -601,10 +601,10 @@ html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "
   --p-color-nav-bg-surface-hover: rgba(255, 255, 255, 0.08);
   --p-color-nav-bg-surface-active: rgba(255, 255, 255, 0.12);
   --p-color-nav-bg-surface-selected: var(--andertal-brand);
-  --p-color-text: #e9e2d6;
-  --p-color-text-secondary: #b9b0a3;
-  --p-color-icon: #cfc6b8;
-  --p-color-icon-secondary: #b9b0a3;
+  --p-color-text: #ffffff;
+  --p-color-text-secondary: rgba(255, 255, 255, 0.72);
+  --p-color-icon: #ffffff;
+  --p-color-icon-secondary: rgba(255, 255, 255, 0.72);
 }
 #AppFrameNav .Polaris-Navigation__PrimaryNavigation,
 #AppFrameNav .Polaris-Navigation__PrimaryNavigation:hover {
@@ -617,10 +617,10 @@ html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "
 #AppFrameNav .Polaris-Navigation__Text,
 #AppFrameNav .Polaris-Navigation__SectionHeading,
 #AppFrameNav .Polaris-Navigation__SectionHeading .Polaris-Text--root {
-  color: #e9e2d6 !important;
+  color: #ffffff !important;
 }
 #AppFrameNav .Polaris-Navigation__Icon svg,
-#AppFrameNav .Polaris-Icon svg { fill: #cfc6b8 !important; }
+#AppFrameNav .Polaris-Icon svg { fill: #ffffff !important; }
 #AppFrameNav .Polaris-Navigation__ItemInnerWrapper { border-radius: 12px; background: transparent !important; }
 #AppFrameNav .Polaris-Navigation__ItemInnerWrapper:hover { background: rgba(255, 255, 255, 0.08) !important; }
 #AppFrameNav .Polaris-Navigation__ItemInnerWrapper--selected,
@@ -640,16 +640,16 @@ html body { font-family: "Instrument Sans", -apple-system, BlinkMacSystemFont, "
   color: #fcebd5 !important;
 }
 #AppFrameNav .Polaris-Navigation__Text .Polaris-Text--root { color: inherit !important; }
-#AppFrameNav .Polaris-Navigation__Text .Polaris-Text--subdued { color: #b9b0a3 !important; }
+#AppFrameNav .Polaris-Navigation__Text .Polaris-Text--subdued { color: rgba(255, 255, 255, 0.72) !important; }
 #AppFrameNav .Polaris-Navigation__Item:focus-visible { outline: 2px solid var(--andertal-brand); }
-#AppFrameNav .Polaris-Badge { background: rgba(255, 255, 255, 0.12); color: #e9e2d6; }
+#AppFrameNav .Polaris-Badge { background: rgba(255, 255, 255, 0.14); color: #ffffff; }
 
 /* Cards: white, rounder, warm hairline */
 .andertal-page-content .Polaris-ShadowBevel {
   --pc-shadow-bevel-border-radius: 20px !important;
-  --pc-shadow-bevel-box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06) !important;
+  --pc-shadow-bevel-box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.1) !important;
 }
-.andertal-page-content .Polaris-LegacyCard { border-radius: 20px; box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06); }
+.andertal-page-content .Polaris-LegacyCard { border-radius: 20px; box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.1); }
 
 /* Buttons: primary = dark pill, secondary = white pill with warm border */
 .Polaris-Button { border-radius: 999px !important; }

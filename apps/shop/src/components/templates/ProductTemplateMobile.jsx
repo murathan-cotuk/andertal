@@ -52,8 +52,8 @@ const Container = styled.div`
   max-width: 100%;
   padding: 32px 24px 64px;
   @media (max-width: 767px) {
-    /* room for the sticky price bar + bottom navigation */
-    padding: 0 12px calc(150px + env(safe-area-inset-bottom, 0px));
+    /* The footer follows the product content, so no extra room for the bottom navigation here. */
+    padding: 0 12px 16px;
     > nav[data-breadcrumb] {
       display: none;
     }
@@ -138,7 +138,7 @@ const MainImageWrap = styled.div`
 const GalleryActionRow = styled.div`
   position: absolute;
   right: 12px;
-  top: 12px;
+  bottom: 12px;
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -368,10 +368,14 @@ const ComparePrice = styled.span`
   text-decoration: line-through;
 `;
 
+/* Bullet points on a white card (same surface as the other product-page sections). */
 const BulletList = styled.ul`
   margin: 0;
-  padding-left: 20px;
+  padding: 16px 18px 16px 36px;
   list-style-type: disc;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
   color: #4b5563;
   line-height: 1.6;
   font-size: 0.95rem;
@@ -748,7 +752,7 @@ const MobileSection = styled.div`
   padding: 10px 0;
 `;
 
-/* Full-bleed image area at the very top (no shop header on the mobile product page). */
+/* Full-bleed image area directly under the shop header. */
 const MobileGalleryOuter = styled.div`
   margin: 0 -12px;
   background: #fff;
@@ -793,54 +797,6 @@ const MobileBackBtn = styled.button`
   justify-content: center;
 `;
 
-/* Price + add to cart, pinned just above the bottom navigation. */
-const MobileCtaBar = styled.div`
-  display: none;
-  @media (max-width: 767px) {
-    display: flex;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
-    z-index: 2147483630;
-    align-items: center;
-    gap: 14px;
-    padding: 10px 16px;
-    background: #fff;
-    border-top: 1px solid #e6dfd4;
-    box-shadow: 0 -4px 16px rgba(29, 27, 24, 0.06);
-  }
-  .cta-price {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-  }
-  .cta-price b {
-    font-family: var(--h2-ff, inherit);
-    font-size: 22px;
-    font-weight: 800;
-  }
-  .cta-price small {
-    margin-top: 3px;
-    font-size: 11px;
-    color: #5e574e;
-  }
-  button {
-    flex: 1;
-    height: 50px;
-    border: 0;
-    border-radius: 25px;
-    background: var(--btn-atc-bg, var(--shop-primary, #ee8a12));
-    color: var(--btn-atc-text, #1d1b18);
-    font: inherit;
-    font-size: 16px;
-    font-weight: 700;
-  }
-  button:disabled {
-    background: #cfc6b8;
-  }
-`;
-
 const MobileGalleryTrack = styled.div`
   display: flex;
   overflow-x: auto;
@@ -856,8 +812,8 @@ const MobileGalleryTrack = styled.div`
 const MobileGallerySlide = styled.div`
   flex: 0 0 100%;
   scroll-snap-align: start;
+  /* Always an exact square. */
   aspect-ratio: 1 / 1;
-  max-height: 62vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -886,6 +842,10 @@ const META_HIDDEN_KEYS = [
   "category_id", "admin_category_id", "collection_id", "collection_ids",
   "seller_id", "product_id", "media", "bullet_points", "uvp_cents", "rabattpreis_cents",
   "thumbnail",
+  // Internal catalog / platform identifiers — never a product property for shoppers.
+  "master_product_id", "master_id", "an_id", "platform_id",
+  "master_total_variants", "master_total_variant", "total_variants", "variant_count", "variants_count",
+  "badge", "description",
   "ean", "brand", "seller_name", "shop_name", "return_days", "return_cost", "return_kostenlos",
   "review_count", "review_avg", "sold_last_month", "metafields", "publish_date",
   "brand_id", "hersteller", "seo_keywords", "seo_meta_title", "seo_meta_description",
@@ -2016,16 +1976,6 @@ export default function ProductTemplateMobile() {
         )}
         </MobileSheet>
       </MobileStack>
-
-      <MobileCtaBar>
-        <span className="cta-price">
-          <b style={{ color: hasSale ? "#b42318" : undefined }}>{formatPriceCents(effectiveDisplayCents)} €</b>
-          <small>{tp("inclVat")}</small>
-        </span>
-        <button type="button" onClick={handleAddToCart} disabled={!inStock || isComingSoon || shippingUnavailable}>
-          {isComingSoon ? tp("comingSoon") : shippingUnavailable ? tp("notAvailable") : !inStock ? tp("outOfStock") : tp("addToCart")}
-        </button>
-      </MobileCtaBar>
 
       {/* ── Desktop ThreeCol (hidden on mobile) ── */}
       <ThreeCol>

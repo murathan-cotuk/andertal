@@ -7,6 +7,7 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
         getDefaultSellerAgreement,
         resolveSellerAgreement,
         saveSellerAgreementTemplate,
+        applyPlatformIdentity,
         listAgreementLocales,
         AGREEMENT_VERSION,
         DEFAULT_PLATFORM_NAME,
@@ -18,6 +19,23 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
         const { Client } = require('pg')
         const isRender = dbUrl.includes('render.com')
         return new Client({ connectionString: dbUrl, ssl: isRender ? { rejectUnauthorized: false } : false })
+      }
+
+      async function loadPlatformLegal() {
+        const pc = getProductsDbClient && getProductsDbClient()
+        if (!pc) return {}
+        try {
+          await pc.connect()
+          const pr = await pc.query(
+            `SELECT legal_company_name, legal_representative, legal_street, legal_city, legal_vat_id, legal_tax_id, legal_email
+             FROM admin_hub_seller_settings WHERE seller_id = 'default' LIMIT 1`,
+          )
+          await pc.end()
+          return pr.rows[0] || {}
+        } catch (_) {
+          try { await pc.end() } catch (e) {}
+          return {}
+        }
       }
 
       const withAgreementDb = async (fn) => {
@@ -92,7 +110,7 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
             doc.fontSize(9).font('Helvetica-Bold').fillColor('#333').text(signPdfDeLatin(platOpLabel) + ':')
             doc.fontSize(8).font('Helvetica').fillColor('#555')
             doc.text(signPdfDeLatin(platName))
-            if (platRep) doc.text(signPdfDeLatin((locale === 'de' ? 'Vertreten durch: ' : locale === 'tr' ? 'Temsilen: ' : 'Represented by: ') + platRep))
+            if (platRep) doc.text(signPdfDeLatin((locale === 'de' ? 'Inhaber: ' : locale === 'tr' ? 'Sahip: ' : 'Proprietor: ') + platRep))
             if (platAddr) doc.text(signPdfDeLatin(platAddr))
             if (platReg) doc.text(signPdfDeLatin((locale === 'de' ? 'Handelsregister: ' : locale === 'tr' ? 'Ticaret Sicil: ' : 'Commercial Register: ') + platReg))
             if (platVat) doc.text(signPdfDeLatin((locale === 'de' ? 'USt-IdNr.: ' : locale === 'tr' ? 'KDV No: ' : 'VAT ID: ') + platVat))
@@ -306,10 +324,10 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
               platformInfo = pr.rows[0] || {}
             }
           } catch (_) {}
-          const agreementDoc = await withAgreementDb(async (query) => {
+          const agreementDoc = applyPlatformIdentity(await withAgreementDb(async (query) => {
             if (!query) return getDefaultSellerAgreement(row.locale)
             return resolveSellerAgreement(row.locale, query)
-          })
+          }), platformInfo)
           const pdfBuf = await buildAgreementPdf(
             { company_name: row.company_name, authorized_person_name: row.authorized_person_name, seller_name: row.store_name, email: row.email },
             row.locale,
@@ -390,8 +408,9 @@ module.exports = function createSellerAgreementRouter({ verifySellerPassword, ge
         if (!query) return getDefaultSellerAgreement(locale)
         return resolveSellerAgreement(locale, query)
       })
+      const legal = await loadPlatformLegal()
       res.set('Cache-Control', 'public, max-age=60')
-      res.json(payload)
+      res.json(applyPlatformIdentity(payload, legal))
     } catch (e) {
       res.status(500).json({ message: e?.message || 'Error' })
     }

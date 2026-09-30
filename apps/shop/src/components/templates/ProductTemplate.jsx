@@ -126,7 +126,7 @@ const MainImageWrap = styled.div`
   position: relative;
   isolation: isolate;
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 1 / 1;
   border-radius: 24px;
   overflow: hidden;
   background: #fff;
@@ -164,7 +164,7 @@ const MainImageWrap = styled.div`
 const GalleryActionRow = styled.div`
   position: absolute;
   right: 16px;
-  top: 16px;
+  bottom: 16px;
   z-index: 40;
   display: inline-flex;
   align-items: center;
@@ -399,10 +399,14 @@ const ComparePrice = styled.span`
   text-decoration: line-through;
 `;
 
+/* Bullet points on a white card (same surface as the other product-page sections). */
 const BulletList = styled.ul`
   margin: 0;
-  padding-left: 20px;
+  padding: 16px 18px 16px 36px;
   list-style-type: disc;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
   color: #4b5563;
   line-height: 1.6;
   font-size: 0.95rem;
@@ -750,6 +754,10 @@ const META_HIDDEN_KEYS = [
   "category_id", "admin_category_id", "collection_id", "collection_ids",
   "seller_id", "product_id", "media", "bullet_points", "uvp_cents", "rabattpreis_cents",
   "thumbnail",
+  // Internal catalog / platform identifiers — never a product property for shoppers.
+  "master_product_id", "master_id", "an_id", "platform_id",
+  "master_total_variants", "master_total_variant", "total_variants", "variant_count", "variants_count",
+  "badge", "description",
   "ean", "brand", "seller_name", "shop_name", "return_days", "return_cost", "return_kostenlos",
   "review_count", "review_avg", "sold_last_month", "metafields", "publish_date",
   "brand_id", "hersteller", "seo_keywords", "seo_meta_title", "seo_meta_description",

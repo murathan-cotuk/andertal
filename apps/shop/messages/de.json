@@ -1213,6 +1213,7 @@
     "error": "Fehler",
     "subscribe": "Abonnieren",
     "subscribed": "Danke! Sie sind jetzt angemeldet.",
-    "home": "Start"
+    "home": "Start",
+    "brandNotFound": "Marke nicht gefunden."
   }
 }

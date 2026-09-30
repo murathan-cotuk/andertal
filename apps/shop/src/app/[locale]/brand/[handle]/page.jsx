@@ -1,15 +1,21 @@
 "use client";
 
+/**
+ * Brand page — same layout as category / collection pages:
+ * banner (or title) → filter + sort bar → filter sidebar (desktop card, mobile bottom sheet) + product grid.
+ * Filters come from the products' metadata (StackedFilterPanel); sub-category navigation is
+ * category-page only, so brands show product filters only.
+ */
+
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
-import { ProductGrid } from "@/components/ProductGrid";
+import { CategoryProductListing } from "@/components/CategoryProductListing";
 import { Link } from "@/i18n/navigation";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, notFound } from "next/navigation";
 import { resolveImageUrl } from "@/lib/image-url";
-import { cachedJsonFetch } from "@/lib/browser-fetch-cache";
-import { storeCategoriesQuery } from "@/lib/store-categories-url";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
+import { useShopStyles } from "@/context/ShopStylesContext";
 import { SITE_URL } from "@/lib/seo";
 import { canonicalMarketPrefix } from "@/lib/shop-market";
 import {
@@ -17,16 +23,11 @@ import {
   PER_PAGE,
   buildFacetsFromProducts,
   filterFacetsToCatalog,
-  buildCategorySlugToNameMap,
-  deriveCategoriesFromProducts,
-  productCategoryIds,
-  filterProductsByFacets,
   applyCatalogSort,
   formatFacetOptionLabel,
   getFacetGroupTitle,
 } from "@/lib/catalog-listing";
 import styled, { keyframes } from "styled-components";
-import CustomCheckbox from "@/components/ui/CustomCheckbox";
 import { useTranslations } from "next-intl";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
@@ -34,49 +35,59 @@ import CatalogDrawerPortal, {
   CATALOG_FILTER_SIDEBAR_Z,
   catalogDrawerMaxCss,
 } from "@/lib/catalog-drawer-portal";
+import StackedFilterPanel, {
+  useCatalogExtraFilters,
+  FilterSheetHeader,
+  FilterSheetScroll,
+  FilterSheetFooter,
+} from "@/components/catalog/StackedFilterPanel";
 
-/* ─────────────────────────────────────────────────────────── */
 const HEADER_H = 72;
+const SORT_LABEL_KEYS = new Set(["default", "bestseller", "newest", "price_asc", "price_desc", "title_asc", "title_desc"]);
 
-/* ─── Shimmer skeleton ───────────────────────────────────── */
 const shimmer = keyframes`
   0%   { background-position: -800px 0; }
   100% { background-position:  800px 0; }
 `;
 const Bone = styled.div`
-  background: linear-gradient(90deg, #efefed 25%, #e5e5e3 50%, #efefed 75%);
+  background: linear-gradient(90deg, #efe8dd 25%, #e6dfd4 50%, #efe8dd 75%);
   background-size: 800px 100%;
   animation: ${shimmer} 1.5s infinite linear;
+  border-radius: 16px;
 `;
 
-/* ─── Page shell ─────────────────────────────────────────── */
 const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #fafafa;
+  background: var(--shop-bg, #f6f2ec);
 `;
 
 const Main = styled.main`
   flex: 1;
 `;
 
-/* ─── Hero banner ────────────────────────────────────────── */
+/* ─── Banner (same sizing as the category banner) ───────── */
 const HeroBanner = styled.div`
   width: 100%;
   aspect-ratio: 21 / 6;
-  min-height: 160px;
+  min-height: 120px;
   max-height: 320px;
   overflow: hidden;
   position: relative;
-  background: #f4f4f2;
+  background: #efe8dd;
+
+  @media (max-width: 767px) {
+    aspect-ratio: 3 / 1;
+    min-height: 80px;
+    max-height: 160px;
+  }
 
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-    opacity: 1;
   }
 `;
 
@@ -87,28 +98,21 @@ const HeroText = styled.div`
   flex-direction: column;
   justify-content: flex-end;
   padding: 24px 32px;
-
-  h1 {
-    margin: 0 0 4px;
-  }
+  h1 { margin: 0 0 4px; }
+  @media (max-width: 767px) { padding: 14px 16px; }
 `;
 
-/* ─── Inline header (no banner) ─────────────────────────── */
 const ColHeader = styled.div`
   padding: 28px 32px 0;
-  max-width: 1440px;
+  max-width: 1376px;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 14px;
-
-  h1 {
-    margin: 0;
-  }
-
-  @media (max-width: 600px) { padding: 20px 16px 0; }
+  h1 { margin: 0; }
+  @media (max-width: 767px) { padding: 16px 16px 4px; }
 `;
 
 const LogoCircle = styled.div`
@@ -116,39 +120,27 @@ const LogoCircle = styled.div`
   height: 52px;
   border-radius: 50%;
   overflow: hidden;
-  background: #f4f4f2;
-  border: 1px solid #e8e8e6;
+  background: #fff;
+  border: 1px solid #e6dfd4;
   flex-shrink: 0;
-
   img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  @media (max-width: 767px) { width: 40px; height: 40px; }
 `;
 
-/* ─── Breadcrumb (below filter bar, above product grid) ── */
 const Breadcrumb = styled.nav`
-  padding: 8px 32px 10px;
-  max-width: 1440px;
-  margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: #999;
-  letter-spacing: 0.02em;
-  background: #fff;
-  border-bottom: 1px solid #e8e8e6;
-
-  a { color: #999; text-decoration: none; transition: color 0.12s; &:hover { color: #111; } }
-  b { color: #444; font-weight: 500; }
-
-  @media (max-width: 600px) { padding: 6px 16px 8px; }
+  font-size: 13px;
+  color: #5e574e;
+  a { color: #5e574e; text-decoration: none; &:hover { color: var(--body-color, #1d1b18); } }
+  b { color: var(--body-color, #1d1b18); font-weight: 600; }
   @media (max-width: 767px) { display: none; }
 `;
 
-/* ─── Filter bar ─────────────────────────────────────────── */
-const FilterBar = styled.div`
+/* ─── Filter + sort bar ──────────────────────────────────── */
+const SortBar = styled.div`
   position: sticky;
   top: ${HEADER_H}px;
   z-index: 20;
@@ -157,40 +149,56 @@ const FilterBar = styled.div`
   border-bottom: 1px solid #e8e8e6;
 `;
 
-const FilterBarInner = styled.div`
-  max-width: 1440px;
+const SortBarInner = styled.div`
+  max-width: 1376px;
   margin: 0 auto;
   padding: 0 32px;
   display: flex;
-  align-items: stretch;
+  align-items: center;
   justify-content: space-between;
-  gap: 0;
+  gap: 20px;
+  @media (max-width: 767px) {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+`;
 
-  @media (max-width: 600px) { padding: 0 16px; }
+const SortBarLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1;
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+    gap: 8px;
+  }
 `;
 
 const FilterBtn = styled.button`
   display: none;
   align-items: center;
-  gap: 7px;
-  padding: 12px 0;
-  background: none;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  margin: 6px 0;
+  background: var(--body-color, #1d1b18);
   border: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: ${(p) => (p.$active ? "#111" : "#666")};
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
   cursor: pointer;
-  transition: color 0.12s;
-  border-bottom: 2px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  margin-bottom: -1px;
-
-  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
-  &:hover { color: #111; }
-
-  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
-    display: inline-flex;
+  line-height: 1;
+  svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+  &:hover { opacity: 0.88; }
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) { display: inline-flex; }
+  @media (max-width: 767px) {
+    flex: 1 1 0;
+    justify-content: center;
+    height: 44px;
+    margin: 0;
   }
 `;
 
@@ -198,35 +206,120 @@ const SortWrap = styled.div`
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
-  color: #666;
-  margin-left: auto;
+  font-size: 14px;
+  color: #5e574e;
+  @media (max-width: 767px) { flex: 1 1 0; }
 `;
 
 const SortLabel = styled.span`
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #999;
+  font-size: 14px;
+  color: #5e574e;
   white-space: nowrap;
-
   @media (max-width: 480px) { display: none; }
 `;
 
 const SortSelect = styled.select`
   appearance: none;
-  background: transparent;
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: #111;
+  background-color: #fff;
+  border: 1px solid #cfc6b8;
+  border-radius: 999px;
+  margin: 6px 0;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--body-color, #1d1b18);
   cursor: pointer;
   outline: none;
-  padding: 12px 20px 12px 0;
+  padding: 10px 34px 10px 16px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 4px center;
+  background-position: right 14px center;
+  @media (max-width: 767px) {
+    width: 100%;
+    margin: 0;
+    height: 44px;
+  }
+`;
+
+/* ─── Body: sticky filter card + product grid ────────────── */
+const ContentWrap = styled.div`
+  max-width: 1376px;
+  margin: 0 auto;
+  padding: 14px 32px 80px;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  @media (max-width: 767px) {
+    padding: 6px 6px 32px;
+    gap: 0;
+  }
+`;
+
+const Sidebar = styled.aside`
+  width: ${(p) => p.$width || "280px"};
+  flex-shrink: 0;
+  position: sticky;
+  top: ${HEADER_H + 100}px;
+  max-height: calc(100vh - ${HEADER_H + 100}px);
+  overflow-y: auto;
+
+  @media (min-width: ${CATALOG_DRAWER_MAX_PX + 1}px) {
+    box-sizing: border-box;
+    scrollbar-width: thin;
+  }
+
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(380px, 92vw);
+    height: 100dvh;
+    max-height: 100dvh;
+    z-index: ${CATALOG_FILTER_SIDEBAR_Z};
+    background: #fff;
+    box-shadow: ${(p) => (p.$open ? "4px 0 32px rgba(0,0,0,0.2)" : "none")};
+    transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
+    transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    @media (prefers-reduced-motion: reduce) { transition: none; }
+  }
+
+  /* Phones: bottom sheet with rounded top corners. */
+  @media (max-width: 767px) {
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    height: 88dvh;
+    max-height: 88dvh;
+    border-radius: 24px 24px 0 0;
+    box-shadow: ${(p) => (p.$open ? "0 -8px 32px rgba(0,0,0,0.2)" : "none")};
+    transform: translateY(${(p) => (p.$open ? "0" : "100%")});
+  }
+`;
+
+const DesktopSidebarContent = styled.div`
+  background: #fff;
+  border-radius: 20px;
+  padding: 18px 18px 8px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) { display: none; }
+`;
+
+const MobileDrawerChrome = styled.div`
+  display: none;
+  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 `;
 
 const SidebarOverlay = styled.div`
@@ -240,6 +333,7 @@ const SidebarOverlay = styled.div`
     opacity: ${(p) => (p.$open ? 1 : 0)};
     pointer-events: ${(p) => (p.$open ? "auto" : "none")};
     transition: opacity var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+    @media (prefers-reduced-motion: reduce) { transition: none; }
   }
 `;
 
@@ -248,260 +342,15 @@ const SidebarHead = styled.div`
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
-  margin-bottom: ${(p) => (p.$filterMode ? "0" : "20px")};
-  padding: ${(p) => (p.$filterMode ? "12px 14px" : "0 0 12px")};
-  border-bottom: 1px solid #e8e8e6;
-
-  @media (min-width: 1024px) {
-    display: none;
-  }
-`;
-
-const DesktopSidebarContent = styled.div`
-  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
-    display: none;
-  }
-`;
-
-const MobileFilterSplit = styled.div`
-  display: none;
-  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
-    display: flex;
-    flex-direction: row;
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-  }
-`;
-
-const MobileFilterLeft = styled.div`
-  width: 92px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  background: #f7f7f6;
-  border-right: 1px solid #e8e8e6;
-`;
-
-const MobileFilterLeftBtn = styled.button`
-  display: block;
-  width: 100%;
-  padding: 13px 8px 13px 11px;
-  font-size: 11px;
-  font-weight: ${(p) => (p.$active ? 700 : 400)};
-  text-align: left;
-  background: ${(p) => (p.$active ? "#fff" : "transparent")};
-  border: none;
-  border-left: 3px solid ${(p) => (p.$active ? "#111" : "transparent")};
-  color: ${(p) => (p.$active ? "#111" : "#555")};
-  cursor: pointer;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  font-family: inherit;
-`;
-
-const MobileFilterRight = styled.div`
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  padding: 12px 10px;
-`;
-
-const MobileFilterPillGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-`;
-
-const MobileFilterPill = styled.button`
-  padding: 9px 6px;
-  font-size: 11.5px;
-  font-weight: ${(p) => (p.$on ? 700 : 400)};
-  background: ${(p) => (p.$on ? "#111" : "#fff")};
-  color: ${(p) => (p.$on ? "#fff" : "#444")};
-  border: 1.5px solid ${(p) => (p.$on ? "#111" : "#d1d5db")};
-  border-radius: 8px;
-  cursor: pointer;
-  text-align: center;
-  line-height: 1.3;
-  font-family: inherit;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-  &:hover { border-color: #111; }
-  word-break: break-word;
-`;
-
-const FilterGroup = styled.div`
-  border-bottom: 1px solid #eceae7;
-`;
-
-const FilterGroupTitle = styled.button`
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-`;
-
-const FilterGroupHeading = styled.h4.attrs({ className: "shop-typo-sidebar-nav" })`
-  margin: 0;
   padding: 0;
+  @media (min-width: 1024px) { display: none; }
+`;
+
+const Body = styled.div`
   flex: 1;
   min-width: 0;
-  text-align: left;
 `;
 
-const FilterGroupBody = styled.div`
-  display: ${(p) => (p.$open ? "block" : "none")};
-  padding: 0 0 12px;
-`;
-
-const FilterChevron = styled.span`
-  font-size: 14px;
-  line-height: 1;
-  color: #666;
-  transform: rotate(${(p) => (p.$open ? "180deg" : "0deg")});
-  transition: transform 0.18s ease;
-`;
-
-const CheckRow = styled.label.attrs({ className: "shop-typo-sidebar-submenu" })`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-  cursor: pointer;
-  color: ${(p) => (p.$on ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
-  font-weight: ${(p) => (p.$on ? 600 : "var(--sidebar-submenu-fw, 400)")};
-  transition: color 0.12s;
-
-  & > label {
-    flex-shrink: 0;
-    width: 12px;
-    height: 12px;
-  }
-
-  & > label svg {
-    width: 100% !important;
-    height: 100% !important;
-    display: block;
-  }
-
-  &:hover { color: var(--sidebar-nav-color, #111827); }
-`;
-
-const ClearAllBtn = styled.button`
-  background: none;
-  border: 1px solid #ccc;
-  padding: 6px 14px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #555;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
-
-  &:hover { border-color: #111; color: #111; }
-`;
-
-const CategoryNavGroup = styled.div`
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e8e8e6;
-`;
-
-const CategoryNavTitle = styled.div`
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #111;
-  margin-bottom: 6px;
-`;
-
-const CategoryNavBtn = styled.button`
-  display: block;
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: ${(p) => (p.$active ? "#111827" : "#4b5563")};
-  font-weight: ${(p) => (p.$active ? 600 : 400)};
-  text-align: left;
-  border: none;
-  border-radius: 6px;
-  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
-  margin-bottom: 2px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.12s, color 0.12s;
-
-  &:hover {
-    background: #e5e7eb;
-    color: #111827;
-  }
-`;
-
-const MOBILE_CATEGORIES_KEY = "__categories";
-
-/* ─── Body (Kategorie-/Kollektion-Layout: flex + Sticky-Sidebar) ─ */
-const ContentWrap = styled.div`
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 14px 32px 80px;
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  gap: 32px;
-  align-items: flex-start;
-
-  @media (max-width: 767px) {
-    padding: 6px 6px 80px;
-    padding-left: 4px !important;
-    padding-right: 4px !important;
-    gap: 0;
-  }
-`;
-
-const SidebarCol = styled.aside`
-  width: 280px;
-  flex-shrink: 0;
-  position: sticky;
-  top: ${HEADER_H + 100}px;
-  max-height: calc(100vh - ${HEADER_H + 100}px);
-  overflow-y: auto;
-
-  @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: min(360px, 90vw);
-    height: 100dvh;
-    max-height: 100dvh;
-    z-index: ${CATALOG_FILTER_SIDEBAR_Z};
-    background: #fff;
-    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.2);
-    transform: translateX(${(p) => (p.$open ? "0" : "-100%")});
-    transition: transform var(--app-duration-surface, 0.3s) var(--app-ease-out, cubic-bezier(0.4, 0, 0.2, 1));
-    padding: ${(p) => (p.$filterMode ? "0" : "14px 16px 16px")};
-    box-sizing: border-box;
-    display: ${(p) => (p.$filterMode ? "flex" : "block")};
-    flex-direction: column;
-    overflow: ${(p) => (p.$filterMode ? "hidden" : "auto")};
-
-    @media (prefers-reduced-motion: reduce) {
-      transition: none;
-    }
-  }
-`;
-
-const MainCol = styled.div`
-  min-width: 0;
-`;
-
-/* ─── Chips ──────────────────────────────────────────────── */
 const ChipBar = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -513,121 +362,138 @@ const ChipBar = styled.div`
 const Chip = styled.button`
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  background: #111;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  background: var(--body-color, #1d1b18);
   color: #fff;
   border: none;
-  font-size: 10.5px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.12s;
-
-  &:hover { background: #333; }
+  &:hover { opacity: 0.85; }
 `;
 
-/* ─── Result bar ─────────────────────────────────────────── */
+const ResetLink = styled.button`
+  border: none;
+  background: none;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #a65300;
+  cursor: pointer;
+`;
+
 const ResultBar = styled.div`
   padding: 16px 0 12px;
-  font-size: 11.5px;
-  color: #999;
-  letter-spacing: 0.04em;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5e574e;
+  @media (max-width: 767px) { padding: 12px 10px 10px; }
 `;
 
-/* ─── Pagination ─────────────────────────────────────────── */
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 80px 16px;
+  color: #8a8174;
+  font-size: 14px;
+`;
+
 const Pager = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 8px;
   padding-top: 48px;
 `;
 
 const PBtn = styled.button`
-  min-width: 36px;
-  height: 36px;
-  padding: 0 6px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid ${(p) => (p.$on ? "#111" : "#ddd")};
-  background: ${(p) => (p.$on ? "#111" : "#fff")};
-  color: ${(p) => (p.$on ? "#fff" : "#555")};
-  font-size: 12.5px;
+  border-radius: 999px;
+  border: 1px solid ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#e6dfd4")};
+  background: ${(p) => (p.$on ? "var(--body-color, #1d1b18)" : "#fff")};
+  color: ${(p) => (p.$on ? "#fff" : "var(--body-color, #1d1b18)")};
+  font-family: inherit;
+  font-size: 14px;
   font-weight: ${(p) => (p.$on ? "700" : "400")};
   cursor: ${(p) => (p.disabled ? "not-allowed" : "pointer")};
   opacity: ${(p) => (p.disabled ? "0.3" : "1")};
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
-
-  &:not(:disabled):hover {
-    border-color: #111;
-    color: ${(p) => (p.$on ? "#fff" : "#111")};
-  }
+  &:not(:disabled):hover { border-color: var(--body-color, #1d1b18); }
 `;
 
-/* ─── Description ────────────────────────────────────────── */
 const Desc = styled.div`
-  margin-top: 56px;
-  padding-top: 28px;
-  border-top: 1px solid #e8e8e6;
-  font-size: 13.5px;
-  line-height: 1.8;
-  color: #666;
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid #e6dfd4;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #5e574e;
   max-width: 700px;
-
-  h1,h2,h3 { font-size: 15px; font-weight: 700; color: #111; margin: 1.5em 0 0.5em; }
-  p { margin: 0 0 0.75em; }
-  a { color: #111; text-decoration: underline; }
+  strong { color: var(--body-color, #1d1b18); }
+  @media (max-width: 767px) { margin: 32px 10px 0; }
 `;
 
-/* ─────────────────────────────────────────────────────────── *
- *  Page
- * ─────────────────────────────────────────────────────────── */
+function FilterIcon() {
+  return (
+    <svg viewBox="0 0 16 12" aria-hidden="true">
+      <line x1="0" y1="2" x2="16" y2="2" />
+      <line x1="0" y1="6" x2="16" y2="6" />
+      <line x1="0" y1="10" x2="16" y2="10" />
+      <circle cx="5" cy="2" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="11" cy="6" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="10" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export default function BrandPage() {
   const tUi = useTranslations("shopUi");
-  const params   = useParams();
-  const locale   = params?.locale ?? "en";
+  const tCommon = useTranslations("common");
+  const tSort = useTranslations("catalogSort");
+  const sortLabel = (o) => (SORT_LABEL_KEYS.has(o.value) ? tSort(o.value) : o.label);
+  const params = useParams();
+  const locale = params?.locale ?? "en";
   const marketPrefixVal = useMarketPrefix();
-  const handle   = params?.handle ? String(params.handle) : undefined;
-  const tCommon  = useTranslations("common");
+  const shopStyles = useShopStyles();
+  const tmpl = shopStyles?.category_template || {};
+  const colsPerRow = Number(tmpl.products_per_row) || 4;
+  const colsPerRowMobile = Number(tmpl.products_per_row_mobile) || 2;
+  const sidebarWidth = tmpl.sidebar_width || "280px";
+  const handle = params?.handle ? String(params.handle) : undefined;
 
-  const [brand,       setBrand]       = useState(null);
-  const [products,    setProducts]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState(null);
-  const [notFoundSt,  setNotFoundSt]  = useState(false);
-  const [sort,        setSort]        = useState("default");
-  const [page,        setPage]        = useState(1);
-  const [filters,     setFilters]     = useState({});
-  const [activeCategoryId, setActiveCategoryId] = useState(null);
-  const [panelOpen,   setPanelOpen]   = useState(false);
-  const [openFilterGroups, setOpenFilterGroups] = useState({});
-  const [activeMobileFilterGroup, setActiveMobileFilterGroup] = useState(null);
-  const [categorySlugToName, setCategorySlugToName] = useState(() => new Map());
-  const [categoryTree, setCategoryTree] = useState([]);
+  const [brand, setBrand] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [notFoundSt, setNotFoundSt] = useState(false);
+  const [sort, setSort] = useState("default");
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState({});
+  const [panelOpen, setPanelOpen] = useState(false);
   const [metafieldDefinitions, setMetafieldDefinitions] = useState({});
-  const filtersRef = useRef(filters);
-  filtersRef.current = filters;
 
   const bodyRef = useRef(null);
 
   /* ── Fetch ── */
   useEffect(() => {
     if (!handle) return;
-    setActiveCategoryId(null);
     setFilters({});
     setPage(1);
     (async () => {
       try {
         setLoading(true);
         setError(null);
-
         const res = await fetch(`/api/store-brands/${encodeURIComponent(handle)}`);
         if (res.status === 404) { setNotFoundSt(true); setLoading(false); return; }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const data = await res.json();
         if (!data?.brand) { setNotFoundSt(true); setLoading(false); return; }
         setBrand(data.brand);
@@ -650,99 +516,28 @@ export default function BrandPage() {
   }, [locale, brand?.handle, marketPrefixVal]);
 
   useEffect(() => {
-    if (!products.length) {
-      setCategoryTree([]);
-      setCategorySlugToName(new Map());
-      return undefined;
-    }
-    const ids = new Set();
-    for (const p of products) {
-      for (const id of productCategoryIds(p)) ids.add(id);
-    }
-    if (!ids.size) {
-      setCategoryTree([]);
-      setCategorySlugToName(new Map());
-      return undefined;
-    }
-    let cancelled = false;
-    const idList = [...ids].slice(0, 200).join(",");
-    cachedJsonFetch(`/api/store-categories${storeCategoriesQuery(locale, { ids: idList })}`, { ttlMs: 60000 })
-      .then((data) => {
-        if (cancelled) return;
-        const nodes = Array.isArray(data?.categories) ? data.categories : (data?.tree || []);
-        setCategoryTree(nodes);
-        setCategorySlugToName(buildCategorySlugToNameMap(nodes));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [products, locale]);
-
-  useEffect(() => {
     let cancelled = false;
     fetch("/api/store-metafield-definitions")
       .then((r) => r.json())
-      .then((data) => {
-        if (!cancelled) setMetafieldDefinitions(data?.definitions || {});
-      })
+      .then((data) => { if (!cancelled) setMetafieldDefinitions(data?.definitions || {}); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  const facets = useMemo(
-    () => filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions),
-    [products, metafieldDefinitions],
-  );
-  const hasFacets = Object.keys(facets).length > 0;
-  const brandCategories = useMemo(
-    () => deriveCategoriesFromProducts(products, categoryTree),
-    [products, categoryTree],
-  );
-  const hasCategories = brandCategories.length > 0;
-  const showCatalogSidebar = hasFacets || hasCategories;
-  const useFilterDrawerLayout = hasFacets || hasCategories;
-  const activeCategory = brandCategories.find((entry) => entry.id === activeCategoryId) || null;
-
-  // facets her render’da yeni obje olmamalı — [facets] deps ile aksi halde max update depth.
-  // Yeni facet anahtarı geldiğinde açık/kapalı için filters’ı ref’ten oku (deps’e gerek yok).
-  useEffect(() => {
-    const facetKeys = Object.keys(facets);
-    setOpenFilterGroups((prev) => {
-      const f = filtersRef.current;
-      let changed = false;
-      const next = { ...prev };
-      facetKeys.forEach((key) => {
-        if (!(key in next)) {
-          next[key] = Boolean(f[key]?.length);
-          changed = true;
-        }
-      });
-      return changed ? next : prev;
-    });
-  }, [facets]);
-
+  /* Lock page scroll while the mobile filter sheet is open. */
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
     if (!window.matchMedia(catalogDrawerMaxCss).matches) return undefined;
     const prev = document.body.style.overflow;
     if (panelOpen) document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    return () => { document.body.style.overflow = prev; };
   }, [panelOpen]);
 
-  useEffect(() => {
-    if (!panelOpen || !useFilterDrawerLayout) return;
-    if (hasCategories && !hasFacets) {
-      setActiveMobileFilterGroup(MOBILE_CATEGORIES_KEY);
-      return;
-    }
-    const keys = Object.keys(facets);
-    if (keys.length > 0 && (!activeMobileFilterGroup || (activeMobileFilterGroup !== MOBILE_CATEGORIES_KEY && !facets[activeMobileFilterGroup]))) {
-      setActiveMobileFilterGroup(hasCategories ? MOBILE_CATEGORIES_KEY : keys[0]);
-    }
-  }, [panelOpen, facets, hasFacets, hasCategories, useFilterDrawerLayout, activeMobileFilterGroup]);
+  // Product metadata facets; category facets stay off (sub-category navigation is category-page only).
+  const facets = useMemo(() => {
+    const raw = filterFacetsToCatalog(buildFacetsFromProducts(products), metafieldDefinitions);
+    return Object.fromEntries(Object.entries(raw).filter(([k]) => k !== "category" && k !== "category_slug"));
+  }, [products, metafieldDefinitions]);
 
   const toggle = (key, val) => {
     setFilters((prev) => {
@@ -758,49 +553,44 @@ export default function BrandPage() {
     setPage(1);
   };
 
-  const selectCategory = (categoryId) => {
-    setActiveCategoryId((prev) => (prev === categoryId ? null : categoryId));
-    setPage(1);
-  };
+  const extra = useCatalogExtraFilters({
+    base: products,
+    facets,
+    filters,
+    setFilters,
+    toggle,
+    setPage,
+    facetTitle: (key) => getFacetGroupTitle(key, locale, metafieldDefinitions),
+    optionLabel: (key, v) => formatFacetOptionLabel(key, v, null, locale, metafieldDefinitions),
+    resetKey: handle || "",
+  });
 
-  const clearAll = () => {
-    setFilters({});
-    setActiveCategoryId(null);
-    setPage(1);
-  };
-
-  let filtered = filterProductsByFacets(products, filters);
-  if (activeCategoryId) {
-    filtered = filtered.filter((product) => productCategoryIds(product).has(activeCategoryId));
-  }
-  const sorted = applyCatalogSort(filtered, sort, { bestsellerOnly: false });
-
-  const total      = sorted.length;
+  const sorted = applyCatalogSort(extra.filtered, sort, { bestsellerOnly: false });
+  const total = sorted.length;
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-  const curPage    = Math.min(page, totalPages);
-  const paginated  = sorted.slice((curPage - 1) * PER_PAGE, curPage * PER_PAGE);
+  const curPage = Math.min(page, totalPages);
+  const paginated = sorted.slice((curPage - 1) * PER_PAGE, curPage * PER_PAGE);
+  const activeCount = Object.values(filters).reduce((n, v) => n + (v?.length || 0), 0) + extra.extraActive;
+  const showFilters = products.length > 0 && tmpl.show_sidebar !== false;
 
-  const activeCount = Object.values(filters).reduce((n, v) => n + (v?.length || 0), 0) + (activeCategoryId ? 1 : 0);
-
-  const title     = brand?.name ?? handle ?? "";
+  const title = brand?.name ?? handle ?? "";
   const bannerUrl = brand?.banner_image ? resolveImageUrl(brand.banner_image) : "";
-  const logoUrl   = brand?.logo_image   ? resolveImageUrl(brand.logo_image)   : "";
+  const logoUrl = brand?.logo_image ? resolveImageUrl(brand.logo_image) : "";
 
   if (notFoundSt) notFound();
 
-  /* ── Skeleton ── */
   if (loading) return (
     <PageWrap>
       <ShopHeader />
       <Main>
-        <Bone style={{ height: 220 }} />
+        <Bone style={{ height: 180, borderRadius: 0 }} />
         <ContentWrap>
-          <MainCol>
-            <Bone style={{ height: 13, width: 200, margin: "24px 0 32px" }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: "#e8e8e6" }}>
-              {Array.from({ length: 6 }).map((_, i) => <Bone key={i} style={{ aspectRatio: "3/4" }} />)}
+          <Body>
+            <Bone style={{ height: 14, width: 200, margin: "24px 0 24px" }} />
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${colsPerRowMobile}, 1fr)`, gap: 12 }}>
+              {Array.from({ length: 4 }).map((_, i) => <Bone key={i} style={{ aspectRatio: "3/4" }} />)}
             </div>
-          </MainCol>
+          </Body>
         </ContentWrap>
       </Main>
       <Footer />
@@ -812,24 +602,20 @@ export default function BrandPage() {
       <ShopHeader />
       <Main>
         <ContentWrap>
-          <MainCol>
-            <p style={{ padding: "48px 0", color: "#b91c1c", fontSize: 13 }}>
-              {error || "Brand not found."}
-            </p>
-          </MainCol>
+          <Body>
+            <p style={{ padding: "48px 0", color: "#b91c1c", fontSize: 14 }}>{error || tUi("brandNotFound")}</p>
+          </Body>
         </ContentWrap>
       </Main>
       <Footer />
     </PageWrap>
   );
 
-  /* ── Render ── */
   return (
     <PageWrap>
       <ShopHeader />
       <Main>
-
-        {/* ── Banner / header ── */}
+        {/* ── Banner / title ── */}
         {bannerUrl ? (
           <HeroBanner>
             <img src={bannerUrl} alt={title} />
@@ -839,15 +625,7 @@ export default function BrandPage() {
                   <img
                     src={logoUrl}
                     alt=""
-                    style={{
-                      width: 36,
-                      height: 36,
-                      objectFit: "cover",
-                      borderRadius: "50%",
-                      verticalAlign: "middle",
-                      marginRight: 10,
-                      border: "2px solid rgba(255,255,255,0.8)",
-                    }}
+                    style={{ width: 36, height: 36, objectFit: "cover", borderRadius: "50%", verticalAlign: "middle", marginRight: 10, border: "2px solid rgba(255,255,255,0.8)" }}
                   />
                 )}
                 {title}
@@ -861,220 +639,95 @@ export default function BrandPage() {
           </ColHeader>
         )}
 
-        {/* ── Sticky filter/sort bar ── */}
-        <FilterBar>
-          <FilterBarInner>
-            {showCatalogSidebar && (
-              <FilterBtn
-                type="button"
-                $active={panelOpen || activeCount > 0}
-                onClick={() => setPanelOpen((o) => !o)}
-                aria-expanded={panelOpen}
-              >
-                <svg viewBox="0 0 16 12">
-                  <line x1="0" y1="2"  x2="16" y2="2" />
-                  <line x1="0" y1="6"  x2="16" y2="6" />
-                  <line x1="0" y1="10" x2="16" y2="10"/>
-                  <circle cx="5"  cy="2"  r="1.5" fill="#111" stroke="none"/>
-                  <circle cx="11" cy="6"  r="1.5" fill="#111" stroke="none"/>
-                  <circle cx="5"  cy="10" r="1.5" fill="#111" stroke="none"/>
-                </svg>
-                {hasCategories && !hasFacets ? tCommon("categories") : tCommon("filter")}{activeCount > 0 ? ` (${activeCount})` : ""}
-              </FilterBtn>
-            )}
-
+        {/* ── Filter + sort bar ── */}
+        <SortBar>
+          <SortBarInner>
+            <SortBarLeft>
+              {showFilters && (
+                <FilterBtn
+                  type="button"
+                  onClick={() => setPanelOpen((o) => !o)}
+                  aria-expanded={panelOpen}
+                >
+                  <FilterIcon />
+                  {tCommon("filter")}{activeCount > 0 ? ` (${activeCount})` : ""}
+                </FilterBtn>
+              )}
+              <Breadcrumb data-breadcrumb="" aria-label={tUi("breadcrumb")}>
+                <Link href="/">{tUi("home")}</Link>
+                <span style={{ color: "#b8afa2", margin: "0 2px" }}>›</span>
+                <b>{title}</b>
+              </Breadcrumb>
+            </SortBarLeft>
             <SortWrap>
               <SortLabel>{tUi("sort")}</SortLabel>
-              <SortSelect
-                value={sort}
-                onChange={e => { setSort(e.target.value); setPage(1); }}
-                aria-label={tUi("sortProducts")}
-              >
-                {SORT_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+              <SortSelect value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} aria-label={tUi("sortProducts")}>
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{sortLabel(o)}</option>
                 ))}
               </SortSelect>
             </SortWrap>
-          </FilterBarInner>
-        </FilterBar>
-
-        <Breadcrumb data-breadcrumb="" aria-label={tUi("breadcrumb")}>
-          <Link href={`/${locale}`}>{tUi("home")}</Link>
-          <span style={{ color: "#ccc" }}>/</span>
-          <b>{title}</b>
-        </Breadcrumb>
+          </SortBarInner>
+        </SortBar>
 
         <ContentWrap ref={bodyRef}>
-          {showCatalogSidebar && (
+          {showFilters && (
             <CatalogDrawerPortal>
               <>
                 <SidebarOverlay $open={panelOpen} onClick={() => setPanelOpen(false)} />
-                <SidebarCol $open={panelOpen} $filterMode={useFilterDrawerLayout}>
-              <SidebarHead $filterMode={useFilterDrawerLayout}>
-                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  {hasCategories && !hasFacets ? tCommon("categories") : tCommon("filter")}{activeCount > 0 ? ` (${activeCount})` : ""}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={clearAll} style={{ padding: "2px 8px", fontSize: 10 }}>
-                      {tCommon("clear")}
-                    </ClearAllBtn>
-                  )}
-                  <button type="button" onClick={() => setPanelOpen(false)} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#555", lineHeight: 1, padding: 0 }} aria-label={tCommon("close")}>×</button>
-                </div>
-              </SidebarHead>
+                <Sidebar $open={panelOpen} $width={sidebarWidth}>
+                  <SidebarHead>
+                    <FilterSheetHeader
+                      showReset={activeCount > 0}
+                      onReset={extra.resetAll}
+                      onClose={() => setPanelOpen(false)}
+                      closeLabel={tCommon("close")}
+                    />
+                  </SidebarHead>
 
-              {/* Desktop: categories + accordion filters */}
-              <DesktopSidebarContent>
-                <div>
-                  {hasCategories && (
-                    <CategoryNavGroup>
-                      <CategoryNavTitle>{tCommon("categories")}</CategoryNavTitle>
-                      <CategoryNavBtn type="button" $active={!activeCategoryId} onClick={() => { setActiveCategoryId(null); setPage(1); }}>
-                        {tCommon("allProducts")}
-                      </CategoryNavBtn>
-                      {brandCategories.map((entry) => (
-                        <CategoryNavBtn
-                          key={entry.id}
-                          type="button"
-                          $active={activeCategoryId === entry.id}
-                          onClick={() => selectCategory(entry.id)}
-                        >
-                          {entry.name}
-                          <span style={{ float: "right", color: "#9ca3af", fontWeight: 400, fontSize: 11 }}>{entry.count}</span>
-                        </CategoryNavBtn>
-                      ))}
-                    </CategoryNavGroup>
-                  )}
-                  {hasFacets && (
-                    <>
-                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#111", marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #e8e8e6" }}>
-                        {tCommon("filter")}
-                        {activeCount > 0 && (
-                          <ClearAllBtn type="button" onClick={clearAll} style={{ float: "right", padding: "2px 8px", fontSize: 10 }}>
-                            {tCommon("clear")}
-                          </ClearAllBtn>
-                        )}
-                      </div>
-                      {Object.entries(facets).map(([key, vals]) => (
-                        <FilterGroup key={key}>
-                          <FilterGroupTitle type="button" onClick={() => setOpenFilterGroups((prev) => ({ ...prev, [key]: !prev[key] }))}>
-                            <FilterGroupHeading>{getFacetGroupTitle(key, locale, metafieldDefinitions)}</FilterGroupHeading>
-                            <FilterChevron $open={!!openFilterGroups[key]}>⌄</FilterChevron>
-                          </FilterGroupTitle>
-                          <FilterGroupBody $open={!!openFilterGroups[key]}>
-                            {vals.map((val) => {
-                              const on = (filters[key] || []).includes(val);
-                              const label = formatFacetOptionLabel(key, val, categorySlugToName, locale, metafieldDefinitions);
-                              return (
-                                <CheckRow key={val} $on={on}>
-                                  <CustomCheckbox checked={on} onChange={() => toggle(key, val)} size={12} />
-                                  {label}
-                                </CheckRow>
-                              );
-                            })}
-                          </FilterGroupBody>
-                        </FilterGroup>
-                      ))}
-                    </>
-                  )}
-                  {activeCount > 0 && (
-                    <ClearAllBtn type="button" onClick={() => { clearAll(); setPanelOpen(false); }}>
-                      {tCommon("clearAllFilters")}
-                    </ClearAllBtn>
-                  )}
-                </div>
-              </DesktopSidebarContent>
+                  <DesktopSidebarContent>
+                    <StackedFilterPanel {...extra.panelProps} />
+                  </DesktopSidebarContent>
 
-              {/* Mobile: two-panel layout */}
-              <MobileFilterSplit>
-                <MobileFilterLeft>
-                  {hasCategories && (
-                    <MobileFilterLeftBtn
-                      type="button"
-                      $active={activeMobileFilterGroup === MOBILE_CATEGORIES_KEY}
-                      onClick={() => setActiveMobileFilterGroup(MOBILE_CATEGORIES_KEY)}
-                    >
-                      {tCommon("categories")}
-                      {activeCategoryId && <span style={{ display: "block", fontSize: 9, color: "#ee8a12", fontWeight: 800, marginTop: 2 }}>1</span>}
-                    </MobileFilterLeftBtn>
-                  )}
-                  {Object.entries(facets).map(([key]) => {
-                    const cnt = (filters[key] || []).length;
-                    return (
-                      <MobileFilterLeftBtn key={key} type="button" $active={activeMobileFilterGroup === key} onClick={() => setActiveMobileFilterGroup(key)}>
-                        {getFacetGroupTitle(key, locale, metafieldDefinitions)}
-                        {cnt > 0 && <span style={{ display: "block", fontSize: 9, color: "#ee8a12", fontWeight: 800, marginTop: 2 }}>{cnt} ausgewählt</span>}
-                      </MobileFilterLeftBtn>
-                    );
-                  })}
-                </MobileFilterLeft>
-                <MobileFilterRight>
-                  {activeMobileFilterGroup === MOBILE_CATEGORIES_KEY && hasCategories ? (
-                    <MobileFilterPillGrid>
-                      <MobileFilterPill type="button" $on={!activeCategoryId} onClick={() => { setActiveCategoryId(null); setPage(1); }}>
-                        {tCommon("allProducts")}
-                      </MobileFilterPill>
-                      {brandCategories.map((entry) => (
-                        <MobileFilterPill
-                          key={entry.id}
-                          type="button"
-                          $on={activeCategoryId === entry.id}
-                          onClick={() => selectCategory(entry.id)}
-                        >
-                          {entry.name}
-                        </MobileFilterPill>
-                      ))}
-                    </MobileFilterPillGrid>
-                  ) : activeMobileFilterGroup && facets[activeMobileFilterGroup] ? (
-                    <MobileFilterPillGrid>
-                      {facets[activeMobileFilterGroup].map((val) => {
-                        const on = (filters[activeMobileFilterGroup] || []).includes(val);
-                        return (
-                          <MobileFilterPill key={val} type="button" $on={on} onClick={() => toggle(activeMobileFilterGroup, val)}>
-                            {formatFacetOptionLabel(activeMobileFilterGroup, val, categorySlugToName, locale, metafieldDefinitions)}
-                          </MobileFilterPill>
-                        );
-                      })}
-                    </MobileFilterPillGrid>
-                  ) : (
-                    <div style={{ color: "#aaa", fontSize: 12 }}>{tCommon("filterSelectHint")}</div>
-                  )}
-                </MobileFilterRight>
-              </MobileFilterSplit>
-            </SidebarCol>
+                  <MobileDrawerChrome>
+                    <FilterSheetScroll>
+                      <StackedFilterPanel {...extra.panelProps} showHeader={false} />
+                    </FilterSheetScroll>
+                    <FilterSheetFooter count={total} onClick={() => setPanelOpen(false)} />
+                  </MobileDrawerChrome>
+                </Sidebar>
               </>
             </CatalogDrawerPortal>
           )}
 
-          <MainCol>
+          <Body>
             {activeCount > 0 && (
               <ChipBar>
-                {activeCategory && (
-                  <Chip type="button" onClick={() => selectCategory(activeCategory.id)}>
-                    {activeCategory.name} ×
-                  </Chip>
-                )}
+                {extra.extraChips.map((c) => (
+                  <Chip key={c.key} type="button" onClick={c.onRemove}>{c.label} ×</Chip>
+                ))}
                 {Object.entries(filters).flatMap(([k, vals]) =>
                   (vals || []).map((v) => (
                     <Chip key={`${k}:${v}`} type="button" onClick={() => toggle(k, v)}>
-                      {formatFacetOptionLabel(k, v, categorySlugToName, locale, metafieldDefinitions)} ×
+                      {formatFacetOptionLabel(k, v, null, locale, metafieldDefinitions)} ×
                     </Chip>
-                  ))
+                  )),
                 )}
+                <ResetLink type="button" onClick={extra.resetAll}>{tCommon("clearAllFilters")}</ResetLink>
               </ChipBar>
             )}
 
-            <ResultBar>
-              {total} {total === 1 ? "product" : "products"}
-            </ResultBar>
+            <ResultBar>{tSort("results", { count: total })}</ResultBar>
 
             {paginated.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "80px 0", color: "#bbb", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                No products match your filters.
-              </div>
+              <EmptyState>{tSort("noMatch")}</EmptyState>
             ) : (
-              <ProductGrid products={paginated} maxColumns={4} activeFilters={filters} />
+              <CategoryProductListing
+                products={paginated}
+                activeFilters={filters}
+                maxColumns={colsPerRow}
+                maxColumnsMobile={colsPerRowMobile}
+              />
             )}
 
             {totalPages > 1 && (
@@ -1082,11 +735,10 @@ export default function BrandPage() {
                 <PBtn
                   type="button"
                   disabled={curPage <= 1}
-                  onClick={() => { setPage(p => p - 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                  onClick={() => { setPage((p) => p - 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
                 >‹</PBtn>
-
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(p => p === 1 || p === totalPages || Math.abs(p - curPage) <= 2)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - curPage) <= 2)
                   .reduce((acc, p, idx, arr) => {
                     if (idx > 0 && p - arr[idx - 1] > 1) acc.push("…");
                     acc.push(p);
@@ -1094,17 +746,22 @@ export default function BrandPage() {
                   }, [])
                   .map((p, i) =>
                     p === "…"
-                      ? <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#bbb", fontSize: 12 }}>…</span>
-                      : <PBtn key={p} type="button" $on={p === curPage}
-                          onClick={() => { setPage(p); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}>
+                      ? <span key={`d${i}`} style={{ width: 36, textAlign: "center", color: "#b8afa2" }}>…</span>
+                      : (
+                        <PBtn
+                          key={p}
+                          type="button"
+                          $on={p === curPage}
+                          onClick={() => { setPage(p); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                        >
                           {p}
                         </PBtn>
+                      ),
                   )}
-
                 <PBtn
                   type="button"
                   disabled={curPage >= totalPages}
-                  onClick={() => { setPage(p => p + 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
+                  onClick={() => { setPage((p) => p + 1); bodyRef.current?.scrollIntoView({ behavior: "smooth" }); }}
                 >›</PBtn>
               </Pager>
             )}
@@ -1115,7 +772,7 @@ export default function BrandPage() {
                 {brand.address}
               </Desc>
             )}
-          </MainCol>
+          </Body>
         </ContentWrap>
       </Main>
       <Footer />

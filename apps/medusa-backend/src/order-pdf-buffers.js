@@ -69,7 +69,7 @@ async function loadPlatformIssuer(pgClient) {
     const next = [name]
     if (street) next.push(street)
     if (city) next.push(city)
-    if (gf) next.push(`Geschäftsführer: ${gf}`)
+    if (gf) next.push(`Inhaber: ${gf}`)
     if (hrb) next.push(`Handelsregister: ${hrb}`)
     if (court) next.push(`Amtsgericht: ${court}`)
     if (vatId) next.push(`USt-IdNr.: ${vatId}`)

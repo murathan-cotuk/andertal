@@ -24,7 +24,7 @@ import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import { PromoBentoEditor, CategoryCirclesEditor } from "@/components/pages/content/WarmContainerEditors";
 import RichTextEditor from "@/components/RichTextEditor";
-import { mergeLoadedShopStyles, buildWarmHomeContainers, isWarmHomeSaved, WARM_HOME_LAYOUT, CUSTOM_HOME_LAYOUT } from "@andertal/shop-theme";
+import { mergeLoadedShopStyles, isWarmHomeSaved, WARM_HOME_LAYOUT, CUSTOM_HOME_LAYOUT } from "@andertal/shop-theme";
 import CategoryDrilldownSelect from "@/components/inputs/CategoryDrilldownSelect";
 import SearchableGroupedSelect from "@/components/inputs/SearchableGroupedSelect";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
@@ -4678,19 +4678,6 @@ export default function LandingPageEditor() {
 
   const handleSave = useCallback(() => persistLanding(), [persistLanding]);
 
-  /* Loads the design homepage (same composition the shop shows until one is saved) into the editor.
-     Existing images from hero / Bilder-Karussell are reused; nothing is live until Save. */
-  const handleApplyHomepageComposition = useCallback(() => {
-    const next = buildWarmHomeContainers(containers).map((c) => ({
-      ...c,
-      id: `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    }));
-    setContainers(next);
-    setCategorySettings((prev) => ({ ...prev, homepage_layout: WARM_HOME_LAYOUT }));
-    setIsDirty(true);
-    setExpandedId(null);
-  }, [containers]);
-
   const handleDiscard = useCallback(async () => {
     setIsDirty(false);
     const pageId = resolveSavePageId();
@@ -5094,14 +5081,6 @@ export default function LandingPageEditor() {
                   </div>
                 )}
               </InlineStack>
-              {selectedPageId === DEFAULT_PAGE_ID && (
-                <BlockStack gap="150">
-                  <Button variant="primary" onClick={handleApplyHomepageComposition}>
-                    {copy.applyHomepageComposition}
-                  </Button>
-                  <Text as="p" variant="bodySm" tone="subdued">{copy.applyHomepageCompositionHelp}</Text>
-                </BlockStack>
-              )}
             </BlockStack>
           </Card>
         </Layout.Section>}

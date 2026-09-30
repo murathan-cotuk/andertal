@@ -1199,6 +1199,7 @@
     "error": "Errore",
     "subscribe": "Iscriviti",
     "subscribed": "Grazie! Ora sei iscritto/a.",
-    "home": "Home"
+    "home": "Home",
+    "brandNotFound": "Marchio non trovato."
   }
 }

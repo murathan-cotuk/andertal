@@ -127,7 +127,7 @@ export default function GeneralSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [uploadingDocs, setUploadingDocs] = useState("");
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [enabledShopLocales, setEnabledShopLocales] = useState(() => ALL_SHOP_LOCALES.map((l) => l.code));
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
@@ -158,8 +158,65 @@ export default function GeneralSettingsPage() {
     contact: locale === "tr" ? "İletişim" : locale === "en" ? "Contact" : locale === "fr" ? "Contact" : locale === "es" ? "Contacto" : locale === "it" ? "Contatto" : "Kontakt",
     compliance: locale === "tr" ? "Ambalaj Geri Dönüşüm (LUCID / EPR)" : locale === "en" ? "Packaging Recycling (LUCID / EPR)" : locale === "fr" ? "Emballages (LUCID / REP)" : locale === "es" ? "Envases (LUCID / RAP)" : locale === "it" ? "Imballaggi (LUCID / EPR)" : "Verpackungsgesetz (LUCID / EPR)",
     complianceSub: locale === "tr" ? "VerpackG gereği zorunlu. Geçerli LUCID olmadan Almanya’da ürün listelenemez." : locale === "en" ? "Required under VerpackG. Without valid LUCID you cannot list on DE marketplaces." : locale === "fr" ? "Obligatoire selon la loi allemande VerpackG. Sans enregistrement LUCID valide, aucune mise en vente sur les marketplaces allemandes." : locale === "es" ? "Obligatorio según la ley alemana VerpackG. Sin registro LUCID válido no se puede vender en marketplaces alemanes." : locale === "it" ? "Obbligatorio secondo la legge tedesca VerpackG. Senza registrazione LUCID valida non si può vendere sui marketplace tedeschi." : "Pflichtangabe nach VerpackG. Ohne gültige LUCID-Registrierung keine Listings auf DE-Marktplätzen.",
-    docs: locale === "tr" ? "Şirket belgeleri" : locale === "en" ? "Company documents" : locale === "fr" ? "Documents de l’entreprise" : locale === "es" ? "Documentos de la empresa" : locale === "it" ? "Documenti aziendali" : "Firmendokumente",
-    docsSub: locale === "tr" ? "Ticaret sicili, vergi belgesi vb. yükleyin." : locale === "en" ? "Upload trade license, tax certificate, registration documents, etc." : locale === "fr" ? "Téléversez extrait du registre du commerce, attestation fiscale, documents d’enregistrement, etc." : locale === "es" ? "Sube el registro mercantil, certificado fiscal, documentos de registro, etc." : locale === "it" ? "Carica visura camerale, certificato fiscale, documenti di registrazione, ecc." : "Handelsregister, Steuerbescheinigung, Registrierungsunterlagen usw. hochladen.",
+    docs: locale === "tr" ? "Zorunlu belgeler" : locale === "en" ? "Required documents" : locale === "fr" ? "Documents obligatoires" : locale === "es" ? "Documentos obligatorios" : locale === "it" ? "Documenti obbligatori" : "Pflichtunterlagen",
+    docsSub: locale === "tr"
+      ? "Üç belge zorunludur. Her biri kendi alanına yüklenir."
+      : locale === "en"
+        ? "Three documents are required. Each one is uploaded in its own field."
+        : locale === "fr"
+          ? "Trois documents sont obligatoires. Chacun se téléverse dans son propre champ."
+          : locale === "es"
+            ? "Tres documentos son obligatorios. Cada uno se sube en su propio campo."
+            : locale === "it"
+              ? "Tre documenti sono obbligatori. Ognuno va caricato nel proprio campo."
+              : "Drei Dokumente sind Pflicht. Jedes wird in ein eigenes Feld geladen.",
+    docSlots: [
+      {
+        id: "authority",
+        title: locale === "tr" ? "Yetkili kişiyi gösteren resmi belge" : locale === "en" ? "Official document naming the responsible person" : locale === "fr" ? "Document officiel désignant le responsable" : locale === "es" ? "Documento oficial que identifica al responsable" : locale === "it" ? "Documento ufficiale che indica il responsabile" : "Amtliches Dokument zur vertretungsberechtigten Person",
+        help: locale === "tr"
+          ? "Belediyeden alınmış Gewerbeanmeldung ya da ticaret siciline kayıtlıysanız Handelsregisterauszug. Belgede yasal sorumlu kişinin adı yazmalıdır. Tek dosya."
+          : locale === "en"
+            ? "The Gewerbeanmeldung from the municipality, or a Handelsregisterauszug if the business is registered. The document must name the person legally responsible. One file."
+            : locale === "fr"
+              ? "La Gewerbeanmeldung de la commune, ou un extrait du registre du commerce si l’entreprise y est inscrite. Le document doit nommer la personne responsable. Un seul fichier."
+              : locale === "es"
+                ? "La Gewerbeanmeldung del municipio o un extracto del registro mercantil si la empresa está inscrita. El documento debe nombrar a la persona responsable. Un solo archivo."
+                : locale === "it"
+                  ? "La Gewerbeanmeldung del comune oppure un estratto del registro delle imprese se l’attività è iscritta. Il documento deve indicare la persona responsabile. Un solo file."
+                  : "Die Gewerbeanmeldung der Gemeinde oder, bei Registereintragung, ein Handelsregisterauszug. Das Dokument muss die vertretungsberechtigte Person namentlich nennen. Eine Datei.",
+      },
+      {
+        id: "address_invoice",
+        title: locale === "tr" ? "Adres için fatura" : locale === "en" ? "Invoice as proof of address" : locale === "fr" ? "Facture comme justificatif d’adresse" : locale === "es" ? "Factura como prueba de domicilio" : locale === "it" ? "Fattura come prova dell’indirizzo" : "Rechnung als Adressnachweis",
+        help: locale === "tr"
+          ? "İşletmenin veya sahibin adına düzenlenmiş, işletme adresini gösteren bir fatura. Son üç ay içinde kesilmiş olmalıdır. Tek dosya."
+          : locale === "en"
+            ? "One invoice issued to the business or the owner and showing the business address. It must be dated within the last three months. One file."
+            : locale === "fr"
+              ? "Une facture au nom de l’entreprise ou du titulaire, indiquant l’adresse de l’entreprise. Elle doit dater de moins de trois mois. Un seul fichier."
+              : locale === "es"
+                ? "Una factura a nombre de la empresa o del titular que muestre la dirección del negocio. Debe tener menos de tres meses. Un solo archivo."
+                : locale === "it"
+                  ? "Una fattura intestata all’impresa o al titolare che indichi l’indirizzo dell’attività. Deve risalire a meno di tre mesi. Un solo file."
+                  : "Eine Rechnung auf den Namen des Unternehmens oder des Inhabers mit der Geschäftsadresse. Sie darf nicht älter als drei Monate sein. Eine Datei.",
+      },
+      {
+        id: "identity",
+        title: locale === "tr" ? "Yasal sorumlunun kimliği" : locale === "en" ? "Identity document of the responsible person" : locale === "fr" ? "Pièce d’identité du responsable" : locale === "es" ? "Documento de identidad del responsable" : locale === "it" ? "Documento d’identità del responsabile" : "Ausweis der vertretungsberechtigten Person",
+        help: locale === "tr"
+          ? "Resmi belgede adı geçen kişinin pasaportu veya kimlik kartı. Çevrimiçi pazar yeri için (AB) 2022/2065 sayılı Tüzük madde 30 bunu ister. Tek dosya."
+          : locale === "en"
+            ? "Passport or national identity card of the person named in the official document. Article 30 of Regulation (EU) 2022/2065 requires this for an online marketplace. One file."
+            : locale === "fr"
+              ? "Passeport ou carte d’identité de la personne nommée dans le document officiel. L’article 30 du règlement (UE) 2022/2065 l’exige pour une place de marché. Un seul fichier."
+              : locale === "es"
+                ? "Pasaporte o documento nacional de identidad de la persona que figura en el documento oficial. El artículo 30 del Reglamento (UE) 2022/2065 lo exige en un mercado en línea. Un solo archivo."
+                : locale === "it"
+                  ? "Passaporto o carta d’identità della persona indicata nel documento ufficiale. L’articolo 30 del regolamento (UE) 2022/2065 lo richiede per un marketplace. Un solo file."
+                  : "Reisepass oder Personalausweis der Person, die im amtlichen Dokument genannt ist. Artikel 30 der Verordnung (EU) 2022/2065 verlangt dies für einen Online-Marktplatz. Eine Datei.",
+      },
+    ],
     locationsNote: locale === "tr" ? "Depo, iade ve fatura adresleri →" : locale === "en" ? "Warehouse, returns and billing addresses →" : locale === "fr" ? "Adresses d’entrepôt, de retour et de facturation →" : locale === "es" ? "Direcciones de almacén, devoluciones y facturación →" : locale === "it" ? "Indirizzi di magazzino, resi e fatturazione →" : "Lager-, Retouren- und Rechnungsadressen →",
     locationsLink: locale === "tr" ? "Konumlar" : locale === "en" ? "Locations" : locale === "fr" ? "Emplacements" : locale === "es" ? "Ubicaciones" : locale === "it" ? "Sedi" : "Standorte",
     managingDirector: locale === "tr" ? "Yetkili kişi (Geschäftsführer)" : locale === "en" ? "Managing Director" : locale === "fr" ? "Représenté par (gérant)" : locale === "es" ? "Representado por (administrador)" : locale === "it" ? "Rappresentato da (amministratore)" : "Vertreten durch (Geschäftsführer)",
@@ -459,30 +516,28 @@ export default function GeneralSettingsPage() {
     }
   };
 
-  const handleDocumentUpload = async (files) => {
-    if (!files?.length) return;
-    setUploadingDocs(true);
+  const handleDocumentUpload = async (kind, files) => {
+    const file = files?.[0];
+    if (!file || !kind) return;
+    setUploadingDocs(kind);
     setSaveError("");
     try {
-      const arr = Array.from(files);
-      const uploaded = [];
-      for (const file of arr) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const result = await client.uploadMedia(fd);
-        if (result?.url) {
-          uploaded.push({
-            name: file.name,
-            url: result.url,
-            mime_type: file.type || "",
-            size: file.size || 0,
-            uploaded_at: new Date().toISOString(),
-          });
-        }
-      }
-      if (uploaded.length) {
-        setFormData((p) => ({ ...p, documents: [...(p.documents || []), ...uploaded] }));
-      }
+      const fd = new FormData();
+      fd.append("file", file);
+      const result = await client.uploadMedia(fd);
+      if (!result?.url) return;
+      const nextDoc = {
+        kind,
+        name: file.name,
+        url: result.url,
+        mime_type: file.type || "",
+        size: file.size || 0,
+        uploaded_at: new Date().toISOString(),
+      };
+      setFormData((p) => ({
+        ...p,
+        documents: [...(p.documents || []).filter((doc) => doc?.kind !== kind), nextDoc],
+      }));
     } catch (err) {
       setSaveError(userError(err, locale, "Document upload failed."));
     } finally {
@@ -490,8 +545,8 @@ export default function GeneralSettingsPage() {
     }
   };
 
-  const removeDocument = (idx) => {
-    setFormData((p) => ({ ...p, documents: (p.documents || []).filter((_, i) => i !== idx) }));
+  const removeDocument = (kind) => {
+    setFormData((p) => ({ ...p, documents: (p.documents || []).filter((doc) => doc?.kind !== kind) }));
   };
 
   const handleLanguageChange = async (value) => {
@@ -647,7 +702,7 @@ export default function GeneralSettingsPage() {
                 label={ui.companyName || "Company legal name"}
                 value={formData.companyName}
                 onChange={(v) => setFormData((p) => ({ ...p, companyName: v }))}
-                placeholder={isSuperuser ? "Andertal GmbH" : "Legal company name"}
+                placeholder={isSuperuser ? "Andertal" : "Legal company name"}
                 autoComplete="organization"
               />
               {isSuperuser && (
@@ -778,30 +833,35 @@ export default function GeneralSettingsPage() {
           </Card>
 
           <Card>
-            <BlockStack gap="300">
+            <BlockStack gap="400">
               <SectionLabel title={copy.docs} subtitle={copy.docsSub} />
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                onChange={(e) => { handleDocumentUpload(e.target.files); e.target.value = ""; }}
-                disabled={uploadingDocs}
-              />
-              {uploadingDocs && <Text as="p" tone="subdued">Uploading documents…</Text>}
-              {(formData.documents || []).length > 0 && (
-                <BlockStack gap="100">
-                  {formData.documents.map((doc, idx) => (
-                    <InlineStack key={`${doc.url || doc.name}-${idx}`} align="space-between" blockAlign="center">
-                      <a href={doc.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, textDecoration: "underline" }}>
-                        {doc.name || doc.url}
-                      </a>
-                      <Button size="slim" variant="plain" tone="critical" onClick={() => removeDocument(idx)}>
-                        {ui.delete || "Remove"}
-                      </Button>
-                    </InlineStack>
-                  ))}
-                </BlockStack>
-              )}
+              {copy.docSlots.map((slot) => {
+                const current = (formData.documents || []).find((doc) => doc?.kind === slot.id);
+                const busy = uploadingDocs === slot.id;
+                return (
+                  <BlockStack key={slot.id} gap="150">
+                    <Text as="h3" variant="headingSm">{slot.title}</Text>
+                    <Text as="p" tone="subdued" variant="bodySm">{slot.help}</Text>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
+                      onChange={(e) => { handleDocumentUpload(slot.id, e.target.files); e.target.value = ""; }}
+                      disabled={Boolean(uploadingDocs)}
+                    />
+                    {busy && <Text as="p" tone="subdued">{locale === "tr" ? "Yükleniyor…" : locale === "de" ? "Wird hochgeladen…" : "Uploading…"}</Text>}
+                    {current?.url && (
+                      <InlineStack align="space-between" blockAlign="center">
+                        <a href={current.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, textDecoration: "underline" }}>
+                          {current.name || current.url}
+                        </a>
+                        <Button size="slim" variant="plain" tone="critical" onClick={() => removeDocument(slot.id)}>
+                          {ui.delete || "Remove"}
+                        </Button>
+                      </InlineStack>
+                    )}
+                  </BlockStack>
+                );
+              })}
             </BlockStack>
           </Card>
         </BlockStack>

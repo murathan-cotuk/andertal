@@ -1,5 +1,7 @@
 'use strict'
 
+const buildDeSections = require('./seller-agreement-de')
+
 /**
  * Canonical Seller–Platform Agreement (single source of truth).
  * Used by: PDF signing, public API, Sellercentral verification modal & sign page.
@@ -8,9 +10,9 @@
  * Version bumps must change AGREEMENT_VERSION so existing sellers can be re-prompted.
  */
 
-const AGREEMENT_VERSION = '2026.09.26'
-const AGREEMENT_UPDATED = '2026-09-26'
-const DEFAULT_PLATFORM_NAME = 'Andertal GmbH'
+const AGREEMENT_VERSION = '2026.09.30'
+const AGREEMENT_UPDATED = '2026-09-30'
+const DEFAULT_PLATFORM_NAME = 'Andertal'
 
 const TITLES = {
   de: 'Händler-Plattform-Vereinbarung',
@@ -32,117 +34,16 @@ const GOVERNING_NOTES = {
 
 /** @type {Record<string, Array<{ heading: string, body: string }>>} */
 const SECTIONS = {
-  de: [
-    {
-      heading: 'Präambel – Parteien und Geltung',
-      body: `Diese Händler-Plattform-Vereinbarung (nachfolgend „Vereinbarung") regelt die Rechtsbeziehung zwischen ${DEFAULT_PLATFORM_NAME} (nachfolgend „Plattform") und dem registrierten gewerblichen Verkäufer (nachfolgend „Verkäufer").\n\nMit dem Setzen des Zustimmungs-Hakens im Sellercentral und/oder der elektronischen Unterzeichnung erklärt der Verkäufer, den vollständigen Text dieser Vereinbarung gelesen und verstanden zu haben und an alle nachfolgenden Bestimmungen gebunden zu sein.\n\nDie Vereinbarung berücksichtigt insbesondere: Verordnung (EU) 2022/2065 (Digital Services Act – DSA), Verordnung (EU) 2019/1150 (P2B-Verordnung), Verordnung (EU) 2016/679 (DSGVO), Verordnung (EU) 2023/988 (GPSR), das BGB, das UWG sowie sonstiges anwendbares Unions- und deutsches Recht.\n\nDiese Vereinbarung steht in mehreren Sprachen zur Verfügung. Bei Widersprüchen zwischen Sprachfassungen ist ausschließlich die deutsche Fassung maßgeblich.`,
-    },
-    {
-      heading: '§ 1 – Begriffsbestimmungen',
-      body: `„Plattform" bezeichnet die von ${DEFAULT_PLATFORM_NAME} betriebene Marktplatz-Infrastruktur (Website, Apps, APIs, Sellercentral und zugehörige Dienste) sowie die rechtliche Person der Plattformbetreiberin.\n„Verkäufer" bezeichnet jede natürliche oder juristische Person, die sich registriert, um Waren über die Plattform anzubieten.\n„Endkunde" / „Verbraucher" bezeichnet den Käufer eines vom Verkäufer angebotenen Produkts.\n„Angebot" / „Listing" bezeichnet jeden auf der Plattform veröffentlichten Produktlistungs-Eintrag.\n„Sellercentral" bezeichnet die Verwaltungsoberfläche des Verkäufers.\n„Transaktion" bezeichnet einen abgeschlossenen Kaufvertrag zwischen Verkäufer und Endkunde, der über die Plattform vermittelt wurde.\n„Preisliste" bezeichnet die im Sellercentral veröffentlichte, jeweils aktuelle Übersicht der Plattformgebühren und Provisionen.\nSingular und Plural sowie geschlechtsbezogene Formulierungen gelten wechselseitig, soweit der Kontext nichts anderes verlangt.`,
-    },
-    {
-      heading: '§ 2 – Vertragsgegenstand und Rolle der Plattform',
-      body: `Die Plattform stellt dem Verkäufer eine technische Infrastruktur zum Anbieten, Verwalten und Verkaufen von Waren gegenüber Endkunden zur Verfügung. Dazu können insbesondere gehören: Katalog- und Angebotsverwaltung, Zahlungsabwicklung über zertifizierte Zahlungsdienstleister, Versand- und Etikettenhilfen, Analysewerkzeuge, Kundensupport-Schnittstellen sowie Marketingfunktionen.\n\nDer Verkäufer handelt stets als eigenverantwortlicher Händler im eigenen Namen und auf eigene Rechnung. Die Plattform ist nicht Vertragspartner der Kaufverträge zwischen Verkäufer und Endkunde und tritt nicht als Kommissionär auf. Sie handelt als „Online-Vermittlungsdienst" i. S. v. Art. 2 Nr. 2 P2B-VO und als „Online-Marktplatz" i. S. v. Art. 3 lit. j DSA.\n\nZusatzleistungen (z. B. Zahlungsabwicklung, Versandetiketten) erbringt die Plattform bzw. ihre Dienstleister als technische Unterstützung für den Verkäufer, ohne dadurch Partei des Kaufvertrags zu werden.`,
-    },
-    {
-      heading: '§ 3 – Registrierung, Konto und Verifizierung',
-      body: `Die Nutzung setzt erfolgreiche Registrierung und – je nach Kategorie und Herkunftsland – Identitäts- und Geschäftsverifizierung voraus. Der Verkäufer verpflichtet sich:\n(a) wahrheitsgemäße, vollständige und aktuelle Angaben zu Person/Unternehmen, Steuernummer bzw. USt-IdNr., Bankverbindung (IBAN/BIC), Handelsregister- bzw. Gewerbedaten und Anschrift zu machen;\n(b) wesentliche Änderungen dieser Daten unverzüglich, spätestens binnen sieben (7) Werktagen, mitzuteilen und im Sellercentral zu aktualisieren;\n(c) auf Anforderung Prüfunterlagen (z. B. Ausweis der vertretungsberechtigten Person, Handelsregister-/Gewerbeauszug, Steuer-/LUCID-Nachweise) innerhalb von zehn (10) Werktagen einzureichen.\n\nFalsche oder irreführende Angaben berechtigen die Plattform zur Verweigerung, erneuten Anforderung oder Sperrung sowie – bei Verdacht auf Straftaten – zur Anzeige bei Behörden. Zugangsdaten sind vertraulich; der Verkäufer haftet für unter seinen Zugangsdaten vorgenommene Handlungen, soweit er deren missbräuchliche Nutzung zu vertreten hat.`,
-    },
-    {
-      heading: '§ 4 – Pflichten des Verkäufers (Angebote, Erfüllung, Gewährleistung)',
-      body: `Der Verkäufer verpflichtet sich insbesondere:\n1. Ausschließlich legale Waren anzubieten und Produktsicherheits-, Kennzeichnungs- und Verbraucherschutzvorschriften einzuhalten, einschließlich GPSR sowie kategorie-/länderspezifischer Vorgaben (z. B. WEEE/ElektroG, EPREL, Batterieverordnung, VerpackG/LUCID) – siehe Compliance-Bereich im Sellercentral.\n2. Vollständige und korrekte Geschäftsdaten (Impressum-relevante Angaben, Steuerdaten, IBAN) bereitzustellen und aktuell zu halten.\n3. Bestellungen innerhalb der im Angebot angegebenen Lieferfristen zu erfüllen; innerhalb der EU soll die Lieferzeit in der Regel 14 Werktage nicht überschreiten, sofern nicht ausdrücklich anders angegeben und gesetzlich zulässig.\n4. Bei Verzögerung oder Nichtverfügbarkeit den Endkunden unverzüglich, spätestens binnen 24 Stunden nach Kenntnis, zu informieren.\n5. Gesetzliche Gewährleistungsrechte (§§ 434 ff. BGB) zu wahren (regelmäßig 2 Jahre für Neuware; bei Gebrauchtware ggf. verkürzt, sofern zulässig und klar gekennzeichnet) und das 14-tägige Widerrufsrecht für Verbraucher (§§ 355 ff. BGB / Verbraucherrechterichtlinie) zu gewähren.\n6. Retouren unkompliziert abzuwickeln und Erstattungen binnen 14 Tagen nach Eingang der Retoure vorzunehmen; Retourenkosten innerhalb der EU trägt der Verkäufer, soweit gesetzlich nichts anderes gilt.\n7. Ordnungsgemäße Rechnungen auszustellen und gesetzliche Aufbewahrungsfristen einzuhalten.\n8. Produktinformationen (EAN, Titel, Beschreibung, Bilder, Preise inkl. gesetzlicher Pflichtangaben) wahrheitsgemäß und nicht irreführend darzustellen und gemeinsame Katalogeinträge nicht ohne Berechtigung zu verändern.\n9. Kundenanfragen über die Plattformkanäle innerhalb angemessener Frist zu beantworten.\n10. Keine Preisabsprachen, Marktmanipulation oder unlauteren Wettbewerb (UWG) zu betreiben.`,
-    },
-    {
-      heading: '§ 5 – Verbotene und eingeschränkte Artikel',
-      body: `Untersagt ist das Anbieten von Waren, die gegen geltendes Recht verstoßen oder deren Verkauf über die Plattform ausgeschlossen ist, einschließlich – ohne Beschränkung –: Markenfälschungen; Waffen und munitionsähnliche Gegenstände; verschreibungspflichtige Arzneimittel ohne Zulassung; gestohlene Ware; Tabak-/Nikotinprodukte ohne gesetzlich erforderliche Altersverifikation; Waren, die gegen Exportkontroll- oder Sanktionsvorschriften verstoßen; Betäubungsmittel und sonstige gesetzlich verbotene Güter.\n\nDie Plattform kann im Sellercentral eine aktuelle, nicht abschließende Liste verbotener/eingeschränkter Kategorien veröffentlichen und aus regulatorischen Gründen anpassen. Wesentliche Änderungen werden gemäß § 21 mitgeteilt. Verstöße können zur sofortigen Entfernung von Angeboten und zu Maßnahmen nach § 19 führen.`,
-    },
-    {
-      heading: '§ 6 – Geistiges Eigentum und Markenrechte',
-      body: `Der Verkäufer sichert zu, über alle erforderlichen Rechte an hochgeladenen Inhalten (Bilder, Texte, Markenzeichen, Videos) zu verfügen oder zur Nutzung berechtigt zu sein.\n\nFür die Nutzung fremder, registrierter Marken gilt der Markenautorisierungsprozess der Plattform (Sellercentral → Marken). Angebote unter einer registrierten Marke ohne nachgewiesene Berechtigung sind untersagt und können ohne Vorankündigung entfernt werden. Rechteinhaber können mutmaßliche Verletzungen über das Meldeverfahren (§ 13) anzeigen.\n\nMit dem Hochladen räumt der Verkäufer der Plattform ein einfaches, nicht ausschließliches, weltweites, zeitlich auf die Vertragsdauer (und angemessene Abwicklungszeiträume danach) beschränktes, kostenfreies Nutzungsrecht ein, die Inhalte auf der Plattform darzustellen und in damit verbundenen Marketingmaßnahmen der Plattform zu verwenden, soweit dies zur Präsentation der Angebote erforderlich ist. Plattform-Marken und -Logos darf der Verkäufer nur mit vorheriger schriftlicher Zustimmung der Plattform nutzen.`,
-    },
-    {
-      heading: '§ 7 – Datenschutz (DSGVO)',
-      body: `Der Verkäufer verarbeitet personenbezogene Daten von Endkunden (Name, Anschrift, Kontaktdaten, Bestelldaten) ausschließlich zur Vertragserfüllung (Art. 6 Abs. 1 lit. b DSGVO) und nur im erforderlichen Umfang. Weitergabe an Dritte ohne Rechtsgrundlage ist untersagt; werbliche Nutzung außerhalb der Plattform ohne gesonderte Einwilligung des Kunden ist unzulässig.\n\nDer Verkäufer:\n(a) trifft angemessene technische und organisatorische Maßnahmen (Art. 32 DSGVO);\n(b) meldet relevante Datenschutzvorfälle der Plattform unverzüglich (Ziel: binnen 24 Stunden) und unterstützt behördliche Meldepflichten;\n(c) beantwortet Betroffenenanfragen binnen 30 Tagen und unterstützt die Plattform bei deren Pflichten;\n(d) schließt, soweit erforderlich, einen AVV nach Art. 28 DSGVO mit der Plattform;\n(e) übermittelt Daten nicht ohne angemessenes Schutzniveau in Drittländer (Art. 44 ff. DSGVO).\n\nEinzelheiten ergeben sich aus der Datenschutzerklärung der Plattform und etwaigen AVV-Dokumenten.`,
-    },
-    {
-      heading: '§ 8 – Zahlungsabwicklung, Treuhand und Auszahlungen',
-      body: `Zahlungen von Endkunden werden über den von der Plattform eingesetzten Zahlungsdienstleister (insbesondere Stripe Connect oder gleichwertige zertifizierte Anbieter) abgewickelt. Der Verkäufer bevollmächtigt die Plattform und den Zahlungsdienstleister, Zahlungen namens und für Rechnung des Verkäufers entgegenzunehmen. Zahlungseingang beim Dienstleister/der Plattform gilt als Zahlungseingang beim Verkäufer.\n\nGelder können zunächst auf einem von der Plattform bzw. dem Zahlungsdienstleister verwalteten Konto eingehen. Auszahlungen an den Verkäufer erfolgen nach Auftragsabschluss und – soweit vorgesehen – nach Ablauf einer Sicherheitshaltefrist (in der Regel 7 bis 14 Werktage nach Lieferbestätigung), gemäß dem im Sellercentral einsehbaren Auszahlungsrhythmus. Zweck der Haltefrist ist die Abfederung von Retouren, Widerrufen und Chargebacks.\n\nDie Plattform darf Beträge bei begründeten Rückforderungen (Chargebacks, Retouren, Betrugsverdacht, offene Gebühren) vorübergehend einbehalten oder verrechnen, bis der Vorgang geklärt ist. Der Verkäufer ist für die Richtigkeit seiner Bankdaten verantwortlich; Verzögerungen durch fehlerhafte Angaben gehen zu seinen Lasten. Monatliche Abrechnungsübersichten im Sellercentral gelten als anerkannt, wenn binnen 30 Tagen keine begründete Beanstandung erhoben wird.`,
-    },
-    {
-      heading: '§ 9 – Provisionen, Gebühren und Preise',
-      body: `Die Plattform erhebt Transaktionsgebühren/Provisionen gemäß der zum Zeitpunkt der jeweiligen Transaktion gültigen, im Sellercentral einsehbaren Preisliste. Provisionen werden in der Regel bei Zahlungseingang vom Transaktionsbetrag einbehalten.\n\nÄnderungen der Gebührenstruktur werden dem Verkäufer gemäß § 21 vorab mitgeteilt. Der Verkäufer bestimmt die Verkaufspreise seiner Angebote eigenverantwortlich; die Plattform nimmt darauf keinen Einfluss, außer im Rahmen vom Verkäufer aktivierter, zulässiger Rabatt-/Kampagnenfunktionen.\n\nBei Verzug mit Gebühren werden Verzugszinsen nach § 288 BGB (bei beiderseitigem Handelsgeschäft regelmäßig 9 Prozentpunkte über dem Basiszinssatz) fällig. Die Plattform darf fällige Gebühren mit Auszahlungsansprüchen verrechnen.`,
-    },
-    {
-      heading: '§ 10 – Retouren, Widerruf und Chargebacks (Auswirkung auf Provision)',
-      body: `Übt ein Verbraucher sein Widerrufsrecht aus oder wird eine berechtigte Retoure vollständig rückabgewickelt, wird der zugehörige Bestellbetrag einschließlich der einbehaltenen Provision storniert bzw. die Provision dem Verkäufer erstattet, sofern der Kaufpreis vollständig zurückgebucht wurde. Bei Teilretouren erfolgt die Provisionserstattung anteilig.\n\nChargebacks durch den Zahlungsdienstleister können zum Einbehalt des Transaktionsbetrags führen; die Plattform informiert den Verkäufer und leitet das Verfahren nach den Regeln des Zahlungsdienstleisters. Der Verkäufer wirkt bei der Klärung mit und stellt erforderliche Nachweise bereit.`,
-    },
-    {
-      heading: '§ 11 – Steuerliche Pflichten',
-      body: `Der Verkäufer ist allein verantwortlich für die zutreffende umsatzsteuerliche Behandlung seiner Verkäufe (einschließlich OSS oder Registrierungen in einzelnen Mitgliedstaaten) sowie für Erklärung und Abführung aller auf seine Umsätze entfallenden Steuern.\n\nDie Plattform kann, soweit gesetzlich vorgeschrieben, Transaktionsdaten an Behörden übermitteln (z. B. § 22f UStG, DAC7). Der Verkäufer stellt auf Anforderung die hierfür erforderlichen Angaben und Nachweise bereit und nimmt zur Kenntnis, dass die Plattform zur Meldung bestimmter Umsätze verpflichtet sein kann.`,
-    },
-    {
-      heading: '§ 12 – Ranking, Sichtbarkeit und Werbung (P2B Art. 5)',
-      body: `Wesentliche Parameter des Rankings sind insbesondere: Produktqualität und Vollständigkeit der Produktdaten; Kundenbewertungen (Note, Anzahl, Aktualität); Bestellabwicklungsrate und Lieferzeiten; Preisgestaltung; Aktualität des Sortiments; Konto-Compliance; sowie relevante Konversions-/Interaktionssignale.\n\nDer Verkäufer kann das Ranking durch Verbesserung dieser Faktoren beeinflussen. Bezahlte Platzierungen (Marketing/Kampagnen) werden als Werbung gekennzeichnet und beeinflussen das organische Ranking anderer Angebote nicht. Die Plattform verpflichtet sich, eigene Angebote nicht unbillig gegenüber Drittverkäufern zu bevorzugen.`,
-    },
-    {
-      heading: '§ 13 – Content-Moderation und Meldeverfahren (DSA)',
-      body: `Die Plattform betreibt gemäß Art. 16 DSA ein Melde- und Abhilfeverfahren für mutmaßlich rechtswidrige Angebote oder Inhalte. Begründete Meldungen können zur Entfernung, Zugriffsbeschränkung oder – bei schwerwiegenden/wiederholten Verstößen – zu Maßnahmen nach § 19 führen.\n\nDer Verkäufer wird über entfernte Inhalte grundsätzlich informiert und erhält Gelegenheit zur Stellungnahme, sofern dem nicht zwingende rechtliche oder sicherheitsrelevante Gründe entgegenstehen (Art. 17, 20 DSA). Offensichtlich unbegründete, wiederholte Meldungen Dritter können zurückgewiesen werden.`,
-    },
-    {
-      heading: '§ 14 – Transparenz gegenüber Verbrauchern (P2B Art. 6a)',
-      body: `Die Plattform stellt Endkunden vor Kaufabschluss erkennbar dar, dass das Angebot von einem gewerblichen Dritten stammt, und weist auf die Verteilung von Rechten und Pflichten (insbesondere Gewährleistung und Widerruf) zwischen Verkäufer und Plattform hin. Der Verkäufer liefert alle dafür erforderlichen Angaben vollständig und wahrheitsgemäß und bestätigt, dass die Hauptverantwortung für die Erfüllung der Kaufverträge – vorbehaltlich dieser Vereinbarung – bei ihm liegt.`,
-    },
-    {
-      heading: '§ 15 – Verhaltenskodex und verbotene Praktiken',
-      body: `Untersagt sind insbesondere:\n(a) kartellrechtswidrige Absprachen;\n(b) gefälschte, irreführende oder manipulierte Bewertungen;\n(c) künstliche Ranking-Manipulation (z. B. Klickfarmen, Bots);\n(d) Abwerbung von Plattformkunden auf externe Kanäle unter missbräuchlicher Nutzung von Plattformdaten;\n(e) Nutzung von Kundendaten der Plattform für Eigenwerbung außerhalb der Plattform ohne Rechtsgrundlage;\n(f) Betrug, Identitätsäuschung, Geldwäsche oder Finanzierung illegaler Aktivitäten;\n(g) Angebote unter Verstoß gegen Exportkontroll-/Sanktionsrecht.`,
-    },
-    {
-      heading: '§ 16 – Haftung des Verkäufers und Freistellung',
-      body: `Der Verkäufer haftet für Schäden, die der Plattform durch schuldhafte Verletzung dieser Vereinbarung, geltender Gesetze oder Rechte Dritter entstehen. Er stellt die Plattform von Ansprüchen Dritter frei, die auf Produktmängeln, Rechtsverletzungen oder sonstigen Pflichtverletzungen des Verkäufers beruhen, einschließlich angemessener Rechtsverteidigungskosten.\n\nFür Datenschutzverletzungen im Verantwortungsbereich des Verkäufers bleibt die Haftung nach Art. 82 DSGVO unberührt. Für reine Vermögensschäden ohne Vorsatz oder grobe Fahrlässigkeit kann die Haftung des Verkäufers gegenüber der Plattform auf den Wert der betreffenden Transaktionen der letzten zwölf (12) Monate begrenzt sein, soweit gesetzlich zulässig.`,
-    },
-    {
-      heading: '§ 17 – Haftungsbeschränkung der Plattform',
-      body: `Die Plattform haftet unbeschränkt für Schäden aus der Verletzung von Leben, Körper oder Gesundheit sowie für vorsätzlich oder grob fahrlässig verursachte Schäden.\n\nBei leichter Fahrlässigkeit haftet die Plattform nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) und nur in Höhe des vertragstypisch vorhersehbaren Schadens. Haftung für mittelbare Schäden, entgangenen Gewinn, Datenverlust und Folgeschäden ist – außer in den vorgenannten Fällen unbeschränkter Haftung – ausgeschlossen, soweit gesetzlich zulässig.\n\nFür die Verfügbarkeit der Infrastruktur wird ein handelsüblicher Standard angestrebt; ein Anspruch auf ununterbrochene Verfügbarkeit besteht nicht. Keine Haftung besteht für Ausfälle durch höhere Gewalt, Angriffe Dritter (z. B. DDoS), allgemeine Internetstörungen oder Störungen externer Dienstleister, soweit die Plattform diese nicht zu vertreten hat.`,
-    },
-    {
-      heading: '§ 18 – Höhere Gewalt',
-      body: `Keine Partei haftet für die Nichterfüllung ihrer Pflichten, soweit diese auf Umständen höherer Gewalt beruht (z. B. Naturkatastrophen, Epidemien, behördliche Anordnungen, Krieg, großflächige Netz-/Energieausfälle), die außerhalb ihrer zumutbaren Kontrolle liegen. Die betroffene Partei informiert die andere Partei unverzüglich über Art und voraussichtliche Dauer und bemüht sich um Wiederaufnahme.`,
-    },
-    {
-      heading: '§ 19 – Kontosperrung, Aussetzung und Kündigung',
-      body: `Bei Verstößen kann die Plattform abgestufte Maßnahmen ergreifen: Verwarnung mit Abhilfefrist; Einschränkung/Entfernung einzelner Listings; vorläufige Einfrierung ausstehender Auszahlungen; bei schwerwiegenden oder wiederholten Verstößen oder behördlicher Anordnung Sperrung oder Kündigung.\n\nVor einer dauerhaften Sperrung bzw. Kündigung erhält der Verkäufer – außer in Notfällen oder soweit rechtlich unzulässig – eine Begründung und angemessene Frist zur Stellungnahme (Art. 4 P2B-VO; Ziel: mindestens 7 Werktage).\n\nDer Verkäufer kann jederzeit mit einer Frist von 30 Tagen kündigen. Die Plattform kann ordentlich mit 30 Tagen Frist kündigen; außerordentliche Kündigung aus wichtigem Grund bleibt vorbehalten. Laufende Bestellungen sind auch nach Beendigung ordnungsgemäß abzuwickeln. Fällige Auszahlungen werden nach Abzug offener Forderungen ausgezahlt, vorbehaltlich Einbehalten nach § 8.`,
-    },
-    {
-      heading: '§ 20 – Vertragsübertragung',
-      body: `Der Verkäufer darf Rechte und Pflichten aus dieser Vereinbarung nicht ohne vorherige schriftliche Zustimmung der Plattform auf Dritte übertragen. Die Plattform kann die Vereinbarung im Rahmen einer Umstrukturierung, Verschmelzung oder eines Betriebsübergangs auf ein verbundenes Unternehmen übertragen, sofern dies die Rechtsposition des Verkäufers nicht wesentlich verschlechtert.`,
-    },
-    {
-      heading: '§ 21 – Änderungen dieser Vereinbarung',
-      body: `Änderungen werden dem Verkäufer mindestens fünfzehn (15) Tage vor Inkrafttreten per E-Mail und/oder Benachrichtigung im Sellercentral mitgeteilt (Art. 3 P2B-VO), außer soweit eine kürzere Frist aufgrund gesetzlicher Verpflichtungen, zur Abwehr unvorhergesehener Gefahren oder zugunsten des Verkäufers erforderlich ist (in gesetzlich zwingenden Fällen ggf. bis zu 3 Tage).\n\nWiderspricht der Verkäufer nicht innerhalb der Ankündigungsfrist und nutzt die Plattform weiter, gelten die Änderungen als angenommen. Bei Widerspruch kann der Verkäufer die Vereinbarung gemäß § 19 kündigen. Die jeweils aktuelle Fassung und Versionsnummer sind im Sellercentral einsehbar.`,
-    },
-    {
-      heading: '§ 22 – Streitbeilegung',
-      body: `Streitigkeiten werden zunächst intern behandelt. Interne Beschwerdestelle gemäß Art. 11 P2B-VO: info@andertal.com. Beschwerden werden kostenfrei und zügig bearbeitet; der Verkäufer kann Entscheidungen der Plattform in der Regel binnen 14 Tagen schriftlich anfechten.\n\nExterne Möglichkeiten: Online-Streitbeilegungsportal der EU (https://ec.europa.eu/consumers/odr/) sowie Mediation nach Art. 12 P2B-VO (u. a. anerkannte Stellen wie CEDR, soweit einschlägig).\n\nEs gilt deutsches Recht unter Ausschluss des UN-Kaufrechts (CISG). Gerichtsstand ist, soweit der Verkäufer Kaufmann ist und gesetzlich zulässig, Berlin.`,
-    },
-    {
-      heading: '§ 23 – Weitere Compliance-Anforderungen',
-      body: `Soweit einschlägig, beachtet der Verkäufer insbesondere: KYC-/Geldwäschevorgaben auf Anforderung der Plattform; DAC7-bezogene Mitwirkungspflichten; Batterieverordnung und ElektroG für betroffene Produkte; Marktüberwachungsrecht (Verordnung (EU) 2019/1020); sowie – soweit gesetzlich anwendbar – Lieferketten-Sorgfaltspflichten. Produktsicherheitsrisiken und erforderliche Rückrufe sind der Plattform unverzüglich zu melden.`,
-    },
-    {
-      heading: '§ 24 – Schlussbestimmungen und Kontakt',
-      body: `Sollten einzelne Bestimmungen unwirksam sein, bleiben die übrigen wirksam (salvatorische Klausel). Die Parteien ersetzen eine unwirksame Bestimmung durch eine wirksame Regelung, die dem wirtschaftlichen Zweck möglichst nahekommt.\n\nDiese Vereinbarung bildet zusammen mit den im Sellercentral veröffentlichten Richtlinien (u. a. verbotene Artikel, Compliance-Vorgaben, Preisliste) die vollständige Vereinbarung zum Vertragsgegenstand und ersetzt frühere Absprachen hierzu. Änderungen bedürfen der Textform i. S. d. § 21 (einschließlich elektronischer Mitteilung).\n\nKontakt Plattform: info@andertal.com.\nVersion: ${AGREEMENT_VERSION} · Stand: ${AGREEMENT_UPDATED}.`,
-    },
-  ],
+  de: buildDeSections(AGREEMENT_VERSION, AGREEMENT_UPDATED),
 
-  tr: [
+    tr: [
     {
       heading: 'Önsöz – Taraflar ve Yürürlük',
-      body: `Bu Satıcı–Platform Sözleşmesi (bundan böyle „Sözleşme"), ${DEFAULT_PLATFORM_NAME} (bundan böyle „Platform") ile kayıtlı ticari satıcı (bundan böyle „Satıcı") arasındaki hukuki ilişkiyi düzenler.\n\nSellercentral'da onay kutusunun işaretlenmesi ve/veya elektronik imza ile Satıcı, bu Sözleşmenin tamamını okuyup anladığını ve aşağıdaki tüm hükümlere bağlı olduğunu kabul eder.\n\nSözleşme özellikle şu düzenlemeleri dikkate alır: (AB) 2022/2065 DSA, (AB) 2019/1150 P2B Tüzüğü, (AB) 2016/679 GDPR, (AB) 2023/988 GPSR, Alman Medeni Kanunu (BGB) ve diğer uygulanabilir AB / Alman hukuku.\n\nSözleşme birden fazla dilde sunulur. Dil sürümleri arasında çelişki halinde yalnızca Almanca metin esas alınır.`,
+      body: `Bu metin okuma kolaylığı içindir. Bağlayıcı olan Almanca sürümdür. Dil metinleri çelişirse Almanca metin uygulanır.\n\nPlatform tarafının bilgileri ayarlardan gelir.\nİşletme: {FIRMA}\nSahip: {INHABER}\nAdres: {ANSCHRIFT}\nE-posta: {EMAIL}\nVergi numarası: {STEUERNUMMER}\nKDV kimlik numarası: {UST_ID}\nAndertal bir GmbH değildir ve tüzel kişiliği yoktur. Sahip, işletmenin borçlarından kişisel malvarlığıyla sorumludur.\n\nSatıcı, Sellercentral'da onay kutusunu işaretleyip cihaz üzerinde imza çizerek sözleşmeyi kurar. Kağıt üzerinde ıslak imza ve kaşe, geçerlilik şartı değildir.`,
     },
     {
       heading: 'Madde 1 – Tanımlar',
-      body: `„Platform": ${DEFAULT_PLATFORM_NAME} tarafından işletilen pazar yeri altyapısı (web sitesi, uygulamalar, API'ler, Sellercentral ve ilgili hizmetler) ile platform işletmecisi tüzel kişiyi ifade eder.\n„Satıcı": Platform üzerinden mal sunmak üzere kayıt olan gerçek veya tüzel kişiyi ifade eder.\n„Son müşteri" / „Tüketici": Satıcının sunduğu ürünü satın alan kişiyi ifade eder.\n„İlan": Platformda yayımlanan ürün listeleme kaydını ifade eder.\n„Sellercentral": Satıcının yönetim arayüzünü ifade eder.\n„İşlem": Platform üzerinden aracılık edilen, Satıcı ile son müşteri arasındaki tamamlanmış satış sözleşmesini ifade eder.\n„Fiyat listesi": Sellercentral'da yayımlanan güncel platform ücretleri ve komisyon özetini ifade eder.`,
+      body: `„Platform": Andertal iş adı altında şahıs şirketi işleten gerçek kişinin işlettiği pazar yeri altyapısını ifade eder. İşleten bir sermaye şirketi değildir.\n„Satıcı": Platform üzerinden mal sunmak üzere kayıt olan gerçek veya tüzel kişiyi ifade eder.\n„Son müşteri" / „Tüketici": Satıcının sunduğu ürünü satın alan kişiyi ifade eder.\n„İlan": Platformda yayımlanan ürün listeleme kaydını ifade eder.\n„Sellercentral": Satıcının yönetim arayüzünü ifade eder.\n„İşlem": Platform üzerinden aracılık edilen, Satıcı ile son müşteri arasındaki tamamlanmış satış sözleşmesini ifade eder.\n„Fiyat listesi": Sellercentral'da yayımlanan güncel platform ücretleri ve komisyon özetini ifade eder.`,
     },
     {
       heading: 'Madde 2 – Konu ve Platformun Rolü',
@@ -241,11 +142,11 @@ const SECTIONS = {
   en: [
     {
       heading: 'Preamble – Parties and Binding Effect',
-      body: `This Seller–Platform Agreement (the „Agreement") governs the legal relationship between ${DEFAULT_PLATFORM_NAME} (the „Platform") and the registered commercial seller (the „Seller").\n\nBy ticking the acceptance box in Sellercentral and/or by electronic signature, the Seller confirms that they have read and understood this Agreement in full and agree to be bound by all of the following terms.\n\nThis Agreement takes into account in particular: Regulation (EU) 2022/2065 (DSA), Regulation (EU) 2019/1150 (P2B Regulation), Regulation (EU) 2016/679 (GDPR), Regulation (EU) 2023/988 (GPSR), the German Civil Code (BGB) and other applicable EU and German law.\n\nThis Agreement is available in several languages. In case of conflict, the German version alone prevails.`,
+      body: `This text is a reading aid. The German version alone is binding. If another language differs, the German text applies.\n\nThe platform operator's details are taken from the platform settings.\nBusiness name: {FIRMA}\nProprietor: {INHABER}\nAddress: {ANSCHRIFT}\nEmail: {EMAIL}\nTax number: {STEUERNUMMER}\nVAT identification number: {UST_ID}\nAndertal is not a limited company and has no legal personality of its own. The proprietor is personally liable for the obligations of the business.\n\nThe contract is formed when the seller ticks acceptance in Sellercentral and draws a signature on a device. A wet-ink signature and a company stamp are not conditions of validity.`,
     },
     {
       heading: 'Article 1 – Definitions',
-      body: `„Platform" means the marketplace infrastructure operated by ${DEFAULT_PLATFORM_NAME} (website, apps, APIs, Sellercentral and related services) and the legal entity operating it.\n„Seller" means any natural or legal person who registers to offer goods via the Platform.\n„End Customer" / „Consumer" means the buyer of a product offered by the Seller.\n„Listing" means each product listing published on the Platform.\n„Sellercentral" means the Seller's management interface.\n„Transaction" means a completed sales contract between Seller and End Customer intermediated via the Platform.\n„Price List" means the current schedule of Platform fees and commissions published in Sellercentral.`,
+      body: `„Platform" means the marketplace infrastructure operated by the natural person who runs the sole proprietorship under the business name Andertal. The operator is not a limited company.\n„Seller" means any natural or legal person who registers to offer goods via the Platform.\n„End Customer" / „Consumer" means the buyer of a product offered by the Seller.\n„Listing" means each product listing published on the Platform.\n„Sellercentral" means the Seller's management interface.\n„Transaction" means a completed sales contract between Seller and End Customer intermediated via the Platform.\n„Price List" means the current schedule of Platform fees and commissions published in Sellercentral.`,
     },
     {
       heading: 'Article 2 – Subject Matter and Role of the Platform',
@@ -508,6 +409,7 @@ async function resolveSellerAgreement(locale, queryFn) {
     if (!row) return fallback
     const sections = Array.isArray(row.sections) ? row.sections : []
     if (!sections.length) return fallback
+    if (String(row.version || '') < AGREEMENT_VERSION) return fallback
     const updated = row.updated_at
       ? new Date(row.updated_at).toISOString().slice(0, 10)
       : fallback.updated
@@ -571,6 +473,32 @@ function listAgreementLocales() {
   return Object.keys(TITLES)
 }
 
+const IDENTITY_TOKENS = ['{INHABER}', '{ANSCHRIFT}', '{EMAIL}', '{STEUERNUMMER}', '{UST_ID}', '{FIRMA}']
+
+function applyPlatformIdentity(agreement, legal) {
+  if (!agreement) return agreement
+  const row = legal || {}
+  const values = {
+    '{FIRMA}': String(row.legal_company_name || 'Andertal').trim() || 'Andertal',
+    '{INHABER}': String(row.legal_representative || '').trim(),
+    '{ANSCHRIFT}': [row.legal_street, row.legal_city].map((part) => String(part || '').trim()).filter(Boolean).join(', '),
+    '{EMAIL}': String(row.legal_email || '').trim(),
+    '{STEUERNUMMER}': String(row.legal_tax_id || '').trim(),
+    '{UST_ID}': String(row.legal_vat_id || '').trim(),
+  }
+  const sections = (agreement.sections || []).map((sec) => {
+    let body = String(sec.body || '')
+    for (const token of IDENTITY_TOKENS) {
+      const value = values[token]
+      if (value) body = body.split(token).join(value)
+      else body = body.split('\n').filter((line) => !line.includes(token)).join('\n')
+    }
+    body = body.replace(/\n{3,}/g, '\n\n').trim()
+    return { ...sec, body }
+  })
+  return { ...agreement, sections }
+}
+
 module.exports = {
   AGREEMENT_VERSION,
   AGREEMENT_UPDATED,
@@ -581,6 +509,7 @@ module.exports = {
   ensureSellerAgreementTable,
   resolveSellerAgreement,
   saveSellerAgreementTemplate,
+  applyPlatformIdentity,
   listAgreementLocales,
   ENSURE_AGREEMENT_TABLE_SQL,
 }
