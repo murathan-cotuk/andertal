@@ -26,14 +26,18 @@ const Shell = styled.div`
 `;
 
 const DesktopRail = styled.aside`
-  width: ${(p) => p.$width || "220px"};
+  width: ${(p) => p.$width || "260px"};
   flex-shrink: 0;
-  padding: 28px 16px 32px 24px;
+  margin: 24px 8px 32px 24px;
+  padding: 18px 14px;
   position: sticky;
   top: 120px;
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh - 140px);
   overflow-y: auto;
   box-sizing: border-box;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(29, 27, 24, 0.06);
 
   @media (max-width: ${CATALOG_DRAWER_MAX_PX}px) {
     display: none;
@@ -42,22 +46,29 @@ const DesktopRail = styled.aside`
 
 const RailTitle = styled.div.attrs({ className: "shop-typo-sidebar-nav" })`
   margin-bottom: 10px;
+  padding: 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d1b18;
 `;
 
 const RailLink = styled(Link).attrs((p) => ({
   className: p.$active ? "shop-typo-sidebar-submenu is-active" : "shop-typo-sidebar-submenu",
 }))`
   display: block;
+  margin: 1px 0;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   text-decoration: none;
-  background: ${(p) => (p.$active ? "#f4f4f2" : "transparent")};
-  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111)" : "var(--sidebar-submenu-color, #333)")};
-  font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-submenu-fw, 400)")};
+  font-size: 14px;
+  background: ${(p) => (p.$active ? "#fcebd5" : "transparent")};
+  box-shadow: ${(p) => (p.$active ? "inset 3px 0 0 var(--shop-primary, #ee8a12)" : "none")};
+  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #1d1b18)" : "var(--sidebar-submenu-color, #5e574e)")};
+  font-weight: ${(p) => (p.$active ? 700 : "var(--sidebar-submenu-fw, 500)")};
 
   &:hover {
-    background: #f4f4f2;
-    color: var(--sidebar-nav-color, #111);
+    background: ${(p) => (p.$active ? "#fcebd5" : "#f6f2ec")};
+    color: var(--sidebar-nav-color, #1d1b18);
   }
 `;
 

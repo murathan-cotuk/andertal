@@ -3,6 +3,7 @@
 import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import LandingContainers from "@/components/landing/LandingContainers";
+import AutoCatalogHub, { inferHubMode } from "@/components/catalog/AutoCatalogHub";
 import CategoryTemplate from "@/components/templates/CategoryTemplate";
 import ProductTemplate from "@/components/templates/ProductTemplate";
 import ProductTemplateMobile from "@/components/templates/ProductTemplateMobile";
@@ -77,6 +78,11 @@ function stripTrailingEmptyBlocks(html) {
     next = prev.replace(TRAILING_EMPTY_BLOCK, "").trimEnd();
   } while (next !== prev);
   return next;
+}
+
+function stripHtmlText(html, max = 200) {
+  const t = String(html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
 function sanitize(html) {
@@ -763,6 +769,8 @@ function CollectionPage() {
   const [collection,  setCollection]  = useState(null);
   const [cmsPage,     setCmsPage]     = useState(null);
   const [cmsPageCategoryLinks, setCmsPageCategoryLinks] = useState([]);
+  /** null = not loaded yet; number of visible landing containers of the CMS page. */
+  const [cmsContainerCount, setCmsContainerCount] = useState(null);
   const [products,    setProducts]    = useState([]);
   const [collCategoryId, setCollCategoryId] = useState("");
   const [loading,     setLoading]     = useState(true);
@@ -951,6 +959,7 @@ function CollectionPage() {
       .then(async (data) => {
         if (cancelled) return;
         const containers = Array.isArray(data?.containers) ? data.containers : [];
+        setCmsContainerCount(containers.filter((c) => c && c.visible !== false).length);
         const seen = new Set();
         const candidates = [];
         for (const c of containers) {
@@ -976,7 +985,7 @@ function CollectionPage() {
         setCmsPageCategoryLinks(withCounts.filter((l) => l.hasProducts));
       })
       .catch(() => {
-        if (!cancelled) setCmsPageCategoryLinks([]);
+        if (!cancelled) { setCmsPageCategoryLinks([]); setCmsContainerCount(0); }
       });
     return () => { cancelled = true; };
   }, [cmsPage?.id]);
@@ -1112,6 +1121,34 @@ function CollectionPage() {
       paddingLeft: 24,
       paddingRight: 24,
     };
+    // A page created under content/pages without any landing containers yet: show the
+    // algorithmic hub (ranked carousels per category + filter sidebar) instead of a blank page.
+    // Text-only pages (e.g. "Versand", "Über uns") stay text-only unless their slug/title is a
+    // catalog topic (bestseller, neu, sale, top, trend, …).
+    const catalogTopic = /best|seller|top|beliebt|trend|neu|new|sale|angebot|deal|rabatt|popular|populer|çok|cok/i
+      .test(`${cmsPage.slug || handle} ${cmsPage.title || ""}`);
+    if (cmsContainerCount === 0 && (!stripHtmlText(localizedBody) || catalogTopic)) {
+      const pageTitle = localizedCmsField(cmsPage, "title", locale) || cmsPage.title || "";
+      return (
+        <PageWrap>
+          <ShopHeader />
+          <Main>
+            <AutoCatalogHub
+              mode={inferHubMode(cmsPage.slug, handle, cmsPage.title)}
+              title={pageTitle}
+              subtitle={stripHtmlText(localizedCmsField(cmsPage, "meta_description", locale) || "", 220)}
+            />
+            {localizedBody ? (
+              <RichtextStrip>
+                <Desc $divider={false} style={cmsBodyStyle}
+                  dangerouslySetInnerHTML={{ __html: sanitize(localizedBody) }} />
+              </RichtextStrip>
+            ) : null}
+          </Main>
+          <Footer />
+        </PageWrap>
+      );
+    }
     return (
       <PageWrap>
         <ShopHeader />
