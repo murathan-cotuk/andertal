@@ -207,7 +207,8 @@ const MiddleBarWrap = styled.div`
   @media (max-width: ${HEADER_NARROW_MQ}px) {
     min-height: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `calc(${1 - t} * var(--header-h, 72px) + ${t} * var(--header-h-compact, var(--header-h, 72px)))`;
+      // Phones: capped so the bar never takes more room than the pre-redesign header did.
+      return `min(60px, calc(${1 - t} * var(--header-h, 72px) + ${t} * var(--header-h-compact, var(--header-h, 72px))))`;
     }};
   }
 `;
@@ -226,7 +227,8 @@ const MiddleBarInner = styled.div`
     padding: 0 10px;
     min-height: ${(p) => {
       const t = Math.min(1, Math.max(0, p.$compactProgress ?? 0));
-      return `calc(${1 - t} * var(--header-h, 72px) + ${t} * var(--header-h-compact, var(--header-h, 72px)))`;
+      // Phones: capped so the bar never takes more room than the pre-redesign header did.
+      return `min(60px, calc(${1 - t} * var(--header-h, 72px) + ${t} * var(--header-h-compact, var(--header-h, 72px))))`;
     }};
   }
 `;
@@ -456,7 +458,7 @@ const SearchBarForm = styled.div`
   }
 
   @media (max-width: ${HEADER_NARROW_MQ}px) {
-    height: 46px;
+    height: 40px;
     border: 0;
     padding: 0 12px 0 0;
     box-shadow: 0 1px 2px rgba(29, 27, 24, 0.08), 0 0 0 1px rgba(29, 27, 24, 0.06);
@@ -1179,6 +1181,16 @@ const SecondMenuRowInner = styled.div`
     padding: 0 12px;
     gap: 16px;
     &::-webkit-scrollbar { display: none; }
+  }
+
+  /* Phones: a slim pill row (the old second nav was ~36px tall). */
+  @media (max-width: ${HEADER_NARROW_MQ}px) {
+    min-height: min(var(--second-nav-h, 42px), 38px);
+    gap: 8px;
+    &&& a {
+      padding: 4px 12px !important;
+      font-size: 13px;
+    }
   }
 `;
 

@@ -291,6 +291,14 @@ a {
   }
 }
 
+/* Phones/tablets: the inner bar (ShopHeader MiddleBarInner, capped at 60px) sets the header height;
+   the theme's min-height: var(--header-h) on the wrapper would otherwise keep it at the desktop value. */
+@media (max-width: 1023px) {
+  .shop-header-main {
+    min-height: 0 !important;
+  }
+}
+
 /*
  * Globe / locale: Land | Sprache yan yana.
  * Dar ekranda panel yatay kayar; sütunlara min-width verilir ki orta sütun sıfıra inmesin.
