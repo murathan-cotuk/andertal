@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { cloneElement, isValidElement, useEffect, useState } from 'react'
 import { useLocale } from 'next-intl'
 import ShopHeader from '@/components/ShopHeader'
 import Footer from '@/components/Footer'
@@ -50,9 +50,13 @@ function shouldUseLandingContainers(landing, { preferNativeCatalog }) {
   // is just as much a hand-built catalog layout as one using the sidebar+carousel combo below,
   // and was previously discarded in favor of the generic AutoCatalogHub fallback.
   const isCarouselContainer = (c) => c && c.visible !== false && (c.type === 'bestseller_carousel' || c.type === 'personalized_product_row')
-  if (settings.show_product_filter_bar === true) {
-    const carouselCount = containers.filter(isCarouselContainer).length
-    if (carouselCount > 0) return true
+  // Category / filter-bar checkboxes on this landing page mean the containers stay,
+  // and CatalogCmsLanding wraps them in the hub sidebar instead of dropping them.
+  if (
+    (settings.show_submenu_left === true || settings.show_product_filter_bar === true || settings.show_filter_bar === true)
+    && containers.some((c) => c && c.visible !== false)
+  ) {
+    return true
   }
 
   const visible = containers.filter((c) => c && c.visible !== false)
@@ -175,6 +179,14 @@ export default function CatalogCmsLanding({
   const showTitle = showTitleWhenNoContainers && !useContainers
   const safeBody = sanitizeHtml(page ? localizedCmsField(page, 'body', locale) : '')
   const trailingBody = safeBody && !hasRichtextSlot
+  // Sellercentral landing-page settings for this hub page: "Unterkategorien links anzeigen"
+  // (show_submenu_left) and "Produkt-Filterleiste anzeigen" (show_product_filter_bar) switch on
+  // the hub template's left category / filter cards around the page's own containers.
+  const landingSettings = landing?.settings && typeof landing.settings === 'object' ? landing.settings : {}
+  const wantCategories = landingSettings.show_submenu_left === true
+  const wantFilters = landingSettings.show_product_filter_bar === true
+  const wantMobileFilter = landingSettings.show_filter_bar === true
+  const hubTemplate = useContainers && hasChildren && preferNativeCatalog && isValidElement(children) && (wantCategories || wantFilters || wantMobileFilter)
   const richtextAlign = tmpl.richtext_align || 'left'
   const richtextMaxW = tmpl.richtext_max_width || '700px'
 
@@ -210,7 +222,24 @@ export default function CatalogCmsLanding({
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--shop-bg, #fafafa)' }}>
       <ShopHeader />
       <main className="flex-1">
-        {useContainers && page?.id ? (
+        {hubTemplate && page?.id ? (
+          cloneElement(children, {
+            showCategories: wantCategories,
+            showFilters: wantFilters,
+            showMobileFilter: wantMobileFilter,
+            children: (
+              <SectionErrorBoundary>
+                <LandingContainers
+                  pageId={page.id}
+                  initialContainers={containers}
+                  initialSettings={landingSettings}
+                  catalogSlots={{ product_container: null, page_richtext: bodyBlock }}
+                  suppressCatalogSidebar
+                />
+              </SectionErrorBoundary>
+            ),
+          })
+        ) : useContainers && page?.id ? (
           <SectionErrorBoundary>
             <LandingContainers
               pageId={page.id}

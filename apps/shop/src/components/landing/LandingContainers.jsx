@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from "react";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { Link } from "@/i18n/navigation";
@@ -20,6 +20,7 @@ import { useResponsiveColumnCount } from "@/hooks/useResponsiveColumnCount";
 import { useIsNarrow, useIsTablet } from "@/hooks/useIsNarrow";
 import { useLocale, useTranslations } from "next-intl";
 import CatalogHubFilterShell from "@/components/catalog/CatalogHubFilterShell";
+import { HubCatalogFilterContext } from "@/components/catalog/AutoCatalogHub";
 import { tokens } from "@/design-system/tokens";
 import { resolveImageUrl } from "@/lib/image-url";
 import styled from "styled-components";
@@ -1530,8 +1531,11 @@ function BestsellerCarousel({ container, locale = "de", preloadedProducts }) {
 }
 
 // ── Personalized Product Row ──────────────────────────────────────────────────
+const CATALOG_ALGO_MODE = { new_arrivals: "newest", bestsellers: "bestseller", on_sale: "sale" };
+
 function PersonalizedProductRow({ container, locale = "de" }) {
   const [products, setProducts] = useState(undefined);
+  const hub = useContext(HubCatalogFilterContext);
   const isNarrow = useIsNarrow(1023);
   const baseGap = container.gap != null ? Number(container.gap) : 12;
   const gap = Number.isNaN(baseGap) ? 12 : baseGap;
@@ -1542,6 +1546,10 @@ function PersonalizedProductRow({ container, locale = "de" }) {
   // ContentMosaic's free grid: every product gets its own col/row span, so a bigger "top pick"
   // tile can sit beside smaller ones — see tile_spans below).
   const displayMode = container.display_mode === "image_tiles" ? "image_tiles" : "product_cards";
+  const presentation = container.presentation === "product_grid" ? "product_grid" : "carousel";
+  const catalogMode = CATALOG_ALGO_MODE[algorithm] || "";
+  const categorySlug = String(container.category_slug || "").trim();
+  const hubGrid = presentation === "product_grid" && !!catalogMode && hub?.mode === catalogMode;
   const orientation = container.orientation === "vertical" ? "vertical" : "horizontal";
   const freeGridCols = Math.max(1, Math.min(6, Number(isNarrow ? (container.grid_cols_mobile ?? 2) : (container.grid_cols_desktop ?? 4)) || (isNarrow ? 2 : 4)));
   const freeGridRowHeight = Math.max(60, Number(isNarrow ? (container.grid_row_height_mobile ?? 140) : (container.grid_row_height_desktop ?? 180)) || (isNarrow ? 140 : 180));
@@ -1577,7 +1585,32 @@ function PersonalizedProductRow({ container, locale = "de" }) {
   }
 
   useEffect(() => {
+    if (hubGrid) return undefined;
     let cancelled = false;
+
+    if (catalogMode) {
+      const qs = new URLSearchParams({ limit: presentation === "product_grid" ? "240" : "50" });
+      if (presentation === "carousel" && categorySlug) qs.set("category", categorySlug);
+      cachedJsonFetch(`/api/store-products?${qs.toString()}`, { ttlMs: 15000 })
+        .then(async (d) => {
+          const all = Array.isArray(d?.products) ? d.products : [];
+          let next = all;
+          if (catalogMode === "sale") {
+            const rules = await loadCatalogBadgeRules();
+            next = all.filter((p) => isDiscountedProduct(p, rules.saleMinDiscountPercent));
+          } else if (catalogMode === "newest") {
+            const days = await loadNewProductWindowDays();
+            const fresh = all.filter((p) => isWithinNewWindow(p, days));
+            next = fresh.length ? fresh : all;
+          } else {
+            next = [...all].sort((a, b) => toSalesScore(b.metadata) - toSalesScore(a.metadata));
+          }
+          if (presentation === "carousel") next = next.slice(0, Math.max(4, visibleCount * 2));
+          if (!cancelled) setProducts(next);
+        })
+        .catch(() => { if (!cancelled) setProducts([]); });
+      return () => { cancelled = true; };
+    }
 
     async function load() {
       try {
@@ -1596,9 +1629,12 @@ function PersonalizedProductRow({ container, locale = "de" }) {
 
     load();
     return () => { cancelled = true; };
-  }, [algorithm, visibleCount]);
+  }, [hubGrid, catalogMode, presentation, categorySlug, algorithm, visibleCount]);
 
-  if (products === undefined) {
+  const shown = hubGrid ? hub?.products : products;
+  const gridCols = isNarrow ? Math.max(2, Math.min(3, Number(container.items_per_row_mobile) || 2)) : Math.max(2, Math.min(6, Number(container.items_per_row) || 4));
+
+  if (shown == null) {
     return (
       <div style={{ ...getContainerPadding(container, "20px 16px"), background: container.bg_color || "transparent" }}>
         <div style={{ display: "flex", gap, overflow: "hidden" }}>
@@ -1620,7 +1656,7 @@ function PersonalizedProductRow({ container, locale = "de" }) {
     );
   }
 
-  if (!products.length) return null;
+  if (!shown.length) return presentation === "product_grid" ? <div style={{ minHeight: 48 }} /> : null;
 
   const title = getTitle();
 
@@ -1662,7 +1698,18 @@ function PersonalizedProductRow({ container, locale = "de" }) {
     // Carousel's navOnSides arrows line up with this row's own edge instead of sitting misaligned.
     <div style={catalogSectionStyle(container, "48px 24px")}>
       <div style={getContentInnerStyle(container, 1312)}>
-        {displayMode === "image_tiles" ? (
+        {presentation === "product_grid" ? (
+          <>
+            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
+              {shown.map((product, i) => (
+                <div key={product.id || i} style={{ minWidth: 0 }}>
+                  <ProductCard product={product} plainImage />
+                </div>
+              ))}
+            </div>
+          </>
+        ) : displayMode === "image_tiles" ? (
           <>
             {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${freeGridCols}, minmax(0, 1fr))`, gridAutoRows: `${freeGridRowHeight}px`, gridAutoFlow: "dense", gap, width: "100%" }}>
@@ -3507,6 +3554,8 @@ export default function LandingContainers({
   applyCatalogDefaults = false,
   catalogSlots = null,
   onSettingsChange = null,
+  // Rendered inside AutoCatalogHub, which already shows the page's category/filter sidebar.
+  suppressCatalogSidebar = false,
 }) {
   const hasProvided = Array.isArray(initialContainers);
   const hasSsrData = hasProvided;
@@ -3671,7 +3720,7 @@ export default function LandingContainers({
   // Links are auto-derived from this page's bestseller_carousel containers with products.
   const wantProductFilterBar = landingSettings?.show_product_filter_bar === true;
   const hasSidebarContainer = Array.isArray(containers) && containers.some((c) => c?.type === "category_sidebar" && c?.visible !== false);
-  const shouldLoadSidebarLinks = Array.isArray(containers) && (hasSidebarContainer || wantProductFilterBar);
+  const shouldLoadSidebarLinks = !suppressCatalogSidebar && Array.isArray(containers) && (hasSidebarContainer || wantProductFilterBar);
   useEffect(() => {
     if (!shouldLoadSidebarLinks) { setSidebarCategoryLinks([]); return; }
     let cancelled = false;

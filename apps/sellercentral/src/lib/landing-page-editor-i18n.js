@@ -1001,6 +1001,33 @@ export function getLandingEditorCopy(locale) {
       "Jede Zeile unten ist ein Produktplatz, in der Reihenfolge, in der sie erscheinen. Gib einem Platz mehr Breite/Höhe, um ihn zu einer größeren Hero-Kachel zu machen — das Raster füllt die Lücken automatisch."
     ),
     personalizedTileN: (n) => x(`Slot ${n}`, `Yuva ${n}`, `Emplacement ${n}`, `Espacio ${n}`, `Slot ${n}`, `Platz ${n}`),
+    personalizedPresentation: x("Layout", "Yerleşim", "Disposition", "Disposición", "Layout", "Darstellung"),
+    personalizedPresentationCarousel: x("Carousel", "Karusel", "Carrousel", "Carrusel", "Carosello", "Karussell"),
+    personalizedPresentationGrid: x("Product grid", "Ürün ızgarası", "Grille de produits", "Cuadrícula de productos", "Griglia prodotti", "Produktraster"),
+    personalizedPresentationHelp: x(
+      "Carousel: one category, shown as a row. Product grid: every matching product, mixed. The left category tree, the filter sidebar and the mobile filter button then come from this page's Category and Filter bar settings.",
+      "Karusel: seçilen kategorideki ürünler bir satırda. Ürün ızgarası: eşleşen tüm ürünler karışık. Soldaki kategori ağacı, filtre kenar çubuğu ve mobildeki filtre düğmesi bu sayfanın Kategori ve Filtre çubuğu ayarlarından gelir.",
+      "Carrousel : une catégorie, en ligne. Grille : tous les produits correspondants, mélangés. L'arbre des catégories, la barre de filtres et le bouton filtre mobile viennent des réglages Catégorie et Barre de filtres de cette page.",
+      "Carrusel: una categoría, en fila. Cuadrícula: todos los productos coincidentes, mezclados. El árbol de categorías, la barra de filtros y el botón de filtro móvil salen de los ajustes Categoría y Barra de filtros de esta página.",
+      "Carosello: una categoria, in riga. Griglia: tutti i prodotti corrispondenti, mescolati. L'albero categorie, la barra filtri e il pulsante filtro mobile arrivano dalle impostazioni Categoria e Barra filtri di questa pagina.",
+      "Karussell: eine Kategorie, als Zeile. Produktraster: alle passenden Produkte, gemischt. Kategoriebaum links, Filterleiste und der Filter-Button auf dem Handy kommen aus den Kategorie- und Filterleisten-Einstellungen dieser Seite.",
+    ),
+    personalizedGridHelp: x(
+      "No category on this block. All matching products are listed together. Turn on “Show subcategories on the left”, “Show product filter sidebar on this page” and “Show filter bar in shop” on this page so the desktop bars and the mobile filter button appear.",
+      "Bu blokta kategori yok. Eşleşen tüm ürünler birlikte listelenir. Masaüstü çubukları ve mobil filtre düğmesi için bu sayfada “Alt kategorileri solda göster”, “Bu sayfada ürün filtre kenar çubuğunu göster” ve “Shop'ta filtre çubuğunu göster” seçeneklerini açın.",
+      "Pas de catégorie sur ce bloc. Tous les produits correspondants sont listés ensemble. Activez les sous-catégories à gauche, la barre de filtres produits et la barre de filtres du shop sur cette page.",
+      "Sin categoría en este bloque. Todos los productos coincidentes se listan juntos. Activa las subcategorías a la izquierda, la barra de filtros de producto y la barra de filtros de la tienda en esta página.",
+      "Nessuna categoria su questo blocco. Tutti i prodotti corrispondenti sono elencati insieme. Attiva le sottocategorie a sinistra, la barra filtri prodotto e la barra filtri del negozio su questa pagina.",
+      "Keine Kategorie in diesem Block. Alle passenden Produkte stehen zusammen. Schalten Sie auf dieser Seite „Unterkategorien links“, „Produkt-Filterleiste“ und „Filterleiste im Shop“ ein, damit die Leisten und der Filter-Button erscheinen.",
+    ),
+    personalizedCategoryHelp: x(
+      "New arrivals from this category only.",
+      "Yalnızca bu kategorideki yeni ürünler.",
+      "Nouveautés de cette catégorie seulement.",
+      "Novedades solo de esta categoría.",
+      "Solo le novità di questa categoria.",
+      "Nur Neuheiten aus dieser Kategorie.",
+    ),
   };
 }
 

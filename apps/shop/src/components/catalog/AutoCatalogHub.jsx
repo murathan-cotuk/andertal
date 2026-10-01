@@ -12,7 +12,7 @@
  * meaningful order instead of an empty page.
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, createContext, useContext } from "react";
 import styled from "styled-components";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -30,6 +30,13 @@ import {
 } from "@/lib/catalog-listing";
 import { productIsInStock, productPriceCents } from "@/lib/seo";
 import { useIsNarrow } from "@/hooks/useIsNarrow";
+import CatalogDrawerPortal, { CATALOG_FILTER_OVERLAY_Z, CATALOG_FILTER_SIDEBAR_Z } from "@/lib/catalog-drawer-portal";
+
+/** Sidebar selection on a hub page. Product grids inside the page read `products`. */
+export const HubCatalogFilterContext = createContext(null);
+export function useHubCatalogFilter() {
+  return useContext(HubCatalogFilterContext);
+}
 
 const INK = "#1d1b18";
 const MUTED = "#5e574e";
@@ -109,6 +116,40 @@ function rootMap(tree) {
   return map;
 }
 
+function nodeById(tree, id) {
+  const want = String(id || "");
+  if (!want) return null;
+  const walk = (nodes) => {
+    for (const n of Array.isArray(nodes) ? nodes : []) {
+      if (!n) continue;
+      if (String(n.id) === want) return n;
+      const hit = walk(n.children);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(tree);
+}
+
+function productMatchesNode(p, node) {
+  if (!node) return true;
+  const ids = new Set();
+  const walk = (n) => {
+    if (!n) return;
+    if (n.id != null) ids.add(String(n.id));
+    if (n.handle) ids.add(`h:${n.handle}`);
+    if (n.slug) ids.add(`h:${String(n.slug).replace(/^\//, "")}`);
+    for (const c of n.children || []) walk(c);
+  };
+  walk(node);
+  const hit = (id, handle) => (id != null && String(id) !== "" && ids.has(String(id))) || (handle && ids.has(`h:${handle}`));
+  for (const c of Array.isArray(p?.categories) ? p.categories : []) {
+    if (hit(c?.id, c?.handle || c?.slug)) return true;
+  }
+  const m = p?.metadata || {};
+  return hit(m.admin_category_id || m.category_id, m.category_handle || m.category_slug);
+}
+
 function productRoots(p, map) {
   const out = new Map();
   const add = (key) => {
@@ -182,7 +223,7 @@ const Intro = styled.header`
 
 const Layout = styled.div`
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: ${(p) => (p.$withSide ? "260px minmax(0, 1fr)" : "minmax(0, 1fr)")};
   gap: 28px;
   align-items: start;
   @media (max-width: 1023px) { grid-template-columns: minmax(0, 1fr); gap: 0; }
@@ -292,6 +333,27 @@ const MobileBar = styled.div`
   .count { font-size: 13px; font-weight: 700; color: ${MUTED}; }
 `;
 
+const FilterOpenBtn = styled.button`
+  display: none;
+  @media (max-width: 1023px) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 16px 12px;
+    padding: 8px 0;
+    background: none;
+    border: none;
+    border-bottom: 1.5px solid #111;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: ${INK};
+    cursor: pointer;
+  }
+`;
+
 const Section = styled.section`
   scroll-margin-top: 140px;
   margin-bottom: 36px;
@@ -345,10 +407,25 @@ const INTRO_BG = {
 /* ─── component ──────────────────────────────────────────────────────────── */
 
 /**
+ * `showCategories` / `showFilters` / `showMobileFilter` follow the page's Sellercentral landing
+ * settings (Kategorie → "Unterkategorien links anzeigen", Filterleiste → "Produkt-Filterleiste
+ * anzeigen" and "Filterleiste im Shop anzeigen"). When the page has its own containers they are
+ * passed as `children` and replace this hub's own product sections; the bars stay.
  * @param {{ mode?: "bestseller"|"newest"|"sale", title?: string, subtitle?: string,
- *   maxItems?: number, rank?: string }} props
+ *   maxItems?: number, rank?: string, showCategories?: boolean, showFilters?: boolean,
+ *   showMobileFilter?: boolean, children?: React.ReactNode }} props
  */
-export default function AutoCatalogHub({ mode = "bestseller", title = "", subtitle = "", maxItems = 20, rank: rankProp = "" }) {
+export default function AutoCatalogHub({
+  mode = "bestseller",
+  title = "",
+  subtitle = "",
+  maxItems = 20,
+  rank: rankProp = "",
+  showCategories = true,
+  showFilters = true,
+  showMobileFilter = false,
+  children = null,
+}) {
   const locale = useLocale();
   const t = useTranslations("catalogHub");
   const tFilter = useTranslations("filterPanel");
@@ -359,6 +436,7 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
   const [activeCat, setActiveCat] = useState("");
   const [rank, setRank] = useState(RANK_OPTIONS[mode]?.includes(rankProp) ? rankProp : DEFAULT_RANK[mode]);
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -376,6 +454,13 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    if (!mobileOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [mobileOpen]);
+
   const pool = useMemo(() => {
     if (!products) return [];
     let list = products;
@@ -388,6 +473,19 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
     if (inStockOnly) list = list.filter((p) => productIsInStock(p));
     return [...list].sort(RANKERS[rank] || RANKERS.bestseller);
   }, [products, mode, rules, rank, inStockOnly]);
+
+  const categoryMap = useMemo(() => rootMap(tree), [tree]);
+  const selectedNode = activeCat ? nodeById(tree, activeCat) : null;
+  const visiblePool = useMemo(() => {
+    if (!selectedNode) return pool;
+    const root = categoryMap.get(String(selectedNode.id));
+    const selectedIsRoot = !root || String(root.id) === String(selectedNode.id);
+    if (!selectedIsRoot) return pool.filter((p) => productMatchesNode(p, selectedNode));
+    return pool.filter((p) => (
+      productMatchesNode(p, selectedNode)
+      || productRoots(p, categoryMap).some((r) => String(r.id) === String(selectedNode.id))
+    ));
+  }, [pool, selectedNode, categoryMap]);
 
   const sections = useMemo(() => {
     const map = rootMap(tree);
@@ -405,11 +503,20 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
       .slice(0, MAX_SECTIONS);
   }, [tree, pool]);
 
-  if (products === null) return <GlobalPageLoader />;
+  const hubFilter = { mode, products: products === null ? null : visiblePool, activeCat };
+
+  if (products === null) {
+    return (
+      <HubCatalogFilterContext.Provider value={hubFilter}>
+        <GlobalPageLoader />
+      </HubCatalogFilterContext.Provider>
+    );
+  }
 
   const catName = (c) => getLocalizedCategory(c, locale).name || c.name || c.handle || "";
   const catSlug = (c) => String(c.slug || c.handle || "").replace(/^\//, "");
-  const visibleSections = activeCat ? sections.filter((s) => String(s.root.id) === activeCat) : sections;
+  const selectedRoot = selectedNode ? (categoryMap.get(String(selectedNode.id)) || selectedNode) : null;
+  const visibleSections = selectedRoot ? sections.filter((s) => String(s.root.id) === String(selectedRoot.id)) : sections;
   const top = pool.slice(0, 10);
   const showRank = rank === "bestseller" || rank === "rating";
   const seeAllQuery = mode === "bestseller" ? "?sort=bestseller" : mode === "newest" ? "?sort=newest" : "?sale=1";
@@ -433,8 +540,62 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
   );
 
   const rankLabel = (r) => t(`rank_${r}`);
+  const embedOnly = children != null;
+  const showCatCard = showCategories && sections.length > 0;
+  const withSide = showCatCard || showFilters;
+  const drawerCats = showCatCard || (showMobileFilter && !showFilters);
+  const drawerFilters = showFilters || (showMobileFilter && !showCatCard);
+
+  const categoryCard = (closeOnPick) => (
+    <Card>
+      <h2>{t("categories")}</h2>
+      <CatBtn type="button" $on={!activeCat} aria-pressed={!activeCat} onClick={() => { setActiveCat(""); if (closeOnPick) setMobileOpen(false); }}>
+        <span>{t("allCategories")}</span>
+        <span>{pool.length}</span>
+      </CatBtn>
+      {sections.map((s) => {
+        const id = String(s.root.id);
+        const kids = (Array.isArray(s.root.children) ? s.root.children : []).filter((c) => c && c.is_visible !== false);
+        const rootOn = activeCat === id || kids.some((c) => String(c.id) === activeCat);
+        return (
+          <div key={id}>
+            <CatBtn type="button" $on={activeCat === id} aria-pressed={activeCat === id} onClick={() => { setActiveCat(activeCat === id ? "" : id); if (closeOnPick) setMobileOpen(false); }}>
+              <span>{catName(s.root)}</span>
+              <span>{s.products.length}</span>
+            </CatBtn>
+            {rootOn ? kids.slice(0, 12).map((c) => {
+              const cid = String(c.id);
+              return (
+                <CatBtn key={cid} type="button" $on={activeCat === cid} aria-pressed={activeCat === cid} onClick={() => { setActiveCat(activeCat === cid ? id : cid); if (closeOnPick) setMobileOpen(false); }} style={{ paddingLeft: 22 }}>
+                  <span>{catName(c)}</span>
+                </CatBtn>
+              );
+            }) : null}
+          </div>
+        );
+      })}
+    </Card>
+  );
+
+  const filterCard = (
+    <Card>
+      <h2>{t("ranking")}</h2>
+      {(RANK_OPTIONS[mode] || RANK_OPTIONS.bestseller).map((r) => (
+        <Radio key={r}>
+          <input type="radio" name="hub-rank" checked={rank === r} onChange={() => setRank(r)} />
+          {rankLabel(r)}
+        </Radio>
+      ))}
+      <div style={{ height: 1, background: LINE, margin: "10px 0" }} />
+      <Radio>
+        <input type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} />
+        {tFilter("inStock")}
+      </Radio>
+    </Card>
+  );
 
   return (
+    <HubCatalogFilterContext.Provider value={hubFilter}>
     <Page>
       <Intro $bg={INTRO_BG[mode] || INTRO_BG.bestseller}>
         <h1>{title || t(`title_${mode}`)}</h1>
@@ -445,45 +606,62 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
         </div>
       </Intro>
 
-      <Layout>
+      <Layout $withSide={withSide}>
+        {withSide ? (
         <Side aria-label={t("filters")}>
-          {sections.length > 1 ? (
-            <Card>
-              <h2>{t("categories")}</h2>
-              <CatBtn type="button" $on={!activeCat} aria-pressed={!activeCat} onClick={() => setActiveCat("")}>
-                <span>{t("allCategories")}</span>
-                <span>{pool.length}</span>
-              </CatBtn>
-              {sections.map((s) => {
-                const id = String(s.root.id);
-                return (
-                  <CatBtn key={id} type="button" $on={activeCat === id} aria-pressed={activeCat === id} onClick={() => setActiveCat(activeCat === id ? "" : id)}>
-                    <span>{catName(s.root)}</span>
-                    <span>{s.products.length}</span>
-                  </CatBtn>
-                );
-              })}
-            </Card>
-          ) : null}
-          <Card>
-            <h2>{t("ranking")}</h2>
-            {(RANK_OPTIONS[mode] || RANK_OPTIONS.bestseller).map((r) => (
-              <Radio key={r}>
-                <input type="radio" name="hub-rank" checked={rank === r} onChange={() => setRank(r)} />
-                {rankLabel(r)}
-              </Radio>
-            ))}
-            <div style={{ height: 1, background: LINE, margin: "10px 0" }} />
-            <Radio>
-              <input type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)} />
-              {tFilter("inStock")}
-            </Radio>
-          </Card>
+          {showCatCard ? categoryCard(false) : null}
+          {showFilters ? filterCard : null}
         </Side>
+        ) : null}
 
         <div style={{ minWidth: 0 }}>
+          {showMobileFilter ? (
+            <FilterOpenBtn type="button" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
+              {t("filters")}
+            </FilterOpenBtn>
+          ) : null}
+          {showMobileFilter && isNarrow ? (
+            <CatalogDrawerPortal>
+              <div
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  display: mobileOpen ? "block" : "none",
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.35)",
+                  zIndex: CATALOG_FILTER_OVERLAY_Z,
+                }}
+              />
+              <aside
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  width: "min(380px, 92vw)",
+                  height: "100dvh",
+                  zIndex: CATALOG_FILTER_SIDEBAR_Z,
+                  background: "#fff",
+                  transform: mobileOpen ? "translateX(0)" : "translateX(-100%)",
+                  transition: "transform 0.3s ease",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px" }}>
+                  <strong>{t("filters")}</strong>
+                  <button type="button" onClick={() => setMobileOpen(false)} aria-label={t("filters")} style={{ background: "none", border: "none", font: "inherit", fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
+                </div>
+                <div style={{ overflowY: "auto", padding: "0 12px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+                  {drawerCats ? categoryCard(true) : null}
+                  {drawerFilters ? filterCard : null}
+                </div>
+              </aside>
+            </CatalogDrawerPortal>
+          ) : null}
+          {!showMobileFilter && withSide ? (
           <MobileBar>
-            {sections.length > 1 ? (
+            {showCatCard ? (
               <div className="pills" role="toolbar" aria-label={t("categories")}>
                 <button type="button" aria-pressed={!activeCat} onClick={() => setActiveCat("")}>{t("allCategories")}</button>
                 {sections.map((s) => {
@@ -496,17 +674,22 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
                 })}
               </div>
             ) : null}
+            {showFilters ? (
             <div className="row">
               <span className="count">{t("productsCount", { count: pool.length })}</span>
               <select value={rank} onChange={(e) => setRank(e.target.value)} aria-label={t("ranking")}>
                 {(RANK_OPTIONS[mode] || RANK_OPTIONS.bestseller).map((r) => <option key={r} value={r}>{rankLabel(r)}</option>)}
               </select>
             </div>
+            ) : null}
           </MobileBar>
+          ) : null}
 
-          {pool.length === 0 ? <Empty>{t(`empty_${mode}`)}</Empty> : null}
+          {children ? <div style={{ marginBottom: 12 }}>{children}</div> : null}
 
-          {!activeCat && top.length >= 4 ? (
+          {!embedOnly && pool.length === 0 ? <Empty>{t(`empty_${mode}`)}</Empty> : null}
+
+          {!embedOnly && !activeCat && top.length >= 4 ? (
             <Section>
               <div className="head" style={{ marginBottom: 14 }}>
                 <h2>{t(`top_${mode}`)}</h2>
@@ -515,7 +698,7 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
             </Section>
           ) : null}
 
-          {visibleSections.map((s) => {
+          {!embedOnly && visibleSections.map((s) => {
             const name = catName(s.root);
             const slug = catSlug(s.root);
             const subs = (Array.isArray(s.root.children) ? s.root.children : []).filter((c) => c && c.is_visible !== false).slice(0, 8);
@@ -543,5 +726,6 @@ export default function AutoCatalogHub({ mode = "bestseller", title = "", subtit
         </div>
       </Layout>
     </Page>
+    </HubCatalogFilterContext.Provider>
   );
 }

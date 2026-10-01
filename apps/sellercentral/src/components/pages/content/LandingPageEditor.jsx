@@ -3774,8 +3774,35 @@ function SupportFaqEditor({ container, onChange, editLang = "de" }) {
 function PersonalizedProductRowEditor({ container, onChange, deviceTab = 0, editLang = "de" }) {
   const c = useLandingCopy();
   const isMobileView = deviceTab >= 1;
+  const client = getMedusaAdminClient();
+  const [categories, setCategories] = useState([]);
   const displayMode = container.display_mode === "image_tiles" ? "image_tiles" : "product_cards";
   const isImageTiles = displayMode === "image_tiles";
+  const catalogAlgo = container.algorithm === "new_arrivals" || container.algorithm === "bestsellers" || container.algorithm === "on_sale";
+  const presentation = container.presentation === "product_grid" ? "product_grid" : "carousel";
+
+  useEffect(() => {
+    if (!catalogAlgo) return undefined;
+    client.getAdminHubCategories({ all: true }).then((r) => {
+      const flat = [];
+      const flatten = (list) => {
+        (list || []).forEach((cat) => {
+          flat.push(cat);
+          if (cat.children?.length) flatten(cat.children);
+        });
+      };
+      flatten(Array.isArray(r?.categories) ? r.categories : (Array.isArray(r) ? r : []));
+      setCategories(flat);
+    }).catch(() => {});
+    return undefined;
+  }, [catalogAlgo]);
+
+  const resolvedCategoryId = useMemo(() => {
+    if (container.category_id) return container.category_id;
+    if (!container.category_slug || !categories.length) return "";
+    const match = categories.find((cat) => (cat.slug || cat.handle || "") === container.category_slug);
+    return match?.id || "";
+  }, [container.category_id, container.category_slug, categories]);
   const visibleCount = Math.min(8, Math.max(2, Number(container.visible_count ?? 4) || 4));
   const tileSpans = Array.isArray(container.tile_spans) ? container.tile_spans : [];
 
@@ -3798,6 +3825,40 @@ function PersonalizedProductRowEditor({ container, onChange, deviceTab = 0, edit
             value={container.algorithm || "top_picks"}
             onChange={(v) => onChange({ ...container, algorithm: v })}
           />
+          {catalogAlgo && (
+            <>
+              <Select
+                label={c.personalizedPresentation}
+                helpText={c.personalizedPresentationHelp}
+                options={[
+                  { label: c.personalizedPresentationCarousel, value: "carousel" },
+                  { label: c.personalizedPresentationGrid, value: "product_grid" },
+                ]}
+                value={presentation}
+                onChange={(v) => onChange({ ...container, presentation: v === "product_grid" ? "product_grid" : "carousel" })}
+              />
+              {presentation === "product_grid" ? (
+                <Text as="p" variant="bodySm" tone="subdued">{c.personalizedGridHelp}</Text>
+              ) : (
+                <div>
+                  <CategoryDrilldownSelect
+                    label={c.category}
+                    categories={categories}
+                    value={resolvedCategoryId}
+                    onChange={(id) => {
+                      const cat = categories.find((item) => item.id === id);
+                      onChange({ ...container, category_id: id || "", category_slug: cat?.slug || cat?.handle || "" });
+                    }}
+                    noneLabel={c.chooseCategory}
+                    placeholder={c.chooseCategoryPh}
+                  />
+                  <div style={{ marginTop: 4, fontSize: 12, color: "#5e574e" }}>
+                    {container.algorithm === "new_arrivals" ? c.personalizedCategoryHelp : c.bestsellerCategoryHelp}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <TextField
             label={`${c.heading} ${c.optional}`}
             value={gi(container, "title", editLang)}
@@ -3825,7 +3886,7 @@ function PersonalizedProductRowEditor({ container, onChange, deviceTab = 0, edit
         </BlockStack>
       </Card>
 
-      <Card>
+      {presentation !== "product_grid" && <Card>
         <BlockStack gap="300">
           <Text as="h3" variant="headingSm">{c.personalizedDisplayMode}</Text>
           <Text as="p" variant="bodySm" tone="subdued">{c.personalizedDisplayModeHelp}</Text>
@@ -3916,7 +3977,7 @@ function PersonalizedProductRowEditor({ container, onChange, deviceTab = 0, edit
             </>
           )}
         </BlockStack>
-      </Card>
+      </Card>}
     </BlockStack>
   );
 }
