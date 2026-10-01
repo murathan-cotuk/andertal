@@ -77,7 +77,7 @@ module.exports = function createTransactionsRouter({
                   COALESCE(o.seller_net_after_commission_cents, 0)::bigint AS seller_net_after_commission_cents,
                   o.stripe_payout_status, o.stripe_payout_id, o.stripe_account_id,
                   o.first_name, o.last_name, o.email, o.currency,
-                  o.sendcloud_label_url,
+                  o.sendcloud_label_url, o.shipping_by_seller,
                   s.store_name, s.commission_rate, s.iban, s.vat_id,
                   COALESCE((SELECT SUM(rr.refund_amount_cents) FROM store_returns rr WHERE rr.order_id = o.id), 0)::bigint AS refund_cents,
                   -- Must mirror payouts.js's payoutEligibleOrderSql exactly (same "is this order
@@ -190,7 +190,7 @@ module.exports = function createTransactionsRouter({
             const mine = filterItemsForSeller(enriched, ownerSid, { isSuperuser: false, orderSellerId: row.seller_id })
             sellerBasis = itemsSubtotalCents(mine)
           }
-          const share = allocateSellerShareOfOrder(row, sellerBasis)
+          const share = allocateSellerShareOfOrder(row, sellerBasis, ownerSid)
           const customerPaid = share.customerPaidCents
           const commission = ownsWholeOrder
             ? resolvePlatformApplicationFeeCents(row, commRate)

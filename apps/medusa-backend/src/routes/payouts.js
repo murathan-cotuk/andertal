@@ -8,6 +8,7 @@ const {
   aggregateMarketplacePeriodSales,
   sellerPeriodPayoutCents,
   settleBalanceLabelsForPayout,
+  parseShippingBySeller,
 } = require('../seller-billing')
 
 const getDbClient = () => {
@@ -577,7 +578,7 @@ module.exports = function createPayoutsRouter({
         // Fetch matching orders un-aggregated — a shared (multi-seller) order's basis must come
         // from only THIS seller's own line items, not the whole order's subtotal (see order-items-seller.js).
         const r = await client.query(
-          `SELECT o.id, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.order_status
+          `SELECT o.id, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.order_status, o.shipping_by_seller
            FROM store_orders o
            WHERE (
              o.seller_id = $1
@@ -613,7 +614,10 @@ module.exports = function createPayoutsRouter({
           }
           basis += orderBasis
           commission += Math.round(orderBasis * commissionRate)
-          if (ownsWholeOrder) shipping += Number(o.shipping_cents) || 0
+          const shipBySeller = parseShippingBySeller(o.shipping_by_seller)
+          if (shipBySeller && Object.prototype.hasOwnProperty.call(shipBySeller, String(sellerId).trim())) {
+            shipping += Math.max(0, Number(shipBySeller[String(sellerId).trim()]) || 0)
+          } else if (ownsWholeOrder) shipping += Number(o.shipping_cents) || 0
           paidCount += 1
           if (String(o.order_status || '').trim().toLowerCase() === 'refunded') refunds += orderBasis
         }

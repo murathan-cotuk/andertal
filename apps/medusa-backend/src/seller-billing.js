@@ -191,20 +191,40 @@ async function settleBalanceLabelsForPayout(client, { sellerId, payoutId, period
   } catch (_) { /* older DB */ }
 }
 
-/** Prorate customer shipping / paid / bonus onto one seller's merchandise share. */
-function allocateSellerShareOfOrder(row, sellerMerchandiseCents) {
+/** store_orders.shipping_by_seller → {seller_id: cents} or null (legacy orders). */
+function parseShippingBySeller(raw) {
+  let v = raw
+  if (typeof v === 'string') {
+    try { v = JSON.parse(v) } catch (_) { return null }
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  return v
+}
+
+/**
+ * Prorate customer paid / bonus onto one seller's merchandise share. Shipping: when the order
+ * carries a per-seller breakdown (shipping_by_seller, each seller's own shipping rules at
+ * checkout) and `sellerId` is given, the seller gets exactly their own shipping; legacy orders
+ * keep the merchandise-ratio split.
+ */
+function allocateSellerShareOfOrder(row, sellerMerchandiseCents, sellerId = null) {
   const orderMerch = sellerOrderRevenueBasisCents(row)
   const orderPaid = resolveOrderPaidTotalCents(row)
   const orderShip = Math.max(0, Number(row.shipping_cents || 0))
   const orderBonus = Math.max(0, Number(row.platform_bonus_funding_cents || 0))
   const mine = Math.max(0, Math.round(Number(sellerMerchandiseCents) || 0))
   if (mine <= 0) return { shippingCents: 0, customerPaidCents: 0, bonusFundingCents: 0 }
+  const bySeller = parseShippingBySeller(row.shipping_by_seller)
+  const sid = sellerId != null ? String(sellerId).trim() : ''
+  const ownShip = bySeller && sid && Object.prototype.hasOwnProperty.call(bySeller, sid)
+    ? Math.max(0, Math.round(Number(bySeller[sid]) || 0))
+    : null
   if (orderMerch <= 0 || mine >= orderMerch) {
-    return { shippingCents: orderShip, customerPaidCents: orderPaid, bonusFundingCents: orderBonus }
+    return { shippingCents: ownShip != null ? ownShip : orderShip, customerPaidCents: orderPaid, bonusFundingCents: orderBonus }
   }
   const ratio = mine / orderMerch
   return {
-    shippingCents: Math.round(orderShip * ratio),
+    shippingCents: ownShip != null ? ownShip : Math.round(orderShip * ratio),
     customerPaidCents: Math.round(orderPaid * ratio),
     bonusFundingCents: Math.round(orderBonus * ratio),
   }
@@ -226,7 +246,7 @@ async function querySellerPeriodOrders(client, sellerId, periodStart, periodEnd)
       `SELECT o.id, o.seller_id, o.subtotal_cents, o.total_cents, o.shipping_cents, o.discount_cents,
               o.coupon_discount_cents, o.bonus_points_redeemed,
               COALESCE(o.platform_bonus_funding_cents, 0) AS platform_bonus_funding_cents,
-              o.sendcloud_label_url
+              o.sendcloud_label_url, o.shipping_by_seller
          FROM store_orders o
         WHERE ${where}`,
       params,
@@ -270,7 +290,7 @@ async function aggregateSellerPeriodSales(client, sellerId, periodStart, periodE
     }
     if (sellerMerch <= 0) continue
     grossCents += sellerMerch
-    const share = allocateSellerShareOfOrder(row, sellerMerch)
+    const share = allocateSellerShareOfOrder(row, sellerMerch, sid)
     shippingCents += share.shippingCents
     const oid = String(row.id)
     const paidByCard = labeled.cardIds.has(oid)
@@ -510,6 +530,7 @@ module.exports = {
   aggregateSellerPeriodSales,
   aggregateMarketplacePeriodSales,
   allocateSellerShareOfOrder,
+  parseShippingBySeller,
   applySellerPeriodLiveFields,
   settleBalanceLabelsForPayout,
   labeledOrderMeta,

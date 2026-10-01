@@ -1197,6 +1197,10 @@
     "subscribe": "S’abonner",
     "subscribed": "Merci ! Vous êtes maintenant inscrit(e).",
     "home": "Accueil",
-    "brandNotFound": "Marque introuvable."
+    "brandNotFound": "Marque introuvable.",
+    "sellerShippingLine": "Livraison {seller}",
+    "sellerShippingFree": "Gratuite",
+    "sellerFreeShippingHint": "Encore {amount} € chez {seller} pour la livraison gratuite",
+    "sellerShippingMarketplace": "Andertal"
   }
 }

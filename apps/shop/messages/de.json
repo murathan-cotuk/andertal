@@ -1214,6 +1214,10 @@
     "subscribe": "Abonnieren",
     "subscribed": "Danke! Sie sind jetzt angemeldet.",
     "home": "Start",
-    "brandNotFound": "Marke nicht gefunden."
+    "brandNotFound": "Marke nicht gefunden.",
+    "sellerShippingLine": "Versand {seller}",
+    "sellerShippingFree": "Kostenlos",
+    "sellerFreeShippingHint": "Noch {amount} € bei {seller} bis zum kostenlosen Versand",
+    "sellerShippingMarketplace": "Andertal"
   }
 }

@@ -26,9 +26,9 @@ import { getMedusaClient } from "@/lib/medusa-client";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { getShippableCountries } from "@/lib/countries";
-import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
+import { computeSellerShipping, useSellerFreeShippingThresholds } from "@/lib/seller-shipping";
+import SellerShippingBreakdown from "@/components/SellerShippingBreakdown";
 import { readAffiliateCookieId } from "@/lib/affiliate";
-import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
 import { normalizeIsoCountryCode } from "@/lib/iso-country";
 import { CHECKOUT_SHIPPING_COUNTRY_LS, CHECKOUT_SHIPPING_MARKET_COUNTRY_LS } from "@/hooks/useShippingCountryForQuotes";
 import { groupCartItemsBySeller } from "@/lib/cart-seller-groups";
@@ -1861,38 +1861,15 @@ export default function CheckoutPage() {
     } catch (_) {}
   }, [shippingCountry, marketCountryCode]);
 
-  const [allThresholds, setAllThresholds] = useState(null);
-  useEffect(() => {
-    fetch("/api/store-seller-settings")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.free_shipping_thresholds && typeof d.free_shipping_thresholds === "object") {
-          setAllThresholds(d.free_shipping_thresholds);
-        } else if (d?.free_shipping_threshold_cents != null) {
-          setAllThresholds({ DE: d.free_shipping_threshold_cents });
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const envThreshold =
-    typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
-      ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
-      : null;
-  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, shippingCountry, envThreshold);
-  const effectiveSubtotal = subtotalCents - bonusDiscountCents;
-
-  let shippingCents = null;
-  for (const item of items) {
-    const groupId = item.shipping_group_id || item.metadata?.shipping_group_id || item.variant?.product?.metadata?.shipping_group_id || item.product?.metadata?.shipping_group_id;
-    if (!groupId) continue;
-    const group = findShippingGroup(shippingGroups, groupId);
-    if (!group?.prices || typeof group.prices !== "object") continue;
-    const p = resolveShippingQuoteCents(group.prices, shippingCountry);
-    if (p == null) continue;
-    if (shippingCents === null || p > shippingCents) shippingCents = p;
-  }
-  const isFreeShipping = freeShippingThreshold != null && effectiveSubtotal >= freeShippingThreshold;
+  // Each seller's own shipping rules (own groups + own free-shipping threshold); the total is
+  // the sum over sellers. The backend quotes the charged amount the same way.
+  const sellerThresholds = useSellerFreeShippingThresholds(items);
+  const sellerShipping = useMemo(
+    () => computeSellerShipping(items, shippingGroups, sellerThresholds, shippingCountry),
+    [items, shippingGroups, sellerThresholds, shippingCountry],
+  );
+  const shippingCents = sellerShipping.totalCents;
+  const isFreeShipping = sellerShipping.anyPriced && shippingCents === 0;
   const shippingLabel = isFreeShipping
     ? t("freeShipping")
     : shippingCents != null
@@ -2147,6 +2124,7 @@ export default function CheckoutPage() {
       body: JSON.stringify({
         cart_id: cart.id,
         shipping_cents: effectiveShippingCents,
+        shipping_country: shippingCountry,
         ...(cancelId ? { cancel_payment_intent_id: cancelId } : {}),
       }),
     })
@@ -2517,6 +2495,7 @@ export default function CheckoutPage() {
                 <span>{t("shipping")}</span>
                 <span style={{ color: isFreeShipping ? "#16a34a" : undefined }}>{shippingLabel}</span>
               </SummaryRow>
+              <SellerShippingBreakdown sellerShipping={sellerShipping} />
               <SummaryTotal>
                 <span>{t("total")}</span>
                 <span>{formatPriceCents(payCents != null ? payCents : subtotalCents)} €</span>

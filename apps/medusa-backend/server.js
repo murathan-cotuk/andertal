@@ -892,6 +892,9 @@ async function start() {
         // (store_customers.vat_number, already collected on account/register — NOT a new checkout
         // field) at order time, so a later profile edit never rewrites a past invoice's tax basis.
         await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS customer_vat_id text`).catch(() => {})
+        // Per-seller customer shipping {seller_id: cents} (src/shipping-quote.js) — null on legacy
+        // orders, which keep the pro-rata shipping split in seller payouts.
+        await client.query(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS shipping_by_seller jsonb`).catch(() => {})
         // Live VIES lookup result (see src/vies-check.js), snapshotted at order time from the
         // customer's profile check — null = never checked / VIES unreachable (falls back to the
         // existing format-only reverse-charge logic, unchanged). Informational only, shown on the

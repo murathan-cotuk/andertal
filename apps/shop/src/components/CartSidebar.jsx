@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -8,8 +8,8 @@ import { useCart } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
-import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
-import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
+import { computeSellerShipping, useSellerFreeShippingThresholds } from "@/lib/seller-shipping";
+import SellerShippingBreakdown from "@/components/SellerShippingBreakdown";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { bonusPointsForCents } from "@/components/product/PdpExtras";
@@ -577,45 +577,6 @@ const FreeShipBar = styled.div`
   }
 `;
 
-const ENV_THRESHOLD_CENTS = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
-  ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS)
-  : null;
-
-function useShippingThresholds() {
-  const [thresholds, setThresholds] = useState(null);
-  useEffect(() => {
-    fetch("/api/store-seller-settings")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.free_shipping_thresholds && typeof d.free_shipping_thresholds === "object") {
-          setThresholds(d.free_shipping_thresholds);
-        } else if (d?.free_shipping_threshold_cents != null) {
-          setThresholds({ DE: d.free_shipping_threshold_cents });
-        }
-      })
-      .catch(() => {});
-  }, []);
-  return thresholds;
-}
-
-function calcShipping(items, shippingGroups, country = "DE") {
-  let maxCents = null;
-  for (const item of items) {
-    const groupId =
-      item.shipping_group_id ||
-      item.metadata?.shipping_group_id ||
-      item.variant?.product?.metadata?.shipping_group_id ||
-      item.product?.metadata?.shipping_group_id;
-    if (!groupId) continue;
-    const group = findShippingGroup(shippingGroups, groupId);
-    if (!group?.prices || typeof group.prices !== "object") continue;
-    const priceCents = resolveShippingQuoteCents(group.prices, country);
-    if (priceCents == null) continue;
-    if (maxCents === null || priceCents > maxCents) maxCents = priceCents;
-  }
-  return maxCents;
-}
-
 export default function CartSidebar() {
   const locale = useLocale();
   const tCart = useTranslations("cart");
@@ -624,14 +585,19 @@ export default function CartSidebar() {
   const items = cart?.items || [];
   const lineImage = useCartLineImages(items);
   const tProduct = useTranslations("product");
-  const allThresholds = useShippingThresholds();
+  const tUi = useTranslations("shopUi");
   const prefix = useMarketPrefix();
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
-  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, marketCountry, ENV_THRESHOLD_CENTS);
   const effectiveTotal = subtotalCents - bonusDiscountCents;
-  const shippingCents = calcShipping(items, shippingGroups, countryCode);
-  const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;
+  // Each seller's own shipping + own free-shipping threshold; total = sum over sellers.
+  const sellerThresholds = useSellerFreeShippingThresholds(items);
+  const sellerShipping = useMemo(
+    () => computeSellerShipping(items, shippingGroups, sellerThresholds, countryCode),
+    [items, shippingGroups, sellerThresholds, countryCode],
+  );
+  const shippingCents = sellerShipping.totalCents;
+  const isFree = sellerShipping.anyPriced && shippingCents === 0;
   const shippingLabel = isFree
     ? tCart("freeShipping")
     : shippingCents != null
@@ -812,16 +778,24 @@ export default function CartSidebar() {
               )}
             </>
           )}
-          {items.length > 0 && freeShippingThreshold != null && freeShippingThreshold > 0 && (
-            <FreeShipBar role="status">
-              {isFree
-                ? <b style={{ color: "#1E6B3C" }}>{tCart("freeShippingReached")}</b>
-                : tCart("freeShippingRemaining", { amount: `${formatPriceCents(Math.max(0, freeShippingThreshold - effectiveTotal))} €` })}
-              <div className="track" aria-hidden="true">
-                <div className="fill" style={{ width: `${Math.min(100, Math.max(0, Math.round((effectiveTotal / freeShippingThreshold) * 100)))}%` }} />
-              </div>
-            </FreeShipBar>
-          )}
+          {items.length > 0 &&
+            sellerShipping.sellers
+              .filter((s) => s.thresholdCents != null && s.thresholdCents > 0)
+              .map((s) => (
+                <FreeShipBar role="status" key={`fsb-${s.sellerId}`}>
+                  {sellerShipping.sellers.length > 1 ? (
+                    <b style={{ display: "block", fontSize: 12, marginBottom: 2 }}>
+                      {s.sellerStoreName || tUi("sellerShippingMarketplace")}
+                    </b>
+                  ) : null}
+                  {s.free
+                    ? <b style={{ color: "#1E6B3C" }}>{tCart("freeShippingReached")}</b>
+                    : tCart("freeShippingRemaining", { amount: `${formatPriceCents(Math.max(0, s.thresholdCents - s.subtotalCents))} €` })}
+                  <div className="track" aria-hidden="true">
+                    <div className="fill" style={{ width: `${Math.min(100, Math.max(0, Math.round((s.subtotalCents / s.thresholdCents) * 100)))}%` }} />
+                  </div>
+                </FreeShipBar>
+              ))}
           {items.map((item) => (
             <Item key={item.id}>
               <ItemImage>
@@ -948,8 +922,9 @@ export default function CartSidebar() {
             ) : null}
             <Row>
               <span>{tCart("shippingLabel")}</span>
-              <span style={{ color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined }}>{shippingLabel}</span>
+              <span style={{ color: isFree ? "#16a34a" : undefined }}>{shippingLabel}</span>
             </Row>
+            {sellerShipping.sellers.length > 1 ? <SellerShippingBreakdown sellerShipping={sellerShipping} compact /> : null}
             <RowTotal>
               <span>{tCart("total")}</span>
               <span>{formatPriceCents(Math.max(0, subtotalCents - bonusDiscountCents + (isFree || shippingCents === null ? 0 : shippingCents)))} €</span>

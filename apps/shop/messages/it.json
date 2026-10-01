@@ -1200,6 +1200,10 @@
     "subscribe": "Iscriviti",
     "subscribed": "Grazie! Ora sei iscritto/a.",
     "home": "Home",
-    "brandNotFound": "Marchio non trovato."
+    "brandNotFound": "Marchio non trovato.",
+    "sellerShippingLine": "Spedizione {seller}",
+    "sellerShippingFree": "Gratuita",
+    "sellerFreeShippingHint": "Ancora {amount} € da {seller} per la spedizione gratuita",
+    "sellerShippingMarketplace": "Andertal"
   }
 }

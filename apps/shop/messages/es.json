@@ -1199,6 +1199,10 @@
     "subscribe": "Suscribirse",
     "subscribed": "¡Gracias! Ya estás suscrito.",
     "home": "Inicio",
-    "brandNotFound": "Marca no encontrada."
+    "brandNotFound": "Marca no encontrada.",
+    "sellerShippingLine": "Envío {seller}",
+    "sellerShippingFree": "Gratis",
+    "sellerFreeShippingHint": "Faltan {amount} € en {seller} para el envío gratis",
+    "sellerShippingMarketplace": "Andertal"
   }
 }

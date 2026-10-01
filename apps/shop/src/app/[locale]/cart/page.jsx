@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import styled from "styled-components";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
@@ -14,8 +14,8 @@ import { tokens } from "@/design-system/tokens";
 import PayNowButton from "@/components/ui/PayNowButton";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
-import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold";
-import { findShippingGroup, resolveShippingQuoteCents } from "@/lib/shipping-price";
+import { computeSellerShipping, useSellerFreeShippingThresholds } from "@/lib/seller-shipping";
+import SellerShippingBreakdown from "@/components/SellerShippingBreakdown";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 
 const PageWrap = styled.div`
@@ -368,39 +368,18 @@ export default function CartPage() {
   const locale = useLocale();
   const { cart, loading, updateLineItem, removeLineItem, clearCart, subtotalCents, bonusDiscountCents, shippingGroups } = useCart();
   const items = cart?.items || [];
-  const envThresholdCents = typeof process !== "undefined" && process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS
-    ? Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD_CENTS) : null;
-  const [allThresholds, setAllThresholds] = useState(null);
-  useEffect(() => {
-    fetch("/api/store-seller-settings")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.free_shipping_thresholds && typeof d.free_shipping_thresholds === "object") {
-          setAllThresholds(d.free_shipping_thresholds);
-        } else if (d?.free_shipping_threshold_cents != null) {
-          setAllThresholds({ DE: d.free_shipping_threshold_cents });
-        }
-      })
-      .catch(() => {});
-  }, []);
   const prefix = useMarketPrefix();
   const marketCountry = (prefix?.split("/").filter(Boolean)[0] || "de").toUpperCase();
   const countryCode = useShippingCountryForQuotes(marketCountry);
-  const freeShippingThreshold = resolveFreeShippingThresholdCents(allThresholds, marketCountry, envThresholdCents);
-  const effectiveTotal = subtotalCents - bonusDiscountCents;
 
-  // Kargo ücreti: sepetteki ürünlerin versandgruppe fiyatından hesaplanır
-  let shippingCents = null;
-  for (const item of items) {
-    const groupId = item.shipping_group_id || item.metadata?.shipping_group_id || item.variant?.product?.metadata?.shipping_group_id || item.product?.metadata?.shipping_group_id;
-    if (!groupId) continue;
-    const group = findShippingGroup(shippingGroups, groupId);
-    if (!group?.prices || typeof group.prices !== "object") continue;
-    const p = resolveShippingQuoteCents(group.prices, countryCode);
-    if (p == null) continue;
-    if (shippingCents === null || p > shippingCents) shippingCents = p;
-  }
-  const isFree = freeShippingThreshold != null && effectiveTotal >= freeShippingThreshold;
+  // Kargo: her satıcının kendi versandgruppe fiyatı + kendi ücretsiz kargo eşiği; toplam = satıcıların toplamı
+  const sellerThresholds = useSellerFreeShippingThresholds(items);
+  const sellerShipping = useMemo(
+    () => computeSellerShipping(items, shippingGroups, sellerThresholds, countryCode),
+    [items, shippingGroups, sellerThresholds, countryCode],
+  );
+  const shippingCents = sellerShipping.totalCents;
+  const isFree = sellerShipping.anyPriced && shippingCents === 0;
   const shippingLabel = isFree
     ? t("freeShipping")
     : shippingCents != null
@@ -539,13 +518,14 @@ export default function CartPage() {
                   <span>{t("shippingLabel")}</span>
                   <SummaryAmount
                     style={{
-                      color: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? "#16a34a" : undefined,
-                      fontWeight: effectiveTotal >= (freeShippingThreshold ?? Infinity) ? 700 : 600,
+                      color: isFree ? "#16a34a" : undefined,
+                      fontWeight: isFree ? 700 : 600,
                     }}
                   >
                     {shippingLabel}
                   </SummaryAmount>
                 </SummaryRowLine>
+                <SellerShippingBreakdown sellerShipping={sellerShipping} />
               </SummaryLines>
               <SummaryTotalBar>
                 <SummaryTotalLabel>{t("total")}</SummaryTotalLabel>

@@ -1214,6 +1214,10 @@
     "subscribe": "Subscribe",
     "subscribed": "Thank you! You are now subscribed.",
     "home": "Home",
-    "brandNotFound": "Brand not found."
+    "brandNotFound": "Brand not found.",
+    "sellerShippingLine": "Shipping {seller}",
+    "sellerShippingFree": "Free",
+    "sellerFreeShippingHint": "{amount} € more from {seller} for free shipping",
+    "sellerShippingMarketplace": "Andertal"
   }
 }

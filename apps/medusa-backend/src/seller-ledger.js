@@ -213,7 +213,8 @@ async function buildSellerLedger(client, sellerId, opts = {}) {
   const oRes = await client.query(
     `SELECT o.id, o.seller_id, o.order_number, o.created_at, o.subtotal_cents, o.total_cents,
             o.shipping_cents, o.discount_cents, o.coupon_discount_cents, o.bonus_points_redeemed,
-            COALESCE(o.platform_bonus_funding_cents, 0)::bigint AS platform_bonus_funding_cents
+            COALESCE(o.platform_bonus_funding_cents, 0)::bigint AS platform_bonus_funding_cents,
+            o.shipping_by_seller
        FROM store_orders o
       WHERE o.payment_status = 'bezahlt'
         AND ${sqlOrderOwnedBySeller('o', '$1')}
@@ -234,7 +235,7 @@ async function buildSellerLedger(client, sellerId, opts = {}) {
       amount_cents: basis,
       description_key: 'order_received',
     }))
-    const share = allocateSellerShareOfOrder(row, basis)
+    const share = allocateSellerShareOfOrder(row, basis, sid)
     if (share.shippingCents > 0) {
       pushEntry(all, tag({
         id: `ship-customer-${row.id}`,

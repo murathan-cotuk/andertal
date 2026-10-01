@@ -1214,6 +1214,10 @@
     "subscribe": "Abone ol",
     "subscribed": "Teşekkürler! Artık abonesiniz.",
     "home": "Ana sayfa",
-    "brandNotFound": "Marka bulunamadı."
+    "brandNotFound": "Marka bulunamadı.",
+    "sellerShippingLine": "Kargo {seller}",
+    "sellerShippingFree": "Ücretsiz",
+    "sellerFreeShippingHint": "{seller} satıcısından {amount} € daha ekleyin, kargo ücretsiz",
+    "sellerShippingMarketplace": "Andertal"
   }
 }

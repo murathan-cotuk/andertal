@@ -902,7 +902,12 @@ const PRESET_CARRIERS = [
   { name: "USPS", tracking_url_template: "https://tools.usps.com/go/TrackConfirmAction?tLabels={tracking}" },
 ];
 
-/** Platform free-shipping thresholds live on `seller_id === 'default'` (same row the storefront reads). */
+/**
+ * Free-shipping thresholds are per seller (admin_hub_seller_settings.free_shipping_thresholds of
+ * the seller's own row; the platform's own products use `seller_id === 'default'`). A seller
+ * edits only their own; the superuser picks which seller to view/edit. The checkout applies each
+ * seller's rule to that seller's own items only (medusa-backend src/shipping-quote.js).
+ */
 
 export default function ShippingSettingsPage() {
   const locale = useLocale();
@@ -920,6 +925,8 @@ export default function ShippingSettingsPage() {
   const [savingThreshold, setSavingThreshold] = useState(false);
   const [savedThreshold, setSavedThreshold] = useState(false);
   const [thresholdErr, setThresholdErr] = useState("");
+  const [thresholdSellerId, setThresholdSellerId] = useState("");
+  const [thresholdSellerOptions, setThresholdSellerOptions] = useState([]);
   const [scannerConfig, setScannerConfig] = useState({ enabled: true, auto_focus: true, auto_submit: true, min_length: 3 });
   const [savingScanner, setSavingScanner] = useState(false);
   const [savedScanner, setSavedScanner] = useState(false);
@@ -928,33 +935,38 @@ export default function ShippingSettingsPage() {
     setLoading(true);
     const loadSuperuser =
       typeof window !== "undefined" && localStorage.getItem("sellerIsSuperuser") === "true";
-    const [carriersData, settings, platformSettings] = await Promise.all([
+    const ownSellerId = (typeof window !== "undefined" && localStorage.getItem("sellerId")) || "default";
+    const [carriersData, settings] = await Promise.all([
       getMedusaAdminClient().getCarriers(),
       getMedusaAdminClient().getSellerSettings().catch(() => ({})),
-      loadSuperuser ? getMedusaAdminClient().getSellerSettings("default").catch(() => ({})) : Promise.resolve({}),
     ]);
     setCarriers(carriersData.carriers || []);
     setCurrentStoreName(settings?.store_name || "");
     if (settings?.barcode_scanner_config && typeof settings.barcode_scanner_config === "object") {
       setScannerConfig((prev) => ({ ...prev, ...settings.barcode_scanner_config }));
     }
-    const thresholdData = loadSuperuser ? platformSettings?.free_shipping_thresholds : null;
+    // Seller: always their own row. Superuser: starts on the platform row, can switch seller.
+    setThresholdSellerId((prev) => prev || (loadSuperuser ? "default" : ownSellerId));
+    setLoading(false);
+  }, []);
+
+  const loadThresholds = useCallback(async (sid) => {
+    if (!sid) return;
+    setThresholdErr("");
+    const data = await getMedusaAdminClient().getSellerSettings(sid).catch(() => ({}));
+    const thresholdData = data?.free_shipping_thresholds;
+    const display = {};
+    const codes = [];
     if (thresholdData && typeof thresholdData === "object") {
-      const display = {};
-      const codes = [];
       for (const [code, cents] of Object.entries(thresholdData)) {
         const iso = normalizeSellerCountryCode(code);
         if (!iso) continue;
         if (!codes.includes(iso)) codes.push(iso);
         display[iso] = String(Number(cents) / 100);
       }
-      setThresholdCountries(codes);
-      setThresholds(display);
-    } else if (loadSuperuser) {
-      setThresholdCountries([]);
-      setThresholds({});
     }
-    setLoading(false);
+    setThresholdCountries(codes);
+    setThresholds(display);
   }, []);
 
   useEffect(() => {
@@ -962,6 +974,25 @@ export default function ShippingSettingsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => { loadThresholds(thresholdSellerId); }, [loadThresholds, thresholdSellerId]);
+
+  useEffect(() => {
+    if (!isSuperuser) return;
+    getMedusaAdminClient()
+      .getSellers({ limit: 500 })
+      .then((d) => {
+        const opts = [];
+        for (const s of d?.sellers || []) {
+          const sid = String(s.seller_id || "").trim();
+          if (!sid || sid === "default") continue;
+          opts.push({ value: sid, label: s.store_name || s.company_name || s.email || sid });
+        }
+        opts.sort((a, b) => String(a.label).localeCompare(String(b.label)));
+        setThresholdSellerOptions(opts);
+      })
+      .catch(() => {});
+  }, [isSuperuser]);
 
   const handleSaveThresholds = async () => {
     const thresholdCents = {};
@@ -972,10 +1003,11 @@ export default function ShippingSettingsPage() {
       const cents = Math.round(parseFloat(raw) * 100);
       if (!isNaN(cents) && cents >= 0) thresholdCents[iso] = cents;
     }
+    if (!thresholdSellerId) return;
     setSavingThreshold(true); setThresholdErr("");
     try {
       await getMedusaAdminClient().updateSellerSettings({
-        seller_id: "default",
+        seller_id: thresholdSellerId,
         free_shipping_thresholds: thresholdCents,
       });
       setSavedThreshold(true);
@@ -1082,7 +1114,7 @@ export default function ShippingSettingsPage() {
           </BlockStack>
         </Card>
 
-        {isSuperuser && <Card>
+        <Card>
           <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center">
               <BlockStack gap="100">
@@ -1091,6 +1123,24 @@ export default function ShippingSettingsPage() {
               </BlockStack>
               {savedThreshold && <Badge tone="success">{copy.saved}</Badge>}
             </InlineStack>
+
+            {isSuperuser && (
+              <div style={{ maxWidth: 360 }}>
+                <Select
+                  label={copy.freeShippingSeller}
+                  options={[
+                    { label: copy.freeShippingPlatform, value: "default" },
+                    ...thresholdSellerOptions,
+                  ]}
+                  value={thresholdSellerId || "default"}
+                  onChange={(v) => {
+                    setSavedThreshold(false);
+                    setAddCountrySelect("");
+                    setThresholdSellerId(v);
+                  }}
+                />
+              </div>
+            )}
 
             {thresholdCountries.length > 0 && (
               <div style={{ border: "1px solid #e6dfd4", borderRadius: 8, overflow: "hidden" }}>
@@ -1158,12 +1208,12 @@ export default function ShippingSettingsPage() {
 
             {thresholdErr && <Text tone="critical">{thresholdErr}</Text>}
             <InlineStack>
-              <Button variant="primary" onClick={handleSaveThresholds} loading={savingThreshold}>
+              <Button variant="primary" onClick={handleSaveThresholds} loading={savingThreshold} disabled={!thresholdSellerId}>
                 {ui.save}
               </Button>
             </InlineStack>
           </BlockStack>
-        </Card>}
+        </Card>
 
         {isSuperuser && <CountryOverviewSection locale={locale} copy={copy} />}
 

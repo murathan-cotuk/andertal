@@ -34,6 +34,23 @@ describe('allocateSellerShareOfOrder', () => {
     assert.equal(share.bonusFundingCents, 400)
   })
 
+  it('per-seller shipping breakdown: each seller gets exactly their own shipping', () => {
+    // A: 40 € (own threshold not reached → 4,95 €), B: 60 € (free from 50 € → 0 €)
+    const row = {
+      subtotal_cents: 10000,
+      shipping_cents: 495,
+      discount_cents: 0,
+      total_cents: 10495,
+      platform_bonus_funding_cents: 0,
+      shipping_by_seller: { sellerA: 495, sellerB: 0 },
+    }
+    assert.equal(allocateSellerShareOfOrder(row, 4000, 'sellerA').shippingCents, 495)
+    assert.equal(allocateSellerShareOfOrder(row, 6000, 'sellerB').shippingCents, 0)
+    // No seller id / seller missing in breakdown → legacy pro-rata split
+    assert.equal(allocateSellerShareOfOrder(row, 4000).shippingCents, 198)
+    assert.equal(allocateSellerShareOfOrder({ ...row, shipping_by_seller: '{"sellerA":495}' }, 4000, 'sellerA').shippingCents, 495)
+  })
+
   it('zero merchandise → zero share', () => {
     const row = { subtotal_cents: 10000, shipping_cents: 500, total_cents: 10500, platform_bonus_funding_cents: 0 }
     const share = allocateSellerShareOfOrder(row, 0)
