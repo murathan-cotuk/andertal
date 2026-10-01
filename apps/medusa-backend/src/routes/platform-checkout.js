@@ -1,6 +1,6 @@
 'use strict'
 const { Router } = require('express')
-const { normalizeThresholdsObject, isStorePublishedStatus } = require('./seller-settings')
+const { normalizeThresholdsObject, isStorePublishedStatus, getApprovedSellerIdsSet } = require('./seller-settings')
 const { getSellerDbClient } = require('./seller-auth')
 const { mapAdminHubToStoreProduct } = require('./store-products')
 const { listAdminHubProductsDb } = require('./admin-products')
@@ -375,6 +375,40 @@ const storeSellerProfileGET = async (req, res) => {
   }
 }
 
+/**
+ * Flat list of public seller storefronts (approved sellers with a real store name) — built for
+ * the shop sitemap (apps/shop/src/app/sitemap.xml/route.js) and for future internal-linking use.
+ * No equivalent bulk endpoint existed before; /store/seller-profile/:seller_id is single-seller
+ * only. Reuses the same approval-status gate every other storefront-visibility check uses
+ * (getApprovedSellerIdsSet, seller-settings.js) rather than re-deriving "who's public" logic.
+ */
+const storeSellersListGET = async (_req, res) => {
+  let client
+  try {
+    const approvedIds = await getApprovedSellerIdsSet()
+    if (!approvedIds.size) return res.json({ sellers: [], count: 0 })
+    client = getDbClient()
+    if (!client) return res.json({ sellers: [], count: 0 })
+    await client.connect()
+    const r = await client.query(
+      `SELECT seller_id, store_name, updated_at FROM admin_hub_seller_settings
+       WHERE seller_id = ANY($1::text[]) AND store_name IS NOT NULL AND TRIM(store_name) != ''`,
+      [[...approvedIds]],
+    )
+    await client.end()
+    client = null
+    const sellers = (r.rows || []).map((row) => ({
+      seller_id: row.seller_id,
+      store_name: row.store_name,
+      updated_at: row.updated_at || null,
+    }))
+    res.json({ sellers, count: sellers.length })
+  } catch (e) {
+    if (client) try { await client.end() } catch (_) {}
+    res.status(500).json({ message: e?.message || 'Error' })
+  }
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 
 module.exports = function createPlatformCheckoutRouter(deps = {}) {
@@ -387,6 +421,7 @@ module.exports = function createPlatformCheckoutRouter(deps = {}) {
   router.post('/admin-hub/v1/platform-checkout-settings/test-stripe', requireSuperuser, platformCheckoutTestStripePOST)
   router.get('/store/seller-settings', storeSellerSettingsGET)
   router.get('/store/seller-profile/:seller_id', storeSellerProfileGET)
+  router.get('/store/sellers', storeSellersListGET)
 
   return router
 }

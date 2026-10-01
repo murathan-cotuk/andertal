@@ -26,6 +26,10 @@ function escapeXml(value) {
 
 /**
  * pathForLocale(locale) ? path without market prefix, e.g. "bestsellers" or "foo-a-12345678"
+ * `lastmod`: pass a real timestamp when one exists (product/brand/page updated_at). Pass
+ * null/undefined when there is no real per-item date to report — the <lastmod> tag is then
+ * omitted entirely rather than stamped with today's date, which would misrepresent content
+ * as "just changed" when it didn't (categories have no updated_at column exposed today).
  */
 function urlEntry(pathForLocale, lastmod, changefreq = "weekly", priority = "0.7", locales = SEO_LOCALES) {
   const list = Array.isArray(locales) && locales.length ? locales : SEO_LOCALES;
@@ -46,14 +50,30 @@ function urlEntry(pathForLocale, lastmod, changefreq = "weekly", priority = "0.7
       ? pathForLocale(defaultLocale)
       : pathForLocale;
   const xDefault = `${SITE_URL}${publicPath(defaultMarketForLocale(defaultLocale), defaultLocale, xDefaultPath)}`;
+  const lastmodStr = lastmod ? String(lastmod).split("T")[0] : "";
   return `  <url>
     <loc>${escapeXml(loc)}</loc>
-    <lastmod>${escapeXml(lastmod)}</lastmod>
-    <changefreq>${changefreq}</changefreq>
+${lastmodStr ? `    <lastmod>${escapeXml(lastmodStr)}</lastmod>\n` : ""}    <changefreq>${changefreq}</changefreq>
     <priority>${priority}</priority>
 ${alternates}
     <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(xDefault)}"/>
   </url>`;
+}
+
+/** Depth-first flatten of the /store/categories tree (same shape LandingContainers/menus
+ * consume) into the nodes we need for the sitemap — reuses the already-computed `has_products`
+ * flag (store-category-tree.js, annotateCategoryTreeHasProducts) instead of re-deriving it. */
+function flattenVisibleCategoriesWithProducts(nodes, out = []) {
+  for (const n of Array.isArray(nodes) ? nodes : []) {
+    if (!n) continue;
+    if (n.is_visible !== false && n.has_products !== false && (n.slug || n.handle)) {
+      out.push(n);
+    }
+    if (Array.isArray(n.children) && n.children.length) {
+      flattenVisibleCategoriesWithProducts(n.children, out);
+    }
+  }
+  return out;
 }
 
 async function fetchJSON(path) {
@@ -85,11 +105,13 @@ async function fetchAllProducts() {
 export async function GET() {
   const today = new Date().toISOString().split("T")[0];
 
-  const [products, collectionsData, pagesData, brandsData, enabledLocales] = await Promise.all([
+  const [products, collectionsData, pagesData, brandsData, categoryTreeData, sellersData, enabledLocales] = await Promise.all([
     fetchAllProducts(),
     fetchJSON("/store/collections"),
     fetchJSON("/store/pages?type=page&limit=200"),
     fetchJSON("/store/brands"),
+    fetchJSON("/store/categories"),
+    fetchJSON("/store/sellers"),
     fetchEnabledShopLocales(),
   ]);
 
@@ -100,6 +122,8 @@ export async function GET() {
   const collections = collectionsData?.collections || [];
   const pages = pagesData?.pages || [];
   const brands = brandsData?.brands || [];
+  const categories = flattenVisibleCategoriesWithProducts(categoryTreeData?.tree || categoryTreeData?.categories || []);
+  const sellers = sellersData?.sellers || [];
 
   const staticUrls = [
     entry("", today, "daily", "1.0"),
@@ -138,15 +162,40 @@ export async function GET() {
 
   const brandUrls = brands
     .filter((b) => b?.handle)
-    .map((b) => entry(`brand/${b.handle}`, today, "weekly", "0.6"));
+    .map((b) => entry(`brand/${b.handle}`, b.updated_at || null, "weekly", "0.6"));
+
+  // Categories: only ones actually reachable/sellable (is_visible, has_products — the same
+  // signal store-category-tree.js already uses to prune empty branches from the storefront
+  // menu) so ~24k categories doesn't mean ~24k thin/empty indexable URLs. No lastmod — the
+  // tree doesn't carry a real per-category updated_at today (see docs/seo-geo-architecture.md).
+  const categoryUrls = categories
+    .filter((c) => c?.slug)
+    .map((c) => entry(String(c.slug).replace(/^\/+/, ""), null, "weekly", "0.6"));
+
+  const sellerUrls = sellers
+    .filter((s) => s?.seller_id)
+    .map((s) => entry(`seller/${s.seller_id}`, s.updated_at || null, "weekly", "0.5"));
 
   const allUrls = [
     ...staticUrls,
     ...collectionUrls,
     ...productUrls,
+    ...categoryUrls,
     ...pageUrls,
     ...brandUrls,
+    ...sellerUrls,
   ];
+
+  // Sitemap protocol caps a single file at 50,000 URLs. This route is still a single
+  // <urlset> (see docs/seo-geo-architecture.md for the sitemap-index migration plan) —
+  // surface it loudly in server logs well before the hard limit instead of silently
+  // producing a spec-invalid file.
+  if (allUrls.length > 45000) {
+    console.warn(
+      `[sitemap.xml] ${allUrls.length} URLs — approaching/over the 50,000-per-file sitemap limit. ` +
+      "Split into a sitemap index (per docs/seo-geo-architecture.md) before this grows further.",
+    );
+  }
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset

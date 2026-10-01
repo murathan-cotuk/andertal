@@ -2,6 +2,7 @@
 import SeoJsonLd from "@/components/SeoJsonLd";
 import { parseProductUrlHandle } from "@/lib/product-url-handle";
 import {
+  buildCategoryJsonLd,
   buildPageMetadata,
   buildProductJsonLd,
   fetchStoreCategoryBySlug,
@@ -83,7 +84,7 @@ export async function generateMetadata({ params }) {
   const market = marketFromHeader(h.get("x-andertal-market-prefix"), locale);
 
   if (!handle || RESERVED.has(String(handle).toLowerCase())) {
-    return { title: "Andertal" };
+    return { title: "Andertal", robots: { index: false, follow: false } };
   }
 
   const entity = await resolveHandleEntity(handle, locale);
@@ -146,6 +147,11 @@ export async function generateMetadata({ params }) {
       market,
       locale,
       path: slug,
+      // has_products is the same signal store-category-tree.js already uses to prune dead-end
+      // branches from the storefront menu (subtree-aware: true if this category OR any
+      // descendant has a sellable product) — a category with nothing under it anywhere gets
+      // kept reachable (no 404) but kept out of the index instead of indexing an empty shell.
+      noIndex: c.has_products === false,
     });
   }
 
@@ -170,7 +176,10 @@ export async function generateMetadata({ params }) {
     });
   }
 
-  return { title: "Andertal" };
+  // Handle didn't resolve to a product/category/collection/CMS page (deleted, unpublished,
+  // hidden-seller product, typo, or stale link) — was previously served as a generic 200
+  // page with no robots directive at all; now explicitly kept out of the index.
+  return { title: "Andertal", robots: { index: false, follow: false } };
 }
 
 export default async function HandleLayout({ children, params }) {
@@ -204,6 +213,12 @@ export default async function HandleLayout({ children, params }) {
         productHandleForLocale(enriched, locale),
       );
       jsonLd = buildProductJsonLd(enriched, { locale, market, canonicalUrl });
+    } else {
+      const category = await fetchStoreCategoryBySlug(handle);
+      if (category?.id || category?.slug) {
+        const canonicalUrl = absolutePublicUrl(market, locale, category.slug || handle);
+        jsonLd = buildCategoryJsonLd(category, { locale, market, canonicalUrl });
+      }
     }
   }
 

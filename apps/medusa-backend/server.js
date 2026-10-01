@@ -2386,6 +2386,10 @@ async function start() {
     const createIdealoFeedRouter = require('./src/routes/idealo-feed')
     httpApp.use('/', createIdealoFeedRouter())
 
+    // --- Google Merchant Center product feed (public, unauthenticated XML — docs/seo-geo-architecture.md): src/routes/google-merchant-feed.js ---
+    const createGoogleMerchantFeedRouter = require('./src/routes/google-merchant-feed')
+    httpApp.use('/', createGoogleMerchantFeedRouter())
+
     // --- "Notify me when back in stock" (TASKS.md #5): src/routes/back-in-stock.js ---
     const createBackInStockRouter = require('./src/routes/back-in-stock')
     httpApp.use('/', createBackInStockRouter())

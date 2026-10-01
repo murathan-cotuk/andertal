@@ -1,5 +1,7 @@
 ﻿import { headers } from "next/headers";
+import SeoJsonLd from "@/components/SeoJsonLd";
 import {
+  buildFaqJsonLd,
   buildPageMetadata,
   localizedCmsField,
   marketFromHeader,
@@ -54,6 +56,32 @@ export async function generateMetadata({ params }) {
   }
 }
 
-export default function PagesSlugLayout({ children }) {
-  return children;
+export default async function PagesSlugLayout({ children, params }) {
+  const { slug, locale } = await params;
+
+  let jsonLd = null;
+  if (slug) {
+    try {
+      const pageRes = await fetch(`${BACKEND}/store/pages/${encodeURIComponent(String(slug))}`, {
+        cache: "no-store",
+      });
+      const page = pageRes.ok ? await pageRes.json().catch(() => null) : null;
+      if (page?.id) {
+        const landingRes = await fetch(`${BACKEND}/store/landing-page/${encodeURIComponent(page.id)}`, {
+          cache: "no-store",
+        });
+        const landing = landingRes.ok ? await landingRes.json().catch(() => null) : null;
+        jsonLd = buildFaqJsonLd(landing?.containers, locale);
+      }
+    } catch {
+      /* no JSON-LD for this request — metadata above already has a safe fallback */
+    }
+  }
+
+  return (
+    <>
+      <SeoJsonLd data={jsonLd} />
+      {children}
+    </>
+  );
 }

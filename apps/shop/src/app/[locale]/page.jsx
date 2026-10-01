@@ -6,7 +6,8 @@ import LandingPopup from "@/components/landing/LandingPopup";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { SectionErrorBoundary } from "@/components/ErrorBoundary";
 import { fetchLandingPage } from "@/lib/landing-page-fetch";
-import { absolutePublicUrl, languageAlternates, normalizeLocale } from "@/lib/seo";
+import { headers } from "next/headers";
+import { absolutePublicUrl, isCanonicalMarket, languageAlternates, marketFromHeader, normalizeLocale } from "@/lib/seo";
 import { defaultMarketForLocale } from "@/lib/shop-market";
 
 // Server-rendered: the homepage's landing containers (hero banner + everything else) used to be
@@ -16,11 +17,14 @@ import { defaultMarketForLocale } from "@/lib/shop-market";
 export async function generateMetadata({ params }) {
   const { locale } = await params;
   const loc = normalizeLocale(locale);
+  const h = await headers();
+  const market = marketFromHeader(h.get("x-andertal-market-prefix"), loc);
   return {
     alternates: {
       canonical: absolutePublicUrl(defaultMarketForLocale(loc), loc, ""),
       languages: languageAlternates(null, ""),
     },
+    ...(isCanonicalMarket(market, loc) ? {} : { robots: { index: false, follow: true } }),
   };
 }
 

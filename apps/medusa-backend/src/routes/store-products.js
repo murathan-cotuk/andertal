@@ -880,6 +880,29 @@ const enrichMappedStoreProduct = async (productRow, mapped, { alsoMatchIds = [] 
       }
     } catch (_) { try { if (client) await client.end() } catch (__) {} }
   }
+  // Product-level rating (store_product_reviews) — matched across the same multi-seller/EAN
+  // group as `matchIds` above, same as GET /store/reviews?product_ids=... (store-checkout.js).
+  // This was previously never attached here, so the shop's Product JSON-LD (lib/seo.js,
+  // buildProductJsonLd) always fell through with no aggregateRating even though real reviews
+  // exist and are shown on the PDP itself.
+  if (matchIds.length) {
+    let reviewClient
+    try {
+      reviewClient = getDbClient()
+      if (reviewClient) {
+        await reviewClient.connect()
+        const rr = await reviewClient.query(
+          'SELECT COUNT(*)::int AS review_count, AVG(rating)::float AS review_avg FROM store_product_reviews WHERE product_id = ANY($1::text[])',
+          [matchIds],
+        )
+        await reviewClient.end()
+        const row = rr.rows && rr.rows[0]
+        if (row && Number(row.review_count) > 0) {
+          mapped.metadata = { ...(mapped.metadata || {}), review_count: Number(row.review_count), review_avg: parseFloat(row.review_avg) }
+        }
+      }
+    } catch (_) { try { if (reviewClient) await reviewClient.end() } catch (__) {} }
+  }
   return mapped
 }
 
@@ -1161,12 +1184,12 @@ module.exports = function createStoreProductsRouter() {
       await client.connect()
       // Only surface approved brands in the shop (docs/BRAND.md Faz 4).
       // NULL status = legacy brand (pre-migration) → treated as active.
-      const r = await client.query(`SELECT id, name, handle, logo_image, banner_image, address, created_at FROM admin_hub_brands WHERE status IS NULL OR status = 'active' ORDER BY created_at DESC NULLS LAST, LOWER(name)`)
+      const r = await client.query(`SELECT id, name, handle, logo_image, banner_image, address, created_at, updated_at FROM admin_hub_brands WHERE status IS NULL OR status = 'active' ORDER BY created_at DESC NULLS LAST, LOWER(name)`)
       await client.end()
       const brands = (r.rows || []).map((row) => {
         const rawHandle = (row.handle || '').trim()
         const handle = rawHandle || ('brand-' + String(row.id || '').replace(/-/g, '').slice(0, 12))
-        return { id: row.id, name: row.name, handle, logo_image: row.logo_image || null, banner_image: row.banner_image || null, address: row.address || null, created_at: row.created_at || null }
+        return { id: row.id, name: row.name, handle, logo_image: row.logo_image || null, banner_image: row.banner_image || null, address: row.address || null, created_at: row.created_at || null, updated_at: row.updated_at || row.created_at || null }
       }).filter((b) => b && b.handle)
       res.json({ brands, count: brands.length })
     } catch (e) {

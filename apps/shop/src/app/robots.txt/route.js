@@ -23,6 +23,7 @@ Disallow: /*/nachrichten
 Disallow: /*/bonus
 Disallow: /*/invoices
 Disallow: /*/reviews
+Disallow: /*/cms-preview
 Disallow: /api/
 
 # ChatGPT search — allow discovery

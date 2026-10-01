@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
-import { buildPageMetadata, marketFromHeader, stripHtml } from "@/lib/seo";
+import SeoJsonLd from "@/components/SeoJsonLd";
+import { absolutePublicUrl, buildPageMetadata, buildSellerJsonLd, marketFromHeader, stripHtml } from "@/lib/seo";
 
 const BASE = (
   process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
@@ -47,6 +48,33 @@ export async function generateMetadata({ params }) {
   }
 }
 
-export default function SellerLayout({ children }) {
-  return children;
+export default async function SellerLayout({ children, params }) {
+  const { seller_id: sellerId, locale } = await params;
+  const h = await headers();
+  const market = marketFromHeader(h.get("x-andertal-market-prefix"), locale);
+
+  let jsonLd = null;
+  if (sellerId) {
+    try {
+      const res = await fetch(
+        `${BASE}/store/seller-profile/${encodeURIComponent(sellerId)}`,
+        { next: { revalidate: 120 } },
+      );
+      const data = res.ok ? await res.json().catch(() => ({})) : {};
+      const seller = data?.seller || null;
+      if (seller?.store_name) {
+        const canonicalUrl = absolutePublicUrl(market, locale, `seller/${sellerId}`);
+        jsonLd = buildSellerJsonLd(seller, { locale, market, canonicalUrl });
+      }
+    } catch {
+      /* no JSON-LD for this request — metadata above already has a safe fallback */
+    }
+  }
+
+  return (
+    <>
+      <SeoJsonLd data={jsonLd} />
+      {children}
+    </>
+  );
 }

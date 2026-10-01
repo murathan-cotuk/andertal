@@ -246,6 +246,11 @@ const storeCategoriesGET = async (req, res) => {
             1,
           )
           if (!cat.image_url && node.image_url) cat.image_url = node.image_url
+          // Same signal store-category-tree.js already uses to prune empty branches from the
+          // storefront menu (annotateCategoryTreeHasProducts) — surfaced here so the shop's
+          // generateMetadata can noindex a category with no sellable products anywhere in its
+          // subtree, instead of only using it for menu visibility.
+          cat.has_products = node.has_products !== false
         }
       } catch (_) {}
 

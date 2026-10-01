@@ -1,5 +1,6 @@
 ﻿import { headers } from "next/headers";
-import { buildPageMetadata, marketFromHeader, stripHtml } from "@/lib/seo";
+import SeoJsonLd from "@/components/SeoJsonLd";
+import { absolutePublicUrl, buildBrandJsonLd, buildPageMetadata, marketFromHeader, stripHtml } from "@/lib/seo";
 
 const BASE = (
   process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
@@ -66,6 +67,32 @@ export async function generateMetadata({ params }) {
   }
 }
 
-export default function BrandLayout({ children }) {
-  return children;
+export default async function BrandLayout({ children, params }) {
+  const { handle, locale } = await params;
+  const h = await headers();
+  const market = marketFromHeader(h.get("x-andertal-market-prefix"), locale);
+
+  let jsonLd = null;
+  if (handle) {
+    try {
+      const res = await fetch(`${BASE}/store/brands/${encodeURIComponent(handle)}`, {
+        next: { revalidate: 120 },
+      });
+      const data = res.ok ? await res.json().catch(() => ({})) : {};
+      const brand = data?.brand || null;
+      if (brand) {
+        const canonicalUrl = absolutePublicUrl(market, locale, `brand/${brand.handle || handle}`);
+        jsonLd = buildBrandJsonLd(brand, { locale, market, canonicalUrl });
+      }
+    } catch {
+      /* no JSON-LD for this request — metadata above already has a safe fallback */
+    }
+  }
+
+  return (
+    <>
+      <SeoJsonLd data={jsonLd} />
+      {children}
+    </>
+  );
 }

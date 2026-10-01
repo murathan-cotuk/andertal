@@ -199,6 +199,18 @@ function absoluteImageUrl(url) {
 }
 
 /**
+ * A URL's own market segment ("/us/de/produkt-x") vs. the one locale/market pair the
+ * canonical tag and sitemap actually point at ("/de/de/produkt-x") — isValidMarket()
+ * accepts any two-letter code so every one of ~676 country codes × 6 locales renders
+ * the identical page with HTTP 200 today; this is the cheap, additive fix (noindex the
+ * non-canonical copies) rather than restricting routing itself, which real bookmarks/
+ * campaign links may depend on.
+ */
+export function isCanonicalMarket(market, locale) {
+  return normalizeMarket(market) === defaultMarketForLocale(normalizeLocale(locale));
+}
+
+/**
  * Next.js Metadata object with canonical + hreflang + Open Graph.
  */
 export function buildPageMetadata({
@@ -212,8 +224,10 @@ export function buildPageMetadata({
   images = [],
   type = "website",
   noIndex = false,
+  noFollow = false,
 }) {
   const loc = normalizeLocale(locale);
+  const shouldNoIndex = noIndex || !isCanonicalMarket(market, loc);
   const canonicalPath =
     typeof pathForLocale === "function" ? pathForLocale(loc) : path || "";
   const canonical = absolutePublicUrl(defaultMarketForLocale(loc), loc, canonicalPath);
@@ -256,7 +270,7 @@ export function buildPageMetadata({
       description: description || undefined,
       ...(imageList.length ? { images: imageList.map((i) => i.url) } : {}),
     },
-    ...(noIndex ? { robots: { index: false, follow: false } } : {}),
+    ...(shouldNoIndex ? { robots: { index: false, follow: !noFollow } } : {}),
   };
 }
 
@@ -399,6 +413,162 @@ export function buildProductJsonLd(product, {
   ];
 }
 
+/** CollectionPage + BreadcrumbList for a category page — no ItemList (would need a live
+ * product fetch just for markup; CategoryTemplate already renders the real product grid). */
+export function buildCategoryJsonLd(category, { locale, market, canonicalUrl } = {}) {
+  if (!category) return null;
+  const loc = normalizeLocale(locale);
+  const mkt = normalizeMarket(market);
+  const localized = getLocalizedCategory(category, loc) || {};
+  const name = localized.name || category.name || category.slug;
+  const description = stripHtml(
+    localized.description || category.description || category.long_content || "",
+    500,
+  );
+  const ancestors = Array.isArray(category._ancestors) ? category._ancestors : [];
+
+  const breadcrumbItems = [
+    { "@type": "ListItem", position: 1, name: "Andertal", item: absolutePublicUrl(mkt, loc) },
+    ...ancestors.map((a, i) => ({
+      "@type": "ListItem",
+      position: i + 2,
+      name: a?.name || a?.slug || "",
+      item: absolutePublicUrl(mkt, loc, String(a?.slug || "").replace(/^\/+/, "")),
+    })),
+    { "@type": "ListItem", position: ancestors.length + 2, name, item: canonicalUrl },
+  ];
+
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "@id": `${canonicalUrl}#category`,
+      url: canonicalUrl,
+      name,
+      ...(description ? { description } : {}),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: breadcrumbItems,
+    },
+  ];
+}
+
+/** CollectionPage + BreadcrumbList for a brand storefront page (/brand/[handle]) — same shape
+ * as buildCategoryJsonLd, no dedicated "Brand page" schema.org type exists for this. */
+export function buildBrandJsonLd(brand, { locale, market, canonicalUrl } = {}) {
+  if (!brand) return null;
+  const loc = normalizeLocale(locale);
+  const mkt = normalizeMarket(market);
+  const name = brand.name || brand.handle || "";
+  if (!name) return null;
+  const description = stripHtml(brand.description || brand.about || "", 500);
+  const image = brand.logo_image || brand.banner_image || "";
+
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "@id": `${canonicalUrl}#brand`,
+      url: canonicalUrl,
+      name,
+      ...(description ? { description } : {}),
+      ...(image ? { image: absoluteImageUrl(image) } : {}),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Andertal", item: absolutePublicUrl(mkt, loc) },
+        { "@type": "ListItem", position: 2, name: "Brands", item: absolutePublicUrl(mkt, loc, "brands") },
+        { "@type": "ListItem", position: 3, name, item: canonicalUrl },
+      ],
+    },
+  ];
+}
+
+/** WebPage + BreadcrumbList for a public seller storefront (/seller/[seller_id]) — review
+ * data (review_avg/review_count) is real, sourced from admin_hub_seller_settings, same as the
+ * seller-profile page itself; no AggregateRating without a nonzero review_count. */
+export function buildSellerJsonLd(seller, { locale, market, canonicalUrl } = {}) {
+  if (!seller) return null;
+  const loc = normalizeLocale(locale);
+  const mkt = normalizeMarket(market);
+  const name = seller.store_name || "";
+  if (!name) return null;
+  const description = stripHtml(seller.shop_about || "", 500);
+  const reviewCount = Number(seller.review_count);
+  const reviewAvg = Number(seller.review_avg);
+
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "@id": `${canonicalUrl}#seller`,
+      url: canonicalUrl,
+      name,
+      ...(description ? { description } : {}),
+      ...(Number.isFinite(reviewCount) && reviewCount > 0 && Number.isFinite(reviewAvg) && reviewAvg > 0
+        ? {
+            aggregateRating: {
+              "@type": "AggregateRating",
+              ratingValue: reviewAvg.toFixed(1),
+              reviewCount,
+              bestRating: "5",
+              worstRating: "1",
+            },
+          }
+        : {}),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Andertal", item: absolutePublicUrl(mkt, loc) },
+        { "@type": "ListItem", position: 2, name, item: canonicalUrl },
+      ],
+    },
+  ];
+}
+
+/** Same locale-fallback rule as LandingContainers.jsx's own `lt()` helper (duplicated, not
+ * imported — that file is a large "use client" component tree, inappropriate to pull into a
+ * server-only lib module just for one field accessor). */
+function localizedContainerField(obj, field, locale) {
+  const loc = normalizeLocale(locale);
+  if (loc === "de") return obj?.[field] ?? "";
+  return obj?._i18n?.[loc]?.[field] ?? obj?.[field] ?? "";
+}
+
+/** FAQPage from a CMS page's `accordion` landing containers (Sellercentral's landing-page
+ * editor — real seller/admin-authored Q&A, not generated). `support_faq`'s nested
+ * category/items shape isn't covered here (unverified at the time this was written — only the
+ * flat `accordion` container's `items[]` shape was confirmed against LandingContainers.jsx). */
+export function buildFaqJsonLd(containers, locale) {
+  const list = Array.isArray(containers) ? containers : [];
+  const questions = [];
+  for (const c of list) {
+    if (!c || c.visible === false || c.type !== "accordion") continue;
+    for (const item of Array.isArray(c.items) ? c.items : []) {
+      const question = String(localizedContainerField(item, "question", locale) || "").trim();
+      const answer = String(localizedContainerField(item, "answer", locale) || "").trim();
+      if (!question || !answer) continue;
+      questions.push({
+        "@type": "Question",
+        name: question,
+        acceptedAnswer: { "@type": "Answer", text: answer },
+      });
+    }
+  }
+  if (!questions.length) return null;
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: questions,
+  };
+}
+
 /** Server-side product fetch with -a-{8char} / legacy suffix fallback. */
 export async function fetchStoreProduct(handle, { revalidate = 60 } = {}) {
   const raw = String(handle || "").trim();
@@ -449,7 +619,12 @@ export async function fetchStoreCategoryBySlug(slug, { revalidate = 60 } = {}) {
     );
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
-    return data?.category || data?.categories?.[0] || null;
+    const category = data?.category || data?.categories?.[0] || null;
+    if (!category) return null;
+    // Attach the response's own ancestor chain (already computed server-side from the
+    // cached category tree) so callers can build a real BreadcrumbList without a second
+    // full-tree fetch — the raw endpoint returns this as a sibling field, not nested.
+    return { ...category, _ancestors: Array.isArray(data?.ancestors) ? data.ancestors : [] };
   } catch {
     return null;
   }
