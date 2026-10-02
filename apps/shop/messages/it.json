@@ -515,6 +515,7 @@
     "addedToCart": "Aggiunto al carrello",
     "addToCartFailed": "Errore nell'aggiunta",
     "outOfStock": "Esaurito",
+    "minOrderQty": "Quantità minima: {n}",
     "backInStockCta": "Avvisami",
     "backInStockEmailPlaceholder": "La tua email",
     "backInStockSuccess": "Grazie! Ti avviseremo appena sarà di nuovo disponibile.",

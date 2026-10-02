@@ -494,6 +494,7 @@ const RESERVED_IMPORT_HEADERS = new Set([
   "responsible_person_information", "verantwortliche_person_information",
   "weight_grams", "dim_length_cm", "dim_width_cm", "dim_height_cm",
   "unit_type", "unit_value", "per_unit", "unit_reference",
+  "minimum_order_quantity", "sales_unit", "packaging_unit", "packaging_unit_plural",
   "price", "price_uvp", "price_sale", "weee_number", "eprel_number", "swatch_image_url",
   "title", "description", "bullet1", "bullet2", "bullet3", "bullet4", "bullet5",
   "seo_title", "seo_description", "seo_keywords", "verkäufer", "_product_id",
@@ -581,6 +582,11 @@ function computeParentPresent(parentRow, idx) {
     dim_height: kp("dim_height_cm"),
     unit_type: kp("unit_type"),
     unit_value: kp("unit_value"),
+    minimum_order_quantity: kp("minimum_order_quantity"),
+    sales_unit: kp("sales_unit"),
+    packaging_unit: kp("packaging_unit"),
+    packaging_unit_plural: kp("packaging_unit_plural"),
+    inventory: kp("inventory"),
     seo_title: kp("seo_title"),
     seo_description: kp("seo_description"),
     seo_keywords: kp("seo_keywords"),
@@ -991,6 +997,10 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
   if (parentPresent.unit_type && pm.unit_type) m.unit_type = pm.unit_type;
   if (parentPresent.unit_value && pm.unit_value != null) m.unit_value = pm.unit_value;
   if (parentPresent.unit_type && pm.unit_reference != null) m.unit_reference = pm.unit_reference;
+  if (parentPresent.minimum_order_quantity && pm.minimum_order_quantity != null) m.minimum_order_quantity = pm.minimum_order_quantity;
+  if (parentPresent.sales_unit && pm.sales_unit) m.sales_unit = pm.sales_unit;
+  if (parentPresent.packaging_unit && pm.packaging_unit) m.packaging_unit = pm.packaging_unit;
+  if (parentPresent.packaging_unit_plural && pm.packaging_unit_plural) m.packaging_unit_plural = pm.packaging_unit_plural;
 
   if (parentPresent.brand && pm.brand_id) m.brand_id = pm.brand_id;
   if (parentPresent.category_slug) {
@@ -1009,7 +1019,9 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
     const structural = new Set([
       "translations", "prices", "media", "ean", "weight_grams",
       "dimensions_length", "dimensions_width", "dimensions_height",
-      "unit_type", "unit_value", "unit_reference", "variation_groups",
+      "unit_type", "unit_value", "unit_reference",
+      "minimum_order_quantity", "sales_unit", "packaging_unit", "packaging_unit_plural",
+      "variation_groups",
       "seo_meta_title", "seo_meta_description", "seo_keywords",
       "hersteller", "hersteller_information", "verantwortliche_person_information",
       "weee_number", "eprel_number", "product_files", "metafields",
@@ -1040,6 +1052,15 @@ function mergeImportIntoExisting(existing, payload, parentPresent, parentRow, ch
   if (hasChildRows && Array.isArray(payload.variants) && payload.variants.length) {
     out.variants = mergeVariantArrays(out.variants, payload.variants, childRows, idx, get, parentRow);
   }
+
+  // Simple products store stock and the selling price on the product row. Variant
+  // products keep stock on each child. Without this, the Excel inventory/price
+  // columns never reached the shop.
+  if (!hasChildRows && parentPresent.inventory) {
+    const inv = parseNum(G("inventory"));
+    if (inv != null) out.inventory = inv;
+  }
+  if (parentPresent.eurPriceTouched && payload.price != null) out.price = payload.price;
 
   return out;
 }
@@ -1203,6 +1224,10 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
     dimensions_height: parseNum(G("dim_height_cm")),
     unit_type: G("unit_type") || undefined,
     unit_value: parseNum(G("unit_value")),
+    minimum_order_quantity: parseNum(G("minimum_order_quantity")),
+    sales_unit: G("sales_unit") || undefined,
+    packaging_unit: G("packaging_unit") || undefined,
+    packaging_unit_plural: G("packaging_unit_plural") || undefined,
     unit_reference: (() => {
       const per = parseNum(G("per_unit") || G("unit_reference"));
       if (per != null) return per;
@@ -1268,6 +1293,12 @@ function buildProductPayload(parentRow, childRows, headers, idx, get, lookups, m
 
   const type = G("type");
   if (type) payload.metadata.type = type;
+
+  const hasChildren = (childRows || []).length > 0;
+  const parentInv = parseNum(G("inventory"));
+  if (!hasChildren && parentInv != null) payload.inventory = parentInv;
+  const eurBlock = prices.EUR || prices.DE || {};
+  if (eurBlock.brutto_cents != null) payload.price = Number((Number(eurBlock.brutto_cents) / 100).toFixed(2));
 
   return { payload };
 }

@@ -53,6 +53,19 @@ export function ContainerTypePreview({ type, label }) {
           <div style={{ position: "absolute", left: "50%", top: "58%", transform: "translate(-50%,-50%)", width: 28, height: 8, borderRadius: 3, background: "#1d1b18" }} />
         </PreviewShell>
       );
+    case "hub_intro":
+      return (
+        <PreviewShell title={label}>
+          <div style={{ padding: 6, height: "100%", boxSizing: "border-box" }}>
+            <div style={{ height: "100%", borderRadius: 8, background: "linear-gradient(120deg,#dfe8dc,#cfdccb)", padding: 8, display: "flex", flexDirection: "column", justifyContent: "center", gap: 4, position: "relative", overflow: "hidden" }}>
+              <div style={bar({ width: "55%", height: 6, background: "#1d1b18" })} />
+              <div style={ink({ width: "80%", height: 3 })} />
+              <div style={ink({ width: "65%", height: 3 })} />
+              <div style={{ position: "absolute", right: -10, top: -10, width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.4)" }} />
+            </div>
+          </div>
+        </PreviewShell>
+      );
     case "promo_bento":
       return (
         <PreviewShell title={label}>

@@ -12,6 +12,10 @@ export function getContainerTypes(locale) {
       label: t(loc, "Hero Banner / Slider", "Hero Banner / Slider", "Bannière Hero / Slider", "Banner Hero / Slider", "Banner Hero / Slider", "Hero Banner / Slider"),
       description: t(loc, "Full-width slider with multiple images (3000×1000 px recommended)", "Birden fazla görselli tam genişlik slider (3000x1000 px önerilir)", "Slider pleine largeur (3000×1000 px recommandé)", "Slider a ancho completo (3000×1000 px recomendado)", "Slider a tutta larghezza (3000×1000 px consigliato)", "Vollbild-Slider mit mehreren Bildern (3000×1000 px empfohlen)"),
     },
+    hub_intro: {
+      label: t(loc, "Catalog hub intro", "Katalog hub intro", "Intro hub catalogue", "Intro hub catálogo", "Intro hub catalogo", "Katalog-Hub Intro"),
+      description: t(loc, "Gradient intro banner for catalog hubs (Neuheiten, Bestsellers, Sale) — title + short text", "Katalog hub’ları için degrade intro banner (Neuheiten, Bestsellers, Sale) — başlık + kısa metin", "Bannière d’intro dégradée pour les hubs catalogue", "Banner de intro con degradado para hubs de catálogo", "Banner intro a gradiente per hub catalogo", "Verlaufs-Intro-Banner für Katalog-Hubs (Neuheiten, Bestseller, Sale) — Titel + Kurztext"),
+    },
     page_banner: {
       label: t(loc, "Banner with title", "Başlıklı banner", "Bannière avec titre", "Banner con título", "Banner con titolo", "Banner mit Titel"),
       description: t(loc, "Page/category/collection banner image with the page title overlaid — matches the current shop catalog header", "Sayfa/kategori/koleksiyon banner görseli, üzerine başlık — mevcut shop katalog başlığıyla aynı", "Bannière de la page avec le titre superposé — comme l’en-tête catalogue actuel", "Banner de la página con el título superpuesto — igual que el encabezado actual", "Banner della pagina con titolo sovrapposto — come l’header catalogo attuale", "Bannerbild der Seite/Kategorie/Kollektion mit Titel — wie die aktuelle Shop-Katalogkopfzeile"),
@@ -174,8 +178,18 @@ export function getLandingEditorCopy(locale) {
     tabPages: x("Pages", "Sayfalar", "Pages", "Páginas", "Pagine", "Seiten"),
     tabTemplates: x("Templates", "Şablonlar", "Modèles", "Plantillas", "Template", "Templates"),
     tabContainers: x("Containers", "Konteynerler", "Conteneurs", "Contenedores", "Contenitori", "Container"),
-    tabCategory: x("Category", "Kategori", "Catégorie", "Categoría", "Categoria", "Kategorie"),
+    tabCategory: x("Left category panel", "Sol kategori paneli", "Panneau catégories", "Panel categorías", "Pannello categorie", "Linke Kategorie-Leiste"),
+    tabFilterBar: x("Nav & left filters", "Nav ve sol filtreler", "Nav et filtres", "Nav y filtros", "Nav e filtri", "Nav & linke Filter"),
     tabPopup: x("Popup", "Popup", "Popup", "Popup", "Popup", "Popup"),
+    tabSitePopup: x("Site popup", "Site popup", "Popup site", "Popup del sitio", "Popup sito", "Site-Popup"),
+    tabSitePopupHelp: x(
+      "Site-wide popup for the whole shop. Saved on homepage landing settings (not per CMS/API page). Sidebar fonts/colors: Content → Styles.",
+      "Tüm shop için site geneli popup. Ana sayfa landing ayarına kaydedilir (sayfa bazlı değil). Kenar çubuğu yazı/renk: İçerik → Stiller.",
+      "Popup global pour toute la boutique. Enregistré sur la page d’accueil.",
+      "Popup global de la tienda. Se guarda en la home.",
+      "Popup globale dello shop. Salvato sulla home.",
+      "Seitenübergreifendes Popup für den gesamten Shop. Wird in den Homepage-Landing-Settings gespeichert (nicht pro CMS/API-Seite). Schriften: Inhalte → Stile."
+    ),
     selectPage: x("Select page", "Sayfa seç", "Sélectionner une page", "Seleccionar página", "Seleziona pagina", "Seite auswählen"),
     selectPageHelp: x("Choose a page to design its content.", "İçeriğini tasarlamak için bir sayfa seçin.", "Choisissez une page pour concevoir son contenu.", "Elige una página para diseñar su contenido.", "Scegli una pagina per progettarne il contenuto.", "Wähle eine Seite aus, für die du die Inhalte gestalten möchtest."),
     managePagesLink: x("Manage pages →", "Sayfaları yönet →", "Gérer les pages →", "Gestionar páginas →", "Gestisci pagine →", "Seiten verwalten →"),
@@ -205,27 +219,33 @@ export function getLandingEditorCopy(locale) {
       "I contenitori di questa pagina API sono sulla pagina CMS corrispondente (sotto).",
       "Container für diese API-Seite liegen auf der zugehörigen CMS-Seite und erscheinen unten. Du kannst sie auch unter CMS-Seiten auswählen."
     ),
-    tabFilterBar: x("Filter bar", "Filtre çubuğu", "Barre de filtres", "Barra de filtros", "Barra filtri", "Filterleiste"),
-    filterBarTemplateTitle: x("Product filter sidebar", "Ürün filtre kenar çubuğu", "Barre latérale de filtres", "Barra lateral de filtros", "Sidebar filtri prodotto", "Produkt-Filter-Seitenleiste"),
+    filterBarTemplateTitle: x("This page: navigation & left filters", "Bu sayfa: navigasyon ve sol filtreler", "Cette page : nav et filtres", "Esta página: nav y filtros", "Questa pagina: nav e filtri", "Diese Seite: Navigation & linke Filter"),
     filterBarTemplateHelp: x(
-      "Two separate shop controls: the header’s second nav row, and the product facet sidebar on listing pages.",
-      "İki ayrı shop kontrolü: header’daki ikinci nav satırı ve liste sayfalarındaki ürün filtre kenar çubuğu.",
-      "Deux réglages distincts : la deuxième nav sous l’en-tête, et la barre latérale de facettes produit.",
-      "Dos controles distintos: la segunda fila de navegación y la barra lateral de filtros de producto.",
-      "Due controlli distinti: la seconda nav sotto l’header e la sidebar filtri prodotto.",
-      "Zwei getrennte Shop-Steuerungen: die zweite Navigationszeile unter dem Header und die Produkt-Filter-Seitenleiste auf Listing-Seiten."
+      "Applies only to the page selected above. Each checkbox below says which device it affects (desktop ≥1024px / tablet / mobile).",
+      "Yalnızca yukarıda seçili sayfa için. Aşağıdaki her seçenek hangi cihaza etki ettiğini yazar (masaüstü ≥1024px / tablet / mobil).",
+      "Uniquement pour la page sélectionnée. Chaque case indique l’appareil (desktop ≥1024px / tablette / mobile).",
+      "Solo para la página seleccionada. Cada casilla indica el dispositivo (escritorio ≥1024px / tablet / móvil).",
+      "Solo per la pagina selezionata. Ogni casella indica il dispositivo (desktop ≥1024px / tablet / mobile).",
+      "Nur für die oben ausgewählte Seite. Jede Checkbox nennt das Gerät (Desktop ≥1024px / Tablet / Mobil)."
+    ),
+    showProductFilterBar: x(
+      "Left product filter (sort / in stock) — desktop & tablet sidebar; mobile drawer",
+      "Sol ürün filtresi (sıralama / stok) — masaüstü & tablet kenar çubuğu; mobil çekmece",
+      "Filtre produit gauche — sidebar desktop/tablette ; tiroir mobile",
+      "Filtro producto izquierda — sidebar escritorio/tablet; cajón móvil",
+      "Filtro prodotto sinistra — sidebar desktop/tablet; cassetto mobile",
+      "Linke Produktfilter (Sortierung / Lager) — Desktop- & Tablet-Sidebar; Mobil-Schublade"
+    ),
+    showProductFilterBarHelp: x(
+      "Devices: desktop & tablet = left column next to content; mobile = same panel in the filter drawer. Hub pages (Neuheiten, Bestsellers, Erneut kaufen). Not the header second-nav. Category/collection facets: Templates + Styles.",
+      "Cihazlar: masaüstü & tablet = içeriğin sol sütunu; mobil = aynı panel filtre çekmecesinde. Hub sayfaları (Neuheiten, Bestsellers, Erneut kaufen). Header second-nav değil. Kategori/koleksiyon facet’leri: Şablonlar + Stiller.",
+      "Appareils : desktop/tablette = colonne gauche ; mobile = tiroir filtre. Hubs catalogue. Pas la second nav.",
+      "Dispositivos: escritorio/tablet = columna izquierda; móvil = cajón. Hubs. No es la second nav.",
+      "Dispositivi: desktop/tablet = colonna sinistra; mobile = cassetto. Hub. Non è la second nav.",
+      "Geräte: Desktop & Tablet = linke Spalte neben dem Inhalt; Mobil = dieselbe Leiste in der Filter-Schublade. Hub-Seiten. Nicht die Second-Nav. Facetten: Templates + Stile."
     ),
     filterCheckboxSize: x("Filter checkbox size (px)", "Filtre onay kutusu boyutu (px)", "Taille des cases (px)", "Tamaño de casillas (px)", "Dimensione checkbox (px)", "Filter-Checkbox-Größe (px)"),
     filterCheckboxSizeHelp: x("Default 10 (8–14). Used on category and collection filter sidebars.", "Varsayılan 10 (8–14). Kategori ve koleksiyon filtre kenar çubuklarında kullanılır.", "Défaut 10 (8–14).", "Predeterminado 10 (8–14).", "Predefinito 10 (8–14).", "Standard 10 (8–14). Gilt für Kategorie- und Kollektions-Filterleisten."),
-    showProductFilterBar: x("Show product filter sidebar on this page", "Bu sayfada ürün filtre kenar çubuğunu göster", "Afficher la barre de filtres produits", "Mostrar barra de filtros de producto", "Mostra sidebar filtri prodotto", "Produkt-Filterleiste auf dieser Seite anzeigen"),
-    showProductFilterBarHelp: x(
-      "When enabled, listing templates for this page can show the product facet filter. Facets are built from products currently listed.",
-      "Açıkken bu sayfanın liste şablonları ürün facet filtresini gösterebilir. Facetler listedeki ürünlerden üretilir.",
-      "Si activé, les listes peuvent afficher les facettes produit.",
-      "Si está activo, las listas pueden mostrar facetas de producto.",
-      "Se attivo, le liste possono mostrare le faccette prodotto.",
-      "Wenn aktiv, können Listing-Templates auf dieser Seite die Produkt-Facetten-Filterleiste zeigen. Facetten kommen aus den aktuell gelisteten Produkten."
-    ),
     stylesSidebarNavHint: x(
       "Change filter group title fonts in: Content → Styles → Catalog navigation → Sidebar navigation (filter sidebar).",
       "Filtre grup başlık fontları: İçerik → Stiller → Katalog navigasyonu → Sidebar navigasyonu.",
@@ -289,23 +309,90 @@ export function getLandingEditorCopy(locale) {
     noDesktopBlocks: x('No desktop blocks yet. Create one with "+ Add container".', 'Henüz masaüstü bloğu yok. "+ Konteyner ekle" ile oluştur.', 'Pas encore de blocs desktop. Créez-en un avec « + Ajouter conteneur ».', 'Aún no hay bloques de escritorio. Crea uno con "+ Añadir contenedor".', 'Nessun blocco desktop. Creane uno con "+ Aggiungi contenitore".', 'Noch keine Desktop-Blöcke. Erstelle einen mit „+ Container hinzufügen“.'),
     noTabletBlocks: x('No tablet blocks yet. Create one with "+ Add container". Set widths in % or vw for tablet.', 'Henüz tablet bloğu yok. "+ Konteyner ekle" ile oluştur; genişlikleri % veya vw yap.', 'Pas de blocs tablette. Créez-en un ; réglez les largeurs en % ou vw.', 'Sin bloques tablet. Crea uno; usa % o vw para anchos.', 'Nessun blocco tablet. Creane uno; imposta larghezze in % o vw.', 'Noch keine Tablet-Blöcke. Erstelle einen ; Breiten in % oder vw setzen.'),
     noMobileBlocks: x('No mobile blocks yet. Create one with "+ Add container".', 'Henüz mobil bloğu yok. "+ Konteyner ekle" ile oluştur.', 'Pas de blocs mobile. Créez-en un.', 'Sin bloques móviles. Crea uno.', 'Nessun blocco mobile. Creane uno.', 'Noch keine Mobil-Blöcke. Erstelle einen mit „+ Container hinzufügen“.'),
-    showSubcategoriesLeft: x("Show subcategories on the left", "Alt kategorileri solda göster", "Afficher les sous-catégories à gauche", "Mostrar subcategorías a la izquierda", "Mostra sottocategorie a sinistra", "Unterkategorien links anzeigen"),
-    showSubcategoriesHelpCat: x("Applies to the collection page of this category (when subcategories exist).", "Bu kategorinin koleksiyon sayfası için geçerli (alt kategoriler varsa).", "S'applique à la page collection de cette catégorie.", "Aplica a la página de colección de esta categoría.", "Si applica alla pagina collezione di questa categoria.", "Gilt für die Kollektionsseite dieser Kategorie (wenn Unterkategorien existieren)."),
-    showSubcategoriesHelpOther: x("Saved for this page. In the shop, collection pages use each category's setting — select the same category under Categories and enable there.", "Bu sayfa için kaydedilir. Shop'ta koleksiyon sayfaları kategori ayarını kullanır.", "Enregistré pour cette page. En boutique, les pages collection utilisent le réglage de chaque catégorie.", "Guardado para esta página. En la tienda, las páginas de colección usan el ajuste de cada categoría.", "Salvato per questa pagina. Nel negozio, le pagine collezione usano l'impostazione di ogni categoria.", "Wert wird für diese Seite gespeichert. Im Shop wirkt die Anzeige auf Kollektionsseiten über die Einstellung der jeweiligen Kategorie."),
-    categoryTabIntro: x(
-      "For each selection under Select page (homepage, CMS pages, categories), control whether subcategories appear on the left on the linked collection page. The navigation shows only when the checkbox is active.",
-      "Her sayfa seçimi için (ana sayfa, CMS, kategoriler) bağlı koleksiyon sayfasında solda alt kategorilerin görünüp görünmeyeceğini kontrol edin.",
-      "Pour chaque page sélectionnée, contrôlez si les sous-catégories apparaissent à gauche sur la page collection liée.",
-      "Para cada página, controla si las subcategorías aparecen a la izquierda en la página de colección vinculada.",
-      "Per ogni pagina selezionata, controlla se le sottocategorie compaiono a sinistra sulla pagina collezione collegata.",
-      "Für jede Auswahl unter „Seite auswählen“ können Sie steuern, ob auf der zugehörigen Kollektionsseite links die Unterkategorien erscheinen."
+    showSubcategoriesLeft: x(
+      "Left category tree — desktop & tablet sidebar; mobile drawer",
+      "Sol kategori ağacı — masaüstü & tablet kenar çubuğu; mobil çekmece",
+      "Arbre catégories gauche — sidebar desktop/tablette ; tiroir mobile",
+      "Árbol categorías izquierda — sidebar escritorio/tablet; cajón móvil",
+      "Albero categorie sinistra — sidebar desktop/tablet; cassetto mobile",
+      "Linker Kategoriebaum — Desktop- & Tablet-Sidebar; Mobil-Schublade"
     ),
-    showFilterBar: x("Show filter bar in shop (second nav row)", "Shop'ta filtre çubuğunu göster (ikinci nav satırı)", "Afficher la barre de filtres (deuxième nav)", "Mostrar barra de filtros (segunda fila nav)", "Mostra barra filtri (seconda nav)", "Filterleiste im Shop anzeigen (zweite Navigationszeile)"),
-    showFilterBarHelp: x("Horizontal menu row under main navigation. Applies on all shop pages loading this landing page.", "Ana navigasyonun altındaki yatay menü. Bu landing page'i yükleyen tüm shop sayfalarında geçerli.", "Ligne horizontale sous la navigation principale.", "Fila horizontal bajo la navegación principal.", "Riga orizzontale sotto la nav principale.", "Die horizontale Menüzeile direkt unter der Hauptnavigation."),
-    secondNavClassic: x("Second nav on desktop: classic links (no pills)", "Masaüstünde second nav: klasik linkler (pill yok)", "Second nav desktop : liens classiques", "Second nav en escritorio: enlaces clásicos", "Second nav desktop: link classici", "Second-Navigation auf Desktop klassisch (ohne Pillen)"),
-    secondNavClassicHelp: x("Desktop only (≥1024px): forces classic links on this landing route.", "Yalnızca desktop (≥1024px): bu landing rotasında klasik linkler.", "Desktop uniquement (≥1024px).", "Solo escritorio (≥1024px).", "Solo desktop (≥1024px).", "Nur Desktop (≥1024px): erzwingt klassische Links auf dieser Landing-Route."),
+    showSubcategoriesHelpCat: x(
+      "Devices: desktop & tablet = left column on this category page; mobile = same tree in the filter drawer (when subcategories exist).",
+      "Cihazlar: masaüstü & tablet = bu kategori sayfasında sol sütun; mobil = aynı ağaç filtre çekmecesinde (alt kategori varsa).",
+      "Appareils : desktop/tablette = colonne gauche ; mobile = tiroir (si sous-catégories).",
+      "Dispositivos: escritorio/tablet = columna izquierda; móvil = cajón (si hay subcategorías).",
+      "Dispositivi: desktop/tablet = colonna sinistra; mobile = cassetto (se ci sono sottocategorie).",
+      "Geräte: Desktop & Tablet = linke Spalte auf dieser Kategorieseite; Mobil = derselbe Baum in der Filter-Schublade (falls Unterkategorien)."
+    ),
+    showSubcategoriesHelpOther: x(
+      "Devices: desktop & tablet = left category list on this hub/CMS page; mobile = same list in the filter drawer. Enable + Save. Banner/hero = Containers tab only (not code).",
+      "Cihazlar: masaüstü & tablet = bu hub/CMS sayfasında sol kategori listesi; mobil = aynı liste filtre çekmecesinde. Aç + Kaydet. Banner/hero = yalnızca Konteynerler sekmesi (kod değil).",
+      "Appareils : desktop/tablette = liste à gauche ; mobile = tiroir. Bannière = onglet Conteneurs.",
+      "Dispositivos: escritorio/tablet = lista a la izquierda; móvil = cajón. Banner = Contenedores.",
+      "Dispositivi: desktop/tablet = elenco a sinistra; mobile = cassetto. Banner = Contenitori.",
+      "Geräte: Desktop & Tablet = linke Kategorie-Liste auf dieser Hub-/CMS-Seite; Mobil = dieselbe Liste in der Filter-Schublade. Banner/Hero nur unter „Container“."
+    ),
+    categoryTabIntro: x(
+      "Per selected page. Device impact is on each checkbox. Content blocks (hub intro, carousels, text) only on the Containers tab — the shop must not invent sections in code.",
+      "Seçili sayfa için. Cihaz etkisi her seçenekte yazıyor. İçerik blokları (hub intro, carousel, metin) yalnızca Konteynerler sekmesinde — shop koddan bölüm uydurmamalı.",
+      "Pour la page sélectionnée. L’impact appareil est sur chaque case. Blocs uniquement sous Conteneurs.",
+      "Para la página seleccionada. El impacto por dispositivo está en cada casilla. Bloques solo en Contenedores.",
+      "Per la pagina selezionata. L’impatto dispositivo è su ogni casella. Blocchi solo in Contenitori.",
+      "Pro ausgewählter Seite. Gerätewirkung steht an jeder Checkbox. Inhaltsblöcke nur unter „Container“ — der Shop darf keine Abschnitte im Code erfinden."
+    ),
+    showFilterBar: x(
+      "Header second-nav row — all devices (desktop, tablet, mobile)",
+      "Header second-nav satırı — tüm cihazlar (masaüstü, tablet, mobil)",
+      "Second nav sous l’en-tête — tous appareils",
+      "Second nav bajo cabecera — todos los dispositivos",
+      "Second nav sotto header — tutti i dispositivi",
+      "Second-Nav unter dem Header — alle Geräte (Desktop, Tablet, Mobil)"
+    ),
+    showFilterBarHelp: x(
+      "Devices: desktop, tablet and mobile — horizontal menu directly under the main header on routes that load this landing. Separate from the left product-filter panel.",
+      "Cihazlar: masaüstü, tablet ve mobil — bu landing’i yükleyen rotalarda ana header altındaki yatay menü. Soldaki ürün filtre panelinden ayrı.",
+      "Appareils : desktop, tablette et mobile — menu sous l’en-tête. Distinct du panneau filtre gauche.",
+      "Dispositivos: escritorio, tablet y móvil — menú bajo la cabecera. Distinto del panel izquierdo.",
+      "Dispositivi: desktop, tablet e mobile — menu sotto l’header. Distinto dal pannello sinistro.",
+      "Geräte: Desktop, Tablet und Mobil — horizontales Menü direkt unter dem Header. Getrennt von der linken Produkt-Filterleiste."
+    ),
+    popupBanner: x(
+      "Site-wide popup (desktop / tablet / mobile). Shop reads this from the homepage landing settings. Save on this Site popup tab.",
+      "Site geneli popup (masaüstü / tablet / mobil). Shop bunu ana sayfa landing ayarından okur. Bu Site popup sekmesinde Kaydet.",
+      "Popup global. La boutique lit les réglages de la page d’accueil.",
+      "Popup global. La tienda lee los ajustes de la home.",
+      "Popup globale. Lo shop legge le impostazioni della home.",
+      "Seitenübergreifendes Popup (Desktop / Tablet / Mobil). Der Shop liest dies aus den Homepage-Landing-Settings. Speichern auf diesem Site-Popup-Tab."
+    ),
+    secondNavClassic: x(
+      "Second nav classic links (no pills) — desktop only (≥1024px)",
+      "Second nav klasik linkler (pill yok) — yalnızca masaüstü (≥1024px)",
+      "Second nav liens classiques — desktop uniquement (≥1024px)",
+      "Second nav enlaces clásicos — solo escritorio (≥1024px)",
+      "Second nav link classici — solo desktop (≥1024px)",
+      "Second-Nav klassische Links (ohne Pillen) — nur Desktop (≥1024px)"
+    ),
+    secondNavClassicHelp: x(
+      "Device: desktop only (≥1024px). No effect on tablet/mobile. Forces classic links on this landing route.",
+      "Cihaz: yalnızca masaüstü (≥1024px). Tablet/mobilde etkisi yok. Bu landing rotasında klasik linkler.",
+      "Appareil : desktop uniquement (≥1024px). Pas d’effet tablette/mobile.",
+      "Dispositivo: solo escritorio (≥1024px). Sin efecto en tablet/móvil.",
+      "Dispositivo: solo desktop (≥1024px). Nessun effetto su tablet/mobile.",
+      "Gerät: nur Desktop (≥1024px). Keine Wirkung auf Tablet/Mobil. Erzwingt klassische Links auf dieser Landing-Route."
+    ),
+    hubIntroTheme: x("Intro theme", "Intro teması", "Thème d’intro", "Tema de intro", "Tema intro", "Intro-Thema"),
+    hubIntroBg: x("Background (CSS color or gradient)", "Arka plan (CSS renk veya degrade)", "Fond (couleur ou dégradé CSS)", "Fondo (color o degradado CSS)", "Sfondo (colore o gradiente CSS)", "Hintergrund (CSS-Farbe oder Verlauf)"),
+    hubIntroSubtitleColor: x("Subtitle color", "Alt başlık rengi", "Couleur du sous-titre", "Color del subtítulo", "Colore sottotitolo", "Untertitel-Farbe"),
+    hubIntroRadius: x("Corner radius (px)", "Köşe yuvarlaklığı (px)", "Rayon des coins (px)", "Radio de esquina (px)", "Raggio angoli (px)", "Eckenradius (px)"),
+    hubIntroThemeOptions: () => [
+      { label: x("New arrivals (green)", "Yenilikler (yeşil)", "Nouveautés (vert)", "Novedades (verde)", "Novità (verde)", "Neuheiten (grün)"), value: "newest" },
+      { label: x("Bestsellers (warm)", "Çok satanlar (sıcak)", "Bestsellers (chaud)", "Más vendidos (cálido)", "Più venduti (caldo)", "Bestseller (warm)"), value: "bestseller" },
+      { label: x("Sale (coral)", "İndirim (mercan)", "Soldes (corail)", "Rebajas (coral)", "Saldi (corallo)", "Sale (koralle)"), value: "sale" },
+      { label: x("Custom", "Özel", "Personnalisé", "Personalizado", "Personalizzato", "Benutzerdefiniert"), value: "custom" },
+    ],
     pagePaddingTop: x("Spacing header → first section (page_padding_top)", "Header → ilk bölüm arası (page_padding_top)", "Espacement en-tête → première section", "Espacio cabecera → primera sección", "Spazio header → prima sezione", "Abstand Header → erste Sektion (page_padding_top)"),
-    pagePaddingTopHelp: x("Top spacing of the landing area under navigation. e.g. 0px, 8px, 24px. Empty = default.", "Landing alanının üst boşluğu. örn. 0px, 8px, 24px. Boş = varsayılan.", "Espacement supérieur sous la navigation.", "Espacio superior bajo la navegación.", "Spazio superiore sotto la navigazione.", "Steuert den oberen Abstand des Landing-Page-Bereichs direkt unter der Navigation."),
+    pagePaddingTopHelp: x("Top spacing of the landing area under navigation. e.g. 0px, 8px, 24px. Empty = default. Affects all devices.", "Landing alanının üst boşluğu. örn. 0px, 8px, 24px. Boş = varsayılan. Tüm cihazlar.", "Espacement supérieur sous la navigation. Tous appareils.", "Espacio superior bajo la navegación. Todos los dispositivos.", "Spazio superiore sotto la navigazione. Tutti i dispositivi.", "Steuert den oberen Abstand des Landing-Page-Bereichs direkt unter der Navigation. Alle Geräte."),
     supportCoreContent: x("Core content", "Temel içerik", "Contenu principal", "Contenido principal", "Contenuto principale", "Kerninhalte"),
     supportTrustText: x("Trust text", "Güven metni", "Texte de confiance", "Texto de confianza", "Testo di fiducia", "Vertrauenstext"),
     supportSearchPlaceholder: x("Search placeholder", "Arama yer tutucusu", "Texte de recherche", "Texto de búsqueda", "Testo ricerca", "Such-Platzhalter"),
@@ -924,7 +1011,6 @@ export function getLandingEditorCopy(locale) {
     cornerRadius: x("Corner radius (px)", "Köşe yarıçapı (px)", "Rayon coins (px)", "Radio esquinas (px)", "Raggio angoli (px)", "Ecken-Radius (px)"),
     overlayOpacity: x("Overlay opacity (0–1)", "Overlay opaklığı (0–1)", "Opacité overlay (0–1)", "Opacidad overlay (0–1)", "Opacità overlay (0–1)", "Overlay-Deckkraft (0–1)"),
     showCloseButton: x("Show close button (×)", "Kapatma düğmesini göster (×)", "Afficher bouton fermer (×)", "Mostrar botón cerrar (×)", "Mostra pulsante chiudi (×)", "Schließen-Button anzeigen (×)"),
-    popupBanner: x("Popup configuration per device. Desktop ≥ 1024 px, tablet 600–1023 px, mobile ≤ 599 px. Changes apply on next Save click.", "Cihaz başına popup yapılandırması. Değişiklikler Kaydet'e basınca uygulanır.", "Configuration popup par appareil.", "Configuración popup por dispositivo.", "Configurazione popup per dispositivo.", "Popup-Konfiguration pro Gerät. Desktop ≥ 1024 px, Tablet 600–1023 px, Mobil ≤ 599 px. Änderungen werden beim nächsten Klick auf Speichern übernommen."),
     captionPh: x("e.g. New arrivals", "örn. Yenilikler", "ex. Nouveautés", "p. ej. Novedades", "es. Novità", "z. B. Neuheiten"),
     background: x("Background", "Arka plan", "Fond", "Fondo", "Sfondo", "Hintergrund"),
     slideN: (n) => x(`Slide ${n}`, `Slayt ${n}`, `Diapositive ${n}`, `Diapositiva ${n}`, `Slide ${n}`, `Folie ${n}`),

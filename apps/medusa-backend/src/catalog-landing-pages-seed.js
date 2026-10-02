@@ -12,7 +12,8 @@
 const { randomUUID } = require('crypto')
 
 const LAYOUT_VERSION = 'catalog_hub_v3'
-const NATIVE_LAYOUT_VERSION = 'native_catalog_v1'
+/** v2: hub_intro CMS banner (replaces hardcoded AutoCatalogHub Intro). */
+const NATIVE_LAYOUT_VERSION = 'native_catalog_v2'
 const LANGUAGES = ['en', 'tr', 'fr', 'es', 'it']
 
 const DEVICE_PRESETS = {
@@ -102,6 +103,15 @@ const CATALOG_PAGES = [
     ),
     algorithm: 'bestsellers',
     nativeCatalog: true,
+    introBg: 'linear-gradient(120deg, #fcebd5 0%, #f6dcc0 100%)',
+    introSubtitles: value(
+      'Die beliebtesten Produkte unserer Händler — nach Kategorien sortiert und laufend neu berechnet.',
+      "Our sellers' most popular products — by category, continuously recalculated.",
+      'Satıcılarımızın en popüler ürünleri — kategorilere göre, sürekli güncellenir.',
+      'Les produits les plus populaires de nos vendeurs — par catégorie, recalculés en continu.',
+      'Los productos más populares de nuestros vendedores — por categoría, recalculados continuamente.',
+      'I prodotti più popolari dei nostri venditori — per categoria, ricalcolati di continuo.',
+    ),
     rowTitles: value(
       'Top-Produkte insgesamt',
       'Top products overall',
@@ -164,6 +174,15 @@ const CATALOG_PAGES = [
     ),
     algorithm: 'on_sale',
     nativeCatalog: true,
+    introBg: 'linear-gradient(120deg, #f7d9cf 0%, #f0c3b3 100%)',
+    introSubtitles: value(
+      'Reduzierte Produkte mit den größten Preisnachlässen, nach Kategorien.',
+      'Reduced products with the biggest discounts, by category.',
+      'En yüksek indirimli ürünler, kategorilere göre.',
+      'Produits réduits avec les plus fortes remises, par catégorie.',
+      'Productos rebajados con los mayores descuentos, por categoría.',
+      'Prodotti scontati con i ribassi maggiori, per categoria.',
+    ),
     rowTitles: value(
       'Aktuelle Angebote',
       'Current deals',
@@ -226,6 +245,15 @@ const CATALOG_PAGES = [
     ),
     algorithm: 'new_arrivals',
     nativeCatalog: true,
+    introBg: 'linear-gradient(120deg, #dfe8dc 0%, #cfdccb 100%)',
+    introSubtitles: value(
+      'Frisch eingetroffen: die neuesten Produkte unserer Händler, nach Kategorien.',
+      'Just in: the newest products from our sellers, by category.',
+      'Yeni geldi: satıcılarımızın en yeni ürünleri, kategorilere göre.',
+      'Tout juste arrivés : les derniers produits de nos vendeurs, par catégorie.',
+      'Recién llegados: los productos más nuevos de nuestros vendedores, por categoría.',
+      'Appena arrivati: i prodotti più nuovi dei nostri venditori, per categoria.',
+    ),
     rowTitles: value(
       'Frisch eingetroffen',
       'Just arrived',
@@ -330,6 +358,7 @@ const CATALOG_PAGES = [
 ]
 
 const CATALOG_STACK_TYPES = new Set([
+  'hub_intro',
   'text_block',
   'personalized_product_row',
   'feature_grid',
@@ -338,6 +367,24 @@ const CATALOG_STACK_TYPES = new Set([
   'newsletter',
   'banner_cta',
 ])
+
+/** Former AutoCatalogHub Intro — CMS container for native catalog hubs. */
+const buildHubIntro = (pageDef, visibleOn) => localize({
+  id: randomUUID(),
+  type: 'hub_intro',
+  visible: true,
+  visible_on: visibleOn,
+  bg_color: pageDef.introBg || 'linear-gradient(120deg, #dfe8dc 0%, #cfdccb 100%)',
+  text_color: '#1d1b18',
+  subtitle_color: '#5e574e',
+  border_radius: 24,
+  padding: visibleOn === 'mobile' ? '16px 16px 8px' : '24px 24px 12px',
+  content_layout: 'contained',
+  content_max_width: '1200px',
+}, {
+  title: pageDef.titles,
+  body: pageDef.introSubtitles || value('', '', '', '', '', ''),
+})
 
 const buildIntroTextBlock = (pageDef, visibleOn, preset) => localize({
   id: randomUUID(),
@@ -457,10 +504,11 @@ const buildNewsletter = (visibleOn, preset) => localize({
 })
 
 const buildDeviceContainers = (pageDef, visibleOn) => {
-  // Bestsellers / Sales / Neuheiten keep their native shop templates (sidebar +
-  // per-category carousels). Empty CMS stacks stop catalog_hub containers from
-  // painting on top of that UI (TASKS §8). Brands still get the CMS intro stack.
-  if (pageDef.nativeCatalog) return []
+  // Bestsellers / Sales / Neuheiten: CMS hub_intro above the native AutoCatalogHub
+  // body (carousels stay in shop code until fully migrated). Brands: full CMS stack.
+  if (pageDef.nativeCatalog) {
+    return [buildHubIntro(pageDef, visibleOn)]
+  }
   const preset = DEVICE_PRESETS[visibleOn] || DEVICE_PRESETS.desktop
   const list = [buildIntroTextBlock(pageDef, visibleOn, preset)]
   if (pageDef.slug === 'brands') {
@@ -581,12 +629,11 @@ async function upsertCatalogPage(client, pageDef, opts = {}) {
     return { slug, created: false, migrated: false, added: existing.length, layout: currentLayout, pageId }
   }
 
-  const custom = pageDef.nativeCatalog
-    ? []
-    : existing.filter((c) => c && !CATALOG_STACK_TYPES.has(c.type))
+  const custom = existing.filter((c) => c && !CATALOG_STACK_TYPES.has(c.type))
   const nextContainers = [...buildPageContainers(pageDef), ...custom]
   settings.catalog_landing_layout = targetLayout
-  // Clear accidental opt-in so preferNativeCatalog pages stay on the shop template
+  // Native hubs render hub_intro via layout flag; keep catalog_use_containers off
+  // so product carousels stay on AutoCatalogHub until fully CMS-migrated.
   if (pageDef.nativeCatalog) delete settings.catalog_use_containers
 
   if (!landingResult.rows[0]) {

@@ -355,6 +355,12 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedLi
           .filter((l) => !approvedSellerIds || approvedSellerIds.size === 0 || approvedSellerIds.has(l.seller_id))
           .filter((l) => {
             const baseRow = productById.get(String(l.product_id)) || masterRow || legacyOffers[0]
+            // A product that already belongs to this seller is edited on admin_hub_products
+            // (Seller Central product form and Excel). A same-seller listing is only a
+            // shadow row and must not replace that stock/price — a stale 0 there shows
+            // the product as sold out while the seller's stock is on the product row.
+            const ownerId = baseRow && baseRow.seller_id ? String(baseRow.seller_id).trim() : ''
+            if (ownerId && ownerId === String(l.seller_id || '').trim()) return false
             return listingCoversEan(l, ean, baseRow)
           })
           .map((l) => {

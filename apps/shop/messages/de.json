@@ -532,6 +532,7 @@
     "addedToCart": "Zum Warenkorb hinzugefügt",
     "addToCartFailed": "Hinzufügen fehlgeschlagen",
     "outOfStock": "Ausverkauft",
+    "minOrderQty": "Mindestbestellmenge: {n}",
     "backInStockCta": "Benachrichtige mich",
     "backInStockEmailPlaceholder": "Ihre E-Mail-Adresse",
     "backInStockSuccess": "Danke! Wir benachrichtigen Sie, sobald der Artikel wieder verfügbar ist.",

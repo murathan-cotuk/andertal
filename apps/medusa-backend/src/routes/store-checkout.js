@@ -877,12 +877,15 @@ const storeCartLineItemsPOST = async (req, res) => {
     const productSellerId = product.seller_id ? String(product.seller_id).trim() : ''
     const lineSellerId = chosenSellerId || (productSellerId && productSellerId !== 'default' ? productSellerId : null) || null
     let listingApplied = false
-    if (lineSellerId) {
+    // The owning seller's price lives on the product (and metadata.prices). Their listing
+    // row is a shadow and must not replace that price with a stale 0.
+    const lineIsOwner = !!(productSellerId && lineSellerId && productSellerId === lineSellerId)
+    if (lineSellerId && !lineIsOwner) {
       const listingRow = await client.query(
         `SELECT price_cents FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 AND status = 'active' LIMIT 1`,
         [String(product.id || productId), lineSellerId]
       )
-      if (listingRow.rows[0]) {
+      if (listingRow.rows[0] && Number(listingRow.rows[0].price_cents) > 0) {
         unitPriceCents = Number(listingRow.rows[0].price_cents)
         listingApplied = true
       }

@@ -532,6 +532,7 @@
     "addedToCart": "Sepete eklendi",
     "addToCartFailed": "Sepete eklenemedi",
     "outOfStock": "Tükendi",
+    "minOrderQty": "Minimum sipariş adedi: {n}",
     "backInStockCta": "Haber ver",
     "backInStockEmailPlaceholder": "E-posta adresiniz",
     "backInStockSuccess": "Teşekkürler! Ürün tekrar stoğa girince size e-posta göndereceğiz.",

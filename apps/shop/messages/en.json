@@ -532,6 +532,7 @@
     "addedToCart": "Added to cart",
     "addToCartFailed": "Add to cart failed",
     "outOfStock": "Sold out",
+    "minOrderQty": "Minimum order quantity: {n}",
     "backInStockCta": "Notify me",
     "backInStockEmailPlaceholder": "Your email address",
     "backInStockSuccess": "Thanks! We'll email you as soon as it's back in stock.",

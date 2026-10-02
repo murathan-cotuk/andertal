@@ -119,6 +119,7 @@ const CONTAINER_EDITOR_CHROME = { flex: "0 0 300px", minWidth: 260, maxWidth: "1
 /** Einheitliche Innenabstand-Defaults pro Container-Typ (Landing Page) */
 const CONTAINER_PADDING_DEFAULTS = {
   hero_banner: "0px 0px 0px 0px",
+  hub_intro: "24px 24px 12px 24px",
   text_block: "48px 24px 48px 24px",
   image_text: "48px 24px 48px 24px",
   image_grid: "32px 24px 32px 24px",
@@ -276,6 +277,20 @@ function newContainer(type) {
   switch (type) {
     case "hero_banner":
       return { ...base, brand_mark: "", slides: [{ image: "", title: "", subtitle: "", btn_text: "", btn_url: "", btn2_text: "", btn2_url: "", btn2_variant: "ghost", overlay: 0, text_color: "#ffffff", title_color: "#ffffff", subtitle_color: "#ffffff", text_position: "center", title_size: "clamp(24px,4vw,56px)", subtitle_size: "clamp(14px,2vw,22px)", title_font: "system", subtitle_font: "system", content_padding: "32px 48px", btn_variant: "andertal_orange", btn_bg: "#ff971c", btn_color: "#fff", btn_hover_bg: "#e8860f", btn_hover_color: "#fff", btn_border: "2px solid #000", btn_radius: 8 }], height: "500px", mobile_height: "70vh", autoplay: true, delay: 4000, padding: "0px 0px 0px 0px", content_layout: "full" };
+    case "hub_intro":
+      return {
+        ...base,
+        title: "",
+        body: "",
+        bg_color: "linear-gradient(120deg, #dfe8dc 0%, #cfdccb 100%)",
+        text_color: "#1d1b18",
+        subtitle_color: "#5e574e",
+        border_radius: 24,
+        padding: "24px 24px 12px 24px",
+        content_layout: "contained",
+        content_max_width: "1200px",
+        intro_theme: "newest",
+      };
     case "text_block":
       return { ...base, title: "", body: "", btn_text: "", btn_url: "", align: "center", bg_color: "#ffffff", text_color: "#111827", padding: "48px 24px", btn_bg: "#ff971c", btn_color: "#fff", btn_border: "2px solid #000", btn_radius: 8, content_layout: "full" };
     case "image_text":
@@ -873,6 +888,79 @@ function TextBlockEditor({ container, onChange, editLang = "de" }) {
         </div>
         <div style={{ flex: 1 }}>
           <TextField label={c.buttonRadius} value={String(container.btn_radius ?? 8)} onChange={(v) => onChange({ ...container, btn_radius: Number(v) || 0 })} autoComplete="off" />
+        </div>
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
+const HUB_INTRO_THEMES = {
+  newest: "linear-gradient(120deg, #dfe8dc 0%, #cfdccb 100%)",
+  bestseller: "linear-gradient(120deg, #fcebd5 0%, #f6dcc0 100%)",
+  sale: "linear-gradient(120deg, #f7d9cf 0%, #f0c3b3 100%)",
+};
+
+function HubIntroEditor({ container, onChange, editLang = "de" }) {
+  const c = useLandingCopy();
+  const theme = container.intro_theme || "custom";
+  return (
+    <BlockStack gap="400">
+      <EditorSectionLabel>{c.content}</EditorSectionLabel>
+      <TextField
+        label={c.heading}
+        value={gi(container, "title", editLang)}
+        onChange={(v) => onChange(si(container, "title", editLang, v))}
+        placeholder={c.headingPh}
+        autoComplete="off"
+      />
+      <RichTextEditor
+        label={c.text}
+        value={gi(container, "body", editLang)}
+        onChange={(v) => onChange(si(container, "body", editLang, v))}
+        placeholder={c.enterText}
+        minHeight="100px"
+      />
+      <Divider />
+      <EditorSectionLabel>{c.sectionStyle}</EditorSectionLabel>
+      <Select
+        label={c.hubIntroTheme}
+        options={c.hubIntroThemeOptions()}
+        value={theme}
+        onChange={(v) => {
+          const next = { ...container, intro_theme: v };
+          if (v !== "custom" && HUB_INTRO_THEMES[v]) next.bg_color = HUB_INTRO_THEMES[v];
+          onChange(next);
+        }}
+      />
+      <TextField
+        label={c.hubIntroBg}
+        value={container.bg_color || ""}
+        onChange={(v) => onChange({ ...container, bg_color: v, intro_theme: "custom" })}
+        autoComplete="off"
+        helpText="z.B. linear-gradient(120deg, #dfe8dc 0%, #cfdccb 100%)"
+      />
+      <InlineStack gap="400" wrap>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <ColorField
+            label={c.textColor}
+            value={container.text_color || "#1d1b18"}
+            onChange={(v) => onChange({ ...container, text_color: v })}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <ColorField
+            label={c.hubIntroSubtitleColor}
+            value={container.subtitle_color || "#5e574e"}
+            onChange={(v) => onChange({ ...container, subtitle_color: v })}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <TextField
+            label={c.hubIntroRadius}
+            value={String(container.border_radius ?? 24)}
+            onChange={(v) => onChange({ ...container, border_radius: Number(v) || 0 })}
+            autoComplete="off"
+          />
         </div>
       </InlineStack>
     </BlockStack>
@@ -4192,6 +4280,7 @@ function ContainerEditor({ container, onChange, deviceTab = 0, editLang = "de" }
   let editor = null;
   switch (container.type) {
     case "hero_banner":          editor = <HeroBannerEditor container={container} onChange={onChange} editLang={editLang} />; break;
+    case "hub_intro":            editor = <HubIntroEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "text_block":           editor = <TextBlockEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "image_text":           editor = <ImageTextEditor container={container} onChange={onChange} editLang={editLang} />; break;
     case "image_grid":           editor = <ImageGridEditor container={container} onChange={onChange} deviceTab={deviceTab} editLang={editLang} />; break;
@@ -4520,6 +4609,9 @@ export default function LandingPageEditor() {
 
   // ── Top-level tab: 0 = Seiten, 1 = Templates
   const [mainTab, setMainTab] = useState(0);
+  const [sitePopupSettings, setSitePopupSettings] = useState(() => normalizeLandingPageSettings({}));
+  const [sitePopupDirty, setSitePopupDirty] = useState(false);
+  const [sitePopupLoading, setSitePopupLoading] = useState(false);
   /** Landing-Inhalt: Texte + Bilder pro Shop-Sprache (_i18n); „de“ = Root-Felder + Fallback im Shop */
   const [contentEditLang, setContentEditLang] = useState("de");
   // Templates: 0 = Desktop, 1 = Mobil (Kollektions- / Kategorie-Raster)
@@ -4699,11 +4791,17 @@ export default function LandingPageEditor() {
     setSaved(false);
     try {
       const catalogPage = String(selectedPageId).startsWith("cat:") || String(selectedPageId).startsWith("col:");
+      // Popup is site-wide (homepage only). Never persist it on other pages' landing settings.
+      const { popup: _pagePopupIgnored, ...pageSettingsSansPopup } = categorySettings || {};
+      const settingsForPage =
+        selectedPageId === DEFAULT_PAGE_ID
+          ? categorySettings
+          : pageSettingsSansPopup;
       const payload = {
         containers,
         settings: catalogPage
-          ? { ...categorySettings, catalog_layout: "containers" }
-          : categorySettings,
+          ? { ...settingsForPage, catalog_layout: "containers" }
+          : settingsForPage,
         publish: true,
       };
       if (selectedPageId === DEFAULT_PAGE_ID) {
@@ -4738,6 +4836,54 @@ export default function LandingPageEditor() {
   }, [selectedPageId, containers, categorySettings, client, resolveSavePageId, copy.loadContainersError, copy.saveError]);
 
   const handleSave = useCallback(() => persistLanding(), [persistLanding]);
+
+  const loadSitePopup = useCallback(async () => {
+    setSitePopupLoading(true);
+    setErr("");
+    try {
+      const data = await client.request("/admin-hub/landing-page");
+      setSitePopupSettings(normalizeLandingPageSettings(data?.settings));
+      setSitePopupDirty(false);
+    } catch (e) {
+      setSitePopupSettings(normalizeLandingPageSettings({}));
+      setErr(e?.message || copy.loadContainersError);
+    }
+    setSitePopupLoading(false);
+  }, [client, copy.loadContainersError]);
+
+  useEffect(() => {
+    if (mainTab === 2) loadSitePopup();
+  }, [mainTab, loadSitePopup]);
+
+  const saveSitePopup = useCallback(async () => {
+    setSaving(true);
+    setErr("");
+    setSaved(false);
+    try {
+      const data = await client.request("/admin-hub/landing-page");
+      const existing = data?.settings && typeof data.settings === "object" ? data.settings : {};
+      const containersHome = Array.isArray(data?.containers) ? data.containers : [];
+      await client.request("/admin-hub/landing-page", {
+        method: "PUT",
+        body: JSON.stringify({
+          containers: containersHome,
+          settings: {
+            ...existing,
+            popup: sitePopupSettings.popup,
+            homepage_layout: existing.homepage_layout
+              || (isWarmHomeSaved(containersHome, {}) ? WARM_HOME_LAYOUT : CUSTOM_HOME_LAYOUT),
+          },
+          publish: true,
+        }),
+      });
+      setSaved(true);
+      setSitePopupDirty(false);
+      setTimeout(() => setSaved(false), 4000);
+    } catch (e) {
+      setErr(e?.message || copy.saveError);
+    }
+    setSaving(false);
+  }, [client, sitePopupSettings.popup, copy.saveError]);
 
   const handleDiscard = useCallback(async () => {
     setIsDirty(false);
@@ -5008,7 +5154,6 @@ export default function LandingPageEditor() {
     { id: "containers", content: copy.tabContainers },
     { id: "category", content: copy.tabCategory },
     { id: "filter", content: copy.tabFilterBar },
-    { id: "popup", content: copy.tabPopup },
   ];
 
   const apiPageLabel =
@@ -5021,6 +5166,7 @@ export default function LandingPageEditor() {
   const mainTabs = [
     { id: "seiten", content: copy.tabPages },
     { id: "templates", content: copy.tabTemplates },
+    { id: "site-popup", content: copy.tabSitePopup },
   ];
 
   return (
@@ -5028,17 +5174,28 @@ export default function LandingPageEditor() {
     <Page
       title={copy.pageTitle}
       subtitle={copy.pageSubtitle}
-      primaryAction={mainTab === 1 ? {
-        content: tmplSaving ? copy.saving : copy.save,
-        onAction: saveTemplates,
-        loading: tmplSaving,
-        disabled: !tmplDirty,
-      } : {
-        content: saving ? copy.saving : copy.save,
-        onAction: handleSave,
-        loading: saving,
-        disabled: !showContainerEditor,
-      }}
+      primaryAction={
+        mainTab === 1
+          ? {
+              content: tmplSaving ? copy.saving : copy.save,
+              onAction: saveTemplates,
+              loading: tmplSaving,
+              disabled: !tmplDirty,
+            }
+          : mainTab === 2
+            ? {
+                content: saving ? copy.saving : copy.save,
+                onAction: saveSitePopup,
+                loading: saving,
+                disabled: sitePopupLoading || !sitePopupDirty,
+              }
+            : {
+                content: saving ? copy.saving : copy.save,
+                onAction: handleSave,
+                loading: saving,
+                disabled: !showContainerEditor,
+              }
+      }
     >
       <Layout>
         {err && <Layout.Section><Banner tone="critical" onDismiss={() => setErr("")}>{err}</Banner></Layout.Section>}
@@ -5253,16 +5410,6 @@ export default function LandingPageEditor() {
                         <p>{copy.stylesSidebarNavHint}</p>
                       </Banner>
                     </BlockStack>
-                  )}
-
-                  {activeTab === 3 && (
-                    <PopupEditor
-                      settings={categorySettings}
-                      onChange={(partial) => {
-                        setCategorySettings((prev) => ({ ...prev, ...partial }));
-                        setIsDirty(true);
-                      }}
-                    />
                   )}
 
                   {activeTab === 0 && (
@@ -5720,6 +5867,28 @@ export default function LandingPageEditor() {
             </>
             )}
           </>
+        )}
+
+        {/* ── TAB 2: Site-wide popup (homepage settings) ── */}
+        {mainTab === 2 && (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text as="p" variant="bodySm" tone="subdued">{copy.tabSitePopupHelp}</Text>
+                {sitePopupLoading ? (
+                  <Text as="p" tone="subdued">{copy.loading}</Text>
+                ) : (
+                  <PopupEditor
+                    settings={sitePopupSettings}
+                    onChange={(partial) => {
+                      setSitePopupSettings((prev) => ({ ...prev, ...partial }));
+                      setSitePopupDirty(true);
+                    }}
+                  />
+                )}
+              </BlockStack>
+            </Card>
+          </Layout.Section>
         )}
 
         <Modal

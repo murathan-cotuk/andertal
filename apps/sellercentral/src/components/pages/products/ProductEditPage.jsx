@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { useRouter, Link } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
@@ -530,7 +531,7 @@ function changeRequestSellerLabel(cr) {
   );
 }
 
-export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [] }) {
+export default function ProductEditPage({ product: initialProduct, idOrHandle, isNew, onReload, sellerListings = [], eanSiblings = [] }) {
   const router = useRouter();
   const locale = useLocale();
   const pe = useMemo(() => productEditCopy(locale), [locale]);
@@ -572,6 +573,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const [collectionPopoverOpen, setCollectionPopoverOpen] = useState(false);
   const [collectionRect, setCollectionRect] = useState(null);
   const collectionSearchRef = useRef(null);
+  const collectionMenuRef = useRef(null);
   const [isSuperuser, setIsSuperuser] = useState(false);
   const [euOriginVerifying, setEuOriginVerifying] = useState(false);
   const [euOriginNotice, setEuOriginNotice] = useState("");
@@ -667,10 +669,14 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (collectionPopoverOpen) document.body.classList.add("andertal-collections-dropdown-open");
-    else document.body.classList.remove("andertal-collections-dropdown-open");
-    return () => document.body.classList.remove("andertal-collections-dropdown-open");
+    if (!collectionPopoverOpen) return undefined;
+    const onDown = (e) => {
+      if (collectionSearchRef.current?.contains(e.target)) return;
+      if (collectionMenuRef.current?.contains(e.target)) return;
+      setCollectionPopoverOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
   }, [collectionPopoverOpen]);
 
   useEffect(() => {
@@ -3032,33 +3038,97 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
         </Modal>
       )}
 
-      {!isNew && isSuperuser && sellerListings.length > 0 && (
+      {!isNew && isSuperuser && (sellerListings.length > 0 || eanSiblings.length > 0) && (
         <Box paddingBlockEnd="200">
           <Card>
-            <BlockStack gap="200">
+            <BlockStack gap="300">
               <Text as="h2" variant="bodyMd" fontWeight="semibold">
-                {locale === "en" ? "Sellers listing this product" : locale === "tr" ? "Bu ürünü listeleyen satıcılar" : locale === "fr" ? "Vendeurs listant ce produit" : locale === "es" ? "Vendedores que listan este producto" : locale === "it" ? "Venditori che elencano questo prodotto" : "Anbieter die dieses Produkt listen"}
+                {lt(locale, "Offers for this EAN", "Bu EAN için kayıtlar", "Offres pour cet EAN", "Ofertas para este EAN", "Offerte per questo EAN", "Angebote für diese EAN")}
               </Text>
-              <Divider />
-              {sellerListings.map((sl) => (
-                <InlineStack key={sl.id} gap="400" blockAlign="center" wrap>
-                  <Text as="span" variant="bodySm" fontWeight="semibold">
-                    {sl.shop_name || sl.email || sl.seller_id}
+              <Text as="p" variant="bodySm" tone="subdued">
+                {lt(
+                  locale,
+                  "The form below is the catalog product. Each line under it is a separate seller offer. A second line for the same seller is not the form you are editing.",
+                  "Aşağıdaki form katalog ürünüdür. Altındaki her satır ayrı bir satıcı teklifidir. Aynı satıcının ikinci satırı, düzenlediğin form değildir.",
+                  "Le formulaire ci-dessous est le produit catalogue. Chaque ligne en dessous est une offre vendeur distincte.",
+                  "El formulario de abajo es el producto del catálogo. Cada línea debajo es una oferta de vendedor distinta.",
+                  "Il modulo sotto è il prodotto di catalogo. Ogni riga sotto è un'offerta venditore distinta.",
+                  "Das Formular unten ist das Katalogprodukt. Jede Zeile darunter ist ein eigenes Verkäuferangebot.",
+                )}
+              </Text>
+              <InlineStack gap="400" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  {lt(locale, "This product", "Bu ürün kaydı", "Ce produit", "Este producto", "Questo prodotto", "Dieser Produkteintrag")}
+                </Text>
+                <Text as="span" variant="bodyXs" tone="subdued">
+                  {productOwnerId || "—"}
+                </Text>
+                <Text as="span" variant="bodyXs" tone="subdued">
+                  {product?.price != null ? `${Number(product.price).toFixed(2)} €` : "—"}
+                </Text>
+                <Text as="span" variant="bodyXs" tone="subdued">
+                  {`${lt(locale, "Stock", "Stok", "Stock", "Stock", "Scorte", "Bestand")}: ${product?.inventory ?? 0}`}
+                </Text>
+              </InlineStack>
+              {sellerListings.map((sl) => {
+                const sameSeller = productOwnerId && String(sl.seller_id || "").trim() === String(productOwnerId).trim();
+                return (
+                  <BlockStack key={sl.id} gap="100">
+                    {sameSeller ? (
+                      <Banner tone="warning">
+                        {lt(
+                          locale,
+                          "Same seller, second record. This is not the form above. The shop used to read stock from this row.",
+                          "Aynı satıcının ikinci kaydı. Yukarıdaki form bu değil. Shop stoğu eskiden bu satırdan okuyordu.",
+                          "Même vendeur, deuxième enregistrement. Ce n'est pas le formulaire ci-dessus.",
+                          "Mismo vendedor, segundo registro. No es el formulario de arriba.",
+                          "Stesso venditore, secondo record. Non è il modulo sopra.",
+                          "Gleicher Verkäufer, zweiter Eintrag. Das ist nicht das Formular oben.",
+                        )}
+                      </Banner>
+                    ) : null}
+                    <InlineStack gap="400" blockAlign="center" wrap>
+                      <Text as="span" variant="bodySm" fontWeight="semibold">
+                        {sameSeller
+                          ? lt(locale, "Second record", "İkinci kayıt", "Deuxième enregistrement", "Segundo registro", "Secondo record", "Zweiter Eintrag")
+                          : lt(locale, "Other seller", "Başka satıcı", "Autre vendeur", "Otro vendedor", "Altro venditore", "Anderer Verkäufer")}
+                        {": "}
+                        {sl.shop_name || sl.email || sl.seller_id}
+                      </Text>
+                      {sl.email ? <Text as="span" variant="bodyXs" tone="subdued">{sl.email}</Text> : null}
+                      <Text as="span" variant="bodyXs" tone="subdued">
+                        {sl.price_cents != null ? `${(sl.price_cents / 100).toFixed(2)} €` : "—"}
+                      </Text>
+                      <Text as="span" variant="bodyXs" tone="subdued">
+                        {`${lt(locale, "Stock", "Stok", "Stock", "Stock", "Scorte", "Bestand")}: ${sl.inventory ?? 0}`}
+                      </Text>
+                      <Text as="span" variant="bodyXs" tone={sl.status === "active" ? "success" : "subdued"}>
+                        {sl.status ?? "—"}
+                      </Text>
+                    </InlineStack>
+                  </BlockStack>
+                );
+              })}
+              {eanSiblings.length > 0 && (
+                <BlockStack gap="100">
+                  <Text as="h3" variant="bodySm" fontWeight="semibold">
+                    {lt(locale, "Other products with this EAN", "Aynı EAN'li başka ürünler", "Autres produits avec cet EAN", "Otros productos con este EAN", "Altri prodotti con questo EAN", "Andere Produkte mit dieser EAN")}
                   </Text>
-                  {sl.email && sl.shop_name && (
-                    <Text as="span" variant="bodyXs" tone="subdued">{sl.email}</Text>
-                  )}
-                  <Text as="span" variant="bodyXs" tone="subdued">
-                    {sl.price_cents != null ? `${(sl.price_cents / 100).toFixed(2)} €` : "—"}
-                  </Text>
-                  <Text as="span" variant="bodyXs" tone="subdued">
-                    {`${locale === "en" ? "Stock" : locale === "tr" ? "Stok" : locale === "fr" ? "Stock" : locale === "es" ? "Stock" : locale === "it" ? "Stock" : "Bestand"}: ${sl.inventory ?? 0}`}
-                  </Text>
-                  <Text as="span" variant="bodyXs" tone={sl.status === "active" ? "success" : "subdued"}>
-                    {sl.status ?? "—"}
-                  </Text>
-                </InlineStack>
-              ))}
+                  {eanSiblings.map((sib) => (
+                    <InlineStack key={sib.id} gap="400" blockAlign="center" wrap>
+                      <Link href={`/products/${sib.id}`}>{sib.title || sib.handle || sib.id}</Link>
+                      <Text as="span" variant="bodyXs" tone="subdued">{sib.seller_id || "—"}</Text>
+                      <Text as="span" variant="bodyXs" tone="subdued">
+                        {sib.price_cents != null ? `${(Number(sib.price_cents) / 100).toFixed(2)} €` : "—"}
+                      </Text>
+                      <Text as="span" variant="bodyXs" tone="subdued">
+                        {`${lt(locale, "Stock", "Stok", "Stock", "Stock", "Scorte", "Bestand")}: ${sib.inventory ?? 0}`}
+                      </Text>
+                      <Text as="span" variant="bodyXs" tone="subdued">{sib.status || "—"}</Text>
+                    </InlineStack>
+                  ))}
+                </BlockStack>
+              )}
             </BlockStack>
           </Card>
         </Box>
@@ -3332,8 +3402,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                   placeholder={locale === "en" ? "Search collection…" : locale === "tr" ? "Koleksiyon ara…" : locale === "fr" ? "Rechercher une collection…" : locale === "es" ? "Buscar colección…" : locale === "it" ? "Cerca collezione…" : "Kollektion suchen…"}
                                   autoComplete="off"
                                 />
-                                {collectionPopoverOpen && collectionRect && (
-                                  <div style={{ position: "fixed", top: collectionRect.bottom + 4, left: collectionRect.left, width: collectionRect.width, maxHeight: 280, overflowY: "auto", background: "var(--p-color-bg-surface)", border: "1px solid var(--p-color-border)", borderRadius: 8, boxShadow: "var(--p-shadow-400)", zIndex: 10002 }}>
+                                {collectionPopoverOpen && collectionRect && typeof document !== "undefined" && createPortal(
+                                  <div
+                                    ref={collectionMenuRef}
+                                    style={{ position: "fixed", top: collectionRect.bottom + 4, left: collectionRect.left, width: collectionRect.width, maxHeight: 280, overflowY: "auto", background: "var(--p-color-bg-surface)", border: "1px solid var(--p-color-border)", borderRadius: 8, boxShadow: "var(--p-shadow-400)", zIndex: 10002 }}
+                                  >
                                     {(collections || [])
                                       .filter((c) => !collectionSearch.trim() || (c.title || c.handle || "").toLowerCase().includes(collectionSearch.toLowerCase()))
                                       .map((c) => (
@@ -3341,6 +3414,7 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                           key={c.id}
                                           type="button"
                                           className="collection-dropdown-item"
+                                          onMouseDown={(e) => e.preventDefault()}
                                           onClick={() => {
                                             const next = collectionIds.includes(c.id) ? collectionIds.filter((id) => id !== c.id) : [...collectionIds, c.id];
                                             updateMeta("collection_ids", next);
@@ -3355,9 +3429,9 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
                                           <span>{c.title || c.handle || c.id}</span>
                                         </button>
                                       ))}
-                                  </div>
+                                  </div>,
+                                  document.body,
                                 )}
-                                {collectionPopoverOpen && <div style={{ position: "fixed", inset: 0, zIndex: 10001 }} onClick={() => setCollectionPopoverOpen(false)} aria-hidden />}
                               </div>
                               {collectionIds.filter((id) => (collections || []).some((c) => c.id === id)).length > 0 && (
                                 <InlineStack gap="100" wrap>

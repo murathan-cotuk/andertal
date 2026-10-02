@@ -9,7 +9,7 @@ const {
 } = require('./catalog-landing-pages-seed')
 
 assert.strictEqual(LAYOUT_VERSION, 'catalog_hub_v3')
-assert.strictEqual(NATIVE_LAYOUT_VERSION, 'native_catalog_v1')
+assert.strictEqual(NATIVE_LAYOUT_VERSION, 'native_catalog_v2')
 assert.strictEqual(CATALOG_PAGES.length, 4)
 assert.deepStrictEqual(
   CATALOG_PAGES.map((p) => p.slug).sort(),
@@ -29,8 +29,18 @@ for (const page of CATALOG_PAGES) {
   const containers = buildPageContainers(page)
 
   if (page.nativeCatalog) {
-    // Shop templates own the UI — CMS stack must stay empty (TASKS §8).
-    assert.strictEqual(containers.length, 0, `${page.slug} native catalog must have 0 containers`)
+    // hub_intro × desktop/tablet/mobile (former AutoCatalogHub Intro banner)
+    assert.strictEqual(containers.length, 3, `${page.slug} native catalog must have 3 hub_intro containers`)
+    assert.ok(containers.every((c) => c.type === 'hub_intro'))
+    assert.ok(page.introBg)
+    assert.ok(page.introSubtitles?.de)
+    const devices = new Set(containers.map((c) => c.visible_on))
+    assert.deepStrictEqual([...devices].sort(), ['desktop', 'mobile', 'tablet'])
+    const intro = containers.find((c) => c.visible_on === 'desktop')
+    assert.strictEqual(intro.title, page.titles.de)
+    assert.ok(intro.body)
+    assert.ok(intro.bg_color)
+    assert.ok(intro._i18n?.en?.title)
     continue
   }
 

@@ -812,5 +812,19 @@
     "noResults": "No se encontraron artículos. Prueba con otro término de búsqueda.",
     "back": "Volver al resumen",
     "readArticle": "Leer artículo"
+  },
+  "globalSearch": {
+    "placeholder": "Buscar productos, pedidos, clientes…",
+    "searching": "Buscando…",
+    "noResults": "Sin resultados para «{query}»",
+    "products": "Productos",
+    "orders": "Pedidos",
+    "customers": "Clientes",
+    "navigation": "Navegación",
+    "bulkUpload": "Carga masiva",
+    "singleUpload": "Añadir un producto",
+    "ranking": "Ranking",
+    "shipping": "Envío",
+    "payments": "Pagos"
   }
 }

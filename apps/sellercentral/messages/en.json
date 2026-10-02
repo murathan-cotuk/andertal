@@ -812,5 +812,19 @@
     "noResults": "No articles found. Try a different search term.",
     "back": "Back to overview",
     "readArticle": "Read article"
+  },
+  "globalSearch": {
+    "placeholder": "Search products, orders, customers…",
+    "searching": "Searching…",
+    "noResults": "No results for “{query}”",
+    "products": "Products",
+    "orders": "Orders",
+    "customers": "Customers",
+    "navigation": "Navigation",
+    "bulkUpload": "Bulk upload",
+    "singleUpload": "Single upload",
+    "ranking": "Ranking",
+    "shipping": "Shipping",
+    "payments": "Payments"
   }
 }

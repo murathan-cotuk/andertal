@@ -37,11 +37,15 @@ function shouldUseLandingContainers(landing, { preferNativeCatalog }) {
   if (!preferNativeCatalog) return true
 
   const settings = landing?.settings && typeof landing.settings === 'object' ? landing.settings : {}
-  // 'category_carousels_v1' was this flag's original name; catalog-landing-pages-seed.js (the
-  // script that actually seeds these pages) writes 'catalog_hub_v1'/'v3' instead — the two were
-  // never the same string, so this check never once matched what the seeder wrote. Accept either.
+  // 'category_carousels_v1' was this flag's original name; catalog-landing-pages-seed.js writes
+  // catalog_hub_v* (full CMS stack) or native_catalog_v* (hub_intro above AutoCatalogHub).
   const layout = String(settings.catalog_landing_layout || '')
-  if (layout === 'category_carousels_v1' || layout.startsWith('catalog_hub_v') || settings.catalog_use_containers === true) {
+  if (
+    layout === 'category_carousels_v1'
+    || layout.startsWith('catalog_hub_v')
+    || layout.startsWith('native_catalog_v')
+    || settings.catalog_use_containers === true
+  ) {
     return true
   }
   // 'bestseller_carousel' and 'personalized_product_row' both render an algorithm-driven
@@ -60,6 +64,7 @@ function shouldUseLandingContainers(landing, { preferNativeCatalog }) {
   }
 
   const visible = containers.filter((c) => c && c.visible !== false)
+  if (visible.some((c) => c.type === 'hub_intro')) return true
   const hasSidebar = visible.some((c) => c.type === 'category_sidebar')
   const carouselCount = visible.filter(isCarouselContainer).length
   return hasSidebar ? carouselCount > 0 : carouselCount >= 2
@@ -174,19 +179,37 @@ export default function CatalogCmsLanding({
   const useContainers = shouldUseLandingContainers(landing, { preferNativeCatalog })
   const brandsDirInCms = slug === 'brands' && hasBrandsDirectoryContainer(landing)
   const hasProductSlot = containers.some((c) => c && c.visible !== false && c.type === 'product_container')
+  const hasCmsProductRows = containers.some(
+    (c) => c && c.visible !== false && (c.type === 'bestseller_carousel' || c.type === 'personalized_product_row'),
+  )
   const hasRichtextSlot = containers.some((c) => c && c.visible !== false && c.type === 'page_richtext')
-  const showNativeBody = hasChildren && !hasProductSlot && (!useContainers || (slug === 'brands' && !brandsDirInCms))
   const showTitle = showTitleWhenNoContainers && !useContainers
   const safeBody = sanitizeHtml(page ? localizedCmsField(page, 'body', locale) : '')
   const trailingBody = safeBody && !hasRichtextSlot
-  // Sellercentral landing-page settings for this hub page: "Unterkategorien links anzeigen"
-  // (show_submenu_left) and "Produkt-Filterleiste anzeigen" (show_product_filter_bar) switch on
-  // the hub template's left category / filter cards around the page's own containers.
+  // Sellercentral landing-page settings for this hub page control left chrome only.
+  // Banners/heroes must be containers on the Containers tab — AutoCatalogHub no longer
+  // injects a marketing Intro banner when CMS containers are present.
   const landingSettings = landing?.settings && typeof landing.settings === 'object' ? landing.settings : {}
   const wantCategories = landingSettings.show_submenu_left === true
   const wantFilters = landingSettings.show_product_filter_bar === true
-  const wantMobileFilter = landingSettings.show_filter_bar === true
-  const hubTemplate = useContainers && hasChildren && preferNativeCatalog && isValidElement(children) && (wantCategories || wantFilters || wantMobileFilter)
+  // Mobile drawer for the same left panels (not the header second-nav row).
+  const wantMobileFilter = wantCategories || wantFilters
+  // Only embed LandingContainers *inside* AutoCatalogHub when CMS owns the product rows —
+  // otherwise embedOnly would hide the native carousels. Intro-only stacks render above the hub.
+  const hubEmbed = useContainers && hasChildren && preferNativeCatalog && isValidElement(children)
+    && (hasProductSlot || hasCmsProductRows)
+  const showContainersAboveNative = useContainers && page?.id && !hubEmbed
+  const showNativeBody = hasChildren && !hasProductSlot && !hubEmbed && (
+    !useContainers || preferNativeCatalog || (slug === 'brands' && !brandsDirInCms)
+  )
+  const hasHubIntro = containers.some((c) => c && c.visible !== false && c.type === 'hub_intro')
+  const chromeProps = {
+    showCategories: wantCategories,
+    showFilters: wantFilters,
+    showMobileFilter: wantMobileFilter,
+    // CMS hub_intro owns the H1 / subtitle — don't duplicate under the native carousels
+    ...(hasHubIntro ? { title: '', subtitle: '' } : {}),
+  }
   const richtextAlign = tmpl.richtext_align || 'left'
   const richtextMaxW = tmpl.richtext_max_width || '700px'
 
@@ -222,11 +245,9 @@ export default function CatalogCmsLanding({
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--shop-bg, #fafafa)' }}>
       <ShopHeader />
       <main className="flex-1">
-        {hubTemplate && page?.id ? (
+        {hubEmbed && page?.id ? (
           cloneElement(children, {
-            showCategories: wantCategories,
-            showFilters: wantFilters,
-            showMobileFilter: wantMobileFilter,
+            ...chromeProps,
             children: (
               <SectionErrorBoundary>
                 <LandingContainers
@@ -239,14 +260,15 @@ export default function CatalogCmsLanding({
               </SectionErrorBoundary>
             ),
           })
-        ) : useContainers && page?.id ? (
+        ) : null}
+        {showContainersAboveNative ? (
           <SectionErrorBoundary>
             <LandingContainers
               pageId={page.id}
               initialContainers={containers}
-              initialSettings={landing?.settings || {}}
+              initialSettings={landingSettings}
               catalogSlots={{
-                product_container: hasChildren ? children : null,
+                product_container: (!preferNativeCatalog && hasChildren) ? children : null,
                 page_richtext: bodyBlock,
               }}
             />
@@ -257,7 +279,9 @@ export default function CatalogCmsLanding({
             <h1 className="shop-typo-catalog-title" style={{ margin: 0 }}>{title}</h1>
           </div>
         ) : null}
-        {showNativeBody ? children : null}
+        {showNativeBody
+          ? (isValidElement(children) ? cloneElement(children, chromeProps) : children)
+          : null}
 
         {trailingBody ? bodyBlock : null}
       </main>

@@ -652,6 +652,84 @@ function TextBlock({ container, locale = "de" }) {
   );
 }
 
+/** Former AutoCatalogHub Intro banner — now a CMS container (hub pages). */
+function HubIntro({ container, locale = "de", headingLevel = 1 }) {
+  const title = lt(container, "title", locale);
+  const body = lt(container, "body", locale);
+  const bg =
+    container.bg_color ||
+    "linear-gradient(120deg, #dfe8dc 0%, #cfdccb 100%)";
+  const ink = container.text_color || "#1d1b18";
+  const muted = container.subtitle_color || "#5e574e";
+  const HeadingTag = headingLevel === 1 ? "h1" : "h2";
+  const pad = getContainerPadding(container, "24px 20px");
+  const radius = Number(container.border_radius) >= 0 ? Number(container.border_radius) : 24;
+  return (
+    <div className="landing-hub-intro" style={{ ...pad, boxSizing: "border-box" }}>
+      <div
+        className="landing-hub-intro__card"
+        style={{
+          ...getContentInnerStyle(container, 1200),
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: radius,
+          background: bg,
+          boxSizing: "border-box",
+        }}
+      >
+        <div style={{ position: "relative", zIndex: 1 }}>
+          {title ? (
+            <HeadingTag
+              className="shop-typo-catalog-title"
+              style={{
+                margin: "0 0 8px",
+                fontSize: "clamp(1.9rem, 3.4vw, 2.75rem)",
+                fontWeight: 800,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.05,
+                color: ink,
+              }}
+            >
+              {title}
+            </HeadingTag>
+          ) : null}
+          {body ? (
+            /<[a-z][\s\S]*>/i.test(body) ? (
+              <div
+                style={{ margin: 0, maxWidth: 640, fontSize: 16, lineHeight: 1.5, color: muted }}
+                dangerouslySetInnerHTML={{ __html: body }}
+              />
+            ) : (
+              <p style={{ margin: 0, maxWidth: 640, fontSize: 16, lineHeight: 1.5, color: muted }}>{body}</p>
+            )
+          ) : null}
+        </div>
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            zIndex: 0,
+            right: -40,
+            top: -30,
+            width: 260,
+            height: 260,
+            borderRadius: "50%",
+            background: "rgba(255,255,255,0.35)",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
+      <style>{`
+        .landing-hub-intro__card { padding: 24px 20px; }
+        @media (min-width: 768px) {
+          .landing-hub-intro { padding-left: 40px !important; padding-right: 40px !important; }
+          .landing-hub-intro__card { padding: 36px 40px; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 /** YouTube- / Vimeo-Links in eine sichere embed-URL umwandeln */
 function landingVideoEmbedFromUrl(input) {
   const raw = String(input || "").trim();
@@ -3476,6 +3554,7 @@ function renderContainer(c, preload = {}, ctx = {}, opts = {}) {
   const singleKey = String(c.product_id || c.product_handle || "").trim();
   switch (c.type) {
     case "hero_banner":          inner = <HeroBanner container={c} locale={locale} headingLevel={ctx.firstVisibleId === c.id ? 1 : 2} />; break;
+    case "hub_intro":            inner = <HubIntro container={c} locale={locale} headingLevel={ctx.firstVisibleId === c.id ? 1 : 2} />; break;
     case "text_block":           inner = <TextBlock container={c} locale={locale} />; break;
     case "video_block":         inner = <VideoBlock container={c} locale={locale} />; break;
     case "image_text":           inner = <ImageText container={c} locale={locale} />; break;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import styled from "styled-components";
 
@@ -221,6 +221,7 @@ function BackInStockForm({ productId, variantId }) {
 export default function ProductPurchaseActions({
   quantity,
   onQuantityChange,
+  minQty = 1,
   maxQty = 99,
   purchaseDisabled = false,
   onAddToCart,
@@ -247,7 +248,12 @@ export default function ProductPurchaseActions({
         ? tp("outOfStock")
         : tp("addToCart");
 
-  const qtyCount = Math.min(maxQty > 0 ? maxQty : 99, 99);
+  const floor = Math.max(1, Number(minQty) || 1);
+  const cap = Math.min(maxQty > 0 ? maxQty : 99, 99);
+  const qtyCount = Math.max(0, cap - floor + 1);
+  useEffect(() => {
+    if (Number(quantity) < floor) onQuantityChange(floor);
+  }, [quantity, floor, onQuantityChange]);
 
   return (
     <>
@@ -262,7 +268,7 @@ export default function ProductPurchaseActions({
             onChange={(e) => onQuantityChange(Number(e.target.value))}
             aria-label={tp("qty")}
           >
-            {Array.from({ length: qtyCount }, (_, i) => i + 1).map((n) => (
+            {Array.from({ length: qtyCount }, (_, i) => i + floor).map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </QtySelect>
@@ -272,6 +278,9 @@ export default function ProductPurchaseActions({
           <span>{buttonLabel}</span>
         </AddBtn>
       </PurchaseRow>
+      {floor > 1 && inStock && !isComingSoon && !shippingUnavailable ? (
+        <NotifyNote>{tp("minOrderQty", { n: floor })}</NotifyNote>
+      ) : null}
       {showBackInStockForm && <BackInStockForm productId={productId} variantId={variantId} />}
       {onBuyNow && (
         <BuyNowBtn onClick={onBuyNow} disabled={purchaseDisabled}>

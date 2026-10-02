@@ -979,6 +979,16 @@ const updateAdminHubProductDb = async (id, body) => {
       `UPDATE admin_hub_products SET title = $1, handle = $2, sku = $3, description = $4, status = $5, price_cents = $6, inventory = $7, metadata = $8, variants = $9, collection_id = $10, updated_at = now() WHERE id = $11`,
       [title, handle, sku, description, status, price, inventory, metadata, variants, collection_id, uuid]
     )
+    // The shop buy box used to prefer admin_hub_seller_listings over this row. For a
+    // product this seller already owns, the product form is the source of truth — keep
+    // their listing shadow in step so checkout cannot keep a stale 0 stock/price.
+    const ownerSellerId = existing.seller_id ? String(existing.seller_id).trim() : ''
+    if (ownerSellerId) {
+      await client.query(
+        `UPDATE admin_hub_seller_listings SET inventory = $1, price_cents = $2, updated_at = now() WHERE product_id = $3 AND seller_id = $4`,
+        [inventory, price, uuid, ownerSellerId]
+      )
+    }
     await client.end()
     stampComplianceReviewAsync(uuid, metadataObj).catch(() => {})
     const saved = await getAdminHubProductByIdOrHandleDb(uuid)
@@ -1397,7 +1407,9 @@ const adminHubProductByIdGET = async (req, res) => {
   try {
     let product = await getAdminHubProductByIdOrHandleDb(req.params.id)
     if (!product) { res.status(404).json({ message: 'Product not found' }); return }
+    const isSuperuserCaller = req.sellerUser?.is_superuser === true
     let seller_listings = []
+    let ean_siblings = []
     try {
       const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
       const { Client } = require('pg')
@@ -1407,7 +1419,7 @@ const adminHubProductByIdGET = async (req, res) => {
         `SELECT sl.id, sl.seller_id, sl.price_cents, sl.inventory, sl.status, sl.sku, sl.created_at,
                 sl.brand_id, sl.shipping_group_id, sl.publish_date, sl.seller_metadata,
                 su.first_name, su.last_name, su.email,
-                COALESCE(su.store_name, su.shop_name) AS shop_name
+                COALESCE(NULLIF(TRIM(su.store_name), ''), NULLIF(TRIM(su.company_name), ''), su.email, sl.seller_id) AS shop_name
          FROM admin_hub_seller_listings sl
          LEFT JOIN seller_users su ON TRIM(su.seller_id) = TRIM(sl.seller_id)
          WHERE sl.product_id = $1
@@ -1415,15 +1427,40 @@ const adminHubProductByIdGET = async (req, res) => {
         [product.id]
       )
       seller_listings = lr.rows || []
+      if (isSuperuserCaller) {
+        const eanDigits = String(product?.metadata?.ean || '').replace(/\D/g, '')
+        if (eanDigits) {
+          const sib = await lc.query(
+            `SELECT id::text AS id, title, handle, seller_id, status, inventory, price_cents
+             FROM admin_hub_products
+             WHERE id <> $2
+               AND (
+                 REGEXP_REPLACE(TRIM(COALESCE(metadata->>'ean', '')), '[^0-9]', '', 'g') = $1
+                 OR EXISTS (
+                   SELECT 1 FROM jsonb_array_elements(
+                     CASE WHEN jsonb_typeof(COALESCE(variants, 'null'::jsonb)) = 'array'
+                       THEN variants ELSE '[]'::jsonb END
+                   ) v
+                   WHERE REGEXP_REPLACE(TRIM(COALESCE(v->>'ean', '')), '[^0-9]', '', 'g') = $1
+                 )
+               )
+             ORDER BY created_at ASC
+             LIMIT 20`,
+            [eanDigits, product.id]
+          )
+          ean_siblings = sib.rows || []
+        }
+      }
       await lc.end()
-    } catch (_) {}
+    } catch (e) {
+      console.warn('adminHubProductByIdGET listings:', e && e.message)
+    }
 
     // A non-owning, non-superuser caller viewing a shared catalog product must see THEIR OWN
     // commercial data (sku/price/inventory/status/brand/shipping), never the master row's —
     // that belongs to whoever originally created it. Without this overlay, opening a listing
     // you just added (or any second-seller listing) showed the original owner's SKU and price
     // as if they were yours.
-    const isSuperuserCaller = req.sellerUser?.is_superuser === true
     const callerSellerId = !isSuperuserCaller && req.sellerUser?.seller_id ? String(req.sellerUser.seller_id).trim() : null
     if (callerSellerId && product.seller_id && String(product.seller_id).trim() !== callerSellerId) {
       const myListing = seller_listings.find((l) => String(l.seller_id || '').trim() === callerSellerId)
@@ -1445,7 +1482,7 @@ const adminHubProductByIdGET = async (req, res) => {
         }
       }
     }
-    res.json({ product, seller_listings })
+    res.json({ product, seller_listings, ean_siblings })
   } catch (err) {
     console.error('Admin Hub product GET error:', err)
     res.status(500).json({ message: (err && err.message) || 'Internal server error' })

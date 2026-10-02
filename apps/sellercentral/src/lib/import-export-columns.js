@@ -48,6 +48,10 @@ function buildProductColumns() {
       col("unit_type", "unit_type"),
       col("unit_value", "unit_value"),
       col("per_unit", "per_unit"),
+      col("minimum_order_quantity", "minimum_order_quantity"),
+      col("sales_unit", "sales_unit"),
+      col("packaging_unit", "packaging_unit"),
+      col("packaging_unit_plural", "packaging_unit_plural"),
     ],
   });
 

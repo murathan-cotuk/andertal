@@ -9,6 +9,7 @@ export const CONTAINER_GROUPS = [
 
 export const CONTAINER_TYPE_GROUP = {
   hero_banner: "hero_media",
+  hub_intro: "hero_media",
   promo_bento: "hero_media",
   page_banner: "hero_media",
   layout_section: "hero_media",

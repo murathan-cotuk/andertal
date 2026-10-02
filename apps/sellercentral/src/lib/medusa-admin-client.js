@@ -232,10 +232,14 @@ class MedusaAdminClient {
     return res?.product ?? res;
   }
 
-  /** GET /admin-hub/products/:id – returns { product, seller_listings } */
+  /** GET /admin-hub/products/:id – returns { product, seller_listings, ean_siblings } */
   async getAdminHubProductFull(idOrHandle) {
     const res = await this.request(`/admin-hub/products/${encodeURIComponent(idOrHandle)}`);
-    return { product: res?.product ?? null, seller_listings: res?.seller_listings ?? [] };
+    return {
+      product: res?.product ?? null,
+      seller_listings: res?.seller_listings ?? [],
+      ean_siblings: res?.ean_siblings ?? [],
+    };
   }
 
   /** PUT /admin-hub/products/:id – ürün güncelle (id veya handle) */

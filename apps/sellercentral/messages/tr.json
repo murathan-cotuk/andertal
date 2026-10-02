@@ -812,5 +812,19 @@
     "noResults": "Makale bulunamadı. Farklı bir arama terimi deneyin.",
     "back": "Genel bakışa dön",
     "readArticle": "Makaleyi oku"
+  },
+  "globalSearch": {
+    "placeholder": "Ürün, sipariş, müşteri ara…",
+    "searching": "Aranıyor…",
+    "noResults": "“{query}” için sonuç yok",
+    "products": "Ürünler",
+    "orders": "Siparişler",
+    "customers": "Müşteriler",
+    "navigation": "Gezinme",
+    "bulkUpload": "Toplu yükleme",
+    "singleUpload": "Tekli ürün ekle",
+    "ranking": "Sıralama",
+    "shipping": "Kargo",
+    "payments": "Ödemeler"
   }
 }

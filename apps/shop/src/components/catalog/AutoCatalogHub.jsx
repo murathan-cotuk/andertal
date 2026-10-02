@@ -175,52 +175,6 @@ const Page = styled.div`
   @media (max-width: 767px) { padding: 12px 0 40px; }
 `;
 
-const Intro = styled.header`
-  position: relative;
-  overflow: hidden;
-  border-radius: 24px;
-  background: ${(p) => p.$bg};
-  padding: 36px 40px;
-  margin-bottom: 24px;
-  h1 {
-    margin: 0 0 8px;
-    font-family: var(--h2-ff, inherit);
-    font-size: clamp(1.9rem, 3.4vw, 2.75rem);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-    color: ${INK};
-  }
-  p { margin: 0; max-width: 640px; font-size: 16px; line-height: 1.5; color: ${MUTED}; }
-  .stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-  .stats span {
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.7);
-    font-size: 13px;
-    font-weight: 700;
-    color: ${INK};
-  }
-  > * { position: relative; z-index: 1; }
-  &::after {
-    content: "";
-    position: absolute;
-    z-index: 0;
-    right: -40px;
-    top: -30px;
-    width: 260px;
-    height: 260px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.35);
-  }
-  @media (max-width: 767px) {
-    margin: 0 16px 16px;
-    padding: 24px 20px;
-    border-radius: 20px;
-    &::after { width: 160px; height: 160px; right: -60px; top: -60px; }
-  }
-`;
-
 const Layout = styled.div`
   display: grid;
   grid-template-columns: ${(p) => (p.$withSide ? "260px minmax(0, 1fr)" : "minmax(0, 1fr)")};
@@ -398,19 +352,13 @@ const Empty = styled.p`
   color: ${MUTED};
 `;
 
-const INTRO_BG = {
-  bestseller: "linear-gradient(120deg, #fcebd5 0%, #f6dcc0 100%)",
-  newest: "linear-gradient(120deg, #dfe8dc 0%, #cfdccb 100%)",
-  sale: "linear-gradient(120deg, #f7d9cf 0%, #f0c3b3 100%)",
-};
-
 /* ─── component ──────────────────────────────────────────────────────────── */
 
 /**
  * `showCategories` / `showFilters` / `showMobileFilter` follow the page's Sellercentral landing
- * settings (Kategorie → "Unterkategorien links anzeigen", Filterleiste → "Produkt-Filterleiste
- * anzeigen" and "Filterleiste im Shop anzeigen"). When the page has its own containers they are
- * passed as `children` and replace this hub's own product sections; the bars stay.
+ * settings (left category panel + left product filter). Marketing banners are CMS containers only.
+ * When the page has its own containers they are passed as `children` and replace this hub's
+ * own product sections; the side bars stay if settings enable them.
  * @param {{ mode?: "bestseller"|"newest"|"sale", title?: string, subtitle?: string,
  *   maxItems?: number, rank?: string, showCategories?: boolean, showFilters?: boolean,
  *   showMobileFilter?: boolean, children?: React.ReactNode }} props
@@ -594,17 +542,18 @@ export default function AutoCatalogHub({
     </Card>
   );
 
+  // No hardcoded marketing banner here — hero/title blocks belong in Sellercentral
+  // landing-page containers (page_banner / text_block / hero_banner). When this hub wraps
+  // CMS containers (`children`), only the left chrome from landing settings remains.
   return (
     <HubCatalogFilterContext.Provider value={hubFilter}>
     <Page>
-      <Intro $bg={INTRO_BG[mode] || INTRO_BG.bestseller}>
-        <h1>{title || t(`title_${mode}`)}</h1>
-        <p>{subtitle || t(`subtitle_${mode}`)}</p>
-        <div className="stats">
-          <span>{t("productsCount", { count: pool.length })}</span>
-          <span>{t("categoriesCount", { count: sections.length })}</span>
+      {!embedOnly && (title || subtitle) ? (
+        <div style={{ marginBottom: 16, padding: "0 4px" }}>
+          {title ? <h1 className="shop-typo-catalog-title" style={{ margin: "0 0 6px" }}>{title}</h1> : null}
+          {subtitle ? <p style={{ margin: 0, color: MUTED, fontSize: 15, lineHeight: 1.45 }}>{subtitle}</p> : null}
         </div>
-      </Intro>
+      ) : null}
 
       <Layout $withSide={withSide}>
         {withSide ? (

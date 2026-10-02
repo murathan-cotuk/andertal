@@ -769,6 +769,8 @@ function CollectionPage() {
   const [collection,  setCollection]  = useState(null);
   const [cmsPage,     setCmsPage]     = useState(null);
   const [cmsPageCategoryLinks, setCmsPageCategoryLinks] = useState([]);
+  /** Landing-page Category / Filter tab settings for CMS pages (e.g. erneut-kaufen). */
+  const [cmsLandingSettings, setCmsLandingSettings] = useState({});
   /** null = not loaded yet; number of visible landing containers of the CMS page. */
   const [cmsContainerCount, setCmsContainerCount] = useState(null);
   const [products,    setProducts]    = useState([]);
@@ -943,20 +945,23 @@ function CollectionPage() {
     })();
   }, [collection?.recommended_product_ids]);
 
-  /* ── CMS landing page (e.g. "Bestseller"): desktop sidebar with one link per
-   * category carousel on the page, reusing the existing category-listing route
-   * (?sort=bestseller) rather than duplicating filter logic for a page that has
-   * no flat product list of its own. ── */
+  /* ── CMS landing page (e.g. "Bestseller" / "Erneut kaufen"):
+   * Category + Filter tabs in Sellercentral control the left hub bars
+   * (show_submenu_left, show_product_filter_bar, show_filter_bar). Legacy fallback:
+   * desktop sidebar with one link per bestseller_carousel category on the page. ── */
   useEffect(() => {
     if (!cmsPage?.id) {
       setCmsPageCategoryLinks([]);
+      setCmsLandingSettings({});
       return;
     }
     let cancelled = false;
-    fetch(`/api/store-landing-page/${encodeURIComponent(cmsPage.id)}`)
+    fetch(`/api/store-landing-page/${encodeURIComponent(cmsPage.id)}`, { cache: "no-store" })
       .then((r) => r.json())
       .then(async (data) => {
         if (cancelled) return;
+        const settings = data?.settings && typeof data.settings === "object" ? data.settings : {};
+        setCmsLandingSettings(settings);
         const containers = Array.isArray(data?.containers) ? data.containers : [];
         setCmsContainerCount(containers.filter((c) => c && c.visible !== false).length);
         const seen = new Set();
@@ -984,7 +989,11 @@ function CollectionPage() {
         setCmsPageCategoryLinks(withCounts.filter((l) => l.hasProducts));
       })
       .catch(() => {
-        if (!cancelled) { setCmsPageCategoryLinks([]); setCmsContainerCount(0); }
+        if (!cancelled) {
+          setCmsPageCategoryLinks([]);
+          setCmsLandingSettings({});
+          setCmsContainerCount(0);
+        }
       });
     return () => { cancelled = true; };
   }, [cmsPage?.id]);
@@ -1110,18 +1119,29 @@ function CollectionPage() {
     // algorithmic hub (ranked carousels per category + filter sidebar) instead of a blank page.
     // Text-only pages (e.g. "Versand", "Über uns") stay text-only unless their slug/title is a
     // catalog topic (bestseller, neu, sale, top, trend, …).
-    const catalogTopic = /best|seller|top|beliebt|trend|neu|new|sale|angebot|deal|rabatt|popular|populer|çok|cok/i
+    const catalogTopic = /best|seller|top|beliebt|trend|neu|new|sale|angebot|deal|rabatt|popular|populer|çok|cok|erneut|reorder|wieder/i
       .test(`${cmsPage.slug || handle} ${cmsPage.title || ""}`);
+    const pageTitle = localizedCmsField(cmsPage, "title", locale) || cmsPage.title || "";
+    const pageSubtitle = stripHtmlText(localizedCmsField(cmsPage, "meta_description", locale) || "", 220);
+    const hubMode = inferHubMode(cmsPage.slug, handle, cmsPage.title);
+    // Sellercentral landing tabs → left bars (same wiring as /neuheiten via CatalogCmsLanding).
+    const wantCategories = cmsLandingSettings.show_submenu_left === true;
+    const wantFilters = cmsLandingSettings.show_product_filter_bar === true;
+    const wantMobileFilter = wantCategories || wantFilters;
+    const wantHubChrome = wantCategories || wantFilters;
+
     if (cmsContainerCount === 0 && (!stripHtmlText(localizedBody) || catalogTopic)) {
-      const pageTitle = localizedCmsField(cmsPage, "title", locale) || cmsPage.title || "";
       return (
         <PageWrap>
           <ShopHeader />
           <Main>
             <AutoCatalogHub
-              mode={inferHubMode(cmsPage.slug, handle, cmsPage.title)}
+              mode={hubMode}
               title={pageTitle}
-              subtitle={stripHtmlText(localizedCmsField(cmsPage, "meta_description", locale) || "", 220)}
+              subtitle={pageSubtitle}
+              showCategories={wantHubChrome ? wantCategories : true}
+              showFilters={wantHubChrome ? wantFilters : true}
+              showMobileFilter={wantHubChrome ? wantMobileFilter : false}
             />
             {localizedBody ? (
               <RichtextStrip>
@@ -1134,35 +1154,58 @@ function CollectionPage() {
         </PageWrap>
       );
     }
+
+    const landingBody = (
+      <LandingContainers
+        pageId={String(cmsPage.id)}
+        suppressCatalogSidebar={wantHubChrome}
+      />
+    );
+
     return (
       <PageWrap>
         <ShopHeader />
         <Main>
-          {cmsPageCategoryLinks.length > 0 && (
-            <CmsPageMobilePills>
-              {cmsPageCategoryLinks.map((l) => (
-                <CmsPageMobilePill key={l.slug} href={`/${l.slug}?sort=bestseller`}>
-                  {l.title}
-                </CmsPageMobilePill>
-              ))}
-            </CmsPageMobilePills>
-          )}
-          {cmsPageCategoryLinks.length > 0 ? (
-            <CmsPageWithSidebar>
-              <CmsPageSidebar>
-                <CmsPageSidebarTitle>
-                  {tCommon("categories")}
-                </CmsPageSidebarTitle>
-                {cmsPageCategoryLinks.map((l) => (
-                  <CmsPageSidebarLink key={l.slug} href={`/${l.slug}?sort=bestseller`}>
-                    {l.title}
-                  </CmsPageSidebarLink>
-                ))}
-              </CmsPageSidebar>
-              <CmsPageContent><LandingContainers pageId={String(cmsPage.id)} /></CmsPageContent>
-            </CmsPageWithSidebar>
+          {wantHubChrome ? (
+            <AutoCatalogHub
+              mode={hubMode}
+              title={pageTitle}
+              subtitle={pageSubtitle}
+              showCategories={wantCategories}
+              showFilters={wantFilters}
+              showMobileFilter={wantMobileFilter}
+            >
+              {landingBody}
+            </AutoCatalogHub>
           ) : (
-            <LandingContainers pageId={String(cmsPage.id)} />
+            <>
+              {cmsPageCategoryLinks.length > 0 && (
+                <CmsPageMobilePills>
+                  {cmsPageCategoryLinks.map((l) => (
+                    <CmsPageMobilePill key={l.slug} href={`/${l.slug}?sort=bestseller`}>
+                      {l.title}
+                    </CmsPageMobilePill>
+                  ))}
+                </CmsPageMobilePills>
+              )}
+              {cmsPageCategoryLinks.length > 0 ? (
+                <CmsPageWithSidebar>
+                  <CmsPageSidebar>
+                    <CmsPageSidebarTitle>
+                      {tCommon("categories")}
+                    </CmsPageSidebarTitle>
+                    {cmsPageCategoryLinks.map((l) => (
+                      <CmsPageSidebarLink key={l.slug} href={`/${l.slug}?sort=bestseller`}>
+                        {l.title}
+                      </CmsPageSidebarLink>
+                    ))}
+                  </CmsPageSidebar>
+                  <CmsPageContent>{landingBody}</CmsPageContent>
+                </CmsPageWithSidebar>
+              ) : (
+                landingBody
+              )}
+            </>
           )}
           {localizedBody ? (
             <RichtextStrip>

@@ -114,6 +114,9 @@ const GalleryCol = styled.div`
   position: sticky;
   top: 116px;
   align-self: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   @media (max-width: 768px) {
     position: static;
     top: auto;
@@ -126,7 +129,10 @@ const MainImageWrap = styled.div`
   position: relative;
   isolation: isolate;
   width: 100%;
+  max-width: 100%;
+  height: auto;
   aspect-ratio: 1 / 1;
+  flex-shrink: 0;
   border-radius: 24px;
   overflow: hidden;
   background: #fff;
@@ -138,6 +144,7 @@ const MainImageWrap = styled.div`
     width: 100%;
     height: 100%;
     object-fit: contain;
+    object-position: center;
     background: #fff;
     display: block;
     z-index: 1;
@@ -203,7 +210,9 @@ const Thumbnails = styled.div`
 const Thumbnail = styled.img`
   width: 80px;
   height: 80px;
+  aspect-ratio: 1 / 1;
   object-fit: contain;
+  object-position: center;
   background: #fff;
   border-radius: 12px;
   cursor: pointer;
@@ -1405,17 +1414,20 @@ export default function ProductTemplate() {
     : (meta.review_avg != null ? Number(meta.review_avg) : 0);
   const soldLastMonth = meta.sold_last_month != null ? Number(meta.sold_last_month) : null;
   const isBestseller = isBestsellerMetadata(meta);
-  const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 0;
+  const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? product.inventory_quantity ?? 0;
   const inventorySafe =
     variant?.inventory_quantity ??
     variant?.inventory ??
     product.variants?.[0]?.inventory_quantity ??
     product.variants?.[0]?.inventory ??
+    product.inventory_quantity ??
+    product.inventory ??
     0;
   const inventorySafeNum = Number(inventorySafe);
   // A variant deactivated in Seller Central is never sellable, regardless of stock.
   const variantDisabled = variant?.metadata?.disabled === true;
   const inStock = inventorySafeNum > 0 && !variantDisabled;
+  const minOrderQty = Math.max(1, parseInt(meta.minimum_order_quantity, 10) || 1);
   const maxQty = variantDisabled ? 0 : (inventorySafeNum || 9999);
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
@@ -1895,6 +1907,7 @@ export default function ProductTemplate() {
               <ProductPurchaseActions
                 quantity={quantity}
                 onQuantityChange={setQuantity}
+                minQty={minOrderQty}
                 maxQty={maxQty}
                 hideQuantity={!pdpVisible("quantity_selector")}
                 purchaseDisabled={!inStock || isComingSoon || shippingUnavailable}

@@ -100,7 +100,10 @@ const MainImageWrap = styled.div`
   position: relative;
   isolation: isolate;
   width: 100%;
-  aspect-ratio: 1;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
   border-radius: 12px;
   overflow: hidden;
   background: #f3f4f6;
@@ -112,6 +115,7 @@ const MainImageWrap = styled.div`
     width: 100%;
     height: 100%;
     object-fit: contain;
+    object-position: center;
     background: #fff;
     display: block;
     z-index: 1;
@@ -176,7 +180,9 @@ const Thumbnails = styled.div`
 const Thumbnail = styled.img`
   width: 64px;
   height: 64px;
+  aspect-ratio: 1 / 1;
   object-fit: contain;
+  object-position: center;
   background: #fff;
   border-radius: 8px;
   cursor: pointer;
@@ -811,16 +817,26 @@ const MobileGalleryTrack = styled.div`
 
 const MobileGallerySlide = styled.div`
   flex: 0 0 100%;
+  width: 100%;
   scroll-snap-align: start;
-  /* Always an exact square. */
+  /* Lock square: absolute img so intrinsic photo size cannot stretch the slide. */
   aspect-ratio: 1 / 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: auto;
+  position: relative;
   overflow: hidden;
   background: #fff;
   cursor: zoom-in;
-  position: relative;
+
+  > img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    background: #fff;
+    display: block;
+  }
 `;
 
 function sanitizeHtml(html) {
@@ -1493,17 +1509,20 @@ export default function ProductTemplateMobile() {
     : (meta.review_avg != null ? Number(meta.review_avg) : 0);
   const soldLastMonth = meta.sold_last_month != null ? Number(meta.sold_last_month) : null;
   const isBestseller = isBestsellerMetadata(meta);
-  const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? 0;
+  const inventory = variant?.inventory_quantity ?? product.variants?.[0]?.inventory_quantity ?? product.inventory_quantity ?? 0;
   const inventorySafe =
     variant?.inventory_quantity ??
     variant?.inventory ??
     product.variants?.[0]?.inventory_quantity ??
     product.variants?.[0]?.inventory ??
+    product.inventory_quantity ??
+    product.inventory ??
     0;
   const inventorySafeNum = Number(inventorySafe);
   // A variant deactivated in Seller Central is never sellable, regardless of stock.
   const variantDisabled = variant?.metadata?.disabled === true;
   const inStock = inventorySafeNum > 0 && !variantDisabled;
+  const minOrderQty = Math.max(1, parseInt(meta.minimum_order_quantity, 10) || 1);
   const maxQty = variantDisabled ? 0 : (inventorySafeNum || 9999);
   const publishDate = meta.publish_date ? new Date(meta.publish_date) : null;
   const isComingSoon = publishDate && !isNaN(publishDate.getTime()) && publishDate.getTime() > Date.now();
@@ -1817,7 +1836,6 @@ export default function ProductTemplateMobile() {
                     src={img.url || mainImage}
                     alt={img.alt || displayTitle}
                     referrerPolicy="no-referrer"
-                    style={{ width: "100%", height: "100%", objectFit: "contain", background: "#fff" }}
                   />
                   {i === 0 ? (
                     <ProductImageBadges isComingSoon={isComingSoon} customBadges={meta.custom_badges} locale={locale} />
@@ -1917,6 +1935,7 @@ export default function ProductTemplateMobile() {
             locale={locale}
             quantity={quantity}
             onQuantityChange={setQuantity}
+            minQty={minOrderQty}
             maxQty={maxQty}
             purchaseDisabled={!inStock || isComingSoon || shippingUnavailable}
             onAddToCart={handleAddToCart}
@@ -2129,6 +2148,7 @@ export default function ProductTemplateMobile() {
                 locale={locale}
                 quantity={quantity}
                 onQuantityChange={setQuantity}
+                minQty={minOrderQty}
                 maxQty={maxQty}
                 purchaseDisabled={!inStock || isComingSoon || shippingUnavailable}
                 onAddToCart={handleAddToCart}
