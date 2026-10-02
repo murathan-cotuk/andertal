@@ -10,7 +10,7 @@ import { restPathFromPathname } from "@/lib/shop-market";
 
 const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
-const BORDER = "#e5e7eb";
+const BORDER = "#e6dfd4";
 
 const NAV_KEYS = [
   { key: "overview", href: "/account" },

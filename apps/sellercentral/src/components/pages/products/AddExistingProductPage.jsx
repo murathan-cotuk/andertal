@@ -196,6 +196,11 @@ export default function AddExistingProductPage() {
         // first place) instead of re-deriving it below with a plain string compare — that
         // mismatch used to silently fail to lock onto the right child variant.
         if (eanResult?.matched_variant_ean) setSearchedEan(eanResult.matched_variant_ean);
+        else if (eanResult?.matched_ean) setSearchedEan(eanResult.matched_ean);
+        // Prefer sellable unit title (EAN product), never the family roof title alone.
+        if (found && eanResult?.sellable_unit?.title) {
+          found = { ...found, title: eanResult.sellable_unit.title };
+        }
       }
 
       if (!found && idTrim) {

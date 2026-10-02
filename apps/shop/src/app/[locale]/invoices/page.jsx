@@ -13,7 +13,7 @@ export default function InvoicesPage() {
   const t = useTranslations("accountMisc");
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>

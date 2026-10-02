@@ -23,10 +23,10 @@ const T = {
   dark2: "var(--body-color, #1d1b18)",
   gray1: "#5e574e",
   gray2: "#6b6459",
-  gray3: "#9ca3af",
+  gray3: "#a39a8d",
   border: "#efe8dd",
   cardBg: "#FFFFFF",
-  pageBg: "#FAFAFA",
+  pageBg: "#FAF7F2",
   radius: "18px",
   font: "inherit",
 };
@@ -36,17 +36,17 @@ const STATUS = {
   offen:           { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
   pending:         { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
   bezahlt:         { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
-  in_bearbeitung:  { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
-  processing:      { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
-  versendet:       { dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
-  shipped:         { dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
+  in_bearbeitung:  { dot: "#a65300", bg: "#fcebd5", color: "#7f3f00" },
+  processing:      { dot: "#a65300", bg: "#fcebd5", color: "#7f3f00" },
+  versendet:       { dot: "#1d1b18", bg: "#efe8dd", color: "#1d1b18" },
+  shipped:         { dot: "#1d1b18", bg: "#efe8dd", color: "#1d1b18" },
   zugestellt:      { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
   delivered:       { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
   abgeschlossen:   { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
   completed:       { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
   storniert:       { dot: "#ef4444", bg: "#fef2f2", color: "#991b1b" },
   cancelled:       { dot: "#ef4444", bg: "#fef2f2", color: "#991b1b" },
-  refunded:        { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
+  refunded:        { dot: "#a65300", bg: "#fcebd5", color: "#7f3f00" },
   retoure:         { dot: "#ef4444", bg: "#fef2f2", color: "#b91c1c" },
   retoure_anfrage: { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
 };
@@ -55,7 +55,7 @@ const RETURN_STATUS = {
   offen:         { color: "#92400e", bg: "#fffbeb" },
   genehmigt:     { color: "#065f46", bg: "#ecfdf5" },
   abgelehnt:     { color: "#991b1b", bg: "#fef2f2" },
-  abgeschlossen: { color: "#374151", bg: "#f3f4f6" },
+  abgeschlossen: { color: "#3a352f", bg: "#f3eee6" },
 };
 
 /** English / German status aliases → translation key (ordersPage.status_*). */
@@ -159,7 +159,7 @@ const CardHeader = styled.div`
   user-select: none;
   border-bottom: ${({ $open }) => ($open ? `1px solid ${T.border}` : "none")};
 
-  &:hover { background: #fafafa; }
+  &:hover { background: #faf7f2; }
 
   @media (max-width: 600px) {
     grid-template-columns: 1fr auto 32px;
@@ -218,7 +218,7 @@ const Chevron = styled.div`
   color: ${T.gray2};
   transition: transform 200ms ease, background 150ms ease;
   transform: ${({ $open }) => ($open ? "rotate(180deg)" : "rotate(0deg)")};
-  background: ${({ $open }) => ($open ? "#f3f4f6" : "#fff")};
+  background: ${({ $open }) => ($open ? "#f3eee6" : "#fff")};
 `;
 
 const ExpandedPanel = styled.div`
@@ -256,7 +256,7 @@ function StatusPill({ status }) {
   const k = (status || "").toLowerCase();
   const s = STATUS[k]
     ? { ...STATUS[k], label: t(`status_${STATUS_KEY[k]}`) }
-    : { label: status || "—", dot: "#9ca3af", bg: "#f3f4f6", color: "#374151" };
+    : { label: status || "—", dot: "#a39a8d", bg: "#f3eee6", color: "#3a352f" };
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
@@ -284,7 +284,7 @@ function TrackingChip({ carrier, number }) {
       borderRadius: 10, padding: "10px 14px",
     }}>
       {/* truck icon */}
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0369a1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a65300" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
         <rect x="1" y="3" width="15" height="13" rx="1"/>
         <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
         <circle cx="5.5" cy="18.5" r="2.5"/>
@@ -293,7 +293,7 @@ function TrackingChip({ carrier, number }) {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         {displayName && (
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#a65300", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>
             {displayName}
           </div>
         )}
@@ -305,15 +305,15 @@ function TrackingChip({ carrier, number }) {
             onClick={e => e.stopPropagation()}
             style={{
               fontSize: 13, fontWeight: 600, fontFamily: "monospace",
-              color: "#0369a1", textDecoration: "none",
-              borderBottom: "1px dashed #0369a1",
+              color: "#a65300", textDecoration: "none",
+              borderBottom: "1px dashed #a65300",
               wordBreak: "break-all",
             }}
           >
             {number}
           </a>
         ) : (
-          <span style={{ fontSize: 13, fontFamily: "monospace", color: "#374151", wordBreak: "break-all" }}>
+          <span style={{ fontSize: 13, fontFamily: "monospace", color: "#3a352f", wordBreak: "break-all" }}>
             {number}
           </span>
         )}
@@ -328,7 +328,7 @@ function TrackingChip({ carrier, number }) {
           style={{
             display: "inline-flex", alignItems: "center", gap: 5,
             fontSize: 12, fontWeight: 700, color: "#fff",
-            background: "#0369a1", borderRadius: 8, padding: "6px 12px",
+            background: "#a65300", borderRadius: 8, padding: "6px 12px",
             textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
           }}
         >
@@ -356,7 +356,7 @@ function ItemRow({ item, isLast, locale }) {
 
   const thumbEl = item.thumbnail
     ? <img src={resolveImageUrl ? resolveImageUrl(item.thumbnail) : item.thumbnail} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-    : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />;
+    : <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />;
 
   return (
     <div style={{
@@ -366,11 +366,11 @@ function ItemRow({ item, isLast, locale }) {
     }}>
       {/* Thumbnail */}
       {productUrl ? (
-        <Link href={`/${productUrl}`} onClick={e => e.stopPropagation()} style={{ width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, flexShrink: 0, background: "#f9fafb", display: "block" }}>
+        <Link href={`/${productUrl}`} onClick={e => e.stopPropagation()} style={{ width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, flexShrink: 0, background: "#faf7f2", display: "block" }}>
           {thumbEl}
         </Link>
       ) : (
-        <div style={{ width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, flexShrink: 0, background: "#f9fafb" }}>
+        <div style={{ width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: `1px solid ${T.border}`, flexShrink: 0, background: "#faf7f2" }}>
           {thumbEl}
         </div>
       )}
@@ -411,7 +411,7 @@ function ItemRow({ item, isLast, locale }) {
 }
 
 /* Action button */
-function ActionBtn({ children, onClick, disabled, color = T.dark, bg = "#f9fafb", danger }) {
+function ActionBtn({ children, onClick, disabled, color = T.dark, bg = "#faf7f2", danger }) {
   return (
     <button
       onClick={onClick}
@@ -420,7 +420,7 @@ function ActionBtn({ children, onClick, disabled, color = T.dark, bg = "#f9fafb"
         display: "inline-flex", alignItems: "center", gap: 6,
         fontSize: 12.5, fontWeight: 600,
         color: disabled ? T.gray3 : (danger ? "#b91c1c" : color),
-        background: disabled ? "#f3f4f6" : (danger ? "#fef2f2" : bg),
+        background: disabled ? "#f3eee6" : (danger ? "#fef2f2" : bg),
         border: `1px solid ${disabled ? T.border : (danger ? "#fecaca" : color + "22")}`,
         borderRadius: 8, padding: "7px 13px",
         cursor: disabled ? "not-allowed" : "pointer",
@@ -594,7 +594,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {returns.map((r, i) => {
                   const rs = (r.status || "offen").toLowerCase();
-                  const s = RETURN_STATUS[rs] ? { ...RETURN_STATUS[rs], label: t(`ret_${rs}`) } : { label: r.status, color: "#374151", bg: "#f3f4f6" };
+                  const s = RETURN_STATUS[rs] ? { ...RETURN_STATUS[rs], label: t(`ret_${rs}`) } : { label: r.status, color: "#3a352f", bg: "#f3eee6" };
                   const reasonIdx = RETOURE_REASONS.indexOf(r.reason);
                   return (
                     <div key={i} style={{
@@ -636,7 +636,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
           <Section style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
             {/* Rechnung */}
             <ActionBtn
-              color="#0369a1" bg="#f0f9ff"
+              color="#a65300" bg="#f0f9ff"
               disabled={busy === "invoice"}
               onClick={e => { e.stopPropagation(); withBusy("invoice", () => downloadBlob(`/api/store-invoice/${order.id}`, `Rechnung-${orderNum}.pdf`, token())); }}
             >
@@ -650,7 +650,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
             {/* Retourenschein */}
             {hasApprovedReturn && (
               <ActionBtn
-                color="#6d28d9" bg="#f5f3ff"
+                color="#6d28d9" bg="#efe8dd"
                 disabled={busy === "retourenschein"}
                 onClick={e => { e.stopPropagation(); withBusy("retourenschein", () => downloadBlob(`/api/store-return-retourenschein/${order.id}`, `Retourenschein-${orderNum}.pdf`, token())); }}
               >
@@ -661,7 +661,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
             {/* Rücksende-Etikett (DHL, auto-generiert via Sendcloud) */}
             {returnWithLabel && (
               <ActionBtn
-                color="#0369a1" bg="#e0f2fe"
+                color="#a65300" bg="#fcebd5"
                 onClick={e => { e.stopPropagation(); window.open(returnWithLabel.label_url, "_blank", "noopener,noreferrer"); }}
               >
                 {t("returnShippingLabel")}
@@ -683,7 +683,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
 
             {/* Nachricht */}
             <ActionBtn
-              color={T.gray1} bg="#f9fafb"
+              color={T.gray1} bg="#faf7f2"
               onClick={e => { e.stopPropagation(); openMessageFlow(); }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -792,7 +792,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
 
           {/* Message form: 1) Produkt wählen → 2) Nachricht → Support-Fall */}
           {showMessage && (
-            <div style={{ margin: "0 18px 16px", background: "#f8fafc", border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px", fontFamily: T.font }}>
+            <div style={{ margin: "0 18px 16px", background: "#faf7f2", border: `1px solid ${T.border}`, borderRadius: 10, padding: "14px", fontFamily: T.font }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.dark, marginBottom: 12 }}>
                 {messageStep === "pick" ? t("pickProduct") : t("sendMessage")}
               </div>
@@ -818,15 +818,15 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                       disabled={!it.id}
                       style={{
                         width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 8px",
-                        border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 8, background: "#fff",
+                        border: "1px solid #e6dfd4", borderRadius: 10, marginBottom: 8, background: "#fff",
                         cursor: it.id ? "pointer" : "not-allowed", opacity: it.id ? 1 : 0.5, textAlign: "left",
                         fontFamily: T.font,
                       }}
                     >
-                      <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3f4f6" }}>
+                      <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3eee6" }}>
                         {it.thumbnail ? (
                           <img src={resolveImageUrl(it.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-                        ) : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
+                        ) : <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: T.dark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -850,7 +850,7 @@ function OrderCard({ order, expanded, onToggle, onRefresh }) {
                 <>
                   {selectedMessageItem && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: `1px solid ${T.border}`, borderRadius: 8, background: "#fff", marginBottom: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 6, overflow: "hidden", background: "#f3f4f6", flexShrink: 0 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 6, overflow: "hidden", background: "#f3eee6", flexShrink: 0 }}>
                         {selectedMessageItem.thumbnail ? (
                           <img src={resolveImageUrl(selectedMessageItem.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                         ) : null}

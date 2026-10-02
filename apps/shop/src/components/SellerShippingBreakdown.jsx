@@ -21,7 +21,7 @@ export default function SellerShippingBreakdown({ sellerShipping, compact = fals
         sellers.map((s) => (
           <div
             key={`line-${s.sellerId}`}
-            style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: fs, color: "#6b7280" }}
+            style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: fs, color: "#5e574e" }}
           >
             <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {tUi("sellerShippingLine", { seller: nameOf(s) })}

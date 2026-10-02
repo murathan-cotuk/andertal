@@ -15,7 +15,7 @@ export default function RecommendedPage() {
           <h1 style={{ fontSize: "36px", fontWeight: 700, marginBottom: "16px", letterSpacing: "0.05em" }}>
             {t("recommendedTitle")}
           </h1>
-          <p style={{ fontSize: "18px", color: "#6b7280", marginBottom: "32px" }}>
+          <p style={{ fontSize: "18px", color: "#5e574e", marginBottom: "32px" }}>
             {t("recommendedSubtitle")}
           </p>
         </div>

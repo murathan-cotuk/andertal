@@ -332,9 +332,9 @@ function fmtDate(d, locale) {
 }
 
 const STATUS_COLOR = {
-  offen: "#92400e", in_bearbeitung: "#1e40af", versendet: "#6d28d9",
+  offen: "#92400e", in_bearbeitung: "#7f3f00", versendet: "#6d28d9",
   zugestellt: "#166534", abgeschlossen: "#166534", storniert: "#991b1b",
-  bezahlt: "#166534", refunded: "#1d4ed8", retoure: "#b91c1c",
+  bezahlt: "#166534", refunded: "#a65300", retoure: "#b91c1c",
   retoure_anfrage: "#b45309", pending: "#92400e", shipped: "#6d28d9",
   delivered: "#166534", completed: "#166534", cancelled: "#991b1b",
 };
@@ -561,7 +561,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
 
       <main style={{ flex: 1 }}>
@@ -750,7 +750,7 @@ export default function AccountPage() {
                           {item.thumbnail ? (
                             <img src={item.thumbnail} alt="" />
                           ) : (
-                            <div style={{ width: "100%", height: "100%", background: "#f3f4f6" }} />
+                            <div style={{ width: "100%", height: "100%", background: "#f3eee6" }} />
                           )}
                         </MiniImg>
                         <MiniBody>
@@ -776,7 +776,7 @@ export default function AccountPage() {
                           {p.thumbnail ? (
                             <img src={p.thumbnail} alt="" />
                           ) : (
-                            <div style={{ width: "100%", height: "100%", background: "#f3f4f6" }} />
+                            <div style={{ width: "100%", height: "100%", background: "#f3eee6" }} />
                           )}
                         </MiniImg>
                         <MiniBody>
@@ -826,7 +826,7 @@ export default function AccountPage() {
                     fontSize: 14,
                     fontWeight: 700,
                     color: "#fff",
-                    background: deleteBusy ? "#9ca3af" : "#b91c1c",
+                    background: deleteBusy ? "#a39a8d" : "#b91c1c",
                     border: "none",
                     borderRadius: 8,
                     cursor: deleteBusy ? "not-allowed" : "pointer",

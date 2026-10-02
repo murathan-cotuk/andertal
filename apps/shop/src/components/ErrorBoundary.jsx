@@ -31,14 +31,14 @@ export class ErrorBoundary extends React.Component {
           minHeight: 320,
           padding: "48px 24px",
           textAlign: "center",
-          color: "#374151",
+          color: "#3a352f",
           fontFamily: "system-ui, sans-serif",
         }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px" }}>
             Etwas ist schiefgelaufen
           </h2>
-          <p style={{ fontSize: 14, color: "#6b7280", margin: "0 0 24px", maxWidth: 380 }}>
+          <p style={{ fontSize: 14, color: "#5e574e", margin: "0 0 24px", maxWidth: 380 }}>
             Ein unerwarteter Fehler ist aufgetreten. Bitte laden Sie die Seite neu oder versuchen Sie es später erneut.
           </p>
           <button
@@ -73,7 +73,7 @@ export function SectionErrorBoundary({ children }) {
   return (
     <ErrorBoundary
       fallback={
-        <div style={{ padding: "24px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+        <div style={{ padding: "24px", textAlign: "center", color: "#a39a8d", fontSize: 13 }}>
           Dieser Bereich konnte nicht geladen werden.
         </div>
       }

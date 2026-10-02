@@ -144,7 +144,7 @@ export default function AddressesPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
@@ -180,7 +180,7 @@ export default function AddressesPage() {
                           </span>
                         )}
                         {a.is_default_billing && (
-                          <span style={{ background: "#eff6ff", color: "#1d4ed8", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>
+                          <span style={{ background: "#fcebd5", color: "#a65300", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>
                             {td("defaultBilling")}
                           </span>
                         )}
@@ -192,7 +192,7 @@ export default function AddressesPage() {
                           </button>
                         )}
                         {!a.is_default_billing && (
-                          <button type="button" onClick={() => setDefaultBill(a.id)} style={{ fontSize: 12, border: "none", background: "none", color: "#2563eb", cursor: "pointer", fontWeight: 600 }}>
+                          <button type="button" onClick={() => setDefaultBill(a.id)} style={{ fontSize: 12, border: "none", background: "none", color: "#a65300", cursor: "pointer", fontWeight: 600 }}>
                             {td("setAsBilling")}
                           </button>
                         )}
@@ -213,7 +213,7 @@ export default function AddressesPage() {
                       justifyContent: "center",
                       cursor: "pointer",
                       minHeight: 180,
-                      background: "#fafafa",
+                      background: "#faf7f2",
                     }}
                   >
                     <span style={{ fontSize: 42, color: GRAY, lineHeight: 1 }}>+</span>

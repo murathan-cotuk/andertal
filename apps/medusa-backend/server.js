@@ -2892,8 +2892,41 @@ async function start() {
     await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS brand_id text`).catch(() => {})
     await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS publish_date text`).catch(() => {})
     await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS seller_metadata jsonb DEFAULT NULL`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_seller_listings ADD COLUMN IF NOT EXISTS listed_ean text`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_product ON admin_hub_seller_listings(product_id)`).catch(() => {})
     await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_seller  ON admin_hub_seller_listings(seller_id)`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_seller_listings_listed_ean ON admin_hub_seller_listings(listed_ean) WHERE listed_ean IS NOT NULL`).catch(() => {})
+    // Backfill listed_ean from seller_metadata.ean (additive; never deletes rows).
+    await dbQ(`UPDATE admin_hub_seller_listings
+      SET listed_ean = regexp_replace(COALESCE(seller_metadata->>'ean',''), '\\D', '', 'g')
+      WHERE listed_ean IS NULL
+        AND seller_metadata IS NOT NULL
+        AND COALESCE(seller_metadata->>'ean','') <> ''
+        AND length(regexp_replace(COALESCE(seller_metadata->>'ean',''), '\\D', '', 'g')) >= 8`).catch(() => {})
+    // Strip legacy covers_all flag — sibling bleed is forbidden.
+    await dbQ(`UPDATE admin_hub_seller_listings
+      SET seller_metadata = seller_metadata - 'covers_all'
+      WHERE seller_metadata ? 'covers_all'`).catch(() => {})
+    // Grain: allow one listing per (seller, product, listed_ean). Drop old UNIQUE(product_id, seller_id).
+    await dbQ(`ALTER TABLE admin_hub_seller_listings DROP CONSTRAINT IF EXISTS admin_hub_seller_listings_product_id_seller_id_key`).catch(() => {})
+    await dbQ(`CREATE UNIQUE INDEX IF NOT EXISTS idx_seller_listings_seller_product_ean
+      ON admin_hub_seller_listings (seller_id, product_id, COALESCE(listed_ean, ''))`).catch(() => {})
+
+    // Family roof (Parent) — optional grouping of independent EAN products. Never sold.
+    await dbQ(`CREATE TABLE IF NOT EXISTS admin_hub_product_families (
+      id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      title       text NOT NULL,
+      handle      varchar(255),
+      metadata    jsonb DEFAULT '{}'::jsonb,
+      created_at  timestamptz DEFAULT now(),
+      updated_at  timestamptz DEFAULT now()
+    )`).catch(() => {})
+    await dbQ(`CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_hub_product_families_handle
+      ON admin_hub_product_families(handle) WHERE handle IS NOT NULL`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_products ADD COLUMN IF NOT EXISTS family_id uuid`).catch(() => {})
+    await dbQ(`ALTER TABLE admin_hub_products ADD COLUMN IF NOT EXISTS product_role varchar(32) DEFAULT 'product'`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_admin_hub_products_family ON admin_hub_products(family_id) WHERE family_id IS NOT NULL`).catch(() => {})
+    await dbQ(`CREATE INDEX IF NOT EXISTS idx_admin_hub_products_role ON admin_hub_products(product_role)`).catch(() => {})
 
     // Inventory page: per-seller private, cosmetic-only product folders ("Produkte
     // gruppieren") — never a product, never touches admin_hub_products/seller_listings,

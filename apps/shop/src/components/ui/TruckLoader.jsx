@@ -131,7 +131,7 @@ export default function TruckLoader({ label }) {
         </TruckWrap>
       </div>
       {label && (
-        <p style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#374151", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#3a352f", margin: 0 }}>{label}</p>
       )}
     </ProcessingOverlay>
   );

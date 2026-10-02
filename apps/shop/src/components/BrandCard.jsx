@@ -65,7 +65,7 @@ const Logo = styled.div`
 const Name = styled.div`
   font-size: 15px;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -77,7 +77,7 @@ const Cta = styled(Link)`
   align-self: flex-start;
   display: inline-block;
   text-decoration: none;
-  background: #111827;
+  background: #1d1b18;
   color: #fff;
   padding: 10px 14px;
   border-radius: 8px;

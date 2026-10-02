@@ -15,8 +15,8 @@ import styled from "styled-components";
 
 const ORANGE = "#ee8a12";
 const DARK = "#1A1A1A";
-const GRAY = "#6b7280";
-const BORDER = "#e5e7eb";
+const GRAY = "#5e574e";
+const BORDER = "#e6dfd4";
 
 const WishGrid = styled.div`
   display: grid;
@@ -59,7 +59,7 @@ export default function WishlistMerkzettelPage() {
   }, [user?.id]);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>

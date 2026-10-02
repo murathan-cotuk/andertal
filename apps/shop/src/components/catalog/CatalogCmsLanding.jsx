@@ -192,8 +192,9 @@ export default function CatalogCmsLanding({
   const landingSettings = landing?.settings && typeof landing.settings === 'object' ? landing.settings : {}
   const wantCategories = landingSettings.show_submenu_left === true
   const wantFilters = landingSettings.show_product_filter_bar === true
-  // Mobile drawer for the same left panels (not the header second-nav row).
-  const wantMobileFilter = wantCategories || wantFilters
+  // Mobile "Filter" button + drawer follows the Filterleiste tab ("Produkt-Filterleiste anzeigen"),
+  // not the header second-nav row. With only the category checkbox on, mobile gets category pills.
+  const wantMobileFilter = wantFilters
   // Only embed LandingContainers *inside* AutoCatalogHub when CMS owns the product rows —
   // otherwise embedOnly would hide the native carousels. Intro-only stacks render above the hub.
   const hubEmbed = useContainers && hasChildren && preferNativeCatalog && isValidElement(children)
@@ -242,7 +243,7 @@ export default function CatalogCmsLanding({
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--shop-bg, #fafafa)' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--shop-bg, #faf7f2)' }}>
       <ShopHeader />
       <main className="flex-1">
         {hubEmbed && page?.id ? (

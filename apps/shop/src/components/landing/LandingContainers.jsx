@@ -141,7 +141,7 @@ function LandingItemSubtext({ html, marginTop: mt }) {
   if (!html || !String(html).trim()) return null;
   return (
     <div
-      style={{ fontSize: 14, color: "#374151", marginTop: mt != null ? mt : 8, lineHeight: 1.6 }}
+      style={{ fontSize: 14, color: "#3a352f", marginTop: mt != null ? mt : 8, lineHeight: 1.6 }}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -234,7 +234,7 @@ function MobilePagedGridScroll({ title, gap, rows, cols, items, itemKey, renderI
           style={{
             fontSize: "clamp(1.125rem, 2vw, 1.375rem)",
             fontWeight: 600,
-            color: "#111827",
+            color: "#1d1b18",
             margin: "0 0 16px 0",
             lineHeight: 1.3,
           }}
@@ -623,12 +623,12 @@ function TextBlock({ container, locale = "de" }) {
     <div style={{ background: container.bg_color || "transparent", ...getContainerPadding(container, "48px 24px") }}>
       <div style={{ ...getContentInnerStyle(container, 800), textAlign: align }}>
         {title && (
-          <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 16px" }}>
+          <h2 style={{ fontSize: "clamp(20px,3vw,36px)", fontWeight: 800, color: container.text_color || "#1d1b18", margin: "0 0 16px" }}>
             {title}
           </h2>
         )}
         {body && (
-          <div style={{ fontSize: 16, color: container.text_color || "#374151", lineHeight: 1.7, margin: "0 0 24px" }} dangerouslySetInnerHTML={{ __html: body }} />
+          <div style={{ fontSize: 16, color: container.text_color || "#3a352f", lineHeight: 1.7, margin: "0 0 24px" }} dangerouslySetInnerHTML={{ __html: body }} />
         )}
         {btnText && container.btn_url && (
           <a
@@ -790,7 +790,7 @@ function VideoBlock({ container, locale = "de" }) {
   const hasFile = mode === "file" && Boolean(fileSrc);
   if (!hasEmbed && !hasFile) return null;
 
-  const tc = container.text_color || "#111827";
+  const tc = container.text_color || "#1d1b18";
   const bg = container.bg_color || "transparent";
   const autoplay = container.autoplay === true;
   const muted = container.muted !== false;
@@ -802,7 +802,7 @@ function VideoBlock({ container, locale = "de" }) {
     width: "100%",
     borderRadius: 12,
     overflow: "hidden",
-    border: "1px solid #e5e7eb",
+    border: "1px solid #e6dfd4",
     background: "#000",
     aspectRatio: arNorm,
   };
@@ -902,12 +902,12 @@ function ImageText({ container, locale = "de" }) {
         <style>{`@media (max-width: 767px){.landing-image-text-media{width:100% !important;}}`}</style>
         <div style={{ flex: 1, minWidth: 240, textAlign }}>
           {title && (
-            <h2 style={{ fontSize: "clamp(20px,2.5vw,32px)", fontWeight: 800, color: container.text_color || "#111827", margin: "0 0 12px" }}>
+            <h2 style={{ fontSize: "clamp(20px,2.5vw,32px)", fontWeight: 800, color: container.text_color || "#1d1b18", margin: "0 0 12px" }}>
               {title}
             </h2>
           )}
           {body && (
-            <div style={{ fontSize: 16, color: container.text_color || "#374151", lineHeight: 1.7, margin: "0 0 20px" }} dangerouslySetInnerHTML={{ __html: body }} />
+            <div style={{ fontSize: 16, color: container.text_color || "#3a352f", lineHeight: 1.7, margin: "0 0 20px" }} dangerouslySetInnerHTML={{ __html: body }} />
           )}
           {btnText && container.btn_url && (
             <a
@@ -1128,7 +1128,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
         {image ? (
           <Image src={image} alt={c.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
         ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>{tNav("collection")}</div>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#a39a8d", fontSize: 13 }}>{tNav("collection")}</div>
         )}
         <div style={{ position: "absolute", inset: "auto 0 0 0", padding: "12px 14px", background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.72) 100%)", color: "#fff" }}>
           <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.2 }}>{c.title || c.handle || `${tNav("collection")} ${i + 1}`}</div>
@@ -1165,7 +1165,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
           borderRadius: 16,
           overflow: "hidden",
           background: "#f8f9fb",
-          border: "1px solid #e5e7eb",
+          border: "1px solid #e6dfd4",
         }}
       >
         {src ? (
@@ -1200,7 +1200,7 @@ function ContentMosaic({ container, preloadedProducts, locale = "de" }) {
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
       <div style={getContentInnerStyle(container, 1312)}>
         {lt(container, "title", locale) && (
-          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
+          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#1d1b18", margin: "0 0 20px" }}>{lt(container, "title", locale)}</h2>
         )}
         {isFreeGrid ? (
           <div
@@ -1747,7 +1747,7 @@ function PersonalizedProductRow({ container, locale = "de" }) {
     const rowSpan = Math.max(1, Math.min(4, Number(span.row_span) || 1));
     const thumb = resolveUrl(product.thumbnail);
     const cell = (
-      <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: 16, overflow: "hidden", background: "#f8f9fb", border: "1px solid #e5e7eb" }}>
+      <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: 16, overflow: "hidden", background: "#f8f9fb", border: "1px solid #e6dfd4" }}>
         {thumb ? (
           <Image src={thumb} alt={product.title || ""} fill sizes="(max-width: 768px) 50vw, 500px" style={{ objectFit: "cover" }} />
         ) : (
@@ -1778,7 +1778,7 @@ function PersonalizedProductRow({ container, locale = "de" }) {
       <div style={getContentInnerStyle(container, 1312)}>
         {presentation === "product_grid" ? (
           <>
-            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#1d1b18", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gap, width: "100%" }}>
               {shown.map((product, i) => (
                 <div key={product.id || i} style={{ minWidth: 0 }}>
@@ -1789,14 +1789,14 @@ function PersonalizedProductRow({ container, locale = "de" }) {
           </>
         ) : displayMode === "image_tiles" ? (
           <>
-            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#1d1b18", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${freeGridCols}, minmax(0, 1fr))`, gridAutoRows: `${freeGridRowHeight}px`, gridAutoFlow: "dense", gap, width: "100%" }}>
               {products.map((product, i) => renderTile(product, i))}
             </div>
           </>
         ) : orientation === "vertical" ? (
           <>
-            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#111827", margin: "0 0 20px" }}>{title}</h2>}
+            {title && <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: "#1d1b18", margin: "0 0 20px" }}>{title}</h2>}
             <div style={{ display: "flex", flexDirection: "column", gap, width: "100%" }}>
               {products.map((product, i) => (
                 <div key={product.id || i} style={{ minWidth: 0 }}>
@@ -1908,17 +1908,17 @@ function SellerCarousel({ container, locale = "de" }) {
               <div key={seller.id || i} style={{ minWidth: 0 }}>
                 <Link
                   href={href}
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 12px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fafafa", textDecoration: "none", color: "inherit", textAlign: "center" }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "20px 12px", borderRadius: 10, border: "1px solid #e6dfd4", background: "#faf7f2", textDecoration: "none", color: "inherit", textAlign: "center" }}
                 >
                   {logoUrl ? (
                     <Image src={logoUrl} alt={name} width={64} height={64} style={{ objectFit: "contain", borderRadius: 8 }} />
                   ) : (
-                    <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#6b7280" }}>
+                    <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#f3eee6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#5e574e" }}>
                       {(name[0] || "S").toUpperCase()}
                     </div>
                   )}
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827", lineHeight: 1.3 }}>{name || tp("seller")}</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#2563eb" }}>{tp("toShop")}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18", lineHeight: 1.3 }}>{name || tp("seller")}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#a65300" }}>{tp("toShop")}</span>
                 </Link>
               </div>
             );
@@ -2087,7 +2087,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
             {image ? (
               <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
             ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#efe8dd" }}>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#a39a8d", fontSize: 13, background: bgEnabled ? "transparent" : "#efe8dd" }}>
                 {tLanding("noPreview")}
               </div>
             )}
@@ -2169,7 +2169,7 @@ function CollectionsCarousel({ container, locale = "de" }) {
                   {image ? (
                     <Image src={image} alt={collection.title || ""} fill sizes="(max-width: 768px) 50vw, 400px" style={{ objectFit: imgObjectFit }} />
                   ) : (
-                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13, background: bgEnabled ? "transparent" : "#efe8dd" }}>
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#a39a8d", fontSize: 13, background: bgEnabled ? "transparent" : "#efe8dd" }}>
                       {tLanding("noPreview")}
                     </div>
                   )}
@@ -2249,7 +2249,7 @@ function SingleProduct({ container, preloadedProduct, locale = "de" }) {
           <h2 style={{
             fontSize: "clamp(20px,3vw,28px)",
             fontWeight: 800,
-            color: container.text_color || "#111827",
+            color: container.text_color || "#1d1b18",
             marginBottom: 20,
             textAlign: "center",
           }}>
@@ -2276,12 +2276,12 @@ function BlogCarousel({ container, locale = "de" }) {
   if (!posts.length) return null;
 
   const bg = container.bg_color || "transparent";
-  const textColor = container.text_color || "#111827";
+  const textColor = container.text_color || "#1d1b18";
 
   const previewClampStyle = {
     margin: 0,
     fontSize: 14,
-    color: "#4b5563",
+    color: "#5e574e",
     lineHeight: 1.55,
     flex: 1,
     minHeight: 0,
@@ -2318,10 +2318,10 @@ function BlogCarousel({ container, locale = "de" }) {
           const CardInner = (
             <div
               style={{
-                border: "1px solid #e5e7eb",
+                border: "1px solid #e6dfd4",
                 borderRadius: 16,
                 overflow: "hidden",
-                background: "#fafafa",
+                background: "#faf7f2",
                 height: "100%",
                 display: "flex",
                 flexDirection: "column",
@@ -2352,7 +2352,7 @@ function BlogCarousel({ container, locale = "de" }) {
                         marginTop: "auto",
                         display: "inline-block",
                         border: "none",
-                        background: "#111827",
+                        background: "#1d1b18",
                         color: "#fff",
                         padding: "10px 16px",
                         borderRadius: 8,
@@ -2372,7 +2372,7 @@ function BlogCarousel({ container, locale = "de" }) {
                         marginTop: "auto",
                         display: "inline-block",
                         border: "none",
-                        background: "#111827",
+                        background: "#1d1b18",
                         color: "#fff",
                         padding: "10px 16px",
                         borderRadius: 8,
@@ -2409,7 +2409,7 @@ function NewsletterSignup({ container, locale = "de" }) {
   const emailName = (container.email_field_name || "EMAIL").trim() || "EMAIL";
   const hiddenFields = Array.isArray(container.hidden_fields) ? container.hidden_fields : [];
   const bg = container.bg_color || "#efe8dd";
-  const textColor = container.text_color || "#111827";
+  const textColor = container.text_color || "#1d1b18";
   const btnBg = container.btn_bg || "var(--body-color, #1d1b18)";
   const btnColor = container.btn_color || "#fff";
   const [internalFirstName, setInternalFirstName] = React.useState("");
@@ -2447,7 +2447,7 @@ function NewsletterSignup({ container, locale = "de" }) {
   const sharedInputStyle = {
     padding: "14px 16px",
     borderRadius: 10,
-    border: "1px solid #d1d5db",
+    border: "1px solid #d6ccbd",
     fontSize: 16,
     width: "100%",
     boxSizing: "border-box",
@@ -2483,7 +2483,7 @@ function NewsletterSignup({ container, locale = "de" }) {
           </h2>
         ) : null}
         {lt(container, "subtitle", locale) ? (
-          <p style={{ margin: "0 0 20px", fontSize: 15, color: "#4b5563", lineHeight: 1.5 }}>
+          <p style={{ margin: "0 0 20px", fontSize: 15, color: "#5e574e", lineHeight: 1.5 }}>
             {lt(container, "subtitle", locale)}
           </p>
         ) : null}
@@ -2543,7 +2543,7 @@ function NewsletterSignup({ container, locale = "de" }) {
           </form>
         )}
         {container.privacy_note ? (
-          <p style={{ marginTop: 14, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>
+          <p style={{ marginTop: 14, fontSize: 12, color: "#5e574e", lineHeight: 1.4 }}>
             {container.privacy_note}
           </p>
         ) : null}
@@ -2580,9 +2580,9 @@ function Accordion({ container, locale = "de" }) {
   // Section sits on the page background (design); the question cards stay white.
   const sectionBg = container.bg_color || "transparent";
   const bg = container.bg_color || "#ffffff";
-  const textColor = container.text_color || "#111827";
+  const textColor = container.text_color || "#1d1b18";
   const borderColor = container.border_color || "#efe8dd";
-  const iconColor = container.icon_color || "#64748b";
+  const iconColor = container.icon_color || "#5e574e";
 
   return (
     <div style={{ background: sectionBg, ...getContainerPadding(container, "48px 24px") }}>
@@ -2687,7 +2687,7 @@ function Tabs({ container, locale = "de" }) {
   const tabs = container.tabs || [];
   if (!tabs.length) return null;
   const bg = container.bg_color || "transparent";
-  const textColor = container.text_color || "#111827";
+  const textColor = container.text_color || "#1d1b18";
   const activeColor = container.active_color || "#ee8a12";
   const tabBg = container.tab_bg || "#efe8dd";
   const style = container.tab_style || "underline";
@@ -2842,7 +2842,7 @@ function FeatureGrid({ container, locale = "de" }) {
     cols = 3, card_style = "flat",
     icon_size = "40px",
     bg_color, card_bg = "transparent",
-    card_border_color = "#e5e7eb", text_color = "#111827",
+    card_border_color = "#e6dfd4", text_color = "#1d1b18",
     items = [],
     variant = "cards",
   } = container;
@@ -2941,7 +2941,7 @@ function Testimonials({ container, locale = "de" }) {
     title_align = "center",
     cols = 3, show_stars = true,
     bg_color = "transparent", card_bg = "#ffffff",
-    card_border_color = "#e5e7eb", text_color = "#111827",
+    card_border_color = "#e6dfd4", text_color = "#1d1b18",
     accent_color = "#ee8a12",
     items = [],
   } = container;
@@ -2949,7 +2949,7 @@ function Testimonials({ container, locale = "de" }) {
   const subtitle = lt(container, "subtitle", locale);
 
   const stars = (n) => Array.from({ length: 5 }, (_, i) => (
-    <span key={i} style={{ color: i < n ? accent_color : "#d1d5db", fontSize: "0.875rem" }}>★</span>
+    <span key={i} style={{ color: i < n ? accent_color : "#d6ccbd", fontSize: "0.875rem" }}>★</span>
   ));
 
   return (
@@ -3178,7 +3178,7 @@ function ImageCarousel({ container, locale = "de", isFirstContainer = false }) {
       aspectRatio: ratio,
       overflow: "hidden",
       borderRadius: 20,
-      background: "#f3f4f6",
+      background: "#f3eee6",
       ...(minH ? { minHeight: String(container.min_height_mobile).trim() } : {}),
       ...(maxH ? { maxHeight: maxH } : {}),
     };
@@ -3445,7 +3445,7 @@ function LayoutSection({ container, locale = "de", preload = {}, ctx = {} }) {
     <div style={{ ...getContainerPadding(container, "32px 24px"), background: bg }}>
       <div style={getContentInnerStyle(container, 1312)}>
         {title && (
-          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: container.text_color || "#111827", margin: "0 0 20px", textAlign: titleAlign }}>
+          <h2 style={{ fontSize: "clamp(1.5rem, 2.6vw, 2.125rem)", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.15, color: container.text_color || "#1d1b18", margin: "0 0 20px", textAlign: titleAlign }}>
             {title}
           </h2>
         )}

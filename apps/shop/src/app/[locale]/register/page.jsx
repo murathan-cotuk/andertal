@@ -76,7 +76,7 @@ const selStyle = {
 };
 
 const sectionLabel = {
-  fontSize: 11, fontWeight: 800, color: "#9ca3af",
+  fontSize: 11, fontWeight: 800, color: "#a39a8d",
   textTransform: "uppercase", letterSpacing: "0.08em",
 };
 
@@ -428,7 +428,7 @@ export default function RegisterPage() {
                       fontSize: 14, fontWeight: 700,
                       border: "none", cursor: "pointer",
                       background: accountType === val ? tokens.primary.DEFAULT : "#fff",
-                      color: accountType === val ? "#fff" : "#6b7280",
+                      color: accountType === val ? "#fff" : "#5e574e",
                       transition: "background 0.15s, color 0.15s",
                       fontFamily: tokens.fontFamily.sans,
                     }}
@@ -610,7 +610,7 @@ export default function RegisterPage() {
                         {c.label} ({c.code})
                       </button>
                     )) : (
-                      <div style={{ padding: "9px 12px", fontSize: 14, color: "#6b7280" }}>
+                      <div style={{ padding: "9px 12px", fontSize: 14, color: "#5e574e" }}>
                         Sonuc bulunamadi
                       </div>
                     )}
@@ -724,7 +724,7 @@ export default function RegisterPage() {
                             {c.label} ({c.code})
                           </button>
                         )) : (
-                          <div style={{ padding: "9px 12px", fontSize: 14, color: "#6b7280" }}>
+                          <div style={{ padding: "9px 12px", fontSize: 14, color: "#5e574e" }}>
                             Sonuc bulunamadi
                           </div>
                         )}
@@ -806,7 +806,7 @@ export default function RegisterPage() {
                 size={18}
                 style={{ marginTop: 2 }}
               />
-              <label htmlFor="legalConsent" style={{ fontSize: 13, lineHeight: 1.45, color: "#374151", cursor: "pointer" }}>
+              <label htmlFor="legalConsent" style={{ fontSize: 13, lineHeight: 1.45, color: "#3a352f", cursor: "pointer" }}>
                 {t("legalConsentPart1")}{" "}
                 <Link href="/agb" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>{t("termsLabel")}</Link>
                 {t("legalConsentPart2")}{" "}
@@ -857,7 +857,7 @@ export default function RegisterPage() {
           `}</style>
 
           {/* Login link */}
-          <p style={{ fontSize: 13, color: "#6b7280", margin: 0, textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "#5e574e", margin: 0, textAlign: "center" }}>
             {t("alreadyHaveAccount")}{" "}
             <Link href="/login" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>
               {t("signInNow")}
@@ -867,7 +867,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Footer hint */}
-      <div style={{ padding: "16px 24px", textAlign: "center", fontSize: 12, color: "#9ca3af" }}>
+      <div style={{ padding: "16px 24px", textAlign: "center", fontSize: 12, color: "#a39a8d" }}>
         © {new Date().getFullYear()} Andertal
       </div>
     </div>

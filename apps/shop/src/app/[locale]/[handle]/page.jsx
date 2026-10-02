@@ -108,7 +108,7 @@ const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--shop-bg, #fafafa);
+  background: var(--shop-bg, #faf7f2);
 `;
 
 const Main = styled.main`
@@ -1127,7 +1127,8 @@ function CollectionPage() {
     // Sellercentral landing tabs → left bars (same wiring as /neuheiten via CatalogCmsLanding).
     const wantCategories = cmsLandingSettings.show_submenu_left === true;
     const wantFilters = cmsLandingSettings.show_product_filter_bar === true;
-    const wantMobileFilter = wantCategories || wantFilters;
+    // Mobile filter button follows the Filterleiste tab only (category-only → mobile pills).
+    const wantMobileFilter = wantFilters;
     const wantHubChrome = wantCategories || wantFilters;
 
     if (cmsContainerCount === 0 && (!stripHtmlText(localizedBody) || catalogTopic)) {
@@ -1244,7 +1245,7 @@ function CollectionPage() {
       <ShopHeader />
       <Main>
         <div style={{ padding: "64px 32px", textAlign: "center" }}>
-          <p style={{ fontSize: 15, color: "#6b7280" }}>{tState("pageNotFound")}</p>
+          <p style={{ fontSize: 15, color: "#5e574e" }}>{tState("pageNotFound")}</p>
         </div>
       </Main>
       <Footer />

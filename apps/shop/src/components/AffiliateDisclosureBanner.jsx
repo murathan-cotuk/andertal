@@ -47,7 +47,7 @@ export default function AffiliateDisclosureBanner() {
         left: 0,
         right: 0,
         zIndex: 2147483646,
-        background: "#111827",
+        background: "#1d1b18",
         color: "#fff",
         fontSize: 13,
         lineHeight: 1.4,

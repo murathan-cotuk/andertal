@@ -81,7 +81,7 @@ const CategoryTitle = styled.h1.attrs({ className: "shop-typo-catalog-title" })`
 
 const TitleSub = styled.p`
   font-size: 16px;
-  color: #6b7280;
+  color: #5e574e;
   margin: 0 0 0 0;
 `;
 
@@ -382,14 +382,14 @@ const SubcategoryLink = styled(Link).attrs((p) => ({
   padding: 8px 10px;
   text-decoration: none;
   border-radius: 6px;
-  background: ${(p) => (p.$active ? "#e5e7eb" : "transparent")};
+  background: ${(p) => (p.$active ? "#e6dfd4" : "transparent")};
   margin-bottom: 2px;
   transition: background 0.12s, color 0.12s;
-  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
+  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #1d1b18)" : "var(--sidebar-submenu-color, #5e574e)")};
   font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-submenu-fw, 400)")};
   &:hover {
-    background: #e5e7eb;
-    color: var(--sidebar-nav-color, #111827);
+    background: #e6dfd4;
+    color: var(--sidebar-nav-color, #1d1b18);
   }
 `;
 
@@ -972,7 +972,7 @@ export default function SearchTemplate() {
 
             {q && paginated.length === 0 ? (
               <>
-                <div style={{ textAlign: "center", padding: "24px 0 14px", color: "#6b7280", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                <div style={{ textAlign: "center", padding: "24px 0 14px", color: "#5e574e", fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   {tUi("noDirectHits")}
                 </div>
                 <ProductGrid

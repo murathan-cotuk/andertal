@@ -342,7 +342,7 @@ export default function LoginPage() {
           </form>
 
           {/* Register link */}
-          <p style={{ fontSize: 13, color: "#6b7280", margin: 0, textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "#5e574e", margin: 0, textAlign: "center" }}>
             {t("noAccount")}{" "}
             <Link href="/register" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>
               {t("registerNow")}
@@ -352,7 +352,7 @@ export default function LoginPage() {
       </div>
 
       {/* Footer hint */}
-      <div style={{ padding: "16px 24px", textAlign: "center", fontSize: 12, color: "#9ca3af" }}>
+      <div style={{ padding: "16px 24px", textAlign: "center", fontSize: 12, color: "#a39a8d" }}>
         © {new Date().getFullYear()} Andertal
       </div>
     </div>

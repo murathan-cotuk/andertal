@@ -10,6 +10,13 @@ const {
 } = require('../product-url-handle')
 const { assignAnId, normalizeAnId, ensureVariantAnIds, findProductByAnId } = require('../an-id')
 const { resolveProductCommissionOverride, productCommissionOverridePct } = require('../commission-rate')
+const {
+  buildListingSellerMeta,
+  resolveSellableUnit,
+  PRODUCT_ROLE_PRODUCT,
+  PRODUCT_ROLE_FAMILY_SHELL,
+  isFamilyShell,
+} = require('../product-identity')
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -1120,9 +1127,20 @@ const adminHubProductsPOST = async (req, res) => {
       let listing = null
       let newListingCreated = false
       if (effectiveSellerId) {
+        // Scope listing to the exact EAN joined — never covers_all (sibling bleed).
+        const listingSellerMetaObj = buildListingSellerMeta(incomingEan)
+        const listedEanCol = listingSellerMetaObj ? listingSellerMetaObj.ean : null
         const existListing = await lc.query(
-          'SELECT id, price_cents, inventory, status FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2',
-          [masterProduct.id, effectiveSellerId]
+          `SELECT id, price_cents, inventory, status FROM admin_hub_seller_listings
+           WHERE product_id = $1 AND seller_id = $2
+             AND (
+               ($3::text IS NOT NULL AND (listed_ean = $3 OR seller_metadata->>'ean' = $3))
+               OR ($3::text IS NULL AND (listed_ean IS NULL OR listed_ean = '')
+                   AND (seller_metadata IS NULL OR seller_metadata->>'ean' IS NULL
+                        OR TRIM(COALESCE(seller_metadata->>'ean','')) = ''))
+             )
+           LIMIT 1`,
+          [masterProduct.id, effectiveSellerId, listedEanCol]
         )
         if (existListing.rows[0]) {
           listing = existListing.rows[0]
@@ -1135,15 +1153,9 @@ const adminHubProductsPOST = async (req, res) => {
           const skuVal = (body.sku || '').toString().trim() || null
           // New cross-seller listings start as 'draft' so they never appear live/in the buy box
           // until the seller (or superuser review) activates them explicitly.
-          // Scope the listing to the EAN the seller actually joined with (variant child vs
-          // whole family). Otherwise "Andere Verkäufer" shows them under every sibling.
-          const matchedOnParentEan = normalizeStoreEan(masterProduct?.metadata?.ean) === incomingEan
-          const listingSellerMeta = incomingEan
-            ? JSON.stringify(matchedOnParentEan ? { covers_all: true } : { ean: incomingEan })
-            : null
           const lr = await lc.query(
-            'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) RETURNING *',
-            [masterProduct.id, effectiveSellerId, priceCents, inventory, 'draft', skuVal, listingSellerMeta]
+            'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, seller_metadata, listed_ean) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8) RETURNING *',
+            [masterProduct.id, effectiveSellerId, priceCents, inventory, 'draft', skuVal, listingSellerMetaObj ? JSON.stringify(listingSellerMetaObj) : null, listedEanCol]
           )
           listing = lr.rows[0]
           newListingCreated = true
@@ -1332,22 +1344,31 @@ const adminHubProductsPOST = async (req, res) => {
           const lc2 = new Client2({ connectionString: dbUrl2, ssl: dbUrl2.includes('render.com') ? { rejectUnauthorized: false } : false })
           try {
             await lc2.connect()
-            const existL = await lc2.query(
-              'SELECT id FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2',
-              [fallbackMaster.id, callerSellerId]
-            )
-            let fallbackListing = existL.rows[0] || null
-            if (!fallbackListing) {
+              const eanFb = normalizeStoreEan(eanFromErr || incomingMeta?.ean || body?.ean || '')
+              const metaFbObj = buildListingSellerMeta(eanFb)
+              const listedEanFb = metaFbObj ? metaFbObj.ean : null
+              const existL = await lc2.query(
+                `SELECT id FROM admin_hub_seller_listings
+                 WHERE product_id = $1 AND seller_id = $2
+                   AND (
+                     ($3::text IS NOT NULL AND (listed_ean = $3 OR seller_metadata->>'ean' = $3))
+                     OR ($3::text IS NULL AND (listed_ean IS NULL OR listed_ean = '')
+                         AND (seller_metadata IS NULL OR seller_metadata->>'ean' IS NULL
+                              OR TRIM(COALESCE(seller_metadata->>'ean','')) = ''))
+                   )
+                 LIMIT 1`,
+                [fallbackMaster.id, callerSellerId, listedEanFb]
+              )
+              let fallbackListing = existL.rows[0] || null
+              if (!fallbackListing) {
               const priceCentsFb = typeof body.price === 'number' ? Math.round(body.price * 100) : parseInt(body.price, 10) || 0
               const inventoryFb = parseInt(body.inventory, 10) || 0
               // New cross-seller listings start as 'draft' so they never appear live/in the buy box
               // until the seller (or superuser review) activates them explicitly.
-              const eanFb = normalizeStoreEan(eanFromErr || incomingMeta?.ean || body?.ean || '')
-              const matchedParentFb = eanFb && normalizeStoreEan(fallbackMaster?.metadata?.ean) === eanFb
-              const metaFb = eanFb ? JSON.stringify(matchedParentFb ? { covers_all: true } : { ean: eanFb }) : null
+              const metaFb = metaFbObj ? JSON.stringify(metaFbObj) : null
               const lrFb = await lc2.query(
-                'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING *',
-                [fallbackMaster.id, callerSellerId, priceCentsFb, inventoryFb, 'draft', metaFb]
+                'INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, seller_metadata, listed_ean) VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7) RETURNING *',
+                [fallbackMaster.id, callerSellerId, priceCentsFb, inventoryFb, 'draft', metaFb, listedEanFb]
               )
               fallbackListing = lrFb.rows[0] || null
               try {
@@ -1630,7 +1651,6 @@ const adminHubProductByIdPUT = async (req, res) => {
       const { Client } = require('pg')
       const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
       await lc.connect()
-      const existingListing = await lc.query('SELECT id FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 LIMIT 1', [existing.id, callerSellerId])
       const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
       const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
       const status = body.status !== undefined ? String(body.status || 'active') : null
@@ -1640,22 +1660,31 @@ const adminHubProductByIdPUT = async (req, res) => {
       const brandId = meta.brand_id !== undefined ? (meta.brand_id || null) : null
       const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
       const listedEan = normalizeStoreEan(meta.ean || body.ean || '')
-      const matchedOnParentEan = listedEan && normalizeStoreEan(existing?.metadata?.ean) === listedEan
-      const listingSellerMeta = listedEan
-        ? (matchedOnParentEan ? { covers_all: true, ean: listedEan } : { ean: listedEan })
-        : null
+      const listingSellerMeta = buildListingSellerMeta(listedEan)
+      const existingListing = await lc.query(
+        `SELECT id FROM admin_hub_seller_listings
+         WHERE product_id = $1 AND seller_id = $2
+           AND (
+             ($3::text IS NOT NULL AND (listed_ean = $3 OR seller_metadata->>'ean' = $3))
+             OR ($3::text IS NULL AND (listed_ean IS NULL OR listed_ean = '')
+                 AND (seller_metadata IS NULL OR seller_metadata->>'ean' IS NULL
+                      OR TRIM(COALESCE(seller_metadata->>'ean','')) = ''))
+           )
+         LIMIT 1`,
+        [existing.id, callerSellerId, listedEan || null]
+      )
       let listing = null
       if (existingListing.rows[0]) {
         const lid = existingListing.rows[0].id
         const ur = await lc.query(
-          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, updated_at = now() WHERE id = $9 RETURNING *`,
-          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid]
+          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, listed_ean = COALESCE($10, listed_ean), updated_at = now() WHERE id = $9 RETURNING *`,
+          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid, listedEan || null]
         )
         listing = ur.rows[0] || null
       } else {
         const ir = await lc.query(
-          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING *`,
-          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null]
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata, listed_ean) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11) RETURNING *`,
+          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, listedEan || null]
         )
         listing = ir.rows[0] || null
         try {
@@ -1729,7 +1758,6 @@ const adminHubProductByIdPUT = async (req, res) => {
       const { Client } = require('pg')
       const lc = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
       await lc.connect()
-      const existingListing = await lc.query('SELECT id FROM admin_hub_seller_listings WHERE product_id = $1 AND seller_id = $2 LIMIT 1', [existing.id, callerSellerId])
       const priceCents = body.price !== undefined ? Math.max(0, Math.round(Number(body.price || 0) * 100)) : null
       const inventory = body.inventory !== undefined ? Math.max(0, parseInt(body.inventory, 10) || 0) : null
       const status = body.status !== undefined ? String(body.status || 'active') : null
@@ -1739,22 +1767,31 @@ const adminHubProductByIdPUT = async (req, res) => {
       const brandId = meta.brand_id !== undefined ? (meta.brand_id || null) : null
       const publishDate = meta.publish_date !== undefined ? (meta.publish_date || null) : null
       const listedEan = normalizeStoreEan(meta.ean || body.ean || '')
-      const matchedOnParentEan = listedEan && normalizeStoreEan(existing?.metadata?.ean) === listedEan
-      const listingSellerMeta = listedEan
-        ? (matchedOnParentEan ? { covers_all: true, ean: listedEan } : { ean: listedEan })
-        : null
+      const listingSellerMeta = buildListingSellerMeta(listedEan)
+      const existingListing = await lc.query(
+        `SELECT id FROM admin_hub_seller_listings
+         WHERE product_id = $1 AND seller_id = $2
+           AND (
+             ($3::text IS NOT NULL AND (listed_ean = $3 OR seller_metadata->>'ean' = $3))
+             OR ($3::text IS NULL AND (listed_ean IS NULL OR listed_ean = '')
+                 AND (seller_metadata IS NULL OR seller_metadata->>'ean' IS NULL
+                      OR TRIM(COALESCE(seller_metadata->>'ean','')) = ''))
+           )
+         LIMIT 1`,
+        [existing.id, callerSellerId, listedEan || null]
+      )
       let listing = null
       if (existingListing.rows[0]) {
         const lid = existingListing.rows[0].id
         const ur = await lc.query(
-          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, updated_at = now() WHERE id = $9 RETURNING *`,
-          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid]
+          `UPDATE admin_hub_seller_listings SET price_cents = COALESCE($1, price_cents), inventory = COALESCE($2, inventory), status = COALESCE($3, status), sku = COALESCE($4, sku), shipping_group_id = COALESCE($5, shipping_group_id), brand_id = COALESCE($6, brand_id), publish_date = COALESCE($7, publish_date), seller_metadata = CASE WHEN $8::jsonb IS NULL THEN seller_metadata ELSE COALESCE(seller_metadata, '{}'::jsonb) || $8::jsonb END, listed_ean = COALESCE($10, listed_ean), updated_at = now() WHERE id = $9 RETURNING *`,
+          [priceCents, inventory, status, skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, lid, listedEan || null]
         )
         listing = ur.rows[0] || null
       } else {
         const ir = await lc.query(
-          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING *`,
-          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null]
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, shipping_group_id, brand_id, publish_date, seller_metadata, listed_ean) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11) RETURNING *`,
+          [existing.id, callerSellerId, priceCents || 0, inventory || 0, status || 'draft', skuVal, shippingGroupId, brandId, publishDate, listingSellerMeta ? JSON.stringify(listingSellerMeta) : null, listedEan || null]
         )
         listing = ir.rows[0] || null
         try {
@@ -1894,21 +1931,39 @@ module.exports = function createAdminProductsRouter() {
       if (!ean) return res.status(400).json({ message: 'ean query param required' })
       const normEan = normalizeStoreEan(ean)
       const allProds = await listAdminHubProductsDb({ limit: 5000 })
-      // Matches on the parent's own EAN OR any child/variant EAN — a variant product's
-      // sellable items are its children, so their EANs must be searchable too.
-      const master = pickCanonicalEanMatch(allProds.filter((p) => productHasEan(p, normEan)))
+      // Prefer first-class product rows (exploded / single-SKU) over family shells.
+      const matches = allProds.filter((p) => productHasEan(p, normEan) && String(p.status || '') !== 'merged')
+      const productRows = matches.filter((p) => !isFamilyShell(p))
+      const master = pickCanonicalEanMatch(productRows.length ? productRows : matches)
       if (!master) return res.status(404).json({ message: 'No product found with this EAN' })
+      const sellable = resolveSellableUnit(master, normEan)
       const masterMeta = master.metadata && typeof master.metadata === 'object' ? master.metadata : {}
       const matchedOnParent = normalizeStoreEan(masterMeta.ean) === normEan
-      const matchedVariant = matchedOnParent
-        ? null
-        : parseVariantsArray(master).find((v) => normalizeStoreEan(v && v.ean) === normEan) || null
+      const matchedVariant = sellable && sellable.matched_on === 'variant'
+        ? parseVariantsArray(master).find((v) => normalizeStoreEan(v && v.ean) === normEan) || null
+        : null
+      // Project catalog fields from the matched sellable unit (variant title/images), not the roof.
+      const safe = catalogSafeProduct(master)
+      if (sellable && sellable.title && sellable.matched_on === 'variant') {
+        safe.title = sellable.title
+        if (matchedVariant) {
+          const vMeta = matchedVariant.metadata && typeof matchedVariant.metadata === 'object' ? matchedVariant.metadata : {}
+          if (Array.isArray(vMeta.media) && vMeta.media.length) safe.metadata = { ...safe.metadata, media: vMeta.media }
+          if (matchedVariant.image_url) safe.metadata = { ...safe.metadata, image_url: matchedVariant.image_url }
+        }
+      }
+      if (sellable && sellable.ean) {
+        safe.metadata = { ...safe.metadata, ean: sellable.ean }
+      }
       res.json({
-        product: catalogSafeProduct(master),
+        product: safe,
         found: true,
         matched_ean: normEan,
-        matched_on: matchedOnParent ? 'parent' : 'variant',
+        matched_on: sellable ? sellable.matched_on : (matchedOnParent ? 'parent' : 'variant'),
         matched_variant_ean: matchedVariant ? normalizeStoreEan(matchedVariant.ean) : null,
+        sellable_unit: sellable,
+        family_id: master.family_id || null,
+        product_role: master.product_role || PRODUCT_ROLE_PRODUCT,
       })
     } catch (err) { res.status(500).json({ message: err?.message || 'Lookup failed' }) }
   })
@@ -2059,7 +2114,7 @@ module.exports = function createAdminProductsRouter() {
       if (dup.seller_id) {
         await client.query(
           `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku)
-           VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (product_id, seller_id) DO NOTHING`,
+           VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
           [masterId, dup.seller_id, dup.price_cents || 0, dup.inventory || 0, dup.status || 'active', dup.sku || null]
         )
       }
@@ -2107,10 +2162,10 @@ module.exports = function createAdminProductsRouter() {
   // Repair for rows already broken by the callerSellerId-forced-to-null bug (fixed above,
   // see adminHubProductsPOST): only ever allowed on a currently-unowned row, so it can assign
   // a missing owner but can never reassign one that already exists.
-  // Fold N standalone products into one parent's variants[] (TASK 22).
-  // Soft-archives absorbed rows (status=merged) — never hard-deletes.
+  // Link N independent EAN products under a family roof (preferred), or legacy-fold
+  // into variants[] when body.legacy_fold === true. Soft-archives only in legacy mode.
   router.post('/admin-hub/v1/products/combine-as-variants', async (req, res) => {
-    const { buildCombineAsVariantsPlan } = require('../combine-as-variants-core')
+    const { buildCombineAsVariantsPlan, buildFamilyLinkPlan } = require('../combine-as-variants-core')
     const parentId = String(req.body?.parent_id || '').trim()
     const productIds = Array.isArray(req.body?.product_ids)
       ? [...new Set(req.body.product_ids.map((id) => String(id || '').trim()).filter(Boolean))]
@@ -2120,6 +2175,7 @@ module.exports = function createAdminProductsRouter() {
       req.body?.option_values && typeof req.body.option_values === 'object' && !Array.isArray(req.body.option_values)
         ? req.body.option_values
         : {}
+    const legacyFold = req.body?.legacy_fold === true
 
     if (!parentId) return res.status(400).json({ message: 'parent_id required' })
     if (!productIds.includes(parentId)) productIds.unshift(parentId)
@@ -2140,7 +2196,7 @@ module.exports = function createAdminProductsRouter() {
       for (const id of productIds) {
         const r = await client.query(
           `SELECT id, title, handle, sku, description, status, seller_id, collection_id,
-                  price_cents, inventory, metadata, variants, created_at, updated_at
+                  price_cents, inventory, metadata, variants, family_id, product_role, created_at, updated_at
            FROM admin_hub_products WHERE id = $1 FOR UPDATE`,
           [id]
         )
@@ -2159,6 +2215,58 @@ module.exports = function createAdminProductsRouter() {
             return res.status(403).json({ message: `Not allowed to combine product: ${p.title || p.id}` })
           }
         }
+      }
+
+      // ── Preferred path: family roof (products stay independent sellable rows) ──
+      if (!legacyFold) {
+        const parentRow = loaded.find((p) => String(p.id) === parentId) || loaded[0]
+        const famPlan = buildFamilyLinkPlan({
+          familyTitle: parentRow.title,
+          products: loaded,
+          optionName,
+          optionValues,
+        })
+        if (!famPlan.ok) {
+          await client.query('ROLLBACK')
+          return res.status(400).json({ message: famPlan.message })
+        }
+        const famIns = await client.query(
+          `INSERT INTO admin_hub_product_families (title, handle, metadata)
+           VALUES ($1, $2, $3::jsonb) RETURNING id`,
+          [
+            famPlan.family_title,
+            slugifyTitle(famPlan.family_title) || null,
+            JSON.stringify({ variation_groups: famPlan.variation_groups }),
+          ]
+        )
+        const familyId = famIns.rows[0].id
+        for (const m of famPlan.members) {
+          await client.query(
+            `UPDATE admin_hub_products
+             SET family_id = $1,
+                 product_role = $2,
+                 metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+                 updated_at = now()
+             WHERE id = $4`,
+            [
+              familyId,
+              PRODUCT_ROLE_PRODUCT,
+              JSON.stringify({
+                family_option_value: m.option_value,
+                variation_groups: famPlan.variation_groups,
+              }),
+              m.product_id,
+            ]
+          )
+        }
+        await client.query('COMMIT')
+        return res.json({
+          combined: true,
+          mode: 'family_link',
+          family_id: familyId,
+          product_ids: famPlan.members.map((m) => m.product_id),
+          variation_groups: famPlan.variation_groups,
+        })
       }
 
       const plan = buildCombineAsVariantsPlan({
@@ -2234,11 +2342,12 @@ module.exports = function createAdminProductsRouter() {
         }
         const srcListingMeta = srcEan ? JSON.stringify({ ean: srcEan }) : null
         await client.query(
-          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, seller_metadata)
-           SELECT $1, seller_id, price_cents, inventory, status, sku, COALESCE(seller_metadata, $3::jsonb) FROM admin_hub_seller_listings
+          `INSERT INTO admin_hub_seller_listings (product_id, seller_id, price_cents, inventory, status, sku, seller_metadata, listed_ean)
+           SELECT $1, seller_id, price_cents, inventory, status, sku, COALESCE(seller_metadata, $3::jsonb), $4
+           FROM admin_hub_seller_listings
            WHERE product_id = $2
-           ON CONFLICT (product_id, seller_id) DO NOTHING`,
-          [plan.parentId, sourceId, srcListingMeta]
+           ON CONFLICT DO NOTHING`,
+          [plan.parentId, sourceId, srcListingMeta, srcEan || '']
         )
         // Existing rows that moved via UPDATE below also get EAN if still empty
         if (srcListingMeta) {

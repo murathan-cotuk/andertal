@@ -26,7 +26,7 @@ const Title = styled.h2`
   margin: 0 0 14px;
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   letter-spacing: -0.02em;
 `;
 
@@ -43,13 +43,13 @@ const SearchInput = styled.input`
   width: 220px;
   max-width: 100%;
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #d6ccbd;
   border-radius: 8px;
   font-size: 13px;
   outline: none;
   background: #fff;
 
-  &:focus { border-color: #111827; }
+  &:focus { border-color: #1d1b18; }
 
   @media (max-width: 680px) {
     width: 100%;
@@ -58,15 +58,15 @@ const SearchInput = styled.input`
 
 const SortSelect = styled.select`
   padding: 8px 10px;
-  border: 1px solid #d1d5db;
+  border: 1px solid #d6ccbd;
   border-radius: 8px;
   font-size: 13px;
   background: #fff;
-  color: #111827;
+  color: #1d1b18;
   outline: none;
   cursor: pointer;
 
-  &:focus { border-color: #111827; }
+  &:focus { border-color: #1d1b18; }
 `;
 
 const AlphaBar = styled.div`
@@ -94,16 +94,16 @@ const AlphaBar = styled.div`
 const AlphaBtn = styled.button`
   min-width: 26px;
   padding: 4px 6px;
-  border: 1px solid ${(p) => (p.$active ? "#111827" : "#e5e7eb")};
-  background: ${(p) => (p.$active ? "#111827" : "#fff")};
-  color: ${(p) => (p.$active ? "#fff" : "#374151")};
+  border: 1px solid ${(p) => (p.$active ? "#1d1b18" : "#e6dfd4")};
+  background: ${(p) => (p.$active ? "#1d1b18" : "#fff")};
+  color: ${(p) => (p.$active ? "#fff" : "#3a352f")};
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   text-transform: uppercase;
 
-  &:hover { border-color: #111827; }
+  &:hover { border-color: #1d1b18; }
   &:disabled { opacity: 0.3; cursor: default; }
 
   @media (max-width: 767px) {
@@ -113,7 +113,7 @@ const AlphaBtn = styled.button`
 
 const ResultCount = styled.span`
   font-size: 12px;
-  color: #6b7280;
+  color: #5e574e;
 `;
 
 const Grid = styled.div`
@@ -341,12 +341,12 @@ export default function BrandsDirectoryBlock({
               ))}
             </Grid>
           ) : (
-            <p style={{ color: "#6b7280" }}>{copy.noMatch}</p>
+            <p style={{ color: "#5e574e" }}>{copy.noMatch}</p>
           )}
         </>
       ) : null}
       {!loading && !error && brands.length === 0 ? (
-        <p style={{ color: "#6b7280" }}>{copy.empty}</p>
+        <p style={{ color: "#5e574e" }}>{copy.empty}</p>
       ) : null}
     </Container>
   );

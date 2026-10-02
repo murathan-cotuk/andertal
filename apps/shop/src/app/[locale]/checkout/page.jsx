@@ -174,7 +174,7 @@ const Main = styled.main`
 const Title = styled.h1`
   font-size: 1.75rem;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   margin: 0 0 32px;
 
   @media (max-width: 768px) {
@@ -203,7 +203,7 @@ const Layout = styled.div`
 
 const FormCard = styled.div`
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 12px;
   padding: 24px;
   box-sizing: border-box;
@@ -218,10 +218,10 @@ const FormCard = styled.div`
 const SectionTitle = styled.h2`
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: #1d1b18;
   margin: 0 0 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f3eee6;
 `;
 
 const FieldGrid = styled.div`
@@ -247,7 +247,7 @@ const FieldWrap = styled.div`
 const Label = styled.label`
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #374151;
+  color: #3a352f;
 `;
 
 const Input = styled.input`
@@ -255,11 +255,11 @@ const Input = styled.input`
   min-width: 0;
   box-sizing: border-box;
   padding: 10px 12px;
-  border: 1px solid ${(p) => (p.$error ? "#ef4444" : "#d1d5db")};
+  border: 1px solid ${(p) => (p.$error ? "#ef4444" : "#d6ccbd")};
   border-radius: 8px;
   font-size: 0.9375rem;
   font-family: inherit;
-  color: #111827;
+  color: #1d1b18;
   outline: none;
   background: #fff;
   transition: border-color 0.15s;
@@ -273,7 +273,7 @@ const ErrorMsg = styled.span`
 
 const SummaryCard = styled.div`
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 12px;
   padding: 24px;
   position: sticky;
@@ -306,7 +306,7 @@ const SummaryThumb = styled.div`
   flex-shrink: 0;
   border-radius: 6px;
   overflow: hidden;
-  background: #f3f4f6;
+  background: #f3eee6;
   img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
 `;
 
@@ -318,7 +318,7 @@ const SummaryItemDetails = styled.div`
 const SummaryItemTitle = styled.div`
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #111827;
+  color: #1d1b18;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -337,13 +337,13 @@ const SummaryItemTitle = styled.div`
 
 const SummaryItemQty = styled.div`
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #5e574e;
 `;
 
 const SummaryItemPrice = styled.div`
   font-size: 0.875rem;
   font-weight: 500;
-  color: #111827;
+  color: #1d1b18;
   white-space: nowrap;
   flex-shrink: 0;
 `;
@@ -369,14 +369,14 @@ const SummarySellerSection = styled.div`
   &:not(:first-of-type) {
     margin-top: 14px;
     padding-top: 14px;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid #f3eee6;
   }
 `;
 
 const SummarySellerLabel = styled.div`
   font-size: 0.75rem;
   font-weight: 700;
-  color: #6b7280;
+  color: #5e574e;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   margin-bottom: 8px;
@@ -391,12 +391,12 @@ const SummarySellerSubtotalRow = styled.div`
   padding-top: 8px;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #4b5563;
+  color: #5e574e;
 `;
 
 const Divider = styled.hr`
   border: none;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e6dfd4;
   margin: 16px 0;
 `;
 
@@ -406,7 +406,7 @@ const SummaryRow = styled.div`
   align-items: flex-start;
   gap: 12px;
   font-size: 0.9375rem;
-  color: #4b5563;
+  color: #5e574e;
   margin-bottom: 8px;
   min-width: 0;
 
@@ -424,7 +424,7 @@ const SummaryRow = styled.div`
 const SummaryTotal = styled(SummaryRow)`
   font-weight: 700;
   font-size: 1.0625rem;
-  color: #111827;
+  color: #1d1b18;
   margin-top: 4px;
 `;
 
@@ -455,14 +455,14 @@ const PayMethodCard = styled.button`
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#e5e7eb")};
+  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#e6dfd4")};
   border-radius: 10px;
   background: ${(p) => (p.$active ? `${tokens.primary.DEFAULT}0d` : "#fff")};
   cursor: pointer;
   font-family: inherit;
   font-size: 0.9rem;
   font-weight: ${(p) => (p.$active ? "600" : "500")};
-  color: #111827;
+  color: #1d1b18;
   transition: border-color 0.15s, background 0.15s;
   min-width: 110px;
   &:hover { border-color: ${tokens.primary.DEFAULT}; }
@@ -473,14 +473,14 @@ const PayMethodListRow = styled.button`
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#e5e7eb")};
+  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#e6dfd4")};
   border-radius: 10px;
   background: ${(p) => (p.$active ? `${tokens.primary.DEFAULT}0d` : "#fff")};
   cursor: pointer;
   font-family: inherit;
   font-size: 0.9375rem;
   font-weight: ${(p) => (p.$active ? "600" : "500")};
-  color: #111827;
+  color: #1d1b18;
   width: 100%;
   text-align: left;
   transition: border-color 0.15s, background 0.15s;
@@ -491,7 +491,7 @@ const RadioDot = styled.span`
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#9ca3af")};
+  border: 2px solid ${(p) => (p.$active ? tokens.primary.DEFAULT : "#a39a8d")};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -571,10 +571,10 @@ const BackLink = styled(Link)`
   align-items: center;
   gap: 6px;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #5e574e;
   text-decoration: none;
   margin-bottom: 24px;
-  &:hover { color: #374151; }
+  &:hover { color: #3a352f; }
 `;
 
 function useField(initial = "") {
@@ -1020,11 +1020,11 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
               }}
               style={{
                 padding: "10px 12px",
-                border: "1px solid #d1d5db",
+                border: "1px solid #d6ccbd",
                 borderRadius: 8,
                 fontSize: "0.9375rem",
                 fontFamily: "inherit",
-                color: "#111827",
+                color: "#1d1b18",
                 background: "#fff",
                 width: "100%",
                 maxWidth: "100%",
@@ -1052,7 +1052,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
           <FieldWrap>
             <Label>{t("country")}</Label>
             {shipList.length === 0 ? (
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "#5e574e" }}>
                 {t("noShippableCountries")}
               </p>
             ) : (
@@ -1069,11 +1069,11 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
                   maxWidth: "100%",
                   boxSizing: "border-box",
                   padding: "10px 12px",
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #d6ccbd",
                   borderRadius: 8,
                   fontSize: "0.9375rem",
                   fontFamily: "inherit",
-                  color: "#111827",
+                  color: "#1d1b18",
                   background: "#fff",
                 }}
               >
@@ -1102,7 +1102,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             onChange={(e) => setBillingSeparateFromShipping(e.target.checked)}
             size={18}
           />
-          <label htmlFor="billing-separate" style={{ fontSize: "0.875rem", color: "#374151", cursor: "pointer", userSelect: "none" }}>
+          <label htmlFor="billing-separate" style={{ fontSize: "0.875rem", color: "#3a352f", cursor: "pointer", userSelect: "none" }}>
             {t("billingSeparateFromShipping")}
           </label>
         </div>
@@ -1130,11 +1130,11 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
                 }}
                 style={{
                   padding: "10px 12px",
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #d6ccbd",
                   borderRadius: 8,
                   fontSize: "0.9375rem",
                   fontFamily: "inherit",
-                  color: "#111827",
+                  color: "#1d1b18",
                   background: "#fff",
                   width: "100%",
                   maxWidth: "100%",
@@ -1162,7 +1162,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             <FieldWrap>
               <Label>{t("country")}</Label>
               {shipList.length === 0 ? (
-                <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>{t("noShippableCountries")}</p>
+                <p style={{ margin: 0, fontSize: "0.875rem", color: "#5e574e" }}>{t("noShippableCountries")}</p>
               ) : (
                 <select
                   value={shipList.some((c) => c.code === billingCountry.value) ? billingCountry.value : shipList[0].code}
@@ -1173,11 +1173,11 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
                     maxWidth: "100%",
                     boxSizing: "border-box",
                     padding: "10px 12px",
-                    border: "1px solid #d1d5db",
+                    border: "1px solid #d6ccbd",
                     borderRadius: 8,
                     fontSize: "0.9375rem",
                     fontFamily: "inherit",
-                    color: "#111827",
+                    color: "#1d1b18",
                     background: "#fff",
                   }}
                 >
@@ -1199,7 +1199,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
               alignItems: "center",
               gap: 10,
               fontSize: "0.875rem",
-              color: "#374151",
+              color: "#3a352f",
               cursor: "pointer",
               flexWrap: "wrap",
               minWidth: 0,
@@ -1222,7 +1222,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
             {t("paymentAlreadyPaid")}
           </div>
         ) : !piStatusKnown ? (
-          <div style={{ padding: "12px 0", color: "#6b7280", fontSize: "0.875rem" }}>{t("processing")}</div>
+          <div style={{ padding: "12px 0", color: "#5e574e", fontSize: "0.875rem" }}>{t("processing")}</div>
         ) : (
           <StripePaymentWrap>
             <PaymentElement
@@ -1286,7 +1286,7 @@ function StripeCheckoutForm({ clientSecret, cartId, items, subtotalCents, amount
                   : `${t("placeOrder")} – ${formatPriceCents(payCentsDisplay)} €`}
           </PayNowButton>
         </CheckoutSubmitWrapFooter>
-        <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 12, lineHeight: 1.5 }}>
+        <p style={{ fontSize: "0.75rem", color: "#a39a8d", marginTop: 12, lineHeight: 1.5 }}>
           {t("marketplaceIntermediaryNotice")}
         </p>
       </FormCard>
@@ -1597,11 +1597,11 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
               }}
               style={{
                 padding: "10px 12px",
-                border: "1px solid #d1d5db",
+                border: "1px solid #d6ccbd",
                 borderRadius: 8,
                 fontSize: "0.9375rem",
                 fontFamily: "inherit",
-                color: "#111827",
+                color: "#1d1b18",
                 background: "#fff",
                 width: "100%",
                 maxWidth: "100%",
@@ -1629,7 +1629,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
           <FieldWrap>
             <Label>{t("country")}</Label>
             {shipList.length === 0 ? (
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "#5e574e" }}>
                 {t("noShippableCountries")}
               </p>
             ) : (
@@ -1646,11 +1646,11 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
                   maxWidth: "100%",
                   boxSizing: "border-box",
                   padding: "10px 12px",
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #d6ccbd",
                   borderRadius: 8,
                   fontSize: "0.9375rem",
                   fontFamily: "inherit",
-                  color: "#111827",
+                  color: "#1d1b18",
                   background: "#fff",
                 }}
               >
@@ -1679,7 +1679,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
             onChange={(e) => setBillingSeparateFromShipping(e.target.checked)}
             size={18}
           />
-          <label htmlFor="billing-separate" style={{ fontSize: "0.875rem", color: "#374151", cursor: "pointer", userSelect: "none" }}>
+          <label htmlFor="billing-separate" style={{ fontSize: "0.875rem", color: "#3a352f", cursor: "pointer", userSelect: "none" }}>
             {t("billingSeparateFromShipping")}
           </label>
         </div>
@@ -1707,11 +1707,11 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
                 }}
                 style={{
                   padding: "10px 12px",
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #d6ccbd",
                   borderRadius: 8,
                   fontSize: "0.9375rem",
                   fontFamily: "inherit",
-                  color: "#111827",
+                  color: "#1d1b18",
                   background: "#fff",
                   width: "100%",
                   maxWidth: "100%",
@@ -1739,7 +1739,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
             <FieldWrap>
               <Label>{t("country")}</Label>
               {shipList.length === 0 ? (
-                <p style={{ margin: 0, fontSize: "0.875rem", color: "#6b7280" }}>{t("noShippableCountries")}</p>
+                <p style={{ margin: 0, fontSize: "0.875rem", color: "#5e574e" }}>{t("noShippableCountries")}</p>
               ) : (
                 <select
                   value={shipList.some((c) => c.code === billingCountry.value) ? billingCountry.value : shipList[0].code}
@@ -1750,11 +1750,11 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
                     maxWidth: "100%",
                     boxSizing: "border-box",
                     padding: "10px 12px",
-                    border: "1px solid #d1d5db",
+                    border: "1px solid #d6ccbd",
                     borderRadius: 8,
                     fontSize: "0.9375rem",
                     fontFamily: "inherit",
-                    color: "#111827",
+                    color: "#1d1b18",
                     background: "#fff",
                   }}
                 >
@@ -1776,7 +1776,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
               alignItems: "center",
               gap: 10,
               fontSize: "0.875rem",
-              color: "#374151",
+              color: "#3a352f",
               cursor: "pointer",
               flexWrap: "wrap",
               minWidth: 0,
@@ -1794,7 +1794,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
 
       <FormCard>
         <SectionTitle>{t("zeroCheckoutPaymentTitle")}</SectionTitle>
-        <p style={{ margin: "0 0 12px", fontSize: "0.875rem", color: "#374151", lineHeight: 1.5 }}>
+        <p style={{ margin: "0 0 12px", fontSize: "0.875rem", color: "#3a352f", lineHeight: 1.5 }}>
           {t("zeroCheckoutExplanation")}
         </p>
         <div
@@ -1817,7 +1817,7 @@ function ZeroCheckoutForm({ cartId, items, subtotalCents, amountToPayCents, ship
             {processing ? t("processing") : paymentIntentRefreshing ? t("processing") : t("zeroCheckoutPlaceOrder")}
           </PayNowButton>
         </CheckoutSubmitWrapFooter>
-        <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 12, lineHeight: 1.5 }}>
+        <p style={{ fontSize: "0.75rem", color: "#a39a8d", marginTop: 12, lineHeight: 1.5 }}>
           {t("marketplaceIntermediaryNotice")}
         </p>
       </FormCard>
@@ -2281,7 +2281,7 @@ export default function CheckoutPage() {
         ) : returnRecovering ? (
           <GlobalPageLoader label={t("processing")} />
         ) : items.length === 0 ? (
-          <div style={{ color: "#6b7280", fontSize: "1rem" }}>
+          <div style={{ color: "#5e574e", fontSize: "1rem" }}>
             <Link href="/cart" style={{ color: tokens.primary.DEFAULT }}>{t("backToCart")}</Link>
           </div>
         ) : (
@@ -2310,7 +2310,7 @@ export default function CheckoutPage() {
                             {item.thumbnail ? (
                               <img src={resolveImageUrl(item.thumbnail)} alt={lineTitle} />
                             ) : (
-                              <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                              <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />
                             )}
                           </SummaryThumb>
                           <SummaryItemDetails>
@@ -2341,7 +2341,7 @@ export default function CheckoutPage() {
                 {customerToken ? (
                   <>
                     {balancePoints != null && (
-                      <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0 0 8px" }}>
+                      <p style={{ fontSize: "0.75rem", color: "#5e574e", margin: "0 0 8px" }}>
                         {t("bonusBalance", { points: Math.max(0, balancePoints - (cart?.bonus_points_reserved ?? 0)) })}
                         {(cart?.bonus_points_reserved ?? 0) > 0 && (
                           <span style={{ color: "#16a34a", marginLeft: 6, fontWeight: 600 }}>
@@ -2362,7 +2362,7 @@ export default function CheckoutPage() {
                           flex: "1 1 100px",
                           minWidth: 80,
                           padding: "5px 8px",
-                          border: "1px solid #d1d5db",
+                          border: "1px solid #d6ccbd",
                           borderRadius: 6,
                           fontSize: "0.8125rem",
                         }}
@@ -2389,7 +2389,7 @@ export default function CheckoutPage() {
                     {bonusErr ? <p style={{ fontSize: "0.75rem", color: "#b91c1c", margin: "8px 0 0" }}>{bonusErr}</p> : null}
                   </>
                 ) : (
-                  <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: 0 }}>{t("bonusLogin")}</p>
+                  <p style={{ fontSize: "0.75rem", color: "#5e574e", margin: 0 }}>{t("bonusLogin")}</p>
                 )}
               </div>
               <div style={{ marginBottom: 16 }}>
@@ -2405,7 +2405,7 @@ export default function CheckoutPage() {
                       flex: "1 1 120px",
                       minWidth: 100,
                       padding: "5px 8px",
-                      border: "1px solid #d1d5db",
+                      border: "1px solid #d6ccbd",
                       borderRadius: 6,
                       fontSize: "0.8125rem",
                     }}
@@ -2436,8 +2436,8 @@ export default function CheckoutPage() {
                       style={{
                         padding: "5px 10px",
                         background: "#fff",
-                        color: "#374151",
-                        border: "1px solid #d1d5db",
+                        color: "#3a352f",
+                        border: "1px solid #d6ccbd",
                         borderRadius: 6,
                         fontSize: "0.75rem",
                         fontWeight: 600,
@@ -2469,7 +2469,7 @@ export default function CheckoutPage() {
                         background: "none",
                         border: "none",
                         cursor: bonusApplying ? "wait" : "pointer",
-                        color: "#6b7280",
+                        color: "#5e574e",
                         padding: "0 2px",
                         fontSize: 14,
                         lineHeight: 1,
@@ -2522,7 +2522,7 @@ export default function CheckoutPage() {
                     style={{
                       marginTop: 10,
                       padding: "8px 16px",
-                      background: "#111827",
+                      background: "#1d1b18",
                       color: "#fff",
                       border: "none",
                       borderRadius: 8,

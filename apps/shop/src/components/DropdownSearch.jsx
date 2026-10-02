@@ -69,7 +69,7 @@ const Input = styled.input`
     &::placeholder {
       font-size: 14px;
       font-weight: 400;
-      color: #9ca3af;
+      color: #a39a8d;
       letter-spacing: 0.02em;
     }
   `}
@@ -114,7 +114,7 @@ const MobileSectionTitle = styled.div`
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: #5e574e;
   padding: 16px 16px 8px;
 `;
 
@@ -125,13 +125,13 @@ const SuggestionChip = styled.button`
   margin: 4px 4px 4px 0;
   font-size: 13px;
   color: #111;
-  background: #f3f4f6;
+  background: #f3eee6;
   border: none;
   border-radius: 9999px;
   cursor: pointer;
   font-family: ${tokens.fontFamily.sans};
   &:active {
-    background: #e5e7eb;
+    background: #e6dfd4;
   }
 `;
 
@@ -609,7 +609,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
     return (
       <>
         <div
-          style={{ minHeight: pill ? 36 : undefined, width: "100%", display: "flex", alignItems: "center", cursor: "text", padding: pill ? "0" : undefined, color: q ? "#111" : "#9ca3af", fontSize: 15 }}
+          style={{ minHeight: pill ? 36 : undefined, width: "100%", display: "flex", alignItems: "center", cursor: "text", padding: pill ? "0" : undefined, color: q ? "#111" : "#a39a8d", fontSize: 15 }}
           onPointerDown={(e) => {
             if (e.button != null && e.button !== 0) return;
             e.preventDefault();
@@ -988,7 +988,7 @@ function SearchInputWithDropdown({
             alignItems: "center",
             cursor: "text",
             padding: pill ? "0" : undefined,
-            color: query ? "#111" : "#9ca3af",
+            color: query ? "#111" : "#a39a8d",
             fontSize: 15,
           }}
           onPointerDown={(e) => {

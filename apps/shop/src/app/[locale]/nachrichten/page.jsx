@@ -14,7 +14,7 @@ export default function NachrichtenPage() {
   const tMessages = useTranslations("pages.messages");
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
         {/* Wider than the shared ACCOUNT_PAGE_MAIN_INNER: this page hosts a two-pane

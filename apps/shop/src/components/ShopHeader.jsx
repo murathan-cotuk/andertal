@@ -199,7 +199,7 @@ const MiddleBarWrap = styled.div`
   width: 100%;
   min-height: var(--header-h, 72px);
   background-color: transparent;
-  color: var(--header-text, #111827);
+  color: var(--header-text, #1d1b18);
   transition: color 0.28s ease, backdrop-filter 0.28s ease, min-height 0.28s ease;
   position: relative;
   z-index: ${HEADER_MIDDLE_Z};
@@ -894,32 +894,6 @@ const CategoryMegaDetailHead = styled.div`
   }
 `;
 
-const CategoryMegaSearch = styled.div`
-  width: min(380px, 32vw);
-  height: 46px;
-  flex-shrink: 0;
-  border-radius: 23px;
-  background: #f6f2ec;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  color: #1d1b18;
-  &:focus-within {
-    box-shadow: 0 0 0 2px #1d1b18;
-  }
-  input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    font-size: 14px;
-    outline: none;
-    color: inherit;
-  }
-`;
-
 const CategoryMegaAllLink = styled(Link)`
   display: inline-flex;
   align-items: center;
@@ -1155,7 +1129,7 @@ const SubNavWrap = styled.div`
   overflow: hidden;
   display: flex;
   align-items: center;
-  color: var(--second-nav-text, #374151);
+  color: var(--second-nav-text, #3a352f);
   font-size: var(--second-nav-fs, 15px);
   font-weight: var(--second-nav-fw, 500);
   position: relative;
@@ -1296,8 +1270,8 @@ const LocaleOption = styled.button`
   }
 
   &[data-active="true"] {
-    background: #eff6ff;
-    color: #1d4ed8;
+    background: #fcebd5;
+    color: #a65300;
     font-weight: 600;
   }
 `;
@@ -2205,10 +2179,10 @@ export default function ShopHeader() {
                   <span className="shop-header-icon-label">{localeButtonLabel}</span>
                 </MiddleBarLocaleBtn>
                 <LocaleDropdown $open={localeDropdownOpen}>
-                  <div style={{ flex: 1, borderRight: "1px solid #e5e7eb", padding: "16px 0", minWidth: 0 }}>
-                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>{tUi("country")}</div>
+                  <div style={{ flex: 1, borderRight: "1px solid #e6dfd4", padding: "16px 0", minWidth: 0 }}>
+                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.08em" }}>{tUi("country")}</div>
                     {shopCountries.length === 0 ? (
-                      <div style={{ padding: "8px 16px", fontSize: 13, color: "#9ca3af" }}>{tUi("noCountries")}</div>
+                      <div style={{ padding: "8px 16px", fontSize: 13, color: "#a39a8d" }}>{tUi("noCountries")}</div>
                     ) : shopCountries.map((c) => (
                       <LocaleOption
                         key={c.code}
@@ -2219,7 +2193,7 @@ export default function ShopHeader() {
                         <span style={{ fontSize: 20 }}>{c.flag}</span>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>{c.label}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                          <div style={{ fontSize: 11, color: "#a39a8d" }}>
                             {defaultCurrencyForMarket(c.code.toLowerCase()).toUpperCase()}
                           </div>
                         </div>
@@ -2227,7 +2201,7 @@ export default function ShopHeader() {
                     ))}
                   </div>
                   <div style={{ flex: 1, padding: "16px 0", minWidth: 0 }}>
-                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em" }}>{tUi("language")}</div>
+                    <div style={{ padding: "4px 16px 10px", fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.08em" }}>{tUi("language")}</div>
                     {SHOP_LOCALES.filter((l) => enabledShopLocales.includes(l.code)).map((l) => (
                       <LocaleOption
                         key={l.code}
@@ -2540,19 +2514,6 @@ export default function ShopHeader() {
                                 <span>{tCommon("allCategories")} ›</span>
                                 <h2>{activeRoot ? activeRoot.label : tCommon("categories")}</h2>
                               </div>
-                              <CategoryMegaSearch role="search">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                                  <circle cx="11" cy="11" r="7" />
-                                  <path d="M20 20l-3.5-3.5" />
-                                </svg>
-                                <input
-                                  type="search"
-                                  value={megaQuery}
-                                  onChange={(e) => setMegaQuery(e.target.value)}
-                                  placeholder={tCommon("searchCategories")}
-                                  aria-label={tCommon("searchCategories")}
-                                />
-                              </CategoryMegaSearch>
                               {activeRoot ? (
                                 <CategoryMegaAllLink href={activeRoot.href} onClick={closeMenu}>
                                   {tCommon("allIn", { name: activeRoot.label })}

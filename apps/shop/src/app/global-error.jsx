@@ -25,7 +25,7 @@ export default function GlobalError({ error, reset }) {
           minHeight: "100vh",
           padding: "32px 24px",
           textAlign: "center",
-          color: "#1f2937",
+          color: "#1d1b18",
           boxSizing: "border-box",
         }}
       >
@@ -36,7 +36,7 @@ export default function GlobalError({ error, reset }) {
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: "16px 0 8px" }}>
           Seite nicht verfügbar
         </h1>
-        <p style={{ fontSize: 14, color: "#6b7280", maxWidth: 400, margin: "0 0 28px", lineHeight: 1.6 }}>
+        <p style={{ fontSize: 14, color: "#5e574e", maxWidth: 400, margin: "0 0 28px", lineHeight: 1.6 }}>
           Ein kritischer Fehler ist aufgetreten. Unser Team wurde benachrichtigt.
           Bitte laden Sie die Seite neu.
         </p>

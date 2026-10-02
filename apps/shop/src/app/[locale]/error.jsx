@@ -25,7 +25,7 @@ export default function LocaleError({ error, reset }) {
         padding: "48px 24px",
         fontFamily: "Montserrat, system-ui, sans-serif",
         textAlign: "center",
-        color: "#1f2937",
+        color: "#1d1b18",
       }}
     >
       <div style={{ fontSize: 56, fontWeight: 900, letterSpacing: "0.12em", color: "#ee8a12", marginBottom: 8 }}>
@@ -35,7 +35,7 @@ export default function LocaleError({ error, reset }) {
       <h1 style={{ fontSize: 22, fontWeight: 700, margin: "16px 0 8px" }}>
         {t("errorTitle")}
       </h1>
-      <p style={{ fontSize: 15, color: "#6b7280", maxWidth: 420, margin: "0 0 32px", lineHeight: 1.6 }}>
+      <p style={{ fontSize: 15, color: "#5e574e", maxWidth: 420, margin: "0 0 32px", lineHeight: 1.6 }}>
         {t("errorText")}
       </p>
 
@@ -61,7 +61,7 @@ export default function LocaleError({ error, reset }) {
           style={{
             padding: "11px 28px",
             background: "#fff",
-            color: "#1f2937",
+            color: "#1d1b18",
             border: "1px solid #e6dfd4",
             borderRadius: 10,
             fontSize: 14,

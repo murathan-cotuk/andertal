@@ -118,7 +118,7 @@ export default function ModernMobileBottomNav({
     >
       {finalItems.map((item, index) => {
         const isActive = index === activeIndex;
-        const textColor = isActive ? "var(--component-active-color)" : "#6b7280";
+        const textColor = isActive ? "var(--component-active-color)" : "#5e574e";
         const common = {
           ref: (el) => {
             itemRefs.current[index] = el;
@@ -166,7 +166,7 @@ export default function ModernMobileBottomNav({
                       position: "absolute",
                       top: -5,
                       right: -7,
-                      background: isActive ? "var(--component-active-color)" : "#6b7280",
+                      background: isActive ? "var(--component-active-color)" : "#5e574e",
                       color: "#fff",
                       borderRadius: "50%",
                       minWidth: 16,

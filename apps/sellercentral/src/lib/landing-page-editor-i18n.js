@@ -229,12 +229,12 @@ export function getLandingEditorCopy(locale) {
       "Nur für die oben ausgewählte Seite. Jede Checkbox nennt das Gerät (Desktop ≥1024px / Tablet / Mobil)."
     ),
     showProductFilterBar: x(
-      "Left product filter (sort / in stock) — desktop & tablet sidebar; mobile drawer",
-      "Sol ürün filtresi (sıralama / stok) — masaüstü & tablet kenar çubuğu; mobil çekmece",
+      "Left product filter (sort / in stock) — desktop & tablet sidebar; mobile: Filter button on top + drawer",
+      "Sol ürün filtresi (sıralama / stok) — masaüstü & tablet kenar çubuğu; mobilde üstte Filtre butonu + çekmece",
       "Filtre produit gauche — sidebar desktop/tablette ; tiroir mobile",
       "Filtro producto izquierda — sidebar escritorio/tablet; cajón móvil",
       "Filtro prodotto sinistra — sidebar desktop/tablet; cassetto mobile",
-      "Linke Produktfilter (Sortierung / Lager) — Desktop- & Tablet-Sidebar; Mobil-Schublade"
+      "Linke Produktfilter (Sortierung / Lager) — Desktop- & Tablet-Sidebar; mobil: Filter-Button oben + Schublade"
     ),
     showProductFilterBarHelp: x(
       "Devices: desktop & tablet = left column next to content; mobile = same panel in the filter drawer. Hub pages (Neuheiten, Bestsellers, Erneut kaufen). Not the header second-nav. Category/collection facets: Templates + Styles.",
@@ -310,12 +310,12 @@ export function getLandingEditorCopy(locale) {
     noTabletBlocks: x('No tablet blocks yet. Create one with "+ Add container". Set widths in % or vw for tablet.', 'Henüz tablet bloğu yok. "+ Konteyner ekle" ile oluştur; genişlikleri % veya vw yap.', 'Pas de blocs tablette. Créez-en un ; réglez les largeurs en % ou vw.', 'Sin bloques tablet. Crea uno; usa % o vw para anchos.', 'Nessun blocco tablet. Creane uno; imposta larghezze in % o vw.', 'Noch keine Tablet-Blöcke. Erstelle einen ; Breiten in % oder vw setzen.'),
     noMobileBlocks: x('No mobile blocks yet. Create one with "+ Add container".', 'Henüz mobil bloğu yok. "+ Konteyner ekle" ile oluştur.', 'Pas de blocs mobile. Créez-en un.', 'Sin bloques móviles. Crea uno.', 'Nessun blocco mobile. Creane uno.', 'Noch keine Mobil-Blöcke. Erstelle einen mit „+ Container hinzufügen“.'),
     showSubcategoriesLeft: x(
-      "Left category tree — desktop & tablet sidebar; mobile drawer",
-      "Sol kategori ağacı — masaüstü & tablet kenar çubuğu; mobil çekmece",
-      "Arbre catégories gauche — sidebar desktop/tablette ; tiroir mobile",
-      "Árbol categorías izquierda — sidebar escritorio/tablet; cajón móvil",
-      "Albero categorie sinistra — sidebar desktop/tablet; cassetto mobile",
-      "Linker Kategoriebaum — Desktop- & Tablet-Sidebar; Mobil-Schublade"
+      "Left category tree — desktop & tablet sidebar; mobile category chips (inside the filter drawer when the product filter is on)",
+      "Sol kategori ağacı — masaüstü & tablet kenar çubuğu; mobilde kategori butonları (ürün filtresi açıksa filtre çekmecesinde)",
+      "Arbre catégories gauche — sidebar desktop/tablette ; pastilles catégories sur mobile (dans le tiroir si le filtre produit est actif)",
+      "Árbol categorías izquierda — sidebar escritorio/tablet; chips de categorías en móvil (en el cajón si el filtro está activo)",
+      "Albero categorie sinistra — sidebar desktop/tablet; chip categorie su mobile (nel cassetto se il filtro prodotto è attivo)",
+      "Linker Kategoriebaum — Desktop- & Tablet-Sidebar; mobil als Kategorie-Chips (bei aktivem Produktfilter in der Filter-Schublade)"
     ),
     showSubcategoriesHelpCat: x(
       "Devices: desktop & tablet = left column on this category page; mobile = same tree in the filter drawer (when subcategories exist).",

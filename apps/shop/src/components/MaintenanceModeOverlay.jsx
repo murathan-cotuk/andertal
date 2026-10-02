@@ -35,7 +35,7 @@ export default function MaintenanceModeOverlay() {
         position: "fixed",
         inset: 0,
         zIndex: 2147483647,
-        background: state.imageUrl ? `#000 url(${JSON.stringify(state.imageUrl)}) center / cover no-repeat` : "#111827",
+        background: state.imageUrl ? `#000 url(${JSON.stringify(state.imageUrl)}) center / cover no-repeat` : "#1d1b18",
       }}
     />
   );

@@ -6,8 +6,8 @@ import { useTranslations } from "next-intl";
 import styled from "styled-components";
 
 const Bar = styled.div`
-  background-color: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+  background-color: #faf7f2;
+  border-bottom: 1px solid #e6dfd4;
   padding: 12px 0;
 `;
 
@@ -22,7 +22,7 @@ const Container = styled.div`
 `;
 
 const LinkItem = styled(Link)`
-  color: #6b7280;
+  color: #5e574e;
   font-weight: 500;
   transition: color 0.2s ease;
 

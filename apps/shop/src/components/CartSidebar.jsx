@@ -164,7 +164,7 @@ const ItemImage = styled.div`
   flex-shrink: 0;
   border-radius: 14px;
   overflow: hidden;
-  background: #f3f4f6;
+  background: #f3eee6;
   img {
     width: 100%;
     height: 100%;
@@ -190,7 +190,7 @@ const RemoveBtn = styled.button`
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  color: #6b7280;
+  color: #5e574e;
   padding: 0;
   font-size: 18px;
   line-height: 1;
@@ -237,14 +237,14 @@ const QtyBtn = styled.button`
   height: 36px;
   border: 0;
   background: transparent;
-  color: #6b7280;
+  color: #5e574e;
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
   &:hover:not(:disabled) {
-    background: #e5e7eb;
-    color: #111827;
+    background: #e6dfd4;
+    color: #1d1b18;
   }
   &:disabled {
     opacity: 0.5;
@@ -258,7 +258,7 @@ const QtyInput = styled.input`
   text-align: center;
   font-size: 12px;
   font-weight: 600;
-  color: #374151;
+  color: #3a352f;
   border: 0;
   background: transparent;
   outline: none;
@@ -309,7 +309,7 @@ const Row = styled.div`
   justify-content: space-between;
   margin-bottom: 8px;
   font-size: 0.875rem;
-  color: #4b5563;
+  color: #5e574e;
 `;
 const RowTotal = styled(Row)`
   align-items: baseline;
@@ -343,7 +343,7 @@ const MobileTopCheckout = styled.div`
   display: none;
   flex-shrink: 0;
   padding: 12px 20px 14px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e6dfd4;
   background: #fff;
 
   @media (max-width: 767px) {
@@ -425,7 +425,7 @@ const MatchTile = styled.div`
 
 const Empty = styled.p`
   text-align: center;
-  color: #6b7280;
+  color: #5e574e;
   font-size: 0.9375rem;
   padding: 32px 16px;
   margin: 0;
@@ -439,7 +439,7 @@ const RecommendedTitle = styled.h3`
   margin: 0 0 10px;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 /** Arama panelindeki „Weiter einkaufen“ ile aynı mantık: yatay kaydırmalı kart şeridi */
@@ -460,7 +460,7 @@ const RecommendedStrip = styled.div`
     height: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background: #d1d5db;
+    background: #d6ccbd;
     border-radius: 999px;
   }
 `;
@@ -484,7 +484,7 @@ const RecommendedThumb = styled.div`
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
-  background: #f3f4f6;
+  background: #f3eee6;
   margin-bottom: 6px;
   img {
     width: 100%;
@@ -506,7 +506,7 @@ const RecommendedName = styled.div`
   font-size: 11px;
   font-weight: 600;
   line-height: 1.3;
-  color: #111827;
+  color: #1d1b18;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -516,7 +516,7 @@ const RecommendedName = styled.div`
 
 const RecommendedPrice = styled.div`
   font-size: 10px;
-  color: #6b7280;
+  color: #5e574e;
   margin-bottom: 6px;
 `;
 
@@ -552,7 +552,7 @@ const BestsellerSectionTitle = styled.h3`
   margin: 0 0 10px;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1f2937;
+  color: #1d1b18;
 `;
 
 const FreeShipBar = styled.div`
@@ -704,9 +704,9 @@ export default function CartSidebar() {
               <Empty>{tCart("empty")}</Empty>
               <RecommendedWrap>
                 <RecommendedTitle>{tCart("recommendedTitle")}</RecommendedTitle>
-                {recommendedLoading && <div style={{ color: "#9ca3af", fontSize: 13 }}>{tCart("loading")}</div>}
+                {recommendedLoading && <div style={{ color: "#a39a8d", fontSize: 13 }}>{tCart("loading")}</div>}
                 {!recommendedLoading && recommended.length === 0 && (
-                  <div style={{ color: "#9ca3af", fontSize: 13 }}>{tCart("noRecommendations")}</div>
+                  <div style={{ color: "#a39a8d", fontSize: 13 }}>{tCart("noRecommendations")}</div>
                 )}
                 {!recommendedLoading && recommended.length > 0 && (
                   <RecommendedStrip role="region" aria-label={tCart("recommendedTitle")}>
@@ -717,7 +717,7 @@ export default function CartSidebar() {
                             {p.thumbnail ? (
                               <img src={p.thumbnail} alt={p.title} />
                             ) : (
-                              <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                              <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />
                             )}
                           </RecommendedThumb>
                           <RecommendedName>{p.title}</RecommendedName>
@@ -753,7 +753,7 @@ export default function CartSidebar() {
                             {p.thumbnail ? (
                               <img src={p.thumbnail} alt={p.title} />
                             ) : (
-                              <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                              <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />
                             )}
                           </RecommendedThumb>
                           <RecommendedName>{p.title}</RecommendedName>
@@ -802,7 +802,7 @@ export default function CartSidebar() {
                 {lineImage(item) ? (
                   <img src={lineImage(item)} alt={getLocalizedCartLineTitle(item, locale)} />
                 ) : (
-                  <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                  <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />
                 )}
               </ItemImage>
               <ItemBody>

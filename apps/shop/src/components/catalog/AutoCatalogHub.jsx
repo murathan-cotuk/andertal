@@ -289,22 +289,25 @@ const MobileBar = styled.div`
 
 const FilterOpenBtn = styled.button`
   display: none;
+  /* Same pill as the category/collection pages' mobile filter button. */
   @media (max-width: 1023px) {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 6px;
-    margin: 0 16px 12px;
-    padding: 8px 0;
-    background: none;
+    justify-content: center;
+    gap: 8px;
+    width: calc(100% - 32px);
+    height: 44px;
+    margin: 0 16px 14px;
+    padding: 0 16px;
+    background: var(--body-color, ${INK});
     border: none;
-    border-bottom: 1.5px solid #111;
+    border-radius: 999px;
     font: inherit;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: ${INK};
+    color: #fff;
     cursor: pointer;
+    svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
   }
 `;
 
@@ -566,7 +569,9 @@ export default function AutoCatalogHub({
         <div style={{ minWidth: 0 }}>
           {showMobileFilter ? (
             <FilterOpenBtn type="button" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M7 12h10M10 18h4" strokeLinecap="round" /></svg>
               {t("filters")}
+              {activeCat || inStockOnly ? <span style={{ fontWeight: 500, opacity: 0.8 }}>· {visiblePool.length}</span> : null}
             </FilterOpenBtn>
           ) : null}
           {showMobileFilter && isNarrow ? (

@@ -28,7 +28,7 @@ function StarPicker({ value, onChange }) {
           onMouseEnter={() => setHovered(n)}
           onMouseLeave={() => setHovered(0)}
           onClick={() => onChange(n)}
-          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 28, color: (hovered || value) >= n ? "#f59e0b" : "#d1d5db", lineHeight: 1 }}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 28, color: (hovered || value) >= n ? "#f59e0b" : "#d6ccbd", lineHeight: 1 }}
         >
           ★
         </button>
@@ -42,7 +42,7 @@ function StarDisplay({ value }) {
   return (
     <span style={{ fontSize: 18, letterSpacing: 1 }}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <span key={n} style={{ color: stars >= n ? "#f59e0b" : "#d1d5db" }}>★</span>
+        <span key={n} style={{ color: stars >= n ? "#f59e0b" : "#d6ccbd" }}>★</span>
       ))}
     </span>
   );
@@ -85,9 +85,9 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
       <div style={{ padding: "12px 16px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0" }}>
         <p style={{ margin: "0 0 4px", fontSize: 13, color: "#15803d", fontWeight: 600 }}>{t("reviewSaved")}</p>
         <StarDisplay value={rating} />
-        {comment && <p style={{ margin: "6px 0 0", fontSize: 13, color: "#374151" }}>{comment}</p>}
+        {comment && <p style={{ margin: "6px 0 0", fontSize: 13, color: "#3a352f" }}>{comment}</p>}
         {trustpilotEvaluateUrl ? (
-          <p style={{ margin: "12px 0 0", fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: "#3a352f", lineHeight: 1.5 }}>
             {t("trustpilotOptional")}{" "}
             <a href={trustpilotEvaluateUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#048068", fontWeight: 600 }}>
               {t("toTrustpilot")}
@@ -99,7 +99,7 @@ function ReviewForm({ orderId, item, existing, onSaved, trustpilotEvaluateUrl })
   }
 
   return (
-    <div style={{ padding: "12px 16px", background: "#fafafa", borderRadius: 8, border: `1px solid ${BORDER}`, marginTop: 4 }}>
+    <div style={{ padding: "12px 16px", background: "#faf7f2", borderRadius: 8, border: `1px solid ${BORDER}`, marginTop: 4 }}>
       <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 600, color: DARK }}>{item.title}</p>
       <StarPicker value={rating} onChange={setRating} />
       <textarea
@@ -180,7 +180,7 @@ export default function ReviewsPage() {
   const ordersWithItems = orders.filter((o) => (o.items || []).some((it) => it.product_id));
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
@@ -218,7 +218,7 @@ export default function ReviewsPage() {
                         {avgRating != null ? (
                           <span style={{ fontSize: 16, letterSpacing: 1 }}>
                             {[1,2,3,4,5].map((n) => (
-                              <span key={n} style={{ color: Math.round(avgRating) >= n ? "#f59e0b" : "#d1d5db" }}>★</span>
+                              <span key={n} style={{ color: Math.round(avgRating) >= n ? "#f59e0b" : "#d6ccbd" }}>★</span>
                             ))}
                           </span>
                         ) : (
@@ -242,18 +242,18 @@ export default function ReviewsPage() {
                               )}
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 {existing && !isEditing ? (
-                                  <div style={{ padding: "10px 14px", background: "#f9fafb", borderRadius: 8, border: `1px solid ${BORDER}` }}>
+                                  <div style={{ padding: "10px 14px", background: "#faf7f2", borderRadius: 8, border: `1px solid ${BORDER}` }}>
                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
                                       <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{item.title}</p>
                                       <span style={{ fontSize: 16, letterSpacing: 1 }}>
                                         {[1,2,3,4,5].map((n) => (
-                                          <span key={n} style={{ color: existing.rating >= n ? "#f59e0b" : "#d1d5db" }}>★</span>
+                                          <span key={n} style={{ color: existing.rating >= n ? "#f59e0b" : "#d6ccbd" }}>★</span>
                                         ))}
                                       </span>
                                     </div>
-                                    {existing.comment && <p style={{ margin: "4px 0 0", fontSize: 13, color: "#374151" }}>{existing.comment}</p>}
+                                    {existing.comment && <p style={{ margin: "4px 0 0", fontSize: 13, color: "#3a352f" }}>{existing.comment}</p>}
                                     {trustpilotEvaluateUrl ? (
-                                      <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
+                                      <p style={{ margin: "10px 0 0", fontSize: 12, color: "#5e574e", lineHeight: 1.45 }}>
                                         <a href={trustpilotEvaluateUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#048068", fontWeight: 600 }}>
                                           {t("alsoTrustpilot")}
                                         </a>

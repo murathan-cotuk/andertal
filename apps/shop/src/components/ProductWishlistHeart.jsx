@@ -67,7 +67,7 @@ export default function ProductWishlistHeart({ productId, positionAbsolute = tru
         onMouseDown={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill={on ? "#e11d48" : "none"} stroke={on ? "#e11d48" : "#374151"} strokeWidth="2" aria-hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill={on ? "#e11d48" : "none"} stroke={on ? "#e11d48" : "#3a352f"} strokeWidth="2" aria-hidden>
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
       </button>
@@ -82,7 +82,7 @@ export default function ProductWishlistHeart({ productId, positionAbsolute = tru
             padding: "10px 12px",
             fontSize: 12,
             lineHeight: 1.4,
-            background: "#111827",
+            background: "#1d1b18",
             color: "#fff",
             borderRadius: 8,
             boxShadow: "0 4px 14px rgba(0,0,0,0.2)",

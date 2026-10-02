@@ -111,7 +111,7 @@ function PopupModal({ config, onClose }) {
     ...(visible ? anim.active : anim.enter),
     position: "relative",
     background: config.bg_color || "#fff",
-    color: config.text_color || "#111827",
+    color: config.text_color || "#1d1b18",
     borderRadius: isBottomBar ? 0 : (config.border_radius ?? 16),
     width: config.width || "600px",
     maxWidth: "calc(100vw - 32px)",
@@ -157,7 +157,7 @@ function PopupModal({ config, onClose }) {
               cursor: "pointer",
               fontSize: 18,
               lineHeight: 1,
-              color: config.text_color || "#111827",
+              color: config.text_color || "#1d1b18",
               zIndex: 1,
               flexShrink: 0,
             }}
@@ -210,7 +210,7 @@ function PopupModal({ config, onClose }) {
               style={{
                 display: "inline-block",
                 padding: "10px 24px",
-                background: config.btn_bg || "#111827",
+                background: config.btn_bg || "#1d1b18",
                 color: config.btn_color || "#ffffff",
                 borderRadius: config.btn_radius ?? 8,
                 textDecoration: "none",

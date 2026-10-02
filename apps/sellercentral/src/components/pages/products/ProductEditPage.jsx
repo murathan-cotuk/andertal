@@ -1047,11 +1047,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
           // is just that OTHER seller's own internal organization, never this seller's problem.
           // Never pull siblings in; "master_total_variants" only powers the informational
           // "See other variations" link, it never adds anything to this seller's own listing.
-          const matchedVariantEan = normalizeEanDigits(result.matched_variant_ean);
-          const matchedVariant = result.matched_on === "variant" && matchedVariantEan
+          const matchedVariantEan = normalizeEanDigits(result.matched_variant_ean || result.sellable_unit?.ean);
+          const matchedVariant = (result.matched_on === "variant" || result.sellable_unit?.matched_on === "variant") && matchedVariantEan
             ? masterVariants.find((v) => normalizeEanDigits(v?.ean || v?.metadata?.ean) === matchedVariantEan) || null
             : null;
-          const resolvedEan = matchedVariant?.ean || String(ean).trim();
+          const resolvedEan = matchedVariant?.ean || result.sellable_unit?.ean || String(ean).trim();
           // A matched child carries its own brand/description/bullets/images in its own metadata
           // (see productRowToVariant on the backend) — the parent row is just a grouping shell and
           // must never be used for these once we know exactly which child this is.
@@ -1064,10 +1064,11 @@ export default function ProductEditPage({ product: initialProduct, idOrHandle, i
             ean: resolvedEan,
             master_product_id: master.id,
             master_total_variants: masterVariants.length,
+            family_id: result.family_id || master.family_id || null,
           };
           return {
             ...prev,
-            title: matchedVariant?.title || master.title || prev.title,
+            title: result.sellable_unit?.title || matchedVariant?.title || master.title || prev.title,
             description: matchedVariant?.metadata?.description || master.description || prev.description,
             handle: master.handle || prev.handle,
             sku: "",

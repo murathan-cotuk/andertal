@@ -123,7 +123,7 @@ const Tag = styled.span`
   text-transform: uppercase;
   color: #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  background: ${(p) => (p.$sale ? "#e11d48" : p.$mut ? "#6b7280" : "#18181b")};
+  background: ${(p) => (p.$sale ? "#e11d48" : p.$mut ? "#5e574e" : "#18181b")};
   border-radius: 6px;
 `;
 
@@ -148,7 +148,7 @@ const Old = styled.span`
 const ShipLine = styled.p`
   margin: 0;
   font-size: 12.5px;
-  color: #6b7280;
+  color: #5e574e;
 `;
 
 const AtcRow = styled.div`

@@ -200,18 +200,18 @@ export default function CookieBanner() {
         }}>
           <div style={{ flex: 1, minWidth: isMobile ? "100%" : 260 }}>
             <span style={{ fontWeight: 700, fontSize: 15, marginRight: 8 }}>{t.title}</span>
-            <span style={{ fontSize: 14, color: "#4b5563", lineHeight: 1.5 }}>{t.body}</span>
+            <span style={{ fontSize: 14, color: "#5e574e", lineHeight: 1.5 }}>{t.body}</span>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
             <button
               onClick={() => setShowManage(true)}
-              style={{ ...btnBase, background: "#fff", color: "#374151", flex: isMobile ? "1 1 100%" : "0 0 auto" }}
+              style={{ ...btnBase, background: "#fff", color: "#3a352f", flex: isMobile ? "1 1 100%" : "0 0 auto" }}
             >
               {t.manage}
             </button>
             <button
               onClick={acceptNecessary}
-              style={{ ...btnBase, background: "#f3f4f6", color: "#374151", flex: isMobile ? "1 1 calc(50% - 4px)" : "0 0 auto" }}
+              style={{ ...btnBase, background: "#f3eee6", color: "#3a352f", flex: isMobile ? "1 1 calc(50% - 4px)" : "0 0 auto" }}
             >
               {t.necessary}
             </button>
@@ -234,7 +234,7 @@ export default function CookieBanner() {
                 style={{
                   display: "flex", alignItems: "flex-start", gap: 14,
                   padding: "12px 14px", borderRadius: 8,
-                  background: "#f9fafb", border: "1px solid #e5e7eb",
+                  background: "#faf7f2", border: "1px solid #e6dfd4",
                   cursor: cat.fixed ? "default" : "pointer",
                 }}
               >
@@ -246,10 +246,10 @@ export default function CookieBanner() {
                   style={{ marginTop: 2, flexShrink: 0 }}
                 />
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
-                    {cat.label}{cat.fixed && <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 400, marginLeft: 6 }}>{t.alwaysActive}</span>}
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#1d1b18" }}>
+                    {cat.label}{cat.fixed && <span style={{ fontSize: 11, color: "#5e574e", fontWeight: 400, marginLeft: 6 }}>{t.alwaysActive}</span>}
                   </div>
-                  <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{cat.desc}</div>
+                  <div style={{ fontSize: 13, color: "#5e574e", marginTop: 2 }}>{cat.desc}</div>
                 </div>
               </label>
             ))}
@@ -257,13 +257,13 @@ export default function CookieBanner() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
               onClick={() => setShowManage(false)}
-              style={{ ...btnBase, background: "#f3f4f6", color: "#374151", fontSize: 13 }}
+              style={{ ...btnBase, background: "#f3eee6", color: "#3a352f", fontSize: 13 }}
             >
               ← Zurück
             </button>
             <button
               onClick={savePrefs}
-              style={{ ...btnBase, background: "#111827", color: "#fff", fontSize: 13 }}
+              style={{ ...btnBase, background: "#1d1b18", color: "#fff", fontSize: 13 }}
             >
               {t.save}
             </button>

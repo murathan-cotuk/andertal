@@ -154,31 +154,12 @@ async function findBestSellerCampaignDiscountRow(c, { productId, variantId, sell
 }
 
 
-// --- Store Carts (session cart: create, get, add/update/remove line-items) ---
-const productIdFromVariantId = (variantId) => {
-  if (!variantId || typeof variantId !== 'string') return null
-  let base
-  if (variantId.endsWith('-variant')) {
-    base = variantId.slice(0, -'-variant'.length)
-  } else {
-    const variantDashIdx = variantId.lastIndexOf('-variant-')
-    if (variantDashIdx > 0) {
-      base = variantId.slice(0, variantDashIdx)
-    } else {
-      const idx = variantId.indexOf('-v-')
-      base = idx > 0 ? variantId.slice(0, idx) : variantId
-    }
-  }
-  // Buybox/"other sellers" listings use a composite id — {productId}-listing-{sellerId}
-  // (see store-products.js: `String(l.product_id) + '-listing-' + l.seller_id`) — so its
-  // variant ids look like {productId}-listing-{sellerId}-variant-{N}. Strip the
-  // "-listing-{sellerId}" part too, or getAdminHubProductByIdOrHandleDb() gets handed
-  // that whole composite string, fails to match it as a UUID or a handle, and the
-  // add-to-cart call 404s with "Product not found".
-  const listingIdx = base.indexOf('-listing-')
-  return listingIdx > 0 ? base.slice(0, listingIdx) : base
-}
+const {
+  productIdFromVariantId,
+  resolveVariantFromCartId,
+} = require('../product-identity')
 
+// --- Store Carts (session cart: create, get, add/update/remove line-items) ---
 const BONUS_POINTS_PER_EURO_DISCOUNT = 50
 const BONUS_SIGNUP_POINTS = 100
 const STRIPE_MIN_CHARGE_CENTS_EUR = 50
@@ -845,14 +826,11 @@ const storeCartLineItemsPOST = async (req, res) => {
     const priceCents = product.price_cents != null ? Number(product.price_cents) : Math.round(Number(product.price || 0) * 100)
     const rawVariants = Array.isArray(product.variants) && product.variants.length > 0 ? product.variants : []
     let unitPriceCents = priceCents
-    const variantIndex = variantId.includes('-v-')
-      ? parseInt(variantId.split('-v-')[1], 10)
-      : variantId.includes('-variant-')
-        ? parseInt(variantId.split('-variant-').pop(), 10)
-        : null
+    const resolvedVar = resolveVariantFromCartId(product, variantId)
+    const variantIndex = resolvedVar.index
     let variantLabel = ''
-    if (rawVariants.length && variantIndex >= 0 && rawVariants[variantIndex]) {
-      const v = rawVariants[variantIndex]
+    if (resolvedVar.variant) {
+      const v = resolvedVar.variant
       if (v.price_cents != null) unitPriceCents = Number(v.price_cents)
       else if (v.price != null) unitPriceCents = Math.round(Number(v.price) * 100)
       const optVals = Array.isArray(v.option_values) && v.option_values.length > 0 ? v.option_values : null

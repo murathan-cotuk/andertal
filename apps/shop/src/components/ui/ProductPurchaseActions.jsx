@@ -19,7 +19,7 @@ const QtySelect = styled.select`
   border: 1px solid #cfc6b8;
   border-radius: 26px;
   background: #fff;
-  color: #111827;
+  color: #1d1b18;
   cursor: pointer;
   flex-shrink: 0;
   min-width: 76px;
@@ -61,7 +61,7 @@ const AddBtn = styled.button`
   &:disabled {
     opacity: 0.55;
     cursor: not-allowed;
-    background: #9ca3af;
+    background: #a39a8d;
   }
 `;
 
@@ -126,9 +126,9 @@ const NotifyInput = styled.input`
   height: 40px;
   padding: 0 12px;
   font-size: 0.875rem;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid #e6dfd4;
   border-radius: 10px;
-  color: #111827;
+  color: #1d1b18;
   min-width: 0;
   &:disabled {
     opacity: 0.6;
@@ -138,9 +138,9 @@ const NotifyInput = styled.input`
 const NotifyBtn = styled.button`
   height: 40px;
   padding: 0 16px;
-  border: 1.5px solid #111827;
+  border: 1.5px solid #1d1b18;
   border-radius: 10px;
-  background: #111827;
+  background: #1d1b18;
   color: #fff;
   font-size: 0.875rem;
   font-weight: 700;

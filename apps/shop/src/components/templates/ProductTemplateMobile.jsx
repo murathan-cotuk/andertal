@@ -958,6 +958,22 @@ function normalizeVariants(variants, variationGroups) {
   });
 }
 
+/** Simple products may ship with variants: []. Cart needs a variant_id — mirror backend default. */
+function ensureSellableVariants(product, rawVariants, variationGroups) {
+  const normalized = normalizeVariants(rawVariants, variationGroups);
+  if (Array.isArray(normalized) && normalized.length > 0) return normalized;
+  if (!product?.id) return [];
+  return [{
+    id: `${product.id}-variant-0`,
+    title: product.title || "Default",
+    sku: product.sku || null,
+    inventory_quantity: product.inventory_quantity ?? 0,
+    price_cents: product.price_cents ?? null,
+    images: Array.isArray(product.images) ? product.images : [],
+    metadata: {},
+  }];
+}
+
 /**
  * Find the best-matching variant index given selectedOptions = { groupName: value }.
  * Returns the index of the first variant where every selected option matches.
@@ -1444,7 +1460,7 @@ export default function ProductTemplateMobile() {
     : (meta.shipping_info || meta.versand || tp("standardShipping"));
   const rawVariants = product.variants || [];
   const variationGroups = product.variation_groups || null;
-  const variants = normalizeVariants(rawVariants, variationGroups);
+  const variants = ensureSellableVariants(product, rawVariants, variationGroups);
   const displayVariationGroups = enrichVariationGroups(variationGroups, variants);
   const useLinkedVariations = Array.isArray(displayVariationGroups) && displayVariationGroups.length > 0 &&
     variants.some((v) => Array.isArray(v.option_values) && v.option_values.length === displayVariationGroups.length);
@@ -1610,7 +1626,10 @@ export default function ProductTemplateMobile() {
 
   const handleAddToCart = async () => {
     const variantId = variant?.id;
-    if (!variantId) return;
+    if (!variantId) {
+      setCartNotice({ text: tp("addToCartFailed"), visible: true });
+      return;
+    }
     if (shippingUnavailable) return;
     // Avoid timer-race when user clicks quickly multiple times
     if (cartNoticeTimersRef.current.hide) window.clearTimeout(cartNoticeTimersRef.current.hide);

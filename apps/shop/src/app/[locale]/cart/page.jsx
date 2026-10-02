@@ -40,7 +40,7 @@ const Main = styled.main`
 const Title = styled.h1`
   font-size: 1.75rem;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   margin: 0 0 32px;
 
   @media (max-width: 768px) {
@@ -73,7 +73,7 @@ const ItemRow = styled.div`
   display: flex;
   gap: 16px;
   padding: 20px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f3eee6;
   &:last-child { border-bottom: none; }
 `;
 
@@ -84,7 +84,7 @@ const Thumb = styled.div`
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: #f3f4f6;
+  background: #f3eee6;
   img { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
 `;
 
@@ -96,7 +96,7 @@ const ItemDetails = styled.div`
 const ItemTitle = styled.div`
   font-size: 0.9375rem;
   font-weight: 500;
-  color: #111827;
+  color: #1d1b18;
   margin-bottom: 4px;
   display: flex;
   align-items: center;
@@ -106,16 +106,16 @@ const ItemTitle = styled.div`
 
 const ItemPrice = styled.div`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #5e574e;
   margin-bottom: 12px;
 `;
 
 const QtyRow = styled.div`
   display: inline-flex;
   align-items: center;
-  border: 1px solid #d1d5db;
+  border: 1px solid #d6ccbd;
   border-radius: 8px;
-  background: #f3f4f6;
+  background: #f3eee6;
   overflow: hidden;
 `;
 
@@ -124,12 +124,12 @@ const QtyBtn = styled.button`
   height: 34px;
   border: 0;
   background: transparent;
-  color: #6b7280;
+  color: #5e574e;
   font-size: 17px;
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
-  &:hover:not(:disabled) { background: #e5e7eb; color: #111827; }
+  &:hover:not(:disabled) { background: #e6dfd4; color: #1d1b18; }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 `;
 
@@ -139,7 +139,7 @@ const QtyInput = styled.input`
   text-align: center;
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: #3a352f;
   border: 0;
   background: transparent;
   outline: none;
@@ -182,7 +182,7 @@ const RemoveBtn = styled.button`
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  color: #6b7280;
+  color: #5e574e;
   padding: 0;
   font-size: 20px;
   line-height: 1;
@@ -203,14 +203,14 @@ const RemoveBtn = styled.button`
 const ItemTotal = styled.div`
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #111827;
+  color: #1d1b18;
   text-align: right;
   white-space: nowrap;
 `;
 
 const SummaryCard = styled.div`
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 12px;
   padding: 24px;
   position: sticky;
@@ -228,7 +228,7 @@ const SummaryCard = styled.div`
     margin-right: -16px;
     width: calc(100% + 32px);
     background: #fff;
-    color: #111827;
+    color: #1d1b18;
   }
 `;
 
@@ -236,7 +236,7 @@ const SummaryHeading = styled.h2`
   font-size: 1.0625rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: #111827;
+  color: #1d1b18;
   margin: 0 0 14px;
   line-height: 1.3;
 
@@ -250,7 +250,7 @@ const SummaryHeading = styled.h2`
 /** Mobilde Zwischensumme / Versand satırlarını tek görsel blokta toplar */
 const SummaryLines = styled.div`
   @media (max-width: 768px) {
-    background: #f3f4f6;
+    background: #f3eee6;
     border-radius: 12px;
     padding: 2px 14px;
     margin-bottom: 14px;
@@ -263,7 +263,7 @@ const SummaryRowLine = styled.div`
   gap: 10px 18px;
   align-items: baseline;
   font-size: 0.9375rem;
-  color: #4b5563;
+  color: #5e574e;
 
   @media (max-width: 768px) {
     padding: 12px 0;
@@ -283,7 +283,7 @@ const SummaryRowLine = styled.div`
 
 const SummaryAmount = styled.span`
   font-weight: 600;
-  color: #111827;
+  color: #1d1b18;
   font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
@@ -298,7 +298,7 @@ const SummaryTotalBar = styled.div`
   margin-bottom: 18px;
   border-radius: 12px;
   border: 1px solid #e8eaee;
-  background: linear-gradient(180deg, #fafafa 0%, #f4f5f7 100%);
+  background: linear-gradient(180deg, #faf7f2 0%, #f4f5f7 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 
   @media (min-width: 769px) {
@@ -307,7 +307,7 @@ const SummaryTotalBar = styled.div`
     margin-bottom: 20px;
     border-radius: 0;
     border: none;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid #e6dfd4;
     background: transparent;
     box-shadow: none;
   }
@@ -316,13 +316,13 @@ const SummaryTotalBar = styled.div`
 const SummaryTotalLabel = styled.span`
   font-size: 1rem;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
 `;
 
 const SummaryTotalAmount = styled.span`
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   font-variant-numeric: tabular-nums;
 `;
 
@@ -330,10 +330,10 @@ const ContinueLink = styled(Link)`
   display: block;
   text-align: center;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #5e574e;
   text-decoration: none;
   margin-top: 12px;
-  &:hover { color: #374151; text-decoration: underline; }
+  &:hover { color: #3a352f; text-decoration: underline; }
 `;
 
 const ClearCartBtn = styled.button`
@@ -341,16 +341,16 @@ const ClearCartBtn = styled.button`
   margin-top: 14px;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   background: #fff;
-  color: #6b7280;
+  color: #5e574e;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   &:hover:not(:disabled) {
-    background: #f9fafb;
-    color: #111827;
-    border-color: #d1d5db;
+    background: #faf7f2;
+    color: #1d1b18;
+    border-color: #d6ccbd;
   }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 `;
@@ -358,7 +358,7 @@ const ClearCartBtn = styled.button`
 const EmptyState = styled.div`
   text-align: center;
   padding: 80px 24px;
-  color: #6b7280;
+  color: #5e574e;
 `;
 
 export default function CartPage() {
@@ -420,7 +420,7 @@ export default function CartPage() {
                     {item.thumbnail ? (
                       <img src={resolveImageUrl(item.thumbnail)} alt={getLocalizedCartLineTitle(item, locale)} />
                     ) : (
-                      <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                      <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />
                     )}
                   </Thumb>
                   <ItemDetails>
@@ -448,7 +448,7 @@ export default function CartPage() {
                       if (!m || !m[2]) return null;
                       const parts = m[2].split(/\s*\/\s*/).filter(Boolean);
                       return (
-                        <span style={{ fontSize: 12, color: "#6b7280", display: "block", marginTop: 4, lineHeight: 1.4 }}>
+                        <span style={{ fontSize: 12, color: "#5e574e", display: "block", marginTop: 4, lineHeight: 1.4 }}>
                           {parts.map((p, i) => (
                             <span key={i} style={{ display: "block" }}>{p.trim()}</span>
                           ))}

@@ -42,7 +42,7 @@ const Btn = styled.button`
   &:disabled {
     opacity: 0.55;
     cursor: not-allowed;
-    background: #9ca3af;
+    background: #a39a8d;
     box-shadow: none;
   }
 

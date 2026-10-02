@@ -187,10 +187,54 @@ const buildCombineAsVariantsPlan = ({ parentId, products, optionName, optionValu
   }
 }
 
+/**
+ * Preferred Andertal model: link independent EAN products under a family roof.
+ * Does NOT fold rows into variants[] and does NOT soft-archive sources.
+ */
+const buildFamilyLinkPlan = ({ familyTitle, products, optionName, optionValues }) => {
+  const rows = Array.isArray(products) ? products : []
+  if (rows.length < 2) return { ok: false, message: 'At least 2 products are required' }
+  for (const p of rows) {
+    if (String(p.status || '') === 'merged') {
+      return { ok: false, message: `Product already merged: ${p.title || p.id}` }
+    }
+  }
+  const axisName = String(optionName || '').trim() || 'Variante'
+  const members = rows.map((p) => {
+    const override = optionValues && optionValues[String(p.id)]
+    const label =
+      override != null && String(override).trim()
+        ? String(override).trim()
+        : String(p.title || '').trim() || 'Product'
+    return {
+      product_id: String(p.id),
+      title: label,
+      option_value: label,
+    }
+  })
+  const labels = uniqueLabels(members.map((m) => m.option_value))
+  const optionSet = []
+  const optSeen = new Set()
+  for (const label of labels) {
+    const k = label.toLowerCase()
+    if (optSeen.has(k)) continue
+    optSeen.add(k)
+    optionSet.push({ value: label })
+  }
+  return {
+    ok: true,
+    mode: 'family_link',
+    family_title: String(familyTitle || rows[0]?.title || 'Family').trim() || 'Family',
+    variation_groups: [{ name: axisName, options: optionSet }],
+    members: members.map((m, i) => ({ ...m, option_value: labels[i] })),
+  }
+}
+
 module.exports = {
   parseVariantsArray,
   hasRealVariants,
   uniqueLabels,
   productRowToVariant,
   buildCombineAsVariantsPlan,
+  buildFamilyLinkPlan,
 }

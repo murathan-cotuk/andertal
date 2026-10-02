@@ -4,7 +4,7 @@ import React from "react";
 import styled from "styled-components";
 
 const HeroSection = styled.section`
-  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  background: linear-gradient(135deg, #0ea5e9 0%, #a65300 100%);
   color: white;
   padding: 80px 24px;
   text-align: center;

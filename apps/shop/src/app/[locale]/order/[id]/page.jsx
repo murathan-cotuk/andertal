@@ -39,20 +39,20 @@ function statusLabel(t, status) {
   try { return t(`status.${k}`); } catch (_) { return status; }
 }
 const STATUS_BG = {
-  offen: "#fef3c7", in_bearbeitung: "#dbeafe", versendet: "#ede9fe",
+  offen: "#fef3c7", in_bearbeitung: "#fcebd5", versendet: "#efe8dd",
   zugestellt: "#d1fae5", abgeschlossen: "#d1fae5", storniert: "#fee2e2",
-  bezahlt: "#d1fae5", refunded: "#dbeafe", retoure: "#fee2e2",
-  retoure_anfrage: "#fef3c7", pending: "#fef3c7", shipped: "#ede9fe",
+  bezahlt: "#d1fae5", refunded: "#fcebd5", retoure: "#fee2e2",
+  retoure_anfrage: "#fef3c7", pending: "#fef3c7", shipped: "#efe8dd",
   delivered: "#d1fae5", completed: "#d1fae5", cancelled: "#fee2e2",
-  processing: "#dbeafe",
+  processing: "#fcebd5",
 };
 const STATUS_COLOR = {
-  offen: "#92400e", in_bearbeitung: "#1e40af", versendet: "#6d28d9",
+  offen: "#92400e", in_bearbeitung: "#7f3f00", versendet: "#6d28d9",
   zugestellt: "#166534", abgeschlossen: "#166534", storniert: "#991b1b",
-  bezahlt: "#166534", refunded: "#1d4ed8", retoure: "#b91c1c",
+  bezahlt: "#166534", refunded: "#a65300", retoure: "#b91c1c",
   retoure_anfrage: "#b45309", pending: "#92400e", shipped: "#6d28d9",
   delivered: "#166534", completed: "#166534", cancelled: "#991b1b",
-  processing: "#1e40af",
+  processing: "#7f3f00",
 };
 
 const STEP_ORDER = ["bezahlt", "in_bearbeitung", "versendet", "zugestellt"];
@@ -77,8 +77,8 @@ function StatusPill({ status, large, t }) {
     <span style={{
       display: "inline-flex", alignItems: "center",
       fontSize: large ? 13 : 11, fontWeight: 700,
-      color: STATUS_COLOR[k] || "#6b7280",
-      background: STATUS_BG[k] || "#f3f4f6",
+      color: STATUS_COLOR[k] || "#5e574e",
+      background: STATUS_BG[k] || "#f3eee6",
       borderRadius: 20, padding: large ? "5px 14px" : "3px 10px",
       letterSpacing: 0.2,
     }}>
@@ -101,7 +101,7 @@ function StatusTimeline({ status, t }) {
               <div style={{
                 width: active ? 20 : 14, height: active ? 20 : 14,
                 borderRadius: "50%",
-                background: done ? ORANGE : "#e5e7eb",
+                background: done ? ORANGE : "#e6dfd4",
                 border: active ? `3px solid ${ORANGE}33` : "none",
                 transition: "all 0.2s",
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -109,12 +109,12 @@ function StatusTimeline({ status, t }) {
               }}>
                 {done && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
               </div>
-              <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: done ? ORANGE : "#9ca3af", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: done ? ORANGE : "#a39a8d", whiteSpace: "nowrap" }}>
                 {statusLabel(t, step)}
               </span>
             </div>
             {i < STEP_ORDER.length - 1 && (
-              <div style={{ flex: 1, height: 2, background: done && i < idx ? ORANGE : "#e5e7eb", margin: "0 4px", marginBottom: 20, transition: "background 0.2s" }} />
+              <div style={{ flex: 1, height: 2, background: done && i < idx ? ORANGE : "#e6dfd4", margin: "0 4px", marginBottom: 20, transition: "background 0.2s" }} />
             )}
           </div>
         );
@@ -158,7 +158,7 @@ async function openPdf(apiPath, failMessage = "PDF konnte nicht geladen werden."
 function Card({ children, style }) {
   return (
     <div style={{
-      background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14,
+      background: "#fff", border: "none", boxShadow: "0 0 0 1px rgba(29,27,24,0.06)", borderRadius: 20,
       padding: "20px 22px", marginBottom: 16,
       ...style,
     }}>
@@ -168,11 +168,11 @@ function Card({ children, style }) {
 }
 
 function CardTitle({ children }) {
-  return <div style={{ fontSize: 13, fontWeight: 700, color: "#374151", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>{children}</div>;
+  return <div style={{ fontSize: 13, fontWeight: 700, color: "#3a352f", marginBottom: 14, textTransform: "uppercase", letterSpacing: "0.06em" }}>{children}</div>;
 }
 
 /* ── Action button ── */
-function ActionBtn({ children, onClick, color = "#374151", bg = "#f9fafb", disabled, loading }) {
+function ActionBtn({ children, onClick, color = "#3a352f", bg = "#faf7f2", disabled, loading }) {
   return (
     <button
       type="button"
@@ -180,9 +180,9 @@ function ActionBtn({ children, onClick, color = "#374151", bg = "#f9fafb", disab
       disabled={disabled || loading}
       style={{
         display: "inline-flex", alignItems: "center", gap: 6,
-        fontSize: 13, fontWeight: 600, color: disabled ? "#9ca3af" : color,
-        background: disabled ? "#f3f4f6" : bg,
-        border: `1px solid ${disabled ? "#e5e7eb" : color + "33"}`,
+        fontSize: 13, fontWeight: 600, color: disabled ? "#a39a8d" : color,
+        background: disabled ? "#f3eee6" : bg,
+        border: `1px solid ${disabled ? "#e6dfd4" : color + "33"}`,
         borderRadius: 9, padding: "8px 16px",
         cursor: disabled ? "not-allowed" : "pointer",
         transition: "opacity 0.1s",
@@ -240,23 +240,23 @@ function ReturnModal({ order, onClose, onDone }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, maxHeight: "86vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
-        <div style={{ padding: "18px 22px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid #f3eee6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{t("requestReturn")}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#a39a8d", lineHeight: 1 }}>×</button>
         </div>
         <div style={{ padding: "18px 22px", overflowY: "auto" }}>
-          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 8, color: "#374151" }}>{t("selectReturnItems")}</label>
-          <div style={{ marginBottom: 14, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 8, color: "#3a352f" }}>{t("selectReturnItems")}</label>
+          <div style={{ marginBottom: 14, border: "1px solid #e6dfd4", borderRadius: 10, overflow: "hidden" }}>
             {orderItems.map((it) => {
               const id = String(it.id);
               const maxQty = Number(it.quantity || 1);
               const checked = selected[id] != null;
               return (
-                <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: "1px solid #f3f4f6" }}>
+                <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: "1px solid #f3eee6" }}>
                   <input type="checkbox" checked={checked} onChange={() => toggleItem(id, maxQty)} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{it.title || "—"}</div>
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>× {maxQty}</div>
+                    <div style={{ fontSize: 11, color: "#a39a8d" }}>× {maxQty}</div>
                   </div>
                   {checked && maxQty > 1 && (
                     <input
@@ -268,15 +268,15 @@ function ReturnModal({ order, onClose, onDone }) {
                         const v = Math.max(1, Math.min(maxQty, Math.round(Number(e.target.value) || 1)));
                         setSelected((prev) => ({ ...prev, [id]: v }));
                       }}
-                      style={{ width: 56, padding: "4px 6px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12 }}
+                      style={{ width: 56, padding: "4px 6px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 12 }}
                     />
                   )}
                 </div>
               );
             })}
           </div>
-          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("returnReasonLabel")}</label>
-          <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#3a352f" }}>{t("returnReasonLabel")}</label>
+          <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, marginBottom: 14 }}>
             <option value="">{t("choosePlaceholder")}</option>
             <option value="defekt">{t("reasonDefect")}</option>
             <option value="falsch">{t("reasonWrongItem")}</option>
@@ -286,15 +286,15 @@ function ReturnModal({ order, onClose, onDone }) {
             <option value="nicht_erwartet">{t("reasonNotAsDescribed")}</option>
             <option value="sonstiges">{t("reasonOther")}</option>
           </select>
-          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("notesLabel")}</label>
+          <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#3a352f" }}>{t("notesLabel")}</label>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-            style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
+            style={{ width: "100%", padding: "9px 12px", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, resize: "vertical", boxSizing: "border-box" }}
             placeholder={t("notesPlaceholder")}
           />
           {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 8 }}>{err}</p>}
         </div>
-        <div style={{ padding: "12px 22px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button onClick={onClose} style={{ padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff" }}>{t("cancelButton")}</button>
+        <div style={{ padding: "12px 22px", borderTop: "1px solid #f3eee6", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button onClick={onClose} style={{ padding: "8px 16px", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff" }}>{t("cancelButton")}</button>
           <button onClick={submit} disabled={busy} style={{ padding: "8px 18px", background: "#b91c1c", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: busy ? "not-allowed" : "pointer", fontWeight: 700 }}>
             {busy ? "…" : t("requestReturn")}
           </button>
@@ -333,7 +333,7 @@ function ReturnTrackingForm({ order, activeReturn, onSaved }) {
     return (
       <Card>
         <CardTitle>{t("returnTrackingHeading")}</CardTitle>
-        <div style={{ fontSize: 13, color: "#374151" }}>
+        <div style={{ fontSize: 13, color: "#3a352f" }}>
           {t("returnTrackingSaved")}: <strong>{activeReturn.customer_tracking_number}</strong>
           {activeReturn.customer_carrier_name ? ` (${activeReturn.customer_carrier_name})` : ""}
         </div>
@@ -344,20 +344,20 @@ function ReturnTrackingForm({ order, activeReturn, onSaved }) {
   return (
     <Card>
       <CardTitle>{t("returnTrackingHeading")}</CardTitle>
-      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px" }}>{t("returnTrackingHint")}</p>
-      <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("trackingNumberLabel")}</label>
+      <p style={{ fontSize: 13, color: "#5e574e", margin: "0 0 12px" }}>{t("returnTrackingHint")}</p>
+      <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#3a352f" }}>{t("trackingNumberLabel")}</label>
       <input value={tracking} onChange={(e) => setTracking(e.target.value)}
-        style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
+        style={{ width: "100%", padding: "9px 12px", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
         placeholder={t("trackingNumberPlaceholder")}
       />
-      <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#374151" }}>{t("carrierOptionalLabel")}</label>
+      <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6, color: "#3a352f" }}>{t("carrierOptionalLabel")}</label>
       <input value={carrier} onChange={(e) => setCarrier(e.target.value)}
-        style={{ width: "100%", padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}
+        style={{ width: "100%", padding: "9px 12px", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}
         placeholder={tUi("carrierPlaceholder")}
       />
       {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 0 }}>{err}</p>}
       <button type="button" onClick={submit} disabled={busy}
-        style={{ padding: "8px 16px", background: "#0d9488", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer" }}>
+        style={{ padding: "8px 16px", background: "#1d1b18", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer" }}>
         {busy ? "…" : t("submitTracking")}
       </button>
     </Card>
@@ -404,14 +404,14 @@ function MessageModal({ order, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, maxHeight: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #f3eee6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{t("messageModalTitle", { number: order.order_number || "-" })}</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#a39a8d" }}>×</button>
         </div>
 
         {!selectedItemId ? (
           <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
-            <div style={{ fontSize: 13, color: "#374151", marginBottom: 10 }}>{t("messageProductPickPrompt")}</div>
+            <div style={{ fontSize: 13, color: "#3a352f", marginBottom: 10 }}>{t("messageProductPickPrompt")}</div>
             {items.map((it, i) => (
               <button
                 key={it.id || i}
@@ -419,33 +419,33 @@ function MessageModal({ order, onClose }) {
                 disabled={!it.id}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "10px 8px",
-                  border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 8, background: "#fff",
+                  border: "1px solid #e6dfd4", borderRadius: 10, marginBottom: 8, background: "#fff",
                   cursor: it.id ? "pointer" : "not-allowed", opacity: it.id ? 1 : 0.5, textAlign: "left",
                 }}
               >
-                <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3f4f6" }}>
+                <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 6, overflow: "hidden", background: "#f3eee6" }}>
                   {it.thumbnail ? (
                     <img src={resolveImageUrl(it.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-                  ) : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />}
+                  ) : <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {getLocalizedCartLineTitle(it, locale)}
                   </div>
-                  <div style={{ fontSize: 11, color: "#9ca3af" }}>× {it.quantity}</div>
+                  <div style={{ fontSize: 11, color: "#a39a8d" }}>× {it.quantity}</div>
                 </div>
               </button>
             ))}
           </div>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
-              <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 5, overflow: "hidden", background: "#f3f4f6" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", borderBottom: "1px solid #f3eee6", background: "#faf7f2" }}>
+              <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: 5, overflow: "hidden", background: "#f3eee6" }}>
                 {selectedItem?.thumbnail ? (
                   <img src={resolveImageUrl(selectedItem.thumbnail)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
                 ) : null}
               </div>
-              <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: "#1d1b18", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {selectedItem ? getLocalizedCartLineTitle(selectedItem, locale) : ""}
               </div>
               {items.length > 1 && (
@@ -454,14 +454,14 @@ function MessageModal({ order, onClose }) {
                 </button>
               )}
             </div>
-            <div style={{ padding: "14px 20px", color: "#6b7280", fontSize: 13 }}>
+            <div style={{ padding: "14px 20px", color: "#5e574e", fontSize: 13 }}>
               {t("messageCreatesCaseHint")}
             </div>
-            <div style={{ padding: "12px 20px", borderTop: "1px solid #f3f4f6" }}>
+            <div style={{ padding: "12px 20px", borderTop: "1px solid #f3eee6" }}>
               {err && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 6 }}>{err}</div>}
               <div style={{ display: "flex", gap: 8 }}>
                 <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3}
-                  style={{ flex: 1, padding: "9px 12px", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, resize: "none" }}
+                  style={{ flex: 1, padding: "9px 12px", border: "1px solid #e6dfd4", borderRadius: 8, fontSize: 13, resize: "none" }}
                   placeholder={t("messagePlaceholder")}
                 />
                 <button onClick={send} disabled={sending || !body.trim()}
@@ -499,7 +499,7 @@ function OrderConfirmationView({ order }) {
   const orderValueCents = cardPaidCents + bonusPaidCents;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--shop-bg, #f6f2ec)" }}>
       <ShopHeader />
       <main style={{ flex: 1, maxWidth: 680, margin: "0 auto", width: "100%", padding: "48px 16px 64px", textAlign: "center" }}>
         <div style={{
@@ -513,57 +513,57 @@ function OrderConfirmationView({ order }) {
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
-        <h1 style={{ fontSize: "1.875rem", fontWeight: 800, color: "#111827", margin: "0 0 10px", letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontSize: "1.875rem", fontWeight: 800, color: "#1d1b18", margin: "0 0 10px", letterSpacing: "-0.02em" }}>
           {t("confirmationTitle")}
         </h1>
-        <p style={{ fontSize: "1rem", color: "#6b7280", margin: "0 0 36px", lineHeight: 1.55 }}>
+        <p style={{ fontSize: "1rem", color: "#5e574e", margin: "0 0 36px", lineHeight: 1.55 }}>
           {t("confirmationSubtitle")}
         </p>
 
-        <div style={{ background: "#fff", border: "1px solid #eef0f2", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 16, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0", borderBottom: "1px solid #f3f4f6" }}>
-            <span style={{ fontWeight: 500, color: "#6b7280" }}>{t("orderNumber")}</span>
-            <span style={{ fontFamily: "monospace", fontSize: "0.875rem", fontWeight: 700, color: "#111827", letterSpacing: "0.02em" }}>
+        <div style={{ background: "#fff", border: "1px solid #efe8dd", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 16, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0", borderBottom: "1px solid #f3eee6" }}>
+            <span style={{ fontWeight: 500, color: "#5e574e" }}>{t("orderNumber")}</span>
+            <span style={{ fontFamily: "monospace", fontSize: "0.875rem", fontWeight: 700, color: "#1d1b18", letterSpacing: "0.02em" }}>
               #{order.order_number || order.id?.slice(0, 8).toUpperCase()}
             </span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0", borderBottom: order.email ? "1px solid #f3f4f6" : "none" }}>
-            <span style={{ fontWeight: 500, color: "#6b7280" }}>{t("orderDate")}</span>
-            <span style={{ color: "#111827", fontWeight: 500 }}>{fmtDate(order.created_at)}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0", borderBottom: order.email ? "1px solid #f3eee6" : "none" }}>
+            <span style={{ fontWeight: 500, color: "#5e574e" }}>{t("orderDate")}</span>
+            <span style={{ color: "#1d1b18", fontWeight: 500 }}>{fmtDate(order.created_at)}</span>
           </div>
           {order.email && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "9px 0" }}>
-              <span style={{ fontWeight: 500, color: "#6b7280" }}>{tUi("email")}</span>
-              <span style={{ color: "#111827", fontWeight: 500 }}>{order.email}</span>
+              <span style={{ fontWeight: 500, color: "#5e574e" }}>{tUi("email")}</span>
+              <span style={{ color: "#1d1b18", fontWeight: 500 }}>{order.email}</span>
             </div>
           )}
         </div>
 
         {settlement && (
-          <div style={{ background: "#fff", border: "1px solid #eef0f2", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 16, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
-            <div style={{ fontWeight: 700, color: "#111827", marginBottom: 14, fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <div style={{ background: "#fff", border: "1px solid #efe8dd", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 16, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
+            <div style={{ fontWeight: 700, color: "#1d1b18", marginBottom: 14, fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {t("settlementHeading")}
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: "1px solid #f3f4f6" }}>
-              <span style={{ fontWeight: 500, color: "#6b7280" }}>{t("paymentFlow")}</span>
-              <span style={{ color: "#111827", fontWeight: 500 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9375rem", padding: "8px 0", borderBottom: "1px solid #f3eee6" }}>
+              <span style={{ fontWeight: 500, color: "#5e574e" }}>{t("paymentFlow")}</span>
+              <span style={{ color: "#1d1b18", fontWeight: 500 }}>
                 {settlement.checkout_payment_kind === "platform_loyalty"
                   ? t("paymentFlowPlatform")
                   : t("paymentFlowStripe")}
               </span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.0625rem", fontWeight: 800, color: "#111827", padding: "10px 0 2px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.0625rem", fontWeight: 800, color: "#1d1b18", padding: "10px 0 2px" }}>
               <span>{t("total")}</span>
               <span>{formatPriceCents(orderValueCents)} €</span>
             </div>
             {bonusPaidCents > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#9ca3af", padding: "0 0 4px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#a39a8d", padding: "0 0 4px" }}>
                 <span>{t("bonusPaidLabel")}</span>
                 <span>−{formatPriceCents(bonusPaidCents)} €</span>
               </div>
             )}
             {bonusPaidCents > 0 && cardPaidCents > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#9ca3af", padding: "0 0 4px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "#a39a8d", padding: "0 0 4px" }}>
                 <span>{t("cardPaidLabel")}</span>
                 <span>{formatPriceCents(cardPaidCents)} €</span>
               </div>
@@ -572,36 +572,36 @@ function OrderConfirmationView({ order }) {
         )}
 
         {items.length > 0 && (
-          <div style={{ background: "#fff", border: "1px solid #eef0f2", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 28, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
-            <div style={{ fontWeight: 700, color: "#111827", marginBottom: 14, fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <div style={{ background: "#fff", border: "1px solid #efe8dd", borderRadius: 16, padding: "22px 26px", textAlign: "left", marginBottom: 28, boxShadow: "0 1px 2px rgba(16,24,40,0.04)" }}>
+            <div style={{ fontWeight: 700, color: "#1d1b18", marginBottom: 14, fontSize: "0.8125rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               {t("items")}
             </div>
             {items.map((item, i) => (
               <div key={item.id || i} style={{
                 display: "flex", alignItems: "center", gap: 12, padding: "12px 0",
-                borderBottom: i < items.length - 1 ? "1px solid #f3f4f6" : "none",
+                borderBottom: i < items.length - 1 ? "1px solid #f3eee6" : "none",
               }}>
-                <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: "hidden", background: "#f9fafb", border: "1px solid #f3f4f6" }}>
+                <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: 8, overflow: "hidden", background: "#faf7f2", border: "1px solid #f3eee6" }}>
                   {item.thumbnail ? (
                     <img src={resolveImageUrl(item.thumbnail)} alt={item.title || ""} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
                   ) : (
-                    <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                    <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.9375rem", fontWeight: 500, color: "#111827" }}>
+                  <div style={{ fontSize: "0.9375rem", fontWeight: 500, color: "#1d1b18" }}>
                     {getLocalizedCartLineTitle(item, locale)}
                   </div>
-                  <div style={{ fontSize: "0.8125rem", color: "#9ca3af" }}>× {item.quantity}</div>
+                  <div style={{ fontSize: "0.8125rem", color: "#a39a8d" }}>× {item.quantity}</div>
                 </div>
-                <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#1d1b18", whiteSpace: "nowrap" }}>
                   {formatPriceCents((item.unit_price_cents || 0) * (item.quantity || 1))} €
                 </div>
               </div>
             ))}
             <div style={{
               display: "flex", justifyContent: "space-between", fontSize: "1.0625rem",
-              fontWeight: 800, color: "#111827", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e5e7eb",
+              fontWeight: 800, color: "#1d1b18", marginTop: 16, paddingTop: 16, borderTop: "1px solid #e6dfd4",
             }}>
               <span>{t("total")}</span>
               <span>{formatPriceCents(orderValueCents || order.total_cents || 0)} €</span>
@@ -620,7 +620,7 @@ function OrderConfirmationView({ order }) {
           {t("viewOrders")}
         </Link>
         <div style={{ marginTop: 14 }}>
-          <Link href="/" style={{ fontSize: "0.875rem", fontWeight: 600, color: "#6b7280", textDecoration: "none" }}>
+          <Link href="/" style={{ fontSize: "0.875rem", fontWeight: 600, color: "#5e574e", textDecoration: "none" }}>
             {t("continueShopping")}
           </Link>
         </div>
@@ -725,7 +725,7 @@ export default function OrderDetailPage() {
     // saw during payment processing instead of switching to a generic spinner mid-flow.
     if (isConfirmed) return <TruckLoader />;
     return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--shop-bg, #f6f2ec)" }}>
         <ShopHeader />
         <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <GlobalPageLoader />
@@ -737,14 +737,14 @@ export default function OrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--shop-bg, #f6f2ec)" }}>
         <ShopHeader />
         <main style={{ flex: 1, maxWidth: 640, margin: "0 auto", padding: "48px 20px", width: "100%" }}>
           <p style={{ color: "#ef4444", textAlign: "center" }}>{error || t("notFound")}</p>
           <div style={{ textAlign: "center", marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
             <button
               onClick={() => { setError(null); setLoading(true); loadOrder(); }}
-              style={{ background: "#111827", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}
+              style={{ background: "#1d1b18", color: "#fff", border: "none", borderRadius: 8, padding: "10px 24px", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}
             >
               {t("retryButton")}
             </button>
@@ -816,7 +816,7 @@ export default function OrderDetailPage() {
   ].filter(Boolean);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f9fafb" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--shop-bg, #f6f2ec)" }}>
       <ShopHeader />
 
       {retourModal && <ReturnModal order={order} onClose={() => setRetourModal(false)} onDone={() => { setActionMsg({ type: "success", text: t("returnSubmitted") }); loadOrder(); }} />}
@@ -826,7 +826,7 @@ export default function OrderDetailPage() {
 
         {/* Back */}
         <div style={{ marginBottom: 20 }}>
-          <button onClick={() => router.push("/orders")} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#6b7280", padding: 0 }}>
+          <button onClick={() => router.push("/orders")} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#5e574e", padding: 0 }}>
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
             {t("allOrders")}
           </button>
@@ -843,10 +843,10 @@ export default function OrderDetailPage() {
         <Card>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#111827", letterSpacing: -0.5, lineHeight: 1.1 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#1d1b18", letterSpacing: -0.5, lineHeight: 1.1 }}>
                 {t("orderTitle", { number: order.order_number || order.id?.slice(0, 8).toUpperCase() })}
               </div>
-              <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+              <div style={{ fontSize: 13, color: "#5e574e", marginTop: 4 }}>
                 {t("dateTimeJoin", { date: fmtDate(order.created_at, locale), time: fmtTime(order.created_at, locale) })}
                 {order.email && <span> · {order.email}</span>}
               </div>
@@ -858,22 +858,22 @@ export default function OrderDetailPage() {
 
           {/* Tracking */}
           {order.tracking_number && (
-            <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", borderRadius: 8, padding: "10px 14px" }}>
+            <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 8, background: "#faf7f2", borderRadius: 8, padding: "10px 14px" }}>
               <span style={{ fontSize: 18 }}>📦</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 1 }}>
                   {t("trackingLabel")}{order.carrier_name ? ` · ${order.carrier_name}` : ""}
                 </div>
                 {trackingUrl ? (
-                  <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "#2563eb", fontFamily: "monospace", textDecoration: "underline" }}>
+                  <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, color: "#a65300", fontFamily: "monospace", textDecoration: "underline" }}>
                     {order.tracking_number}
                   </a>
                 ) : (
-                  <span style={{ fontSize: 13, fontFamily: "monospace", color: "#374151" }}>{order.tracking_number}</span>
+                  <span style={{ fontSize: 13, fontFamily: "monospace", color: "#3a352f" }}>{order.tracking_number}</span>
                 )}
               </div>
               {trackingUrl && (
-                <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", textDecoration: "none", background: "#eff6ff", borderRadius: 6, padding: "5px 10px", flexShrink: 0 }}>
+                <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "#a65300", textDecoration: "none", background: "#fcebd5", borderRadius: 6, padding: "5px 10px", flexShrink: 0 }}>
                   {t("trackButton")} →
                 </a>
               )}
@@ -902,11 +902,11 @@ export default function OrderDetailPage() {
               const unitPrice = Number(item.unit_price_cents || 0);
               const qty = Number(item.quantity || 1);
               return (
-                <div key={item.id || i} style={{ display: "flex", gap: 14, alignItems: "center", paddingBottom: i < items.length - 1 ? 14 : 0, marginBottom: i < items.length - 1 ? 14 : 0, borderBottom: i < items.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-                  <div style={{ width: 60, height: 60, borderRadius: 10, overflow: "hidden", border: "1px solid #f3f4f6", flexShrink: 0, background: "#f9fafb" }}>
+                <div key={item.id || i} style={{ display: "flex", gap: 14, alignItems: "center", paddingBottom: i < items.length - 1 ? 14 : 0, marginBottom: i < items.length - 1 ? 14 : 0, borderBottom: i < items.length - 1 ? "1px solid #f3eee6" : "none" }}>
+                  <div style={{ width: 60, height: 60, borderRadius: 10, overflow: "hidden", border: "1px solid #f3eee6", flexShrink: 0, background: "#faf7f2" }}>
                     {item.thumbnail
                       ? <img src={resolveImageUrl(item.thumbnail)} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      : <div style={{ width: "100%", height: "100%", background: "#e5e7eb" }} />
+                      : <div style={{ width: "100%", height: "100%", background: "#e6dfd4" }} />
                     }
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -916,15 +916,15 @@ export default function OrderDetailPage() {
                         locale,
                       );
                       return url
-                        ? <Link href={`/${url}`} style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none" }}>{name}</Link>
-                        : <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{name}</div>;
+                        ? <Link href={`/${url}`} style={{ fontSize: 14, fontWeight: 600, color: "#1d1b18", textDecoration: "none" }}>{name}</Link>
+                        : <div style={{ fontSize: 14, fontWeight: 600, color: "#1d1b18" }}>{name}</div>;
                     })()}
-                    {variant && <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{variant.split(/\s*\/\s*/).join(" · ")}</div>}
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                    {variant && <div style={{ fontSize: 12, color: "#a39a8d", marginTop: 2 }}>{variant.split(/\s*\/\s*/).join(" · ")}</div>}
+                    <div style={{ fontSize: 12, color: "#5e574e", marginTop: 2 }}>
                       {qty > 1 ? `${qty} × ${fmtEur(unitPrice, locale)}` : fmtEur(unitPrice, locale)}
                     </div>
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", flexShrink: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1d1b18", flexShrink: 0 }}>
                     {fmtEur(unitPrice * qty, locale)}
                   </div>
                 </div>
@@ -933,7 +933,7 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Price breakdown */}
-          <div style={{ borderTop: "1px solid #f3f4f6", marginTop: 16, paddingTop: 14 }}>
+          <div style={{ borderTop: "1px solid #f3eee6", marginTop: 16, paddingTop: 14 }}>
             {[
               { label: t("subtotal"), value: fmtEur(subtotal, locale), muted: true },
               shipping !== 0 && { label: t("shippingLabel"), value: shipping > 0 ? fmtEur(shipping, locale) : t("freeShipping"), muted: true },
@@ -941,20 +941,20 @@ export default function OrderDetailPage() {
               { label: t("netLabel"), value: fmtEur(netTotal, locale), muted: true },
               { label: t("vatLabel", { rate: formatVatPercent(vatRate) }), value: fmtEur(vatAmount, locale), muted: true },
             ].filter(Boolean).map(row => (
-              <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: row.green ? "#16a34a" : "#6b7280", marginBottom: 5 }}>
+              <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: row.green ? "#16a34a" : "#5e574e", marginBottom: 5 }}>
                 <span>{row.label}</span><span>{row.value}</span>
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "#111827", borderTop: "2px solid #e5e7eb", marginTop: 8, paddingTop: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, fontWeight: 800, color: "#1d1b18", borderTop: "2px solid #e6dfd4", marginTop: 8, paddingTop: 10 }}>
               <span>{t("total")}</span><span>{fmtEur(total, locale)}</span>
             </div>
             {bonusPaid > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a39a8d", marginTop: 6 }}>
                 <span>{t("bonusPaidLabel")}</span><span>−{fmtEur(bonusPaid, locale)}</span>
               </div>
             )}
             {bonusPaid > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#9ca3af" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a39a8d" }}>
                 <span>{t("cardPaidLabel")}</span><span>{fmtEur(Math.max(0, total - bonusPaid), locale)}</span>
               </div>
             )}
@@ -967,29 +967,29 @@ export default function OrderDetailPage() {
             <Card style={{ marginBottom: 0 }}>
               <CardTitle>{t("shippingAddressHeading")}</CardTitle>
               {addrLines.map((l, i) => (
-                <div key={i} style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{l}</div>
+                <div key={i} style={{ fontSize: 13, color: "#3a352f", lineHeight: 1.6 }}>{l}</div>
               ))}
               {order.delivery_date && (
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>{t("deliveredOn", { date: fmtDate(order.delivery_date, locale) })}</div>
+                <div style={{ fontSize: 12, color: "#a39a8d", marginTop: 8 }}>{t("deliveredOn", { date: fmtDate(order.delivery_date, locale) })}</div>
               )}
             </Card>
           )}
           <Card style={{ marginBottom: 0 }}>
             <CardTitle>{t("orderInfoHeading")}</CardTitle>
             {order.payment_method && (
-              <div style={{ fontSize: 13, color: "#374151", marginBottom: 6 }}>
-                <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("paymentMethodLabel")}</span>
+              <div style={{ fontSize: 13, color: "#3a352f", marginBottom: 6 }}>
+                <span style={{ color: "#a39a8d", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("paymentMethodLabel")}</span>
                 {order.payment_method}
               </div>
             )}
             {order.payment_status && (
-              <div style={{ fontSize: 13, color: "#374151", marginBottom: 6 }}>
-                <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("paymentStatus")}</span>
+              <div style={{ fontSize: 13, color: "#3a352f", marginBottom: 6 }}>
+                <span style={{ color: "#a39a8d", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("paymentStatus")}</span>
                 {order.payment_status}
               </div>
             )}
-            <div style={{ fontSize: 13, color: "#374151" }}>
-              <span style={{ color: "#9ca3af", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("orderedOn")}</span>
+            <div style={{ fontSize: 13, color: "#3a352f" }}>
+              <span style={{ color: "#a39a8d", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 2 }}>{t("orderedOn")}</span>
               {fmtDate(order.created_at, locale)}
             </div>
           </Card>
@@ -1005,7 +1005,7 @@ export default function OrderDetailPage() {
         <Card>
           <CardTitle>{t("actionsHeading")}</CardTitle>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            <ActionBtn bg="#f0f9ff" color="#0369a1" onClick={() => openPdf(`/api/store-invoice/${order.id}`, t("pdfLoadFailed"))}>
+            <ActionBtn bg="#f0f9ff" color="#a65300" onClick={() => openPdf(`/api/store-invoice/${order.id}`, t("pdfLoadFailed"))}>
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
               {t("downloadInvoice")}
             </ActionBtn>
@@ -1034,7 +1034,7 @@ export default function OrderDetailPage() {
                 {t("cancelOrderAction")}
               </ActionBtn>
             )}
-            <Link href="/orders" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#6b7280", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 9, padding: "8px 16px", textDecoration: "none" }}>
+            <Link href="/orders" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#5e574e", background: "#faf7f2", border: "1px solid #e6dfd4", borderRadius: 9, padding: "8px 16px", textDecoration: "none" }}>
               &larr; {t("allOrders")}
             </Link>
           </div>

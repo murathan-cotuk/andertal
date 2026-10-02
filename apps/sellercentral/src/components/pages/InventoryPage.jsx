@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
+import styled from "styled-components";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import {
-  Page,
-  Layout,
   Card,
   Button,
   Text,
@@ -39,6 +38,157 @@ import { SettingsIcon } from "@shopify/polaris-icons";
 
 const INVENTORY_ROW_GRID = "2.5rem 3.5rem 6.875rem 4.5rem minmax(20rem, 2fr) minmax(8.75rem, 0.9fr) minmax(9.375rem, 1fr) minmax(12.5rem, 1.2fr) 9.25rem";
 const EXCEL_BORDER = "1px solid #e6dfd4";
+
+/* ── Layout: same compact shell as OrdersPage (full width, slim header, white filter bar) ── */
+const InvPageContainer = styled.div`
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 4px 0 16px;
+  min-height: 100%;
+  background: transparent;
+`;
+
+const InvPageHeader = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+`;
+
+const InvPageTitle = styled.h1`
+  font-size: 18px;
+  font-weight: 650;
+  margin: 0;
+  color: #1d1b18;
+`;
+
+const InvHeaderMeta = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+`;
+
+const InvFilterBar = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #e6dfd4;
+  border-radius: 8px;
+`;
+
+const InvFilterInput = styled.input`
+  flex: 1 1 200px;
+  min-width: 160px;
+  max-width: 340px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #d6ccbd;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #1d1b18;
+  background: #fff;
+  box-sizing: border-box;
+  &:focus { outline: none; border-color: #a65300; box-shadow: 0 0 0 2px rgba(166, 83, 0, 0.15); }
+  &::placeholder { color: #a39a8d; }
+`;
+
+const InvFilterSelect = styled.select`
+  height: 28px;
+  max-width: 190px;
+  padding: 0 6px;
+  border: 1px solid #d6ccbd;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #1d1b18;
+  background: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+  &:focus { outline: none; border-color: #a65300; box-shadow: 0 0 0 2px rgba(166, 83, 0, 0.15); }
+`;
+
+const InvFilterToggle = styled.button`
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid ${(p) => (p.$on ? "#a65300" : "#d6ccbd")};
+  border-radius: 6px;
+  background: ${(p) => (p.$on ? "#fcebd5" : "#fff")};
+  color: ${(p) => (p.$on ? "#7f3f00" : "#1d1b18")};
+  font: inherit;
+  font-size: 12px;
+  font-weight: ${(p) => (p.$on ? 600 : 500)};
+  cursor: pointer;
+`;
+
+const InvTableCard = styled.div`
+  padding: 0;
+  margin-bottom: 8px;
+  overflow: clip;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e6dfd4;
+`;
+
+const InvBulkBar = styled.div`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 5px 10px;
+  margin-bottom: 8px;
+  background: #faf7f2;
+  border: 1px solid #fcebd5;
+  border-radius: 8px;
+`;
+
+const InvSectionLabel = styled.div`
+  padding: 4px 10px;
+  margin: 4px 0 6px;
+  border-radius: 6px;
+  background: ${(p) => (p.$seller ? "#f3eee6" : "#fcebd5")};
+  border: 1px solid ${(p) => (p.$seller ? "#e6dfd4" : "#f5d3a8")};
+  font-weight: 700;
+  font-size: 11px;
+  color: ${(p) => (p.$seller ? "#3a352f" : "#7f3f00")};
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+`;
+
+const InvSellerGroupHeader = styled.button`
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #faf7f2;
+  border: none;
+  border-bottom: 1px solid #e6dfd4;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+`;
+
+const InvEmpty = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 12px;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #e6dfd4;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #5e574e;
+`;
 
 const DEFAULT_DUPLICATE_OPTIONS = {
   title: true,
@@ -1237,13 +1387,13 @@ export default function InventoryPage() {
       }}
     >
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem" }} />
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.select}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.status}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.select}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem", textAlign: "center" }}>{rowHead.status}</div>
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.5rem 0.375rem" }} />
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.details}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "inventory_desc" ? "inventory_asc" : "inventory_desc"))}>{rowHead.inventory}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "price_desc" ? "price_asc" : "price_desc"))}>{rowHead.price}</div>
-      <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "#a39a8d", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.variations}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.details}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "inventory_desc" ? "inventory_asc" : "inventory_desc"))}>{rowHead.inventory}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.03em", textAlign: "center", borderRight: EXCEL_BORDER, padding: "0.5rem", cursor: "pointer" }} onClick={() => setInventorySort((s) => (s === "price_desc" ? "price_asc" : "price_desc"))}>{rowHead.price}</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#5e574e", textTransform: "uppercase", letterSpacing: "0.03em", borderRight: EXCEL_BORDER, padding: "0.5rem", textAlign: "center" }}>{rowHead.variations}</div>
       <div style={{ padding: "0.5rem 0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
       <div style={{ borderRight: EXCEL_BORDER, padding: "0.375rem" }} />
@@ -1267,19 +1417,11 @@ export default function InventoryPage() {
     </div>
   );
 
+  // No inner scroll box — the table grows with the page, like the Orders table.
   const TableShell = ({ children }) => (
-    <div
-      style={{
-        border: "1px solid #e6dfd4",
-        borderRadius: 8,
-        background: "#fff",
-        maxHeight: "68vh",
-        overflowX: "auto",
-        overflowY: "auto",
-      }}
-    >
-      {children}
-    </div>
+    <InvTableCard>
+      <div style={{ overflowX: "auto" }}>{children}</div>
+    </InvTableCard>
   );
 
   const runQuickExport = async () => {
@@ -1954,361 +2096,240 @@ export default function InventoryPage() {
 
   if (loading) {
     return (
-      <Page title="Inventory">
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="300">
-                <SkeletonDisplayText size="small" />
-                <SkeletonBodyText lines={3} />
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        </Layout>
-      </Page>
+      <InvPageContainer>
+        <InvTableCard style={{ padding: 16 }}>
+          <BlockStack gap="300">
+            <SkeletonDisplayText size="small" />
+            <SkeletonBodyText lines={6} />
+          </BlockStack>
+        </InvTableCard>
+      </InvPageContainer>
     );
   }
 
+  const invTitle = lt(locale, "Inventory", "Envanter", "Inventaire", "Inventario", "Inventario", "Bestand");
+  const statusOptions = [
+    { label: lt(locale, "All statuses", "Tüm statüler", "Tous les statuts", "Todos los estados", "Tutti gli stati", "Alle Status"), value: "all" },
+    { label: lt(locale, "Active", "Aktif", "Actif", "Activo", "Attivo", "Aktiv"), value: "published" },
+    { label: lt(locale, "Draft", "Taslak", "Brouillon", "Borrador", "Bozza", "Entwurf"), value: "draft" },
+    { label: lt(locale, "Inactive", "Pasif", "Inactif", "Inactivo", "Inattivo", "Inaktiv"), value: "inactive" },
+    { label: lt(locale, "Archived", "Arşiv", "Archivé", "Archivado", "Archiviato", "Archiviert"), value: "archived" },
+  ];
+  const sortOptions = [
+    { label: "Name A→Z", value: "title_asc" },
+    { label: "Name Z→A", value: "title_desc" },
+    { label: lt(locale, "Inventory (high→low)", "Stok (yüksek→düşük)", "Stock (haut→bas)", "Stock (alto→bajo)", "Stock (alto→basso)", "Bestand (hoch→niedrig)"), value: "inventory_desc" },
+    { label: lt(locale, "Inventory (low→high)", "Stok (düşük→yüksek)", "Stock (bas→haut)", "Stock (bajo→alto)", "Stock (basso→alto)", "Bestand (niedrig→hoch)"), value: "inventory_asc" },
+    { label: lt(locale, "Price (high→low)", "Fiyat (yüksek→düşük)", "Prix (haut→bas)", "Precio (alto→bajo)", "Prezzo (alto→basso)", "Preis (hoch→niedrig)"), value: "price_desc" },
+    { label: lt(locale, "Price (low→high)", "Fiyat (düşük→yüksek)", "Prix (bas→haut)", "Precio (bajo→alto)", "Prezzo (basso→alto)", "Preis (niedrig→hoch)"), value: "price_asc" },
+    { label: lt(locale, "Newest first", "Önce yeni", "Plus récent", "Más reciente", "Più recente", "Neu zuerst"), value: "created_desc" },
+    { label: lt(locale, "Oldest first", "Önce eski", "Plus ancien", "Más antiguo", "Più vecchio", "Älteste zuerst"), value: "created_asc" },
+  ];
+  const productsWord = lt(locale, "products", "ürün", "produits", "productos", "prodotti", "Produkte");
+  const totalCount = ownProducts.length + (isSuperuser ? filteredSellerGroups.reduce((n, g) => n + g.items.length, 0) : 0);
+  const emptyText = isSuperuser
+    ? lt(locale, "No products in this section.", "Bu bölümde ürün yok.", "Aucun produit dans cette section.", "Sin productos en esta sección.", "Nessun prodotto in questa sezione.", "Keine Produkte in diesem Bereich.")
+    : lt(locale, "No products yet. Add your first product to get started.", "Henüz ürün yok. Başlamak için ilk ürününüzü ekleyin.", "Aucun produit pour l'instant. Ajoutez votre premier produit.", "Aún no hay productos. Agrega tu primer producto.", "Ancora nessun prodotto. Aggiungi il tuo primo prodotto.", "Noch keine Produkte. Fügen Sie Ihr erstes Produkt hinzu.");
+  const addProductLabel = lt(locale, "Add product", "Ürün ekle", "Ajouter un produit", "Agregar producto", "Aggiungi prodotto", "Produkt hinzufügen");
+  const bulkUploadLabel = lt(locale, "Bulk upload", "Toplu yükleme", "Import en masse", "Carga masiva", "Caricamento in blocco", "Massenimport");
+  const selectedCount = selectedIds.length;
+
   return (
-    <Page
-      title={locale === "en" ? "Inventory" : locale === "tr" ? "Envanter" : locale === "fr" ? "Inventaire" : locale === "es" ? "Inventario" : locale === "it" ? "Inventario" : "Bestand"}
-      primaryAction={{
-        content: locale === "en" ? "Add product" : locale === "tr" ? "Ürün ekle" : locale === "fr" ? "Ajouter un produit" : locale === "es" ? "Agregar producto" : locale === "it" ? "Aggiungi prodotto" : "Produkt hinzufügen",
-        onAction: () => router.push("/products/new"),
-      }}
-      secondaryActions={[
-        ...(isSuperuser ? [{ icon: SettingsIcon, accessibilityLabel: locale === "en" ? "Inventory settings" : locale === "tr" ? "Envanter ayarları" : locale === "fr" ? "Paramètres inventaire" : locale === "es" ? "Ajustes de inventario" : locale === "it" ? "Impostazioni inventario" : "Bestand-Einstellungen", onAction: () => router.push("/settings/inventory") }] : []),
-        { content: locale === "en" ? "Add existing product" : locale === "tr" ? "Mevcut ürün ekle" : locale === "fr" ? "Ajouter produit existant" : locale === "es" ? "Agregar producto existente" : locale === "it" ? "Aggiungi prodotto esistente" : "Bestehendes Produkt hinzufügen", onAction: () => router.push("/products/add-existing") },
-        { content: locale === "en" ? "Bulk upload" : locale === "tr" ? "Toplu yükleme" : locale === "fr" ? "Import en masse" : locale === "es" ? "Carga masiva" : locale === "it" ? "Caricamento in blocco" : "Massenimport", url: "/import-export" },
-        { content: locale === "en" ? "Export" : locale === "tr" ? "Disa aktar" : locale === "fr" ? "Exporter" : locale === "es" ? "Exportar" : locale === "it" ? "Esporta" : "Exportieren", onAction: () => setExportModalOpen(true) },
-        { content: locale === "en" ? "Group products" : locale === "tr" ? "Ürünleri grupla" : locale === "fr" ? "Grouper les produits" : locale === "es" ? "Agrupar productos" : locale === "it" ? "Raggruppa prodotti" : "Produkte gruppieren", onAction: () => setGroupModalOpen(true) },
-      ]}
-    >
-      <Layout>
-        {error && (
-          <Layout.Section>
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          </Layout.Section>
-        )}
-
-        {!isSuperuser && payoutSetupMissing && (payoutSetupMissing.card || payoutSetupMissing.iban) && (
-          <Layout.Section>
-            <Banner
-              tone="warning"
-              title={l === "tr" ? "Satış için zorunlu bilgiler eksik" : l === "de" ? "Pflichtangaben für den Verkauf fehlen" : l === "fr" ? "Informations obligatoires manquantes" : l === "es" ? "Faltan datos obligatorios" : l === "it" ? "Dati obbligatori mancanti" : "Required setup missing"}
-              action={{ content: l === "tr" ? "Şimdi tamamla" : l === "de" ? "Jetzt erledigen" : l === "fr" ? "Compléter maintenant" : l === "es" ? "Completar ahora" : l === "it" ? "Completa ora" : "Complete now", onAction: () => router.push("/settings/payments") }}
-            >
-              <p>
-                {payoutSetupMissing.card && payoutSetupMissing.iban
-                  ? (l === "tr" ? "Ürünlerinizi yönetmeye devam edebilirsiniz, ama Gebühren için kredi kartı ve Auszahlung için IBAN eklemeden gerçek satış/ödeme akışı tamamlanmış sayılmaz." : l === "en" ? "You can keep managing products, but without a credit card (fees) and IBAN (payouts) your seller setup isn't complete for real sales." : l === "fr" ? "Vous pouvez continuer à gérer vos produits, mais sans carte bancaire (frais) ni IBAN (versements), votre configuration vendeur n’est pas complète pour vendre réellement." : l === "es" ? "Puedes seguir gestionando productos, pero sin tarjeta de crédito (comisiones) ni IBAN (pagos) tu configuración de vendedor no está completa para vender de verdad." : l === "it" ? "Puoi continuare a gestire i prodotti, ma senza carta di credito (commissioni) e IBAN (pagamenti) la configurazione del venditore non è completa per vendere davvero." : "Sie können Ihre Produkte weiter verwalten, aber ohne Kreditkarte (Gebühren) und IBAN (Auszahlung) gilt die Einrichtung für den echten Verkauf nicht als abgeschlossen.")
-                  : payoutSetupMissing.card
-                  ? (l === "tr" ? "Platform ücretleri (Gebühren) için kredi kartı eklemediniz." : l === "en" ? "You haven't added a credit card for platform fees yet." : l === "fr" ? "Vous n’avez pas encore ajouté de carte bancaire pour les frais de la plateforme." : l === "es" ? "Aún no has añadido una tarjeta de crédito para las comisiones de la plataforma." : l === "it" ? "Non hai ancora aggiunto una carta di credito per le commissioni della piattaforma." : "Sie haben noch keine Kreditkarte für die Plattformgebühren (Gebühren) hinterlegt.")
-                  : (l === "tr" ? "Ödemelerinizin (Auszahlung) yatırılabilmesi için IBAN eklemediniz." : l === "en" ? "You haven't added an IBAN for your payouts yet." : l === "fr" ? "Vous n’avez pas encore ajouté d’IBAN pour vos versements." : l === "es" ? "Aún no has añadido un IBAN para tus pagos." : l === "it" ? "Non hai ancora aggiunto un IBAN per i tuoi pagamenti." : "Sie haben noch keine IBAN für Ihre Auszahlungen hinterlegt.")}
-              </p>
-            </Banner>
-          </Layout.Section>
-        )}
-
-        <Layout.Section>
+    <InvPageContainer>
+      <InvPageHeader>
+        <InvPageTitle>{invTitle}</InvPageTitle>
+        <InvHeaderMeta>
+          <span style={{ fontSize: 12, color: "#5e574e" }}>{totalCount} {productsWord}</span>
           {isSuperuser && (
-            <Box paddingBlockEnd="400">
-              <InlineStack gap="400" blockAlign="center" wrap>
-                <Box minWidth="260px">
-                  <TextField
-                    label="Search products"
-                    labelHidden
-                    autoComplete="off"
-                    placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : l === "fr" ? "Rechercher produits (nom, SKU, EAN, variation)..." : l === "es" ? "Buscar productos (nombre, SKU, EAN, variación)..." : l === "it" ? "Cerca prodotti (nome, SKU, EAN, variazione)..." : "Search products (name, SKU, EAN, variation)..."}
-                    value={productSearch}
-                    onChange={setProductSearch}
-                  />
-                </Box>
-                <Box minWidth="180px">
-                  <Select
-                    label={l === "tr" ? "Durum filtresi" : l === "de" ? "Statusfilter" : l === "fr" ? "Filtre statut" : l === "es" ? "Filtro estado" : l === "it" ? "Filtro stato" : "Status filter"}
-                    labelHidden
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={[
-                      { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : l === "fr" ? "Tous les statuts" : l === "es" ? "Todos los estados" : l === "it" ? "Tutti gli stati" : "All statuses", value: "all" },
-                      { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : l === "fr" ? "Actif" : l === "es" ? "Activo" : l === "it" ? "Attivo" : "Active", value: "published" },
-                      { label: l === "tr" ? "Taslak" : l === "de" ? "Entwurf" : l === "fr" ? "Brouillon" : l === "es" ? "Borrador" : l === "it" ? "Bozza" : "Draft", value: "draft" },
-                      { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : l === "fr" ? "Inactif" : l === "es" ? "Inactivo" : l === "it" ? "Inattivo" : "Inactive", value: "inactive" },
-                      { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : l === "fr" ? "Archivé" : l === "es" ? "Archivado" : l === "it" ? "Archiviato" : "Archived", value: "archived" },
-                    ]}
-                  />
-                </Box>
-                <Box minWidth="200px">
-                  <Select
-                    label={l === "tr" ? "Siralama" : l === "de" ? "Sortierung" : l === "fr" ? "Tri" : l === "es" ? "Ordenar" : l === "it" ? "Ordina" : "Sort"}
-                    labelHidden
-                    options={[
-                      { label: "Name A?Z", value: "title_asc" },
-                      { label: "Name Z?A", value: "title_desc" },
-                      { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : l === "fr" ? "Stock (haut→bas)" : l === "es" ? "Stock (alto→bajo)" : l === "it" ? "Stock (alto→basso)" : "Inventory (high→low)", value: "inventory_desc" },
-                      { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : l === "fr" ? "Stock (bas→haut)" : l === "es" ? "Stock (bajo→alto)" : l === "it" ? "Stock (basso→alto)" : "Inventory (low→high)", value: "inventory_asc" },
-                      { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : l === "fr" ? "Prix (haut→bas)" : l === "es" ? "Precio (alto→bajo)" : l === "it" ? "Prezzo (alto→basso)" : "Price (high→low)", value: "price_desc" },
-                      { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : l === "fr" ? "Prix (bas→haut)" : l === "es" ? "Precio (bajo→alto)" : l === "it" ? "Prezzo (basso→alto)" : "Price (low→high)", value: "price_asc" },
-                      { label: l === "tr" ? "Önce yeni" : l === "de" ? "Neu zuerst" : l === "fr" ? "Plus récent" : l === "es" ? "Más reciente" : l === "it" ? "Più recente" : "Newest first", value: "created_desc" },
-                      { label: l === "tr" ? "Önce eski" : l === "de" ? "Älteste zuerst" : l === "fr" ? "Plus ancien" : l === "es" ? "Más antiguo" : l === "it" ? "Più vecchio" : "Oldest first", value: "created_asc" },
-                    ]}
-                    value={inventorySort}
-                    onChange={setInventorySort}
-                  />
-                </Box>
-                <Button
-                  pressed={showCustomCommissionOnly}
-                  onClick={() => setShowCustomCommissionOnly((v) => !v)}
-                >
-                  {inventoryI18n.customCommissionFilter}
-                </Button>
-              </InlineStack>
-            </Box>
+            <Button
+              size="slim"
+              icon={SettingsIcon}
+              accessibilityLabel={lt(locale, "Inventory settings", "Envanter ayarları", "Paramètres inventaire", "Ajustes de inventario", "Impostazioni inventario", "Bestand-Einstellungen")}
+              onClick={() => router.push("/settings/inventory")}
+            />
           )}
+          <Button size="slim" onClick={() => router.push("/products/add-existing")}>
+            {lt(locale, "Add existing product", "Mevcut ürün ekle", "Ajouter produit existant", "Agregar producto existente", "Aggiungi prodotto esistente", "Bestehendes Produkt hinzufügen")}
+          </Button>
+          <Button size="slim" url="/import-export">{bulkUploadLabel}</Button>
+          <Button size="slim" onClick={() => setExportModalOpen(true)}>
+            {lt(locale, "Export", "Dışa aktar", "Exporter", "Exportar", "Esporta", "Exportieren")}
+          </Button>
+          <Button size="slim" onClick={() => setGroupModalOpen(true)}>
+            {lt(locale, "Group products", "Ürünleri grupla", "Grouper les produits", "Agrupar productos", "Raggruppa prodotti", "Produkte gruppieren")}
+          </Button>
+          <Button variant="primary" size="slim" onClick={() => router.push("/products/new")}>{addProductLabel}</Button>
+        </InvHeaderMeta>
+      </InvPageHeader>
 
-          {!isSuperuser && (
-            <Card>
-              <BlockStack gap="400">
-                <InlineStack align="space-between" blockAlign="center" wrap>
-                  <Text as="h2" variant="headingSm">{locale === "en" ? "All products" : locale === "tr" ? "Tüm ürünler" : locale === "fr" ? "Tous les produits" : locale === "es" ? "Todos los productos" : locale === "it" ? "Tutti i prodotti" : "Alle Produkte"}</Text>
-                  <InlineStack gap="300" blockAlign="center" wrap>
-                    <Box minWidth="260px">
-                      <TextField
-                        label="Search products"
-                        labelHidden
-                        autoComplete="off"
-                        placeholder={l === "tr" ? "Ürün ara (isim, sku, ean, varyasyon)..." : l === "de" ? "Produkte suchen (Name, SKU, EAN, Variation)..." : l === "fr" ? "Rechercher produits (nom, SKU, EAN, variation)..." : l === "es" ? "Buscar productos (nombre, SKU, EAN, variación)..." : l === "it" ? "Cerca prodotti (nome, SKU, EAN, variazione)..." : "Search products (name, SKU, EAN, variation)..."}
-                        value={productSearch}
-                        onChange={setProductSearch}
-                      />
-                    </Box>
-                    <Box minWidth="180px">
-                      <Select
-                        label="Status filter"
-                        labelHidden
-                        value={statusFilter}
-                        onChange={setStatusFilter}
-                        options={[
-                          { label: l === "tr" ? "Tüm statüler" : l === "de" ? "Alle Status" : l === "fr" ? "Tous les statuts" : l === "es" ? "Todos los estados" : l === "it" ? "Tutti gli stati" : "All statuses", value: "all" },
-                          { label: l === "tr" ? "Aktif" : l === "de" ? "Aktiv" : l === "fr" ? "Actif" : l === "es" ? "Activo" : l === "it" ? "Attivo" : "Active", value: "published" },
-                          { label: l === "tr" ? "Taslak" : l === "de" ? "Entwurf" : l === "fr" ? "Brouillon" : l === "es" ? "Borrador" : l === "it" ? "Bozza" : "Draft", value: "draft" },
-                          { label: l === "tr" ? "Pasif" : l === "de" ? "Inaktiv" : l === "fr" ? "Inactif" : l === "es" ? "Inactivo" : l === "it" ? "Inattivo" : "Inactive", value: "inactive" },
-                          { label: l === "tr" ? "Arşiv" : l === "de" ? "Archiviert" : l === "fr" ? "Archivé" : l === "es" ? "Archivado" : l === "it" ? "Archiviato" : "Archived", value: "archived" },
-                        ]}
-                      />
-                    </Box>
-                    <Box minWidth="200px">
-                      <Select
-                        label={l === "tr" ? "Siralama" : l === "de" ? "Sortierung" : l === "fr" ? "Tri" : l === "es" ? "Ordenar" : l === "it" ? "Ordina" : "Sort"}
-                        labelHidden
-                        options={[
-                          { label: "Name A?Z", value: "title_asc" },
-                          { label: "Name Z?A", value: "title_desc" },
-                          { label: l === "tr" ? "Stok (yüksek→düşük)" : l === "de" ? "Bestand (hoch→niedrig)" : l === "fr" ? "Stock (haut→bas)" : l === "es" ? "Stock (alto→bajo)" : l === "it" ? "Stock (alto→basso)" : "Inventory (high→low)", value: "inventory_desc" },
-                          { label: l === "tr" ? "Stok (düşük→yüksek)" : l === "de" ? "Bestand (niedrig→hoch)" : l === "fr" ? "Stock (bas→haut)" : l === "es" ? "Stock (bajo→alto)" : l === "it" ? "Stock (basso→alto)" : "Inventory (low→high)", value: "inventory_asc" },
-                          { label: l === "tr" ? "Fiyat (yüksek→düşük)" : l === "de" ? "Preis (hoch→niedrig)" : l === "fr" ? "Prix (haut→bas)" : l === "es" ? "Precio (alto→bajo)" : l === "it" ? "Prezzo (alto→basso)" : "Price (high→low)", value: "price_desc" },
-                          { label: l === "tr" ? "Fiyat (düşük→yüksek)" : l === "de" ? "Preis (niedrig→hoch)" : l === "fr" ? "Prix (bas→haut)" : l === "es" ? "Precio (bajo→alto)" : l === "it" ? "Prezzo (basso→alto)" : "Price (low→high)", value: "price_asc" },
-                          { label: l === "tr" ? "Önce yeni" : l === "de" ? "Neu zuerst" : l === "fr" ? "Plus récent" : l === "es" ? "Más reciente" : l === "it" ? "Più recente" : "Newest first", value: "created_desc" },
-                          { label: l === "tr" ? "Önce eski" : l === "de" ? "Älteste zuerst" : l === "fr" ? "Plus ancien" : l === "es" ? "Más antiguo" : l === "it" ? "Più vecchio" : "Oldest first", value: "created_asc" },
-                        ]}
-                        value={inventorySort}
-                        onChange={setInventorySort}
-                      />
-                    </Box>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {ownProducts.length} {locale === "en" ? (ownProducts.length === 1 ? "product" : "products") : locale === "tr" ? "ürün" : locale === "fr" ? "produit(s)" : locale === "es" ? "producto(s)" : locale === "it" ? "prodotto/i" : (ownProducts.length === 1 ? "Produkt" : "Produkte")}
-                    </Text>
-                    {selectedIds.length > 0 && (
-                      <InlineStack gap="200">
-                        {selectedIds.length >= 2 && (
-                          <Button onClick={openCombineModal}>
-                            {locale === "en"
-                              ? `Combine as variants (${selectedIds.length})`
-                              : locale === "tr"
-                                ? `Varyant olarak birlestir (${selectedIds.length})`
-                                : locale === "fr"
-                                  ? `Fusionner en variantes (${selectedIds.length})`
-                                  : locale === "es"
-                                    ? `Combinar como variantes (${selectedIds.length})`
-                                    : locale === "it"
-                                      ? `Unisci come varianti (${selectedIds.length})`
-                                      : `Als Varianten zusammenführen (${selectedIds.length})`}
-                          </Button>
-                        )}
-                        <Button
-                          variant="primary"
-                          onClick={() => {
-                            const firstId = selectedIds[0];
-                            if (firstId) {
-                              const prod = products.find((p) => p.id === firstId);
-                              router.push(`/products/${prod?.id || firstId}`);
-                            }
-                          }}
-                        >
-                          {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
-                        </Button>
-                      </InlineStack>
-                    )}
-                  </InlineStack>
-                </InlineStack>
-                <Divider />
-                {ownProducts.length === 0 ? (
-                  <Box paddingBlock="400">
-                    <BlockStack gap="300">
-                      <Text as="p" tone="subdued">{locale === "en" ? "No products yet. Add your first product to get started." : locale === "tr" ? "Henüz ürün yok. Başlamak için ilk ürününüzü ekleyin." : locale === "fr" ? "Aucun produit pour l'instant. Ajoutez votre premier produit." : locale === "es" ? "Aún no hay productos. Agrega tu primer producto." : locale === "it" ? "Ancora nessun prodotto. Aggiungi il tuo primo prodotto." : "Noch keine Produkte. Fügen Sie Ihr erstes Produkt hinzu."}</Text>
-                      <InlineStack gap="200">
-                        <Button variant="primary" url="/products/new">{locale === "en" ? "Add product" : locale === "tr" ? "Ürün ekle" : locale === "fr" ? "Ajouter un produit" : locale === "es" ? "Agregar producto" : locale === "it" ? "Aggiungi prodotto" : "Produkt hinzufügen"}</Button>
-                        <Button url="/import-export">{locale === "en" ? "Bulk upload" : locale === "tr" ? "Toplu yükleme" : locale === "fr" ? "Import en masse" : locale === "es" ? "Carga masiva" : locale === "it" ? "Caricamento in blocco" : "Massenimport"}</Button>
-                      </InlineStack>
-                    </BlockStack>
-                  </Box>
-                ) : (
-                  <TableShell>
-                    {renderInventoryHeader()}
-                    {renderOwnRows()}
-                  </TableShell>
-                )}
-              </BlockStack>
-            </Card>
-          )}
+      {error && (
+        <div style={{ marginBottom: 8 }}>
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        </div>
+      )}
 
-          {isSuperuser && eanDuplicateGroups.length > 0 && (
-            <Banner
-              tone="warning"
-              title={lt(locale, `${eanDuplicateGroups.length} duplicate product(s) found`, `${eanDuplicateGroups.length} yinelenen ürün bulundu`, `${eanDuplicateGroups.length} produit(s) en double trouvé(s)`, `${eanDuplicateGroups.length} producto(s) duplicado(s) encontrado(s)`, `${eanDuplicateGroups.length} prodotto/i duplicato/i trovato/i`, `${eanDuplicateGroups.length} doppelte Produkt(e) gefunden`)}
-              action={{
-                content: lt(locale, "Review & merge", "İncele ve birleştir", "Vérifier et fusionner", "Revisar y fusionar", "Rivedi e unisci", "Prüfen & zusammenführen"),
-                onAction: () => setEanDuplicatesModalOpen(true),
+      {!isSuperuser && payoutSetupMissing && (payoutSetupMissing.card || payoutSetupMissing.iban) && (
+        <div style={{ marginBottom: 8 }}>
+          <Banner
+            tone="warning"
+            title={lt(locale, "Required setup missing", "Satış için zorunlu bilgiler eksik", "Informations obligatoires manquantes", "Faltan datos obligatorios", "Dati obbligatori mancanti", "Pflichtangaben für den Verkauf fehlen")}
+            action={{ content: lt(locale, "Complete now", "Şimdi tamamla", "Compléter maintenant", "Completar ahora", "Completa ora", "Jetzt erledigen"), onAction: () => router.push("/settings/payments") }}
+          >
+            <p>
+              {payoutSetupMissing.card && payoutSetupMissing.iban
+                ? lt(locale, "You can keep managing products, but without a credit card (fees) and IBAN (payouts) your seller setup isn't complete for real sales.", "Ürünlerinizi yönetmeye devam edebilirsiniz, ama Gebühren için kredi kartı ve Auszahlung için IBAN eklemeden gerçek satış/ödeme akışı tamamlanmış sayılmaz.", "Vous pouvez continuer à gérer vos produits, mais sans carte bancaire (frais) ni IBAN (versements), votre configuration vendeur n’est pas complète pour vendre réellement.", "Puedes seguir gestionando productos, pero sin tarjeta de crédito (comisiones) ni IBAN (pagos) tu configuración de vendedor no está completa para vender de verdad.", "Puoi continuare a gestire i prodotti, ma senza carta di credito (commissioni) e IBAN (pagamenti) la configurazione del venditore non è completa per vendere davvero.", "Sie können Ihre Produkte weiter verwalten, aber ohne Kreditkarte (Gebühren) und IBAN (Auszahlung) gilt die Einrichtung für den echten Verkauf nicht als abgeschlossen.")
+                : payoutSetupMissing.card
+                ? lt(locale, "You haven't added a credit card for platform fees yet.", "Platform ücretleri (Gebühren) için kredi kartı eklemediniz.", "Vous n’avez pas encore ajouté de carte bancaire pour les frais de la plateforme.", "Aún no has añadido una tarjeta de crédito para las comisiones de la plataforma.", "Non hai ancora aggiunto una carta di credito per le commissioni della piattaforma.", "Sie haben noch keine Kreditkarte für die Plattformgebühren (Gebühren) hinterlegt.")
+                : lt(locale, "You haven't added an IBAN for your payouts yet.", "Ödemelerinizin (Auszahlung) yatırılabilmesi için IBAN eklemediniz.", "Vous n’avez pas encore ajouté d’IBAN pour vos versements.", "Aún no has añadido un IBAN para tus pagos.", "Non hai ancora aggiunto un IBAN per i tuoi pagamenti.", "Sie haben noch keine IBAN für Ihre Auszahlungen hinterlegt.")}
+            </p>
+          </Banner>
+        </div>
+      )}
+
+      {selectedCount > 0 && (
+        <InvBulkBar>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#7f3f00" }}>
+            {selectedCount} {lt(locale, "selected", "seçili", "sélectionné(s)", "seleccionado(s)", "selezionato/i", "ausgewählt")}
+          </span>
+          <InlineStack gap="200" wrap blockAlign="center">
+            {selectedCount >= 2 && (
+              <Button size="slim" onClick={openCombineModal}>
+                {lt(locale, "Combine as variants", "Varyant olarak birleştir", "Fusionner en variantes", "Combinar como variantes", "Unisci come varianti", "Als Varianten zusammenführen")} ({selectedCount})
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              size="slim"
+              onClick={() => {
+                const firstId = selectedIds[0];
+                if (firstId) router.push(`/products/${products.find((p) => p.id === firstId)?.id || firstId}`);
               }}
             >
-              <p>
-                {lt(
-                  locale,
-                  "Multiple sellers listed the same EAN and it created separate catalog entries instead of one shared listing. Merge each group back into the original entry so ownership stays with whoever added it first.",
-                  "Birden fazla satıcı aynı EAN'i listeledi ve bu, ortak bir listing yerine ayrı katalog kayıtları oluşturdu. Sahipliğin ilk ekleyen satıcıda kalması için her grubu orijinal kayda geri birleştirin.",
-                  "Plusieurs vendeurs ont référencé le même EAN, créant des fiches catalogue distinctes au lieu d'une seule offre partagée. Fusionnez chaque groupe dans la fiche d'origine pour que la propriété reste au premier vendeur.",
-                  "Varios vendedores listaron el mismo EAN y se crearon fichas de catálogo separadas en lugar de una sola oferta compartida. Fusiona cada grupo con la ficha original para que la propiedad se mantenga con quien la añadió primero.",
-                  "Più venditori hanno inserito lo stesso EAN creando voci di catalogo separate invece di un'unica offerta condivisa. Unisci ogni gruppo alla voce originale così la proprietà resta al primo venditore.",
-                  "Mehrere Verkäufer haben dieselbe EAN gelistet, wodurch getrennte Katalogeinträge statt eines gemeinsamen Angebots entstanden sind. Führe jede Gruppe wieder mit dem ursprünglichen Eintrag zusammen, damit die Inhaberschaft beim Erstverkäufer bleibt."
-                )}
-              </p>
-            </Banner>
-          )}
+              {lt(locale, "Bulk edit", "Toplu düzenle", "Modifier en masse", "Edición masiva", "Modifica in blocco", "Massenbearbeitung")} ({selectedCount})
+            </Button>
+            <Button variant="plain" size="slim" onClick={() => setSelectedIds([])}>
+              {lt(locale, "Clear selection", "Seçimi temizle", "Effacer la sélection", "Borrar selección", "Cancella selezione", "Auswahl aufheben")}
+            </Button>
+          </InlineStack>
+        </InvBulkBar>
+      )}
 
-          {isSuperuser && (
-            <BlockStack gap="500">
-              <Card>
-                <BlockStack gap="400">
-                  <InlineStack align="space-between" blockAlign="center" wrap>
-                    <BlockStack gap="100">
-                      <Text as="h2" variant="headingSm">{locale === "en" ? "Your superuser area" : locale === "tr" ? "Süper kullanıcı alanınız" : locale === "fr" ? "Votre espace super-utilisateur" : locale === "es" ? "Tu área de superusuario" : locale === "it" ? "La tua area superutente" : "Ihr Superuser-Bereich"}</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        {locale === "en" ? `Own account products and entries without seller assignment (${ownProducts.length})` : locale === "tr" ? `Kendi hesap ürünleri ve satıcı ataması olmayan girişler (${ownProducts.length})` : locale === "fr" ? `Produits du compte propre et entrées sans vendeur assigné (${ownProducts.length})` : locale === "es" ? `Productos de cuenta propia y entradas sin vendedor asignado (${ownProducts.length})` : locale === "it" ? `Prodotti dell'account proprio e voci senza venditore assegnato (${ownProducts.length})` : `Eigene Konto-Produkte und Einträge ohne Verkäufer-Zuordnung (${ownProducts.length})`}
-                      </Text>
-                    </BlockStack>
-                    {selectedIds.length > 0 && (
-                      <InlineStack gap="200">
-                        {selectedIds.length >= 2 && (
-                          <Button onClick={openCombineModal}>
-                            {locale === "en"
-                              ? `Combine as variants (${selectedIds.length})`
-                              : locale === "tr"
-                                ? `Varyant olarak birlestir (${selectedIds.length})`
-                                : locale === "fr"
-                                  ? `Fusionner en variantes (${selectedIds.length})`
-                                  : locale === "es"
-                                    ? `Combinar como variantes (${selectedIds.length})`
-                                    : locale === "it"
-                                      ? `Unisci come varianti (${selectedIds.length})`
-                                      : `Als Varianten zusammenführen (${selectedIds.length})`}
-                          </Button>
-                        )}
-                        <Button
-                          variant="primary"
-                          onClick={() => {
-                            const firstId = selectedIds[0];
-                            if (firstId) router.push(`/products/${products.find((p) => p.id === firstId)?.id || firstId}`);
-                          }}
-                        >
-                          {locale === "en" ? `Bulk edit (${selectedIds.length})` : locale === "tr" ? `Toplu düzenle (${selectedIds.length})` : locale === "fr" ? `Modifier en masse (${selectedIds.length})` : locale === "es" ? `Edición masiva (${selectedIds.length})` : locale === "it" ? `Modifica in blocco (${selectedIds.length})` : `Massenbearbeitung (${selectedIds.length})`}
-                        </Button>
-                      </InlineStack>
-                    )}
-                  </InlineStack>
-                  <Divider />
-                  {ownProducts.length === 0 ? (
-                    <Text as="p" tone="subdued">{locale === "en" ? "No products in this section." : locale === "tr" ? "Bu bölümde ürün yok." : locale === "fr" ? "Aucun produit dans cette section." : locale === "es" ? "Sin productos en esta sección." : locale === "it" ? "Nessun prodotto in questa sezione." : "Keine Produkte in diesem Bereich."}</Text>
-                  ) : (
-                    <TableShell>
+      <InvFilterBar>
+        <InvFilterInput
+          placeholder={lt(locale, "Search products (name, SKU, EAN, variation)…", "Ürün ara (isim, sku, ean, varyasyon)…", "Rechercher produits (nom, SKU, EAN, variation)…", "Buscar productos (nombre, SKU, EAN, variación)…", "Cerca prodotti (nome, SKU, EAN, variazione)…", "Produkte suchen (Name, SKU, EAN, Variation)…")}
+          value={productSearch}
+          onChange={(e) => setProductSearch(e.target.value)}
+          aria-label="Search products"
+        />
+        <InvFilterSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status">
+          {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </InvFilterSelect>
+        <InvFilterSelect value={inventorySort} onChange={(e) => setInventorySort(e.target.value)} aria-label="Sort">
+          {sortOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </InvFilterSelect>
+        {isSuperuser && (
+          <InvFilterToggle type="button" $on={showCustomCommissionOnly} aria-pressed={showCustomCommissionOnly} onClick={() => setShowCustomCommissionOnly((v) => !v)}>
+            {inventoryI18n.customCommissionFilter}
+          </InvFilterToggle>
+        )}
+        {isSuperuser && (
+          <InvFilterInput
+            placeholder={lt(locale, "Search seller (store name)…", "Satıcı ara (Mağaza adı)…", "Chercher vendeur (nom de boutique)…", "Buscar vendedor (nombre de tienda)…", "Cerca venditore (nome negozio)…", "Verkäufer suchen (Store-Name)…")}
+            value={sellerSearchFilter}
+            onChange={(e) => setSellerSearchFilter(e.target.value)}
+            aria-label="Seller filter"
+          />
+        )}
+      </InvFilterBar>
+
+      {isSuperuser && eanDuplicateGroups.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <Banner
+            tone="warning"
+            title={lt(locale, `${eanDuplicateGroups.length} duplicate product(s) found`, `${eanDuplicateGroups.length} yinelenen ürün bulundu`, `${eanDuplicateGroups.length} produit(s) en double trouvé(s)`, `${eanDuplicateGroups.length} producto(s) duplicado(s) encontrado(s)`, `${eanDuplicateGroups.length} prodotto/i duplicato/i trovato/i`, `${eanDuplicateGroups.length} doppelte Produkt(e) gefunden`)}
+            action={{
+              content: lt(locale, "Review & merge", "İncele ve birleştir", "Vérifier et fusionner", "Revisar y fusionar", "Rivedi e unisci", "Prüfen & zusammenführen"),
+              onAction: () => setEanDuplicatesModalOpen(true),
+            }}
+          >
+            <p>
+              {lt(
+                locale,
+                "Multiple sellers listed the same EAN and it created separate catalog entries instead of one shared listing. Merge each group back into the original entry so ownership stays with whoever added it first.",
+                "Birden fazla satıcı aynı EAN'i listeledi ve bu, ortak bir listing yerine ayrı katalog kayıtları oluşturdu. Sahipliğin ilk ekleyen satıcıda kalması için her grubu orijinal kayda geri birleştirin.",
+                "Plusieurs vendeurs ont référencé le même EAN, créant des fiches catalogue distinctes au lieu d'une seule offre partagée. Fusionnez chaque groupe dans la fiche d'origine pour que la propriété reste au premier vendeur.",
+                "Varios vendedores listaron el mismo EAN y se crearon fichas de catálogo separadas en lugar de una sola oferta compartida. Fusiona cada grupo con la ficha original para que la propiedad se mantenga con quien la añadió primero.",
+                "Più venditori hanno inserito lo stesso EAN creando voci di catalogo separate invece di un'unica offerta condivisa. Unisci ogni gruppo alla voce originale così la proprietà resta al primo venditore.",
+                "Mehrere Verkäufer haben dieselbe EAN gelistet, wodurch getrennte Katalogeinträge statt eines gemeinsamen Angebots entstanden sind. Führe jede Gruppe wieder mit dem ursprünglichen Eintrag zusammen, damit die Inhaberschaft beim Erstverkäufer bleibt."
+              )}
+            </p>
+          </Banner>
+        </div>
+      )}
+
+      {isSuperuser && (
+        <InvSectionLabel>
+          {lt(locale, "Your superuser area", "Süper kullanıcı alanınız", "Votre espace super-utilisateur", "Tu área de superusuario", "La tua area superutente", "Ihr Superuser-Bereich")} ({ownProducts.length})
+        </InvSectionLabel>
+      )}
+      {ownProducts.length === 0 ? (
+        <InvEmpty>
+          <span>{emptyText}</span>
+          {!isSuperuser && (
+            <InlineStack gap="200">
+              <Button variant="primary" size="slim" url="/products/new">{addProductLabel}</Button>
+              <Button size="slim" url="/import-export">{bulkUploadLabel}</Button>
+            </InlineStack>
+          )}
+        </InvEmpty>
+      ) : (
+        <TableShell>
+          {renderInventoryHeader()}
+          {renderOwnRows()}
+        </TableShell>
+      )}
+
+      {isSuperuser && (
+        <>
+          <InvSectionLabel $seller>
+            {lt(locale, "Seller products", "Satıcı ürünleri", "Produits des vendeurs", "Productos de vendedores", "Prodotti dei venditori", "Verkäufer-Produkte")}
+          </InvSectionLabel>
+          {filteredSellerGroups.length === 0 ? (
+            <InvEmpty>
+              <span>
+                {lt(locale, "No more seller products", "Başka satıcı ürünü yok", "Aucun autre produit de vendeur", "No hay más productos de vendedores", "Nessun altro prodotto di venditori", "Keine weiteren Verkäufer-Produkte")}
+                {sellerSearchFilter.trim() ? " (Filter)" : ""}.
+              </span>
+            </InvEmpty>
+          ) : (
+            filteredSellerGroups.map(({ sellerId, items }) => {
+              const label = sellerLabelById[sellerId] || sellerId;
+              const open = sellerSectionsOpen[sellerId] !== false;
+              const sortedItems = sortProductsList(items, locale, inventorySort);
+              return (
+                <InvTableCard key={sellerId}>
+                  <InvSellerGroupHeader
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => setSellerSectionsOpen((prev) => ({ ...prev, [sellerId]: !open }))}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 12, color: "#1d1b18" }}>{label}</span>
+                    <span style={{ fontSize: 11, color: "#5e574e" }}>{open ? "▲" : "▼"} {sortedItems.length} {productsWord}</span>
+                  </InvSellerGroupHeader>
+                  {open && (
+                    <div style={{ overflowX: "auto" }}>
                       {renderInventoryHeader()}
-                      {renderOwnRows()}
-                    </TableShell>
+                      {sortedItems.map((product) => renderRow(product))}
+                    </div>
                   )}
-                </BlockStack>
-              </Card>
-
-              <Card>
-                <BlockStack gap="400">
-                  <Text as="h2" variant="headingSm">{locale === "en" ? "Seller products" : locale === "tr" ? "Satıcı ürünleri" : locale === "fr" ? "Produits des vendeurs" : locale === "es" ? "Productos de vendedores" : locale === "it" ? "Prodotti dei venditori" : "Verkäufer-Produkte"}</Text>
-                  <TextField
-                    label="Seller filter"
-                    labelHidden
-                    placeholder={locale === "en" ? "Search seller (store name)…" : locale === "tr" ? "Satıcı ara (Mağaza adı)…" : locale === "fr" ? "Chercher vendeur (nom de boutique)…" : locale === "es" ? "Buscar vendedor (nombre de tienda)…" : locale === "it" ? "Cerca venditore (nome negozio)…" : "Verkäufer suchen (Store-Name)…"}
-                    value={sellerSearchFilter}
-                    onChange={setSellerSearchFilter}
-                    autoComplete="off"
-                  />
-                  <Divider />
-                  {filteredSellerGroups.length === 0 ? (
-                    <Text as="p" tone="subdued">{locale === "en" ? `No more seller products${sellerSearchFilter.trim() ? " (filter)" : ""}.` : locale === "tr" ? `Başka satıcı ürünü yok${sellerSearchFilter.trim() ? " (Filtre)" : ""}.` : locale === "fr" ? `Aucun autre produit de vendeur${sellerSearchFilter.trim() ? " (filtre)" : ""}.` : locale === "es" ? `No hay más productos de vendedores${sellerSearchFilter.trim() ? " (filtro)" : ""}.` : locale === "it" ? `Nessun altro prodotto di venditori${sellerSearchFilter.trim() ? " (filtro)" : ""}.` : `Keine weiteren Verkäufer-Produkte${sellerSearchFilter.trim() ? " (Filter)" : ""}.`}</Text>
-                  ) : (
-                    <BlockStack gap="300">
-                      {filteredSellerGroups.map(({ sellerId, items }) => {
-                        const label = sellerLabelById[sellerId] || sellerId;
-                        const open = sellerSectionsOpen[sellerId] !== false;
-                        const sortedItems = sortProductsList(items, locale, inventorySort);
-                        return (
-                          <Box key={sellerId} padding="300" background="bg-surface-secondary" borderRadius="200">
-                            <button
-                              type="button"
-                              onClick={() => setSellerSectionsOpen((prev) => ({ ...prev, [sellerId]: !open }))}
-                              style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                padding: "4px 0",
-                                font: "inherit",
-                                textAlign: "left",
-                              }}
-                            >
-                              <Text as="span" variant="bodyMd" fontWeight="semibold">{label}</Text>
-                              <Text as="span" variant="bodySm" tone="subdued">{open ? "▲" : "▼"} {sortedItems.length} {locale === "en" ? "products" : locale === "tr" ? "ürün" : locale === "fr" ? "produits" : locale === "es" ? "productos" : locale === "it" ? "prodotti" : "Produkte"}</Text>
-                            </button>
-                            {open && (
-                              <Box paddingBlockStart="300">
-                                <TableShell>
-                                  {renderInventoryHeader()}
-                                  {sortedItems.map((product) => renderRow(product))}
-                                </TableShell>
-                              </Box>
-                            )}
-                          </Box>
-                        );
-                      })}
-                    </BlockStack>
-                  )}
-                </BlockStack>
-              </Card>
-            </BlockStack>
+                </InvTableCard>
+              );
+            })
           )}
-        </Layout.Section>
-      </Layout>
+        </>
+      )}
 
       {groupModalOpen && (
         <GroupProductsModal
@@ -2694,6 +2715,6 @@ export default function InventoryPage() {
           </Modal.Section>
         </Modal>
       )}
-    </Page>
+    </InvPageContainer>
   );
 }

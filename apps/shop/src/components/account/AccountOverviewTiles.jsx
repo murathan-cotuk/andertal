@@ -85,14 +85,14 @@ const StatusPill = styled.span`
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
-  background: ${(p) => p.$bg || "#f3f4f6"};
+  background: ${(p) => p.$bg || "#f3eee6"};
   color: ${(p) => p.$color || "#5e574e"};
   &::before {
     content: "";
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: ${(p) => p.$dot || "#9ca3af"};
+    background: ${(p) => p.$dot || "#a39a8d"};
     flex-shrink: 0;
   }
 `;
@@ -111,10 +111,10 @@ const STATUS_PILL = {
   offen: { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
   pending: { dot: "#f59e0b", bg: "#fffbeb", color: "#92400e" },
   bezahlt: { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
-  in_bearbeitung: { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
-  processing: { dot: "#3b82f6", bg: "#eff6ff", color: "#1e40af" },
-  versendet: { dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
-  shipped: { dot: "#8b5cf6", bg: "#f5f3ff", color: "#5b21b6" },
+  in_bearbeitung: { dot: "#a65300", bg: "#fcebd5", color: "#7f3f00" },
+  processing: { dot: "#a65300", bg: "#fcebd5", color: "#7f3f00" },
+  versendet: { dot: "#1d1b18", bg: "#efe8dd", color: "#1d1b18" },
+  shipped: { dot: "#1d1b18", bg: "#efe8dd", color: "#1d1b18" },
   zugestellt: { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
   delivered: { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },
   abgeschlossen: { dot: "#10b981", bg: "#ecfdf5", color: "#065f46" },

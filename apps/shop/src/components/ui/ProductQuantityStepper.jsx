@@ -23,7 +23,7 @@ const Label = styled.span`
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: #a39a8d;
 `;
 
 const Stepper = styled.div`
@@ -31,7 +31,7 @@ const Stepper = styled.div`
   align-items: stretch;
   width: 100%;
   min-height: 52px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
@@ -46,8 +46,8 @@ const StepBtn = styled.button`
   flex: 0 0 48px;
   width: 48px;
   border: 0;
-  background: #f9fafb;
-  color: #374151;
+  background: #faf7f2;
+  color: #3a352f;
   font-size: 1.25rem;
   font-weight: 500;
   line-height: 1;
@@ -58,12 +58,12 @@ const StepBtn = styled.button`
   transition: background 0.15s ease, color 0.15s ease;
 
   &:hover:not(:disabled) {
-    background: #f3f4f6;
-    color: #111827;
+    background: #f3eee6;
+    color: #1d1b18;
   }
 
   &:active:not(:disabled) {
-    background: #e5e7eb;
+    background: #e6dfd4;
   }
 
   &:disabled {
@@ -81,13 +81,13 @@ const Value = styled.input`
   flex: 1;
   min-width: 0;
   border: 0;
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
+  border-left: 1px solid #e6dfd4;
+  border-right: 1px solid #e6dfd4;
   background: #fff;
   text-align: center;
   font-size: 1rem;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   font-variant-numeric: tabular-nums;
   outline: none;
   padding: 0 8px;
@@ -103,8 +103,8 @@ const Value = styled.input`
   }
 
   &:disabled {
-    color: #9ca3af;
-    background: #fafafa;
+    color: #a39a8d;
+    background: #faf7f2;
   }
 `;
 

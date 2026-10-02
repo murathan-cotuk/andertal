@@ -25,7 +25,7 @@ const PageWrap = styled.div`
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f9fafb;
+  background: #faf7f2;
 `;
 
 const Main = styled.main`
@@ -40,7 +40,7 @@ const Main = styled.main`
 /* ─── Seller header card ──────────────────────────────────── */
 const SellerCard = styled.div`
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 14px;
   padding: 28px 32px;
   display: flex;
@@ -60,7 +60,7 @@ const SellerLogo = styled.div`
   width: 80px;
   height: 80px;
   border-radius: 12px;
-  background: #f3f4f6;
+  background: #f3eee6;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -95,7 +95,7 @@ const SellerInfo = styled.div`
 const SellerName = styled.h1`
   font-size: 22px;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   margin: 0 0 6px;
 `;
 
@@ -114,12 +114,12 @@ const Stars = styled.span`
 const RatingNum = styled.span`
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
 `;
 
 const RatingCount = styled.span`
   font-size: 13px;
-  color: #6b7280;
+  color: #5e574e;
 `;
 
 /* ─── Rating distribution ─────────────────────────────────── */
@@ -141,13 +141,13 @@ const DistRow = styled.div`
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #6b7280;
+  color: #5e574e;
 `;
 
 const DistBar = styled.div`
   flex: 1;
   height: 6px;
-  background: #f3f4f6;
+  background: #f3eee6;
   border-radius: 99px;
   overflow: hidden;
 `;
@@ -164,7 +164,7 @@ const DistFill = styled.div`
 const SectionTitle = styled.h2`
   font-size: 17px;
   font-weight: 700;
-  color: #111827;
+  color: #1d1b18;
   margin: 0 0 16px;
 `;
 
@@ -189,7 +189,7 @@ const AskBtn = styled.a`
 const AboutText = styled.p`
   margin: 8px 0 0;
   font-size: 13.5px;
-  color: #4b5563;
+  color: #5e574e;
   line-height: 1.6;
   max-width: 620px;
   white-space: pre-wrap;
@@ -197,7 +197,7 @@ const AboutText = styled.p`
 
 const InfoCard = styled.div`
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 32px;
@@ -210,8 +210,8 @@ const ImpressumGrid = styled.dl`
   gap: 8px 20px;
   font-size: 13.5px;
 
-  dt { color: #6b7280; }
-  dd { margin: 0; color: #111827; }
+  dt { color: #5e574e; }
+  dd { margin: 0; color: #1d1b18; }
 
   @media (max-width: 560px) {
     grid-template-columns: 1fr;
@@ -229,9 +229,9 @@ const BrandChips = styled.div`
 const BrandChip = styled.a`
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  color: #374151;
+  border: 1px solid #e6dfd4;
+  background: #faf7f2;
+  color: #3a352f;
   font-size: 13px;
   font-weight: 500;
   text-decoration: none;
@@ -246,7 +246,7 @@ const ReviewsWrap = styled.div`
 
 const ReviewCard = styled.div`
   background: #fff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e6dfd4;
   border-radius: 10px;
   padding: 16px 20px;
   margin-bottom: 12px;
@@ -264,24 +264,24 @@ const ReviewHeader = styled.div`
 const ReviewAuthor = styled.span`
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: #3a352f;
 `;
 
 const ReviewProduct = styled.span`
   font-size: 12px;
-  color: #9ca3af;
+  color: #a39a8d;
   margin-left: 6px;
 `;
 
 const ReviewDate = styled.span`
   font-size: 11px;
-  color: #9ca3af;
+  color: #a39a8d;
 `;
 
 const ReviewComment = styled.p`
   margin: 6px 0 0;
   font-size: 13.5px;
-  color: #4b5563;
+  color: #5e574e;
   line-height: 1.55;
 `;
 
@@ -291,7 +291,7 @@ function renderStars(avg, size = 18) {
   return (
     <Stars style={{ fontSize: size }}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <span key={n} style={{ color: n <= full ? "#f59e0b" : half && n === full + 1 ? "#f59e0b" : "#d1d5db", opacity: half && n === full + 1 ? 0.5 : 1 }}>
+        <span key={n} style={{ color: n <= full ? "#f59e0b" : half && n === full + 1 ? "#f59e0b" : "#d6ccbd", opacity: half && n === full + 1 ? 0.5 : 1 }}>
           ★
         </span>
       ))}
@@ -488,7 +488,7 @@ export default function SellerProfilePage() {
           )}
 
           {!loading && reviews.length === 0 && (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#9ca3af", fontSize: 14 }}>
+            <div style={{ textAlign: "center", padding: "40px 0", color: "#a39a8d", fontSize: 14 }}>
               {t("noReviews")}
             </div>
           )}

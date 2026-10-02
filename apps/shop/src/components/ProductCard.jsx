@@ -564,7 +564,17 @@ export function ProductCard({ product, activeFilters = {}, plainImage = false, i
   const cartLoading = cartCtx?.loading ?? false;
   const shippingGroups = cartCtx?.shippingGroups ?? [];
 
-  const variants = product.variants || [];
+  const variantsRaw = product.variants || [];
+  const variants = variantsRaw.length > 0
+    ? variantsRaw
+    : (product?.id ? [{
+        id: `${product.id}-variant-0`,
+        title: product.title || "Default",
+        inventory_quantity: product.inventory_quantity ?? 0,
+        price_cents: product.price_cents ?? null,
+        images: Array.isArray(product.images) ? product.images : [],
+        metadata: {},
+      }] : []);
   const variationGroupsRaw = Array.isArray(product.variation_groups) && product.variation_groups.length > 0
     ? product.variation_groups : null;
 
@@ -1079,7 +1089,17 @@ export function ProductListItem({ product, activeFilters = {}, isBestseller: _is
   const cartLoading = cartCtx?.loading ?? false;
   const shippingGroups = cartCtx?.shippingGroups ?? [];
 
-  const variants = product.variants || [];
+  const variantsRaw = product.variants || [];
+  const variants = variantsRaw.length > 0
+    ? variantsRaw
+    : (product?.id ? [{
+        id: `${product.id}-variant-0`,
+        title: product.title || "Default",
+        inventory_quantity: product.inventory_quantity ?? 0,
+        price_cents: product.price_cents ?? null,
+        images: Array.isArray(product.images) ? product.images : [],
+        metadata: {},
+      }] : []);
   const variant = variants[0] ?? null;
 
   const [adding, setAdding] = useState(false);

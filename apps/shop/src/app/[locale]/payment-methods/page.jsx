@@ -19,7 +19,7 @@ function CardIcon() {
   return (
     <svg width="32" height="24" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="32" height="24" rx="4" fill="#1a1a2e" />
-      <rect x="0" y="7" width="32" height="5" fill="#e5e7eb" opacity="0.3" />
+      <rect x="0" y="7" width="32" height="5" fill="#e6dfd4" opacity="0.3" />
       <rect x="4" y="15" width="10" height="3" rx="1" fill="#fbbf24" />
     </svg>
   );
@@ -29,7 +29,7 @@ function BrandLogo({ brand }) {
   const b = (brand || "").toLowerCase();
   const labels = { visa: "VISA", mastercard: "MC", amex: "AMEX", discover: "DISC", jcb: "JCB" };
   return (
-    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: 3 }}>
+    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: "#5e574e", background: "#f3eee6", padding: "2px 6px", borderRadius: 3 }}>
       {labels[b] || brand?.toUpperCase() || "CARD"}
     </span>
   );
@@ -44,11 +44,11 @@ function SavedCard({ pm, onDelete, deleting }) {
       <div style={{ flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <BrandLogo brand={card.brand} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#1d1b18" }}>
             •••• •••• •••• {card.last4 || "????"}
           </span>
         </div>
-        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 3 }}>
+        <div style={{ fontSize: 12, color: "#a39a8d", marginTop: 3 }}>
           {t("expires", { date: `${String(card.exp_month).padStart(2, "0")}/${card.exp_year}` })}
         </div>
       </div>
@@ -90,7 +90,7 @@ function AddCardForm({ onSuccess, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", borderRadius: 14, padding: "20px 18px" }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 14 }}>{t("addTitle")}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#3a352f", marginBottom: 14 }}>{t("addTitle")}</div>
       <PaymentElement />
       {err && <p style={{ color: "#ef4444", fontSize: 12, marginTop: 10 }}>{err}</p>}
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -193,7 +193,7 @@ export default function PaymentMethodsPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
       <main style={{ flex: 1 }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>
@@ -208,7 +208,7 @@ export default function PaymentMethodsPage() {
               {!loading && !showAddForm && (
                 <>
                   {paymentMethods.length === 0 && (
-                    <div style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", borderRadius: 18, padding: "40px 24px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
+                    <div style={{ background: "#fff", boxShadow: "0 0 0 1px rgba(29, 27, 24, 0.06)", borderRadius: 18, padding: "40px 24px", textAlign: "center", color: "#a39a8d", fontSize: 14 }}>
                       {t("empty")}
                     </div>
                   )}

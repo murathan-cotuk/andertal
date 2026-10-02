@@ -68,7 +68,7 @@ export default function BonusPage() {
   }, [authLoading, isAuthenticated, authToken, user?.id, user?.sub]);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#faf7f2" }}>
       <ShopHeader />
       <main style={{ flex: 1, width: "100%", boxSizing: "border-box" }}>
         <div style={ACCOUNT_PAGE_MAIN_INNER}>

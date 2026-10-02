@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
           }}
         >
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1A1A1A", margin: "0 0 8px" }}>{t("forgotPasswordTitle")}</h1>
-          <p style={{ fontSize: 14, color: "#6b7280", margin: "0 0 18px" }}>
+          <p style={{ fontSize: 14, color: "#5e574e", margin: "0 0 18px" }}>
             {t("forgotPasswordSubtitle")}
           </p>
 
@@ -122,7 +122,7 @@ export default function ForgotPasswordPage() {
             </button>
           </form>
 
-          <p style={{ fontSize: 13, color: "#6b7280", margin: "14px 0 0", textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "#5e574e", margin: "14px 0 0", textAlign: "center" }}>
             <Link href="/login" style={{ color: tokens.primary.DEFAULT, fontWeight: 700, textDecoration: "none" }}>
               {t("backToLogin")}
             </Link>

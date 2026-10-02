@@ -473,12 +473,12 @@ const SubcategoryLink = styled(Link).attrs((p) => ({
   box-shadow: ${(p) => (p.$active ? "inset 3px 0 0 var(--shop-primary, #ee8a12)" : "none")};
   margin-bottom: 1px;
   transition: background 0.12s, color 0.12s;
-  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #111827)" : "var(--sidebar-submenu-color, #4b5563)")};
+  color: ${(p) => (p.$active ? "var(--sidebar-nav-color, #1d1b18)" : "var(--sidebar-submenu-color, #5e574e)")};
   font-weight: ${(p) => (p.$active ? 600 : "var(--sidebar-submenu-fw, 400)")};
 
   &:hover {
     background: #f6f2ec;
-    color: var(--sidebar-nav-color, #111827);
+    color: var(--sidebar-nav-color, #1d1b18);
   }
 `;
 
@@ -620,8 +620,8 @@ const Desc = styled.div`
   & blockquote {
     margin: 0.75em 0;
     padding-left: 1em;
-    border-left: 4px solid #e5e7eb;
-    color: #6b7280;
+    border-left: 4px solid #e6dfd4;
+    color: #5e574e;
   }
   /* Tailwind Preflight sets list-style:none and padding:0 — restore HTML lists. */
   & ul,
@@ -1048,7 +1048,7 @@ export default function CategoryTemplate() {
 
   if (!category) {
     return (
-      <div style={{ padding: "48px 32px", color: "#6b7280", fontSize: 14 }}>
+      <div style={{ padding: "48px 32px", color: "#5e574e", fontSize: 14 }}>
         Kategorie nicht gefunden.
       </div>
     );

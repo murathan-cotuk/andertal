@@ -52,7 +52,7 @@ export default function CmsPreviewPage() {
 
   if (!state) {
     return (
-      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 14 }}>
+      <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#a39a8d", fontSize: 14 }}>
         Preview…
       </div>
     );

@@ -246,29 +246,11 @@ const collectProductEans = (p) => {
   return out
 }
 
-/**
- * Whether a seller_listing applies to the given EAN.
- * - seller_metadata.covers_all → every EAN on the parent
- * - seller_metadata.ean → only that child EAN (seller joined via variant barcode)
- * - empty metadata on multi-EAN parents → treat as covers_all for backward compat of
- *   old full-product listings; new variant joins always write ean (see admin-products).
- */
-const listingCoversEan = (listing, targetEan, productRow) => {
-  const want = normalizeStoreEan(targetEan)
-  if (!want) return false
-  const sm = listing && listing.seller_metadata && typeof listing.seller_metadata === 'object'
-    ? listing.seller_metadata
-    : {}
-  if (sm.covers_all === true) return true
-  const listed = normalizeStoreEan(sm.ean || sm.listed_ean || '')
-  if (listed) return listed === want
-  const all = collectProductEans(productRow)
-  if (all.length <= 1) return true
-  // Legacy listing with no EAN scope on a multi-variant parent: pin to the
-  // representative (first) EAN only so siblings don't inherit "Andere Verkäufer".
-  // New joins always persist seller_metadata.ean for the exact child barcode.
-  return extractEanFromHubProductRow(productRow) === want
-}
+const {
+  listingCoversEan,
+  stableVariantId,
+  isFamilyShell,
+} = require('../product-identity')
 
 const primaryPriceCentsHubProduct = (p) => {
   const meta = p.metadata && typeof p.metadata === 'object' ? p.metadata : {}
@@ -345,7 +327,7 @@ const findEanOffersFromHub = async (canonicalEan, approvedSellerIds, preloadedLi
         const lc = require('../db-pool').getPooledClient()
         await lc.connect()
         const lr = await lc.query(
-          `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id, seller_metadata, brand_id
+          `SELECT seller_id, price_cents, inventory, status, orders_count, product_id::text AS product_id, seller_metadata, brand_id, listed_ean
            FROM admin_hub_seller_listings WHERE product_id = ANY($1::uuid[]) AND status = 'active'`,
           [productIdsForListings]
         )
@@ -460,8 +442,18 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   const priceCents = parentPriceByCountry && parentPriceByCountry.brutto_cents != null
     ? Number(parentPriceByCountry.brutto_cents)
     : (p.price != null ? Math.round(Number(p.price) * 100) : 0)
+  const compareCents = parentPriceByCountry && parentPriceByCountry.uvp_cents != null
+    ? Number(parentPriceByCountry.uvp_cents)
+    : null
   const rawVariants = parseVariantsArray(p)
   const variationGroups = Array.isArray(meta.variation_groups) ? meta.variation_groups : null
+  const ownThumbEarly = resolveUploadUrl(ownRawMediaList[0] || null)
+  const ownImagesEarly = ownRawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
+  const parentInventory = parseInt(p.inventory, 10) || 0
+  // Simple products often have an empty variants JSON. Cart/PDP require a variant_id —
+  // synthesize a single default so "In den Warenkorb" works without a silent no-op.
+  // Family shells never sell — no synthetic default.
+  const defaultEan = extractEanFromHubProductRow(p) || null
   const variants = rawVariants.length > 0
     ? rawVariants.map((v, i) => {
         const vMeta = v.metadata && typeof v.metadata === 'object' ? v.metadata : {}
@@ -509,7 +501,7 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
           : undefined
         const optionLabels = variationGroups && variationGroups[i] ? variationGroups[i].labels || null : null
         return {
-          id: v.id || `${p.id}-variant-${i}`,
+          id: stableVariantId(p.id, v, i),
           title: v.title || v.label
             || (vMeta.translations && vMeta.translations.de && vMeta.translations.de.title)
             || (optionValues && optionValues.length > 0 ? optionValues.join(' / ') : v.value)
@@ -529,10 +521,25 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
           metadata: { ...(vMeta || {}), ...(translations ? { translations } : {}) },
         }
       })
-    : []
-  const compareCents = parentPriceByCountry && parentPriceByCountry.uvp_cents != null
-    ? Number(parentPriceByCountry.uvp_cents)
-    : null
+    : (isFamilyShell(p)
+      ? []
+      : [{
+        id: stableVariantId(p.id, { ean: defaultEan }, 0),
+        title: p.title || 'Default',
+        sku: p.sku || null,
+        ean: defaultEan,
+        price_cents: priceCents,
+        compare_at_price_cents: compareCents,
+        inventory_quantity: parentInventory,
+        option_values: null,
+        option_labels: null,
+        image_url: ownThumbEarly || null,
+        swatch_image_url: null,
+        image_urls: null,
+        images: ownImagesEarly,
+        weight: meta.weight || null,
+        metadata: {},
+      }])
   // Display resolution: a product WITH variants is purely an umbrella row grouping its
   // children — the card/listing must show the first variant's own image, never the
   // umbrella row's own metadata.media. The row's own image is kept only as a last-resort
@@ -544,8 +551,8 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
   // ProductTemplate) already resolves the variant's own price independently via
   // variant.metadata.prices, so no product-family consumer needs this field to change.
   const firstVariant = variants[0] || null
-  const ownThumb = resolveUploadUrl(ownRawMediaList[0] || null)
-  const ownImagesResolved = ownRawMediaList.map((m) => resolveUploadUrl(typeof m === 'string' ? m : (m && m.url) || null)).filter(Boolean)
+  const ownThumb = ownThumbEarly
+  const ownImagesResolved = ownImagesEarly
   const variantImagesResolved = firstVariant
     ? (firstVariant.images && firstVariant.images.length > 0 ? firstVariant.images : (firstVariant.image_url ? [firstVariant.image_url] : []))
     : []
@@ -588,12 +595,15 @@ const mapAdminHubToStoreProduct = (p, marketCountry = 'DE') => {
     status: p.status,
     seller_id: p.seller_id || null,
     collection_id: p.collection_id || null,
+    family_id: p.family_id || null,
+    product_role: p.product_role || 'product',
+    is_family_shell: isFamilyShell(p),
     thumbnail: thumb || null,
     images: imagesResolved,
     price_cents: priceCents,
     compare_at_price_cents: compareCents,
     price: priceCents > 0 ? priceCents / 100 : 0,
-    inventory_quantity: parseInt(p.inventory, 10) || (variants.reduce((s, v) => s + (v.inventory_quantity || 0), 0)),
+    inventory_quantity: parentInventory || (variants.reduce((s, v) => s + (v.inventory_quantity || 0), 0)),
     variants,
     variant_option_keys: variantOptionKeys,
     variation_groups: variationGroups,
@@ -965,6 +975,8 @@ const storeProductsFromAdminHubGET = async (req, res) => {
     }
     const approvedSellerIds = await getApprovedSellerIdsSet()
     list = list.filter((p) => isStorePublishedStatus(p.status) && isStoreVisibleSellerProduct(p, approvedSellerIds))
+    // Family roofs are not sellable catalog cards — only EAN products appear in listings.
+    list = list.filter((p) => !isFamilyShell(p))
     if (searchQ) {
       list = list.filter((p) => {
         const t = (p.title || '').toLowerCase(), d = (p.description || '').toLowerCase()
@@ -1228,6 +1240,8 @@ module.exports = function createStoreProductsRouter() {
         offset: brandOffset,
       })
       list = list.filter((p) => isStorePublishedStatus(p.status) && isStoreVisibleSellerProduct(p, approvedSellerIds))
+    // Family roofs are not sellable catalog cards — only EAN products appear in listings.
+    list = list.filter((p) => !isFamilyShell(p))
       const sellerIds = [...new Set(list.map((p) => (p.seller_id || 'default').toString().trim() || 'default').filter(Boolean))]
       const storeNamesBySeller = {}
       await Promise.all(sellerIds.map(async (id) => { storeNamesBySeller[id] = await getSellerStoreName(id) }))
