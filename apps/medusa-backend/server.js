@@ -2381,6 +2381,10 @@ async function start() {
     const createStorePublicRouter = require('./src/routes/store-public')
     httpApp.use('/', createStorePublicRouter())
 
+    // --- Storefront search (relevance-ranked, codes + text + typos): src/routes/store-search.js ---
+    const createStoreSearchRouter = require('./src/routes/store-search')
+    httpApp.use('/', createStoreSearchRouter())
+
     // --- Admin Hub Media: extracted to src/routes/media.js ---
     const createMediaRouter = require('./src/routes/media')
     httpApp.use('/', createMediaRouter())

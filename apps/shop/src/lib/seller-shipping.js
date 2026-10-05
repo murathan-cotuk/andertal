@@ -12,7 +12,7 @@ import { resolveFreeShippingThresholdCents } from "@/lib/free-shipping-threshold
  * free-shipping threshold for the country. Total = sum over sellers.
  */
 
-const sellerKey = (item) => String(item?.seller_id || item?.product_seller_id || "").trim() || "default";
+export const sellerKey = (item) => String(item?.seller_id || item?.product_seller_id || "").trim() || "default";
 
 const itemGroupId = (item) =>
   item?.shipping_group_id ||
@@ -64,6 +64,23 @@ export function computeSellerShipping(items, shippingGroups, thresholdsBySeller,
     });
   }
   return { totalCents: anyPriced ? totalCents : null, anyPriced, sellers };
+}
+
+/**
+ * Cart lines grouped by seller (sender) in the order sellers first appear, each group with its
+ * own quote from computeSellerShipping(). `name` is the store name or "" (caller picks a fallback).
+ */
+export function groupCartBySeller(items, sellerShipping) {
+  const byId = new Map();
+  for (const item of items || []) {
+    const sid = sellerKey(item);
+    if (!byId.has(sid)) byId.set(sid, { sellerId: sid, name: "", items: [] });
+    const g = byId.get(sid);
+    g.items.push(item);
+    if (!g.name && (item.seller_store_name || item.store_name)) g.name = item.seller_store_name || item.store_name;
+  }
+  const quotes = new Map((sellerShipping?.sellers || []).map((s) => [s.sellerId, s]));
+  return [...byId.values()].map((g) => ({ ...g, shipping: quotes.get(g.sellerId) || null }));
 }
 
 /** Loads `{seller_id: {ISO: cents}|null}` for the sellers present in the cart. */

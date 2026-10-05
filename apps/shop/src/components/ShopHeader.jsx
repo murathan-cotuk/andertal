@@ -1449,11 +1449,19 @@ export default function ShopHeader() {
 
     const setThemeColor = (color) => {
       const value = String(color || MIDDLE_BAR_BG).trim() || MIDDLE_BAR_BG;
-      // iOS often ignores in-place content updates — remove + reinsert the meta tag.
-      document.querySelectorAll("meta[name='theme-color']").forEach((el) => el.remove());
+      // Never remove the theme-color tag React/Next rendered (from metadata): React later
+      // deletes/updates its own node, and a node already gone throws "removeChild of null",
+      // which aborts that commit and freezes UI updates (search panel stuck on loading).
+      // React-owned tags are updated in place; only our own tag is removed + reinserted
+      // (iOS often ignores in-place content updates).
+      document.querySelectorAll("meta[name='theme-color']").forEach((el) => {
+        if (el.dataset.andertalThemeColor === "1") el.remove();
+        else el.setAttribute("content", value);
+      });
       const meta = document.createElement("meta");
       meta.setAttribute("name", "theme-color");
       meta.setAttribute("content", value);
+      meta.dataset.andertalThemeColor = "1";
       document.head.appendChild(meta);
     };
 
@@ -1759,6 +1767,8 @@ export default function ShopHeader() {
   const effectiveHideProgress = mainMenuOpen ? 0 : chromeHideProgress;
   const snHideOnScroll = shopStyles?.secondNav?.hide_on_scroll !== false;
   const snChromeCover = shopStyles?.secondNav?.chrome_covers_on_scroll === true;
+  /** "Hintergrund (beim Scrollen)" set for the desktop row (chrome-cover is desktop-only). */
+  const snScrollBgSet = String(shopStyles?.secondNav?.bg_scroll_desktop ?? shopStyles?.secondNav?.bg_scroll ?? "").trim() !== "";
   const subNavHideProgress = !showHeaderFilterBar
     ? 1
     : snHideOnScroll && scrollPastThreshold
@@ -2255,10 +2265,15 @@ export default function ShopHeader() {
             style={{
               ...(unifiedHeaderAtTop
                 ? { background: "transparent", borderTop: "none", borderBottom: "none" }
-                : snChromeCover
-                  ? { background: "var(--header-chrome-bg)" }
+                : snChromeCover && !snScrollBgSet
+                  ? { background: "var(--header-chrome-bg)", "--second-nav-bg": "var(--header-chrome-bg)" }
                   : {}),
+              // Styles → Second-nav "Hintergrund / Textfarbe (beim Scrollen)" per device; an explicit
+              // scroll background also wins over "chrome covers on scroll".
               ...(scrollPastThreshold ? { "--second-nav-text": "var(--second-nav-text-scrolled)" } : {}),
+              ...(scrollPastThreshold && !unifiedHeaderAtTop && !(snChromeCover && !snScrollBgSet)
+                ? { "--second-nav-bg": "var(--second-nav-bg-scrolled)" }
+                : {}),
             }}
           >
             <SecondMenuRowInner>

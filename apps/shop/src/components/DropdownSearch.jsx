@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -10,9 +10,25 @@ import { liteClient as algoliasearch } from "algoliasearch/lite";
 import { InstantSearch, useSearchBox, useHits, useInstantSearch, Configure } from "react-instantsearch";
 import styled from "styled-components";
 import { getMedusaClient } from "@/lib/medusa-client";
+import {
+  useStoreSearch,
+  useRecentSearches,
+  loadRecentSearches,
+  saveRecentSearch,
+  removeRecentSearch,
+  clearRecentSearches,
+  RECENT_SEARCHES_KEY,
+} from "@/lib/store-search";
 import { stripHtmlForSearch, getLocalizedProduct } from "@/lib/format";
 import { tokens } from "@/design-system/tokens";
-import { useSearchDiscovery, DiscoveryTerms, DiscoveryProducts, DiscoveryColumns } from "@/components/search/SearchDiscovery";
+import {
+  useSearchDiscovery,
+  usePrefetchSearchDiscovery,
+  DiscoveryTerms,
+  DiscoveryProducts,
+  DiscoveryColumns,
+  SearchResultsPanel,
+} from "@/components/search/SearchDiscovery";
 
 const Wrap = styled.div`
   position: relative;
@@ -178,8 +194,6 @@ const Empty = styled.div`
 
 const DEBOUNCE_MS = 120;
 const MAX_HITS = 8;
-const RECENT_SEARCHES_KEY = "andertal-recent-searches";
-const MAX_RECENT = 10;
 const MOBILE_MQ = "(max-width: 767px)";
 
 const BACK_BTN_STYLE = { border: "none", background: "none", color: "#1d1b18", width: 36, height: 40, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" };
@@ -284,28 +298,6 @@ function searchSheetStyle(box) {
   };
 }
 
-function loadRecentSearches() {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(RECENT_SEARCHES_KEY);
-    const a = raw ? JSON.parse(raw) : [];
-    return Array.isArray(a) ? a.filter((s) => typeof s === "string" && s.trim()).slice(0, MAX_RECENT) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveRecentSearch(term) {
-  const t = String(term || "").trim();
-  if (t.length < 2) return;
-  if (typeof window === "undefined") return;
-  try {
-    const prev = loadRecentSearches().filter((s) => s.toLowerCase() !== t.toLowerCase());
-    const next = [t, ...prev].slice(0, MAX_RECENT);
-    window.localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
-  } catch { /* ignore */ }
-}
-
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -334,23 +326,19 @@ function formatPriceCents(cents) {
  * "Weiter einkaufen" products from /api/store-products. */
 function useDesktopFocusSuggestions(enabled) {
   const [focused, setFocused] = useState(false);
-  const [recent, setRecent] = useState([]);
+  const recent = useRecentSearches(enabled);
   const onFocus = useCallback(() => {
     if (!enabled) return;
     setFocused(true);
-    setRecent(loadRecentSearches());
   }, [enabled]);
-  const clearRecent = useCallback(() => {
-    try { window.localStorage.removeItem(RECENT_SEARCHES_KEY); } catch { /* ignore */ }
-    setRecent([]);
-  }, []);
+  const clearRecent = useCallback(() => clearRecentSearches(), []);
   return { focused, setFocused, recent, onFocus, clearRecent };
 }
 
 const FocusDropdown = styled(Dropdown)`
   left: 50%;
   right: auto;
-  width: min(900px, calc(100vw - 48px));
+  width: min(960px, calc(100vw - 48px));
   transform: translateX(-50%);
   border-radius: 24px;
   border: none;
@@ -370,6 +358,7 @@ function DesktopFocusPanel({ recent, onPickTerm, onClose, onClearRecent }) {
         <DiscoveryTerms
           recent={recent}
           onClearRecent={onClearRecent}
+          onRemoveRecent={removeRecentSearch}
           onPickTerm={onPickTerm}
           popular={discovery.popular}
           recentCats={discovery.recentCats}
@@ -381,78 +370,39 @@ function DesktopFocusPanel({ recent, onPickTerm, onClose, onClearRecent }) {
   );
 }
 
-function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hideSearchIcon = false, pill = false }) {
+/**
+ * Header search (no Algolia): the backend search engine (/api/store-search) behind a rich panel —
+ * empty field: recent (removable) / popular / recent categories / recommendations;
+ * typing: suggestions, categories, brands and products (exact → related → popular), on desktop
+ * as a two-column panel under the field and on phones as a full-screen sheet.
+ */
+function SearchBarFallback({ placeholder = "Search...", hideSearchIcon = false, pill = false }) {
   const router = useRouter();
   const locale = useLocale();
   const ts = useTranslations("search");
   const isMobile = useMatchMediaOnce(MOBILE_MQ);
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState([]);
-  const [fallbackHits, setFallbackHits] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const mobileDiscovery = useSearchDiscovery(isMobile && mobileOpen);
-  const [recentSearches, setRecentSearches] = useState([]);
   const [mounted, setMounted] = useState(false);
   const wrapRef = useRef(null);
   const mobileInputRef = useRef(null);
-  const debounceRef = useRef(null);
   const searchSheetBox = useSearchSheetBox(isMobile && mobileOpen);
   const focusPanel = useDesktopFocusSuggestions(!isMobile);
-
-  const fetchProducts = useCallback(async (query) => {
-    if (!(query && query.trim().length >= 1)) {
-      setHits([]);
-      setFallbackHits([]);
-      setOpen(!!(query && query.trim()));
-      return;
-    }
-    setLoading(true);
-    try {
-      const client = getMedusaClient();
-      const { products = [] } = await client.getProducts({ q: query.trim(), limit: MAX_HITS });
-      setHits(products);
-      if (!products.length) {
-        const { products: fb = [] } = await client.getProducts({ limit: MAX_HITS });
-        setFallbackHits(fb || []);
-      } else {
-        setFallbackHits([]);
-      }
-      setOpen(true);
-    } catch (_) {
-      setHits([]);
-      try {
-        const client = getMedusaClient();
-        const { products: fb = [] } = await client.getProducts({ limit: MAX_HITS });
-        setFallbackHits(fb || []);
-      } catch {
-        setFallbackHits([]);
-      }
-      setOpen(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  usePrefetchSearchDiscovery();
+  const mobileDiscovery = useSearchDiscovery(isMobile && mobileOpen);
+  const recentSearches = useRecentSearches(true);
+  const typed = (q || "").trim();
+  const typingDiscovery = useSearchDiscovery(!isMobile && typed.length > 0);
+  const live = useStoreSearch(typed, {
+    limit: isMobile ? 6 : 8,
+    locale,
+    enabled: isMobile ? mobileOpen : open || focusPanel.focused,
+  });
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    const query = (q || "").trim();
-    if (!query) {
-      setHits([]);
-      setFallbackHits([]);
-      setOpen(false);
-      return;
-    }
-    debounceRef.current = setTimeout(() => fetchProducts(q), DEBOUNCE_MS);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [q, fetchProducts]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -483,48 +433,29 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
     return () => unlockDocumentForSearch();
   }, [isMobile, mobileOpen]);
 
-  useEffect(() => {
-    if (!isMobile || !mobileOpen) return;
-    setRecentSearches(loadRecentSearches());
-  }, [isMobile, mobileOpen]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const query = (q || "").trim();
-    if (query) router.push(`/search?q=${encodeURIComponent(query)}`);
-  };
-
+  /** Every way of starting a search ends here: history + results page. */
   const goSearchResults = (term) => {
     const t = String(term || "").trim();
     if (t) saveRecentSearch(t);
     setMobileOpen(false);
+    setOpen(false);
+    focusPanel.setFocused(false);
     setQ("");
-    if (t) router.push(`/search?q=${encodeURIComponent(t)}`);
-    else router.push("/search");
+    router.push(t ? `/search?q=${encodeURIComponent(t)}` : "/search");
   };
 
-  const showDropdown = open && (q || "").trim().length >= 1;
+  const afterNavigate = () => {
+    if (typed) saveRecentSearch(typed);
+    setMobileOpen(false);
+    setOpen(false);
+    focusPanel.setFocused(false);
+    setQ("");
+  };
 
-  const productHitList = (onPick) =>
-    hits.map((product, i) => {
-      const { title: hitTitle, description: hitDesc } = getLocalizedProduct(product, locale);
-      const priceCents = product.variants?.[0]?.prices?.[0]?.amount ?? product.metadata?.price_cents ?? null;
-      const pathHandle = storefrontProductHandle(product, locale);
-      return (
-        <HitLink
-          key={product.id || product.handle || i}
-          href={pathHandle ? `/${pathHandle}` : "#"}
-          onClick={onPick}
-        >
-          {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
-          <HitText>
-            <Primary><HighlightText text={hitTitle || "(No title)"} query={q.trim()} /></Primary>
-            {hitDesc && <Secondary>{stripHtmlForSearch(hitDesc, 100)}</Secondary>}
-            {priceCents != null && <Tertiary>{formatPriceCents(priceCents)}</Tertiary>}
-          </HitText>
-        </HitLink>
-      );
-    });
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (typed) goSearchResults(typed);
+  };
 
   if (isMobile) {
     const mobilePanel = mobileOpen && mounted ? createPortal(
@@ -537,69 +468,64 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid #efe8dd", flexShrink: 0 }}>
           <button type="button" onClick={() => setMobileOpen(false)} aria-label={ts("back")} style={BACK_BTN_STYLE}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
-          <input
-            ref={mobileInputRef}
-            type="text"
-            inputMode="search"
-            enterKeyHint="search"
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            placeholder={placeholder}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); goSearchResults(q); } }}
-            style={{ flex: 1, minWidth: 0, fontSize: 16, padding: "10px 14px", border: "2px solid #1d1b18", borderRadius: 999, background: "#f6f2ec", outline: "none" }}
-          />
+          <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
+            <input
+              ref={mobileInputRef}
+              type="text"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              placeholder={placeholder}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); goSearchResults(q); } }}
+              style={{ width: "100%", boxSizing: "border-box", fontSize: 16, padding: "10px 40px 10px 14px", border: "2px solid #1d1b18", borderRadius: 999, background: "#f6f2ec", outline: "none" }}
+            />
+            {q ? (
+              <button
+                type="button"
+                aria-label={ts("clearRecent")}
+                onClick={() => { setQ(""); mobileInputRef.current?.focus(); }}
+                style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", width: 30, height: 30, border: "none", borderRadius: "50%", background: "#e6dfd4", color: "#1d1b18", fontSize: 16, cursor: "pointer" }}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
         </div>
         <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-          {!q.trim() ? (
+          {!typed ? (
             <div style={{ padding: "16px 16px 8px" }}>
               <DiscoveryTerms
                 recent={recentSearches}
-                onClearRecent={null}
-                onPickTerm={(term) => { setQ(term); goSearchResults(term); }}
-                popular={[]}
+                onClearRecent={clearRecentSearches}
+                onRemoveRecent={removeRecentSearch}
+                onPickTerm={(term) => goSearchResults(term)}
+                popular={mobileDiscovery.popular}
                 recentCats={mobileDiscovery.recentCats}
-                onNavigate={() => { setMobileOpen(false); setQ(""); }}
-                showPopular={false}
-                showIcons={false}
+                onNavigate={afterNavigate}
               />
               <DiscoveryProducts
                 browse={mobileDiscovery.browse}
                 recommended={mobileDiscovery.recommended}
-                onNavigate={() => { setMobileOpen(false); setQ(""); }}
+                onNavigate={afterNavigate}
               />
             </div>
           ) : (
-            <>
-              {loading && hits.length === 0 && <div style={{ marginTop: 16 }}><Empty>{ts("searching")}</Empty></div>}
-              {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>{ts("noDirectResults")}</Empty>}
-              {hits.length > 0 && <div style={{ padding: "8px 0" }}>{productHitList(() => { saveRecentSearch(q); setMobileOpen(false); setQ(""); })}</div>}
-              {!loading && hits.length === 0 && fallbackHits.length > 0 && (
-                <div style={{ padding: "8px 0" }}>
-                  {fallbackHits.map((product, i) => {
-                    const { title: hitTitle, description: hitDesc } = getLocalizedProduct(product, locale);
-                    const priceCents = product.variants?.[0]?.prices?.[0]?.amount ?? product.metadata?.price_cents ?? null;
-                    const pathHandle = storefrontProductHandle(product, locale);
-                    return (
-                      <HitLink
-                        key={product.id || product.handle || i}
-                        href={pathHandle ? `/${pathHandle}` : "#"}
-                        onClick={() => { saveRecentSearch(q); setMobileOpen(false); setQ(""); }}
-                      >
-                        {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
-                        <HitText>
-                          <Primary>{hitTitle || "(No title)"}</Primary>
-                          {hitDesc && <Secondary>{stripHtmlForSearch(hitDesc, 100)}</Secondary>}
-                          {priceCents != null && <Tertiary>{formatPriceCents(priceCents)}</Tertiary>}
-                        </HitText>
-                      </HitLink>
-                    );
-                  })}
-                </div>
-              )}
-            </>
+            <SearchResultsPanel
+              layout="mobile"
+              query={typed}
+              popular={mobileDiscovery.popular}
+              data={live.data}
+              loading={live.loading}
+              recent={recentSearches}
+              onPickTerm={(term) => goSearchResults(term)}
+              onRemoveRecent={removeRecentSearch}
+              onNavigate={afterNavigate}
+              onSeeAll={() => goSearchResults(typed)}
+            />
           )}
         </div>
       </div>,
@@ -613,10 +539,9 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
           onPointerDown={(e) => {
             if (e.button != null && e.button !== 0) return;
             e.preventDefault();
-            setRecentSearches(loadRecentSearches());
             openMobileSearchSheet(setMobileOpen, mobileInputRef);
           }}
-          onClick={() => { setRecentSearches(loadRecentSearches()); openMobileSearchSheet(setMobileOpen, mobileInputRef); }}
+          onClick={() => openMobileSearchSheet(setMobileOpen, mobileInputRef)}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openMobileSearchSheet(setMobileOpen, mobileInputRef); } }}
           role="button"
           tabIndex={0}
@@ -629,6 +554,7 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
     );
   }
 
+  const showResults = typed.length > 0 && (open || focusPanel.focused);
   return (
     <Wrap ref={wrapRef} as="form" onSubmit={handleSubmit}>
       <InputWrap>
@@ -637,56 +563,44 @@ function SearchBarFallback({ placeholder = "Search...", maxHeight = "400px", hid
           type="search"
           placeholder={placeholder}
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
           onFocus={focusPanel.onFocus}
-          onKeyDown={(e) => { if (e.key === "Escape") focusPanel.setFocused(false); }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { focusPanel.setFocused(false); setOpen(false); }
+          }}
           aria-label={ts("label")}
-          aria-expanded={showDropdown}
+          aria-expanded={showResults || focusPanel.focused}
+          autoComplete="off"
           $pill={pill}
         />
       </InputWrap>
-      {!showDropdown && focusPanel.focused && !q.trim() ? (
+      {!typed && focusPanel.focused ? (
         <DesktopFocusPanel
           recent={focusPanel.recent}
           onClearRecent={focusPanel.clearRecent}
-          onPickTerm={(term) => {
-            focusPanel.setFocused(false);
-            saveRecentSearch(term);
-            router.push(`/search?q=${encodeURIComponent(term)}`);
-          }}
+          onPickTerm={(term) => goSearchResults(term)}
           onClose={() => focusPanel.setFocused(false)}
         />
       ) : null}
-      {showDropdown && (
-        <Dropdown $maxHeight={maxHeight} role="listbox">
-          {loading && hits.length === 0 && <Empty>{ts("searching")}</Empty>}
-          {!loading && hits.length === 0 && fallbackHits.length === 0 && <Empty>{ts("noDirectResults")}</Empty>}
-          {productHitList(() => setOpen(false))}
-          {!loading && hits.length === 0 && fallbackHits.length > 0 &&
-            fallbackHits.map((product, i) => {
-              const { title: hitTitle, description: hitDesc } = getLocalizedProduct(product, locale);
-              const priceCents = product.variants?.[0]?.prices?.[0]?.amount ?? product.metadata?.price_cents ?? null;
-              const pathHandle = storefrontProductHandle(product, locale);
-              return (
-                <HitLink
-                  key={product.id || product.handle || `fb-${i}`}
-                  href={pathHandle ? `/${pathHandle}` : "#"}
-                  onClick={() => setOpen(false)}
-                >
-                  {product.thumbnail && <HitImage src={product.thumbnail} alt="" />}
-                  <HitText>
-                    <Primary>{hitTitle || "(No title)"}</Primary>
-                    {hitDesc && <Secondary>{stripHtmlForSearch(hitDesc, 120)}</Secondary>}
-                    {priceCents != null && <Tertiary>{formatPriceCents(priceCents)}</Tertiary>}
-                  </HitText>
-                </HitLink>
-              );
-            })}
-        </Dropdown>
-      )}
+      {showResults ? (
+        <FocusDropdown $maxHeight="min(78vh, 680px)" role="dialog" aria-label={ts("label")}>
+          <SearchResultsPanel
+            query={typed}
+            popular={typingDiscovery.popular}
+            data={live.data}
+            loading={live.loading}
+            recent={recentSearches}
+            onPickTerm={(term) => goSearchResults(term)}
+            onRemoveRecent={removeRecentSearch}
+            onNavigate={afterNavigate}
+            onSeeAll={() => goSearchResults(typed)}
+          />
+        </FocusDropdown>
+      ) : null}
     </Wrap>
   );
 }
+
 
 function getByPath(obj, path) {
   if (!path || !obj) return undefined;
@@ -719,6 +633,7 @@ function SearchInputWithDropdown({
   const searchSheetBox = useSearchSheetBox(isMobile && mobileOpen);
   const focusPanel = useDesktopFocusSuggestions(!isMobile);
   const setFocusPanelOpen = focusPanel.setFocused;
+  usePrefetchSearchDiscovery();
 
   const showDropdown = query.length > 0;
   const loading = status === "loading" || status === "stalled";
@@ -865,13 +780,14 @@ function SearchInputWithDropdown({
             <div style={{ padding: "16px 16px 8px" }}>
               <DiscoveryTerms
                 recent={recentSearches}
-                onClearRecent={null}
+                onClearRecent={() => {
+                  try { window.localStorage.removeItem(RECENT_SEARCHES_KEY); } catch { /* ignore */ }
+                  setRecentSearches([]);
+                }}
                 onPickTerm={(term) => { refine(term); goSearchResults(term); }}
-                popular={[]}
+                popular={mobileDiscovery.popular}
                 recentCats={mobileDiscovery.recentCats}
                 onNavigate={() => { setMobileOpen(false); refine(""); }}
-                showPopular={false}
-                showIcons={false}
               />
               <DiscoveryProducts
                 browse={mobileDiscovery.browse}

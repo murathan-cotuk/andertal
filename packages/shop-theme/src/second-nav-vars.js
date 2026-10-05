@@ -15,8 +15,11 @@ function trimOpt(v) {
  */
 export function secondNavSurfaceForViewport(sn, vp) {
   const text = pickSecondNavText(sn, vp);
+  const bg = pickSecondNavBg(sn, vp);
   return {
-    bg: pickSecondNavBg(sn, vp),
+    bg,
+    bgScrolled: pickSecondNavBgScrolled(sn, vp, bg),
+    hasBgScrolled: pickSecondNavBgScrolled(sn, vp, "") !== "",
     border: pickSecondNavBorder(sn, vp),
     text,
     textScrolled: pickSecondNavTextScrolled(sn, vp, text),
@@ -43,6 +46,17 @@ function pickSecondNavBg(sn, vp) {
   }
   const leg = trimOpt(sn.bg_color);
   return leg === "" ? "transparent" : leg;
+}
+
+/** Styles → "Hintergrund (beim Scrollen)"; empty = the static background (`staticBg`). */
+function pickSecondNavBgScrolled(sn, vp, staticBg) {
+  const k = `bg_scroll_${vp}`;
+  if (own(sn, k)) {
+    const t = trimOpt(sn[k]);
+    if (t !== "") return t;
+  }
+  const leg = trimOpt(sn.bg_scroll);
+  return leg !== "" ? leg : staticBg;
 }
 
 function pickSecondNavBorder(sn, vp) {

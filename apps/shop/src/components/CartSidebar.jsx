@@ -8,8 +8,7 @@ import { useCart } from "@/context/CartContext";
 import { formatPriceCents, getLocalizedCartLineTitle } from "@/lib/format";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
-import { computeSellerShipping, useSellerFreeShippingThresholds } from "@/lib/seller-shipping";
-import SellerShippingBreakdown from "@/components/SellerShippingBreakdown";
+import { computeSellerShipping, useSellerFreeShippingThresholds, groupCartBySeller } from "@/lib/seller-shipping";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 import { resolveImageUrl } from "@/lib/image-url";
 import { bonusPointsForCents } from "@/components/product/PdpExtras";
@@ -555,8 +554,21 @@ const BestsellerSectionTitle = styled.h3`
   color: #1d1b18;
 `;
 
+/** One block per seller (sender): name, the seller's lines, then that seller's shipping. */
+const SellerGroup = styled.section`
+  margin-bottom: 16px;
+`;
+
+const SellerGroupHead = styled.div`
+  padding: 0 0 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #efe8dd;
+  .label { font-size: 12px; color: #5e574e; }
+  .name { font-size: 14px; font-weight: 700; color: #1d1b18; }
+`;
+
 const FreeShipBar = styled.div`
-  margin: 0 0 14px;
+  margin: 6px 0 0;
   padding: 12px 14px;
   border-radius: 14px;
   background: #faf6ef;
@@ -598,6 +610,13 @@ export default function CartSidebar() {
   );
   const shippingCents = sellerShipping.totalCents;
   const isFree = sellerShipping.anyPriced && shippingCents === 0;
+  const sellerGroups = useMemo(
+    () => groupCartBySeller(items, sellerShipping).map((g) => ({
+      ...g,
+      name: g.name || (g.sellerId === "default" ? tUi("sellerShippingMarketplace") : tCart("sellerFallback")),
+    })),
+    [items, sellerShipping, tCart, tUi],
+  );
   const shippingLabel = isFree
     ? tCart("freeShipping")
     : shippingCents != null
@@ -778,25 +797,13 @@ export default function CartSidebar() {
               )}
             </>
           )}
-          {items.length > 0 &&
-            sellerShipping.sellers
-              .filter((s) => s.thresholdCents != null && s.thresholdCents > 0)
-              .map((s) => (
-                <FreeShipBar role="status" key={`fsb-${s.sellerId}`}>
-                  {sellerShipping.sellers.length > 1 ? (
-                    <b style={{ display: "block", fontSize: 12, marginBottom: 2 }}>
-                      {s.sellerStoreName || tUi("sellerShippingMarketplace")}
-                    </b>
-                  ) : null}
-                  {s.free
-                    ? <b style={{ color: "#1E6B3C" }}>{tCart("freeShippingReached")}</b>
-                    : tCart("freeShippingRemaining", { amount: `${formatPriceCents(Math.max(0, s.thresholdCents - s.subtotalCents))} €` })}
-                  <div className="track" aria-hidden="true">
-                    <div className="fill" style={{ width: `${Math.min(100, Math.max(0, Math.round((s.subtotalCents / s.thresholdCents) * 100)))}%` }} />
-                  </div>
-                </FreeShipBar>
-              ))}
-          {items.map((item) => (
+          {sellerGroups.map((g) => (
+          <SellerGroup key={g.sellerId} aria-label={g.name}>
+          <SellerGroupHead>
+            <span className="label">{tCart("sellerHeading")}: </span>
+            <span className="name">{g.name}</span>
+          </SellerGroupHead>
+          {g.items.map((item) => (
             <Item key={item.id}>
               <ItemImage>
                 {lineImage(item) ? (
@@ -866,6 +873,32 @@ export default function CartSidebar() {
               </RemoveBtn>
             </Item>
           ))}
+          {g.shipping ? (
+            <FreeShipBar role="status">
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <span>{tCart("shippingLabel")}</span>
+                {g.shipping.free ? (
+                  <b style={{ color: "#16a34a" }}>{tCart("freeShipping")}</b>
+                ) : g.shipping.baseCents != null ? (
+                  <b>{formatPriceCents(g.shipping.shippingCents)} €</b>
+                ) : (
+                  <span style={{ color: "#5e574e" }}>{tCart("shipping")}</span>
+                )}
+              </div>
+              {g.shipping.remainingCents != null && g.shipping.remainingCents > 0 && g.shipping.shippingCents > 0 ? (
+                <>
+                  <div style={{ marginTop: 4, fontWeight: 600, color: "#a65300" }}>
+                    {tUi("sellerFreeShippingHint", { amount: formatPriceCents(g.shipping.remainingCents), seller: g.name })}
+                  </div>
+                  <div className="track" aria-hidden="true">
+                    <div className="fill" style={{ width: `${Math.min(100, Math.max(0, Math.round((g.shipping.subtotalCents / g.shipping.thresholdCents) * 100)))}%` }} />
+                  </div>
+                </>
+              ) : null}
+            </FreeShipBar>
+          ) : null}
+          </SellerGroup>
+          ))}
           {items.length > 0 && matches.length > 0 && (
             <RecommendedWrap>
               <RecommendedTitle>{tCart("matchesTitle")}</RecommendedTitle>
@@ -924,7 +957,6 @@ export default function CartSidebar() {
               <span>{tCart("shippingLabel")}</span>
               <span style={{ color: isFree ? "#16a34a" : undefined }}>{shippingLabel}</span>
             </Row>
-            {sellerShipping.sellers.length > 1 ? <SellerShippingBreakdown sellerShipping={sellerShipping} compact /> : null}
             <RowTotal>
               <span>{tCart("total")}</span>
               <span>{formatPriceCents(Math.max(0, subtotalCents - bonusDiscountCents + (isFree || shippingCents === null ? 0 : shippingCents)))} €</span>

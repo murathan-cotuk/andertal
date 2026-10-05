@@ -6,6 +6,7 @@ node_modules.bak_ci/
 
 # Testing
 coverage
+.playwright-mcp/
 
 # Next.js
 .next/

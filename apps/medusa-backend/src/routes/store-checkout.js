@@ -157,7 +157,29 @@ async function findBestSellerCampaignDiscountRow(c, { productId, variantId, sell
 const {
   productIdFromVariantId,
   resolveVariantFromCartId,
+  parseVariantsArray,
 } = require('../product-identity')
+
+/**
+ * Which sellable unit a cart line is, independent of the variant-id format the caller used
+ * (`…-variant-N`, `…-v-N`, `…-ean-…`, the variant's own id) — the same variant added from the
+ * PDP and from e.g. a carousel must land on ONE cart line with a higher quantity.
+ */
+const cartLineUnitKey = (product, variantId) => {
+  const r = resolveVariantFromCartId(product, variantId)
+  if (r.index != null && Number.isFinite(r.index)) return `i:${r.index}`
+  if (r.ean) return `e:${r.ean}`
+  if (!parseVariantsArray(product).length) return 'base'
+  return `v:${String(variantId || '').trim()}`
+}
+
+/** null / '' / 'default' seller on a line means "the product owner". */
+const cartLineSellerKeyFor = (sellerId, productSellerId) => {
+  const s = String(sellerId || '').trim()
+  if (s && s !== 'default') return s
+  const owner = String(productSellerId || '').trim()
+  return owner || 'default'
+}
 
 // --- Store Carts (session cart: create, get, add/update/remove line-items) ---
 const BONUS_POINTS_PER_EURO_DISCOUNT = 50
@@ -895,25 +917,35 @@ const storeCartLineItemsPOST = async (req, res) => {
     const handle = product.handle || product.id
     const cartExists = await client.query('SELECT id FROM store_carts WHERE id = $1', [cartId])
     if (!cartExists.rows || !cartExists.rows[0]) { await client.end(); return res.status(404).json({ message: 'Cart not found' }) }
-    const existing = lineSellerId
-      ? await client.query(
-          `SELECT id, quantity FROM store_cart_items
-           WHERE cart_id = $1 AND variant_id = $2 AND removed_at IS NULL
-             AND COALESCE(NULLIF(TRIM(seller_id), ''), '') = $3`,
-          [cartId, variantId, lineSellerId]
-        )
-      : await client.query(
-          `SELECT id, quantity FROM store_cart_items
-           WHERE cart_id = $1 AND variant_id = $2 AND removed_at IS NULL
-             AND (seller_id IS NULL OR TRIM(seller_id) = '' OR seller_id = 'default')`,
-          [cartId, variantId]
-        )
-    if (existing.rows && existing.rows[0]) {
-      const newQty = (existing.rows[0].quantity || 0) + quantity
+    // Same product + same resolved variant + same (effective) seller → one line, higher quantity.
+    // Matching on the raw variant_id text split one variant into several lines whenever it was
+    // added through a different id format; any such duplicates are folded into the first line.
+    const wantUnit = cartLineUnitKey(product, variantId)
+    const wantSeller = cartLineSellerKeyFor(lineSellerId, productSellerId)
+    const productIdKeys = [...new Set([String(product.id || ''), String(productId || '')].filter(Boolean))]
+    const sameProductRows = await client.query(
+      `SELECT id, quantity, variant_id, seller_id FROM store_cart_items
+       WHERE cart_id = $1 AND removed_at IS NULL AND product_id = ANY($2::text[])
+       ORDER BY created_at`,
+      [cartId, productIdKeys]
+    )
+    const matches = (sameProductRows.rows || []).filter((row) => (
+      cartLineUnitKey(product, row.variant_id) === wantUnit
+      && cartLineSellerKeyFor(row.seller_id, productSellerId) === wantSeller
+    ))
+    if (matches.length) {
+      const [keep, ...dupes] = matches
+      const newQty = matches.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0) + quantity
       await client.query(
         'UPDATE store_cart_items SET quantity = $1, seller_id = COALESCE($2, seller_id), unit_price_cents = $3, updated_at = now() WHERE id = $4',
-        [newQty, lineSellerId, unitPriceCents, existing.rows[0].id]
+        [newQty, lineSellerId, unitPriceCents, keep.id]
       )
+      if (dupes.length) {
+        await client.query(
+          'UPDATE store_cart_items SET removed_at = now(), updated_at = now() WHERE id = ANY($1::uuid[])',
+          [dupes.map((row) => row.id)]
+        ).catch(() => {})
+      }
     } else {
       await client.query(
         'INSERT INTO store_cart_items (cart_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle, seller_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
@@ -4170,5 +4202,7 @@ module.exports.getOrderWithItems = getOrderWithItems
 module.exports.resolveSellerDisplayNameForStripe = resolveSellerDisplayNameForStripe
 module.exports.truncateForStripeDescription = truncateForStripeDescription
 module.exports.computeCartCheckoutMoney = computeCartCheckoutMoney
+module.exports.cartLineUnitKey = cartLineUnitKey
+module.exports.cartLineSellerKeyFor = cartLineSellerKeyFor
 module.exports.discountCentsFromBonusPoints = discountCentsFromBonusPoints
 module.exports.clampCartBonusRedemption = clampCartBonusRedemption

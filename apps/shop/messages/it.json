@@ -613,7 +613,17 @@
     "popularSearches": "Ricerche popolari",
     "recentCategories": "Categorie visitate di recente",
     "continueIn": "Continua a esplorare in «{name}»",
-    "forYou": "Consigliati per te"
+    "forYou": "Consigliati per te",
+    "productsHeading": "Prodotti ({count})",
+    "relatedHeading": "Nessun risultato esatto per «{query}» – prodotti simili",
+    "popularHeading": "Nessun risultato per «{query}» – i più popolari",
+    "didYouMean": "Forse cercavi",
+    "categoriesHeading": "Categorie",
+    "brandsHeading": "Marchi",
+    "seeAllResults": "{count, plural, one {Mostra # risultato} other {Mostra tutti i # risultati}}",
+    "searchFor": "Cerca «{query}»",
+    "removeRecent": "Rimuovi «{term}»",
+    "resultsHeadingExact": "{count} risultati per «{query}»"
   },
   "landing": {
     "noPreview": "Nessuna anteprima",

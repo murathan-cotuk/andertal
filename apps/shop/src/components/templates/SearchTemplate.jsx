@@ -16,7 +16,7 @@ import ShopHeader from "@/components/ShopHeader";
 import Footer from "@/components/Footer";
 import { ProductGrid } from "@/components/ProductGrid";
 import { Link } from "@/i18n/navigation";
-import { useMedusaProducts } from "@/hooks/useMedusa";
+import { useStoreSearch } from "@/lib/store-search";
 import { useShopStyles } from "@/context/ShopStylesContext";
 import CatalogDrawerPortal, {
   CATALOG_DRAWER_MAX_PX,
@@ -430,6 +430,36 @@ const ResultBar = styled.div`
   letter-spacing: 0.04em;
 `;
 
+/** Under the title: related / no-hit notice, "Meintest du", matching categories. */
+const SearchInfo = styled.div`
+  max-width: 1440px;
+  margin: 0 auto 8px;
+  box-sizing: border-box;
+  .si-note { margin: 0 0 8px; font-size: 15px; color: #3a352f; }
+  .si-dym { margin: 0 0 10px; font-size: 15px; color: #3a352f; }
+  .si-dym a { font-weight: 800; color: #a65300; text-decoration: underline; text-underline-offset: 3px; }
+  .si-cats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .si-cats a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px #e6dfd4;
+    color: #1d1b18;
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .si-cats a span { font-size: 12px; color: #8a8174; }
+  .si-cats a:hover { box-shadow: inset 0 0 0 1px #1d1b18; }
+  @media (max-width: 767px) {
+    .si-cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+    .si-cats::-webkit-scrollbar { display: none; }
+    .si-cats a { flex: none; }
+  }
+`;
+
 const Pager = styled.div`
   display: flex;
   align-items: center;
@@ -458,68 +488,6 @@ const PBtn = styled.button`
     color: ${(p) => (p.$on ? "#fff" : "#111")};
   }
 `;
-
-function normalizeSearchText(v) {
-  return String(v || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isSubsequence(needle, haystack) {
-  if (!needle || !haystack) return false;
-  let i = 0;
-  let j = 0;
-  while (i < needle.length && j < haystack.length) {
-    if (needle[i] === haystack[j]) i += 1;
-    j += 1;
-  }
-  return i === needle.length;
-}
-
-function scoreProductForQuery(product, needle, tokens) {
-  const title = normalizeSearchText(product?.title || "");
-  const desc = normalizeSearchText(product?.description || "");
-  const brand = normalizeSearchText(product?.brand || product?.brand_name || "");
-  const category = normalizeSearchText(product?.category || product?.category_name || "");
-  const merged = `${title} ${brand} ${category} ${desc}`.trim();
-  if (!merged) return 0;
-
-  let score = 0;
-  if (title.includes(needle)) score += 120;
-  else if (brand.includes(needle) || category.includes(needle)) score += 90;
-  else if (desc.includes(needle)) score += 60;
-
-  for (const t of tokens) {
-    if (!t) continue;
-    if (title.includes(t)) score += 24;
-    else if (brand.includes(t) || category.includes(t)) score += 16;
-    else if (desc.includes(t)) score += 10;
-    else if (isSubsequence(t, title) || isSubsequence(t, brand) || isSubsequence(t, category)) score += 7;
-    else if (isSubsequence(t, merged)) score += 3;
-  }
-
-  if (score === 0 && isSubsequence(needle, merged)) score += 5;
-  return score;
-}
-
-function textMatchProducts(q, products) {
-  if (!q || !Array.isArray(products)) return [];
-  const needle = normalizeSearchText(q);
-  if (!needle) return [];
-  const tokens = needle.split(" ").filter(Boolean);
-
-  const scored = products
-    .map((p) => ({ p, s: scoreProductForQuery(p, needle, tokens) }))
-    .filter((x) => x.s > 0)
-    .sort((a, b) => b.s - a.s)
-    .map((x) => x.p);
-
-  if (scored.length > 0) return scored;
-  return [...products];
-}
 
 function buildSearchUrl(pathname, q, cat) {
   const p = new URLSearchParams();
@@ -550,7 +518,12 @@ export default function SearchTemplate() {
   const q = (searchParams?.get("q") || "").trim();
   const catParam = (searchParams?.get("cat") || "").trim();
 
-  const { products, loading, error } = useMedusaProducts();
+  // Backend search engine (codes, names in every language, brands, categories, typos);
+  // log=1 counts the search for "Beliebte Suchen".
+  const search = useStoreSearch(q, { limit: 200, locale, debounceMs: 0, log: true });
+  const loading = search.loading || (Boolean(q) && search.query !== q);
+  const error = null;
+  const searchData = search.data;
   const [pathInfo, setPathInfo] = useState(null); // { category, ancestors, children }
   const [parentSiblings, setParentSiblings] = useState([]);
   const [treeLoading, setTreeLoading] = useState(false);
@@ -583,8 +556,8 @@ export default function SearchTemplate() {
   }, []);
 
   const textHits = useMemo(
-    () => (loading ? [] : textMatchProducts(q, products || [])),
-    [q, products, loading],
+    () => (loading ? [] : (Array.isArray(searchData.products) ? searchData.products : [])),
+    [searchData, loading],
   );
 
   const dominantId = useMemo(
@@ -856,6 +829,32 @@ export default function SearchTemplate() {
           <CategoryTitle>{title}</CategoryTitle>
         </ColHeader>
 
+        {q && !loading && (searchData.mode !== "exact" || searchData.did_you_mean || (searchData.categories || []).length > 0) ? (
+          <SearchInfo style={{ paddingLeft: contentPadX, paddingRight: contentPadX }}>
+            {searchData.mode !== "exact" ? (
+              <p className="si-note">
+                {searchData.mode === "popular" ? tSearch("popularHeading", { query: q }) : tSearch("relatedHeading", { query: q })}
+              </p>
+            ) : null}
+            {searchData.did_you_mean ? (
+              <p className="si-dym">
+                {tSearch("didYouMean")}{" "}
+                <Link href={`/search?q=${encodeURIComponent(searchData.did_you_mean)}`}>{searchData.did_you_mean}</Link>?
+              </p>
+            ) : null}
+            {(searchData.categories || []).length > 0 ? (
+              <div className="si-cats" aria-label={tSearch("categoriesHeading")}>
+                {searchData.categories.map((c) => (
+                  <Link key={c.id} href={`/${c.slug}`}>
+                    {c.name}
+                    <span>{c.count}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </SearchInfo>
+        ) : null}
+
         <SortBar>
           <SortBarInner>
             <SortBarLeft>
@@ -976,7 +975,7 @@ export default function SearchTemplate() {
                   {tUi("noDirectHits")}
                 </div>
                 <ProductGrid
-                  products={applyCatalogSort(products || [], sort, { bestsellerOnly: false }).slice(0, PER_PAGE)}
+                  products={applyCatalogSort(textHits, sort, { bestsellerOnly: false }).slice(0, PER_PAGE)}
                   activeFilters={{}}
                   maxColumns={productsPerRow}
                   maxColumnsMobile={productsPerRowMobile}

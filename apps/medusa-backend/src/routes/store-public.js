@@ -101,7 +101,13 @@ const STORE_CATEGORIES_TREE_TTL_MS = 45_000
 // In-flight promise per cache key: without this, every concurrent request that
 // lands while the 45s cache is cold independently re-runs the same tree build.
 const storeCategoriesTreeInFlight = new Map()
-/** Load full slim localized tree (cached 45s per locale). Slicing happens per request. */
+/**
+ * Load full slim localized tree (fresh for 45s per locale). Slicing happens per request.
+ * Stale-while-revalidate: a rebuild can take many seconds on a cold DB, so once an entry has
+ * expired the stale tree is returned immediately and the rebuild runs in the background —
+ * only the very first request after a restart waits for the build (header categories / mega
+ * menu used to hang ~14s every time the 45s window lapsed).
+ */
 const loadCachedStoreCategoryTree = async (req, requestLocale) => {
   const cacheKey = requestLocale
   const now = Date.now()
@@ -109,7 +115,18 @@ const loadCachedStoreCategoryTree = async (req, requestLocale) => {
   if (cachedEntry && now - cachedEntry.at < STORE_CATEGORIES_TREE_TTL_MS) {
     return cachedEntry.payload
   }
+  if (cachedEntry) {
+    if (!storeCategoriesTreeInFlight.has(cacheKey)) {
+      buildStoreCategoryTreeEntry(req, cacheKey).catch((err) => {
+        console.error('Store categories background refresh failed:', err && err.message)
+      })
+    }
+    return cachedEntry.payload
+  }
+  return buildStoreCategoryTreeEntry(req, cacheKey)
+}
 
+const buildStoreCategoryTreeEntry = (req, cacheKey) => {
   let payloadPromise = storeCategoriesTreeInFlight.get(cacheKey)
   if (!payloadPromise) {
     payloadPromise = (async () => {

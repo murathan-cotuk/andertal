@@ -630,7 +630,17 @@
     "popularSearches": "Popular searches",
     "recentCategories": "Recently viewed categories",
     "continueIn": "Keep browsing in “{name}”",
-    "forYou": "Recommended for you"
+    "forYou": "Recommended for you",
+    "productsHeading": "Products ({count})",
+    "relatedHeading": "No exact matches for “{query}” – similar products",
+    "popularHeading": "No matches for “{query}” – popular with others",
+    "didYouMean": "Did you mean",
+    "categoriesHeading": "Categories",
+    "brandsHeading": "Brands",
+    "seeAllResults": "{count, plural, one {Show # result} other {Show all # results}}",
+    "searchFor": "Search for “{query}”",
+    "removeRecent": "Remove “{term}”",
+    "resultsHeadingExact": "{count} results for “{query}”"
   },
   "landing": {
     "noPreview": "No preview",

@@ -14,8 +14,7 @@ import { tokens } from "@/design-system/tokens";
 import PayNowButton from "@/components/ui/PayNowButton";
 import { useMarketPrefix } from "@/context/MarketPrefixContext";
 import { useShippingCountryForQuotes } from "@/hooks/useShippingCountryForQuotes";
-import { computeSellerShipping, useSellerFreeShippingThresholds } from "@/lib/seller-shipping";
-import SellerShippingBreakdown from "@/components/SellerShippingBreakdown";
+import { computeSellerShipping, useSellerFreeShippingThresholds, groupCartBySeller } from "@/lib/seller-shipping";
 import { storefrontProductHandle } from "@/lib/product-url-handle";
 
 const PageWrap = styled.div`
@@ -62,11 +61,49 @@ const Layout = styled.div`
   }
 `;
 
-const ItemsSection = styled.div`
+const ItemsColumn = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+`;
+
+/** One card per seller (sender): header, the seller's own lines, then that seller's shipping. */
+const ItemsSection = styled.section`
   background: #fff;
   border: 1px solid #efe8dd;
   border-radius: 20px;
   overflow: hidden;
+`;
+
+const SellerHead = styled.header`
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #faf7f2;
+  border-bottom: 1px solid #f3eee6;
+  .label { font-size: 12px; color: #5e574e; }
+  .name { font-size: 15px; font-weight: 700; color: #1d1b18; }
+`;
+
+const SellerFoot = styled.footer`
+  padding: 12px 20px 14px;
+  border-top: 1px solid #f3eee6;
+  background: #faf7f2;
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    color: #5e574e;
+  }
+  .row strong { color: #1d1b18; font-variant-numeric: tabular-nums; }
+  .row strong.free { color: #16a34a; }
+  .hint { margin-top: 6px; font-size: 13px; font-weight: 600; color: #a65300; }
+  .track { margin-top: 6px; height: 5px; border-radius: 3px; background: #efe8dd; overflow: hidden; }
+  .fill { height: 100%; border-radius: 3px; background: var(--shop-primary, #ee8a12); }
 `;
 
 const ItemRow = styled.div`
@@ -212,7 +249,7 @@ const SummaryCard = styled.div`
   background: #fff;
   border: 1px solid #e6dfd4;
   border-radius: 12px;
-  padding: 24px;
+  padding: 18px 20px;
   position: sticky;
   top: 64px;
 
@@ -241,9 +278,9 @@ const SummaryHeading = styled.h2`
   line-height: 1.3;
 
   @media (min-width: 769px) {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: 20px;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    margin-bottom: 12px;
   }
 `;
 
@@ -266,7 +303,7 @@ const SummaryRowLine = styled.div`
   color: #5e574e;
 
   @media (max-width: 768px) {
-    padding: 12px 0;
+    padding: 9px 0;
     &:not(:last-child) {
       border-bottom: 1px solid rgba(17, 24, 39, 0.08);
     }
@@ -274,7 +311,7 @@ const SummaryRowLine = styled.div`
 
   @media (min-width: 769px) {
     padding: 0;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     &:last-child {
       margin-bottom: 0;
     }
@@ -302,9 +339,9 @@ const SummaryTotalBar = styled.div`
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 
   @media (min-width: 769px) {
-    margin-top: 16px;
-    padding: 16px 0 20px;
-    margin-bottom: 20px;
+    margin-top: 10px;
+    padding: 12px 0 14px;
+    margin-bottom: 14px;
     border-radius: 0;
     border: none;
     border-top: 1px solid #e6dfd4;
@@ -380,6 +417,15 @@ export default function CartPage() {
   );
   const shippingCents = sellerShipping.totalCents;
   const isFree = sellerShipping.anyPriced && shippingCents === 0;
+  // Cart grouped by seller (sender), in the order the sellers first appear in the cart; each
+  // group carries its own shipping quote (lib/seller-shipping.js — same rule the backend charges).
+  const sellerGroups = useMemo(
+    () => groupCartBySeller(items, sellerShipping).map((g) => ({
+      ...g,
+      name: g.name || (g.sellerId === "default" ? tUi("sellerShippingMarketplace") : t("sellerFallback")),
+    })),
+    [items, sellerShipping, t, tUi],
+  );
   const shippingLabel = isFree
     ? t("freeShipping")
     : shippingCents != null
@@ -413,8 +459,16 @@ export default function CartPage() {
           </EmptyState>
         ) : (
           <Layout>
-            <ItemsSection>
-              {items.map((item) => (
+            <ItemsColumn>
+            {sellerGroups.map((g) => (
+            <ItemsSection key={g.sellerId} aria-label={g.name}>
+              <SellerHead>
+                <span>
+                  <span className="label">{t("sellerHeading")}: </span>
+                  <span className="name">{g.name}</span>
+                </span>
+              </SellerHead>
+              {g.items.map((item) => (
                 <ItemRow key={item.id}>
                   <Thumb>
                     {item.thumbnail ? (
@@ -497,7 +551,36 @@ export default function CartPage() {
                   </div>
                 </ItemRow>
               ))}
+              {g.shipping ? (
+                <SellerFoot>
+                  <div className="row">
+                    <span>{t("shippingLabel")}</span>
+                    {g.shipping.free ? (
+                      <strong className="free">{t("freeShipping")}</strong>
+                    ) : g.shipping.baseCents != null ? (
+                      <strong>{formatPriceCents(g.shipping.shippingCents)} €</strong>
+                    ) : (
+                      <strong style={{ fontWeight: 500, color: "#5e574e" }}>{t("shipping")}</strong>
+                    )}
+                  </div>
+                  {g.shipping.remainingCents != null && g.shipping.remainingCents > 0 && g.shipping.shippingCents > 0 ? (
+                    <>
+                      <div className="hint">
+                        {tUi("sellerFreeShippingHint", { amount: formatPriceCents(g.shipping.remainingCents), seller: g.name })}
+                      </div>
+                      <div className="track" aria-hidden="true">
+                        <div
+                          className="fill"
+                          style={{ width: `${Math.min(100, Math.max(0, Math.round((g.shipping.subtotalCents / g.shipping.thresholdCents) * 100)))}%` }}
+                        />
+                      </div>
+                    </>
+                  ) : null}
+                </SellerFoot>
+              ) : null}
             </ItemsSection>
+            ))}
+            </ItemsColumn>
 
             <SummaryCard>
               <SummaryHeading>{t("summaryTitle")}</SummaryHeading>
@@ -525,7 +608,6 @@ export default function CartPage() {
                     {shippingLabel}
                   </SummaryAmount>
                 </SummaryRowLine>
-                <SellerShippingBreakdown sellerShipping={sellerShipping} />
               </SummaryLines>
               <SummaryTotalBar>
                 <SummaryTotalLabel>{t("total")}</SummaryTotalLabel>

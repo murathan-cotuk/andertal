@@ -926,7 +926,20 @@ const enrichMappedStoreProduct = async (productRow, mapped, { alsoMatchIds = [] 
 
 const storeProductsFromAdminHubGET = async (req, res) => {
   try {
-    const query = req.query || {}
+    const products = await listStoreProducts(req.query || {})
+    res.json({ products, count: products.length })
+  } catch (err) {
+    console.error('Store products GET (admin hub):', err)
+    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+  }
+}
+
+/**
+ * The storefront product list (published, visible, enriched with seller / brand / badges) —
+ * shared by GET /store/products and the search index (src/store-search.js).
+ */
+async function listStoreProducts(query = {}) {
+  {
     const searchQ = (query.q || '').toString().trim().toLowerCase()
     const limitForSearch = searchQ ? 8 : (parseInt(query.limit, 10) || 100)
     const categorySlugFilter = (query.category || query.category_slug || '').toString().trim()
@@ -1063,10 +1076,7 @@ const storeProductsFromAdminHubGET = async (req, res) => {
         products = products.filter((p) => { const ids = storeProductCategoryIds(p); return ids.some((id) => allowedCategoryIds.has(id)) })
       }
     }
-    res.json({ products, count: products.length })
-  } catch (err) {
-    console.error('Store products GET (admin hub):', err)
-    res.status(500).json({ message: (err && err.message) || 'Internal server error' })
+    return products
   }
 }
 
@@ -1282,3 +1292,4 @@ module.exports.canonicalProductId = canonicalProductId
 module.exports.isUuidLike = isUuidLike
 module.exports.getAdminHubCollectionIdByHandle = getAdminHubCollectionIdByHandle
 module.exports.storeProductCategoryIds = storeProductCategoryIds
+module.exports.listStoreProducts = listStoreProducts

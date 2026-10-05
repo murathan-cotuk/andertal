@@ -630,7 +630,17 @@
     "popularSearches": "Popüler aramalar",
     "recentCategories": "Son görüntülenen kategoriler",
     "continueIn": "“{name}” içinde keşfetmeye devam et",
-    "forYou": "Senin için önerilenler"
+    "forYou": "Senin için önerilenler",
+    "productsHeading": "Ürünler ({count})",
+    "relatedHeading": "“{query}” için birebir sonuç yok – benzer ürünler",
+    "popularHeading": "“{query}” için sonuç yok – en çok tercih edilenler",
+    "didYouMean": "Bunu mu demek istediniz",
+    "categoriesHeading": "Kategoriler",
+    "brandsHeading": "Markalar",
+    "seeAllResults": "{count, plural, one {# sonucu göster} other {# sonucun tümünü göster}}",
+    "searchFor": "“{query}” için ara",
+    "removeRecent": "“{term}” aramasını kaldır",
+    "resultsHeadingExact": "“{query}” için {count} sonuç"
   },
   "landing": {
     "noPreview": "Önizleme yok",
