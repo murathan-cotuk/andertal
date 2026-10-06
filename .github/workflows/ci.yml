@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, dev]
 
+# Soften flaky registry drops (ECONNRESET) without changing install semantics.
+env:
+  NPM_CONFIG_FETCH_RETRIES: "5"
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
+
 jobs:
   lint:
     name: Lint
@@ -20,7 +26,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/ci-npm-ci.sh
 
       - name: Run linter
         run: npm run lint
@@ -38,7 +44,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/ci-npm-ci.sh
 
       - name: Run typecheck
         run: npm run typecheck
@@ -56,7 +62,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/ci-npm-ci.sh
 
       - name: Run unit tests
         run: npm run test
@@ -90,7 +96,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/ci-npm-ci.sh
 
       - name: Run settlement tests
         working-directory: apps/medusa-backend
@@ -110,6 +116,7 @@ jobs:
           node-version: '22'
 
       # npm audit only needs the lockfile — no install required.
+      # AUDIT_STRICT=0: report only (Medusa transitive noise); does not fail the job.
       - name: Run npm audit (high+)
         run: node scripts/ci-npm-audit.js
         env:
@@ -130,7 +137,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/ci-npm-ci.sh
 
       - name: Build shop app
         run: npm run build -- --filter=@andertal/shop
@@ -153,7 +160,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: bash scripts/ci-npm-ci.sh
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
