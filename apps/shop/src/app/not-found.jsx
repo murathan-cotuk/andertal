@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { Montserrat } from "next/font/google";
-
-const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "700"], display: "swap" });
+import { montserrat } from "@/lib/fonts";
 
 const getBackendUrl = () =>
   (process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000").replace(/\/$/, "");

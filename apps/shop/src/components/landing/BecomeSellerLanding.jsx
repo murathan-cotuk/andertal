@@ -2,25 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
-import { Instrument_Serif, Manrope } from "next/font/google";
+import { instrumentSerif, manrope } from "@/lib/fonts";
 import styles from "./BecomeSellerLanding.module.css";
 import { BecomeSellerSection } from "./BecomeSellerSections";
 
-// Self-hosted via next/font instead of a runtime-injected <link> (which used to fetch fonts
-// AFTER mount, i.e. after hydration — guaranteed FOUC/CLS on this route every load).
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  display: "swap",
-  variable: "--font-instrument-serif",
-});
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  display: "swap",
-  variable: "--font-manrope",
-});
+// Fonts are self-hosted via next/font/local (src/lib/fonts.js) — never a runtime-injected <link>
+// (which used to fetch fonts AFTER mount, i.e. after hydration — FOUC/CLS on this route).
 
 function useReveal(rootRef) {
   useEffect(() => {
