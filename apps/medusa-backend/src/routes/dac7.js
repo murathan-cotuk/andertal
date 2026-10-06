@@ -1,7 +1,9 @@
 'use strict'
 const { Router } = require('express')
+const { dac7FiguresWithLegacy, dac7MissingFields } = require('../settlement/reporting')
 
-// DAC7 thresholds (EU Directive 2021/514): report sellers with >= 30 transactions OR >= €2,000 revenue in a calendar year.
+// Reporting thresholds as implemented before (EU Directive 2021/514 de-minimis for goods sellers:
+// fewer than 30 sales AND ≤ 2,000 € → not reportable). Confirm with the tax advisor before filing.
 const DAC7_MIN_TRANSACTIONS = 30
 const DAC7_MIN_REVENUE_CENTS = 200000 // €2,000
 
@@ -15,116 +17,102 @@ function escapeXml(str) {
     .replace(/'/g, '&apos;')
 }
 
-function buildDac7Xml(year, sellers, platformName = 'Andertal') {
+const eur = (cents) => (Number(cents || 0) / 100).toFixed(2)
+
+/**
+ * INTERNAL preview export. This is NOT the official BZSt / OECD DPI XML schema and must not be
+ * submitted as a DAC7 report — it lists the data points per seller so the official report (BZSt
+ * portal / ELMA, or Stripe Platform Tax Reporting as a helper) can be prepared and checked.
+ */
+function buildDac7PreviewXml(year, sellers, platformName = 'Andertal') {
   const now = new Date().toISOString().slice(0, 19)
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<!-- DAC7 / § 12 PStTG Meldung — Plattform: ${escapeXml(platformName)} — Meldejahr: ${year} -->`,
-    `<!-- Erstellt: ${now} — Enthält ${sellers.length} meldepflichtige Anbieter -->`,
-    '<DAC7Report xmlns="urn:oecd:ties:dac:v1">',
-    '  <MessageSpec>',
-    `    <SendingEntityIN>${escapeXml(platformName)}</SendingEntityIN>`,
-    `    <TransmittingCountry>DE</TransmittingCountry>`,
-    `    <MessageType>DAC7</MessageType>`,
-    `    <MessageRefId>${escapeXml(platformName)}-${year}-${Date.now()}</MessageRefId>`,
-    `    <ReportingPeriod>${year}</ReportingPeriod>`,
-    `    <Timestamp>${now}</Timestamp>`,
-    '  </MessageSpec>',
-    '  <ReportableSellers>',
+    '<!-- INTERNE VORSCHAU — KEINE offizielle DAC7-/PStTG-Meldung und NICHT das BZSt-XML-Schema. -->',
+    `<!-- Plattform: ${escapeXml(platformName)} — Meldejahr: ${year} — erstellt ${now} -->`,
+    `<Dac7InternalPreview xmlns="urn:andertal:internal:dac7-preview:v1" year="${year}" generated="${now}">`,
   ]
-
   for (const s of sellers) {
     const addr = s.business_address || {}
-    lines.push('    <ReportableSeller>')
-    lines.push(`      <SellerID>${escapeXml(s.seller_id)}</SellerID>`)
-    lines.push(`      <Name>${escapeXml(s.store_name || s.company_name || '')}</Name>`)
-    lines.push(`      <CompanyName>${escapeXml(s.company_name || '')}</CompanyName>`)
-    lines.push(`      <TaxID>${escapeXml(s.tax_id || '')}</TaxID>`)
-    lines.push(`      <VatID>${escapeXml(s.vat_id || '')}</VatID>`)
-    lines.push(`      <IBAN>${escapeXml(s.iban || '')}</IBAN>`)
-    lines.push(`      <Email>${escapeXml(s.email || '')}</Email>`)
-    lines.push('      <Address>')
-    lines.push(`        <Street>${escapeXml(addr.street || '')}</Street>`)
-    lines.push(`        <City>${escapeXml(addr.city || '')}</City>`)
-    lines.push(`        <PostalCode>${escapeXml(addr.postal_code || '')}</PostalCode>`)
-    lines.push(`        <Country>${escapeXml(addr.country || 'DE')}</Country>`)
-    lines.push('      </Address>')
-    lines.push('      <ReportingPeriodActivities>')
-    lines.push(`        <NumberOfActivities>${s.transaction_count}</NumberOfActivities>`)
-    lines.push(`        <TotalConsideration currency="EUR">${(s.revenue_cents / 100).toFixed(2)}</TotalConsideration>`)
-    lines.push(`        <Fees>${(s.commission_cents / 100).toFixed(2)}</Fees>`)
-    lines.push('      </ReportingPeriodActivities>')
-    lines.push('    </ReportableSeller>')
+    lines.push('  <Seller>')
+    lines.push(`    <SellerId>${escapeXml(s.seller_id)}</SellerId>`)
+    lines.push(`    <EntityType>${escapeXml(s.legal_entity_type || '')}</EntityType>`)
+    lines.push(`    <LegalName>${escapeXml(s.legal_name || s.company_name || [s.first_name, s.last_name].filter(Boolean).join(' '))}</LegalName>`)
+    lines.push(`    <DateOfBirth>${escapeXml(s.date_of_birth ? String(s.date_of_birth).slice(0, 10) : '')}</DateOfBirth>`)
+    lines.push(`    <TIN country="${escapeXml(s.tax_id_country || '')}">${escapeXml(s.tax_id || '')}</TIN>`)
+    lines.push(`    <VatId>${escapeXml(s.vat_id || '')}</VatId>`)
+    lines.push(`    <BusinessRegistration country="${escapeXml(s.business_registration_country || '')}">${escapeXml(s.business_registration_number || '')}</BusinessRegistration>`)
+    lines.push(`    <FinancialAccount>${escapeXml(s.iban || '')}</FinancialAccount>`)
+    lines.push('    <Address>')
+    lines.push(`      <Street>${escapeXml(addr.street || addr.line1 || '')}</Street>`)
+    lines.push(`      <PostalCode>${escapeXml(addr.postal_code || '')}</PostalCode>`)
+    lines.push(`      <City>${escapeXml(addr.city || '')}</City>`)
+    lines.push(`      <Country>${escapeXml(addr.country || '')}</Country>`)
+    lines.push('    </Address>')
+    for (const q of s.quarters || []) {
+      lines.push(`    <Quarter q="${q.quarter}" activities="${q.transaction_count}" gross="${eur(q.gross_cents)}" refunds="${eur(q.refunds_cents)}" consideration="${eur(q.consideration_cents)}" fees="${eur(q.fees_cents)}" currency="EUR"/>`)
+    }
+    if (s.includes_estimate) lines.push('    <EstimateIncluded>true</EstimateIncluded>')
+    lines.push(`    <MissingFields>${escapeXml((s.missing_fields || []).join(', '))}</MissingFields>`)
+    lines.push('  </Seller>')
   }
-
-  lines.push('  </ReportableSellers>')
-  lines.push('</DAC7Report>')
+  lines.push('</Dac7InternalPreview>')
   return lines.join('\n')
 }
 
 module.exports = function createDac7Router({ getSellerDbClient }) {
   const router = Router()
 
+  /** Figures from the settlement ledger (seller line items, quarterly) + the seller's legal data. */
+  const loadReport = async (client, year) => {
+    const figures = await dac7FiguresWithLegacy(client, year)
+    const ids = figures.map((f) => f.seller_id)
+    const su = ids.length
+      ? (await client.query(
+        `SELECT seller_id, store_name, email, company_name, first_name, last_name, legal_entity_type, legal_name,
+                date_of_birth, tax_id, tax_id_country, vat_id, business_registration_number, business_registration_country,
+                iban, business_address
+           FROM seller_users WHERE seller_id = ANY($1::text[]) AND sub_of_seller_id IS NULL AND COALESCE(is_superuser, false) = false`,
+        [ids],
+      )).rows
+      : []
+    const byId = new Map(su.map((r) => [r.seller_id, r]))
+    return figures
+      .filter((f) => byId.has(f.seller_id))
+      .map((f) => {
+        const s = byId.get(f.seller_id)
+        return {
+          ...s,
+          ...f,
+          revenue_cents: f.consideration_cents,
+          commission_cents: f.fees_cents,
+          exceeds_revenue: f.consideration_cents >= DAC7_MIN_REVENUE_CENTS,
+          exceeds_transactions: f.transaction_count >= DAC7_MIN_TRANSACTIONS,
+          missing_fields: dac7MissingFields(s),
+        }
+      })
+      .filter((s) => s.exceeds_revenue || s.exceeds_transactions)
+      .sort((a, b) => b.consideration_cents - a.consideration_cents)
+  }
+
   // GET /admin-hub/v1/dac7/report?year=YYYY — superuser: preview reportable sellers
   router.get('/admin-hub/v1/dac7/report', async (req, res) => {
     if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
     const year = parseInt(req.query.year || new Date().getFullYear(), 10)
     if (!year || year < 2023 || year > 2100) return res.status(400).json({ message: 'Invalid year' })
-
     const client = getSellerDbClient()
     if (!client) return res.status(503).json({ message: 'DB not configured' })
     try {
       await client.connect()
-
-      // Aggregate orders per seller for the given calendar year
-      const r = await client.query(
-        `SELECT
-           su.seller_id,
-           su.store_name,
-           su.email,
-           su.company_name,
-           su.tax_id,
-           su.vat_id,
-           su.iban,
-           su.business_address,
-           su.lucid_number,
-           COALESCE(SUM(o.subtotal_cents), 0)::bigint AS revenue_cents,
-           COUNT(o.id)::int AS transaction_count,
-           su.commission_rate
-         FROM seller_users su
-         LEFT JOIN store_orders o
-           ON o.seller_id = su.seller_id
-           AND o.payment_status = 'bezahlt'
-           AND EXTRACT(YEAR FROM o.created_at) = $1
-         WHERE su.sub_of_seller_id IS NULL
-           AND su.is_superuser = false
-         GROUP BY su.seller_id, su.store_name, su.email, su.company_name,
-                  su.tax_id, su.vat_id, su.iban, su.business_address,
-                  su.lucid_number, su.commission_rate
-         HAVING
-           COALESCE(SUM(o.subtotal_cents), 0) >= $2
-           OR COUNT(o.id) >= $3
-         ORDER BY revenue_cents DESC`,
-        [year, DAC7_MIN_REVENUE_CENTS, DAC7_MIN_TRANSACTIONS]
-      )
-
+      const sellers = await loadReport(client, year)
       await client.end()
-
-      const sellers = r.rows.map(row => ({
-        ...row,
-        revenue_cents: parseInt(row.revenue_cents) || 0,
-        transaction_count: parseInt(row.transaction_count) || 0,
-        commission_cents: Math.round((parseInt(row.revenue_cents) || 0) * (parseFloat(row.commission_rate) || 0.12)),
-        revenue_eur: ((parseInt(row.revenue_cents) || 0) / 100).toFixed(2),
-        exceeds_revenue: (parseInt(row.revenue_cents) || 0) >= DAC7_MIN_REVENUE_CENTS,
-        exceeds_transactions: (parseInt(row.transaction_count) || 0) >= DAC7_MIN_TRANSACTIONS,
-      }))
-
       res.json({
         year,
+        source: 'settlement_ledger',
+        note: 'Interne Auswertung: ab Settlement-Cutover aus dem Ledger, davor aus Bestellpositionen GESCHÄTZT (includes_estimate). Vergütung = nach Abzug der Plattformgebühren. Keine offizielle DAC7-Meldung.',
         reportable_seller_count: sellers.length,
         thresholds: { min_revenue_eur: DAC7_MIN_REVENUE_CENTS / 100, min_transactions: DAC7_MIN_TRANSACTIONS },
-        sellers,
+        sellers: sellers.map((s) => ({ ...s, revenue_eur: eur(s.revenue_cents) })),
       })
     } catch (e) {
       try { await client.end() } catch (_) {}
@@ -132,59 +120,20 @@ module.exports = function createDac7Router({ getSellerDbClient }) {
     }
   })
 
-  // GET /admin-hub/v1/dac7/export?year=YYYY — superuser: download XML
+  // GET /admin-hub/v1/dac7/export?year=YYYY — superuser: INTERNAL preview XML (not the BZSt format)
   router.get('/admin-hub/v1/dac7/export', async (req, res) => {
     if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
     const year = parseInt(req.query.year || new Date().getFullYear(), 10)
     if (!year || year < 2023 || year > 2100) return res.status(400).json({ message: 'Invalid year' })
-
     const client = getSellerDbClient()
     if (!client) return res.status(503).json({ message: 'DB not configured' })
     try {
       await client.connect()
-
-      const r = await client.query(
-        `SELECT
-           su.seller_id, su.store_name, su.email, su.company_name,
-           su.tax_id, su.vat_id, su.iban, su.business_address, su.lucid_number,
-           COALESCE(agg.revenue_cents, 0)::bigint AS revenue_cents,
-           COALESCE(agg.transaction_count, 0)::int AS transaction_count,
-           su.commission_rate
-         FROM seller_users su
-         LEFT JOIN (
-           -- An order's own seller_id is always the platform (an order can mix items from
-           -- several real sellers) — reportable income must come from this seller's own
-           -- line items, never the whole order's subtotal.
-           SELECT oi.seller_id AS seller_id,
-                  SUM(oi.unit_price_cents * oi.quantity)::bigint AS revenue_cents,
-                  COUNT(DISTINCT oi.order_id)::int AS transaction_count
-           FROM store_order_items oi
-           JOIN store_orders o ON o.id = oi.order_id
-           WHERE o.payment_status = 'bezahlt'
-             AND EXTRACT(YEAR FROM o.created_at) = $1
-             AND oi.seller_id IS NOT NULL AND oi.seller_id != ''
-           GROUP BY oi.seller_id
-         ) agg ON agg.seller_id = su.seller_id
-         WHERE su.sub_of_seller_id IS NULL
-           AND su.is_superuser = false
-           AND (COALESCE(agg.revenue_cents, 0) >= $2 OR COALESCE(agg.transaction_count, 0) >= $3)
-         ORDER BY revenue_cents DESC`,
-        [year, DAC7_MIN_REVENUE_CENTS, DAC7_MIN_TRANSACTIONS]
-      )
-
+      const sellers = await loadReport(client, year)
       await client.end()
-
-      const sellers = r.rows.map(row => ({
-        ...row,
-        revenue_cents: parseInt(row.revenue_cents) || 0,
-        transaction_count: parseInt(row.transaction_count) || 0,
-        commission_cents: Math.round((parseInt(row.revenue_cents) || 0) * (parseFloat(row.commission_rate) || 0.12)),
-      }))
-
-      const xml = buildDac7Xml(year, sellers, 'Andertal')
       res.setHeader('Content-Type', 'application/xml; charset=utf-8')
-      res.setHeader('Content-Disposition', `attachment; filename="dac7-${year}.xml"`)
-      res.send(xml)
+      res.setHeader('Content-Disposition', `attachment; filename="dac7-interne-vorschau-${year}.xml"`)
+      res.send(buildDac7PreviewXml(year, sellers, 'Andertal'))
     } catch (e) {
       try { await client.end() } catch (_) {}
       res.status(500).json({ message: e?.message || 'Error' })
@@ -193,3 +142,5 @@ module.exports = function createDac7Router({ getSellerDbClient }) {
 
   return router
 }
+
+module.exports.buildDac7PreviewXml = buildDac7PreviewXml

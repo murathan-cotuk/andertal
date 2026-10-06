@@ -61,6 +61,43 @@ jobs:
       - name: Run unit tests
         run: npm run test
 
+  settlement:
+    name: Settlement tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    # Money flows (payables, ledger, refunds, disputes, payouts) are tested against a real
+    # PostgreSQL - idempotency and double-payout guards live in constraints and locks.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: settlement_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run settlement tests
+        working-directory: apps/medusa-backend
+        run: npm run test:settlement
+        env:
+          SETTLEMENT_TEST_PG_URL: postgres://postgres:postgres@localhost:5432/settlement_test
+
   audit:
     name: Security Audit (high+)
     runs-on: ubuntu-latest

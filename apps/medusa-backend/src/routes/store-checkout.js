@@ -14,7 +14,7 @@ const { resolveLocaleFromCountry } = require('../locale-from-country')
 const { createReturnLabelForOrder } = require('../return-label')
 const { pickCountryMerchandiseCents, normalizeCountryCode, isValidEuVatIdFormat } = require('../goods-vat')
 const { checkVatIdViaVies } = require('../vies-check')
-const { resolveProductCommissionOverride } = require('../commission-rate')
+const { resolveProductCommissionOverride, resolveSellerCommissionRate } = require('../commission-rate')
 const { quoteCartShipping, shippingBySellerMap, loadFreeShippingThresholds, normalizeCountry: normalizeShippingCountry } = require('../shipping-quote')
 
 /**
@@ -3407,6 +3407,7 @@ const storeOrdersCancelPOST = async (req, res) => {
 
     const platformRow = await loadPlatformCheckoutRow(client)
     const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
+    let refundStillProcessing = false
 
     if (totalCents > 0) {
       if (!piId) {
@@ -3429,14 +3430,35 @@ const storeOrdersCancelPOST = async (req, res) => {
             await client.end()
             return res.status(400).json({ message: 'Keine Charge für Erstattung gefunden.' })
           }
-          // Destination charge: reverse the transfer and refund the application fee too
-          const isDestinationCharge = !!(pi.transfer_data?.destination)
-          const refundParams = { charge: chargeId }
-          if (isDestinationCharge) {
-            refundParams.reverse_transfer = true
-            refundParams.refund_application_fee = true
+          const settlement = require('../settlement')
+          const hasPayables = (await client.query('SELECT 1 FROM seller_payables WHERE order_id = $1::uuid LIMIT 1', [orderId]).catch(() => ({ rows: [] }))).rows.length > 0
+          if (hasPayables) {
+            // Canonical path: full refund of every line + every seller's shipping, idempotent per
+            // order, booked into the seller ledger only once Stripe confirms it.
+            const lines = (await client.query(`SELECT order_item_id, quantity - refunded_quantity AS qty FROM seller_payables WHERE order_id = $1::uuid AND kind = 'item' AND quantity > refunded_quantity`, [orderId])).rows
+              .map((l) => ({ order_item_id: l.order_item_id, quantity: Number(l.qty) }))
+            const shipSellers = (await client.query(`SELECT DISTINCT seller_id FROM seller_payables WHERE order_id = $1::uuid AND kind = 'shipping'`, [orderId])).rows.map((r) => r.seller_id)
+            const pay = (await client.query('SELECT gross_amount_cents FROM order_payments WHERE order_id = $1::uuid', [orderId])).rows[0]
+            const { refund } = await settlement.createRefundRecord(client, {
+              orderId, amountCents: Number(pay?.gross_amount_cents ?? totalCents), lines, shippingSellerIds: shipSellers,
+              reason: 'customer_cancellation', actor: `customer:${payload.email}`, idempotencyKey: `cancel:${orderId}`,
+            })
+            const done = await settlement.executeRefund(client, stripe, refund.id, { actor: `customer:${payload.email}` })
+            if (done.status === 'failed' || done.status === 'canceled') {
+              await client.end()
+              return res.status(502).json({ message: `Stripe-Rückbuchung fehlgeschlagen: ${done.failure_reason || done.status}` })
+            }
+            refundStillProcessing = done.status !== 'succeeded'
+          } else {
+            // Legacy order (before settlement cutover): unchanged behaviour.
+            const isDestinationCharge = !!(pi.transfer_data?.destination)
+            const refundParams = { charge: chargeId }
+            if (isDestinationCharge) {
+              refundParams.reverse_transfer = true
+              refundParams.refund_application_fee = true
+            }
+            await stripe.refunds.create(refundParams, { idempotencyKey: `andertal-cancel-${orderId}` })
           }
-          await stripe.refunds.create(refundParams)
         } else if (pi.status === 'canceled' || pi.status === 'requires_payment_method') {
           /* bereits storniert / unbezahlt */
         } else {
@@ -3495,21 +3517,25 @@ const storeOrdersCancelPOST = async (req, res) => {
       }
     }
 
+    // payment_status only says 'refunded' once Stripe confirmed the refund; a refund still
+    // processing keeps 'bezahlt' and the webhook (refund.updated) completes it.
+    const markRefunded = totalCents > 0 && !refundStillProcessing
     await client.query(
       `UPDATE store_orders SET order_status = 'storniert',
-         payment_status = CASE WHEN $2::bigint > 0 THEN 'refunded' ELSE payment_status END,
+         payment_status = CASE WHEN $2::boolean THEN 'refunded' ELSE payment_status END,
          updated_at = now()
        WHERE id = $1::uuid`,
-      [orderId, totalCents],
+      [orderId, markRefunded],
     )
 
     await client.end()
     res.json({
       success: true,
+      refund_processing: refundStillProcessing,
       order: {
         id: row.id,
         order_status: 'storniert',
-        payment_status: totalCents > 0 ? 'refunded' : row.payment_status,
+        payment_status: markRefunded ? 'refunded' : row.payment_status,
       },
     })
   } catch (e) {
@@ -3692,6 +3718,7 @@ const storeOrdersPOST = async (req, res) => {
     let stripeInst = null
     let piStripeAccountId = null   // connected account from destination charge
     let piAppFeeCents = null       // application_fee_amount from destination charge
+    let verifiedPi = null          // PaymentIntent as retrieved from Stripe (settlement payment snapshot)
 
     if (isZeroPayOrder) {
       orderPaidTotalCents = 0
@@ -3712,6 +3739,7 @@ const storeOrdersPOST = async (req, res) => {
           return res.status(400).json({ message: `Zahlung noch nicht abgeschlossen (Status: ${pi.status})` })
         }
         paidCentsFromStripe = Number(pi.amount)
+        verifiedPi = pi
 
         const recon = await reconcileCartCheckoutFromPaymentIntent(client, cartId, cart, pi)
         if (!recon.ok) {
@@ -3943,11 +3971,42 @@ const storeOrdersPOST = async (req, res) => {
     // Stripe Connect transfer is intentionally NOT sent at order creation.
     // It is dispatched by scheduled job after delivery + 14 days.
 
+    // Commission rate in force at checkout, frozen per line (Verkäufervertrag §12: a later price
+    // list change never applies to an existing transaction). Settlement payables read this.
+    const lineRates = new Map()
+    try {
+      const lineSellers = [...new Set(items.map((it) => cartLineSellerKey(it)).filter((sid) => sid && sid !== 'default'))]
+      const sellerRates = new Map()
+      if (lineSellers.length) {
+        const sr = await client.query('SELECT seller_id, commission_rate FROM seller_users WHERE seller_id = ANY($1::text[]) AND sub_of_seller_id IS NULL', [lineSellers])
+        for (const row of sr.rows || []) sellerRates.set(String(row.seller_id), resolveSellerCommissionRate(row.commission_rate))
+      }
+      const pids = [...new Set(items.map((it) => String(it.product_id || '')).filter(Boolean))]
+      const overrides = new Map()
+      if (pids.length) {
+        const ovR = await client.query(
+          `SELECT id::text AS id, metadata->>'commission_rate_override' AS ov FROM admin_hub_products WHERE id::text = ANY($1::text[])`,
+          [pids],
+        )
+        for (const row of ovR.rows || []) {
+          const ov = resolveProductCommissionOverride(row.ov)
+          if (ov != null) overrides.set(String(row.id), ov)
+        }
+      }
+      for (const it of items) {
+        const sid = cartLineSellerKey(it)
+        if (!sid || sid === 'default') continue
+        lineRates.set(it, overrides.has(String(it.product_id)) ? overrides.get(String(it.product_id)) : (sellerRates.has(sid) ? sellerRates.get(sid) : resolveSellerCommissionRate(null)))
+      }
+    } catch (rateErr) {
+      console.warn('[checkout] commission rate snapshot failed:', rateErr?.message || rateErr)
+    }
+
     for (const it of items) {
       await client.query(
         `INSERT INTO store_order_items
-          (order_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle, seller_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          (order_id, variant_id, product_id, quantity, unit_price_cents, title, thumbnail, product_handle, seller_id, commission_rate_snapshot)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
         [
           orderId,
           it.variant_id,
@@ -3958,8 +4017,30 @@ const storeOrdersPOST = async (req, res) => {
           it.thumbnail,
           it.product_handle,
           cartLineSellerKey(it),
+          lineRates.has(it) ? lineRates.get(it) : null,
         ]
       )
+    }
+
+    // Settlement: verified payment snapshot + immutable per-seller payables. A failure here must not
+    // fail the (already paid) order — the hourly sweeper re-verifies with Stripe and repairs it.
+    try {
+      const settlement = require('../settlement')
+      if (!isZeroPayOrder && verifiedPi) {
+        await settlement.recordOrderPayment(client, {
+          orderId,
+          paymentIntentId: verifiedPi.id,
+          chargeId: typeof verifiedPi.latest_charge === 'string' ? verifiedPi.latest_charge : verifiedPi.latest_charge?.id || null,
+          currency: verifiedPi.currency || 'eur',
+          grossAmountCents: Number(verifiedPi.amount_received || verifiedPi.amount),
+          paymentSucceededAt: new Date((verifiedPi.created || Math.floor(Date.now() / 1000)) * 1000),
+          source: 'checkout_verified',
+          feeBearer: settlement.stripeFeeBearer(),
+        })
+      }
+      await settlement.createPayablesForOrder(client, orderId, { source: 'checkout' })
+    } catch (settleErr) {
+      console.error(`[settlement] order ${orderId}: payables not created at checkout (sweeper will retry):`, settleErr?.message || settleErr)
     }
 
     if (bonusPointsRedeemed > 0 && customerId) {

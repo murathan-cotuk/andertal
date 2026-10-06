@@ -30,6 +30,8 @@ const STATUS_COLORS = {
 const REFUND_STATUS_COLORS = {
   erstattet: { bg: "#fcebd5", color: "#7f3f00" },
   ausstehend: { bg: "#fefce8", color: "#a16207" },
+  in_bearbeitung: { bg: "#fefce8", color: "#a16207" },
+  fehlgeschlagen: { bg: "#fde8e8", color: "#b42318" },
 };
 const LABEL_CHARGE_COLORS = {
   pending: { bg: "#fefce8", color: "#a16207" },
@@ -159,7 +161,13 @@ function RefundModal({ ret, onClose, onRefunded, locale }) {
     try {
       const client = getMedusaAdminClient();
       const res = await client.refundReturn(ret.id, { refund_amount_cents: cents, refund_note: note });
-      onRefunded(res?.return ?? { ...ret, refund_amount_cents: cents, refund_note: note, refund_status: "erstattet" });
+      // The backend only reports "erstattet" once Stripe confirmed the refund.
+      if (res?.return) onRefunded(res.return);
+      if (res?.refund?.status === "failed" || res?.refund?.status === "canceled") {
+        setError(`${c.error}${res.refund.failure_reason ? ` — ${res.refund.failure_reason}` : ""}`);
+        setSaving(false);
+        return;
+      }
       onClose();
     } catch (err) {
       setError(err?.message || c.error);
@@ -341,7 +349,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
               </button>
             </div>
           )}
-          {ret.status === "eingegangen" && !ret.refund_status && (
+          {ret.status === "eingegangen" && (!ret.refund_status || ret.refund_status === "fehlgeschlagen") && (
             <div style={{ marginBottom: 20 }}>
               <button
                 onClick={() => setShowRefund(true)}
@@ -351,7 +359,7 @@ function DetailPanel({ ret, onClose, onUpdate, isSuperuser, locale }) {
               </button>
             </div>
           )}
-          {ret.status === "abgeschlossen" && !ret.refund_status && (
+          {ret.status === "abgeschlossen" && (!ret.refund_status || ret.refund_status === "fehlgeschlagen") && (
             <div style={{ marginBottom: 20 }}>
               <button
                 onClick={() => setShowRefund(true)}

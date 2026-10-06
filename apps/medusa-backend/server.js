@@ -2041,6 +2041,15 @@ async function start() {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_shop_live_presence_country ON shop_live_presence(country_code)`).catch(() => {})
         const { initializeSupportCaseSchema } = require('./src/support-case-schema')
         await initializeSupportCaseSchema(client)
+        // Canonical settlement tables (payables, append-only ledger, refunds, disputes, payouts,
+        // webhook store). Own try/catch: logged loudly, never silently skipped with the rest.
+        try {
+          const { ensureSettlementSchema } = require('./src/settlement/schema')
+          await ensureSettlementSchema(client)
+          log.info('Settlement schema ready')
+        } catch (settlementErr) {
+          console.error('[settlement] schema migration FAILED — payouts stay disabled until fixed:', settlementErr && settlementErr.message)
+        }
         await client.end()
         log.info('Admin Hub and support-case tables ready')
       } catch (migErr) {
@@ -2499,6 +2508,10 @@ async function start() {
       loadPlatformCheckoutRow,
       resolveStripeSecretKeyFromPlatform,
     }))
+
+    // --- Canonical settlement API (payables / ledger / refunds / payouts / Custom payout account): src/routes/settlement.js ---
+    const createSettlementRouter = require('./src/routes/settlement')
+    httpApp.use('/', createSettlementRouter({ loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform }))
 
     // --- Seller Health (Analysen → Seller Health): scoring engine + config + history: src/routes/seller-health.js ---
     const createSellerHealthRouter = require('./src/routes/seller-health')

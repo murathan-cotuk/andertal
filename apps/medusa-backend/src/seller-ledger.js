@@ -6,7 +6,8 @@
  *
  * Wallet / payout (affects_balance):
  *   Warenwert − Provision netto + Versand Kunde − Etikett (balance) − iade ± düzeltme
- * Commission VAT is listed (Provisionsrechnung) but does not reduce Auszahlung.
+ * Legacy (pre-settlement) view: commission VAT was listed but did not reduce Auszahlung. Since the
+ * settlement cutover the canonical ledger withholds commission incl. VAT (see buildSellerLedger).
  * Card-paid labels are listed but already settled.
  */
 
@@ -28,6 +29,11 @@ const SEQ = {
   advertising: 9,
   manual_adjustment: 10,
   payout: 11,
+  chargeback: 12,
+  chargeback_release: 13,
+  stripe_fee: 14,
+  dispute_fee: 15,
+  payout_reversal: 16,
 }
 
 function commissionInclVatCents(netCents, vatPercent) {
@@ -124,10 +130,13 @@ function summarizeLedgerEntries(entries) {
       t.advertising_cents += Math.abs(amt)
     } else if (type === 'payout') {
       t.payouts_cents += Math.abs(amt)
-    } else if (type === 'manual_adjustment' || type === 'commission_refund' || type === 'commission_vat_refund') {
+    } else if (type === 'manual_adjustment' || type === 'commission_refund' || type === 'commission_vat_refund'
+      || type === 'chargeback' || type === 'chargeback_release' || type === 'stripe_fee' || type === 'dispute_fee') {
       t.adjustments_cents += amt
+    } else if (type === 'payout_reversal') {
+      t.payouts_cents -= Math.abs(amt)
     }
-    if (type !== 'payout' && e.affects_balance !== false) t.net_cents += amt
+    if (type !== 'payout' && type !== 'payout_reversal' && e.affects_balance !== false) t.net_cents += amt
   }
   t.order_count = orderIds.size
   return t
@@ -174,7 +183,7 @@ function emptyLedger() {
  * @param {string} sellerId
  * @param {{ periodStart?: string|null, periodEnd?: string|null, storeName?: string|null }} [opts]
  */
-async function buildSellerLedger(client, sellerId, opts = {}) {
+async function buildLegacySellerLedger(client, sellerId, opts = {}) {
   const sid = String(sellerId || '').trim()
   if (!sid || sid === 'default') return emptyLedger()
   const periodStart = opts.periodStart ? String(opts.periodStart).slice(0, 10) : null
@@ -436,6 +445,157 @@ async function buildSellerLedger(client, sellerId, opts = {}) {
   }
 }
 
+/** Settlement cutover (null when the settlement tables are not migrated yet). */
+async function settlementCutover(client) {
+  try {
+    const r = await client.query(`SELECT value::timestamptz AS at FROM settlement_settings WHERE key = 'cutover_at'`)
+    return r.rows[0]?.at || null
+  } catch (_) {
+    return null
+  }
+}
+
+const VIEW_TYPE_BY_EVENT = {
+  SALE: 'order_received',
+  SHIPPING: 'shipping_customer',
+  REFUND: 'refund',
+  CHARGEBACK: 'chargeback',
+  CHARGEBACK_RELEASE: 'chargeback_release',
+  PAYOUT: 'payout',
+  PAYOUT_REVERSAL: 'payout_reversal',
+}
+const VIEW_TYPE_BY_ADJ = {
+  shipping_label: 'shipping_label',
+  return_shipping: 'return_shipping',
+  advertising: 'advertising',
+  stripe_processing_fee: 'stripe_fee',
+  stripe_dispute_fee: 'dispute_fee',
+}
+
+/**
+ * Canonical view rows: every row IS a seller_ledger_entries booking (plus label charges booked
+ * after the cutover that the next settlement will net). The balance therefore equals the real
+ * ledger balance — no screen-side recomputation.
+ */
+async function canonicalLedgerRows(client, sid, resolvedStore) {
+  const out = []
+  const r = await client.query(
+    `SELECT e.*, o.order_number, a.type AS adj_type, a.description_key AS adj_key, a.description_params AS adj_params,
+            a.charge_method AS adj_charge_method
+       FROM seller_ledger_entries e
+       LEFT JOIN store_orders o ON o.id = e.order_id
+       LEFT JOIN seller_ledger_adjustments a ON e.idempotency_key = 'LEGACY_ADJ:' || a.id::text
+      WHERE e.seller_id = $1
+      ORDER BY e.created_at DESC
+      LIMIT 10000`,
+    [sid],
+  )
+  for (const e of r.rows) {
+    const meta = e.metadata || {}
+    let type = VIEW_TYPE_BY_EVENT[e.event_type]
+    let descriptionKey = type
+    let params = {}
+    if (e.event_type === 'COMMISSION') {
+      type = meta.vat ? 'commission_vat' : 'commission'
+      params = meta.vat ? { vat_pct: meta.vat_rate } : { rate_pct: meta.rate != null ? Math.round(Number(meta.rate) * 1000) / 10 : undefined }
+    } else if (e.event_type === 'COMMISSION_REFUND') {
+      type = meta.vat ? 'commission_vat_refund' : 'commission_refund'
+    } else if (e.event_type === 'ADJUSTMENT') {
+      const adjType = String(e.adj_type || meta.type || 'manual_adjustment')
+      type = VIEW_TYPE_BY_ADJ[adjType] || (e.adj_key === 'return_shipping_label' ? 'return_shipping' : 'manual_adjustment')
+      descriptionKey = e.adj_key || type
+      params = asParams(e.adj_params)
+    }
+    descriptionKey = descriptionKey || type
+    pushEntry(out, {
+      id: `le-${e.id}`,
+      type,
+      occurred_at: e.created_at,
+      order_id: e.order_id,
+      order_number: e.order_number ? Number(e.order_number) : null,
+      amount_cents: Number(e.amount_cents),
+      description_key: descriptionKey,
+      description_params: { ...params, reference_id: e.reference_id || undefined },
+      charge_method: e.adj_charge_method || null,
+      affects_balance: true,
+      seller_id: sid,
+      store_name: resolvedStore,
+    })
+  }
+  // Label charges after the cutover that are not mirrored yet (netted by the next settlement).
+  const pending = await client.query(
+    `SELECT a.* , o.order_number FROM seller_ledger_adjustments a
+       LEFT JOIN store_orders o ON o.id = a.order_id
+      WHERE a.seller_id = $1 AND COALESCE(a.charge_method, 'balance') = 'balance'
+        AND a.created_at >= (SELECT value::timestamptz FROM settlement_settings WHERE key = 'cutover_at')
+        AND NOT EXISTS (SELECT 1 FROM seller_ledger_entries e WHERE e.idempotency_key = 'LEGACY_ADJ:' || a.id::text)`,
+    [sid],
+  ).catch(() => ({ rows: [] }))
+  for (const a of pending.rows) {
+    pushEntry(out, {
+      id: `adj-${a.id}`,
+      type: classifyAdjustmentType(a),
+      occurred_at: a.created_at,
+      order_id: a.order_id,
+      order_number: a.order_number ? Number(a.order_number) : null,
+      amount_cents: Number(a.amount_cents),
+      description_key: a.description_key,
+      description_params: asParams(a.description_params),
+      charge_method: a.charge_method || null,
+      affects_balance: true,
+      seller_id: sid,
+      store_name: resolvedStore,
+    })
+  }
+  return out
+}
+
+/**
+ * Seller ledger for Sellercentral. After the settlement cutover the rows and the balance come
+ * from the canonical ledger; movements before the cutover are still listed (history) but marked
+ * as not affecting the balance, because they were never booked in the canonical ledger.
+ */
+async function buildSellerLedger(client, sellerId, opts = {}) {
+  const sid = String(sellerId || '').trim()
+  if (!sid || sid === 'default') return emptyLedger()
+  const cutover = await settlementCutover(client)
+  if (!cutover) return buildLegacySellerLedger(client, sellerId, opts)
+  const periodStart = opts.periodStart ? String(opts.periodStart).slice(0, 10) : null
+  const periodEnd = opts.periodEnd ? String(opts.periodEnd).slice(0, 10) : null
+  const legacy = await buildLegacySellerLedger(client, sid, { storeName: opts.storeName })
+  const cutMs = new Date(cutover).getTime()
+  const history = (legacy.entries || [])
+    .filter((e) => new Date(e.occurred_at || 0).getTime() < cutMs)
+    .map((e) => ({ ...e, affects_balance: false, legacy: true }))
+  const canonical = await canonicalLedgerRows(client, sid, legacy.store_name || opts.storeName || null)
+  const all = [...canonical, ...history].sort((a, b) => {
+    const dt = new Date(b.occurred_at || 0).getTime() - new Date(a.occurred_at || 0).getTime()
+    if (dt !== 0) return dt
+    return (a.seq || 0) - (b.seq || 0)
+  })
+  let current = 0
+  let periodSum = 0
+  const entries = []
+  for (const e of all) {
+    if (e.affects_balance) current += e.amount_cents
+    if (inPeriod(entryDay(e.occurred_at), periodStart, periodEnd)) {
+      entries.push(e)
+      if (e.affects_balance) periodSum += e.amount_cents
+    }
+  }
+  return {
+    entries,
+    balance: { current_cents: current, period_cents: periodSum },
+    totals: summarizeLedgerEntries(entries),
+    count: entries.length,
+    commission_rate: legacy.commission_rate,
+    seller_id: sid,
+    store_name: legacy.store_name,
+    source: 'settlement_ledger',
+    settlement_cutover_at: cutover,
+  }
+}
+
 async function listLedgerSellers(client) {
   try {
     const r = await client.query(
@@ -493,6 +653,8 @@ async function buildMarketplaceLedger(client, opts = {}) {
 
 module.exports = {
   buildSellerLedger,
+  buildLegacySellerLedger,
+  settlementCutover,
   buildMarketplaceLedger,
   listLedgerSellers,
   commissionInclVatCents,

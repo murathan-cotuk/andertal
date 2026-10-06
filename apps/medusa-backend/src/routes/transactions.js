@@ -404,6 +404,16 @@ module.exports = function createTransactionsRouter({
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
+        // Once booked into the canonical (append-only) ledger it can only be corrected by a
+        // counter-adjustment, never deleted — otherwise ledger and adjustments diverge.
+        const booked = await client.query(
+          `SELECT 1 FROM seller_ledger_entries WHERE idempotency_key = 'LEGACY_ADJ:' || $1::text LIMIT 1`,
+          [req.params.id],
+        ).catch(() => ({ rows: [] }))
+        if (booked.rows.length) {
+          await client.end()
+          return res.status(409).json({ message: 'Bereits im Settlement-Ledger gebucht — bitte eine Gegenbuchung (negative/positive Anpassung) anlegen.' })
+        }
         const r = await client.query(
           `DELETE FROM seller_ledger_adjustments WHERE id = $1::uuid AND type = 'manual_adjustment' RETURNING id`,
           [req.params.id],

@@ -1173,20 +1173,27 @@ function renderCommissionSettlementDocument(doc, {
   labelCents = 0,
   orderCount = null,
   refundCents = 0,
+  commissionVatCents = null,
+  commissionVatScheme = null,
+  vatWithheld = false,
 }) {
   const hasUnicode = setupDocFonts(doc)
   const REG = hasUnicode ? 'PdfRegular' : 'Helvetica'
   const BOLD = hasUnicode ? 'PdfBold' : 'Helvetica-Bold'
   const { left, right, contentWidth } = pageMetrics(doc)
   const rate = displayCommissionRatePct(commissionRatePct)
+  // Reverse charge (seller in another EU state with VAT ID) / non-EU seller: no German VAT.
+  const noGermanVat = commissionVatScheme === 'reverse_charge_eu' || commissionVatScheme === 'non_eu_not_taxable'
   const gross = Number(grossSalesCents || 0)
   const shipping = Math.max(0, Number(shippingCents || 0))
   const labelCharge = Math.max(0, Number(labelCents || 0))
   const orderValue = gross + shipping
   const commission = Number(commissionCents || 0)
   const payout = Number.isFinite(payoutCents) ? Number(payoutCents) : Math.max(0, gross - commission)
-  const vatPercent = Number(platformVatPercent) > 0 ? Number(platformVatPercent) : 19
-  const vatOnCommission = Math.round(commission * vatPercent / 100)
+  const vatPercent = noGermanVat ? 0 : (Number(platformVatPercent) > 0 ? Number(platformVatPercent) : 19)
+  const vatOnCommission = commissionVatCents != null && Number.isFinite(Number(commissionVatCents))
+    ? Number(commissionVatCents)
+    : Math.round(commission * vatPercent / 100)
   const commissionTotal = commission + vatOnCommission
   const bonus = Math.max(0, Number(bonusFundingCents || 0))
   const customerPaid = Math.max(0, Number(customerPaidCents || 0))
@@ -1250,7 +1257,7 @@ function renderCommissionSettlementDocument(doc, {
   const cards = [
     { label: 'WARENWERT (PROVISIONSBASIS)', value: pdfCents(gross), sub: 'Verkäufer-GMV — nicht Andertal-Umsatz' },
     { label: 'PROVISION INKL. MWST.', value: pdfCents(commissionTotal), sub: `Fällig · netto ${pdfCents(commission)} + USt ${pdfCents(vatOnCommission)}` },
-    { label: 'AUSZAHLUNG AN VERKÄUFER', value: pdfCents(payout), sub: 'Ware − Provision netto + Versand Kunde (ohne Plattform-Versand)' },
+    { label: 'AUSZAHLUNG AN VERKÄUFER', value: pdfCents(payout), sub: noGermanVat ? 'Ware − Provision + Versand Kunde (ohne Plattform-Versand)' : (vatWithheld ? 'Ware − Provision inkl. USt + Versand Kunde (ohne Plattform-Versand)' : 'Ware − Provision netto + Versand Kunde (ohne Plattform-Versand)') },
   ]
   cards.forEach((card, i) => {
     const x = left + i * (cardW + 12)
@@ -1281,7 +1288,9 @@ function renderCommissionSettlementDocument(doc, {
     { label: 'Vom Kunden gezahlt', amount: customerPaid },
     { label: 'Von Bonuspunkten gezahlt (Andertal)', amount: bonus, info: true },
     { label: `Provision ${rate} % (netto)`, amount: commission },
-    { label: `zzgl. MwSt. ${vatPercent} % auf Provision (dem Verkäufer belastet)`, amount: vatOnCommission },
+    noGermanVat
+      ? { label: commissionVatScheme === 'reverse_charge_eu' ? 'USt 0 % — Steuerschuldnerschaft des Leistungsempfängers (§ 13b UStG / Art. 196 MwStSystRL)' : 'Nicht im Inland steuerbar (§ 3a Abs. 2 UStG)', amount: 0, info: true }
+      : { label: `zzgl. MwSt. ${vatPercent} % auf Provision (dem Verkäufer belastet)`, amount: vatOnCommission },
     { label: 'Provision inkl. MwSt. (fällig)', amount: commissionTotal, emphasis: true },
     labelCharge > 0 ? { label: 'Versand (Plattform, Andertal bezahlt — nicht an Verkäufer)', amount: labelCharge } : null,
     { label: 'Auszahlung an Verkäufer', amount: payout },
@@ -1350,6 +1359,9 @@ function renderPeriodCommissionInvoiceDocument(doc, {
   const commissionCents = Number(payout.commission_cents || 0)
   const payoutCents = Number(payout.payout_cents || Math.max(0, grossCents - commissionCents))
   const vatPercent = Number(platformVatPercent) > 0 ? Number(platformVatPercent) : 19
+  const { commissionVatScheme } = require('./settlement/money')
+  const { EU_COUNTRIES } = require('./goods-vat')
+  const scheme = commissionVatScheme(payout, { domesticPercent: vatPercent, euCountries: EU_COUNTRIES })
   const sellerInfo = {
     store_name: payout.store_name, company_name: payout.company_name,
     first_name: payout.first_name, last_name: payout.last_name,
@@ -1373,6 +1385,9 @@ function renderPeriodCommissionInvoiceDocument(doc, {
     labelCents: Number(payout.label_cents || 0),
     orderCount: payout.order_count != null ? Number(payout.order_count) : null,
     refundCents: Number(payout.refund_cents || 0),
+    commissionVatCents: payout.commission_vat_cents != null ? Number(payout.commission_vat_cents) : null,
+    commissionVatScheme: scheme.scheme,
+    vatWithheld: payout._vat_withheld === true,
   })
 }
 

@@ -111,8 +111,16 @@ module.exports = function createShipmentTrackingRouter({
         const event = evRes.rows[0]
         let firedTrigger = null
         if (status === 'zugestellt') {
-          const upd = await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          // A seller's own "delivered" entry is recorded for display only — it never sets the
+          // payout-relevant delivery date (settlement: carrier webhook / carrier API / superuser).
+          const upd = isSuperuser
+            ? await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+            : await client.query(`UPDATE store_orders SET delivery_status='zugestellt', seller_reported_delivered_at=COALESCE(seller_reported_delivered_at, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
           await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
+          if (isSuperuser) {
+            const { confirmDelivery } = require('../settlement/payables')
+            await confirmDelivery(client, id, { source: 'superuser', at: event.event_time ? new Date(event.event_time) : new Date(), actor: `superuser:${req.sellerUser?.email || ''}` }).catch((e) => console.warn('confirmDelivery:', e?.message))
+          }
           if (upd.rowCount > 0) firedTrigger = 'order_delivered'
         } else if (status === 'versendet') {
           const upd = await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [id])
@@ -437,6 +445,11 @@ module.exports = function createShipmentTrackingRouter({
         let firedTrigger = null
         if (mostRecentStatus === 'zugestellt') {
           const upd = await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date, now()), updated_at=now() WHERE id=$1::uuid AND delivery_status != 'zugestellt'`, [id])
+          // Delivery event fetched from the carrier's API → trusted for the payout hold period.
+          try {
+            const { confirmDelivery } = require('../settlement/payables')
+            await confirmDelivery(client, id, { source: 'carrier_api', at: mostRecentEvent?.event_time ? new Date(mostRecentEvent.event_time) : new Date(), actor: 'carrier_api' })
+          } catch (dErr) { console.warn('confirmDelivery (carrier api):', dErr?.message || dErr) }
           await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [id])
           if (upd.rowCount > 0) firedTrigger = 'order_delivered'
         } else if (mostRecentStatus === 'versendet' || mostRecentStatus === 'in_transit') {

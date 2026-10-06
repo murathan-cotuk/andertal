@@ -20,6 +20,7 @@ const getDbClient = () => {
 }
 
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
+const { aggregateSellerPeriodFromPayables } = require('../settlement/reporting')
 
 module.exports = function createPayoutsRouter({
   getSellerDbClient,
@@ -91,12 +92,22 @@ module.exports = function createPayoutsRouter({
       try {
         await client.connect()
         const { status, proof_url, notes, paid_at } = req.body || {}
+        // seller_payouts rows are statements (Provisionsrechnung). Whether money was paid is
+        // recorded ONLY by a settlement payout (POST /admin-hub/v1/settlement/payouts/manual or
+        // the Stripe payout run) — never by flipping a status here.
+        if (status !== undefined && ['bezahlt', 'paid'].includes(String(status).toLowerCase())) {
+          await client.end()
+          return res.status(409).json({ message: 'Auszahlungsstatus wird aus der Settlement-Auszahlung abgeleitet (Settlement → manuelle Überweisung mit Referenz).' })
+        }
+        if (paid_at !== undefined) {
+          await client.end()
+          return res.status(409).json({ message: 'paid_at wird aus der Settlement-Auszahlung abgeleitet.' })
+        }
         const sets = ['updated_at = now()']
         const params = []
         if (status !== undefined) { params.push(status); sets.push(`status = $${params.length}`) }
         if (proof_url !== undefined) { params.push(proof_url); sets.push(`proof_url = $${params.length}`) }
         if (notes !== undefined) { params.push(notes); sets.push(`notes = $${params.length}`) }
-        if (paid_at !== undefined || status === 'bezahlt') { params.push(paid_at || new Date().toISOString()); sets.push(`paid_at = $${params.length}`) }
         params.push(id)
         const r = await client.query(`UPDATE seller_payouts SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`, params)
         await client.end()
@@ -108,40 +119,34 @@ module.exports = function createPayoutsRouter({
       }
     }
 
-    // POST /admin-hub/v1/payouts/mark-paid — superuser marks a seller period as paid
+    // POST /admin-hub/v1/payouts/mark-paid — superuser records a bank transfer made OUTSIDE Stripe.
+    // Canonical: creates a manual settlement payout over exactly the currently claimable ledger
+    // entries. Requires the real transfer reference and the exact amount (no blind "paid" flag).
     const adminHubPayoutsMarkPaidPOST = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
-        const { seller_id, period_start, period_end, amount_cents, reference } = req.body || {}
-        if (!seller_id || !period_start || !period_end) { await client.end(); return res.status(400).json({ message: 'seller_id, period_start, period_end required' }) }
-        // Upsert: if a payout record exists for this seller+period, update it; otherwise create it
-        const existing = await client.query(
-          `SELECT id FROM seller_payouts WHERE seller_id = $1 AND period_start = $2 AND period_end = $3 LIMIT 1`,
-          [seller_id, period_start, period_end]
-        )
-        let row
-        if (existing.rows.length) {
-          const r = await client.query(
-            `UPDATE seller_payouts SET status = 'bezahlt', payout_cents = $1, notes = COALESCE($2, notes), paid_at = now(), updated_at = now() WHERE id = $3 RETURNING *`,
-            [amount_cents || 0, reference || null, existing.rows[0].id]
-          )
-          row = r.rows[0]
-        } else {
-          const r = await client.query(
-            `INSERT INTO seller_payouts (seller_id, period_start, period_end, payout_cents, notes, status, paid_at)
-             VALUES ($1, $2, $3, $4, $5, 'bezahlt', now()) RETURNING *`,
-            [seller_id, period_start, period_end, amount_cents || 0, reference || null]
-          )
-          row = r.rows[0]
+        const { seller_id, transfer_reference, confirm_amount_cents } = req.body || {}
+        const sellerId = String(seller_id || '').trim()
+        if (!sellerId || sellerId === 'default') { await client.end(); return res.status(400).json({ message: 'seller_id required' }) }
+        if (!transfer_reference || confirm_amount_cents == null) {
+          await client.end()
+          return res.status(400).json({ message: 'transfer_reference (Bankreferenz der Überweisung) und confirm_amount_cents sind erforderlich' })
         }
+        const { createSettlementPayout } = require('../settlement/payouts')
+        const r = await createSettlementPayout(client, {
+          sellerId, method: 'manual_bank_transfer', businessKey: `MANUAL:${sellerId}:${String(transfer_reference).trim()}`,
+          externalReference: transfer_reference, expectedAmountCents: Number(confirm_amount_cents),
+          actor: `superuser:${req.sellerUser?.email || ''}`,
+        })
         await client.end()
-        res.json({ payout: row })
+        if (!r.payout) return res.status(409).json({ message: `Nichts abzurechnen (${r.skipped})`, ...r })
+        res.json({ payout: r.payout, existing: !!r.existing })
       } catch (e) {
         try { await client.end() } catch (_) {}
-        res.status(500).json({ message: e?.message || 'Error' })
+        res.status(e?.status || 500).json({ message: e?.message || 'Error', ...(e?.amount != null ? { settlement_amount_cents: e.amount } : {}) })
       }
     }
 
@@ -172,14 +177,27 @@ module.exports = function createPayoutsRouter({
         if (ex.rows.length) { skipped++; continue }
         const agg = await aggregateSellerPeriodSales(client, sellerId, monthStart, monthEnd)
         const rate = Number(s.commission_rate) >= 0 ? Number(s.commission_rate) : 0.12
-        const commissionCents = Math.round(agg.grossCents * rate)
-        const payoutCents = sellerPeriodPayoutCents({
+        let commissionCents = Math.round(agg.grossCents * rate)
+        let payoutCents = sellerPeriodPayoutCents({
           grossCents: agg.grossCents,
           commissionCents,
           shippingPayoutCents: agg.shippingPayoutCents,
           labelBalanceCents: agg.labelBalanceCents,
         })
-        const commissionVatCents = Math.round(commissionCents * vatPct / 100)
+        let commissionVatCents = Math.round(commissionCents * vatPct / 100)
+        // Settlement era: commission comes from the immutable payable snapshots (rate at order
+        // time), refunds from the ledger — never from today's commission rate.
+        const fromPayables = await aggregateSellerPeriodFromPayables(client, sellerId, monthStart, monthEnd).catch(() => null)
+        if (fromPayables) {
+          agg.grossCents = fromPayables.grossCents
+          agg.shippingCents = fromPayables.shippingCents
+          agg.refundCents = fromPayables.refundCents
+          agg.orderCount = fromPayables.orderCount
+          commissionCents = fromPayables.commissionCents - fromPayables.commissionRefundCents
+          // VAT from the per-seller snapshot (0 for reverse-charge sellers), not a flat rate.
+          commissionVatCents = fromPayables.commissionVatCents - fromPayables.commissionVatRefundCents
+          payoutCents = fromPayables.netCents
+        }
         let insRes
         try {
           insRes = await client.query(
@@ -565,6 +583,29 @@ module.exports = function createPayoutsRouter({
       try {
         await client.connect()
         const { period_start, period_end } = req.query
+        const { settlementCutover } = require('../seller-ledger')
+        if (period_start && period_end && await settlementCutover(client)) {
+          const { aggregateSellerPeriodFromPayables } = require('../settlement/reporting')
+          const agg = await aggregateSellerPeriodFromPayables(client, sellerId, period_start, period_end)
+          const last = (await client.query(
+            `SELECT status FROM seller_settlement_payouts WHERE seller_id = $1 ORDER BY created_at DESC LIMIT 1`, [sellerId],
+          )).rows[0]
+          await client.end()
+          return res.json({
+            source: 'settlement_ledger',
+            summary: {
+              total_cents: agg?.grossCents || 0,
+              commission_cents: agg ? agg.commissionCents - agg.commissionRefundCents : 0,
+              commission_vat_cents: agg ? agg.commissionVatCents - agg.commissionVatRefundCents : 0,
+              shipping_cents: agg?.shippingCents || 0,
+              refund_cents: agg?.refundCents || 0,
+              net_cents: agg?.netCents || 0,
+              paid_count: agg?.orderCount || 0,
+              status: last?.status || null,
+              ad_spend_cents: 0,
+            },
+          })
+        }
         const params = [sellerId]
         const dateFilter = period_start && period_end
           ? `AND DATE(COALESCE(o.delivery_date::timestamp, o.created_at)) >= $2::date
@@ -823,12 +864,84 @@ module.exports = function createPayoutsRouter({
     }
 
     // GET /admin-hub/v1/payout-overview — superuser: all sellers summary for a period
+    /**
+     * Canonical overview (settlement era): per seller the period's booked sales from payables
+     * (commission at order-time rate + its VAT) and — independent of the period — what is payable
+     * NOW (= exactly the amount a manual transfer must confirm) plus the real settlement status.
+     */
+    const canonicalPayoutOverview = async (client, periodStart, periodEnd) => {
+      const { claimableEntries, sellerAccountReadiness } = require('../settlement/payouts')
+      const params = []
+      let dateSql = ''
+      if (periodStart && periodEnd) {
+        params.push(periodStart, periodEnd)
+        dateSql = `AND COALESCE(o.payment_succeeded_at, o.created_at) >= $1::date
+                   AND COALESCE(o.payment_succeeded_at, o.created_at) < ($2::date + interval '1 day')`
+      }
+      const sales = (await client.query(
+        `SELECT p.seller_id, COALESCE(SUM(p.gross_cents), 0)::bigint AS gross,
+                COALESCE(SUM(p.commission_cents), 0)::bigint AS commission,
+                COALESCE(SUM(p.commission_vat_cents), 0)::bigint AS commission_vat,
+                COUNT(DISTINCT p.order_id)::int AS orders
+           FROM seller_payables p JOIN store_orders o ON o.id = p.order_id
+          WHERE 1 = 1 ${dateSql}
+          GROUP BY p.seller_id`,
+        params,
+      )).rows
+      const sellerIds = new Set(sales.map((r) => r.seller_id))
+      const withBalance = (await client.query('SELECT DISTINCT seller_id FROM seller_ledger_entries')).rows
+      for (const r of withBalance) sellerIds.add(r.seller_id)
+      const out = []
+      for (const sid of sellerIds) {
+        const su = (await client.query(
+          `SELECT store_name, email FROM seller_users WHERE seller_id = $1 AND sub_of_seller_id IS NULL LIMIT 1`, [sid],
+        )).rows[0] || {}
+        const sale = sales.find((x) => x.seller_id === sid) || { gross: 0, commission: 0, commission_vat: 0, orders: 0 }
+        const entries = await claimableEntries(client, sid)
+        const claimable = entries.reduce((a, e) => a + Number(e.amount_cents), 0)
+        const balance = Number((await client.query(
+          'SELECT COALESCE(SUM(amount_cents), 0)::bigint AS c FROM seller_ledger_entries WHERE seller_id = $1', [sid],
+        )).rows[0].c)
+        const last = (await client.query(
+          `SELECT status, paid_at, amount_cents, method FROM seller_settlement_payouts WHERE seller_id = $1 ORDER BY created_at DESC LIMIT 1`, [sid],
+        )).rows[0]
+        const open = last && !['paid', 'failed'].includes(last.status)
+        const status = open ? 'processing' : (claimable > 0 ? 'ausstehend' : (last?.status === 'paid' ? 'bezahlt' : 'ausstehend'))
+        const readiness = await sellerAccountReadiness(client, sid)
+        if (!Number(sale.gross) && !claimable && !balance && !last) continue
+        out.push({
+          seller_id: sid,
+          store_name: su.store_name || sid,
+          email: su.email || null,
+          total_cents: Number(sale.gross),
+          order_count: Number(sale.orders),
+          commission_cents: Number(sale.commission),
+          commission_vat_cents: Number(sale.commission_vat),
+          payout_cents: Math.max(0, claimable),
+          claimable_cents: claimable,
+          balance_cents: balance,
+          status,
+          paid_at: last?.status === 'paid' ? last.paid_at : null,
+          last_payout_method: last?.method || null,
+          payout_account_ready: readiness.ready,
+          payout_account_reason: readiness.reason || null,
+        })
+      }
+      return out.sort((a, b) => b.total_cents - a.total_cents)
+    }
+
     const adminHubPayoutOverviewGET = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
       const client = getDbClient()
       if (!client) return res.status(503).json({ message: 'DB not configured' })
       try {
         await client.connect()
+        const { settlementCutover } = require('../seller-ledger')
+        if (await settlementCutover(client)) {
+          const sellers = await canonicalPayoutOverview(client, req.query.period_start || null, req.query.period_end || null)
+          await client.end()
+          return res.json({ sellers, source: 'settlement_ledger' })
+        }
         const { period_start, period_end } = req.query
         const params = []
         const dateFilter = period_start && period_end
@@ -939,168 +1052,11 @@ module.exports = function createPayoutsRouter({
       return { is: false }
     }
 
-    /** Orders eligible for seller payout: paid, delivered 14d+, no refund flow / open return. */
-    const payoutEligibleOrderSql = `o.payment_status = 'bezahlt'
-             AND o.delivery_date IS NOT NULL
-             AND o.delivery_date <= now() - interval '14 days'
-             AND COALESCE(o.order_status, '') NOT IN ('storniert', 'refunded', 'retoure', 'retoure_anfrage')
-             AND NOT EXISTS (
-               SELECT 1 FROM store_returns r
-               WHERE r.order_id = o.id
-                 AND COALESCE(r.status, '') NOT IN ('abgelehnt', 'abgeschlossen')
-             )`
-
-    /** ISO 13616 MOD-97 IBAN check — SEPA-capable accounts use standard IBAN. */
-    const validateSepaIbanChecksum = (raw) => {
-      const iban = String(raw || '').replace(/\s/g, '').toUpperCase()
-      if (!iban) return { ok: false, message: 'IBAN erforderlich' }
-      if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]+$/.test(iban)) return { ok: false, message: 'Ungültiges IBAN-Format' }
-      if (iban.length < 15 || iban.length > 34) return { ok: false, message: 'IBAN-Länge ungültig' }
-      const rearranged = iban.slice(4) + iban.slice(0, 4)
-      let expanded = ''
-      for (let i = 0; i < rearranged.length; i++) {
-        const c = rearranged[i]
-        if (c >= 'A' && c <= 'Z') expanded += String(c.charCodeAt(0) - 55)
-        else expanded += c
-      }
-      let rem = 0
-      for (let i = 0; i < expanded.length; i++) {
-        const d = expanded.charCodeAt(i) - 48
-        if (d < 0 || d > 9) return { ok: false, message: 'Ungültiges IBAN-Format' }
-        rem = (rem * 10 + d) % 97
-      }
-      if (rem !== 1) return { ok: false, message: 'IBAN-Prüfziffer ungültig' }
-      return { ok: true, iban }
-    }
-
-    const autoPayoutPeriodForDate = () => {
-      const fri = isPayoutFridayToday()
-      if (!fri.is) return null
-      const { y, m, day } = civilDatePartsBerlin()
-
-      const mm = String(m + 1).padStart(2, '0')
-      const pad = (n) => String(n).padStart(2, '0')
-      const iso = (yr, mo, da) => `${yr}-${String(mo + 1).padStart(2, '0')}-${pad(da)}`
-
-      if (fri.n === 2) {
-        // Period: (4th Friday of previous month + 1) → 2nd Friday of this month
-        const prevM = m === 0 ? 11 : m - 1
-        const prevY = m === 0 ? y - 1 : y
-        const f4prev = nthFridayOfMonth(prevY, prevM, 4)
-        const sd = new Date(Date.UTC(prevY, prevM, f4prev + 1))
-        const periodStart = iso(sd.getUTCFullYear(), sd.getUTCMonth(), sd.getUTCDate())
-        const periodEnd = iso(y, m, day)
-        return { runKey: `AUTO-${y}-${mm}-F2`, periodStart, periodEnd }
-      }
-      // fri.n === 4
-      // Period: (2nd Friday of this month + 1) → 4th Friday of this month
-      const f2 = nthFridayOfMonth(y, m, 2)
-      const sd = new Date(Date.UTC(y, m, f2 + 1))
-      const periodStart = iso(sd.getUTCFullYear(), sd.getUTCMonth(), sd.getUTCDate())
-      const periodEnd = iso(y, m, day)
-      return { runKey: `AUTO-${y}-${mm}-F4`, periodStart, periodEnd }
-    }
-
-    const runAutomaticPayoutsIfDue = async () => {
-      const period = autoPayoutPeriodForDate()
-      if (!period) return
-      const client = getDbClient()
-      if (!client) return
-      try {
-        await client.connect()
-        const already = await client.query('SELECT run_key FROM seller_payout_auto_runs WHERE run_key = $1 LIMIT 1', [period.runKey])
-        if (already.rows.length) { await client.end(); return }
-        const su = await client.query(
-          `SELECT iban FROM seller_users
-           WHERE is_superuser = true
-             AND iban IS NOT NULL
-             AND LENGTH(TRIM(iban)) > 0
-           ORDER BY created_at ASC
-           LIMIT 1`
-        )
-        const sourceIban = su.rows[0]?.iban ? String(su.rows[0].iban).trim() : null
-        if (!sourceIban) { await client.end(); return }
-        const summary = await client.query(
-          `SELECT
-             o.seller_id,
-             ROUND(COALESCE(SUM(o.subtotal_cents), 0)) AS total_cents,
-             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * COALESCE(MAX(s.commission_rate), 0.12)))::bigint AS commission_cents,
-             ROUND((COALESCE(SUM(o.subtotal_cents), 0)::numeric * (1 - COALESCE(MAX(s.commission_rate), 0.12))))::bigint AS payout_cents
-           FROM store_orders o
-           LEFT JOIN seller_users s ON s.seller_id = o.seller_id
-           WHERE ${payoutEligibleOrderSql}
-             AND o.created_at >= $1::date
-             AND o.created_at < ($2::date + interval '1 day')
-             AND LOWER(COALESCE(s.approval_status, '')) = 'approved'
-           GROUP BY o.seller_id`,
-          [period.periodStart, period.periodEnd]
-        )
-        let createdCount = 0
-        for (const row of summary.rows || []) {
-          const sellerId = String(row.seller_id || '').trim()
-          if (!sellerId) continue
-          const existing = await client.query(
-            `SELECT id, status FROM seller_payouts
-             WHERE seller_id = $1 AND period_start = $2::date AND period_end = $3::date
-             ORDER BY created_at DESC LIMIT 1`,
-            [sellerId, period.periodStart, period.periodEnd]
-          )
-          if (existing.rows.length) {
-            const keepPaid = ['bezahlt', 'paid'].includes(String(existing.rows[0].status || '').toLowerCase())
-            await client.query(
-              `UPDATE seller_payouts
-               SET total_cents = $1, commission_cents = $2, payout_cents = $3,
-                   iban = COALESCE(iban, $4),
-                   notes = COALESCE(notes, $5),
-                   status = $6,
-                   updated_at = now()
-               WHERE id = $7`,
-              [
-                parseInt(row.total_cents) || 0,
-                parseInt(row.commission_cents) || 0,
-                parseInt(row.payout_cents) || 0,
-                sourceIban,
-                `AUTO-PAYOUT ${period.periodStart}..${period.periodEnd}`,
-                keepPaid ? existing.rows[0].status : 'processing',
-                existing.rows[0].id,
-              ]
-            )
-          } else {
-            await client.query(
-              `INSERT INTO seller_payouts
-               (seller_id, period_start, period_end, total_cents, commission_cents, payout_cents, iban, notes, status)
-               VALUES ($1, $2::date, $3::date, $4, $5, $6, $7, $8, 'processing')`,
-              [
-                sellerId,
-                period.periodStart,
-                period.periodEnd,
-                parseInt(row.total_cents) || 0,
-                parseInt(row.commission_cents) || 0,
-                parseInt(row.payout_cents) || 0,
-                sourceIban,
-                `AUTO-PAYOUT ${period.periodStart}..${period.periodEnd}`,
-              ]
-            )
-          }
-          createdCount += 1
-        }
-        await client.query(
-          `INSERT INTO seller_payout_auto_runs (run_key, period_start, period_end, source_iban, created_count)
-           VALUES ($1, $2::date, $3::date, $4, $5)`,
-          [period.runKey, period.periodStart, period.periodEnd, sourceIban, createdCount]
-        )
-        await client.end()
-      } catch (e) {
-        try { await client.end() } catch (_) {}
-        console.error('runAutomaticPayoutsIfDue:', e?.message || e)
-      }
-    }
-
     /**
      * Automatic monthly Provisionsrechnung generation (BonusPunkte.md §3.8 + explicit user instruction:
      * "her ödeme döneminde otomatik tüm bu faturalar oluşmalı ve satıcıya ... email hem bildirim
      * olarak atılmalı"). Runs on every boot + hourly tick (same idempotent "IsDue" pattern as
-     * runAutomaticPayoutsIfDue below — cheap to call repeatedly, no-ops when nothing is due):
+     * runSettlementCycleIfDue below — cheap to call repeatedly, no-ops when nothing is due):
      * catches up every completed 15-day payout window after the latest seller_payouts.period_end
      * (current half-month excluded, still in progress), notifying sellers only for genuinely
      * new invoices. Existing monthly rows that already cover a window are skipped.
@@ -1148,165 +1104,54 @@ module.exports = function createPayoutsRouter({
       }
     }
 
-    // Stripe Connect transfers to seller Connect accounts are disabled — all settlements use Sellercentral IBAN (SEPA)
-    // via runSellerIbanPayoutsIfDue (platform → Stripe Custom recipient → bank payout).
-    const runStripeConnectTransfersIfDue = async () => {}
-
-    const runStripePayoutsIfDue = async () => {}
-
     /**
-     * One seller's actual IBAN/SEPA payout: Stripe Custom account (create if missing) → transfer
-     * platform funds to it → payout from it to the seller's IBAN. Marks the eligible orders
-     * 'processing' first (idempotency guard — a concurrent call for the same seller finds nothing
-     * left to claim) then 'paid' on success, or resets to 'pending' on failure so the next run
-     * (scheduled or manual) retries. Shared by the scheduled Friday batch below and the on-demand
-     * "überweisen" button (POST /admin-hub/v1/payouts/seller-iban-now) — same money-movement code
-     * path either way, just a different trigger and no Friday/batch gate for the manual one.
+     * Settlement cycle (canonical payout path — replaces the former store_orders-based IBAN
+     * payout and the "AUTO-PAYOUT" statement updater, which paid by store_orders.seller_id and
+     * could never reach multi-seller carts). Every hour: repair missing payables (payment
+     * re-verified with Stripe) and reconcile in-flight Stripe calls. On payout Fridays (2nd/4th,
+     * Europe/Berlin): one settlement payout per seller with a positive claimable balance.
+     * SETTLEMENT_AUTO_PAYOUTS=off disables the Friday money movement (sweeps still run).
      */
-    const attemptSellerIbanPayout = async (client, stripeInst, row) => {
-      const { seller_id, iban, payment_account_holder, email } = row
-      let customAccountId = row.stripe_custom_account_id
-
-      if (!iban) return { ok: false, reason: 'no_iban', message: 'Seller has no IBAN on file.' }
-      const ibChk = validateSepaIbanChecksum(iban)
-      if (!ibChk.ok) return { ok: false, reason: 'invalid_iban', message: ibChk.message }
-
-      const payoutCents = Math.floor(Number(row.payout_cents_sum || 0))
-      if (payoutCents <= 50) return { ok: false, reason: 'below_minimum', message: 'Nothing eligible above the Stripe minimum payout.' }
-
-      // Idempotency: mark all eligible orders as processing first
-      const guard = await client.query(
-        `UPDATE store_orders SET stripe_payout_status = 'processing', updated_at = now()
-         WHERE seller_id = $1 AND stripe_payout_status = 'pending' AND stripe_account_id IS NULL
-           AND ${payoutEligibleOrderSql.replace(/\bo\./g, 'store_orders.')}`,
-        [seller_id]
-      )
-      if (!guard.rowCount) return { ok: false, reason: 'already_claimed', message: 'Nothing left to pay out (already processing or paid).' }
-
-      try {
-        // Create Stripe Custom account if missing
-        if (!customAccountId) {
-          const acct = await stripeInst.accounts.create({
-            type: 'custom',
-            country: 'DE',
-            email,
-            capabilities: { transfers: { requested: true } },
-            tos_acceptance: { service_agreement: 'full', date: Math.floor(Date.now() / 1000), ip: '127.0.0.1' },
-          })
-          customAccountId = acct.id
-          const sellerClient = getSellerDbClient()
-          if (sellerClient) {
-            await sellerClient.connect()
-            await sellerClient.query('UPDATE seller_users SET stripe_custom_account_id = $1 WHERE seller_id = $2', [customAccountId, seller_id])
-            await sellerClient.end()
-          }
-          // Add IBAN as external account
-          const cleanIban = iban.replace(/\s/g, '').toUpperCase()
-          await stripeInst.accounts.createExternalAccount(customAccountId, {
-            external_account: {
-              object: 'bank_account', country: 'DE', currency: 'eur',
-              account_number: cleanIban,
-              account_holder_name: payment_account_holder || 'Account Holder',
-              account_holder_type: 'individual',
-            },
-          })
-        }
-
-        // Transfer from platform to custom account
-        await stripeInst.transfers.create({
-          amount: payoutCents,
-          currency: 'eur',
-          destination: customAccountId,
-        })
-
-        // Payout from custom account to IBAN
-        const payout = await stripeInst.payouts.create(
-          { amount: payoutCents, currency: 'eur' },
-          { stripeAccount: customAccountId }
-        )
-
-        await client.query(
-          `UPDATE store_orders SET stripe_payout_status = 'paid', stripe_payout_id = $1, updated_at = now()
-           WHERE seller_id = $2 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
-          [payout.id, seller_id]
-        )
-        console.log(`attemptSellerIbanPayout: paid seller ${seller_id} ${payoutCents} EUR → ${customAccountId} (payout ${payout.id})`)
-        return { ok: true, payoutCents, payoutId: payout.id }
-      } catch (e) {
-        // Reset to pending so the next run (scheduled or manual) retries
-        await client.query(
-          `UPDATE store_orders SET stripe_payout_status = 'pending', updated_at = now()
-           WHERE seller_id = $1 AND stripe_payout_status = 'processing' AND stripe_account_id IS NULL`,
-          [seller_id]
-        ).catch(() => {})
-        console.error(`attemptSellerIbanPayout: seller ${seller_id} failed:`, e?.message)
-        return { ok: false, reason: 'stripe_error', message: e?.message || 'Stripe transfer failed.' }
-      }
-    }
-
-    const SELLER_IBAN_PAYOUT_ROW_SQL = `
-           SELECT o.seller_id,
-                  SUM(
-                    GREATEST(0,
-                      COALESCE(o.seller_net_after_commission_cents::bigint,
-                        FLOOR(o.subtotal_cents::numeric * (1 - COALESCE(s.commission_rate, 0.12)))::bigint)
-                    )
-                  )::bigint AS payout_cents_sum,
-                  s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email
-           FROM store_orders o
-           JOIN seller_users s ON s.seller_id = o.seller_id
-           WHERE o.stripe_payout_status = 'pending'
-             AND o.stripe_account_id IS NULL
-             AND ${payoutEligibleOrderSql}`
-
-    // IBAN / SEPA payout — Sellercentral bank account (seller_users.iban). Platform PI funds settle here.
-    // Eligible: stripe_payout_status pending, order stripe_account_id NULL (all store orders today), 14d + no open return.
-    const runSellerIbanPayoutsIfDue = async () => {
-      if (!isPayoutFridayToday().is) return   // 2nd / 4th Friday (Europe/Berlin)
+    const runSettlementCycleIfDue = async () => {
       const client = getDbClient()
       if (!client) return
       try {
         await client.connect()
-
-        const { y: by, m: bm, d: bd } = civilDatePartsBerlin()
-        const berlinIso = `${by}-${String(bm + 1).padStart(2, '0')}-${String(bd).padStart(2, '0')}`
-        // Idempotency: one batch per payout calendar day (Berlin)
-        const todayKey = `IBAN-${berlinIso}`
-        const alreadyRan = await client.query('SELECT run_key FROM seller_payout_auto_runs WHERE run_key = $1 LIMIT 1', [todayKey])
-        if (alreadyRan.rows.length) { await client.end(); return }
-
+        const settlement = require('../settlement')
         const platformRow = await loadPlatformCheckoutRow(client)
         const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
-        if (!secretKey) { await client.end(); return }
-        const stripeInst = new (require('stripe'))(secretKey)
-
-        // Per-order seller net (stored at checkout); fallback = merchandise × (1 − commission).
-        const due = await client.query(
-          `${SELLER_IBAN_PAYOUT_ROW_SQL}
-           GROUP BY o.seller_id, s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email`
-        )
-
-        for (const row of due.rows || []) {
-          await attemptSellerIbanPayout(client, stripeInst, row)
+        const stripeInst = secretKey ? new (require('stripe'))(secretKey) : null
+        await settlement.refreshSellerVatIdsViaVies(client).catch((e) => console.warn('[settlement] VIES refresh:', e?.message))
+        await settlement.sweepOrdersWithoutPayables(client, stripeInst)
+        await settlement.reconcileInFlight(client, stripeInst)
+        const autoOff = String(process.env.SETTLEMENT_AUTO_PAYOUTS || '').trim().toLowerCase() === 'off'
+        if (!autoOff && stripeInst && isPayoutFridayToday().is) {
+          const { y: by, m: bm, d: bd } = civilDatePartsBerlin()
+          const berlinIso = `${by}-${String(bm + 1).padStart(2, '0')}-${String(bd).padStart(2, '0')}`
+          const runKey = `SETTLEMENT-${berlinIso}`
+          const claimed = await client.query(
+            `INSERT INTO seller_payout_auto_runs (run_key, period_start, period_end, source_iban, created_count)
+             VALUES ($1, $2::date, $2::date, 'stripe_connect', 0) ON CONFLICT (run_key) DO NOTHING RETURNING run_key`,
+            [runKey, berlinIso],
+          )
+          if (claimed.rows.length) {
+            const results = await settlement.runScheduledPayouts(client, stripeInst, { runKey: berlinIso, actor: 'payout_job' })
+            const paid = results.filter((r) => r.payoutId).length
+            await client.query('UPDATE seller_payout_auto_runs SET created_count = $2 WHERE run_key = $1', [runKey, paid])
+            console.log(`[settlement] payout run ${berlinIso}: ${paid} payout(s), ${results.length - paid} skipped`)
+          }
         }
-        // Record that we ran this Friday so subsequent hourly ticks skip it
-        await client.query(
-          `INSERT INTO seller_payout_auto_runs (run_key, period_start, period_end, source_iban, created_count)
-           VALUES ($1, $2::date, $3::date, '', 0) ON CONFLICT (run_key) DO NOTHING`,
-          [todayKey, berlinIso, berlinIso]
-        ).catch(() => {})
-        await client.end()
       } catch (e) {
-        console.error('runSellerIbanPayoutsIfDue:', e?.message || e)
+        console.error('runSettlementCycleIfDue:', e?.message || e)
+      } finally {
+        try { await client.end() } catch (_) {}
       }
     }
 
     /**
-     * POST /admin-hub/v1/payouts/seller-iban-now — superuser presses "überweisen" on a specific
-     * seller: pays out THAT seller's currently-eligible pending orders immediately via the exact
-     * same Stripe/IBAN path as the scheduled Friday batch, without waiting for Friday and without
-     * touching the batch's own idempotency key (so the next scheduled Friday run still processes
-     * every other seller, and this seller too if new eligible orders accumulate afterward).
+     * POST /admin-hub/v1/payouts/seller-iban-now — superuser "überweisen": immediate settlement
+     * payout for ONE seller via the canonical path (same claims, same idempotency, same Stripe
+     * transfer → bank payout). Kept under its old URL so Sellercentral keeps working.
      */
     const adminHubPayoutsSellerIbanNowPOST = async (req, res) => {
       if (!req.sellerUser?.is_superuser) return res.status(403).json({ message: 'Superuser access required' })
@@ -1320,37 +1165,32 @@ module.exports = function createPayoutsRouter({
         const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
         if (!secretKey) { await client.end(); return res.status(503).json({ message: 'Stripe not configured' }) }
         const stripeInst = new (require('stripe'))(secretKey)
-
-        const due = await client.query(
-          `${SELLER_IBAN_PAYOUT_ROW_SQL}
-             AND o.seller_id = $1
-           GROUP BY o.seller_id, s.commission_rate, s.iban, s.payment_account_holder, s.stripe_custom_account_id, s.email`,
-          [sellerId],
-        )
-        const row = due.rows?.[0]
-        if (!row) { await client.end(); return res.status(404).json({ message: 'No eligible pending orders for this seller.' }) }
-
-        const result = await attemptSellerIbanPayout(client, stripeInst, row)
+        const { runScheduledPayouts } = require('../settlement/jobs')
+        const [result] = await runScheduledPayouts(client, stripeInst, {
+          runKey: `NOW-${new Date().toISOString().slice(0, 10)}-${String(req.body?.request_id || Date.now())}`,
+          onlySellerId: sellerId, actor: `superuser:${req.sellerUser?.email || ''}`,
+        })
         await client.end()
-        if (!result.ok) return res.status(422).json({ message: result.message || 'Payout could not be sent.', reason: result.reason })
-        res.json({ ok: true, payout_cents: result.payoutCents, payout_id: result.payoutId })
+        if (!result?.payoutId) return res.status(422).json({ message: `Keine Auszahlung möglich: ${result?.skipped || result?.error || 'unbekannt'}`, reason: result?.skipped || 'error', amount_cents: result?.amount ?? null })
+        if (result.ok === false && !result.pending) return res.status(422).json({ message: result.error || 'Stripe transfer failed', reason: result.stage, payout_id: result.payoutId })
+        const amt = await (async () => {
+          const c2 = getDbClient(); await c2.connect()
+          try { return Number((await c2.query('SELECT amount_cents FROM seller_settlement_payouts WHERE id = $1', [result.payoutId])).rows[0]?.amount_cents || 0) } finally { await c2.end() }
+        })()
+        res.json({ ok: true, payout_cents: amt, payout_id: result.payoutId, settlement_payout_id: result.payoutId })
       } catch (e) {
         try { await client.end() } catch (_) {}
         res.status(500).json({ message: e?.message || 'Error' })
       }
     }
 
-    // Fire once on boot and then every hour
-    runAutomaticPayoutsIfDue().catch(() => {})
-    runStripeConnectTransfersIfDue().catch(() => {})
-    runStripePayoutsIfDue().catch(() => {})
-    runSellerIbanPayoutsIfDue().catch(() => {})
-    runMonthlyCommissionInvoicesIfDue().catch(() => {})
+    // Fire once on boot (after the schema had time to migrate) and then every hour
+    setTimeout(() => {
+      runSettlementCycleIfDue().catch(() => {})
+      runMonthlyCommissionInvoicesIfDue().catch(() => {})
+    }, 30 * 1000)
     setInterval(() => {
-      runAutomaticPayoutsIfDue().catch(() => {})
-      runStripeConnectTransfersIfDue().catch(() => {})
-      runStripePayoutsIfDue().catch(() => {})
-      runSellerIbanPayoutsIfDue().catch(() => {})
+      runSettlementCycleIfDue().catch(() => {})
       runMonthlyCommissionInvoicesIfDue().catch(() => {})
     }, 60 * 60 * 1000)
 

@@ -29,6 +29,7 @@ const STATUS_LABELS = {
   paid: (loc) => lt(loc, "Paid", "Ödendi", "Payé", "Pagado", "Pagato", "Bezahlt"),
   teil_erstattet: (loc) => lt(loc, "Partially refunded", "Kısmi iade", "Partiellement remboursé", "Reembolso parcial", "Rimborsato parzialmente", "Teilweise erstattet"),
   erstattet: (loc) => lt(loc, "Refunded", "İade edildi", "Remboursé", "Reembolsado", "Rimborsato", "Erstattet"),
+  fehlgeschlagen: (loc) => lt(loc, "Failed", "Başarısız", "Échoué", "Fallido", "Non riuscito", "Fehlgeschlagen"),
   refunded: (loc) => lt(loc, "Refunded", "İade edildi", "Remboursé", "Reembolsado", "Rimborsato", "Erstattet"),
   ausstehend: (loc) => lt(loc, "Pending", "Beklemede", "En attente", "Pendiente", "In attesa", "Ausstehend"),
 

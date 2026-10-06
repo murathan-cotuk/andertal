@@ -532,9 +532,8 @@ export default function SellerDetailPage({ sellerId }) {
     setSendingPayoutId(payout.id);
     try {
       const result = await client.sendSellerIbanPayoutNow(seller.seller_id);
-      // Real transfer succeeded — also record this specific invoice row as paid for the
-      // Sellercentral paper trail (the transfer itself isn't scoped to one period/row).
-      await client.updatePayout(payout.id, { status: "bezahlt" }).catch(() => {});
+      // Paid status lives on the settlement payout (Stripe transfer → bank payout), not on this
+      // statement row — the backend refuses to flip a statement to "bezahlt" by hand.
       const amount = result?.payout_cents != null ? (result.payout_cents / 100).toLocaleString("de-DE", { minimumFractionDigits: 2 }) + " €" : "";
       setMsg({ tone: "success", text: locale === "en" ? `Transfer sent${amount ? ` (${amount})` : ""}.` : locale === "tr" ? `Havale gönderildi${amount ? ` (${amount})` : ""}.` : locale === "fr" ? `Virement envoyé${amount ? ` (${amount})` : ""}.` : locale === "es" ? `Transferencia enviada${amount ? ` (${amount})` : ""}.` : locale === "it" ? `Bonifico inviato${amount ? ` (${amount})` : ""}.` : `Überweisung gesendet${amount ? ` (${amount})` : ""}.` });
       load();

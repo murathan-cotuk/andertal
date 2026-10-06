@@ -11,6 +11,27 @@ const { resolveOrderPaidTotalCents } = require('./order-money')
  * allowed to go negative once a charge is applied; there is no floor check on purchase.
  */
 async function getSellerAvailableCents(client, sellerId) {
+  // Canonical: ledger balance (sales − commission − refunds − payouts …) minus label charges not
+  // yet mirrored into the ledger. Falls back to the legacy estimate only if the settlement tables
+  // are missing (pre-migration database).
+  try {
+    const r = await client.query(
+      `SELECT
+         (SELECT COALESCE(SUM(amount_cents), 0) FROM seller_ledger_entries WHERE seller_id = $1)::bigint
+         + (SELECT COALESCE(SUM(a.amount_cents), 0) FROM seller_ledger_adjustments a
+             WHERE a.seller_id = $1 AND COALESCE(a.charge_method, 'balance') = 'balance'
+               AND a.created_at >= (SELECT value::timestamptz FROM settlement_settings WHERE key = 'cutover_at')
+               AND NOT EXISTS (SELECT 1 FROM seller_ledger_entries e WHERE e.idempotency_key = 'LEGACY_ADJ:' || a.id::text))::bigint
+         AS cents`,
+      [sellerId],
+    )
+    return Number(r.rows[0]?.cents || 0)
+  } catch (_) {
+    return getSellerAvailableCentsLegacy(client, sellerId)
+  }
+}
+
+async function getSellerAvailableCentsLegacy(client, sellerId) {
   const oRes = await client.query(
     `SELECT id, seller_id, subtotal_cents, total_cents FROM store_orders o
      WHERE o.payment_status = 'bezahlt' AND (

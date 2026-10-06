@@ -8,6 +8,7 @@ import {
   Badge, Button, Banner, Box, Select, Modal, TextField, Tabs,
 } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import ManualTransferModal from "@/components/ManualTransferModal";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { lt, dateLocaleFor } from "@/lib/locale-text";
 import { ledgerEntryLabel } from "@/lib/payments-i18n";
@@ -928,28 +929,10 @@ function AdminTransactionsView() {
     ...sellers.map((s) => ({ label: s.store_name || s.seller_id, value: s.seller_id })),
   ];
 
-  const handleMarkPaid = async (s) => {
-    const t = s.totals || {};
-    const payout = Number(t.net_cents || 0);
-    if (!(await confirmDelete(copy.markPaidConfirm(s.store_name, fmtCents(payout, "EUR", locale))))) return;
-    setMarkingPaid(s.seller_id);
-    try {
-      await getMedusaAdminClient().createPayout({
-        seller_id: s.seller_id,
-        period_start: periodStart,
-        period_end: periodEnd,
-        total_cents: Number(t.merchandise_cents || 0),
-        commission_cents: Number(t.commission_cents || 0),
-        payout_cents: Math.max(0, payout),
-        notes: `${s.seller_id}-${periodKey}`,
-      });
-      await loadData();
-    } catch (e) {
-      alert(e?.message || copy.error);
-    } finally {
-      setMarkingPaid(null);
-    }
-  };
+  // "Mark paid" = record a real bank transfer as a canonical settlement payout (reference + exact
+  // amount, audit-logged) — it no longer creates a statement row that merely looks paid.
+  const [manualPaySeller, setManualPaySeller] = useState(null);
+  const handleMarkPaid = (s) => setManualPaySeller({ seller_id: s.seller_id, store_name: s.store_name });
 
   const openAdjModal = () => {
     setAdjSellerId(filterSeller || "");
@@ -1155,6 +1138,9 @@ function AdminTransactionsView() {
           </BlockStack>
         </Modal.Section>
       </Modal>
+      {manualPaySeller && (
+        <ManualTransferModal seller={manualPaySeller} onClose={() => setManualPaySeller(null)} onDone={loadData} />
+      )}
     </div>
   );
 }

@@ -1634,6 +1634,42 @@ class MedusaAdminClient {
   async resolveSellerHealthEvent(id) {
     return this.request(`/admin-hub/v1/seller-health/events/${encodeURIComponent(id)}/resolve`, { method: 'PATCH' })
   }
+  async getPayoutAccount() {
+    return this.request('/admin-hub/v1/seller/payout-account')
+  }
+  async updateLegalProfile(data) {
+    return this.request('/admin-hub/v1/seller/legal-profile', { method: 'PATCH', body: JSON.stringify(data) })
+  }
+  async createPayoutAccount(data = {}) {
+    return this.request('/admin-hub/v1/seller/payout-account', { method: 'POST', body: JSON.stringify(data) })
+  }
+  async getPayoutOnboardingLink() {
+    return this.request('/admin-hub/v1/seller/payout-account/onboarding-link', { method: 'POST', body: '{}' })
+  }
+  async getSettlementReview() {
+    return this.request('/admin-hub/v1/settlement/review')
+  }
+  async getSettlementOrder(orderId) {
+    return this.request(`/admin-hub/v1/settlement/orders/${encodeURIComponent(orderId)}`)
+  }
+  async retrySettlementPayout(payoutId) {
+    return this.request(`/admin-hub/v1/settlement/payouts/${encodeURIComponent(payoutId)}/retry`, { method: 'POST', body: '{}' })
+  }
+  async allocateSettlementRefund(refundId, data) {
+    return this.request(`/admin-hub/v1/settlement/refunds/${encodeURIComponent(refundId)}/allocate`, { method: 'POST', body: JSON.stringify(data) })
+  }
+  async confirmSettlementDelivery(orderId, deliveredAt) {
+    return this.request(`/admin-hub/v1/settlement/orders/${encodeURIComponent(orderId)}/confirm-delivery`, { method: 'POST', body: JSON.stringify({ delivered_at: deliveredAt }) })
+  }
+  async setSellerPayoutBlock(sellerId, blocked, reason) {
+    return this.request(`/admin-hub/v1/settlement/sellers/${encodeURIComponent(sellerId)}/payout-block`, { method: 'POST', body: JSON.stringify({ blocked, reason }) })
+  }
+  async replaySettlementWebhook(eventId) {
+    return this.request(`/admin-hub/v1/settlement/webhook-events/${encodeURIComponent(eventId)}/replay`, { method: 'POST', body: '{}' })
+  }
+  async getSettlementSummary(sellerId) {
+    return this.request(`/admin-hub/v1/settlement/summary?seller_id=${encodeURIComponent(sellerId)}`)
+  }
   async markPayoutPaid(data) {
     return this.request('/admin-hub/v1/payouts/mark-paid', { method: 'POST', body: JSON.stringify(data) })
   }

@@ -7,6 +7,7 @@ import { useLocale } from "next-intl";
 import { lt } from "@/lib/locale-text";
 import { Button } from "@shopify/polaris";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
+import OrderSettlementBox from "@/components/pages/orders/OrderSettlementBox";
 import { getOrderPdfDownloadUrl } from "@/lib/order-pdf-url";
 import TrackingSection from "@/components/orders/TrackingSection";
 import SearchableSelect from "@/components/inputs/SearchableSelect";
@@ -86,7 +87,7 @@ function InfoRow({ label, value }) {
   );
 }
 
-function StatusSelect({ label, value, options, onChange, saving, locale }) {
+function StatusSelect({ label, value, options, onChange, saving, locale, readOnly = false }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderBottom: "1px solid #f3eee6" }}>
       <span style={{ fontSize: 13, color: "#5e574e", minWidth: 120, flexShrink: 0 }}>{label}</span>
@@ -96,8 +97,8 @@ function StatusSelect({ label, value, options, onChange, saving, locale }) {
       <select
         value={value || ""}
         onChange={e => onChange(e.target.value)}
-        disabled={saving}
-        style={{ padding: "5px 8px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 12, background: "#fff", cursor: "pointer" }}
+        disabled={saving || readOnly}
+        style={{ padding: "5px 8px", border: "1px solid #e6dfd4", borderRadius: 6, fontSize: 12, background: readOnly ? "#f7f4ef" : "#fff", cursor: readOnly ? "not-allowed" : "pointer" }}
       >
         {options.map(o => <option key={o} value={o}>{statusLabel(locale, o)}</option>)}
       </select>
@@ -449,7 +450,7 @@ export default function OrderDetailPage() {
           {/* Status management */}
           <Section title={c.manageStatus}>
             <StatusSelect label={ui.orderStatus} value={orderStatus} options={["offen", "in_bearbeitung", "abgeschlossen", "storniert"]} onChange={setOrderStatus} saving={saving} locale={locale} />
-            <StatusSelect label={ui.paymentStatus} value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} locale={locale} />
+            <StatusSelect label={ui.paymentStatus} value={paymentStatus} options={["offen", "bezahlt", "teil_erstattet", "erstattet"]} onChange={handlePaymentChange} saving={saving} locale={locale} readOnly={!isSuperuser} />
             <StatusSelect label={ui.deliveryStatus} value={deliveryStatus} options={["offen", "versendet", "zugestellt"]} onChange={handleDeliveryChange} saving={saving} locale={locale} />
             <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
               <Button variant="primary" onClick={handleSaveStatus} disabled={saving} loading={saving}>
@@ -464,6 +465,13 @@ export default function OrderDetailPage() {
             order={order}
             onOrderStatusChanged={loadOrder}
           />
+
+          {/* Settlement — superuser only: payables per seller + delivery confirmation (payout clock). */}
+          {isSuperuser && (
+            <Section title={locale === "en" ? "Settlement" : locale === "tr" ? "Hesap kesim" : locale === "fr" ? "Règlement" : locale === "es" ? "Liquidación" : locale === "it" ? "Liquidazione" : "Abrechnung"}>
+              <OrderSettlementBox orderId={id} order={order} onChanged={loadOrder} />
+            </Section>
+          )}
 
           {/* Flows — superuser only: did the automation emails for this order actually send? */}
           {isSuperuser && (

@@ -92,6 +92,11 @@ module.exports = function createWebhooksRouter({
           // Update order status
           if (internalStatus === 'zugestellt' && order.delivery_status !== 'zugestellt') {
             await client.query(`UPDATE store_orders SET delivery_status='zugestellt', delivery_date=COALESCE(delivery_date,now()), updated_at=now() WHERE id=$1::uuid`, [order.id])
+            // Carrier-confirmed delivery starts the payout hold period (settlement).
+            try {
+              const { confirmDelivery } = require('../settlement/payables')
+              await confirmDelivery(client, order.id, { source: 'carrier_webhook', at: new Date(ts), actor: 'sendcloud' })
+            } catch (dErr) { console.warn('[sendcloud] confirmDelivery:', dErr?.message || dErr) }
             await client.query(`UPDATE store_orders SET order_status='abgeschlossen', updated_at=now() WHERE id=$1::uuid AND payment_status='bezahlt' AND delivery_status='zugestellt' AND order_status NOT IN ('abgeschlossen','retoure','retoure_anfrage','refunded','storniert')`, [order.id])
           } else if (internalStatus === 'versendet' || internalStatus === 'in_transit') {
             await client.query(`UPDATE store_orders SET delivery_status='versendet', updated_at=now() WHERE id=$1::uuid AND delivery_status NOT IN ('versendet','zugestellt')`, [order.id])
@@ -129,8 +134,10 @@ module.exports = function createWebhooksRouter({
     // constructEvent MUST receive the raw bytes — parsing to JSON breaks the signature.
   router.post('/webhook/stripe', async (req, res) => {
       const sig = req.headers['stripe-signature']
-      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-      if (!webhookSecret) return res.status(400).json({ message: 'STRIPE_WEBHOOK_SECRET not configured' })
+      // Platform events and Connect (connected-account) events may come from two Stripe webhook
+      // endpoints with different signing secrets — both are accepted, nothing else is.
+      const secrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter(Boolean)
+      if (!secrets.length) return res.status(400).json({ message: 'STRIPE_WEBHOOK_SECRET not configured' })
 
       const rawBody = req.rawBody
       if (!rawBody) return res.status(400).json({ message: 'Raw body missing — verify callback not running' })
@@ -139,24 +146,40 @@ module.exports = function createWebhooksRouter({
       const secretKey = resolveStripeSecretKeyFromPlatform(platformRow)
       if (!secretKey) return res.status(400).json({ message: 'Stripe not configured' })
 
-      let event
-      try {
-        const stripe = new (require('stripe'))(secretKey)
-        event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret)
-      } catch (err) {
-        console.error('[webhook/stripe] Signature verification failed:', err.message)
-        return res.status(400).json({ message: `Webhook signature invalid: ${err.message}` })
+      const stripe = new (require('stripe'))(secretKey)
+      let event = null
+      let lastErr = null
+      for (const secret of secrets) {
+        try { event = stripe.webhooks.constructEvent(rawBody, sig, secret); break } catch (err) { lastErr = err }
+      }
+      if (!event) {
+        console.error('[webhook/stripe] Signature verification failed:', lastErr?.message)
+        return res.status(400).json({ message: `Webhook signature invalid: ${lastErr?.message}` })
       }
 
-      // Acknowledge immediately — Stripe retries if it doesn't get 2xx within 30s
-      res.json({ received: true })
+      const { Client } = require('pg')
+      const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
+      const mkClient = () => new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
 
+      // Canonical, idempotent processing (stripe_webhook_events, unique event id) BEFORE answering:
+      // a failure answers 500 so Stripe redelivers; a redelivery of a processed event is a no-op.
+      let outcome
+      const settleClient = mkClient()
+      try {
+        await settleClient.connect()
+        const { processStripeEvent } = require('../settlement/stripe-events')
+        outcome = await processStripeEvent(settleClient, stripe, event)
+      } catch (e) {
+        console.error(`[webhook/stripe] ${event.type} ${event.id} failed:`, e?.message || e)
+        try { await settleClient.end() } catch (_) {}
+        return res.status(500).json({ message: 'processing failed — will be retried' })
+      }
+      try { await settleClient.end() } catch (_) {}
+      res.json({ received: true, status: outcome.status })
+      if (outcome.status === 'duplicate') return
+
+      // Legacy side effects (campaign budget, pre-cutover destination/transfer orders) — unchanged.
       setImmediate(async () => {
-        const stripe = new (require('stripe'))(secretKey)
-        const { Client } = require('pg')
-        const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
-        const mkClient = () => new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
-
         // ── payment_intent.succeeded ──────────────────────────────────────────
         if (event.type === 'payment_intent.succeeded') {
           const pi = event.data.object
@@ -255,7 +278,7 @@ module.exports = function createWebhooksRouter({
                 const reversal = await stripe.transfers.createReversal(order.stripe_transfer_id, {
                   description: `Refund — order #${order.order_number || order.id}`,
                   metadata: { order_id: order.id, order_number: String(order.order_number || '') },
-                })
+                }, { idempotencyKey: `andertal-legacy-reversal-${event.id}` })
                 await client.query(
                   `UPDATE store_orders SET stripe_transfer_status = 'reversed', stripe_transfer_error = $2, updated_at = now() WHERE id = $1::uuid`,
                   [order.id, `Reversed: ${reversal.id}`]

@@ -9,6 +9,8 @@ import { useLocale } from "next-intl";
 import { getMedusaAdminClient } from "@/lib/medusa-admin-client";
 import { useUnsavedChanges } from "@/context/UnsavedChangesContext";
 import SellerCreditCardSection from "@/components/SellerCreditCardSection";
+import SellerPayoutAccountSection from "@/components/SellerPayoutAccountSection";
+import ManualTransferModal from "@/components/ManualTransferModal";
 import { confirmDelete } from "@/lib/confirm-delete";
 import { fmtDateShort, fmtMoney } from "@/lib/locale-text";
 import { getPaymentsCopy, payoutStatusLabel } from "@/lib/payments-i18n";
@@ -338,6 +340,11 @@ function SellerPaymentsView() {
           <IbanSection />
           <Box paddingBlockStart="300">
             <Card>
+              <SellerPayoutAccountSection />
+            </Card>
+          </Box>
+          <Box paddingBlockStart="300">
+            <Card>
               <SellerCreditCardSection />
             </Card>
           </Box>
@@ -376,26 +383,9 @@ function AdminPaymentsView() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleMarkPaid = async (seller) => {
-    if (!(await confirmDelete(
-      txt.markPaidConfirm(seller.store_name || seller.email)
-    ))) return;
-    setPaying(seller.seller_id);
-    try {
-      await getMedusaAdminClient().markPayoutPaid({
-        seller_id: seller.seller_id,
-        period_start: selectedPeriod.startDate,
-        period_end: selectedPeriod.endDate,
-        amount_cents: seller.payout_cents,
-        reference: `${seller.seller_id}-${periodKey}`,
-      });
-      await loadData();
-    } catch (e) {
-      alert(e?.message || txt.genericError);
-    } finally {
-      setPaying(null);
-    }
-  };
+  // Manual bank transfer (outside Stripe) → canonical settlement payout (ManualTransferModal).
+  const [manualPay, setManualPay] = useState(null);
+  const handleMarkPaid = (seller) => setManualPay(seller);
 
   // Admin KPIs
   const totalRevenue    = sellers.reduce((s, x) => s + (x.total_cents || 0), 0);
@@ -517,6 +507,9 @@ function AdminPaymentsView() {
 
         </Layout.Section>
       </Layout>
+      {manualPay && (
+        <ManualTransferModal seller={manualPay} onClose={() => setManualPay(null)} onDone={loadData} />
+      )}
     </Page>
   );
 }

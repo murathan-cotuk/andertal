@@ -147,6 +147,66 @@ const adminHubReturnsPOST = async (req, res) => {
   }
 }
 
+/**
+ * Sends the refund of a return to Stripe. Settlement-era orders go through the canonical refund
+ * record (allocation per seller + item, ledger on success); legacy orders without payables get a
+ * plain idempotent Stripe refund. Either way the return only shows 'erstattet' after Stripe
+ * confirmed it; failures show 'fehlgeschlagen' with the reason.
+ */
+async function executeReturnRefund(client, returnId, { isSuperuser, jwtSellerId, actor }) {
+  const ret = (await client.query('SELECT * FROM store_returns WHERE id = $1::uuid', [returnId])).rows[0]
+  if (!ret?.order_id) return { httpStatus: 404, message: 'Return / order not found' }
+  if (ret.refund_status === 'erstattet') return { status: 'succeeded', alreadyDone: true }
+  const amount = Math.max(0, Math.round(Number(ret.refund_amount_cents) || 0))
+  const settlement = require('../settlement')
+  const { loadPlatformCheckoutRow, resolveStripeSecretKeyFromPlatform } = require('./platform-checkout')
+  const key = resolveStripeSecretKeyFromPlatform(await loadPlatformCheckoutRow(client))
+  const stripe = key ? new (require('stripe'))(key) : null
+  const attempt = Number((await client.query(
+    `SELECT COUNT(*)::int AS n FROM order_refunds WHERE return_id = $1::uuid AND status IN ('failed', 'canceled')`, [returnId],
+  ).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n)
+  const hasPayables = (await client.query('SELECT 1 FROM seller_payables WHERE order_id = $1::uuid LIMIT 1', [ret.order_id]).catch(() => ({ rows: [] }))).rows.length > 0
+  if (hasPayables) {
+    let items = ret.items
+    if (typeof items === 'string') { try { items = JSON.parse(items) } catch (_) { items = null } }
+    const lines = Array.isArray(items)
+      ? items.filter((it) => it && it.order_item_id).map((it) => ({ order_item_id: it.order_item_id, quantity: Math.max(1, Math.round(Number(it.quantity) || 1)) }))
+      : []
+    try {
+      const { refund } = await settlement.createRefundRecord(client, {
+        orderId: ret.order_id, returnId, amountCents: amount,
+        lines: lines.length ? lines : null,
+        sellerScope: lines.length ? null : (ret.seller_id || null),
+        actorSellerId: isSuperuser ? null : jwtSellerId,
+        reason: 'return', actor, idempotencyKey: `return:${returnId}:${attempt}`,
+      })
+      await client.query(`UPDATE store_returns SET refund_id = $2, refund_status = 'in_bearbeitung', updated_at = now() WHERE id = $1::uuid AND COALESCE(refund_status, '') <> 'erstattet'`, [returnId, refund.id])
+      const done = await settlement.executeRefund(client, stripe, refund.id, { actor })
+      return { status: done.status, failureReason: done.failure_reason }
+    } catch (e) {
+      return { httpStatus: e?.status || 500, message: e?.message || 'Refund failed' }
+    }
+  }
+  // Legacy order (before the settlement cutover).
+  if (amount <= 0) return { httpStatus: 400, message: 'refund_amount_cents required' }
+  if (!stripe) return { httpStatus: 503, message: 'Stripe not configured' }
+  const o = (await client.query('SELECT payment_intent_id FROM store_orders WHERE id = $1::uuid', [ret.order_id])).rows[0]
+  if (!o?.payment_intent_id) return { httpStatus: 409, message: 'No payment reference on order' }
+  try {
+    const sr = await stripe.refunds.create(
+      { payment_intent: o.payment_intent_id, amount, metadata: { return_id: returnId, order_id: ret.order_id } },
+      { idempotencyKey: `andertal-return-${returnId}-${attempt}` },
+    )
+    const st = settlement.mapStripeRefundStatus(sr.status)
+    const label = st === 'succeeded' ? 'erstattet' : st === 'processing' ? 'in_bearbeitung' : 'fehlgeschlagen'
+    await client.query(`UPDATE store_returns SET refund_status = $2, refund_failure_reason = $3, updated_at = now() WHERE id = $1::uuid`, [returnId, label, st === 'failed' ? (sr.failure_reason || 'failed') : null])
+    return { status: st, failureReason: sr.failure_reason || null }
+  } catch (e) {
+    await client.query(`UPDATE store_returns SET refund_status = 'fehlgeschlagen', refund_failure_reason = $2, updated_at = now() WHERE id = $1::uuid`, [returnId, e?.message || 'stripe_error'])
+    return { status: 'failed', failureReason: e?.message }
+  }
+}
+
 const adminHubReturnPATCH = async (req, res) => {
   const dbUrl = (process.env.DATABASE_URL || '').replace(/^postgresql:\/\//, 'postgres://')
   const id = (req.params.id || '').trim()
@@ -162,9 +222,12 @@ const adminHubReturnPATCH = async (req, res) => {
   }
   if (notes !== undefined) { params.push(notes); sets.push(`notes = $${params.length}`) }
   if (refund_amount_cents !== undefined) { params.push(refund_amount_cents); sets.push(`refund_amount_cents = $${params.length}`) }
-  if (refund_status !== undefined) { params.push(refund_status); sets.push(`refund_status = $${params.length}`) }
+  // 'erstattet' is never written directly: it means "send the money back" and is only set once
+  // Stripe confirms the refund (settlement/refunds.js). Other refund_status values are labels.
+  const refundRequested = refund_status === 'erstattet'
+  if (refund_status !== undefined && !refundRequested) { params.push(refund_status); sets.push(`refund_status = $${params.length}`) }
   if (refund_note !== undefined) { params.push(refund_note); sets.push(`refund_note = $${params.length}`) }
-  if (!sets.length) return res.status(400).json({ message: 'Nothing to update' })
+  if (!sets.length && !refundRequested) return res.status(400).json({ message: 'Nothing to update' })
   sets.push('updated_at = now()')
   params.push(id)
   let client
@@ -187,7 +250,23 @@ const adminHubReturnPATCH = async (req, res) => {
       )
       if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
     }
+    // A refund that is processing or done is money reality — its amount and status are frozen.
+    const cur = (await client.query('SELECT refund_status FROM store_returns WHERE id = $1::uuid', [id])).rows[0]
+    if (['erstattet', 'in_bearbeitung'].includes(String(cur?.refund_status || '')) && (refund_amount_cents !== undefined || (refund_status !== undefined && !refundRequested))) {
+      await client.end()
+      return res.status(409).json({ message: 'Erstattung läuft bereits bzw. ist abgeschlossen — Betrag/Status nicht mehr änderbar.' })
+    }
     await client.query(`UPDATE store_returns SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
+    let refundSucceeded = false
+    let refundOutcome = null
+    if (refundRequested) {
+      refundOutcome = await executeReturnRefund(client, id, { isSuperuser, jwtSellerId, actor: `${isSuperuser ? 'superuser' : 'seller'}:${req.sellerUser?.email || jwtSellerId}` })
+      if (refundOutcome.httpStatus) {
+        await client.end()
+        return res.status(refundOutcome.httpStatus).json({ message: refundOutcome.message })
+      }
+      refundSucceeded = refundOutcome.status === 'succeeded' && !refundOutcome.alreadyDone
+    }
     if (status === 'genehmigt') {
       await client.query(
         `UPDATE store_orders SET order_status = 'retoure', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
@@ -204,8 +283,8 @@ const adminHubReturnPATCH = async (req, res) => {
         [id],
       ).catch(() => {})
     }
-    // If refund processed, also mark order as refunded
-    if (refund_status === 'erstattet') {
+    // Refund confirmed by Stripe → order + affiliate + bonus follow-ups (each idempotent per return).
+    if (refundSucceeded) {
       await client.query(
         `UPDATE store_orders SET order_status = 'refunded', updated_at = now() WHERE id = (SELECT order_id FROM store_returns WHERE id = $1::uuid)`,
         [id]
@@ -296,7 +375,10 @@ const adminHubReturnPATCH = async (req, res) => {
     const r = await client.query(`SELECT r.*, o.order_number, o.email, o.first_name, o.last_name, o.total_cents, o.payment_method FROM store_returns r LEFT JOIN store_orders o ON o.id = r.order_id WHERE r.id = $1::uuid`, [id])
     await client.end()
     const row = r.rows && r.rows[0]
-    res.json({ return: { ...row, return_number: row?.return_number ? Number(row.return_number) : null, order_number: row?.order_number ? Number(row.order_number) : null } })
+    res.json({
+      return: { ...row, return_number: row?.return_number ? Number(row.return_number) : null, order_number: row?.order_number ? Number(row.order_number) : null },
+      ...(refundOutcome ? { refund: { status: refundOutcome.status, failure_reason: refundOutcome.failureReason || null } } : {}),
+    })
   } catch (e) {
     if (client) try { await client.end() } catch (_) {}
     res.status(500).json({ message: e?.message || 'Error' })

@@ -182,6 +182,13 @@ export function getPaymentsCopy(locale) {
       `Auszahlung für „${name}" als überwiesen markieren?\n\nBitte stelle sicher, dass die tatsächliche Überweisung bereits erfolgt ist.`
     ),
     genericError: t("Error", "Hata", "Erreur", "Error", "Errore", "Fehler"),
+    manualPayTitle: t("Record bank transfer", "Banka havalesini kaydet", "Enregistrer le virement", "Registrar transferencia", "Registra bonifico", "Überweisung erfassen"),
+    manualPayAmount: t("Settlement amount (all claimable entries)", "Hesap kesim tutarı (ödenebilir tüm kalemler)", "Montant du règlement (toutes les écritures exigibles)", "Importe de liquidación (todas las partidas exigibles)", "Importo di liquidazione (tutte le voci esigibili)", "Abrechnungsbetrag (alle fälligen Buchungen)"),
+    manualPayReference: t("Bank reference of the executed transfer", "Yapılan havalenin banka referansı", "Référence bancaire du virement effectué", "Referencia bancaria de la transferencia realizada", "Riferimento bancario del bonifico eseguito", "Bankreferenz der ausgeführten Überweisung"),
+    manualPayHint: t("Only after the money was actually sent. The amount must match exactly; it is recorded with your name in the finance audit log.", "Yalnızca para gerçekten gönderildikten sonra. Tutar birebir eşleşmeli; işlem adınızla finans denetim kaydına yazılır.", "Uniquement après l’envoi effectif. Le montant doit correspondre exactement ; enregistré à votre nom dans le journal d’audit.", "Solo después de enviar el dinero. El importe debe coincidir exactamente; se registra con su nombre en el registro de auditoría.", "Solo dopo l’invio effettivo. L’importo deve coincidere esattamente; viene registrato con il tuo nome nel log di audit.", "Nur nachdem das Geld tatsächlich überwiesen wurde. Der Betrag muss exakt stimmen; die Buchung wird mit deinem Namen im Finanz-Audit-Log protokolliert."),
+    manualPayNothing: t("Nothing is due for this seller right now.", "Bu satıcı için şu an ödenecek tutar yok.", "Rien n’est dû à ce vendeur pour le moment.", "No hay nada pendiente para este vendedor.", "Nulla è dovuto a questo venditore al momento.", "Für diesen Verkäufer ist derzeit nichts fällig."),
+    manualPaySave: t("Record as paid", "Ödendi olarak kaydet", "Enregistrer comme payé", "Registrar como pagado", "Registra come pagato", "Als bezahlt erfassen"),
+    cancel: t("Cancel", "İptal", "Annuler", "Cancelar", "Annulla", "Abbrechen"),
     paymentsTitle: t("Payments", "Ödemeler", "Paiements", "Pagos", "Pagamenti", "Zahlungen"),
     balance: t("Balance", "Bakiye", "Solde", "Saldo", "Saldo", "Guthaben"),
     periodMovement: t("This period", "Bu dönem", "Cette période", "Este período", "Questo periodo", "Dieser Zeitraum"),
@@ -277,6 +284,21 @@ export function ledgerEntryLabel(entry, locale) {
       );
     }
     return t("Advertising", "Reklam", "Publicité", "Publicidad", "Pubblicità", "Werbung");
+  }
+  if (type === "chargeback") {
+    return t("Chargeback", "Ters ibraz (chargeback)", "Rétrofacturation", "Contracargo", "Chargeback", "Rückbelastung (Chargeback)");
+  }
+  if (type === "chargeback_release") {
+    return t("Chargeback won — released", "Chargeback kazanıldı — iade", "Rétrofacturation gagnée — libérée", "Contracargo ganado — liberado", "Chargeback vinto — rilasciato", "Chargeback gewonnen — freigegeben");
+  }
+  if (type === "stripe_fee") {
+    return t("Payment processing fee", "Ödeme işlem ücreti", "Frais de traitement", "Comisión de procesamiento", "Commissione di elaborazione", "Zahlungsabwicklungsgebühr");
+  }
+  if (type === "dispute_fee") {
+    return t("Chargeback fee", "Chargeback ücreti", "Frais de rétrofacturation", "Tarifa de contracargo", "Commissione chargeback", "Chargeback-Gebühr");
+  }
+  if (type === "payout_reversal") {
+    return t("Payout reversed (not transferred)", "Ödeme geri alındı (aktarılmadı)", "Versement annulé (non transféré)", "Pago revertido (no transferido)", "Pagamento stornato (non trasferito)", "Auszahlung storniert (nicht überwiesen)");
   }
   if (entry?.description_key === "manual_note" && p.note) return String(p.note);
   if (type === "manual_adjustment") {

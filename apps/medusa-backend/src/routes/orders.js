@@ -6,6 +6,7 @@ const { runAutomationFlowsForOrder } = require('../flow-automation')
 const { enqueueFlowEvent } = require('../flow-queue')
 const { enrichOrderItemRows, filterItemsForSeller, itemsSubtotalCents } = require('../order-items-seller')
 const { sqlOrderOwnedBySeller, sqlOrderItemOwnedBySeller, sqlOrderItemSellerIdsAgg } = require('../seller-scope')
+const { authorizeOrderPatch } = require('../order-patch-policy')
 
 function getClientIpFromRequest(req) {
   const xff = req.headers['x-forwarded-for']
@@ -414,6 +415,9 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
       const id = (req.params.id || '').trim()
       if (!id) return res.status(400).json({ message: 'id required' })
       const { order_status, payment_status, delivery_status, notes, tracking_number, carrier_name, shipped_at, delivery_date } = req.body || {}
+      const isSuperuserCaller = req.sellerUser?.is_superuser === true
+      const callerSid = String(req.sellerUser?.seller_id || '').trim()
+      if (!isSuperuserCaller && (!callerSid || callerSid === 'default')) return res.status(403).json({ message: 'Forbidden' })
       const sets = []; const params = []
       if (order_status) { params.push(order_status); sets.push(`order_status = $${params.length}`) }
       if (payment_status) { params.push(payment_status); sets.push(`payment_status = $${params.length}`) }
@@ -432,13 +436,37 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
         // Fetch previous state to detect tracking_number / order_status changes
-        const prevRes = await client.query('SELECT tracking_number, carrier_name, delivery_status, order_status FROM store_orders WHERE id = $1::uuid', [id])
+        const prevRes = await client.query('SELECT tracking_number, carrier_name, delivery_status, order_status, payment_status FROM store_orders WHERE id = $1::uuid', [id])
         const prevRow = prevRes.rows[0] || {}
+        if (!prevRes.rows[0]) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        if (!isSuperuserCaller) {
+          // Ownership: the seller must own at least one line of this order.
+          const own = await client.query(`SELECT 1 FROM store_orders o WHERE o.id = $1::uuid AND ${sqlOrderOwnedBySeller('o', '$2')}`, [id, callerSid])
+          if (!own.rows.length) { await client.end(); return res.status(403).json({ message: 'Forbidden' }) }
+        }
+        const policy = authorizeOrderPatch(req.body, prevRow, { isSuperuser: isSuperuserCaller })
+        if (!policy.ok) { await client.end(); return res.status(policy.status).json({ message: policy.message, field: policy.field }) }
         const orderStatusChangedToProcessing = order_status === 'in_bearbeitung' && prevRow.order_status !== 'in_bearbeitung'
         await client.query(`UPDATE store_orders SET ${sets.join(', ')} WHERE id = $${params.length}::uuid`, params)
-        // Auto-set delivery_date when marking as delivered (triggers 14-day Stripe payout window)
+        if (isSuperuserCaller && payment_status && String(payment_status) !== String(prevRow.payment_status || '')) {
+          const { auditFinance } = require('../settlement/ledger')
+          await auditFinance(client, { actor: `superuser:${req.sellerUser?.email || ''}`, action: 'order_payment_status_manual_change', entityType: 'order', entityId: id, details: { from: prevRow.payment_status, to: payment_status } }).catch(() => {})
+        }
+        // delivery_date drives the payout hold period: only a superuser's "delivered" counts as a
+        // confirmation; a seller's "zugestellt" is shown but never starts the payout clock.
         if (delivery_status === 'zugestellt' && delivery_date === undefined) {
-          await client.query(`UPDATE store_orders SET delivery_date = COALESCE(delivery_date, now()), updated_at = now() WHERE id = $1::uuid`, [id])
+          if (isSuperuserCaller) {
+            await client.query(`UPDATE store_orders SET delivery_date = COALESCE(delivery_date, now()), updated_at = now() WHERE id = $1::uuid`, [id])
+          } else {
+            await client.query(`UPDATE store_orders SET seller_reported_delivered_at = COALESCE(seller_reported_delivered_at, now()), updated_at = now() WHERE id = $1::uuid`, [id])
+          }
+        }
+        if (isSuperuserCaller && (delivery_status === 'zugestellt' || delivery_date)) {
+          const { confirmDelivery } = require('../settlement/payables')
+          const at = delivery_date ? new Date(delivery_date) : new Date()
+          if (!Number.isNaN(at.getTime())) {
+            await confirmDelivery(client, id, { source: 'superuser', at, actor: `superuser:${req.sellerUser?.email || ''}` }).catch((e) => console.warn('confirmDelivery:', e?.message))
+          }
         }
         // Auto-complete: paid + delivered → abgeschlossen (never when only versendet)
         await client.query(
@@ -661,6 +689,15 @@ module.exports = function createOrdersRouter({ requireSuperuser }) {
         const { Client } = require('pg')
         client = new Client({ connectionString: dbUrl, ssl: dbUrl.includes('render.com') ? { rejectUnauthorized: false } : false })
         await client.connect()
+        // Finance records (payment snapshot, payables, ledger) must never lose their order.
+        const fin = await client.query(
+          `SELECT 1 FROM order_payments WHERE order_id = $1::uuid UNION ALL SELECT 1 FROM seller_payables WHERE order_id = $1::uuid LIMIT 1`,
+          [id],
+        ).catch(() => ({ rows: [] }))
+        if (fin.rows.length) {
+          await client.end()
+          return res.status(409).json({ message: 'Bestellung hat Zahlungs-/Abrechnungsdaten und kann nicht gelöscht werden. Bitte stornieren/erstatten.' })
+        }
         await client.query('DELETE FROM store_orders WHERE id = $1::uuid', [id])
         await client.end()
         res.json({ success: true })

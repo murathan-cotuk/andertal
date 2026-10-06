@@ -530,7 +530,7 @@ async function buildSellerPayoutPdfBuffer(pgClient, payoutId) {
   const id = String(payoutId || '').trim()
   const pRes = await pgClient.query(
     `SELECT p.*, s.store_name, s.company_name, s.first_name, s.last_name,
-            s.vat_id, s.tax_id, s.email, s.business_address, s.commission_rate, s.iban
+            s.vat_id, s.tax_id, s.email, s.business_address, s.commission_rate, s.iban, s.vat_id_vies_valid, s.vat_id_vies_checked_value
        FROM seller_payouts p
        LEFT JOIN seller_users s ON s.seller_id = p.seller_id
        WHERE p.id = $1::uuid LIMIT 1`,
@@ -540,14 +540,33 @@ async function buildSellerPayoutPdfBuffer(pgClient, payoutId) {
   if (!payout) return null
 
   const platform = await loadPlatformIssuer(pgClient)
+  // Settlement era: the invoice shows exactly what the payables + ledger booked (commission at
+  // the order-time rate, VAT per seller scheme) — never a live recomputation at today's rate.
+  let fromPayables = null
   try {
-    const { aggregateSellerPeriodSales, applySellerPeriodLiveFields } = require('./seller-billing')
-    const live = await aggregateSellerPeriodSales(pgClient, payout.seller_id, payout.period_start, payout.period_end)
-    const rate = Number(payout.commission_rate) >= 0 ? Number(payout.commission_rate) : resolveSellerCommissionRate(null)
-    if (live.grossCents > 0 || Number(payout.total_cents || 0) === 0) {
-      applySellerPeriodLiveFields(payout, live, rate)
-    }
+    const { aggregateSellerPeriodFromPayables } = require('./settlement/reporting')
+    fromPayables = await aggregateSellerPeriodFromPayables(pgClient, payout.seller_id, payout.period_start, payout.period_end)
   } catch (_) {}
+  if (fromPayables) {
+    payout.total_cents = fromPayables.grossCents
+    payout.shipping_cents = fromPayables.shippingCents
+    payout.commission_cents = fromPayables.commissionCents - fromPayables.commissionRefundCents
+    payout.commission_vat_cents = fromPayables.commissionVatCents - fromPayables.commissionVatRefundCents
+    payout.refund_cents = fromPayables.refundCents
+    payout.order_count = fromPayables.orderCount
+    payout.payout_cents = fromPayables.netCents
+    payout._vat_withheld = true
+  } else {
+    try {
+      const { aggregateSellerPeriodSales, applySellerPeriodLiveFields } = require('./seller-billing')
+      const live = await aggregateSellerPeriodSales(pgClient, payout.seller_id, payout.period_start, payout.period_end)
+      const rate = Number(payout.commission_rate) >= 0 ? Number(payout.commission_rate) : resolveSellerCommissionRate(null)
+      if (live.grossCents > 0 || Number(payout.total_cents || 0) === 0) {
+        applySellerPeriodLiveFields(payout, live, rate)
+      }
+      // Legacy period (before the settlement cutover): VAT was never withheld; keep the stored figure.
+    } catch (_) {}
+  }
 
   const ps = new Date(payout.period_start)
   const pe = new Date(payout.period_end)

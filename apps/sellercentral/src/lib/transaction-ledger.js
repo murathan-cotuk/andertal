@@ -7,17 +7,23 @@ export const LEDGER_FILTER_TYPES = [
   "order_received",
   "shipping_customer",
   "commission",
+  "commission_vat",
   "shipping_label",
   "return_shipping",
   "refund",
   "commission_refund",
   "advertising",
   "manual_adjustment",
+  "chargeback",
+  "stripe_fee",
   "payout",
 ];
 
+// Commission VAT is a real deduction in the settlement ledger (withheld with the commission);
+// only legacy (pre-settlement, informational) VAT rows stay hidden.
 export function isVisibleLedgerEntry(entry) {
-  return !HIDDEN_LEDGER_TYPES.has(entry?.type);
+  if (!HIDDEN_LEDGER_TYPES.has(entry?.type)) return true;
+  return entry?.affects_balance !== false && !entry?.legacy;
 }
 
 export function visibleLedgerEntries(entries) {

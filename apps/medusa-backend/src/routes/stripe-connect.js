@@ -263,6 +263,16 @@ module.exports = function createStripeConnectRouter({
         )
         const order = oRes.rows[0]
         if (!order) { await client.end(); return res.status(404).json({ message: 'Order not found' }) }
+        // Single canonical settlement path: orders with seller payables (everything since the
+        // settlement cutover) are paid ONLY by settlement payouts — never by this per-order call.
+        const canon = await client.query(
+          `SELECT 1 FROM seller_payables WHERE order_id = $1::uuid
+           UNION ALL SELECT 1 FROM store_orders WHERE id = $1::uuid
+             AND created_at >= (SELECT value::timestamptz FROM settlement_settings WHERE key = 'cutover_at')
+           LIMIT 1`,
+          [orderId],
+        ).catch(() => ({ rows: [{}] }))
+        if (canon.rows.length) { await client.end(); return res.status(409).json({ message: 'Diese Bestellung wird über die Settlement-Auszahlung abgerechnet (kein Einzeltransfer).' }) }
         if (order.stripe_payout_status === 'paid') { await client.end(); return res.status(400).json({ message: 'Payout already completed' }) }
         if (order.stripe_transfer_status === 'completed') { await client.end(); return res.status(400).json({ message: 'Transfer already completed' }) }
 

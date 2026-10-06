@@ -2,7 +2,7 @@
 
 *Ödeme Alma (Checkout) ve Para Dağıtımı (Payout) Mimarisi*
 
-Andertal Marketplace — Teknik Dokümantasyon · 2026-09-08
+Andertal Marketplace — Teknik Dokümantasyon · 2026-10-06
 
 ## 1. Amaç
 
@@ -14,18 +14,25 @@ Müşteri ödemesi Stripe'ın Payment Element / Card Element bileşenleriyle al�
 
 Özel bir yol: eğer bir siparişin tamamı bonus puan + kupon ile karşılanıyorsa (mal bedelinin geri kalanı sıfırsa), sistem Stripe'a hiç gitmeyen ayrı bir `platform_loyalty` ödeme yolunu kullanır — bu durumda kart bilgisi hiç istenmez (bkz. Bonus Puanları dokümanı, Bölüm 2, "Minimum Stripe tutarı" satırı: bonus, mal bedelini 0,50€'nun altına indiremez, tamamen bonus/kupon olan siparişler bu ayrı yolu kullanır).
 
-## 3. Satıcılara Para Dağıtımı — İki Paralel Model
+## 3. Satıcılara Para Dağıtımı — Tek Kanonik Settlement Yolu
 
-| **Model** | **Nasıl Çalışır** | **Kim Kullanır** |
-| --- | --- | --- |
-| IBAN / Banka Havalesi | Her 15 günlük dönem için otomatik "Provisionsrechnung" (komisyon faturası) üretilir; superuser bu faturaları inceleyip banka havalesiyle öder, sistemde "ödendi" işaretler. Ayrıca ayda iki kez (2. ve 4. Cuma) otomatik toplu bir işlem de vardır. | Satıcıların ÇOĞUNLUĞU (varsayılan/ana yöntem). |
-| Stripe Connect Express | Satıcı/affiliate kendi Stripe Express hesabını bağlar (bir "Account Link" üzerinden Stripe'ın kendi KYC/onboarding akışına yönlendirilir). Platform stripe.transfers.create ile bu hesaba para aktarır. Hesap BİLİNÇLİ OLARAK "manuel ödeme takvimi" (payouts.schedule.interval = manual) ile ayarlanır — yani para hesaba düşer ama otomatik olarak dış bankaya gönderilmez; kişi kendi Stripe Express panelinden (bir "dashboard-link" / createLoginLink ile erişilen) istediği an kendi bankasına çeker. Bu, platformun parayı doğrudan otomatik olarak dış hesaplara göndermek yerine bir kontrol/onay adımı istemesinin bilinçli sonucudur. | Bazı satıcılar + affiliate sisteminin TÜMÜ. |
+Ayrıntılı tasarım: `docs/Odeme-Payout-Implementasyon.md`. Özet:
 
-Satıcı tarafında Settings → Stripe Connect sayfası KASITLI olarak superuser-only'dir — sıradan bir satıcı bu sayfaya erişemez, çünkü satıcıların büyük çoğunluğu IBAN modelini kullanır ve Stripe Connect ile hiçbir işlem yapmamalıdır (yanlışlıkla iki farklı ödeme yoluna kaydolmalarını önlemek için).
+- Model: **Separate Charges & Transfers**. Müşteri platform hesabına öder; Merchant of Record platformdur. Destination charge ve `on_behalf_of` kullanılmaz.
+- Her sipariş kalemi için değişmez bir **seller payable** oluşur (satıcı = kalemin satıcısı, komisyon oranı sipariş anındaki snapshot). Tüm para olayları append-only **satıcı ledger'ına** yazılır.
+- Teslimat **carrier (Sendcloud webhook / tracking API) veya superuser** tarafından onaylandıktan 14 gün sonra payable ödenebilir hale gelir. Açık iade, refund, dispute ya da satıcı bloğu varsa beklemede kalır.
+- 2. ve 4. Cuma (Europe/Berlin) otomatik settlement çalışır. Satıcı başına tek payout; içinde **sipariş başına bir Stripe transferi** (`source_transaction` + `transfer_group ORDER_<id>`) gider. Fonlar connected account'ta available olunca (recipient için yaklaşık 24 saat) banka payout'u yapılır.
+- Satıcının ödeme hesabı **Stripe Connect Custom, recipient service agreement, yalnızca transfers**. Satıcı hesabı SC → Einstellungen → Zahlungen ekranında kendisi açar ve Stripe sözleşmesini kendisi kabul eder (gerçek IP ve tarih kaydedilir). KYC Stripe-hosted onboarding ile tamamlanır.
+- **Manuel havale** (Stripe dışı) yalnızca superuser tarafından, gerçek banka referansı ve tutarın birebir onayı ile kaydedilir; ledger ve audit log'a yazılır. Provisionsrechnung satırı elle "bezahlt" yapılamaz.
+- Refund'lar gerçek Stripe refund'udur ve yalnızca Stripe `succeeded` dediğinde "erstattet" görünür. Payout'tan sonraki refund/chargeback satıcı bakiyesini negatife düşürebilir; bu tutar sonraki payout'tan mahsup edilir.
+- **Affiliate** ödemeleri ayrıdır ve Stripe Connect **Express** ile yürür (bkz. Bölüm 6). Satıcı settlement'ı Express kullanmaz.
 
-## 4. Manuel Superuser Müdahalesi (routes/stripe-connect.js)
+## 4. Manuel Superuser Müdahalesi
 
-Superuser, gerektiğinde tek bir siparişin parasını normal 14 günlük bekleme süresini beklemeden manuel olarak serbest bırakabilir (/admin-hub/v1/stripe-connect/transfer/:orderId). Bu uç nokta, siparişin hangi ödeme modeliyle alındığına göre (destination charge / legacy transfer) iki farklı Stripe API çağrısı arasında otomatik seçim yapar.
+- `POST /admin-hub/v1/payouts/seller-iban-now` ("Überweisen"): tek satıcı için kanonik settlement'ı hemen çalıştırır.
+- `POST /admin-hub/v1/settlement/payouts/:id/retry`: başarısız banka payout'unu kontrollerden geçirdikten sonra tekrar dener.
+- `POST /admin-hub/v1/settlement/orders/:id/confirm-delivery`: superuser teslim onayı.
+- `/admin-hub/v1/stripe-connect/transfer/:orderId`: **yalnızca settlement cutover'ından önceki legacy siparişler** için çalışır; settlement kapsamındaki siparişlerde 409 döner.
 
 ## 5. Vergi (KDV) Ayrımı — Karıştırılmaması Gereken İki Farklı Oran
 
